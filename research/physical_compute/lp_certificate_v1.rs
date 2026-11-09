@@ -93,6 +93,7 @@ pub struct OptimalMetrics {
 pub struct FarkasMetrics {
     pub dual_cone_violation: f64,
     pub contradiction_margin: f64,
+    /// b^T y after infinity-normalizing the homogeneous Farkas vector.
     pub b_transpose_y: f64,
 }
 
@@ -101,6 +102,7 @@ pub struct UnboundedMetrics {
     pub base_point_residual_inf: f64,
     pub ray_residual_inf: f64,
     pub ray_nonnegativity_violation: f64,
+    /// c^T d after infinity-normalizing the homogeneous improving ray.
     pub objective_slope: f64,
 }
 
@@ -260,16 +262,50 @@ pub fn verify_infeasible(
         return Err(VerifyError::NonFiniteInput);
     }
 
-    let aty = transpose_mat_vec(problem, &certificate.y)?;
-    let aty_inf = norm_inf(&aty);
-    let cone_scale = checked_max2(1.0, aty_inf)?;
-    let dual_cone_violation = max_negative_part(&aty) / cone_scale;
+    // Farkas multipliers are homogeneous: y and alpha*y (alpha > 0)
+    // represent the same certificate. Normalize before applying tolerances so
+    // a harmless change of certificate scale cannot turn PASS into REJECT.
+    let y_inf = norm_inf(&certificate.y);
+    if y_inf == 0.0 {
+        return Err(VerifyError::NoStrictFarkasContradiction);
+    }
+    let normalized_y: Vec<f64> = certificate.y.iter().map(|value| value / y_inf).collect();
+    let aty = transpose_mat_vec(problem, &normalized_y)?;
 
-    let b_transpose_y = dot(&problem.b, &certificate.y)?;
+    // Check each dual-cone component against its own column scale. A global
+    // matrix norm can hide a violation in a small column when another column
+    // has much larger coefficients.
+    let mut dual_cone_violation = 0.0_f64;
+    for col in 0..problem.cols {
+        let mut column_scale = 0.0_f64;
+        for row in 0..problem.rows {
+            column_scale += problem.a[row * problem.cols + col].abs();
+            if !column_scale.is_finite() {
+                return Err(VerifyError::NonFiniteArithmetic);
+            }
+        }
+        let component_violation = if column_scale > 0.0 {
+            (-aty[col]).max(0.0) / column_scale
+        } else if aty[col] < 0.0 {
+            f64::INFINITY
+        } else {
+            0.0
+        };
+        dual_cone_violation = dual_cone_violation.max(component_violation);
+    }
+
+    let b_transpose_y = dot(&problem.b, &normalized_y)?;
     let b_inf = norm_inf(&problem.b);
-    let y_l1 = sum_abs(&certificate.y)?;
-    let contradiction_scale = checked_max2(1.0, b_inf * y_l1)?;
-    let contradiction_margin = -b_transpose_y / contradiction_scale;
+    let y_l1 = sum_abs(&normalized_y)?;
+    let contradiction_scale = b_inf * y_l1;
+    if !contradiction_scale.is_finite() {
+        return Err(VerifyError::NonFiniteArithmetic);
+    }
+    let contradiction_margin = if contradiction_scale > 0.0 {
+        -b_transpose_y / contradiction_scale
+    } else {
+        0.0
+    };
 
     if !dual_cone_violation.is_finite()
         || !contradiction_margin.is_finite()
@@ -309,12 +345,9 @@ pub fn verify_unbounded(
     }
 
     let base_ax = mat_vec(problem, &certificate.feasible_point)?;
-    let ray_ad = mat_vec(problem, &certificate.improving_ray)?;
     let a_inf = matrix_inf_norm(problem)?;
     let b_inf = norm_inf(&problem.b);
     let x_inf = norm_inf(&certificate.feasible_point);
-    let d_inf = norm_inf(&certificate.improving_ray);
-
     let base_scale = checked_max3(1.0, b_inf, a_inf * x_inf)?;
     let mut base_residual = 0.0_f64;
     for (ax_i, b_i) in base_ax.iter().zip(problem.b.iter()) {
@@ -322,16 +355,43 @@ pub fn verify_unbounded(
     }
     let base_point_residual_inf = base_residual / base_scale;
 
-    let ray_scale = checked_max2(1.0, a_inf * d_inf)?;
-    let ray_residual_inf = norm_inf(&ray_ad) / ray_scale;
-    let ray_nonnegativity_violation =
-        max_negative_part(&certificate.improving_ray) / checked_max2(1.0, d_inf)?;
+    // An improving ray is homogeneous under positive scaling. Normalize it
+    // before checking A*d = 0, d >= 0 and c^T*d < 0; otherwise a tiny copy of
+    // a non-ray can appear feasible merely because the absolute scale is tiny.
+    let d_inf = norm_inf(&certificate.improving_ray);
+    if d_inf == 0.0 {
+        return Err(VerifyError::RayNotImproving);
+    }
+    let normalized_ray: Vec<f64> = certificate
+        .improving_ray
+        .iter()
+        .map(|value| value / d_inf)
+        .collect();
+    let ray_ad = mat_vec(problem, &normalized_ray)?;
+    let ray_residual_raw = norm_inf(&ray_ad);
+    let ray_residual_inf = if a_inf > 0.0 {
+        ray_residual_raw / a_inf
+    } else if ray_residual_raw == 0.0 {
+        0.0
+    } else {
+        f64::INFINITY
+    };
+    let ray_nonnegativity_violation = max_negative_part(&normalized_ray);
 
-    let objective_slope = dot(&problem.c, &certificate.improving_ray)?;
+    // The reported slope uses the normalized ray too: its magnitude depends
+    // on arbitrary certificate scaling, but its sign and normalized margin do not.
+    let objective_slope = dot(&problem.c, &normalized_ray)?;
     let c_inf = norm_inf(&problem.c);
-    let d_l1 = sum_abs(&certificate.improving_ray)?;
-    let slope_scale = checked_max2(1.0, c_inf * d_l1)?;
-    let improving_margin = -objective_slope / slope_scale;
+    let d_l1 = sum_abs(&normalized_ray)?;
+    let slope_scale = c_inf * d_l1;
+    if !slope_scale.is_finite() {
+        return Err(VerifyError::NonFiniteArithmetic);
+    }
+    let improving_margin = if slope_scale > 0.0 {
+        -objective_slope / slope_scale
+    } else {
+        0.0
+    };
 
     if ![
         base_point_residual_inf,
@@ -685,6 +745,64 @@ mod tests {
         assert_eq!(
             verify_optimal(&problem, &certificate, invalid),
             Err(VerifyError::InvalidTolerance)
+        );
+    }
+
+    #[test]
+    fn farkas_certificate_is_invariant_to_positive_scaling() {
+        let problem = LpProblem {
+            rows: 1,
+            cols: 2,
+            a: vec![1.0, 1.0],
+            b: vec![-1.0],
+            c: vec![0.0, 0.0],
+        };
+        for scale in [1.0e-200, 1.0, 1.0e200] {
+            let certificate = FarkasCertificate { y: vec![scale] };
+            assert!(
+                verify_infeasible(&problem, &certificate, tolerances()).is_ok(),
+                "valid Farkas certificate rejected at scale {scale:e}"
+            );
+        }
+    }
+
+    #[test]
+    fn unbounded_ray_certificate_is_invariant_to_positive_scaling() {
+        let problem = LpProblem {
+            rows: 1,
+            cols: 1,
+            a: vec![0.0],
+            b: vec![0.0],
+            c: vec![-1.0],
+        };
+        for scale in [1.0e-200, 1.0, 1.0e200] {
+            let certificate = UnboundedCertificate {
+                feasible_point: vec![0.0],
+                improving_ray: vec![scale],
+            };
+            assert!(
+                verify_unbounded(&problem, &certificate, tolerances()).is_ok(),
+                "valid improving ray rejected at scale {scale:e}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_tiny_scaled_non_nullspace_ray() {
+        let problem = LpProblem {
+            rows: 1,
+            cols: 1,
+            a: vec![1.0],
+            b: vec![0.0],
+            c: vec![-1.0],
+        };
+        let certificate = UnboundedCertificate {
+            feasible_point: vec![0.0],
+            improving_ray: vec![1.0e-200],
+        };
+        assert_eq!(
+            verify_unbounded(&problem, &certificate, tolerances()),
+            Err(VerifyError::RayNotFeasible)
         );
     }
 
