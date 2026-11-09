@@ -414,7 +414,7 @@
         "name": "QuantizedBoxAndBall",
         "numeric_bytes_per_dimension": 8,
         "formula": "centroid f32 + coordinate min u16 + coordinate max u16",
-        "status": "experimental_outward_quantized"
+        "status": "experimental_outward_quantized_selector_gated"
       },
       {
         "name": "BallOnly",
@@ -469,7 +469,9 @@
       "false_prune_count": 0,
       "mode_dimension_generation_and_score_contract_binding": "required",
       "rust_test_execution": "required_before selector use",
-      "physical_io_measurement": "required_for payload savings claims"
+      "physical_io_measurement": "required_for payload savings claims",
+      "selector_must_reject_unqualified_quantized_mode": true,
+      "no_temporary_decoded_bound_vectors": true
     },
     "proposed_targets": {
       "metadata_work_fraction_of_per_record_baseline": 0.1,
@@ -480,7 +482,15 @@
       "Analytical estimates are not runtime RSS or serialized storage measurements.",
       "Quantized mode is not Rust-test qualified or production selector enabled.",
       "No group survival or payload I/O savings are inferred from metadata size alone."
-    ]
+    ],
+    "query_decode": {
+      "core_kernel": "similarity_interval_full_resolution_for_component_bounds_with",
+      "allocation_behavior": "no dimension-sized f32 decode vectors",
+      "decode": "u16 endpoints expanded outward and supplied by deterministic callback",
+      "valid_callback_invocations_per_component": 1,
+      "selector_gate": "QuantizedBoxAndBall is rejected by the public group score API until #11243 qualification and explicit promotion",
+      "rust_execution": "not run"
+    }
   },
   "external_comparators": [
     {
