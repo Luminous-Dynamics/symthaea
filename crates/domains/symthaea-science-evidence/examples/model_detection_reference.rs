@@ -5,8 +5,8 @@ use std::error::Error;
 use symthaea_science_evidence::{
     CandidateExperiment, DetectionAwareCandidateExperiment, DiscriminationHypothesis,
     GaussianModelPrediction, MeasurementNoiseModel, ModelDetectionProbability,
-    ModelDiscriminationConfig, ModelPriorScenario, ModelUniverseCoverage,
-    NoiseCalibrationStatus, PredictionDisposition, rank_detection_aware_model_discriminating_experiments,
+    ModelDiscriminationConfig, ModelPriorScenario, ModelUniverseCoverage, NoiseCalibrationStatus,
+    PredictionDisposition, rank_detection_aware_model_discriminating_experiments,
 };
 
 fn hypothesis(id: &str, source_byte: u8) -> DiscriminationHypothesis {
@@ -43,7 +43,11 @@ fn candidate(
     predictive_sigmas: [f64; 3],
     detection_probabilities: [f64; 3],
 ) -> DetectionAwareCandidateExperiment {
-    let ids = ["synthetic-model-a", "synthetic-model-b", "synthetic-model-c"];
+    let ids = [
+        "synthetic-model-a",
+        "synthetic-model-b",
+        "synthetic-model-c",
+    ];
     let predictions = ids
         .iter()
         .enumerate()
@@ -135,8 +139,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let report =
         rank_detection_aware_model_discriminating_experiments(&hypotheses, &experiments, &config)?;
 
-    println!("epistemic_status=SYNTHETIC_BERNOULLI_GAUSSIAN_DETECTION_CHANNEL_NOT_PHYSICAL_VALIDATION");
-    println!("observation_model=execution_success_then_model_conditional_detection_then_gaussian_value");
+    println!(
+        "epistemic_status=SYNTHETIC_BERNOULLI_GAUSSIAN_DETECTION_CHANNEL_NOT_PHYSICAL_VALIDATION"
+    );
+    println!(
+        "observation_model=execution_success_then_model_conditional_detection_then_gaussian_value"
+    );
     println!("open_world_unresolved_excluded=true");
     println!("model_count={}", report.model_ids.len());
     println!("prior_scenarios={}", report.prior_scenario_ids.join(";"));
@@ -185,6 +193,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!("claim_boundary=declared_synthetic_Bernoulli_Gaussian_two_stage_observation_channel");
-    println!("not_claimed=real_detection_calibration,physical_model_truth,model_set_completeness,UAP_identity,new_physics_or_propulsion");
+    println!(
+        "not_claimed=real_detection_calibration,physical_model_truth,model_set_completeness,UAP_identity,new_physics_or_propulsion"
+    );
     Ok(())
 }
