@@ -581,6 +581,46 @@ pub struct VehicleTelemetry {
     pub follow_oracle_relative_speed_mps: Option<f64>,
     /// Age of the exact simulator snapshot relative to the ego observation (s).
     pub follow_oracle_snapshot_age_s: Option<f64>,
+    /// Raw learned-controller proposal before teacher blending or exploration.
+    #[serde(default)]
+    pub student_proposal_steering: f32,
+    #[serde(default)]
+    pub student_proposal_throttle: f32,
+    #[serde(default)]
+    pub student_proposal_brake: f32,
+    /// Privileged PD teacher action before blending. None means it was not computed.
+    #[serde(default)]
+    pub teacher_target_steering: Option<f32>,
+    #[serde(default)]
+    pub teacher_target_throttle: Option<f32>,
+    #[serde(default)]
+    pub teacher_target_brake: Option<f32>,
+    /// Mean absolute difference across steering/throttle/brake between student and teacher.
+    #[serde(default)]
+    pub student_teacher_action_delta_l1: Option<f32>,
+    /// Whether the teacher action was blended into the executed proposal this step.
+    #[serde(default)]
+    pub teacher_action_used_for_blend: bool,
+    /// Whether the teacher action was supplied as the BPTT target on this step.
+    #[serde(default)]
+    pub teacher_action_used_for_supervision: bool,
+    /// Actual teacher blend coefficient; zero when no teacher blend occurred.
+    #[serde(default)]
+    pub pd_teacher_blend_weight: f32,
+    /// Proposal after teacher blending but before exploration noise.
+    #[serde(default)]
+    pub blended_action_steering: f32,
+    #[serde(default)]
+    pub blended_action_throttle: f32,
+    #[serde(default)]
+    pub blended_action_brake: f32,
+    /// Command sent to the physics simulator after exploration and clamping.
+    #[serde(default)]
+    pub executed_action_steering: f32,
+    #[serde(default)]
+    pub executed_action_throttle: f32,
+    #[serde(default)]
+    pub executed_action_brake: f32,
 }
 
 /// Configuration for the vehicle training system.
