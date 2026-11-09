@@ -119,6 +119,20 @@ Use paired comparisons, bootstrap confidence intervals or other pre-registered u
 
 The v0.1 shared temporal kernel (#11241 / PR #11253) accepts only exact, offset-aware availability instants. Date-only filing dates and macro vintage dates must not be converted to midnight and treated as exact intraday availability. Preserve source precision; use an explicit interval or return INDETERMINATE when the possible availability interval straddles the decision frontier. The interval-censored extension is tracked in [SYM-FIN-TIME-002 #11256](https://github.com/Luminous-Dynamics/symthaea/issues/11256). A date can identify a vintage without proving its release hour. The shared temporal programme also tracks [unresolved revision forks #11300](https://github.com/Luminous-Dynamics/symthaea/issues/11300): two admissible successors of the same source version remain contested until an explicit resolution, not “latest timestamp wins.”
 
+## 8g. Typed claim-level fact and trace audit
+
+The finance-specific claim audit contract is now defined in [claim-evidence-audit-v1.schema.json](claim-evidence-audit-v1.schema.json), with a six-claim synthetic example in [dev-example.claim-audit.json](dev-example.claim-audit.json).
+
+Keep two verdicts separate:
+- **Fact assessment:** whether the proposition is supported, contradicted, mixed, insufficiently evidenced, scope/unit-mismatched, stale/temporally inadmissible or not evaluable against the reference evidence.
+- **Trace support:** whether the candidate's own permitted trace actually supports, partially supports, contradicts or fails to support the claim.
+
+Absence of support is not proof of falsity. For example, "the buyer purchases 40%" is not evaluable in the synthetic fixture and unsupported by the trace; it must not be labelled factually contradicted. The energy index value 124 is supported in index points, while a claimed 24% increase lacks a baseline and is insufficiently evidenced; it is not automatically false. A fabricated $420,000 loss is not evaluable and unsupported, with a non-compensatory fabricated-quantity/causal hard gate.
+
+Each material atomic claim binds canonical evidence IDs, exact source snapshot digests, source locators, temporal admissibility, source-family identifiers, optional reproducible derivation inputs and explicit hard-gate flags. Adjudicator records distinguish `ai`, `human` and `programmatic` reviewers and retain whether candidate identity was known and whether prior votes were visible. AI reviewers are never counted as humans.
+
+The current example is public synthetic calibration data. Its JSON/schema structure has been parsed and its enum/evidence-digest relationships checked; a full JSON Schema 2020-12 validator and production claim extractor remain implementation work. This is a reference-data contract, not a benchmark win.
+
 ## 8a. Evaluator, rubric and reference metrology
 
 A frozen rubric, a committed reference digest or agreement among multiple LLM judges does not establish that the evaluation is valid. The scorer is itself a measurement instrument and must be qualified before it is used to claim a financial-agent improvement.
@@ -176,6 +190,16 @@ A deliberately synthetic calibration artifact is recorded in [BLINDED_AI_ADJUDIC
 The second calibration artifact [BLINDED_AI_ADJUDICATION_PILOT_V2_2026-11-09.md](BLINDED_AI_ADJUDICATION_PILOT_V2_2026-11-09.md) adds synthetic cases for filing restatement without hindsight rewrite, same-name legal-entity collision, source-family duplication with a material contradiction, and annual-versus-half-year financial comparison. One GPT-6 AI adjudicator scored masked, authored probe responses. It is not a human vote, model-output comparison or benchmark result.
 
 The next benchmark construct is [SYM-FIN-SEQ-001 #11290](https://github.com/Luminous-Dynamics/symthaea/issues/11290): prequential financial evidence revision and forecast calibration. It tests immutable snapshots at every frontier, justified updates as evidence arrives, conflict preservation, irrelevant-update stability and properly timed probabilistic forecasts. Keep this sequential construct separate from the static task/report score vector and from the quantitative portfolio tournament.
+
+## 8h. Sequential stream and oracle schemas
+
+The public supplier-correction event tape and its evaluator-only oracle now have explicit structural contracts:
+- [sequence-stream.schema.json](sequential-v0/sequence-stream.schema.json)
+- [sequence-oracle.schema.json](sequential-v0/sequence-oracle.schema.json)
+
+The stream and oracle were fetched back and checked for JSON parseability, unique event/evidence IDs, monotonic decision frontiers, event-to-first-admissible-frontier consistency, valid correction ancestry, mirror source-family continuity, inventory expiry at F5 and outcome-known time after F4. These are custom structural/invariant checks, not a full JSON Schema 2020-12 or production packetizer qualification.
+
+A runtime must still materialize only the events admissible at the current frontier and keep future events/oracle outside candidate access. Do not pass the full public development stream to a candidate and then call the result blinded or leakage-resistant.
 
 ## 8f. Sequential supplier-correction development fixture
 
