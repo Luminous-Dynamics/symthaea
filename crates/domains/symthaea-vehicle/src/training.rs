@@ -876,7 +876,7 @@ impl VehicleTrainer {
                 if !metrics.telemetry.is_empty() {
                     let step_path = format!("{}/episode_{:04}.csv", dir, ep);
                     let mut csv = String::from(
-                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers,follow_oracle_available,follow_oracle_actor_id,follow_oracle_gap_m,follow_oracle_relative_speed_mps,follow_oracle_snapshot_age_s,student_proposal_steering,student_proposal_throttle,student_proposal_brake,teacher_target_steering,teacher_target_throttle,teacher_target_brake,student_teacher_action_delta_l1,teacher_action_used_for_blend,teacher_action_used_for_supervision,pd_teacher_blend_weight,blended_action_steering,blended_action_throttle,blended_action_brake,executed_action_steering,executed_action_throttle,executed_action_brake\n",
+                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers,follow_oracle_available,follow_oracle_actor_id,follow_oracle_gap_m,follow_oracle_relative_speed_mps,follow_oracle_snapshot_age_s,student_proposal_steering,student_proposal_throttle,student_proposal_brake,teacher_target_steering,teacher_target_throttle,teacher_target_brake,student_teacher_action_delta_l1,teacher_action_used_for_blend,teacher_action_used_for_supervision,pd_teacher_blend_weight,blended_action_steering,blended_action_throttle,blended_action_brake,executed_action_steering,executed_action_throttle,executed_action_brake,training_enabled,follow_oracle_used_for_policy\n",
                     );
                     for t in &metrics.telemetry {
                         let actor_id = t
@@ -912,7 +912,7 @@ impl VehicleTrainer {
                             .map(|value| format!("{value:.6}"))
                             .unwrap_or_default();
                         csv.push_str(&format!(
-                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}\n",
+                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
                             t.step,
                             t.time,
                             t.speed,
@@ -946,6 +946,8 @@ impl VehicleTrainer {
                             t.executed_action_steering,
                             t.executed_action_throttle,
                             t.executed_action_brake,
+                            t.training_enabled,
+                            t.follow_oracle_used_for_policy,
                         ));
                     }
                     let _ = std::fs::write(&step_path, csv);
