@@ -14,6 +14,9 @@ pub const INPUT_LEVELS: [i64; 3] = [-1, 0, 1];
 pub const GAIN_VALUES: [i64; 3] = [1, 2, 3];
 /// Maximum gain accepted by the reference world generator, including out-of-catalogue controls.
 pub const MAX_WORLD_GAIN: i64 = 16;
+/// Maximum nonzero coefficient in the evaluator-only quadratic response-term
+/// control. Candidate models remain unchanged and always assume this term is zero.
+pub const MAX_STRUCTURAL_QUADRATIC_TERM: i64 = 4;
 pub const DECAY_VALUES: [i64; 3] = [0, 1, 2];
 pub const INITIAL_STATES: [i64; 3] = [-1, 0, 1];
 pub const MAX_ORACLE_HORIZON: usize = 6;
@@ -179,14 +182,35 @@ impl ObservationLog {
 pub struct NumericWorld {
     truth: ModelHypothesis,
     state: Option<i64>,
+    /// Evaluator-only extra even term on direct response: q * u^2.
+    /// Zero in all closed-catalogue worlds and candidate hypotheses.
+    quadratic_term: i64,
 }
 
 impl NumericWorld {
     pub fn new(truth: ModelHypothesis) -> Result<Self, NumericError> {
+        Self::new_with_quadratic_term(truth, 0)
+    }
+
+    /// Create an evaluator-only structurally shifted world. A nonzero
+    /// quadratic term is legal only for direct-response worlds; the agent's
+    /// candidate catalogue remains the original linear/direct and leaky-memory
+    /// grammar, so this is a true F2 structural-support control.
+    pub fn new_with_quadratic_term(
+        truth: ModelHypothesis,
+        quadratic_term: i64,
+    ) -> Result<Self, NumericError> {
         truth.validate()?;
+        if !(-MAX_STRUCTURAL_QUADRATIC_TERM..=MAX_STRUCTURAL_QUADRATIC_TERM)
+            .contains(&quadratic_term)
+            || (quadratic_term != 0 && truth.mechanism != Mechanism::DirectResponse)
+        {
+            return Err(NumericError::InvalidStructuralTerm);
+        }
         Ok(Self {
             truth,
             state: truth.initial_state,
+            quadratic_term,
         })
     }
 
@@ -200,6 +224,12 @@ impl NumericWorld {
                     .truth
                     .gain
                     .checked_mul(*input)
+                    .and_then(|base| {
+                        input
+                            .checked_mul(*input)
+                            .and_then(|square| self.quadratic_term.checked_mul(square))
+                            .and_then(|term| base.checked_add(term))
+                    })
                     .ok_or(NumericError::ArithmeticOverflow)?,
                 Mechanism::LeakyMemory => {
                     self.state.ok_or(NumericError::InvalidParameterBinding)?
@@ -572,6 +602,7 @@ pub enum NumericError {
     EmptyExperiment,
     ArithmeticOverflow,
     OracleHorizonOutOfRange,
+    InvalidStructuralTerm,
 }
 
 impl fmt::Display for NumericError {
@@ -596,6 +627,10 @@ impl fmt::Display for NumericError {
             Self::OracleHorizonOutOfRange => write!(
                 f,
                 "oracle horizon must be between 1 and {MAX_ORACLE_HORIZON}"
+            ),
+            Self::InvalidStructuralTerm => write!(
+                f,
+                "quadratic response term must be within -{MAX_STRUCTURAL_QUADRATIC_TERM}..={MAX_STRUCTURAL_QUADRATIC_TERM} and requires direct-response structure"
             ),
         }
     }
@@ -810,6 +845,18 @@ mod tests {
         );
         let mut world = NumericWorld::new(leaky_truth()).unwrap();
         assert!(world.run(&[2]).is_err());
+    }
+
+    #[test]
+    fn evaluator_only_quadratic_term_creates_a_structural_support_shift() {
+        let truth = direct_truth();
+        let mut world = NumericWorld::new_with_quadratic_term(truth, 1).unwrap();
+        let log = world.run(&[-1, 0, 1]).unwrap();
+
+        assert_eq!(log.measurements, vec![-1, 0, 3]);
+        let report = discover(&log, StructureAccess::Withheld).unwrap();
+        assert_eq!(report.disposition, DiscoveryDisposition::NoCompatibleModel);
+        assert!(report.compatible_models.is_empty());
     }
 
     #[test]
