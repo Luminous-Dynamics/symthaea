@@ -148,6 +148,10 @@ No candidate can compensate for a hard-gate failure with high returns or Sharpe.
 7. Emit per-run vector metrics and a reproducible receipt, then add PBO/CSCV and DSR/PSR.
 8. Only after S0 passes, connect one lawful historical dataset adapter or a compatible existing event-driven engine. Real-data permission is a prerequisite, not a post-hoc caveat.
 
+## 10a. Digest semantics for the synthetic reference
+
+For this first fixture, `universe.membership_sha256` is SHA-256 over the exact UTF-8 bytes of `synthetic-universe.json`, including the trailing newline. `data_frontier.source_manifest_sha256` is SHA-256 over the exact UTF-8 bytes of `synthetic-market-data.json`, including the trailing newline. Do not normalize whitespace or line endings before hashing. These are synthetic content digests, not evidence of real-market data quality. Historical source adapters must declare their own content-addressing and normalization profile.
+
 ## 11. Provisional hypotheses — not achieved results
 
 After development baselines and confirmatory splits are frozen, test if a candidate can:
