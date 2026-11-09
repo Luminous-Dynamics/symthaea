@@ -227,7 +227,13 @@ pub fn evaluate_gaussian_decision_diagnostics(
         // Chernoff: P(|Z|>=12) <= 2 exp(-72), for each Gaussian component.
         let tail_bound = 2.0 * (-72.0_f64).exp();
         let risk_error_estimate = risk_error + tail_bound * maximum_loss;
-        let information_error_estimate = information_error + tail_bound * entropy_upper_bound(&prior);
+        let minimum_positive_prior = prior
+            .iter()
+            .copied()
+            .filter(|probability| *probability > 0.0)
+            .fold(f64::INFINITY, f64::min);
+        let maximum_posterior_kl = -minimum_positive_prior.ln();
+        let information_error_estimate = information_error + tail_bound * maximum_posterior_kl;
         if risk > prior_risk + risk_error_estimate + RISK_TOLERANCE {
             return Err(GaussianDecisionDiagnosticError::NonMonotonicBayesRisk {
                 prior_risk,
@@ -305,18 +311,35 @@ pub fn gaussian_posterior_model_probabilities(
     if !observed_value.is_finite() {
         return Err(GaussianDecisionDiagnosticError::ImpossibleObservation { action_index });
     }
-    let mut masses = Vec::with_capacity(hypotheses.len());
-    let mut evidence = 0.0;
-    for h in hypotheses {
-        let density = normal_density(observed_value, h.outcome_predictions_by_action[action_index]);
-        let mass = h.prior_probability * density;
-        masses.push(mass);
-        evidence += mass;
-    }
-    if !evidence.is_finite() || evidence <= 0.0 {
+    // Log-sum-exp avoids treating a finite, very unlikely observation as
+    // impossible merely because all ordinary probability densities underflow.
+    let log_masses: Vec<f64> = hypotheses
+        .iter()
+        .map(|h| {
+            if h.prior_probability == 0.0 {
+                f64::NEG_INFINITY
+            } else {
+                h.prior_probability.ln()
+                    + normal_log_density(
+                        observed_value,
+                        h.outcome_predictions_by_action[action_index],
+                    )
+            }
+        })
+        .collect();
+    let maximum_log_mass = log_masses.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if !maximum_log_mass.is_finite() {
         return Err(GaussianDecisionDiagnosticError::ImpossibleObservation { action_index });
     }
-    Ok(masses.into_iter().map(|mass| mass / evidence).collect())
+    let scaled_mass = log_masses
+        .iter()
+        .map(|log_mass| (*log_mass - maximum_log_mass).exp())
+        .collect::<Vec<_>>();
+    let normalization = scaled_mass.iter().sum::<f64>();
+    if !normalization.is_finite() || normalization <= 0.0 {
+        return Err(GaussianDecisionDiagnosticError::ImpossibleObservation { action_index });
+    }
+    Ok(scaled_mass.into_iter().map(|mass| mass / normalization).collect())
 }
 
 fn validate_hypotheses(
@@ -429,6 +452,16 @@ fn bayes_risk(p: &[f64], hypotheses: &[GaussianDecisionHypothesis], decisions: u
     (0..decisions)
         .map(|d| hypotheses.iter().zip(p).map(|(h, probability)| probability * h.loss_by_final_decision[d]).sum::<f64>())
         .fold(f64::INFINITY, f64::min)
+}
+
+fn normal_log_density(y: f64, prediction: GaussianOutcomePrediction) -> f64 {
+    let z = (y - prediction.mean) / prediction.standard_deviation;
+    if !z.is_finite() {
+        return f64::NEG_INFINITY;
+    }
+    -0.5 * z * z
+        - prediction.standard_deviation.ln()
+        - 0.5 * (2.0 * std::f64::consts::PI).ln()
 }
 
 fn normal_density(y: f64, prediction: GaussianOutcomePrediction) -> f64 {
@@ -593,10 +626,6 @@ fn simpson(a: f64, b: f64, fa: f64, fm: f64, fb: f64) -> f64 {
     (b - a) * (fa + 4.0 * fm + fb) / 6.0
 }
 
-fn entropy_upper_bound(p: &[f64]) -> f64 {
-    p.iter().filter(|x| **x > 0.0).map(|x| -*x * x.ln()).sum()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -703,6 +732,15 @@ mod tests {
         let h = binary(prediction(-2.0, 1.0), prediction(2.0, 1.0));
         let p = gaussian_posterior_model_probabilities(&h, 0, -2.0).expect("posterior");
         assert!(p[0] > p[1]);
+        assert!((p.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn posterior_update_uses_log_likelihoods_for_extreme_finite_observations() {
+        let h = binary(prediction(-2.0, 1.0), prediction(2.0, 1.0));
+        let p = gaussian_posterior_model_probabilities(&h, 0, 50.0)
+            .expect("finite observations must not fail only from density underflow");
+        assert!(p[1] > p[0]);
         assert!((p.iter().sum::<f64>() - 1.0).abs() < 1e-12);
     }
 
