@@ -1273,6 +1273,7 @@ mod tests {
         assert!(step_header.contains("teacher_target_steering"));
         assert!(step_header.contains("student_teacher_action_delta_l1"));
         assert!(step_header.contains("teacher_action_used_for_supervision"));
+        assert!(step_header.contains("teacher_action_evaluation_only"));
         assert!(step_header.contains("pd_teacher_blend_weight"));
         assert!(step_header.contains("blended_action_steering"));
         assert!(step_header.contains("executed_action_steering"));
@@ -1871,11 +1872,12 @@ mod tests {
                 && !row.teacher_action_used_for_blend
                 && !row.teacher_action_used_for_supervision
                 && !row.follow_oracle_used_for_policy
+                && row.teacher_action_evaluation_only
                 && row.pd_teacher_blend_weight == 0.0
-                && row.teacher_target_steering.is_none()
-                && row.teacher_target_throttle.is_none()
-                && row.teacher_target_brake.is_none()
-                && row.student_teacher_action_delta_l1.is_none()
+                && row.teacher_target_steering.is_some()
+                && row.teacher_target_throttle.is_some()
+                && row.teacher_target_brake.is_some()
+                && row.student_teacher_action_delta_l1.is_some()
                 && (row.executed_action_steering - row.blended_action_steering).abs() < 1e-6
                 && (row.executed_action_throttle - row.blended_action_throttle).abs() < 1e-6
                 && (row.executed_action_brake - row.blended_action_brake).abs() < 1e-6
