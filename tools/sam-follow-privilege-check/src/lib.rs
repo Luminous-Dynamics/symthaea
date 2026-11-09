@@ -48,10 +48,10 @@ fn validate_semantics(report: &Value) -> Vec<String> {
     if let Some(values) = benchmark.get("arms").and_then(Value::as_array) {
         for (index, arm) in values.iter().enumerate() {
             let id = arm.get("arm_id").and_then(Value::as_str);
-            if let Some(id) = id {
-                if arms.insert(id.to_owned(), arm).is_some() {
-                    errors.push(format!("benchmark.arms[{index}]: duplicate arm_id {id}"));
-                }
+            if let Some(id) = id
+                && arms.insert(id.to_owned(), arm).is_some()
+            {
+                errors.push(format!("benchmark.arms[{index}]: duplicate arm_id {id}"));
             }
             if id == Some("C") {
                 let disabled = [
@@ -97,10 +97,10 @@ fn validate_semantics(report: &Value) -> Vec<String> {
         for (index, trial) in trials.iter().enumerate() {
             let prefix = format!("trials[{index}]");
             let trial_id = trial.get("trial_id").and_then(Value::as_str);
-            if let Some(id) = trial_id {
-                if !trial_ids.insert(id.to_owned()) {
-                    errors.push(format!("{prefix}: duplicate trial_id {id}"));
-                }
+            if let Some(id) = trial_id
+                && !trial_ids.insert(id.to_owned())
+            {
+                errors.push(format!("{prefix}: duplicate trial_id {id}"));
             }
             let pair_id = trial.get("paired_case_id").and_then(Value::as_str);
             let pair_role = trial.get("paired_role").and_then(Value::as_str);
@@ -308,9 +308,9 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
     }
     let observation_tick = trial.get("action_observation_tick").and_then(Value::as_u64);
     let commit_tick = trial.get("action_commit_tick").and_then(Value::as_u64);
-    if !observation_tick
+    if observation_tick
         .zip(commit_tick)
-        .is_some_and(|(observed, committed)| observed <= committed)
+        .is_none_or(|(observed, committed)| observed > committed)
     {
         errors.push(format!(
             "{prefix}: action observation tick must not exceed action commit tick"
@@ -476,7 +476,7 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
                 .get("evaluator_truth")
                 .and_then(|x| x.get("delivered_tick"))
                 .and_then(Value::as_u64);
-            if !commit.zip(delivered).is_some_and(|(c, d)| d > c) {
+            if commit.zip(delivered).is_none_or(|(c, d)| d <= c) {
                 errors.push(format!(
                     "{prefix}: arm C evaluator truth must be delivered strictly after action commit"
                 ));
@@ -519,24 +519,23 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
         .and_then(|x| x.get("available"))
         .and_then(Value::as_bool)
         == Some(true);
-    if !truth_available {
-        if truth
+    if !truth_available
+        && (truth
             .and_then(|x| x.get("delivered_tick"))
             .is_some_and(|tick| !tick.is_null())
             || truth
                 .and_then(|x| x.get("source_ids"))
                 .and_then(Value::as_array)
-                .is_some_and(|ids| !ids.is_empty())
-        {
-            errors.push(format!("{prefix}.evaluator_truth: unavailable truth must not carry a delivery tick or source IDs"));
-        }
+                .is_some_and(|ids| !ids.is_empty()))
+    {
+        errors.push(format!("{prefix}.evaluator_truth: unavailable truth must not carry a delivery tick or source IDs"));
     }
     if truth_available {
         let commit = trial.get("action_commit_tick").and_then(Value::as_u64);
         let delivered = truth
             .and_then(|x| x.get("delivered_tick"))
             .and_then(Value::as_u64);
-        if !commit.zip(delivered).is_some_and(|(c, d)| d > c)
+        if commit.zip(delivered).is_none_or(|(c, d)| d <= c)
             && arm.get("evaluator_truth").and_then(Value::as_str) == Some("post_commit_only")
         {
             errors.push(format!(
