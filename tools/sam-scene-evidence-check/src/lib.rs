@@ -971,10 +971,10 @@ fn validate_simulator_truth_actor_states(
         let source_ref = actor.get("source_ref").and_then(Value::as_str);
         let acquisition_tick = actor.get("acquisition_tick_ns").and_then(Value::as_u64);
 
-        if let Some(actor_id) = actor_id {
-            if !seen_actor_ids.insert(actor_id.to_owned()) {
-                errors.push(format!("{prefix}: duplicate actor_id {actor_id}"));
-            }
+        if let Some(actor_id) = actor_id
+            && !seen_actor_ids.insert(actor_id.to_owned())
+        {
+            errors.push(format!("{prefix}: duplicate actor_id {actor_id}"));
         }
         if actor_scenario != scenario_id {
             errors.push(format!(
@@ -1478,36 +1478,32 @@ fn validate_follow_target_context(
 
     if let (Some(ego_position), Some(target_position), Some(gap)) =
         (ego_position, target_position, gap)
+        && ego_position.len() == 3
+        && target_position.len() == 3
+        && let (Some(ego_x), Some(target_x)) =
+            (ego_position[0].as_f64(), target_position[0].as_f64())
     {
-        if ego_position.len() == 3 && target_position.len() == 3 {
-            if let (Some(ego_x), Some(target_x)) =
-                (ego_position[0].as_f64(), target_position[0].as_f64())
-            {
-                let expected_gap = target_x - ego_x;
-                if (gap - expected_gap).abs() > 1e-6 || expected_gap <= 0.0 {
-                    errors.push(
-                        "follow_target_context: gap_m must equal positive target.x - ego.x in the declared local_road frame"
-                            .into(),
-                    );
-                }
-            }
+        let expected_gap = target_x - ego_x;
+        if (gap - expected_gap).abs() > 1e-6 || expected_gap <= 0.0 {
+            errors.push(
+                "follow_target_context: gap_m must equal positive target.x - ego.x in the declared local_road frame"
+                    .into(),
+            );
         }
     }
     if let (Some(ego_velocity), Some(target_velocity), Some(relative_speed)) =
         (ego_velocity, target_velocity, relative_speed)
+        && ego_velocity.len() == 3
+        && target_velocity.len() == 3
+        && let (Some(ego_vx), Some(target_vx)) =
+            (ego_velocity[0].as_f64(), target_velocity[0].as_f64())
     {
-        if ego_velocity.len() == 3 && target_velocity.len() == 3 {
-            if let (Some(ego_vx), Some(target_vx)) =
-                (ego_velocity[0].as_f64(), target_velocity[0].as_f64())
-            {
-                let expected_relative_speed = target_vx - ego_vx;
-                if (relative_speed - expected_relative_speed).abs() > 1e-6 {
-                    errors.push(
-                        "follow_target_context: relative_speed_mps must equal target.vx - ego.vx"
-                            .into(),
-                    );
-                }
-            }
+        let expected_relative_speed = target_vx - ego_vx;
+        if (relative_speed - expected_relative_speed).abs() > 1e-6 {
+            errors.push(
+                "follow_target_context: relative_speed_mps must equal target.vx - ego.vx"
+                    .into(),
+            );
         }
     }
 }
