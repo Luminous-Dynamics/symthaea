@@ -861,7 +861,9 @@ mod tests {
     use super::*;
 
     fn digest(byte: char) -> String {
-        format!("blake3:{}", byte.to_string().repeat(64))
+        let nibble = byte.to_digit(16).unwrap_or((byte as u32) % 16);
+        let hex = char::from_digit(nibble, 16).unwrap();
+        format!("blake3:{}", hex.to_string().repeat(64))
     }
 
     fn receipt(performance: char, audio: char) -> RenderReceipt {
@@ -1104,6 +1106,7 @@ mod tests {
 
         let mut mismatch = replicate(102, 28.0, '7', '8');
         mismatch.baseline_receipt.model_artifact_digest = digest('z');
+        mismatch.variant_receipt.model_artifact_digest = digest('z');
         let changed_artifact = ControlSuite {
             schema_version: CASE_SCHEMA_VERSION,
             suite_id: "changed-artifact".into(),
