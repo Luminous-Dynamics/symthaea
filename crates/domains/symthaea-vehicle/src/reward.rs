@@ -93,7 +93,7 @@ pub fn follow_distance_reward_with_oracle(
     let Some(target) = target.filter(|target| target.is_current_at(state.timestamp)) else {
         return 0.0;
     };
-    let gap_error = (target.gap_m - target_gap).abs();
+    let gap_error = (target.gap_m() - target_gap).abs();
     (-gap_error / 10.0).exp()
 }
 
@@ -247,13 +247,8 @@ mod tests {
     #[test]
     fn test_follow_reward_on_oracle_target() {
         let state = VehicleState::cruising(13.4);
-        let target = SimulatorOracleFollowTarget {
-            actor_id: 1,
-            gap_m: 30.0,
-            relative_speed_mps: 0.0,
-            snapshot_time_s: state.timestamp,
-            max_age_s: 0.05,
-        };
+        let target =
+            SimulatorOracleFollowTarget::from_simulator_snapshot(1, 30.0, 0.0, state.timestamp, 0.05);
         let reward = follow_distance_reward_with_oracle(&state, 30.0, Some(&target));
         assert!(
             (reward - 1.0).abs() < 1e-6,
@@ -264,13 +259,8 @@ mod tests {
     #[test]
     fn test_follow_reward_off_target_uses_oracle_gap() {
         let state = VehicleState::cruising(13.4);
-        let target = SimulatorOracleFollowTarget {
-            actor_id: 1,
-            gap_m: 60.0,
-            relative_speed_mps: 0.0,
-            snapshot_time_s: state.timestamp,
-            max_age_s: 0.05,
-        };
+        let target =
+            SimulatorOracleFollowTarget::from_simulator_snapshot(1, 60.0, 0.0, state.timestamp, 0.05);
         let reward = follow_distance_reward_with_oracle(&state, 30.0, Some(&target));
         assert!(reward < 0.1, "Far from target gap should be low: {reward}");
     }
@@ -279,13 +269,7 @@ mod tests {
     fn test_follow_reward_missing_or_stale_target_is_zero() {
         let state = VehicleState::cruising(13.4);
         assert_eq!(follow_distance_reward_with_oracle(&state, 30.0, None), 0.0);
-        let stale = SimulatorOracleFollowTarget {
-            actor_id: 1,
-            gap_m: 30.0,
-            relative_speed_mps: 0.0,
-            snapshot_time_s: -1.0,
-            max_age_s: 0.05,
-        };
+        let stale = SimulatorOracleFollowTarget::from_simulator_snapshot(1, 30.0, 0.0, -1.0, 0.05);
         assert_eq!(
             follow_distance_reward_with_oracle(&state, 30.0, Some(&stale)),
             0.0
