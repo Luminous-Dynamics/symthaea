@@ -235,19 +235,16 @@ impl SequentialWeightVerification {
         let n = self.observation_count;
         let n_float = n as f64;
         let candidate = self.binding.candidate_index as f64;
-        let candidate_alpha =
-            self.config.campaign_alpha / (candidate * (candidate + 1.0));
+        let candidate_alpha = self.config.campaign_alpha / (candidate * (candidate + 1.0));
         let (alpha_at_look, confidence_radius, lower_confidence_bound, upper_confidence_bound) =
             if n == 0 {
                 // No confidence look has occurred yet. Return the full bounded
                 // range and a finite initial candidate-level alpha allocation.
                 (candidate_alpha, 1.0, -1.0, 1.0)
             } else {
-                let alpha_denominator =
-                    candidate * (candidate + 1.0) * n_float * (n_float + 1.0);
+                let alpha_denominator = candidate * (candidate + 1.0) * n_float * (n_float + 1.0);
                 let alpha_at_look = self.config.campaign_alpha / alpha_denominator;
-                let log_tail_ratio = std::f64::consts::LN_2
-                    - self.config.campaign_alpha.ln()
+                let log_tail_ratio = std::f64::consts::LN_2 - self.config.campaign_alpha.ln()
                     + candidate.ln()
                     + (candidate + 1.0).ln()
                     + n_float.ln()
@@ -289,8 +286,8 @@ impl SequentialWeightVerification {
             observation_digest: &observation_digest,
             status,
         };
-        let encoded =
-            serde_json::to_vec(&claims).map_err(|_| SequentialWeightVerificationError::ReportSerialization)?;
+        let encoded = serde_json::to_vec(&claims)
+            .map_err(|_| SequentialWeightVerificationError::ReportSerialization)?;
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-weight-verification-report-v1\0");
         hasher.update(&(encoded.len() as u64).to_le_bytes());
@@ -334,8 +331,14 @@ fn validate_binding(
         return Err(SequentialWeightVerificationError::InvalidCandidateIndex);
     }
     for (name, value) in [
-        ("baseline_model_digest", binding.baseline_model_digest.as_str()),
-        ("candidate_model_digest", binding.candidate_model_digest.as_str()),
+        (
+            "baseline_model_digest",
+            binding.baseline_model_digest.as_str(),
+        ),
+        (
+            "candidate_model_digest",
+            binding.candidate_model_digest.as_str(),
+        ),
         (
             "evaluation_protocol_digest",
             binding.evaluation_protocol_digest.as_str(),
@@ -371,8 +374,7 @@ fn validate_config(
     {
         return Err(SequentialWeightVerificationError::InvalidConfig);
     }
-    if config.minimum_observations == 0
-        || config.minimum_observations > config.maximum_observations
+    if config.minimum_observations == 0 || config.minimum_observations > config.maximum_observations
     {
         return Err(SequentialWeightVerificationError::InvalidObservationBudget);
     }
@@ -393,7 +395,10 @@ mod tests {
         }
     }
 
-    fn config(minimum_improvement: f64, maximum_observations: u64) -> SequentialWeightVerificationConfig {
+    fn config(
+        minimum_improvement: f64,
+        maximum_observations: u64,
+    ) -> SequentialWeightVerificationConfig {
         SequentialWeightVerificationConfig {
             campaign_alpha: 0.05,
             minimum_improvement,
@@ -474,8 +479,8 @@ mod tests {
 
     #[test]
     fn duplicate_episode_ids_are_rejected_without_consuming_budget() {
-        let mut verifier = SequentialWeightVerification::new(binding(1), config(0.1, 10))
-            .expect("valid verifier");
+        let mut verifier =
+            SequentialWeightVerification::new(binding(1), config(0.1, 10)).expect("valid verifier");
         verifier
             .observe(observation(1, 0.8, 0.4))
             .expect("first episode");
@@ -495,8 +500,8 @@ mod tests {
             Err(SequentialWeightVerificationError::InvalidDigest(_))
         ));
 
-        let mut verifier = SequentialWeightVerification::new(binding(1), config(0.1, 10))
-            .expect("valid verifier");
+        let mut verifier =
+            SequentialWeightVerification::new(binding(1), config(0.1, 10)).expect("valid verifier");
         assert!(matches!(
             verifier.observe(observation(1, 1.1, 0.1)),
             Err(SequentialWeightVerificationError::InvalidLoss)
@@ -506,8 +511,8 @@ mod tests {
 
     #[test]
     fn report_digest_is_replay_deterministic_and_binds_the_evidence_stream() {
-        let mut left = SequentialWeightVerification::new(binding(2), config(0.05, 20))
-            .expect("left verifier");
+        let mut left =
+            SequentialWeightVerification::new(binding(2), config(0.05, 20)).expect("left verifier");
         let mut right = SequentialWeightVerification::new(binding(2), config(0.05, 20))
             .expect("right verifier");
         let episodes = episodes_for_replay_test();
@@ -517,7 +522,10 @@ mod tests {
             left_report = left.observe(episode.clone()).expect("left");
             right_report = right.observe(episode).expect("right");
         }
-        assert_eq!(left_report.observation_digest, right_report.observation_digest);
+        assert_eq!(
+            left_report.observation_digest,
+            right_report.observation_digest
+        );
         assert_eq!(left_report.report_digest, right_report.report_digest);
         let mut altered = SequentialWeightVerification::new(binding(2), config(0.05, 20))
             .expect("altered-evidence verifier");
@@ -538,8 +546,8 @@ mod tests {
 
     #[test]
     fn inconclusive_budget_is_terminal_and_cannot_be_extended() {
-        let mut verifier = SequentialWeightVerification::new(binding(1), config(0.5, 2))
-            .expect("valid verifier");
+        let mut verifier =
+            SequentialWeightVerification::new(binding(1), config(0.5, 2)).expect("valid verifier");
         verifier
             .observe(observation(1, 0.5, 0.5))
             .expect("first episode");
