@@ -16,7 +16,7 @@ use std::fs;
 use std::path::{Component, Path};
 
 /// Current serialized cohort manifest schema revision.
-pub const COHORT_MANIFEST_SCHEMA_VERSION: &str = "0.1.0";
+pub const COHORT_MANIFEST_SCHEMA_VERSION: &str = "0.2.0";
 
 /// Declared evidence stage of a cohort. This is metadata, not independent proof.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,12 +132,18 @@ pub struct CohortRecord {
     pub source_audio_sha256: String,
     /// SHA-256 of the exact waveform supplied to the evaluated system.
     pub evaluation_audio_sha256: String,
-    /// SHA-256 of the source/rights manifest for this record.
+    /// SHA-256 of the exact source/rights manifest artifact bytes.
     pub source_manifest_sha256: String,
-    /// SHA-256 of the transcript, annotation, and adjudication package manifest.
+    /// Safe path relative to the cohort manifest directory for the source manifest.
+    pub source_manifest_path: String,
+    /// SHA-256 of the exact transcript, annotation, and adjudication manifest bytes.
     pub annotation_manifest_sha256: String,
-    /// SHA-256 of the pinned derivation manifest when evaluation audio differs.
+    /// Safe path relative to the cohort manifest directory for the annotation manifest.
+    pub annotation_manifest_path: String,
+    /// SHA-256 of the exact derivation manifest bytes when evaluation audio differs.
     pub derivation_manifest_sha256: Option<String>,
+    /// Safe relative path to the derivation manifest, when one is declared.
+    pub derivation_manifest_path: Option<String>,
     /// Pseudonymous independent reviewer IDs; never personal names or emails.
     pub reviewer_ids: Vec<String>,
     /// SHA-256 of adjudication evidence when confirmatory evaluation is claimed.
@@ -218,6 +224,11 @@ pub enum CohortAdmissionError {
     DuplicateLanguageTag(String),
     InvalidDigest(&'static str, String),
     InvalidPairManifestPath(String),
+    InvalidEvidenceArtifactPath(String),
+    EvidenceArtifactPathEscapesRoot(String),
+    EvidenceArtifactDigestMismatch { path: String, expected: String, actual: String },
+    MissingEvidenceArtifact(String),
+    UnexpectedDerivationManifestPath(String),
     DuplicatePairManifestPath(String),
     ArtifactIo { path: String, reason: String },
     InvalidPairManifestJson(String),
@@ -329,6 +340,10 @@ pub fn validate_cohort_manifest(
             "annotation_manifest_sha256",
             &record.annotation_manifest_sha256,
         )?;
+        validate_relative_artifact_path(&record.source_manifest_path)
+            .map_err(|_| CohortAdmissionError::InvalidEvidenceArtifactPath(record.source_manifest_path.clone()))?;
+        validate_relative_artifact_path(&record.annotation_manifest_path)
+            .map_err(|_| CohortAdmissionError::InvalidEvidenceArtifactPath(record.annotation_manifest_path.clone()))?;
 
         if !record.source_audio_sha256.eq_ignore_ascii_case(&record.evaluation_audio_sha256) {
             let derivation = record
@@ -338,13 +353,27 @@ pub fn validate_cohort_manifest(
                     CohortAdmissionError::MissingDerivedAudioManifest(record.record_id.clone())
                 })?;
             check_digest("derivation_manifest_sha256", derivation)?;
+            let derivation_path = record.derivation_manifest_path.as_deref().ok_or_else(||
+                CohortAdmissionError::MissingEvidenceArtifact(record.record_id.clone())
+            )?;
+            validate_relative_artifact_path(derivation_path)
+                .map_err(|_| CohortAdmissionError::InvalidEvidenceArtifactPath(derivation_path.to_string()))?;
             if !record.rights.derivative_processing_authorized {
                 return Err(CohortAdmissionError::DerivativeProcessingNotAuthorized(
                     record.record_id.clone(),
                 ));
             }
-        } else if let Some(derivation) = record.derivation_manifest_sha256.as_deref() {
-            check_digest("derivation_manifest_sha256", derivation)?;
+        } else {
+            match (record.derivation_manifest_sha256.as_deref(), record.derivation_manifest_path.as_deref()) {
+                (Some(derivation), Some(path)) => {
+                    check_digest("derivation_manifest_sha256", derivation)?;
+                    validate_relative_artifact_path(path)
+                        .map_err(|_| CohortAdmissionError::InvalidEvidenceArtifactPath(path.to_string()))?;
+                }
+                (None, None) => {}
+                (Some(_), None) => return Err(CohortAdmissionError::MissingEvidenceArtifact(record.record_id.clone())),
+                (None, Some(path)) => return Err(CohortAdmissionError::UnexpectedDerivationManifestPath(path.to_string())),
+            }
         }
 
         require_identifier(&record.rights.license_id, "license_id")?;
@@ -615,8 +644,81 @@ pub fn require_external_processing_authorization(
     Ok(())
 }
 
-/// Compute a deterministic BLAKE3 digest of the serialized cohort manifest.
+/// Verify source, annotation, and optional derivation artifact bytes against the cohort.
 ///
+/// Paths are resolved relative to the cohort manifest directory. Absolute paths,
+/// traversal, symlink escapes, missing files, and digest mismatches fail closed.
+/// Shared cohort-level manifests may be referenced by multiple records, but a
+/// single path cannot be associated with conflicting digests.
+pub fn verify_cohort_evidence_artifacts(
+    manifest: &CohortManifest,
+    manifest_directory: &Path,
+) -> Result<usize, CohortAdmissionError> {
+    let root = fs::canonicalize(manifest_directory).map_err(|error| CohortAdmissionError::ArtifactIo {
+        path: manifest_directory.display().to_string(),
+        reason: error.to_string(),
+    })?;
+    let mut verified: HashMap<String, String> = HashMap::new();
+
+    for record in &manifest.records {
+        verify_evidence_file(&root, &record.source_manifest_path, &record.source_manifest_sha256, &mut verified)?;
+        verify_evidence_file(&root, &record.annotation_manifest_path, &record.annotation_manifest_sha256, &mut verified)?;
+        match (record.derivation_manifest_path.as_deref(), record.derivation_manifest_sha256.as_deref()) {
+            (Some(path), Some(digest)) => verify_evidence_file(&root, path, digest, &mut verified)?,
+            (None, None) => {}
+            (Some(path), None) => return Err(CohortAdmissionError::UnexpectedDerivationManifestPath(path.to_string())),
+            (None, Some(_)) => return Err(CohortAdmissionError::MissingEvidenceArtifact(record.record_id.clone())),
+        }
+    }
+    Ok(verified.len())
+}
+
+fn verify_evidence_file(
+    root: &Path,
+    relative_path: &str,
+    expected_digest: &str,
+    verified: &mut HashMap<String, String>,
+) -> Result<(), CohortAdmissionError> {
+    validate_relative_artifact_path(relative_path)
+        .map_err(|_| CohortAdmissionError::InvalidEvidenceArtifactPath(relative_path.to_string()))?;
+    check_digest("evidence_artifact_sha256", expected_digest)?;
+    if let Some(previous) = verified.get(relative_path) {
+        if !previous.eq_ignore_ascii_case(expected_digest) {
+            return Err(CohortAdmissionError::EvidenceArtifactDigestMismatch {
+                path: relative_path.to_string(),
+                expected: previous.clone(),
+                actual: expected_digest.to_string(),
+            });
+        }
+        return Ok(());
+    }
+
+    let joined = root.join(relative_path);
+    let canonical = fs::canonicalize(&joined).map_err(|error| CohortAdmissionError::ArtifactIo {
+        path: joined.display().to_string(),
+        reason: error.to_string(),
+    })?;
+    if !canonical.starts_with(root) {
+        return Err(CohortAdmissionError::EvidenceArtifactPathEscapesRoot(relative_path.to_string()));
+    }
+    let bytes = fs::read(&canonical).map_err(|error| CohortAdmissionError::ArtifactIo {
+        path: canonical.display().to_string(),
+        reason: error.to_string(),
+    })?;
+    let actual = format!("{:x}", Sha256::digest(&bytes));
+    if !actual.eq_ignore_ascii_case(expected_digest) {
+        return Err(CohortAdmissionError::EvidenceArtifactDigestMismatch {
+            path: relative_path.to_string(),
+            expected: expected_digest.to_string(),
+            actual,
+        });
+    }
+    verified.insert(relative_path.to_string(), expected_digest.to_ascii_lowercase());
+    Ok(())
+}
+
+/// Compute a deterministic BLAKE3 digest of the serialized cohort manifest.
+
 /// Record and pair input order does not affect the digest. Struct field order
 /// and schema version do; changing the manifest contract therefore changes
 /// the digest intentionally.
@@ -798,8 +900,11 @@ mod tests {
             source_audio_sha256: source_audio.into(),
             evaluation_audio_sha256: eval_audio.into(),
             source_manifest_sha256: C.into(),
+            source_manifest_path: "source-manifests/source-register.json".into(),
             annotation_manifest_sha256: D.into(),
+            annotation_manifest_path: "annotation-manifests/annotation-register.json".into(),
             derivation_manifest_sha256: None,
+            derivation_manifest_path: None,
             reviewer_ids: vec!["reviewer-a".into(), "reviewer-b".into()],
             adjudication_manifest_sha256: None,
             phonological_profile_id: None,
@@ -845,6 +950,79 @@ mod tests {
                     purpose: PairPurpose::PreferenceTraining,
                 },
             ],
+        }
+    }
+
+    #[test]
+    fn verifies_source_and_annotation_evidence_artifact_bytes() {
+        let temp = tempfile::tempdir().unwrap();
+        let source_dir = temp.path().join("source-manifests");
+        let annotation_dir = temp.path().join("annotation-manifests");
+        std::fs::create_dir_all(&source_dir).unwrap();
+        std::fs::create_dir_all(&annotation_dir).unwrap();
+        let source_bytes = br#"{"schema_version":"synthetic-v1","records":[]}"#;
+        let annotation_bytes = br#"{"schema_version":"synthetic-v1","records":[]}"#;
+        std::fs::write(source_dir.join("source-register.json"), source_bytes).unwrap();
+        std::fs::write(annotation_dir.join("annotation-register.json"), annotation_bytes).unwrap();
+        let mut manifest = fixture();
+        let source_digest = format!("{:x}", Sha256::digest(source_bytes));
+        let annotation_digest = format!("{:x}", Sha256::digest(annotation_bytes));
+        for record in &mut manifest.records {
+            record.source_manifest_sha256 = source_digest.clone();
+            record.annotation_manifest_sha256 = annotation_digest.clone();
+        }
+        assert_eq!(verify_cohort_evidence_artifacts(&manifest, temp.path()).unwrap(), 2);
+    }
+
+    #[test]
+    fn rejects_source_evidence_artifact_digest_mismatch() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(temp.path().join("source-manifests")).unwrap();
+        std::fs::create_dir_all(temp.path().join("annotation-manifests")).unwrap();
+        std::fs::write(temp.path().join("source-manifests/source-register.json"), b"tampered").unwrap();
+        std::fs::write(temp.path().join("annotation-manifests/annotation-register.json"), b"annotation").unwrap();
+        let mut manifest = fixture();
+        for record in &mut manifest.records {
+            record.source_manifest_sha256 = A.into();
+            record.annotation_manifest_sha256 = format!("{:x}", Sha256::digest(b"annotation"));
+        }
+        assert!(matches!(
+            verify_cohort_evidence_artifacts(&manifest, temp.path()),
+            Err(CohortAdmissionError::EvidenceArtifactDigestMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_evidence_artifact_path_traversal() {
+        let mut manifest = fixture();
+        manifest.records[0].source_manifest_path = "../outside.json".into();
+        assert!(matches!(
+            validate_cohort_manifest(&manifest),
+            Err(CohortAdmissionError::InvalidEvidenceArtifactPath(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_evidence_artifact_symlink_escape() {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            let temp = tempfile::tempdir().unwrap();
+            let outside = tempfile::tempdir().unwrap();
+            std::fs::create_dir_all(temp.path().join("source-manifests")).unwrap();
+            std::fs::create_dir_all(temp.path().join("annotation-manifests")).unwrap();
+            std::fs::write(outside.path().join("outside.json"), b"source").unwrap();
+            symlink(outside.path().join("outside.json"), temp.path().join("source-manifests/source-register.json")).unwrap();
+            std::fs::write(temp.path().join("annotation-manifests/annotation-register.json"), b"annotation").unwrap();
+            let mut manifest = fixture();
+            for record in &mut manifest.records {
+                record.source_manifest_sha256 = format!("{:x}", Sha256::digest(b"source"));
+                record.annotation_manifest_sha256 = format!("{:x}", Sha256::digest(b"annotation"));
+            }
+            assert!(matches!(
+                verify_cohort_evidence_artifacts(&manifest, temp.path()),
+                Err(CohortAdmissionError::EvidenceArtifactPathEscapesRoot(_))
+            ));
         }
     }
 
