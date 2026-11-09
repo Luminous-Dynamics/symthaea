@@ -1023,8 +1023,8 @@ mod tests {
             values
                 .iter()
                 .max_by(|left, right| left.1.total_cmp(right.1))
-                .map(|(key, _)| key.as_str())
-                .unwrap()
+                .map(|(key, _)| key.clone())
+                .expect("each policy score map contains every candidate")
         };
         assert_eq!(max_key(&point_eig), "static_function_probe");
         assert_eq!(max_key(&expected_scenario_eig), "static_function_probe");
