@@ -54,6 +54,23 @@ jobs:
       - name: Draft 2020-12 schema and raw capture integrity tests
         run: cargo test --manifest-path tools/rea-behavior-observation-check/Cargo.toml --locked
 
+      - name: Validate synthetic observation profile through CLI
+        run: |
+          mkdir -p artifacts
+          cargo run --manifest-path tools/rea-behavior-observation-check/Cargo.toml --locked --bin rea-behavior-observation-check -- \
+            docs/research/rea-behavior-observation-profile-v0.synthetic.json \
+            > artifacts/rea-behavior-observation-validation.synthetic.json
+          test -s artifacts/rea-behavior-observation-validation.synthetic.json
+
+      - name: Archive synthetic observation validation report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-behavior-observation-validation-synthetic
+          path: artifacts/rea-behavior-observation-validation.synthetic.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Warnings-denied Clippy
         run: cargo clippy --manifest-path tools/rea-behavior-observation-check/Cargo.toml --all-targets --locked -- -D warnings
 
