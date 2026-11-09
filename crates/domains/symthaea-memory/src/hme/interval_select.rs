@@ -1370,7 +1370,7 @@ pub fn select_group_refinement_set(
 ///
 /// The receipt proves group membership disjointness and completeness for one
 /// manifest/eligibility generation. Query-time validation is O(number of
-/// groups log groups): it checks group identities, counts, query digests and
+/// O(G log G): it checks group identities, counts, query digests and
 /// snapshot fields, without walking each member ID. A persisted receipt must be
 /// authenticated against the immutable segment manifest by #10917 after reopen.
 pub fn select_group_refinement_set_with_partition_receipt(
@@ -1564,7 +1564,7 @@ pub fn select_hierarchical_refinement_set(
 }
 
 /// Perform hierarchical selection using an authenticated build-time partition
-/// receipt. Global group selection is O(G); member rosters are only traversed
+/// receipt. Global group selection is O(G log G); member rosters are only traversed
 /// for groups that survive stage one.
 pub fn select_hierarchical_refinement_set_with_partition_receipt(
     groups: &[GroupScoreIntervalRecord],
