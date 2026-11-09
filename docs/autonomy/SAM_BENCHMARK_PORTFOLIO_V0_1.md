@@ -34,6 +34,19 @@ These descriptors describe the system; the four coordinates describe the evidenc
 - A benchmark's public code license does not imply that its data, assets or scenario content have the same rights.
 - An adapter/smoke test is not a benchmark reproduction.
 
+### 2026 world-model evaluation landscape update — 9 November 2026
+
+The survey's 8 November 2026 snapshot lists 130 representative world-model benchmarks, 108 spanning multiple evaluation-target categories. For the specific **Control Fidelity & Interactive Dynamics** target it codes 74 benchmark tracks: 6 include closed-loop interaction (8.1%), while 4 include downstream outcome metrics (5.4%). These counts are not driving-only and must not be reported as an autonomous-driving-only denominator. The survey explicitly separates target, protocol, metric level and data source; the distinctions prevent visual/prediction scores from being mistaken for policy utility or real-world safety.
+
+**SAM implication:** preserve three different comparator levels:
+1. **NAVSIM v2:** trajectory-dependent pseudo-simulation with precomputed follow-up scenes; useful bridge beyond open-loop, but not online reciprocal actor–ego interaction.
+2. **ReactSim-Bench:** surrounding agents respond to pre-generated ego deviations; useful one-sided reactive-agent comparator, but not full feedback where the ego replans from newly realized actor responses.
+3. **Symtropy #3532 reciprocal loop:** both ego and surrounding-agent policies replan from their own delivered observations at each tick. This is a SAM/Symtropy-developed interaction protocol and must be measured separately from upstream benchmarks.
+
+The opportunity is not to claim that all existing driving benchmarks are weak. It is to build a more demanding, reproducible closed-loop evaluation slice and report exactly which action-feedback capabilities are present.
+
+Source: [A Survey of World Model Benchmarks — 8 November 2026 snapshot](https://world-model-benchmarks.github.io/World-Model-Benchmarks/).
+
 ## 3. Driving and embodied benchmark entries
 
 ### Bench2Drive v0.0.4
@@ -353,6 +366,18 @@ The primary success criterion is **downstream decision improvement without weake
 - **Next coverage expansion:** build a full factorial profile matrix across traffic side (LHT/RHT) and steering-wheel position (LHD/RHD); add multi-lane merges, roundabouts, overtaking, intersection priority and jurisdiction-specific rule evidence only with exact source/version/applicability. Add real-world paired road scenarios only after rights and local legal review.
 - **Claim boundary:** the 25 passing tests establish only conformance for the declared synthetic fixtures. They do not establish national traffic-law correctness, sensor accuracy, map fidelity, real-road generalization, roadworthiness or public-road safety.
 - **Sources:** [SAM scene-evidence PR #11111](https://github.com/Luminous-Dynamics/symthaea/pull/11111), [SAM-TRAFFIC-CONVENTION-001 #11123](https://github.com/Luminous-Dynamics/symthaea/issues/11123), [ISO 34502:2022](https://www.iso.org/standard/78951.html), [SAE J3164_202301](https://saemobilus.sae.org/standards/j3164_202301-ontology-lexicon-automated-driving-system-ads-operated-vehicle-behaviors-maneuvers-routine-normal-operating-scenarios).
+
+### SAM Follow Oracle / Observation-Domain Separation v0.1 — implementation in review
+
+- **Role:** qualify the information source used by the Follow training teacher and reward. Keep simulator truth, delayed mesh aggregates, future local tracked-object observations and remote V2X claims in distinct evidence domains.
+- **Protocol:** at each ego observation tick, select the nearest same-road lead actor only from simulator history at or before that tick; require positive along-road gap, lateral corridor, declared range and freshness. The Follow teacher consumes a typed `SimulatorOracleFollowTarget` (actor ID, gap, relative speed, snapshot time, max age). Missing/stale/future targets invoke the baseline teacher and contribute zero Follow-gap reward. The legacy 20D HDC input layout remains unchanged.
+- **Information-privilege distinction:** this is an **oracle-teacher / observed-input student** experiment. The learner still receives the existing simulated vehicle/mesh state. Passing this contract does not establish that a deployable local perception input exists. The deployment comparator must later consume a #11109-admitted local tracked-object hypothesis, and V2X must never silently substitute.
+- **Required comparison arms:** (a) privileged simulator-oracle teacher, (b) delayed mesh aggregate as a legacy simulation-only comparison, (c) no-target baseline/abstention, (d) stale/future/off-lane/wrong-way oracle faults, and (e) future local-perception adapter only after it links to exact scene source/frame/time/track evidence.
+- **Metrics:** valid-target availability and age distribution; stale/future/off-corridor rejection; wrong-actor selection; gap and relative-speed residual against the exact oracle actor; teacher-action delta and action-ranking changes; no-target fallback rate; target-source identity; p50/p95/p99 selector latency; and performance with matched scenario/action/actor-policy budgets.
+- **Prospective acceptance:** 100% rejection of future, stale, non-finite, behind, off-corridor and out-of-range targets in the declared synthetic profile; zero fallback to raw mesh distance when target evidence is absent; exact time alignment; and no sensor/V2X authority promotion. Benchmark performance targets are not assigned until the comparison harness and action evaluator are frozen.
+- **Current status:** source/test cases authored in [PR #11213](https://github.com/Luminous-Dynamics/symthaea/pull/11213), stacked on workspace repair #11148. CI was queued at the 9 November 2026 snapshot; no test or performance pass is claimed.
+- **Claim boundary:** synthetic simulator-teacher semantics only. No local object tracking, physical sensing, ACC road performance, vehicle safety, public-road operation or SAE L4/5 evidence.
+- **Sources:** [PR #11213](https://github.com/Luminous-Dynamics/symthaea/pull/11213), [SAM-LOCAL-PEER-SEPARATION-001 #11149](https://github.com/Luminous-Dynamics/symthaea/issues/11149), [NIST Measurement Science for Automated Vehicles](https://www.nist.gov/programs-projects/measurement-science-automated-vehicles-0).
 
 ## 10. Registry status semantics
 
