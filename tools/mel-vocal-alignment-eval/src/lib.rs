@@ -208,16 +208,14 @@ pub fn score_alignment(
             if expected.is_vowel {
                 vowel_onset_errors_ms.push(onset_error_ms);
             }
-            offset_errors_ms.push(
-                expected.end_frame.abs_diff(observed.end_frame) as f64 * frames_to_ms,
-            );
+            offset_errors_ms
+                .push(expected.end_frame.abs_diff(observed.end_frame) as f64 * frames_to_ms);
             let expected_duration = expected.end_frame - expected.start_frame;
             let observed_duration = observed.end_frame - observed.start_frame;
             exact_reference_duration_frames += u128::from(expected_duration);
             exact_predicted_duration_frames += u128::from(observed_duration);
-            duration_errors_ms.push(
-                expected_duration.abs_diff(observed_duration) as f64 * frames_to_ms,
-            );
+            duration_errors_ms
+                .push(expected_duration.abs_diff(observed_duration) as f64 * frames_to_ms);
         }
     }
 
@@ -235,7 +233,9 @@ pub fn score_alignment(
 
     let mut covered_melismas = 0usize;
     for span in melismas {
-        if let Some(predicted_index) = identity_prediction_for_reference[span.reference_phone_index] {
+        if let Some(predicted_index) =
+            identity_prediction_for_reference[span.reference_phone_index]
+        {
             let phone = &predicted[predicted_index];
             if phone.is_vowel
                 && phone.syllable_index == span.syllable_index
@@ -740,7 +740,7 @@ mod tests {
         assert_eq!(result.timing.vowel_onset_within_50ms_fraction, None);
         assert_eq!(result.timing.onset_within_100ms_fraction, None);
         assert_eq!(result.timing.duration_ratio, None);
-        assert_eq!(result.prediction_exact_precision, None);
+        assert_eq!(result.prediction_phone_precision, None);
     }
 
     #[test]
