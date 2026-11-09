@@ -1698,16 +1698,32 @@ mod tests {
                 && row.teacher_target_brake.is_some()
                 && row.student_teacher_action_delta_l1.is_some()
                 && row.teacher_action_used_for_blend
-                && row.pd_teacher_blend_weight > 0.0
+                && (row.pd_teacher_blend_weight - 0.8).abs() < 1e-6
+                && row.student_proposal_steering.is_finite()
+                && row.student_proposal_throttle.is_finite()
+                && row.student_proposal_brake.is_finite()
+                && row.blended_action_steering.is_finite()
+                && row.blended_action_throttle.is_finite()
+                && row.blended_action_brake.is_finite()
                 && row.executed_action_steering.is_finite()
                 && row.executed_action_throttle.is_finite()
                 && row.executed_action_brake.is_finite()
         }));
+        let supervised = telemetry
+            .iter()
+            .find(|row| row.teacher_action_used_for_supervision)
+            .expect("at least one BPTT teacher-target step");
+        let teacher_delta = ((supervised.student_proposal_steering
+            - supervised.teacher_target_steering.unwrap())
+        .abs()
+            + (supervised.student_proposal_throttle
+                - supervised.teacher_target_throttle.unwrap())
+            .abs()
+            + (supervised.student_proposal_brake - supervised.teacher_target_brake.unwrap()).abs())
+            / 3.0;
         assert!(
-            telemetry
-                .iter()
-                .any(|row| row.teacher_action_used_for_supervision),
-            "At least one step must record use of the teacher as a BPTT target"
+            (supervised.student_teacher_action_delta_l1.unwrap() - teacher_delta).abs() < 1e-6,
+            "Recorded action delta must be recomputable from the retained teacher/student actions"
         );
         assert!(
             telemetry
