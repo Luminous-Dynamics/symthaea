@@ -1102,34 +1102,57 @@ mod tests {
         .expect("valid campaign")
     }
 
+    fn manifest_for_shard(
+        campaign: &SequentialWeightVerificationCampaign,
+        shard_marker: char,
+    ) -> ConfirmatoryEpisodeManifest {
+        ConfirmatoryEpisodeManifest::new(
+            (0..campaign.config.maximum_observations)
+                .map(|index| format!("episode-{shard_marker}-{index}"))
+                .collect(),
+        )
+        .expect("valid confirmatory episode manifest")
+    }
+
     fn candidate(
         campaign: &mut SequentialWeightVerificationCampaign,
         model_marker: char,
         shard_marker: char,
     ) -> SequentialWeightVerification {
+        let manifest = manifest_for_shard(campaign, shard_marker);
         campaign
             .start_candidate(
                 digest('a'),
                 digest(model_marker),
                 digest(shard_marker),
+                manifest,
                 digest('e'),
             )
             .expect("fresh candidate")
     }
 
-    fn observation(index: u64, baseline_loss: f64, candidate_loss: f64) -> PairedLossObservation {
+    fn observation_for_shard(
+        shard_marker: char,
+        index: u64,
+        baseline_loss: f64,
+        candidate_loss: f64,
+    ) -> PairedLossObservation {
         PairedLossObservation {
-            episode_id: format!("episode-{index}"),
+            episode_id: format!("episode-{shard_marker}-{index}"),
             baseline_loss,
             candidate_loss,
         }
     }
 
-    fn episodes_for_replay_test() -> [PairedLossObservation; 3] {
+    fn observation(index: u64, baseline_loss: f64, candidate_loss: f64) -> PairedLossObservation {
+        observation_for_shard('d', index, baseline_loss, candidate_loss)
+    }
+
+    fn episodes_for_replay_test(shard_marker: char) -> [PairedLossObservation; 3] {
         [
-            observation(1, 0.8, 0.4),
-            observation(2, 0.7, 0.3),
-            observation(3, 0.9, 0.5),
+            observation_for_shard(shard_marker, 1, 0.8, 0.4),
+            observation_for_shard(shard_marker, 2, 0.7, 0.3),
+            observation_for_shard(shard_marker, 3, 0.9, 0.5),
         ]
     }
 
@@ -1185,7 +1208,7 @@ mod tests {
             seventh = candidate(&mut campaign, model, shard);
         }
         let later_report = seventh
-            .observe(observation(0, 0.8, 0.5))
+            .observe(observation_for_shard('4', 0, 0.8, 0.5))
             .expect("seventh candidate look");
         assert_eq!(later_report.binding.candidate_index, 7);
         assert!(later_report.alpha_at_look < first_report.alpha_at_look);
@@ -1199,12 +1222,25 @@ mod tests {
         assert_eq!(first.binding.candidate_index, 1);
         assert_eq!(campaign.next_candidate_index(), 2);
         assert_eq!(campaign.used_confirmatory_shard_count(), 1);
+        assert_eq!(campaign.used_confirmatory_episode_id_count(), 10);
         assert!(matches!(
-            campaign.start_candidate(digest('a'), digest('b'), digest('e'), digest('e')),
+            campaign.start_candidate(
+                digest('a'),
+                digest('b'),
+                digest('e'),
+                manifest_for_shard(&campaign, 'e'),
+                digest('e'),
+            ),
             Err(SequentialWeightVerificationError::CandidateModelAlreadyEvaluated)
         ));
         assert!(matches!(
-            campaign.start_candidate(digest('a'), digest('c'), digest('d'), digest('e')),
+            campaign.start_candidate(
+                digest('a'),
+                digest('c'),
+                digest('d'),
+                manifest_for_shard(&campaign, 'd'),
+                digest('e'),
+            ),
             Err(SequentialWeightVerificationError::ConfirmatoryShardAlreadyUsed)
         ));
         assert_eq!(campaign.next_candidate_index(), 2);
@@ -1225,6 +1261,7 @@ mod tests {
 
         assert_eq!(restored.next_candidate_index(), 3);
         assert_eq!(restored.used_confirmatory_shard_count(), 2);
+        assert_eq!(restored.used_confirmatory_episode_id_count(), 200);
         assert_eq!(
             restored
                 .snapshot()
@@ -1233,11 +1270,23 @@ mod tests {
             snapshot.snapshot_digest
         );
         assert!(matches!(
-            restored.start_candidate(digest('a'), digest('b'), digest('f'), digest('e')),
+            restored.start_candidate(
+                digest('a'),
+                digest('b'),
+                digest('f'),
+                manifest_for_shard(&restored, 'f'),
+                digest('e'),
+            ),
             Err(SequentialWeightVerificationError::CandidateModelAlreadyEvaluated)
         ));
         assert!(matches!(
-            restored.start_candidate(digest('a'), digest('f'), digest('d'), digest('e')),
+            restored.start_candidate(
+                digest('a'),
+                digest('f'),
+                digest('d'),
+                manifest_for_shard(&restored, 'd'),
+                digest('e'),
+            ),
             Err(SequentialWeightVerificationError::ConfirmatoryShardAlreadyUsed)
         ));
 
@@ -1293,7 +1342,13 @@ mod tests {
 
         let mut campaign = campaign(0.1, 10);
         assert!(matches!(
-            campaign.start_candidate(digest('a'), "not-a-digest".into(), digest('d'), digest('e'),),
+            campaign.start_candidate(
+                digest('a'),
+                "not-a-digest".into(),
+                digest('d'),
+                manifest_for_shard(&campaign, 'd'),
+                digest('e'),
+            ),
             Err(SequentialWeightVerificationError::InvalidDigest(_))
         ));
         let mut verifier = candidate(&mut campaign, 'b', 'd');
@@ -1312,7 +1367,7 @@ mod tests {
         let mut right = candidate(&mut right_campaign, 'b', 'd');
         let mut left_report = left.report().expect("initial");
         let mut right_report = right.report().expect("initial");
-        for episode in episodes_for_replay_test() {
+        for episode in episodes_for_replay_test('d') {
             left_report = left.observe(episode.clone()).expect("left");
             right_report = right.observe(episode).expect("right");
         }
@@ -1325,7 +1380,7 @@ mod tests {
         let mut altered_campaign = campaign(0.05, 20);
         let mut altered = candidate(&mut altered_campaign, 'b', 'e');
         let mut altered_report = altered.report().expect("initial");
-        for (index, episode) in episodes_for_replay_test().into_iter().enumerate() {
+        for (index, episode) in episodes_for_replay_test('e').into_iter().enumerate() {
             let changed = if index == 2 {
                 PairedLossObservation {
                     candidate_loss: 0.4,
