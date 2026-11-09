@@ -66,7 +66,11 @@ impl Aggregate {
         }
 
         for entry in &posterior.dimensions {
-            let target = f64::from(entry.spacetime_dimension == true_dimension);
+            let target = if entry.spacetime_dimension == true_dimension {
+                1.0
+            } else {
+                0.0
+            };
             let probability = entry.posterior_probability.unwrap_or(0.0);
             self.brier_sum += (probability - target).powi(2);
         }
@@ -152,7 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             calibration_seed,
         )?;
 
-        for (dimension_index, dimension) in DIMENSIONS.iter().copied().enumerate() {
+        for dimension in DIMENSIONS.iter().copied() {
             let mut aggregates: [Aggregate; 3] = std::array::from_fn(|_| Aggregate::default());
             for replicate in 0..QUALIFICATION_REPLICATES {
                 let seed = QUALIFICATION_BASE_SEED
@@ -191,10 +195,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     )
                 );
             }
-
-            // Keep the compiler from optimizing away the deliberate dimension
-            // indexing contract; all three named priors are emitted per truth.
-            let _ = dimension_index;
         }
     }
 
