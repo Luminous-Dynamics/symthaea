@@ -1172,6 +1172,140 @@ mod tests {
     }
 
     #[test]
+    fn target_marginal_information_equals_joint_information_without_nuisance() {
+        let scenarios = vec![scenario("target-only", 1.0)];
+        let options = vec![
+            option("measure-x", 1.0, None, vec![vec![vec![1.0, 0.0]]]),
+            option("measure-y", 1.0, None, vec![vec![vec![0.0, 2.0]]]),
+        ];
+        let scores = evaluate_selection(
+            &scenarios,
+            &options,
+            &[0, 1],
+            &[1.0, 1.0],
+            2,
+        )
+        .unwrap();
+
+        assert!(
+            (scores[0].information_gain_nats - scores[0].joint_information_gain_nats).abs()
+                < 1.0e-12
+        );
+    }
+
+    #[test]
+    fn uncoupled_nuisance_measurement_has_joint_gain_but_zero_target_gain() {
+        let scenarios = vec![DesignScenario {
+            scenario_id: "target-with-clock-nuisance".to_string(),
+            target_parameter_count: 1,
+            weight: 1.0,
+            prior_precision: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        }];
+        let options = vec![option(
+            "clock-only-calibration",
+            1.0,
+            None,
+            vec![vec![vec![0.0, 1.0]]],
+        )];
+
+        // Evaluate the action explicitly: a target-only optimizer should not
+        // select it when its target marginal gain is zero, but the report must
+        // still show that nuisance information was acquired.
+        let scores = evaluate_selection(
+            &scenarios,
+            &options,
+            &[0],
+            &[1.0, 1.0],
+            2,
+        )
+        .unwrap();
+
+        assert!(scores[0].information_gain_nats.abs() < 1.0e-12);
+        assert!((scores[0].joint_information_gain_nats - 2.0_f64.ln()).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn coupled_calibration_observation_improves_target_marginal_information() {
+        let scenarios = vec![DesignScenario {
+            scenario_id: "target-correlated-with-clock".to_string(),
+            target_parameter_count: 1,
+            weight: 1.0,
+            prior_precision: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        }];
+        let options = vec![
+            option(
+                "bearing-mixed-target-and-clock",
+                1.0,
+                None,
+                vec![vec![vec![1.0, 1.0]]],
+            ),
+            option(
+                "clock-calibration",
+                1.0,
+                None,
+                vec![vec![vec![0.0, 1.0]]],
+            ),
+        ];
+        let bearing_only =
+            evaluate_selection(&scenarios, &options, &[0], &[1.0, 1.0], 2).unwrap();
+        let bearing_and_calibration =
+            evaluate_selection(&scenarios, &options, &[0, 1], &[1.0, 1.0], 2).unwrap();
+
+        let expected_bearing_target_gain = 1.5_f64.ln();
+        let expected_combined_target_gain = (5.0_f64 / 3.0).ln();
+        assert!(
+            (bearing_only[0].information_gain_nats - expected_bearing_target_gain).abs()
+                < 1.0e-12
+        );
+        assert!(
+            (bearing_and_calibration[0].information_gain_nats - expected_combined_target_gain)
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            bearing_and_calibration[0].information_gain_nats
+                > bearing_only[0].information_gain_nats
+        );
+        assert!(
+            bearing_and_calibration[0].joint_information_gain_nats
+                > bearing_only[0].joint_information_gain_nats
+        );
+    }
+
+    #[test]
+    fn schur_complement_matches_correlated_precision_reference() {
+        let precision = vec![vec![2.0, 0.6], vec![0.6, 1.5]];
+        let logdet = marginal_target_log_determinant(&precision, 1).unwrap();
+        let expected_precision = 2.0 - 0.6_f64.powi(2) / 1.5;
+
+        assert!((logdet - expected_precision.ln()).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn singular_nuisance_precision_is_rejected_without_pseudoinverse() {
+        let precision = vec![vec![2.0, 0.0], vec![0.0, 0.0]];
+
+        assert!(marginal_target_log_determinant(&precision, 1).is_err());
+    }
+
+    #[test]
+    fn invalid_target_parameter_partition_fails_closed() {
+        let mut scenarios = vec![scenario("bad-target-partition", 1.0)];
+        scenarios[0].target_parameter_count = 0;
+        let options = vec![option(
+            "measure",
+            1.0,
+            None,
+            vec![vec![vec![1.0, 0.0]]],
+        )];
+
+        assert!(matches!(
+            greedy_budgeted_design(&scenarios, &options, &config(1.0)),
+            Err(BudgetedDesignError::InvalidTargetParameterCount { .. })
+        ));
+    }
+
+    #[test]
     fn exhaustive_oracle_rejects_large_candidate_sets() {
         let scenarios = vec![scenario("single", 1.0)];
         let options = (0..21)
