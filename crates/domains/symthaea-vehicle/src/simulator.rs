@@ -137,6 +137,19 @@ impl BicycleModelSimulator {
         &self.params
     }
 
+    /// Set the simulator's absolute time origin before the first step.
+    ///
+    /// Used when a subsystem is initialized after the ego simulation has already
+    /// been primed. Keeping the state timestamp and subsystem clock aligned avoids
+    /// false stale/future classifications in time-bounded simulator evidence.
+    pub(crate) fn set_simulation_time(&mut self, time_s: f64) {
+        assert!(
+            time_s.is_finite() && time_s >= 0.0,
+            "simulation time origin must be finite and non-negative"
+        );
+        self.state.timestamp = time_s;
+    }
+
     /// Set the vehicle's world-frame position and heading directly.
     pub fn set_position(&mut self, x: f64, y: f64, heading: f64) {
         self.state.position_x = x;
