@@ -2979,12 +2979,12 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
                         solution,
                     };
                     let entry_bytes = cluster_cache_entry_bytes(&entry)?;
-                    cached_bytes = cached_bytes.checked_add(entry_bytes)
+                    let projected_cached_bytes = cached_bytes.checked_add(entry_bytes)
                         .ok_or(PolicyPortfolioError::DimensionOverflow)?;
-                    if cached_bytes > budget.max_cached_cluster_bytes {
+                    if projected_cached_bytes > budget.max_cached_cluster_bytes {
                         return Err(PolicyPortfolioError::BudgetExceeded {
                             resource: "outer cached cluster bytes",
-                            required: cached_bytes,
+                            required: projected_cached_bytes,
                             limit: budget.max_cached_cluster_bytes,
                         });
                     }
@@ -2995,6 +2995,7 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
                         }
                     })?;
                     cache.push(entry);
+                    cached_bytes = cluster_cache_bytes(&cache)?;
                     cache.len() - 1
                 }
             };
