@@ -3003,7 +3003,7 @@ fn threshold_cover_dfs(
     }
     let chosen_model = chosen_model.ok_or(PolicyPortfolioError::ThresholdCoverCertificateMismatch)?;
     if minimum_candidates == 0 {
-        *dead_ends = dead_ends.checked_add(1)
+        *dead_ends = (*dead_ends).checked_add(1)
             .ok_or(PolicyPortfolioError::DimensionOverflow)?;
         return Ok(false);
     }
@@ -4632,6 +4632,19 @@ mod tests {
         }
     }
 
+    fn threshold_cover_budget(source_policies: usize, source_candidates: usize) -> PolicyThresholdCoverBudget {
+        PolicyThresholdCoverBudget {
+            source_verification_budget: budget(source_policies, source_candidates),
+            profile_budget: regret_profile_budget(),
+            max_threshold_candidates: 100_000,
+            max_profile_coverage_checks: 10_000_000,
+            max_search_nodes_per_threshold: 100_000,
+            max_total_search_nodes: 1_000_000,
+            max_recursion_depth: 128,
+            max_output_memory_bytes: 20_000_000,
+        }
+    }
+
     #[test]
     fn exact_action_mask_bound_is_zero_for_full_mask_and_exact_at_leaf() {
         let family = FiniteUmdpModelFamily::new(vec![
@@ -5715,6 +5728,230 @@ mod tests {
             compute_policy_regret_profile_frontier(&family, &source, memory_tight),
             Err(PolicyPortfolioError::BudgetExceeded {
                 resource: "regret profile frontier output bytes",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn threshold_cover_two_specialists_proves_exact_k_one_and_k_two_optima() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1,0]),
+            one_state_model(&[0,1]),
+        ]).unwrap();
+        let source = solve_finite_family_policy_portfolio(
+            &family, q(1,2), 2, budget(2,3),
+        ).unwrap();
+        let profiles = compute_policy_regret_profile_frontier(
+            &family, &source, regret_profile_budget(),
+        ).unwrap();
+
+        let single = solve_exact_policy_regret_threshold_cover(
+            &family, &source, &profiles, 1, threshold_cover_budget(2,3),
+        ).unwrap();
+        assert_eq!(single.optimal_threshold, q(1,1));
+        assert_eq!(single.selected_profile_group_indices, vec![0]);
+        assert_eq!(single.selected_policy_indices, vec![0]);
+        assert_eq!(single.model_minimum_regrets, vec![q(0,1),q(1,1)]);
+        assert_eq!(single.worst_case_model_indices, vec![1]);
+        assert!(single.optimality_proven);
+        assert_eq!(single.threshold_candidate_count, 2);
+        assert_eq!(single.thresholds_tested, 2);
+        assert_eq!(single.profile_frontier_sha256, profiles.certificate_sha256);
+        verify_policy_regret_threshold_cover(
+            &family, &source, &profiles, threshold_cover_budget(2,3), &single,
+        ).unwrap();
+
+        let pair = solve_exact_policy_regret_threshold_cover(
+            &family, &source, &profiles, 2, threshold_cover_budget(2,3),
+        ).unwrap();
+        assert_eq!(pair.optimal_threshold, q(0,1));
+        assert_eq!(pair.selected_profile_group_indices, vec![0,1]);
+        assert_eq!(pair.selected_policy_indices, vec![0,1]);
+        assert_eq!(pair.model_minimum_regrets, vec![q(0,1),q(0,1)]);
+        assert_eq!(pair.worst_case_model_indices, vec![0,1]);
+        assert!(pair.optimality_proven);
+        assert_eq!(source.minimax_regret, pair.optimal_threshold);
+        verify_policy_regret_threshold_cover(
+            &family, &source, &profiles, threshold_cover_budget(2,3), &pair,
+        ).unwrap();
+
+        let mut mutated = pair.clone();
+        mutated.model_minimum_regrets[0] = q(1,1);
+        assert_eq!(
+            verify_policy_regret_threshold_cover(
+                &family, &source, &profiles, threshold_cover_budget(2,3), &mutated,
+            ),
+            Err(PolicyPortfolioError::ThresholdCoverCertificateMismatch)
+        );
+    }
+
+    #[test]
+    fn threshold_cover_uses_profile_quotient_and_finds_better_than_first_policy() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[3,3,1]),
+        ]).unwrap();
+        let source = solve_finite_family_policy_portfolio(
+            &family, q(1,2), 1, budget(3,3),
+        ).unwrap();
+        let profiles = compute_policy_regret_profile_frontier(
+            &family, &source, regret_profile_budget(),
+        ).unwrap();
+        let result = solve_exact_policy_regret_threshold_cover(
+            &family, &source, &profiles, 1, threshold_cover_budget(3,3),
+        ).unwrap();
+        assert_eq!(profiles.profile_groups.len(), 2);
+        assert_eq!(profiles.frontier_profile_group_indices, vec![0]);
+        assert_eq!(result.optimal_threshold, q(0,1));
+        assert_eq!(result.selected_profile_group_indices, vec![0]);
+        assert_eq!(result.selected_policy_indices, vec![0]);
+        assert_eq!(result.model_covering_profile_group_indices, vec![0]);
+        assert_eq!(result.model_minimum_regrets, vec![q(0,1)]);
+        assert_eq!(result.worst_case_model_indices, vec![0]);
+        verify_policy_regret_threshold_cover(
+            &family, &source, &profiles, threshold_cover_budget(3,3), &result,
+        ).unwrap();
+    }
+
+    #[test]
+    fn threshold_cover_rejects_forged_sources_and_frontiers() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1,0]),
+            one_state_model(&[0,1]),
+        ]).unwrap();
+        let source = solve_finite_family_policy_portfolio(
+            &family, q(1,2), 2, budget(2,3),
+        ).unwrap();
+        let profiles = compute_policy_regret_profile_frontier(
+            &family, &source, regret_profile_budget(),
+        ).unwrap();
+
+        let mut forged_source = source.clone();
+        forged_source.model_policy_values[0][0] = q(0,1);
+        // Even when an attacker recomputes the table digest, the threshold
+        // solver independently replays the original exhaustive source result.
+        forged_source.policy_values_sha256 = hash_policy_values(
+            family.sha256(),
+            forged_source.policy_manifest_sha256,
+            forged_source.discount,
+            family.state_count(),
+            family.action_count(),
+            family.horizon(),
+            &forged_source.model_optimal_values,
+            &forged_source.model_policy_values,
+        );
+        assert_eq!(
+            solve_exact_policy_regret_threshold_cover(
+                &family, &forged_source, &profiles, 2, threshold_cover_budget(2,3),
+            ),
+            Err(PolicyPortfolioError::PortfolioCertificateMismatch)
+        );
+
+        let mut forged_frontier = profiles.clone();
+        forged_frontier.profile_groups[0].regret_profile[0] = q(1,1);
+        assert_eq!(
+            solve_exact_policy_regret_threshold_cover(
+                &family, &source, &forged_frontier, 2, threshold_cover_budget(2,3),
+            ),
+            Err(PolicyPortfolioError::PolicyRegretProfileCertificateMismatch)
+        );
+    }
+
+    #[test]
+    fn threshold_cover_budgets_fail_closed_before_claiming_optimality() {
+        let family = FiniteUmdpModelFamily::new(vec![
+            one_state_model(&[1,0]),
+            one_state_model(&[0,1]),
+        ]).unwrap();
+        let source = solve_finite_family_policy_portfolio(
+            &family, q(1,2), 2, budget(2,3),
+        ).unwrap();
+        let profiles = compute_policy_regret_profile_frontier(
+            &family, &source, regret_profile_budget(),
+        ).unwrap();
+
+        assert!(matches!(
+            solve_exact_policy_regret_threshold_cover(
+                &family, &source, &profiles, 0, threshold_cover_budget(2,3),
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "threshold-cover portfolio size (must be in 1..=policy_count)",
+                ..
+            })
+        ));
+
+        let mut candidate_tight = threshold_cover_budget(2,3);
+        candidate_tight.max_threshold_candidates = 3;
+        assert_eq!(
+            solve_exact_policy_regret_threshold_cover(
+                &family, &source, &profiles, 2, candidate_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "threshold-cover candidate profile components",
+                required: 4,
+                limit: 3,
+            })
+        );
+
+        let mut node_tight = threshold_cover_budget(2,3);
+        node_tight.max_search_nodes_per_threshold = 1;
+        assert_eq!(
+            solve_exact_policy_regret_threshold_cover(
+                &family, &source, &profiles, 2, node_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "threshold-cover nodes per feasibility check",
+                required: 2,
+                limit: 1,
+            })
+        );
+
+        let mut total_nodes_tight = threshold_cover_budget(2,3);
+        total_nodes_tight.max_total_search_nodes = 1;
+        assert_eq!(
+            solve_exact_policy_regret_threshold_cover(
+                &family, &source, &profiles, 2, total_nodes_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "threshold-cover total search nodes",
+                required: 2,
+                limit: 1,
+            })
+        );
+
+        let mut depth_tight = threshold_cover_budget(2,3);
+        depth_tight.max_recursion_depth = 1;
+        assert_eq!(
+            solve_exact_policy_regret_threshold_cover(
+                &family, &source, &profiles, 2, depth_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "threshold-cover recursion depth",
+                required: 2,
+                limit: 1,
+            })
+        );
+
+        let mut checks_tight = threshold_cover_budget(2,3);
+        checks_tight.max_profile_coverage_checks = 3;
+        assert!(matches!(
+            solve_exact_policy_regret_threshold_cover(
+                &family, &source, &profiles, 2, checks_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "threshold-cover profile coverage checks",
+                ..
+            })
+        ));
+
+        let mut memory_tight = threshold_cover_budget(2,3);
+        memory_tight.max_output_memory_bytes = 1;
+        assert!(matches!(
+            solve_exact_policy_regret_threshold_cover(
+                &family, &source, &profiles, 2, memory_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "threshold-cover output and scratch memory bytes",
                 ..
             })
         ));
