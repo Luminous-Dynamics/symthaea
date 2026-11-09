@@ -332,7 +332,7 @@ impl VehicleTrainer {
             }
             let mut scaled_cfg = cfg.clone();
             scaled_cfg.num_peers = num_peers;
-            Some(SwarmSimulator::new(scaled_cfg))
+            Some(SwarmSimulator::new_at_time(scaled_cfg, physics.state().timestamp))
         });
 
         let subterranean_bridge = self
