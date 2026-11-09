@@ -505,6 +505,14 @@ pub fn evaluate_bundle(
                     evidence_id: Some(record.evidence_id.clone()),
                 });
             }
+            if let (Some(parent_known_at), Some(revision_known_at)) = (parent.known_at, record.known_at) {
+                if revision_known_at <= parent_known_at {
+                    return Err(BundleError {
+                        reason: "superseding version must become available strictly after its predecessor",
+                        evidence_id: Some(record.evidence_id.clone()),
+                    });
+                }
+            }
         }
     }
 
@@ -770,6 +778,25 @@ mod tests {
         record.published_at = Some(ts("2026-11-10T08:00:00Z"));
         let result = evaluate_evidence(&record, &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"));
         assert_eq!(result.disposition, Disposition::Pass);
+    }
+
+
+    #[test]
+    fn revision_availability_must_follow_the_superseded_version() {
+        let first = evidence("evidence:revision-v1", "2026-11-08T09:00:00Z", "2026-11-08T09:05:00Z");
+        let mut same_time = evidence("evidence:revision-v2", "2026-11-08T09:00:00Z", "2026-11-08T09:06:00Z");
+        same_time.supersedes = vec![first.evidence_id.clone()];
+        assert!(evaluate_bundle(
+            &[first.clone(), same_time],
+            &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")
+        ).is_err());
+
+        let mut backwards = evidence("evidence:revision-v3", "2026-11-08T08:59:00Z", "2026-11-08T09:06:00Z");
+        backwards.supersedes = vec![first.evidence_id.clone()];
+        assert!(evaluate_bundle(
+            &[first, backwards],
+            &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")
+        ).is_err());
     }
 
     #[test]
