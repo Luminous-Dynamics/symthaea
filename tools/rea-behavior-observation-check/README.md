@@ -19,7 +19,7 @@ cargo run --manifest-path tools/rea-behavior-observation-check/Cargo.toml --lock
 cargo clippy --manifest-path tools/rea-behavior-observation-check/Cargo.toml --all-targets --locked -- -D warnings
 ```
 
-The CLI rejects duplicate JSON object keys and trailing data, validates Draft 2020-12, recomputes capture hashes/lengths, checks filesystem path containment and duplicate identities, and ensures assertions agree with complete captured data.
+The CLI rejects duplicate JSON object keys and trailing data, validates Draft 2020-12, recomputes capture hashes/lengths, checks filesystem path containment and duplicate identities, ensures assertions agree with complete captured data, and validates links from observed clauses to exact observation/assertion IDs. Broader bounded input-class rules must remain `untested` with an explicit falsification condition.
 
 ## Claim ceiling
 
