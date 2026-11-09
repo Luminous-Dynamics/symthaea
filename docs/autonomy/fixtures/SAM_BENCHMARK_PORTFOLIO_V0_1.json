@@ -1411,7 +1411,8 @@
     "World-model benchmark-landscape counts are cross-domain taxonomy data, not driving-only counts; preserve target-specific denominators and distinguish closed-loop protocol from downstream outcome metrics.",
     "SAM-developed Follow oracle/observation-domain experiments remain in internal_conformance_crucibles until exact-head tests and frozen scenario/action metrics are executed; no authored test is a result.",
     "WOD-E2E is an open-loop expert-preference / long-tail trajectory benchmark; RFS is not a closed-loop safety or counterfactual outcome metric.",
-    "Different secondary leaderboard pages for WOD-E2E are distinct benchmark views until exact split, label, evaluator and submission protocols are proven identical; never compare scores across those views directly."
+    "Different secondary leaderboard pages for WOD-E2E are distinct benchmark views until exact split, label, evaluator and submission protocols are proven identical; never compare scores across those views directly.",
+    "Research method references (for example SURE-Plan) are distinct from benchmark records; do not invent leaderboard values or infer a matched SOTA comparison from abstract-level claims."
   ],
   "system_references": [
     {
@@ -1899,5 +1900,38 @@
     "scope_note": "Counts refer to the survey's Control Fidelity & Interactive Dynamics target across world-model domains; they are not driving-only counts.",
     "source_status": "upstream_survey_coding",
     "source": "https://world-model-benchmarks.github.io/World-Model-Benchmarks/"
-  }
+  },
+  "research_method_references": [
+    {
+      "id": "sure-plan-2026",
+      "name": "SURE-Plan: spatio-temporal uncertainty-aware reachable-set planning",
+      "category": "research_method_reference_not_benchmark",
+      "publication_window": "2026-09",
+      "venue": "Transportation Research Part C: Emerging Technologies",
+      "doi": "10.1016/j.trc.2026.105800",
+      "reported_method": {
+        "uncertainty_model": "single-pass deep evidential learning for aleatoric and epistemic uncertainty",
+        "planning_constraint": "spatio-temporal driving corridor constructed through reachability analysis",
+        "objective": "uncertainty-driven cost balancing robustness and efficiency",
+        "evaluation_domains": [
+          "CommonRoad",
+          "SIND",
+          "nuPlan"
+        ]
+      },
+      "reported_numerical_results": null,
+      "comparison_to_sam": "Reachable-set constraint method comparator. SAM #11291 measures observation-constrained common feasible continuation actions across hidden-state/reference cells; complementary construct, not same metric.",
+      "source_status": "peer_reviewed_paper_metadata_and_abstract",
+      "rights_status": "paper_code_and_dataset_terms_to_check",
+      "sources": [
+        "https://doi.org/10.1016/j.trc.2026.105800",
+        "https://www.sciencedirect.com/science/article/pii/S0968090X26002883"
+      ],
+      "caveats": [
+        "Do not infer or reproduce headline numerical claims from abstract-only metadata.",
+        "No SURE-Plan score is a SAM result.",
+        "A matched comparison requires exact paper protocol, dataset split, checkpoint, evaluator, sensor privilege and compute budget."
+      ]
+    }
+  ]
 }
