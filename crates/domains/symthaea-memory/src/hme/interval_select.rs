@@ -1882,6 +1882,36 @@ mod tests {
     }
 
     #[test]
+    fn unqualified_quantized_group_synopsis_cannot_create_selector_record() {
+        let query = ContinuousHV::from_vec(vec![1.0; 8]);
+        let members = vec![
+            ("quantized-a".to_owned(), ContinuousHV::from_vec(vec![0.7; 8])),
+            ("quantized-b".to_owned(), ContinuousHV::from_vec(vec![0.8; 8])),
+        ];
+        let envelope = ContinuousHVGroupEnvelope::from_original_members_with_mode(
+            72,
+            11,
+            &members,
+            super::super::group_envelope::GroupEnvelopeMode::QuantizedBoxAndBall,
+        )
+        .unwrap();
+        let result = GroupScoreIntervalRecord::from_group_envelope(
+            &envelope,
+            &query,
+            72,
+            11,
+            envelope.member_set_digest(),
+            envelope.content_digest(),
+        );
+        assert!(matches!(
+            result,
+            Err(GroupScoreIntervalBuildError::GroupEnvelope(
+                GroupEnvelopeError::UnqualifiedSynopsisMode
+            ))
+        ));
+    }
+
+    #[test]
     fn group_selection_record_is_bound_to_the_verified_envelope_identity() {
         let members = vec![
             ("memory-a".to_owned(), ContinuousHV::from_vec(vec![0.8; 8])),
