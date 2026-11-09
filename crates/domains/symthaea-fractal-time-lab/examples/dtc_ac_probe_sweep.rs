@@ -3,9 +3,7 @@
 
 use std::error::Error;
 use std::f64::consts::PI;
-use symthaea_fractal_time_lab::{
-    DtcProbeConfig, SubharmonicLifetime, evaluate_dtc_probe_sensing,
-};
+use symthaea_fractal_time_lab::{DtcProbeConfig, SubharmonicLifetime, evaluate_dtc_probe_sensing};
 
 fn lifetime_label(lifetime: SubharmonicLifetime) -> String {
     match lifetime {
@@ -34,10 +32,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("readout=single_final_collective_Z_measurement_with_N_plus_1_Hamming_weight_outcomes");
     println!("initial_state=all_up_product");
     println!("n_spins={N_SPINS},periods={PERIODS},analysis_start={ANALYSIS_START}");
-    println!("pulse_angle_rad={:.9},probe_amplitude={PROBE_AMPLITUDE:.9}", PI + 0.10);
+    println!(
+        "pulse_angle_rad={:.9},probe_amplitude={PROBE_AMPLITUDE:.9}",
+        PI + 0.10
+    );
     println!("information_metric=classical_Fisher_information_from_exact_total_Z_distribution");
-    println!("cost_metric=Fisher_information_per_simulated_Floquet_period_not_full_experiment_cost");
-    println!("coupling,probe_frequency,baseline_order,probed_order,baseline_sign_coherence,probed_sign_coherence,baseline_lifetime,probed_lifetime,CFI_per_shot,QFI_per_shot,CFI_per_period,QFI_per_period,CFI_over_QFI,CFI_within_QFI,norm_error");
+    println!(
+        "cost_metric=Fisher_information_per_simulated_Floquet_period_not_full_experiment_cost"
+    );
+    println!(
+        "coupling,probe_frequency,baseline_order,probed_order,baseline_sign_coherence,probed_sign_coherence,baseline_lifetime,probed_lifetime,CFI_per_shot,QFI_per_shot,CFI_per_period,QFI_per_period,CFI_over_QFI,CFI_within_QFI,norm_error"
+    );
 
     for coupling in couplings {
         for frequency in frequencies {
@@ -83,8 +88,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("Interpretation boundary: a high Fisher value is conditional on the exact simulator, final total-Z readout, ideal calibration and repeated identical preparations.");
-    println!("Not included: bath/noise, spatial dipolar disorder, sensor back-action, NV optical readout, calibration drift, dead time or device sensitivity.");
-    println!("No result here establishes a thermodynamic DTC phase or reproduces the experimental diamond sensing protocol.");
+    println!(
+        "Interpretation boundary: a high Fisher value is conditional on the exact simulator, final total-Z readout, ideal calibration and repeated identical preparations."
+    );
+    println!(
+        "Not included: bath/noise, spatial dipolar disorder, sensor back-action, NV optical readout, calibration drift, dead time or device sensitivity."
+    );
+    println!(
+        "No result here establishes a thermodynamic DTC phase or reproduces the experimental diamond sensing protocol."
+    );
     Ok(())
 }
