@@ -306,6 +306,9 @@ impl BlindEpisode {
         quadratic_term: i64,
         max_probe_actions: usize,
     ) -> Result<Self, ProtocolError> {
+        if quadratic_term == 0 {
+            return Err(ProtocolError::InvalidManifest);
+        }
         Self::new_numeric_with_support(
             episode_id,
             truth,
