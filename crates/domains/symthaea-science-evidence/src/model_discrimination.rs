@@ -718,6 +718,7 @@ fn score_experiment(
             experiment_id: experiment.experiment_id.clone(),
             observable_id: experiment.observable_id.clone(),
             cost: experiment.cost,
+            availability_probability: experiment.availability_probability,
             status: ExperimentDiscriminationStatus::NotComparable { blockers },
             prior_scenario_scores: Vec::new(),
             worst_case_model_identity_eig_nats: None,
@@ -743,6 +744,8 @@ fn score_experiment(
     let mut prior_scenario_scores = Vec::with_capacity(config.prior_scenarios.len());
     let mut worst_case = f64::INFINITY;
     let mut weighted_sum = 0.0;
+    let mut availability_adjusted_worst_case = f64::INFINITY;
+    let mut availability_adjusted_weighted_sum = 0.0;
     let mut maximum_error = 0.0_f64;
     let max_scenario_weight = config
         .prior_scenarios
@@ -784,13 +787,21 @@ fn score_experiment(
         let prior_entropy = discrete_entropy(&probabilities);
         let converged = error <= config.quadrature_tolerance_nats;
         maximum_error = maximum_error.max(error);
+        let availability_adjusted_eig = experiment.availability_probability * refined;
+        let expected_posterior_entropy = prior_entropy - availability_adjusted_eig;
         worst_case = worst_case.min(refined);
         weighted_sum += normalized_scenario_weight * refined;
+        availability_adjusted_worst_case =
+            availability_adjusted_worst_case.min(availability_adjusted_eig);
+        availability_adjusted_weighted_sum +=
+            normalized_scenario_weight * availability_adjusted_eig;
         prior_scenario_scores.push(PriorScenarioEIG {
             scenario_id: scenario.scenario_id.clone(),
             prior_entropy_nats: prior_entropy,
             coarse_eig_nats: coarse,
             refined_eig_nats: refined,
+            availability_adjusted_eig_nats: availability_adjusted_eig,
+            expected_posterior_entropy_nats: expected_posterior_entropy,
             quadrature_error_nats: error,
             converged,
         });
@@ -801,6 +812,7 @@ fn score_experiment(
             experiment_id: experiment.experiment_id.clone(),
             observable_id: experiment.observable_id.clone(),
             cost: experiment.cost,
+            availability_probability: experiment.availability_probability,
             status: ExperimentDiscriminationStatus::QuadratureNotConverged {
                 maximum_error_nats: maximum_error,
                 tolerance_nats: config.quadrature_tolerance_nats,
@@ -817,16 +829,20 @@ fn score_experiment(
     let weighted_mean = weighted_sum / total_scenario_weight;
     let worst_case = worst_case.max(0.0);
     let weighted_mean = weighted_mean.max(0.0);
+    let availability_adjusted_worst_case = availability_adjusted_worst_case.max(0.0);
+    let availability_adjusted_weighted_mean =
+        (availability_adjusted_weighted_sum / total_scenario_weight).max(0.0);
     Ok(ExperimentDiscriminationScore {
         experiment_id: experiment.experiment_id.clone(),
         observable_id: experiment.observable_id.clone(),
         cost: experiment.cost,
+        availability_probability: experiment.availability_probability,
         status: ExperimentDiscriminationStatus::Scored,
         prior_scenario_scores,
         worst_case_model_identity_eig_nats: Some(worst_case),
         weighted_mean_model_identity_eig_nats: Some(weighted_mean),
-        worst_case_eig_per_cost: Some(worst_case / experiment.cost),
-        weighted_mean_eig_per_cost: Some(weighted_mean / experiment.cost),
+        worst_case_eig_per_cost: Some(availability_adjusted_worst_case / experiment.cost),
+        weighted_mean_eig_per_cost: Some(availability_adjusted_weighted_mean / experiment.cost),
         open_world_unresolved_excluded,
     })
 }
