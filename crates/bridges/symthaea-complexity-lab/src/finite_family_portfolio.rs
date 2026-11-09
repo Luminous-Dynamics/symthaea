@@ -4061,6 +4061,35 @@ mod tests {
                 limit: 1,
             })
         );
+
+        let mut aggregate_cluster_nodes_tight = portfolio_search_budget();
+        aggregate_cluster_nodes_tight.max_total_cluster_search_nodes = 2;
+        assert_eq!(
+            solve_exact_finite_family_policy_portfolio_bnb(
+                &family, q(1,2), 2, aggregate_cluster_nodes_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "outer total cluster B&B search nodes",
+                required: 3,
+                limit: 2,
+            })
+        );
+
+        // The inner cluster searches fit (92 DP terms), but the final
+        // all-model-by-selected-policy replay needs another 12. Reject before
+        // allocating the replay output or performing those extra DP operations.
+        let mut replay_work_tight = portfolio_search_budget();
+        replay_work_tight.max_total_inner_dp_multiply_adds = 103;
+        assert_eq!(
+            solve_exact_finite_family_policy_portfolio_bnb(
+                &family, q(1,2), 2, replay_work_tight,
+            ),
+            Err(PolicyPortfolioError::BudgetExceeded {
+                resource: "outer total DP work including cross-model portfolio replay",
+                required: 104,
+                limit: 103,
+            })
+        );
     }
 
     #[test]
