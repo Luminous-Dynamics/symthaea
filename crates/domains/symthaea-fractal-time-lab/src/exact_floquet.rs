@@ -126,7 +126,10 @@ impl fmt::Display for FloquetError {
                 )
             }
             Self::InvalidProbeFrequency => {
-                write!(f, "AC probe frequency must be finite and in [0, 0.5] cycles per drive period")
+                write!(
+                    f,
+                    "AC probe frequency must be finite and in [0, 0.5] cycles per drive period"
+                )
             }
         }
     }
@@ -442,9 +445,7 @@ impl KickedIsingFloquet {
         signal.push(self.magnetization());
         for period in 0..periods {
             let midpoint = period as f64 + 0.5;
-            let phase = 2.0 * std::f64::consts::PI
-                * frequency_cycles_per_drive_period
-                * midpoint
+            let phase = 2.0 * std::f64::consts::PI * frequency_cycles_per_drive_period * midpoint
                 + initial_phase_rad;
             self.step_with_uniform_ac_probe(amplitude, phase)?;
             signal.push(self.magnetization());
