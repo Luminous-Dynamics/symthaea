@@ -287,6 +287,9 @@ pub fn evaluate(case: &ControlCase) -> Result<ControlReport, String> {
     }).collect();
     let observed_mean_target_delta = target_deltas.iter().sum::<f64>() / target_deltas.len() as f64;
     let target_response_ratio = observed_mean_target_delta / case.requested_delta;
+    if !observed_mean_target_delta.is_finite() || !target_response_ratio.is_finite() {
+        return Err("target response calculation overflowed or became non-finite".into());
+    }
     let target_region_direction_fraction = target_deltas.iter()
         .filter(|delta| **delta * direction > 0.0).count() as f64 / target_deltas.len() as f64;
 
@@ -308,6 +311,12 @@ pub fn evaluate(case: &ControlCase) -> Result<ControlReport, String> {
             let delta = variant - baseline;
             let tolerance = case.feature_tolerances[dimension];
             let normalized_drift = delta.abs() / tolerance;
+            if !delta.is_finite() || !normalized_drift.is_finite() {
+                return Err(format!(
+                    "collateral drift calculation overflowed for region {region:?}, feature {}",
+                    dimension.label()
+                ));
+            }
             max_collateral_ratio = max_collateral_ratio.max(normalized_drift);
             if normalized_drift > case.max_collateral_ratio {
                 collateral_exceedances.push(FeatureDrift {
@@ -479,8 +488,15 @@ fn t_critical_95(degrees_of_freedom: usize) -> f64 {
         18 => 2.101,
         19 => 2.093,
         20 => 2.086,
-        21..=24 => 2.064,
-        25..=29 => 2.045,
+        21 => 2.080,
+        22 => 2.074,
+        23 => 2.069,
+        24 => 2.064,
+        25 => 2.060,
+        26 => 2.056,
+        27 => 2.052,
+        28 => 2.048,
+        29 => 2.045,
         _ => 1.96,
     }
 }
@@ -512,6 +528,14 @@ pub fn evaluate_suite(suite: &ControlSuite) -> Result<ControlSuiteReport, String
     let critical = t_critical_95(ratios.len() - 1);
     let half_width = critical * sample_sd / (ratios.len() as f64).sqrt();
     let ci = [mean_ratio - half_width, mean_ratio + half_width];
+    if !mean_ratio.is_finite()
+        || !sample_variance.is_finite()
+        || !sample_sd.is_finite()
+        || !ci[0].is_finite()
+        || !ci[1].is_finite()
+    {
+        return Err("suite response statistics overflowed or became non-finite".into());
+    }
 
     let first_case = &suite.replicates[0];
     let mean_direction = replicate_reports
