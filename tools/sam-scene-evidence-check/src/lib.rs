@@ -907,9 +907,97 @@ fn validate_semantics(instance: &Value) -> Vec<String> {
         &source_roles,
         &["simulator_oracle"],
     );
+    validate_simulator_truth_actor_states(&mut errors, snapshot, &source_records, &frame_ids);
     validate_follow_target_context(&mut errors, snapshot, &source_records, &frame_ids);
 
     errors
+}
+
+fn validate_simulator_truth_actor_states(
+    errors: &mut Vec<String>,
+    snapshot: &Value,
+    source_records: &BTreeMap<String, Value>,
+    frame_ids: &BTreeSet<String>,
+) {
+    let Some(actors) = snapshot
+        .get("simulator_truth_actor_states")
+        .and_then(Value::as_array)
+    else {
+        errors.push("simulator_truth_actor_states: required array is missing".into());
+        return;
+    };
+    let scenario_id = snapshot.get("scenario_id").and_then(Value::as_str);
+    let truth_refs: BTreeSet<&str> = snapshot
+        .get("simulator_truth_refs")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+    let mut seen_actor_ids = BTreeSet::new();
+
+    for (index, actor) in actors.iter().enumerate() {
+        let prefix = format!("simulator_truth_actor_states[{index}]");
+        let actor_id = actor.get("actor_id").and_then(Value::as_str);
+        let actor_scenario = actor.get("scenario_id").and_then(Value::as_str);
+        let frame_id = actor.get("reference_frame_id").and_then(Value::as_str);
+        let source_ref = actor.get("source_ref").and_then(Value::as_str);
+        let acquisition_tick = actor.get("acquisition_tick_ns").and_then(Value::as_u64);
+
+        if let Some(actor_id) = actor_id {
+            if !seen_actor_ids.insert(actor_id.to_owned()) {
+                errors.push(format!("{prefix}: duplicate actor_id {actor_id}"));
+            }
+        }
+        if actor_scenario != scenario_id {
+            errors.push(format!("{prefix}: scenario_id must match the containing scene"));
+        }
+        if frame_id.is_none_or(|frame| !frame_ids.contains(frame)) {
+            errors.push(format!("{prefix}: reference_frame_id must resolve in the scene"));
+        }
+        let Some(source_ref) = source_ref else {
+            errors.push(format!("{prefix}: source_ref is required"));
+            continue;
+        };
+        if !truth_refs.contains(source_ref) {
+            errors.push(format!("{prefix}: source_ref must also appear in simulator_truth_refs"));
+        }
+        let Some(source) = source_records.get(source_ref) else {
+            errors.push(format!("{prefix}: unknown simulator-oracle source {source_ref}"));
+            continue;
+        };
+        if source.get("source_role").and_then(Value::as_str) != Some("simulator_oracle") {
+            errors.push(format!("{prefix}: source_ref must have simulator_oracle role"));
+        }
+        if source.get("modality").and_then(Value::as_str) != Some("synthetic")
+            || source.get("evidence_kind").and_then(Value::as_str)
+                != Some("synthetic_observation")
+        {
+            errors.push(format!("{prefix}: source must be a synthetic oracle observation"));
+        }
+        if source.get("currentness").and_then(Value::as_str)
+            .is_none_or(|value| !matches!(value, "current" | "current_for_fixture"))
+        {
+            errors.push(format!("{prefix}: stale or unknown oracle source cannot define truth state"));
+        }
+        if source.get("reference_frame_id").and_then(Value::as_str) != frame_id {
+            errors.push(format!("{prefix}: actor and oracle source frames must match"));
+        }
+        if source.get("acquisition_tick_ns").and_then(Value::as_u64) != acquisition_tick {
+            errors.push(format!("{prefix}: actor acquisition tick must match oracle source"));
+        }
+        for field in ["position_m", "velocity_mps"] {
+            let values = actor.get(field).and_then(Value::as_array);
+            if values.is_none_or(|values| {
+                values.len() != 3
+                    || values.iter().any(|value| {
+                        value.as_f64().is_none_or(|number| !number.is_finite())
+                    })
+            }) {
+                errors.push(format!("{prefix}.{field}: expected a finite metric 3-vector"));
+            }
+        }
+    }
 }
 
 fn validate_follow_target_context(
@@ -942,6 +1030,8 @@ fn validate_follow_target_context(
             "gap_m",
             "relative_speed_mps",
             "distance_uncertainty_m",
+            "target_reference_kind",
+            "target_reference_id",
         ];
         for field in unresolved_fields {
             if context.get(field).is_some_and(|value| !value.is_null()) {
@@ -953,7 +1043,13 @@ fn validate_follow_target_context(
         return;
     }
 
-    for field in ["scenario_id", "actor_id", "coordinate_frame_id"] {
+    for field in [
+        "scenario_id",
+        "actor_id",
+        "coordinate_frame_id",
+        "target_reference_kind",
+        "target_reference_id",
+    ] {
         if context
             .get(field)
             .and_then(Value::as_str)
@@ -988,9 +1084,26 @@ fn validate_follow_target_context(
         .get("source_role")
         .and_then(Value::as_str)
         .unwrap_or("unknown");
+    let reference_kind = context
+        .get("target_reference_kind")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let reference_id = context
+        .get("target_reference_id")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+
     let expected_role = match profile {
         "simulation_benchmark" => "simulator_oracle",
-        "local_perception" | "deployment" => "local_sensor_observation",
+        "local_perception" => {
+            if !matches!(role, "local_sensor_observation" | "synthetic_sensor_observation") {
+                errors.push(format!(
+                    "follow_target_context: local_perception requires a local sensor observation, not {role}"
+                ));
+            }
+            role
+        }
+        "deployment" => "local_sensor_observation",
         _ => {
             errors.push(format!(
                 "follow_target_context: unsupported consumer profile {profile}"
@@ -998,7 +1111,7 @@ fn validate_follow_target_context(
             return;
         }
     };
-    if role != expected_role {
+    if profile != "local_perception" && role != expected_role {
         errors.push(format!(
             "follow_target_context: {profile} requires source role {expected_role}, not {role}; remote cooperative claims never substitute for a local lead track"
         ));
@@ -1016,16 +1129,9 @@ fn validate_follow_target_context(
         .get("currentness")
         .and_then(Value::as_str)
         .unwrap_or("unknown");
-    let sensor_modality = matches!(
+    let actor_sensor_modality = matches!(
         source_modality,
-        "rgb_camera"
-            | "stereo_camera"
-            | "lidar"
-            | "radar"
-            | "ultrasonic"
-            | "imu"
-            | "gnss"
-            | "wheel_odometry"
+        "rgb_camera" | "stereo_camera" | "lidar" | "radar" | "ultrasonic"
     );
 
     match profile {
@@ -1042,17 +1148,50 @@ fn validate_follow_target_context(
                         .into(),
                 );
             }
-        }
-        "local_perception" | "deployment" => {
-            if !sensor_modality || evidence_kind != "measurement" || currentness != "current" {
+            if reference_kind != "simulator_truth_actor" || reference_id != context.get("actor_id").and_then(Value::as_str).unwrap_or("") {
                 errors.push(
-                    "follow_target_context: local/deployment Follow requires a current local sensor measurement"
+                    "follow_target_context: simulation benchmark must link to the exact simulator truth actor"
                         .into(),
                 );
             }
-            if source_modality == "synthetic" {
+        }
+        "local_perception" => {
+            if !actor_sensor_modality {
                 errors.push(
-                    "follow_target_context: synthetic simulator truth is not a local sensor measurement"
+                    "follow_target_context: local perception Follow requires camera/LiDAR/radar/ultrasonic actor evidence, not proprioceptive or remote modalities"
+                        .into(),
+                );
+            }
+            let admissible = match role {
+                "local_sensor_observation" => evidence_kind == "measurement" && currentness == "current",
+                "synthetic_sensor_observation" => {
+                    evidence_kind == "synthetic_observation" && currentness == "current_for_fixture"
+                }
+                _ => false,
+            };
+            if !admissible {
+                errors.push(
+                    "follow_target_context: local perception source must be a current local measurement or explicitly synthetic fixture observation"
+                        .into(),
+                );
+            }
+            if reference_kind != "tracked_object_hypothesis" {
+                errors.push(
+                    "follow_target_context: local perception must link to a tracked object hypothesis"
+                        .into(),
+                );
+            }
+        }
+        "deployment" => {
+            if !actor_sensor_modality || evidence_kind != "measurement" || currentness != "current" {
+                errors.push(
+                    "follow_target_context: deployment Follow requires a current camera/LiDAR/radar/ultrasonic local sensor measurement"
+                        .into(),
+                );
+            }
+            if reference_kind != "tracked_object_hypothesis" {
+                errors.push(
+                    "follow_target_context: deployment must link to a tracked object hypothesis, not simulator truth"
                         .into(),
                 );
             }
@@ -1061,11 +1200,21 @@ fn validate_follow_target_context(
     }
 
     let context_frame = context.get("coordinate_frame_id").and_then(Value::as_str);
-    let source_frame = source.get("reference_frame_id").and_then(Value::as_str);
-    if context_frame != source_frame || context_frame.is_none_or(|frame| !frame_ids.contains(frame))
-    {
+    if context_frame.is_none_or(|frame| !frame_ids.contains(frame)) {
+        errors.push("follow_target_context: coordinate_frame_id must resolve in the scene".into());
+    }
+    let road_frame_is_local = snapshot
+        .get("reference_frames")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .any(|frame| {
+            frame.get("frame_id").and_then(Value::as_str) == context_frame
+                && frame.get("kind").and_then(Value::as_str) == Some("local_road")
+        });
+    if !road_frame_is_local {
         errors.push(
-            "follow_target_context: evidence source frame must resolve and match the follow-target frame"
+            "follow_target_context: v0.1 gap and relative speed require the declared local_road x-forward frame"
                 .into(),
         );
     }
@@ -1106,6 +1255,119 @@ fn validate_follow_target_context(
         ),
     }
 
+    let ego_state = snapshot.get("ego_state");
+    let ego_frame = ego_state
+        .and_then(|state| state.get("reference_frame_id"))
+        .and_then(Value::as_str);
+    let ego_position = ego_state
+        .and_then(|state| state.get("position_m"))
+        .and_then(Value::as_array);
+    let ego_velocity = ego_state
+        .and_then(|state| state.get("velocity_mps"))
+        .and_then(Value::as_array);
+
+    let (target_position, target_velocity, target_frame, target_scenario, target_tick) =
+        if profile == "simulation_benchmark" {
+            let actor = snapshot
+                .get("simulator_truth_actor_states")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .find(|actor| {
+                    actor.get("actor_id").and_then(Value::as_str) == Some(reference_id)
+                });
+            if let Some(actor) = actor {
+                let actor_source = actor.get("source_ref").and_then(Value::as_str);
+                if actor_source != Some(source_id) {
+                    errors.push(
+                        "follow_target_context: simulator actor and evidence_source_ref must share the exact oracle source"
+                            .into(),
+                    );
+                }
+                (
+                    actor.get("position_m").and_then(Value::as_array),
+                    actor.get("velocity_mps").and_then(Value::as_array),
+                    actor.get("reference_frame_id").and_then(Value::as_str),
+                    actor.get("scenario_id").and_then(Value::as_str),
+                    actor.get("acquisition_tick_ns").and_then(Value::as_u64),
+                )
+            } else {
+                errors.push(format!(
+                    "follow_target_context: unknown simulator truth actor {reference_id}"
+                ));
+                (None, None, None, None, None)
+            }
+        } else {
+            let object = snapshot
+                .get("object_hypotheses")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .find(|object| {
+                    object.get("hypothesis_id").and_then(Value::as_str) == Some(reference_id)
+                });
+            if let Some(object) = object {
+                if object.get("track_lineage_id").and_then(Value::as_str)
+                    != context.get("actor_id").and_then(Value::as_str)
+                {
+                    errors.push(
+                        "follow_target_context: actor_id must match the linked track_lineage_id"
+                            .into(),
+                    );
+                }
+                let refs: BTreeSet<&str> = object
+                    .get("source_refs")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .collect();
+                if !refs.contains(source_id) {
+                    errors.push(
+                        "follow_target_context: evidence_source_ref must be attached to the linked object hypothesis"
+                            .into(),
+                    );
+                }
+                if !matches!(
+                    object.get("epistemic_state").and_then(Value::as_str),
+                    Some("observed" | "estimated")
+                ) {
+                    errors.push(
+                        "follow_target_context: stale, unknown, occluded, predicted or contradicted object cannot be a current Follow target"
+                            .into(),
+                    );
+                }
+                (
+                    object.get("position_m").and_then(Value::as_array),
+                    object.get("velocity_mps").and_then(Value::as_array),
+                    object.get("reference_frame_id").and_then(Value::as_str),
+                    snapshot_scenario,
+                    object.get("measurement_time_tick_ns").and_then(Value::as_u64),
+                )
+            } else {
+                errors.push(format!(
+                    "follow_target_context: unknown tracked object hypothesis {reference_id}"
+                ));
+                (None, None, None, None, None)
+            }
+        };
+
+    if target_frame != context_frame || target_frame != ego_frame {
+        errors.push(
+            "follow_target_context: ego, target and requested Follow frame must match exactly"
+                .into(),
+        );
+    }
+    if target_scenario != scenario {
+        errors.push("follow_target_context: target actor must belong to the exact scenario".into());
+    }
+    if target_tick != observation_tick {
+        errors.push(
+            "follow_target_context: target state time must match the admitted observation time"
+                .into(),
+        );
+    }
+
     let gap = context.get("gap_m").and_then(Value::as_f64);
     let relative_speed = context.get("relative_speed_mps").and_then(Value::as_f64);
     let uncertainty = context
@@ -1120,8 +1382,44 @@ fn validate_follow_target_context(
                 .into(),
         );
     }
-}
 
+    if let (Some(ego_position), Some(target_position), Some(gap)) =
+        (ego_position, target_position, gap)
+    {
+        if ego_position.len() == 3 && target_position.len() == 3 {
+            if let (Some(ego_x), Some(target_x)) = (
+                ego_position[0].as_f64(),
+                target_position[0].as_f64(),
+            ) {
+                let expected_gap = target_x - ego_x;
+                if (gap - expected_gap).abs() > 1e-6 || expected_gap <= 0.0 {
+                    errors.push(
+                        "follow_target_context: gap_m must equal positive target.x - ego.x in the declared local_road frame"
+                            .into(),
+                    );
+                }
+            }
+        }
+    }
+    if let (Some(ego_velocity), Some(target_velocity), Some(relative_speed)) =
+        (ego_velocity, target_velocity, relative_speed)
+    {
+        if ego_velocity.len() == 3 && target_velocity.len() == 3 {
+            if let (Some(ego_vx), Some(target_vx)) = (
+                ego_velocity[0].as_f64(),
+                target_velocity[0].as_f64(),
+            ) {
+                let expected_relative_speed = target_vx - ego_vx;
+                if (relative_speed - expected_relative_speed).abs() > 1e-6 {
+                    errors.push(
+                        "follow_target_context: relative_speed_mps must equal target.vx - ego.vx"
+                            .into(),
+                    );
+                }
+            }
+        }
+    }
+}
 fn validate_source_role(errors: &mut Vec<String>, source: &Value) {
     let id = source
         .get("source_id")
