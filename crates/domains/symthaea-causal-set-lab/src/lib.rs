@@ -46,8 +46,8 @@ pub use interval_profile::{
     IntervalAbundanceProfile, IntervalProfileError, MAX_INTERVAL_PROFILE_BINS,
 };
 pub use joint_likelihood::{
-    DimensionProbability, JointDimensionModel, JointDimensionPosterior,
-    JointGaussianCalibration, JointLikelihoodError, infer_joint_dimension,
+    DimensionProbability, JointDimensionModel, JointDimensionPosterior, JointGaussianCalibration,
+    JointLikelihoodError, infer_joint_dimension,
 };
 pub use joint_signature::{
     JointCausalSetSignature, JointSignatureError, MAX_SIGNATURE_SPACETIME_DIMENSION,
