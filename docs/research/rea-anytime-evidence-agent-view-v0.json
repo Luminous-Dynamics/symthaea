@@ -482,8 +482,9 @@
         {
           "claim_id": "behavior_verified_for_exact_artifact",
           "strength_rank": 2,
-          "claim_text": "The behavior was verified for the exact acquired artifact.",
+          "claim_text": "The behavior described by the provider report was verified for the exact acquired artifact.",
           "required_obligation_ids": [
+            "provider_report",
             "artifact_identity",
             "behavior_reproduction"
           ],
