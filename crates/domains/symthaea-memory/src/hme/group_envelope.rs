@@ -40,6 +40,8 @@ const QUERY_DOMAIN: &[u8] = b"hme_continuous_hv_query_v1";
 pub enum GroupEnvelopeMode {
     /// Coordinate extrema plus centroid/radius.
     BoxAndBall,
+    /// Quantized 16-bit coordinate extrema plus centroid/radius.
+    QuantizedBoxAndBall,
     /// Centroid/radius only; lower synopsis memory, potentially looser pruning.
     BallOnly,
 }
@@ -48,6 +50,7 @@ impl GroupEnvelopeMode {
     fn domain_tag(self) -> &'static [u8] {
         match self {
             Self::BoxAndBall => b"box_and_ball_v1",
+            Self::QuantizedBoxAndBall => b"quantized_box_u16_and_ball_v1",
             Self::BallOnly => b"ball_only_v1",
         }
     }
@@ -66,6 +69,8 @@ pub struct ContinuousHVGroupEnvelope {
     content_digest: [u8; 32],
     coordinate_minima: Option<Arc<[f32]>>,
     coordinate_maxima: Option<Arc<[f32]>>,
+    coordinate_minima_u16: Option<Arc<[u16]>>,
+    coordinate_maxima_u16: Option<Arc<[u16]>>,
     centroid: ContinuousHV,
     radius_l2_upper: f32,
 }
@@ -117,8 +122,9 @@ impl std::error::Error for GroupEnvelopeMemoryEstimateError {}
 
 /// Estimate the explicitly countable metadata cost of a grouped HME synopsis.
 ///
-/// BoxAndBall stores 3 f32 values per dimension (min, max, centroid), while
-/// BallOnly stores one f32 per dimension (centroid). Both store one f32 radius.
+/// BoxAndBall stores 3 f32 values per dimension; QuantizedBoxAndBall stores one
+/// f32 centroid plus two u16 endpoints; BallOnly stores one f32 centroid. All
+/// profiles store one f32 radius.
 /// Member IDs and payload digests are per record and do not vary with group size.
 pub fn estimate_group_envelope_memory(
     dimension: usize,
@@ -135,15 +141,16 @@ pub fn estimate_group_envelope_memory(
     }
     let group_count = eligible_records / group_size
         + usize::from(eligible_records % group_size != 0);
-    let coordinate_vectors = match mode {
-        GroupEnvelopeMode::BoxAndBall => 3usize,
-        GroupEnvelopeMode::BallOnly => 1usize,
-    };
-    let numeric_bytes_per_group = dimension
-        .checked_mul(coordinate_vectors)
-        .and_then(|values| values.checked_mul(std::mem::size_of::<f32>()))
-        .and_then(|values| values.checked_add(std::mem::size_of::<f32>()))
-        .ok_or(GroupEnvelopeMemoryEstimateError::ArithmeticOverflow)?;
+    let numeric_bytes_per_group = match mode {
+        GroupEnvelopeMode::BoxAndBall => dimension
+            .checked_mul(3 * std::mem::size_of::<f32>()),
+        GroupEnvelopeMode::QuantizedBoxAndBall => dimension
+            .checked_mul(std::mem::size_of::<f32>() + 2 * std::mem::size_of::<u16>()),
+        GroupEnvelopeMode::BallOnly => dimension
+            .checked_mul(std::mem::size_of::<f32>()),
+    }
+    .and_then(|values| values.checked_add(std::mem::size_of::<f32>()))
+    .ok_or(GroupEnvelopeMemoryEstimateError::ArithmeticOverflow)?;
     let numeric_synopsis_bytes = group_count
         .checked_mul(numeric_bytes_per_group)
         .ok_or(GroupEnvelopeMemoryEstimateError::ArithmeticOverflow)?;
@@ -339,6 +346,80 @@ pub fn member_id_set_digest(
     Ok(*hasher.finalize().as_bytes())
 }
 
+fn next_up_f64(value: f64) -> f64 {
+    if value.is_nan() || value == f64::INFINITY {
+        return value;
+    }
+    if value == 0.0 {
+        return f64::from_bits(1);
+    }
+    let bits = value.to_bits();
+    f64::from_bits(if value > 0.0 { bits + 1 } else { bits - 1 })
+}
+
+fn next_down_f64(value: f64) -> f64 {
+    if value.is_nan() || value == f64::NEG_INFINITY {
+        return value;
+    }
+    if value == 0.0 {
+        return -f64::from_bits(1);
+    }
+    let bits = value.to_bits();
+    f64::from_bits(if value > 0.0 { bits - 1 } else { bits + 1 })
+}
+
+fn next_up_f32(value: f32) -> f32 {
+    if value.is_nan() || value == f32::INFINITY {
+        return value;
+    }
+    if value == 0.0 {
+        return f32::from_bits(1);
+    }
+    let bits = value.to_bits();
+    f32::from_bits(if value > 0.0 { bits + 1 } else { bits - 1 })
+}
+
+fn next_down_f32(value: f32) -> f32 {
+    if value.is_nan() || value == f32::NEG_INFINITY {
+        return value;
+    }
+    if value == 0.0 {
+        return -f32::from_bits(1);
+    }
+    let bits = value.to_bits();
+    f32::from_bits(if value > 0.0 { bits - 1 } else { bits + 1 })
+}
+
+fn quantize_lower_coordinate(value: f32) -> u16 {
+    (((value as f64 + 1.0) * 32_767.5).floor().clamp(0.0, 65_535.0)) as u16
+}
+
+fn quantize_upper_coordinate(value: f32) -> u16 {
+    (((value as f64 + 1.0) * 32_767.5).ceil().clamp(0.0, 65_535.0)) as u16
+}
+
+fn decode_lower_coordinate(value: u16) -> f32 {
+    let exact = (2.0 * value as f64) / 65_535.0 - 1.0;
+    let outward = next_down_f64(exact).max(-1.0);
+    let rounded = outward as f32;
+    if (rounded as f64) > outward {
+        next_down_f32(rounded).max(-1.0)
+    } else {
+        rounded.max(-1.0)
+    }
+}
+
+fn decode_upper_coordinate(value: u16) -> f32 {
+    let exact = (2.0 * value as f64) / 65_535.0 - 1.0;
+    let outward = next_up_f64(exact).min(1.0);
+    let rounded = outward as f32;
+    if (rounded as f64) < outward {
+        next_up_f32(rounded).min(1.0)
+    } else {
+        rounded.min(1.0)
+    }
+}
+
 fn next_up_f64_nonnegative(value: f64) -> f64 {
     if value.is_nan() || value == f64::INFINITY {
         return value;
@@ -419,7 +500,7 @@ impl ContinuousHVGroupEnvelope {
         }
 
         let (coordinate_minima, coordinate_maxima) = match mode {
-            GroupEnvelopeMode::BoxAndBall => {
+            GroupEnvelopeMode::BoxAndBall | GroupEnvelopeMode::QuantizedBoxAndBall => {
                 let mut minima = vec![f32::INFINITY; dimension];
                 let mut maxima = vec![f32::NEG_INFINITY; dimension];
                 for (_, vector) in by_id.values() {
@@ -431,6 +512,31 @@ impl ContinuousHVGroupEnvelope {
                 (Some(minima), Some(maxima))
             }
             GroupEnvelopeMode::BallOnly => (None, None),
+        };
+        let (coordinate_minima_u16, coordinate_maxima_u16) = match mode {
+            GroupEnvelopeMode::QuantizedBoxAndBall => {
+                let minima = coordinate_minima
+                    .as_ref()
+                    .expect("quantized mode computed coordinate minima")
+                    .iter()
+                    .copied()
+                    .map(quantize_lower_coordinate)
+                    .collect();
+                let maxima = coordinate_maxima
+                    .as_ref()
+                    .expect("quantized mode computed coordinate maxima")
+                    .iter()
+                    .copied()
+                    .map(quantize_upper_coordinate)
+                    .collect();
+                (Some(minima), Some(maxima))
+            }
+            _ => (None, None),
+        };
+        let (coordinate_minima, coordinate_maxima) = if mode == GroupEnvelopeMode::QuantizedBoxAndBall {
+            (None, None)
+        } else {
+            (coordinate_minima, coordinate_maxima)
         };
 
         let member_ids: Vec<String> = by_id.keys().map(|id| (*id).to_owned()).collect();
@@ -528,6 +634,11 @@ impl ContinuousHVGroupEnvelope {
                 hasher.update(&value.to_bits().to_le_bytes());
             }
         }
+        if let (Some(minima), Some(maxima)) = (&coordinate_minima_u16, &coordinate_maxima_u16) {
+            for value in minima.iter().chain(maxima) {
+                hasher.update(&value.to_le_bytes());
+            }
+        }
         hasher.update(&radius_l2_upper.to_bits().to_le_bytes());
         for value in &centroid.values {
             hasher.update(&value.to_bits().to_le_bytes());
@@ -544,6 +655,8 @@ impl ContinuousHVGroupEnvelope {
             content_digest: *hasher.finalize().as_bytes(),
             coordinate_minima: coordinate_minima.map(Arc::from),
             coordinate_maxima: coordinate_maxima.map(Arc::from),
+            coordinate_minima_u16: coordinate_minima_u16.map(Arc::from),
+            coordinate_maxima_u16: coordinate_maxima_u16.map(Arc::from),
             centroid,
             radius_l2_upper,
         })
@@ -566,6 +679,14 @@ impl ContinuousHVGroupEnvelope {
                 .coordinate_maxima
                 .as_ref()
                 .map_or(0, |values| values.len() * std::mem::size_of::<f32>())
+            + self
+                .coordinate_minima_u16
+                .as_ref()
+                .map_or(0, |values| values.len() * std::mem::size_of::<u16>())
+            + self
+                .coordinate_maxima_u16
+                .as_ref()
+                .map_or(0, |values| values.len() * std::mem::size_of::<u16>())
             + std::mem::size_of::<f32>()
     }
 
@@ -683,11 +804,23 @@ impl ContinuousHVGroupEnvelope {
             )
             .map_err(GroupEnvelopeError::ScoreInterval)?;
 
-        let (Some(minima), Some(maxima)) =
-            (&self.coordinate_minima, &self.coordinate_maxima)
-        else {
-            return Ok(centroid_ball);
-        };
+        let decoded_bounds;
+        let (minima, maxima): (&[f32], &[f32]) =
+            if let (Some(minima), Some(maxima)) =
+                (&self.coordinate_minima, &self.coordinate_maxima)
+            {
+                (minima, maxima)
+            } else if let (Some(minima), Some(maxima)) =
+                (&self.coordinate_minima_u16, &self.coordinate_maxima_u16)
+            {
+                decoded_bounds = (
+                    minima.iter().copied().map(decode_lower_coordinate).collect::<Vec<_>>(),
+                    maxima.iter().copied().map(decode_upper_coordinate).collect::<Vec<_>>(),
+                );
+                (&decoded_bounds.0, &decoded_bounds.1)
+            } else {
+                return Ok(centroid_ball);
+            };
         let component_box = query
             .similarity_interval_full_resolution_for_component_bounds(minima, maxima)
             .map_err(GroupEnvelopeError::ScoreInterval)?;
