@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/evidence_span_golden_v0.1.schema.json",
+  "title": "Synthetic source-bound temporal evidence citation vectors",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "evidence_state",
+    "coordinate_system",
+    "purpose",
+    "policy",
+    "vectors",
+    "rejected_controls"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "evidence_state": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "coordinate_system": {
+      "const": "ZERO_BASED_HALF_OPEN_SAMPLES"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/vector"
+      }
+    },
+    "rejected_controls": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rejected"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "interval": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "integer",
+          "minimum": 1
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "citation": {
+      "type": "object",
+      "required": [
+        "source_audio_sha256",
+        "interval"
+      ],
+      "properties": {
+        "source_audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "interval": {
+          "$ref": "#/$defs/interval"
+        }
+      },
+      "additionalProperties": false
+    },
+    "reference_claim": {
+      "type": "object",
+      "required": [
+        "claim_id",
+        "support_intervals"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "support_intervals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/interval"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "predicted_claim": {
+      "type": "object",
+      "required": [
+        "claim_id",
+        "citations"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/citation"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "rate": {
+      "type": "object",
+      "required": [
+        "numerator",
+        "denominator",
+        "rate"
+      ],
+      "properties": {
+        "numerator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "matched_claims",
+        "unsupported_predicted_claims",
+        "predicted_claims_without_citations",
+        "reference_claims_with_supported_citations",
+        "citation_count",
+        "predicted_citation_samples",
+        "reference_support_samples",
+        "overlapping_support_samples",
+        "claim_precision",
+        "claim_recall",
+        "reference_claim_evidence_coverage",
+        "citation_sample_precision",
+        "reference_sample_recall",
+        "sample_iou",
+        "unsupported_predicted_claim_rate",
+        "unsupported_citation_sample_rate"
+      ],
+      "properties": {
+        "matched_claims": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unsupported_predicted_claims": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "predicted_claims_without_citations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reference_claims_with_supported_citations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "citation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "predicted_citation_samples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reference_support_samples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overlapping_support_samples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "claim_precision": {
+          "$ref": "#/$defs/rate"
+        },
+        "claim_recall": {
+          "$ref": "#/$defs/rate"
+        },
+        "reference_claim_evidence_coverage": {
+          "$ref": "#/$defs/rate"
+        },
+        "citation_sample_precision": {
+          "$ref": "#/$defs/rate"
+        },
+        "reference_sample_recall": {
+          "$ref": "#/$defs/rate"
+        },
+        "sample_iou": {
+          "$ref": "#/$defs/rate"
+        },
+        "unsupported_predicted_claim_rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "unsupported_citation_sample_rate": {
+          "$ref": "#/$defs/rate"
+        }
+      },
+      "additionalProperties": false
+    },
+    "vector": {
+      "type": "object",
+      "required": [
+        "id",
+        "source_audio_sha256",
+        "sample_rate_hz",
+        "sample_count",
+        "reference_claims",
+        "predicted_claims",
+        "expected"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reference_claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/reference_claim"
+          }
+        },
+        "predicted_claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/predicted_claim"
+          }
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      },
+      "additionalProperties": false
+    },
+    "rejected": {
+      "type": "object",
+      "required": [
+        "id",
+        "source_audio_sha256",
+        "expected_error"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "citation_source_audio_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "interval": {
+          "$ref": "#/$defs/interval"
+        },
+        "expected_error": {
+          "enum": [
+            "CitationSourceDigestMismatch",
+            "InvalidInterval"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
