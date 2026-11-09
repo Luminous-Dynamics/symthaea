@@ -37,3 +37,7 @@ path = "examples/curved_order_inversion.rs"
 [[example]]
 name = "link_sampling_bias_reference"
 path = "examples/link_sampling_bias_reference.rs"
+
+[[example]]
+name = "bayesian_dimension_reference"
+path = "examples/bayesian_dimension_reference.rs"
