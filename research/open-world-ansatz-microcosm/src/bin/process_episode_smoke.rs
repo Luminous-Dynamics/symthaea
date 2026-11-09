@@ -25,6 +25,7 @@ struct PairedProcessSmokeReport {
     comparison_design: &'static str,
     a0: ProcessEpisodeReceipt,
     a2: ProcessEpisodeReceipt,
+    out_of_catalogue: ProcessEpisodeReceipt,
     limitations: Vec<String>,
 }
 
@@ -91,6 +92,33 @@ fn run_arm(
         .map_err(|error| format!("process episode failed: {error}"))
 }
 
+fn run_open_support_arm(
+    executable: &Path,
+    strategy: &str,
+) -> Result<ProcessEpisodeReceipt, String> {
+    let truth = ModelHypothesis {
+        mechanism: Mechanism::DirectResponse,
+        gain: 7,
+        decay: None,
+        initial_state: None,
+        sensor: SensorMap::Identity,
+    };
+    let episode = BlindEpisode::new_numeric_open_support(
+        "process-open-support-out-of-catalogue",
+        truth,
+        StructureAccess::NumericWithheld,
+        6,
+    )
+    .map_err(|error| format!("cannot create open-support evaluator episode: {error}"))?;
+    let config = ProcessAgentConfig::new(executable)
+        .with_args(child_args(strategy))
+        .with_working_directory(std::env::temp_dir());
+    let agent = ProcessAgent::spawn(config)
+        .map_err(|error| format!("cannot start open-support child agent: {error}"))?;
+    run_process_episode(episode, agent, "out_of_catalogue")
+        .map_err(|error| format!("open-support process episode failed: {error}"))
+}
+
 fn run() -> Result<(), String> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     let (executable, strategy) = parse_args(&args)?;
@@ -118,6 +146,7 @@ fn run() -> Result<(), String> {
         "a2",
         truth,
     )?;
+    let out_of_catalogue = run_open_support_arm(&executable, &strategy)?;
 
     for (label, score) in [
         ("a0", &a0.evaluator_score),
@@ -138,6 +167,24 @@ fn run() -> Result<(), String> {
         }
     }
 
+    if out_of_catalogue.evaluator_score.generating_model_in_version_space
+        || out_of_catalogue.evaluator_score.set_score.oracle_model_count != 0
+        || !out_of_catalogue.evaluator_score.set_score.exact_version_space_match
+        || !out_of_catalogue.evaluator_score.decision_correct
+        || !out_of_catalogue.evaluator_score.evidence_references_valid
+        || out_of_catalogue.evaluator_score.probe_count > 6
+    {
+        return Err(format!(
+            "out-of-catalogue support control failed: truth={}, oracle_models={}, exact_set={}, decision_correct={}, evidence_refs={}, probes={}",
+            out_of_catalogue.evaluator_score.generating_model_in_version_space,
+            out_of_catalogue.evaluator_score.set_score.oracle_model_count,
+            out_of_catalogue.evaluator_score.set_score.exact_version_space_match,
+            out_of_catalogue.evaluator_score.decision_correct,
+            out_of_catalogue.evaluator_score.evidence_references_valid,
+            out_of_catalogue.evaluator_score.probe_count
+        ));
+    }
+
     if a0.agent.executable_sha256 != a2.agent.executable_sha256
         || a0.agent.arguments != a2.agent.arguments
     {
@@ -152,12 +199,14 @@ fn run() -> Result<(), String> {
         comparison_design: "adaptive_budget",
         a0,
         a2,
+        out_of_catalogue,
         limitations: vec![
             "The policy is open_world_agent's finite baseline, not the learned Symthaea research policy.".to_owned(),
             "A0 and A2 share generating model, empty starting evidence, policy arguments and action budget; their adaptive traces may diverge.".to_owned(),
             "The child receives no generating truth, evaluator score or truth-bearing command-line argument.".to_owned(),
             "The parent/child process boundary is not an OS sandbox; filesystem and network access remain available unless an external isolator restricts them.".to_owned(),
-            "This one-world smoke test verifies wire/process/evidence binding, not agent performance or scientific discovery.".to_owned(),
+            "The third episode is an evaluator-designated open-support control: truth is outside the finite gain catalogue, so correct behavior is an exact empty version space and no-compatible-model disposition.".to_owned(),
+            "This three-episode smoke test verifies wire/process/evidence binding and one support-omission negative control, not agent performance or scientific discovery.".to_owned(),
         ],
     };
 
