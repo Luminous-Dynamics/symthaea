@@ -490,15 +490,19 @@ fn release_accepted(
                 && event.component_revision_digest == task.target_component_revision_digest
         })
         .collect();
-    let repair_started = task_evidence.iter()
+    let first_repair_started = task_evidence.iter()
+        .filter(|event| event.kind == EventKind::RepairStarted)
+        .map(|event| event.at_seconds).min();
+    let Some(first_repair_started) = first_repair_started else { return false; };
+    let last_repair_started = task_evidence.iter()
         .filter(|event| event.kind == EventKind::RepairStarted)
         .map(|event| event.at_seconds).max();
-    let Some(repair_started) = repair_started else { return false; };
+    let Some(last_repair_started) = last_repair_started else { return false; };
     let repair_completed = task_evidence.iter()
         .filter(|event| event.kind == EventKind::RepairCompleted)
         .map(|event| event.at_seconds).max();
     let Some(repair) = repair_completed else { return false; };
-    if repair_started <= fault.at_seconds || repair <= repair_started {
+    if first_repair_started <= fault.at_seconds || repair <= last_repair_started {
         return false;
     }
 
@@ -521,7 +525,7 @@ fn release_accepted(
     let spare_arrival_before_repair = task_evidence.iter()
         .filter(|event| event.kind == EventKind::SpareArrived)
         .map(|event| event.at_seconds)
-        .any(|arrival| arrival < repair_started);
+        .any(|arrival| arrival < first_repair_started);
     let spare_matches = match task.spare_state {
         SpareState::NotRequired => task.spare_component_revision_digest.is_none(),
         SpareState::CompatibleOnboard => task.spare_component_revision_digest.as_deref()
