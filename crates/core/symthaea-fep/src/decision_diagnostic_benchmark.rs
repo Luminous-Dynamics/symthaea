@@ -91,7 +91,8 @@ pub struct DiagnosticPolicyContrast {
     pub task_loss_difference_ci95: Option<[f64; 2]>,
     /// Distribution-free paired Hoeffding interval; paired task loss lies in [-1, 1].
     pub task_loss_difference_hoeffding_ci95: Option<[f64; 2]>,
-    /// Simultaneous family-wise 95% Hoeffding interval, Bonferroni-adjusted across all contrasts and outcomes.
+    /// Simultaneous family-wise 95% Hoeffding interval, Bonferroni-adjusted
+    /// across all contrasts and outcomes.
     pub task_loss_difference_familywise_ci95: Option<[f64; 2]>,
     pub mean_decision_regret_difference: f64,
     /// Descriptive paired normal-approximation interval for decision regret.
@@ -554,7 +555,10 @@ fn paired_hoeffding_ci95(
     {
         return None;
     }
-    if values.iter().any(|value| !value.is_finite() || value.abs() > absolute_bound) {
+    if values
+        .iter()
+        .any(|value| !value.is_finite() || value.abs() > absolute_bound)
+    {
         return None;
     }
     let count = values.len() as f64;
@@ -808,19 +812,28 @@ mod tests {
         let distribution_free_interval = evsi_vs_pure_eig
             .decision_regret_difference_hoeffding_ci95
             .expect("finite-sample paired interval with 10,000 episodes");
-        assert!(distribution_free_interval[0] <= evsi_vs_pure_eig.mean_decision_regret_difference);
-        assert!(distribution_free_interval[1] >= evsi_vs_pure_eig.mean_decision_regret_difference);
+        assert!(
+            distribution_free_interval[0]
+                <= evsi_vs_pure_eig.mean_decision_regret_difference
+        );
+        assert!(
+            distribution_free_interval[1]
+                >= evsi_vs_pure_eig.mean_decision_regret_difference
+        );
         assert!(distribution_free_interval[1] < 0.0);
+        let familywise_regret_interval = evsi_vs_pure_eig
+            .decision_regret_difference_familywise_ci95
+            .expect("simultaneous family-wise interval");
+        assert_eq!(evsi_vs_pure_eig.familywise_comparison_count, 12);
+        assert!(familywise_regret_interval[1] < 0.0);
     }
 
     #[test]
     fn paired_hoeffding_interval_is_finite_sample_and_shrinks_with_more_episodes() {
         let small = vec![-0.2, -0.1, 0.0, 0.1];
         let large = small.repeat(100);
-        let small_interval =
-            paired_hoeffding_ci95(&small, 1.0, 0.05).expect("small interval");
-        let large_interval =
-            paired_hoeffding_ci95(&large, 1.0, 0.05).expect("large interval");
+        let small_interval = paired_hoeffding_ci95(&small, 1.0, 0.05).expect("small interval");
+        let large_interval = paired_hoeffding_ci95(&large, 1.0, 0.05).expect("large interval");
         let familywise_interval =
             paired_hoeffding_ci95(&large, 1.0, 0.05 / 12.0).expect("family-wise interval");
         assert!(small_interval[0] <= 0.0 && small_interval[1] >= 0.0);
@@ -829,9 +842,7 @@ mod tests {
         let large_width = large_interval[1] - large_interval[0];
         assert!(large_width < small_width);
         assert!(familywise_interval[0] <= 0.0 && familywise_interval[1] >= 0.0);
-        assert!(
-            familywise_interval[1] - familywise_interval[0] >= large_width
-        );
+        assert!(familywise_interval[1] - familywise_interval[0] >= large_width);
         assert!(paired_hoeffding_ci95(&[], 1.0, 0.05).is_none());
         assert!(paired_hoeffding_ci95(&[1.1], 1.0, 0.05).is_none());
         assert!(paired_hoeffding_ci95(&[0.0], f64::NAN, 0.05).is_none());
