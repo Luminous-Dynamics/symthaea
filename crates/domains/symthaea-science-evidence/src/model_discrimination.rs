@@ -828,6 +828,8 @@ fn score_experiment(
             prior_scenario_scores,
             worst_case_model_identity_eig_nats: None,
             weighted_mean_model_identity_eig_nats: None,
+            availability_adjusted_worst_case_model_identity_eig_nats: None,
+            availability_adjusted_weighted_mean_model_identity_eig_nats: None,
             worst_case_eig_per_cost: None,
             weighted_mean_eig_per_cost: None,
             open_world_unresolved_excluded,
@@ -1268,6 +1270,107 @@ mod tests {
                 > score.prior_scenario_scores[1].refined_eig_nats
         );
         assert!(score.worst_case_model_identity_eig_nats.is_some());
+    }
+
+    #[test]
+    fn availability_adjusts_expected_eig_without_erasing_conditional_eig() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let make = |id: &str, availability_probability: f64| {
+            let mut candidate = experiment(
+                id,
+                2.0,
+                Some(0.1),
+                vec![
+                    prediction("model-a", Some(-1.0), Some(0.0)),
+                    prediction("model-b", Some(1.0), Some(0.0)),
+                ],
+            );
+            candidate.availability_probability = availability_probability;
+            candidate
+        };
+        let report = rank_model_discriminating_experiments(
+            &hypotheses,
+            &[
+                make("always", 1.0),
+                make("half", 0.5),
+                make("never", 0.0),
+            ],
+            &config(vec![equal_prior()], 256),
+        )
+        .unwrap();
+
+        let score = |id: &str| {
+            report
+                .experiments
+                .iter()
+                .find(|score| score.experiment_id == id)
+                .unwrap()
+        };
+        let always = score("always");
+        let half = score("half");
+        let never = score("never");
+        let conditional = always.worst_case_model_identity_eig_nats.unwrap();
+
+        assert!((half.worst_case_model_identity_eig_nats.unwrap() - conditional).abs() < 1.0e-12);
+        assert!(
+            (half
+                .availability_adjusted_worst_case_model_identity_eig_nats
+                .unwrap()
+                - 0.5 * conditional)
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            (never
+                .availability_adjusted_worst_case_model_identity_eig_nats
+                .unwrap())
+                .abs()
+                < 1.0e-12
+        );
+        let half_scenario = &half.prior_scenario_scores[0];
+        assert!(
+            (half_scenario.expected_posterior_entropy_nats
+                - (half_scenario.prior_entropy_nats - half_scenario.availability_adjusted_eig_nats))
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            (never.prior_scenario_scores[0].expected_posterior_entropy_nats
+                - never.prior_scenario_scores[0].prior_entropy_nats)
+                .abs()
+                < 1.0e-12
+        );
+        assert_eq!(
+            report.experiments[0].experiment_id,
+            "always",
+            "availability-adjusted EIG per cost should rank the fully available candidate first"
+        );
+    }
+
+    #[test]
+    fn invalid_availability_probability_fails_closed() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        let mut candidate = experiment(
+            "invalid-availability",
+            1.0,
+            Some(0.1),
+            vec![
+                prediction("model-a", Some(0.0), Some(0.0)),
+                prediction("model-b", Some(1.0), Some(0.0)),
+            ],
+        );
+        candidate.availability_probability = f64::NAN;
+
+        assert_eq!(
+            rank_model_discriminating_experiments(
+                &hypotheses,
+                &[candidate],
+                &config(vec![equal_prior()], 128),
+            ),
+            Err(ModelDiscriminationError::InvalidAvailabilityProbability(
+                "invalid-availability".to_string()
+            ))
+        );
     }
 
     #[test]
