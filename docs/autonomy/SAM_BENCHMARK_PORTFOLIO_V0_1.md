@@ -419,6 +419,16 @@ The primary success criterion is **downstream decision improvement without weake
 - **Claim ceiling:** this is a SAM-designed internal experiment, not an external leaderboard. It can detect declared simulation-path leakage but does not establish local perception quality, human behavioural realism, physical vehicle safety, V2X security or SAE L4/L5 capability.
 - **Specification:** [SAM_FOLLOW_PRIVILEGE_BENCHMARK_V0_1.md](SAM_FOLLOW_PRIVILEGE_BENCHMARK_V0_1.md) and [canonical manifest](fixtures/SAM_FOLLOW_PRIVILEGE_BENCHMARK_V0_1.json).
 
+### SAM World-Model Decision-Utility Promotion Gate v0.1 — specification only
+
+- **Role:** prevent visual realism, open-loop prediction error or model-internal uncertainty reduction from being mistaken for downstream driving decision value.
+- **Protocol:** matched direct-reactive, direct-plus-same-memory, model-assisted, shuffled-dynamics, stale-model, evaluator-only oracle and distilled-student arms. The promotion claim must account for prediction fidelity, controllability, decision lift, qualified-reference disagreement, interactive robustness, safety constraints and compute.
+- **Evaluation ladder:** DrivingGen for scene/video fidelity and controllability; #10256/#10257 for prediction-set coverage, sharpness and horizon-conditioned discrepancy; #10237/#9010 for paired decision lift/regret; WOD-E2E for open-loop rater preference; NAVSIM v2 for two-stage pseudo-simulation; ReactSim-Bench for one-sided reactive actor response; nuPlan-R for selective reciprocal interaction; Symtropy #3532 for declared full-reciprocal synthetic policy loop.
+- **Promotion rule:** a model is not promoted into the planner merely because FVD, CLIP-IQA, ADE/FDE or mean rollout error improves. It must improve decision utility under matched compute and held-out interaction families, preserve calibrated coverage/constraint outcomes and worst-family behavior, remain robust to stale/shuffled model controls, and meet p50/p95/p99 latency/resource constraints.
+- **Methodology distinction:** World-In-World (ICLR 2026) provides an embodied closed-loop utility methodology, but its tasks are not AV benchmarks. Use it as evidence for evaluation design, not as a comparable driving score.
+- **Current status:** specification and manifest only; no world model or controller is promoted. Owner [CMAQ-004 #9010](https://github.com/Luminous-Dynamics/symthaea/issues/9010).
+- **Specification:** [SAM_WORLD_MODEL_DECISION_UTILITY_GATE_V0_1.md](SAM_WORLD_MODEL_DECISION_UTILITY_GATE_V0_1.md) and [canonical manifest](fixtures/SAM_WORLD_MODEL_DECISION_UTILITY_GATE_V0_1.json).
+
 ## 10. Registry status semantics
 
 - `upstream_reported`: published by benchmark/model authors.
