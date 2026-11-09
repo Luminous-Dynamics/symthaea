@@ -1,0 +1,214 @@
+{
+  "schema_version": "luminous.financial-sequence-oracle.v0-dev",
+  "stream_id": "dev.synthetic.supplier-correction.0001",
+  "visibility": "public_development_only_not_sealed",
+  "expected_frontiers": [
+    {
+      "frontier_id": "F0",
+      "admitted_evidence_ids": [
+        "ev.seq.supplier-status.original.0001"
+      ],
+      "required_claims": [
+        {
+          "claim": "The terminal authority reported a shipment suspension for SYN-SUPPLIER-01.",
+          "disposition": "supported_as_report_not_verified_actual_suspension"
+        },
+        {
+          "claim": "SYN-BUYER-01 has 35% purchase share from the supplier.",
+          "disposition": "unknown_not_admissible"
+        },
+        {
+          "claim": "Buyer inventory covers the shipment delay.",
+          "disposition": "unknown_not_admissible"
+        },
+        {
+          "claim": "The shipment caused buyer production or financial loss.",
+          "disposition": "not_established"
+        }
+      ],
+      "required_unknowns": [
+        "buyer component purchase share",
+        "buyer component inventory coverage",
+        "current shipment outcome"
+      ],
+      "snapshot_invariants": [
+        "Do not include EVT-002 through EVT-006.",
+        "Retain the exact original version and F0 result."
+      ]
+    },
+    {
+      "frontier_id": "F1",
+      "admitted_evidence_ids": [
+        "ev.seq.supplier-status.original.0001",
+        "ev.seq.supplier-status.correction.0001"
+      ],
+      "required_claims": [
+        {
+          "claim": "The current admissible source version corrects the original suspension description to an expected 24-hour delay.",
+          "disposition": "supported_by_correction"
+        },
+        {
+          "claim": "Buyer component purchase share is 35%.",
+          "disposition": "unknown_not_admissible"
+        },
+        {
+          "claim": "Buyer inventory covers the delay.",
+          "disposition": "unknown_not_admissible"
+        },
+        {
+          "claim": "The supplier correction proves buyer financial loss.",
+          "disposition": "not_established"
+        }
+      ],
+      "required_unknowns": [
+        "buyer component purchase share",
+        "buyer inventory coverage",
+        "actual shipment arrival"
+      ],
+      "snapshot_invariants": [
+        "Preserve F0 unchanged.",
+        "Mark original version as superseded for the current view; do not delete it."
+      ]
+    },
+    {
+      "frontier_id": "F2",
+      "admitted_evidence_ids": [
+        "ev.seq.supplier-status.original.0001",
+        "ev.seq.supplier-status.correction.0001",
+        "ev.seq.buyer-purchase-share.0001"
+      ],
+      "required_claims": [
+        {
+          "claim": "The buyer purchases 35% of this specified critical component from SYN-SUPPLIER-01.",
+          "disposition": "supported_scoped_relationship"
+        },
+        {
+          "claim": "The supplier represents 35% of total buyer procurement spend or revenue.",
+          "disposition": "unsupported_scope_expansion"
+        },
+        {
+          "claim": "The 24-hour delay caused a production shortfall.",
+          "disposition": "not_established_inventory_unknown"
+        }
+      ],
+      "required_unknowns": [
+        "buyer component inventory coverage",
+        "actual shipment arrival"
+      ],
+      "snapshot_invariants": [
+        "The purchase-share fact must not appear in F0 or F1."
+      ]
+    },
+    {
+      "frontier_id": "F3",
+      "admitted_evidence_ids": [
+        "ev.seq.supplier-status.original.0001",
+        "ev.seq.supplier-status.correction.0001",
+        "ev.seq.buyer-purchase-share.0001",
+        "ev.seq.supplier-status.mirror.0001"
+      ],
+      "required_claims": [
+        {
+          "claim": "A copied industry-news mirror was published.",
+          "disposition": "supported_as_document"
+        },
+        {
+          "claim": "The mirror independently corroborates the terminal authority report.",
+          "disposition": "false_same_provenance_family"
+        },
+        {
+          "claim": "There are two distinct source-family identifiers in the admitted evidence.",
+          "disposition": "true_but_not_proof_of_independence"
+        }
+      ],
+      "required_unknowns": [
+        "buyer component inventory coverage",
+        "actual shipment arrival"
+      ],
+      "snapshot_invariants": [
+        "Do not increase independent evidence count due to EVT-004.",
+        "Preserve its copy lineage to AUTH-BULLETIN-001-v2."
+      ]
+    },
+    {
+      "frontier_id": "F4",
+      "admitted_evidence_ids": [
+        "ev.seq.supplier-status.original.0001",
+        "ev.seq.supplier-status.correction.0001",
+        "ev.seq.buyer-purchase-share.0001",
+        "ev.seq.supplier-status.mirror.0001",
+        "ev.seq.buyer-inventory-buffer.0001"
+      ],
+      "required_claims": [
+        {
+          "claim": "Reported component inventory coverage is 14 business days.",
+          "disposition": "supported_scoped_measurement"
+        },
+        {
+          "claim": "Fourteen business days exceeds the reported 24-hour delay.",
+          "disposition": "true_conditional_comparison"
+        },
+        {
+          "claim": "There is no production risk or financial impact.",
+          "disposition": "not_established_unmodeled_constraints_remain"
+        },
+        {
+          "claim": "The shipment will arrive by the 5 October noon deadline.",
+          "disposition": "forecast_required_not_observed"
+        }
+      ],
+      "required_unknowns": [
+        "actual shipment arrival",
+        "quality/acceptance outcome",
+        "any unrelated production constraints"
+      ],
+      "snapshot_invariants": [
+        "Do not import EVT-006 into F4 even though its later event time may be known in the final stream file.",
+        "No forecast scoring without a retained forecast committed before outcome_known_at."
+      ]
+    },
+    {
+      "frontier_id": "F5",
+      "admitted_evidence_ids": [
+        "ev.seq.supplier-status.original.0001",
+        "ev.seq.supplier-status.correction.0001",
+        "ev.seq.buyer-purchase-share.0001",
+        "ev.seq.supplier-status.mirror.0001",
+        "ev.seq.buyer-inventory-buffer.0001",
+        "ev.seq.shipment-receipt.0001"
+      ],
+      "required_claims": [
+        {
+          "claim": "SYN-SHIPMENT-001 arrived at 11:30 UTC on 5 October.",
+          "disposition": "supported_outcome"
+        },
+        {
+          "claim": "SYN-SHIPMENT-001 arrived by the 12:00 UTC deadline.",
+          "disposition": "true"
+        },
+        {
+          "claim": "This outcome proves there was no buyer financial impact.",
+          "disposition": "not_established"
+        }
+      ],
+      "required_unknowns": [
+        "any later quality/acceptance outcome",
+        "other supplier or production constraints"
+      ],
+      "snapshot_invariants": [
+        "F0–F4 remain byte-identical.",
+        "EVT-006 is admitted only from 12:15 known_at, not from its 11:30 event time."
+      ]
+    }
+  ],
+  "stream_level_hard_gates": [
+    "No future-known evidence in any earlier frontier.",
+    "No historical snapshot mutation after later events.",
+    "Correction must not erase the original evidence version.",
+    "No mirror inflation of independent corroboration.",
+    "No broadening of component purchase share to total spend/revenue.",
+    "No claim of zero production risk from inventory buffer alone.",
+    "No forecast scoring unless a pre-outcome forecast artifact exists.",
+    "No claim of no financial impact merely because shipment arrived by the deadline."
+  ]
+}
