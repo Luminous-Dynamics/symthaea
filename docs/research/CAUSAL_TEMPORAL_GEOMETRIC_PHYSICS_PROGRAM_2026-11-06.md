@@ -937,6 +937,65 @@ Next gates:
 
 The claim ceiling remains finite-order-statistic and sampling-estimator reproduction. This does not establish a continuum spacetime limit, quantum dynamics, or quantum gravity.
 
+## 2026-11-09 execution additions: active measurement and observation-process integrity
+
+### Model-dependent detection EIG
+
+The active experiment stack now includes a first Bernoulli/Gaussian observation-process extension:
+- existing model-independent execution availability remains distinct from model-conditional detection;
+- model-specific detection/non-detection carries `I(M;D)`;
+- the detected-value channel uses the prior conditioned on detection;
+- total EIG follows the chain rule `I(M;D,Y) = I(M;D) + P(D=1) I(M;Y|D=1)`;
+- conditional quadrature error is independently gated before weighting by detection/execution probability;
+- row permutation, zero/one detection, zero-prior, independent joint-outcome and legacy-reduction tests are required.
+
+Implementation: `symthaea-science-evidence::model_discrimination::rank_detection_aware_model_discriminating_experiments`; executable `model_detection_reference`; specification `uap-model-dependent-detection-eig-v0.1.md`; issue [#11247](https://github.com/Luminous-Dynamics/symthaea/issues/11247).
+
+This v0.1 channel is valid only when its detection probabilities describe a separate Bernoulli selection mechanism and its Gaussian value distributions are conditional on detection. It is not a thresholded-Gaussian likelihood, false-alarm/clutter model or censored-data engine. The follow-on [threshold-derived detection and truncated-value likelihood #11250](https://github.com/Luminous-Dynamics/symthaea/issues/11250) requires detection probability and conditional-value distribution to be derived from one common raw sensor statistic. Do not assign physical meaning to a non-detection until the observation process is calibrated.
+
+### Local observability, global alternatives and profile likelihood
+
+The existing local Jacobian SVD and discrete global-ambiguity screen should be benchmarked against practical identifiability methods, not interpreted as a uniqueness proof. A September 2026 *Mathematical Biosciences* study, *Optimal experiment design for practical parameter identifiability and model discrimination* (Vol. 399, 109710; DOI 10.1016/j.mbs.2026.109710), uses profile-likelihood widths as a practical-identifiability criterion and explicitly distinguishes parameter-identifiability design from model-discrimination design.
+
+Add a pinned profile-likelihood baseline to the small synthetic fixtures:
+- compare data-only local FIM rank/singular values;
+- compare supplied discrete ambiguity pairs / multi-start solutions;
+- profile each parameter of interest while re-optimizing nuisance parameters;
+- record 95% profile intervals, disconnected confidence regions and unbounded profiles;
+- verify the known coplanar mirror-twin fixture, near-planar degradation and held-out nonlinear cases;
+- do not claim global identifiability from local rank, finite candidate enumeration or a single optimizer initialization.
+
+This is an evaluation and integration target—not a claim that profile likelihood or global identifiability analysis is new.
+
+### SOTA comparison and benchmark discipline
+
+The 2026 *Nature* review *Designing physics experiments with artificial intelligence* (Vol. 657, 47–58; DOI 10.1038/s41586-026-10898-6) frames AI experimental design around expressive search spaces, fast/reliable simulators, computable scientific objectives and optimizers for mixed discrete/continuous hardware choices. CTGP should be judged against those dimensions, not merely by the number of physics crates.
+
+For any claim of improved experiment design, compare under matched models, priors, simulator accuracy, observation budgets and cost:
+1. random and space-filling designs;
+2. nominal/robust Fisher D/A/E-optimal designs;
+3. greedy EIG per cost;
+4. multifidelity EIG estimators/control variates;
+5. profile-likelihood design where available;
+6. exact subset enumeration on small candidate sets;
+7. direct joint-observation likelihood vs chain-rule decompositions;
+8. model-recovery accuracy, coverage and abstention on sealed in-distribution and open-world generators.
+
+Keep objectives distinct: model-identity EIG, parameter EIG, goal-oriented predictive EIG, expected decision utility, model-recovery accuracy and worst-case identifiability are not interchangeable.
+
+### Prospective engineering targets
+
+- **Analytic/reference correctness:** zero mismatches on declared exact oracles and known limiting cases.
+- **Numerical EIG:** conditional quadrature error under the predeclared tolerance; direct joint-likelihood and chain-rule implementations agree on sealed fixtures.
+- **Uncertainty calibration:** nominal 95% synthetic uncertainty regions achieve 93–97% empirical coverage on held-out geometries/motion families before any instrument claim.
+- **No false certainty:** rank-deficient, globally ambiguous and prior-dominated fixtures must be identified or explicitly abstained on.
+- **Model adequacy:** retain `OTHER_UNRESOLVED`; report named-model recovery, selective accuracy, coverage and false-confident assignment separately.
+- **Detection calibration:** Brier/log score, reliability curves, calibration slope/intercept, false alarms and misses by SNR, geometry, background and sensor-health regime.
+- **Design quality:** report optimality gap to exhaustive solutions on tractable candidate sets; measure compute/high-fidelity calls and value per cost. Do not assume greedy or worst-case objectives are submodular without proving the relevant assumptions.
+- **Reproducibility:** every score binds source SHA, model/source revisions, observation-process model, priors, calibrations, seeds, quadrature settings, resource use and raw output digest.
+
+No result is called “better than SOTA” from a single synthetic suite. Superiority requires pinned baselines, matched information and compute budgets, held-out model families/regimes, uncertainty intervals and independent reproduction.
+
 ## Scientific non-claims
 
 This programme does not claim that:
