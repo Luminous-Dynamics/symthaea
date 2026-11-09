@@ -624,7 +624,11 @@
         "paired_task_loss_hoeffding_ci95",
         "paired_decision_regret_hoeffding_ci95",
         "paired_total_cost_hoeffding_ci95",
-        "total_cost_contrast_known_absolute_bound"
+        "total_cost_contrast_known_absolute_bound",
+        "paired_task_loss_hoeffding_familywise_ci95",
+        "paired_decision_regret_hoeffding_familywise_ci95",
+        "paired_total_cost_hoeffding_familywise_ci95",
+        "bonferroni_12_claim_family_95pct_coverage"
       ],
       "negative_controls": [
         "high_eig_zero_evsi_irrelevant_probe",
@@ -639,7 +643,8 @@
         "decision_information_data_processing_inequality",
         "paired_evsi_contrast_episode_seed_alignment",
         "paired_evsi_confidence_interval_source_data_preserved",
-        "paired_hoeffding_interval_support_and_shrinking"
+        "paired_hoeffding_interval_support_and_shrinking",
+        "bonferroni_familywise_interval_is_wider_than_per_comparison_interval"
       ],
       "scope_note": "Current executable implementation is a deterministic synthetic fixture and five-policy harness (no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, always-inspect); it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study.",
       "execution_artifact": {
