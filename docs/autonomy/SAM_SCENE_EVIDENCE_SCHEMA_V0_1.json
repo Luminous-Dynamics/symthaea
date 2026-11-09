@@ -481,7 +481,8 @@
         "traffic_convention_profile_id",
         "cooperative_advisory_refs",
         "simulator_truth_refs",
-        "follow_target_context"
+        "follow_target_context",
+        "simulator_truth_actor_states"
       ],
       "properties": {
         "snapshot_id": {
@@ -930,6 +931,12 @@
         },
         "follow_target_context": {
           "$ref": "#/$defs/followTargetContext"
+        },
+        "simulator_truth_actor_states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/simulatorTruthActorState"
+          }
         }
       }
     },
@@ -946,7 +953,9 @@
         "max_age_ns",
         "gap_m",
         "relative_speed_mps",
-        "distance_uncertainty_m"
+        "distance_uncertainty_m",
+        "target_reference_kind",
+        "target_reference_id"
       ],
       "properties": {
         "consumer_profile": {
@@ -1020,6 +1029,54 @@
             "null"
           ],
           "minimum": 0
+        },
+        "target_reference_kind": {
+          "enum": [
+            "simulator_truth_actor",
+            "tracked_object_hypothesis"
+          ]
+        },
+        "target_reference_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "simulatorTruthActorState": {
+      "type": "object",
+      "required": [
+        "actor_id",
+        "scenario_id",
+        "reference_frame_id",
+        "acquisition_tick_ns",
+        "position_m",
+        "velocity_mps",
+        "source_ref"
+      ],
+      "properties": {
+        "actor_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "scenario_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "reference_frame_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "acquisition_tick_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "position_m": {
+          "$ref": "#/$defs/vector3"
+        },
+        "velocity_mps": {
+          "$ref": "#/$defs/vector3"
+        },
+        "source_ref": {
+          "$ref": "#/$defs/nonEmptyString"
         }
       }
     }
