@@ -712,7 +712,7 @@ impl VehicleTrainer {
 
         let mut summary = if telemetry_dir.is_some() {
             Some(String::from(
-                "episode,task,avg_safety_reward,avg_episode_reward,avg_free_energy,avg_speed,avg_lateral_offset,avg_heading_error,avg_control_effort,exploration_count,total_steps\n",
+                "episode,task,avg_safety_reward,avg_episode_reward,avg_free_energy,avg_speed,avg_lateral_offset,avg_heading_error,avg_control_effort,exploration_count,total_steps,follow_oracle_available_steps,follow_oracle_unavailable_steps\n",
             ))
         } else {
             None
@@ -784,11 +784,27 @@ impl VehicleTrainer {
                 if !metrics.telemetry.is_empty() {
                     let step_path = format!("{}/episode_{:04}.csv", dir, ep);
                     let mut csv = String::from(
-                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers\n",
+                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers,follow_oracle_available,follow_oracle_actor_id,follow_oracle_gap_m,follow_oracle_relative_speed_mps,follow_oracle_snapshot_age_s\n",
                     );
                     for t in &metrics.telemetry {
+                        let actor_id = t
+                            .follow_oracle_actor_id
+                            .map(|value| value.to_string())
+                            .unwrap_or_default();
+                        let gap_m = t
+                            .follow_oracle_gap_m
+                            .map(|value| format!("{value:.6}"))
+                            .unwrap_or_default();
+                        let relative_speed_mps = t
+                            .follow_oracle_relative_speed_mps
+                            .map(|value| format!("{value:.6}"))
+                            .unwrap_or_default();
+                        let snapshot_age_s = t
+                            .follow_oracle_snapshot_age_s
+                            .map(|value| format!("{value:.6}"))
+                            .unwrap_or_default();
                         csv.push_str(&format!(
-                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{}\n",
+                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{}\n",
                             t.step,
                             t.time,
                             t.speed,
@@ -801,6 +817,11 @@ impl VehicleTrainer {
                             t.tau_factor,
                             t.control_effort,
                             t.mesh_peers_visible,
+                            t.follow_oracle_available,
+                            actor_id,
+                            gap_m,
+                            relative_speed_mps,
+                            snapshot_age_s,
                         ));
                     }
                     let _ = std::fs::write(&step_path, csv);
@@ -808,7 +829,7 @@ impl VehicleTrainer {
 
                 if let Some(ref mut s) = summary {
                     s.push_str(&format!(
-                        "{},{:?},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
+                        "{},{:?},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{}\n",
                         ep,
                         metrics.task,
                         metrics.avg_safety_reward,
@@ -820,6 +841,8 @@ impl VehicleTrainer {
                         metrics.avg_control_effort,
                         metrics.exploration_count,
                         metrics.total_steps,
+                        metrics.follow_oracle_available_steps,
+                        metrics.follow_oracle_unavailable_steps,
                     ));
                 }
             }
