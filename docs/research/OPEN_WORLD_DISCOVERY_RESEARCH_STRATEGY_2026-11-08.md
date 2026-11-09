@@ -23,6 +23,17 @@ This is a direction for the programme, not a claim that current Symthaea already
 ## 1. Paradigm shifts
 
 ### 1.1 From best equation to identifiable model class
+### 1.1a Separate exact parameter identity from behavioral representation
+
+A generating parameterization can lie outside the literal candidate catalogue while its observable law remains exactly represented by a different parameterization. A physical gain of 4 with an identity sensor can be indistinguishable from gain 2 with a double-gain sensor. Declaring the first "unknown" would be over-rejection; declaring the second the hidden truth would overclaim parameter identification.
+
+Score three layers separately:
+1. exact generating parameterization membership;
+2. behavioral representation by at least one admissible candidate over the full declared intervention language;
+3. identification of the observable equivalence class and its remaining internal parameter ambiguity.
+
+For finite reference worlds, the evaluator can exhaustively compare response signatures over the allowed action language. For open continuous systems, use declared equivalence tolerances, held-out interventions and independent structural validation; do not extrapolate finite signature equality into a universal identity theorem.
+
 
 A single equation is not always the right answer. Different parameterizations or mechanisms can be observationally equivalent under the available interventions. The system should return an equivalence class or an explicit non-identifiability/abstention disposition instead of choosing a single representative and presenting it as truth.
 
@@ -218,6 +229,7 @@ A0 must pass first. If the supplied-structure arm fails, do not attribute the pa
 - Explicit rejection / quarantine of harmful source mechanisms.
 
 ### I. A6 model misspecification and candidate selection
+- Exact generating-parameter membership versus behavioral representation/equivalence-class coverage.
 - F0 closed-grammar exact version-space recovery.
 - F1 parameter-support extrapolation; F2 structural support shift; F3 measurement-process shift; F4 regime shift; F5 stochastic/discrepancy shift.
 - OOD detection precision/recall and false-rejection rate on in-grammar controls.
