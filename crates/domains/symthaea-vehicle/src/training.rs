@@ -271,7 +271,8 @@ impl VehicleTrainer {
     ) -> EpisodeMetrics {
         let dt = self.config.physics_dt();
         let cognitive_interval = self.config.cognitive_interval();
-        let (task, curriculum_pd_weight, target_speed, use_perturbations) = self.curriculum(episode);
+        let (task, curriculum_pd_weight, target_speed, use_perturbations) =
+            self.curriculum(episode);
         // Evaluation never inherits the curriculum's teacher blend.
         let pd_weight = if train_controller {
             curriculum_pd_weight
@@ -606,9 +607,7 @@ impl VehicleTrainer {
                     training_enabled: train_controller,
                     follow_oracle_used_for_policy: follow_oracle_target.is_some()
                         && (teacher_action_used_for_blend
-                            || (train_controller
-                                && train_this_step
-                                && teacher_command.is_some())),
+                            || (train_controller && train_this_step && teacher_command.is_some())),
                     student_proposal_steering: student_proposal_command.steering,
                     student_proposal_throttle: student_proposal_command.throttle,
                     student_proposal_brake: student_proposal_command.brake,
@@ -637,8 +636,8 @@ impl VehicleTrainer {
 
             // -- TRAINING (every train_every steps, 50Hz) --
             if train_controller && train_this_step {
-                let target = teacher_command
-                    .expect("training step must have a computed teacher target");
+                let target =
+                    teacher_command.expect("training step must have a computed teacher target");
 
                 // Reward-modulated BPTT: scale gradient by safety reward
                 // so the network learns more when stable (clear signal)
@@ -1779,9 +1778,7 @@ mod tests {
         let teacher_delta = ((supervised.student_proposal_steering
             - supervised.teacher_target_steering.unwrap())
         .abs()
-            + (supervised.student_proposal_throttle
-                - supervised.teacher_target_throttle.unwrap())
-            .abs()
+            + (supervised.student_proposal_throttle - supervised.teacher_target_throttle.unwrap()).abs()
             + (supervised.student_proposal_brake - supervised.teacher_target_brake.unwrap()).abs())
             / 3.0;
         assert!(
@@ -1812,8 +1809,16 @@ mod tests {
         let metrics = trainer.train();
         let telemetry = &metrics[99].telemetry;
 
-        assert!(telemetry.iter().all(|row| !row.teacher_action_used_for_blend));
-        assert!(telemetry.iter().all(|row| row.pd_teacher_blend_weight == 0.0));
+        assert!(
+            telemetry
+                .iter()
+                .all(|row| !row.teacher_action_used_for_blend)
+        );
+        assert!(
+            telemetry
+                .iter()
+                .all(|row| row.pd_teacher_blend_weight == 0.0)
+        );
         assert!(
             telemetry.iter().any(|row| {
                 row.teacher_action_used_for_supervision
@@ -1838,11 +1843,14 @@ mod tests {
             ..VehicleConfig::default()
         };
         let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
-        let mut trainer = VehicleTrainer::new(config.clone()).with_swarm(SwarmConfig::convoy_straight(1));
+        let mut trainer =
+            VehicleTrainer::new(config.clone()).with_swarm(SwarmConfig::convoy_straight(1));
         let mut encoder = VehicleHdcEncoder::new(&genesis, config.num_levels);
         let mut controller = VehicleController::new(&genesis, &config);
-        let mut fep_agent =
-            ActiveInferenceVehicleAgent::new(VehicleFepConfig::default(), VehicleTask::Follow { target_gap: 30.0 });
+        let mut fep_agent = ActiveInferenceVehicleAgent::new(
+            VehicleFepConfig::default(),
+            VehicleTask::Follow { target_gap: 30.0 },
+        );
         let original_projection = controller.output_projection();
 
         let metrics =
