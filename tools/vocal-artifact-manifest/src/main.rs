@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
@@ -45,7 +45,7 @@ fn main() {
 fn run() -> Result<(), String> {
     let args: Vec<OsString> = env::args_os().skip(1).collect();
     match args.as_slice() {
-        [flag, root, output] if flag == "--create" => {
+        [flag, root, output] if flag == OsStr::new("--create") => {
             let root = PathBuf::from(root);
             let output = PathBuf::from(output);
             ensure_output_outside_root(&root, &output)?;
@@ -63,7 +63,7 @@ fn run() -> Result<(), String> {
             println!("bytes={}", manifest.total_bytes);
             Ok(())
         }
-        [flag, root, manifest_path] if flag == "--verify" => {
+        [flag, root, manifest_path] if flag == OsStr::new("--verify") => {
             let expected_path = PathBuf::from(manifest_path);
             let expected_bytes = fs::read(&expected_path)
                 .map_err(|error| format!("read {}: {error}", expected_path.display()))?;
@@ -87,18 +87,21 @@ fn run() -> Result<(), String> {
 }
 
 fn build_manifest(root: &Path) -> Result<ArtifactManifest, String> {
+    let root_metadata = fs::symlink_metadata(root)
+        .map_err(|error| format!("inspect root {}: {error}", root.display()))?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(format!("artifact root must be a real directory: {}", root.display()));
+    }
     let root = root
         .canonicalize()
         .map_err(|error| format!("canonicalize root {}: {error}", root.display()))?;
-    let metadata = fs::symlink_metadata(&root)
-        .map_err(|error| format!("inspect root {}: {error}", root.display()))?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        return Err(format!("artifact root must be a real directory: {}", root.display()));
-    }
 
     let mut entries = Vec::new();
     walk_directory(&root, &root, &mut entries)?;
     entries.sort_by(|left, right| left.path.cmp(&right.path));
+    if entries.is_empty() {
+        return Err("artifact root contains no files".to_string());
+    }
 
     let total_files = u64::try_from(entries.len())
         .map_err(|_| "artifact file count exceeds u64".to_string())?;
@@ -186,6 +189,12 @@ fn hash_stable_file(path: &Path) -> Result<(u64, String), String> {
         .map_err(|error| format!("metadata before hashing {}: {error}", path.display()))?;
     let mut file = File::open(path)
         .map_err(|error| format!("open {}: {error}", path.display()))?;
+    let opened = file
+        .metadata()
+        .map_err(|error| format!("inspect opened file {}: {error}", path.display()))?;
+    if !opened.is_file() || opened.len() != before.len() || modified(&opened) != modified(&before) {
+        return Err(format!("artifact changed before hashing: {}", path.display()));
+    }
     let mut hasher = blake3::Hasher::new();
     let mut buffer = vec![0u8; BUFFER_BYTES];
     let mut bytes_read = 0u64;
@@ -203,11 +212,18 @@ fn hash_stable_file(path: &Path) -> Result<(u64, String), String> {
         hasher.update(&buffer[..count]);
     }
 
-    let after = fs::metadata(path)
+    let after_path = fs::symlink_metadata(path)
         .map_err(|error| format!("metadata after hashing {}: {error}", path.display()))?;
-    if before.len() != after.len()
+    let after = file
+        .metadata()
+        .map_err(|error| format!("inspect hashed file {}: {error}", path.display()))?;
+    if after_path.file_type().is_symlink()
+        || !after_path.is_file()
+        || before.len() != after.len()
+        || before.len() != after_path.len()
         || before.len() != bytes_read
         || modified(&before) != modified(&after)
+        || modified(&before) != modified(&after_path)
     {
         return Err(format!("artifact changed while being hashed: {}", path.display()));
     }
@@ -256,6 +272,7 @@ fn validate_manifest_shape(manifest: &ArtifactManifest) -> Result<(), String> {
     }
     for entry in &manifest.entries {
         if entry.path.starts_with('/')
+            || entry.path.contains('\\')
             || entry.path.split('/').any(|part| part.is_empty() || part == "." || part == "..")
         {
             return Err(format!("manifest contains unsafe relative path: {}", entry.path));
