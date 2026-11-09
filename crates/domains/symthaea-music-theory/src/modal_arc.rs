@@ -15,6 +15,12 @@ use crate::rhythm::Duration;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use crate::spec::{Attitude, CompositionSpec};
 
+// The lead line persists through Alap, Jor, Jhala and the final tonic.
+// The tonic/fifth field is one sustained drone entity, even where the score
+// exposes its bass and upper drone tones under different VoiceRole values.
+const MODAL_MELODY: PartId = PartId(0);
+const MODAL_DRONE: PartId = PartId(1);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModalArcProfile {
@@ -86,7 +92,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
             let duration = event.duration.scale(2, 1);
             if let Some(degree) = event.degree {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: MODAL_MELODY,
                     pitch: scale.degree_pitch(degree, 4),
                     onset,
                     duration,
@@ -111,7 +117,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
             let duration = event.duration;
             if let Some(degree) = event.degree {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: MODAL_MELODY,
                     pitch: scale.degree_pitch(degree, 4),
                     onset,
                     duration,
@@ -137,7 +143,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
             let duration = event.duration.scale(1, 2);
             if let Some(degree) = event.degree {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: MODAL_MELODY,
                     pitch: scale.degree_pitch(degree + if repetition % 2 == 0 { 0 } else { 7 }, 4),
                     onset,
                     duration,
@@ -150,7 +156,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
             onset = onset + duration;
             let punctuation = duration.scale(1, 2);
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: MODAL_MELODY,
                 pitch: scale.degree_pitch(if repetition % 2 == 0 { 1 } else { 5 }, 5),
                 onset,
                 duration: punctuation,
@@ -163,7 +169,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
         }
     }
     score.push(ScoreNote {
-        part: PartId::UNASSIGNED,
+        part: MODAL_MELODY,
         pitch: scale.degree_pitch(1, 4),
         onset,
         duration: Duration::new(meter as i64, 1),
@@ -183,7 +189,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
         (VoiceRole::Harmony, 8, 3, 0.26),
     ] {
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: MODAL_DRONE,
             pitch: scale.degree_pitch(degree, octave),
             onset: Duration::zero(),
             duration: onset,
@@ -231,6 +237,35 @@ mod tests {
             assert_eq!(note.duration, realized.plan.jhala_end);
         }
         assert_eq!(realized.score.voice(VoiceRole::Bass).len(), 1);
+    }
+
+    #[test]
+    fn melodic_line_and_drone_keep_stable_part_identity_across_the_arc() {
+        let realized = realize_modal_arc(&intent(), &Style::HindustaniInspired.spec());
+        assert!(realized.score.has_part_identity());
+        assert_eq!(realized.score.parts(), vec![MODAL_MELODY, MODAL_DRONE]);
+
+        assert!(
+            realized.score.notes.iter().all(|note| {
+                if note.role == VoiceRole::Melody {
+                    note.part == MODAL_MELODY
+                } else {
+                    note.part == MODAL_DRONE
+                }
+            }),
+            "the melodic line and the continuous drone must remain distinct"
+        );
+        assert!(
+            realized.score.notes.iter().any(|note| {
+                note.part == MODAL_DRONE && note.role == VoiceRole::Bass
+            })
+        );
+        assert!(
+            realized.score.notes.iter().any(|note| {
+                note.part == MODAL_DRONE && note.role == VoiceRole::Harmony
+            }),
+            "one continuous drone can carry more than one local role"
+        );
     }
 
     #[test]
