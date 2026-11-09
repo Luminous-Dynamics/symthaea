@@ -8,6 +8,41 @@ use serde::{Deserialize, Serialize};
 /// Number of actuators: steering, throttle, brake.
 pub const NUM_ACTUATORS: usize = 3;
 
+/// Explicit simulation-oracle target used by the Follow curriculum.
+///
+/// Produced only by SwarmSimulator from a time-aligned simulator snapshot.
+/// It is not a local perception observation or a V2X claim, and must never
+/// be populated from the legacy mesh aggregate fields.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct SimulatorOracleFollowTarget {
+    /// Stable actor identifier within the synthetic swarm scenario.
+    pub actor_id: u64,
+    /// Positive along-road distance from ego to the lead actor (m).
+    pub gap_m: f64,
+    /// Lead actor longitudinal speed minus ego longitudinal speed (m/s).
+    /// Negative means ego is closing on the lead actor.
+    pub relative_speed_mps: f64,
+    /// Simulation time of the actor snapshot used to produce this target (s).
+    pub snapshot_time_s: f64,
+    /// Maximum allowed age of the source snapshot for this training step (s).
+    pub max_age_s: f64,
+}
+
+impl SimulatorOracleFollowTarget {
+    /// Whether this oracle snapshot is finite, forward-facing and current at now_s.
+    pub fn is_current_at(&self, now_s: f64) -> bool {
+        self.gap_m.is_finite()
+            && self.gap_m > 0.0
+            && self.relative_speed_mps.is_finite()
+            && self.snapshot_time_s.is_finite()
+            && now_s.is_finite()
+            && self.max_age_s.is_finite()
+            && self.max_age_s >= 0.0
+            && self.snapshot_time_s <= now_s + 1e-9
+            && now_s - self.snapshot_time_s <= self.max_age_s + 1e-9
+    }
+}
+
 /// Number of state channels for HDC encoding (20D: 14 proprioceptive + 2 road + 4 mesh).
 pub const NUM_STATE_CHANNELS: usize = 20;
 
@@ -696,20 +731,27 @@ pub fn pd_cruise_baseline_with_road(
     }
 }
 
-/// PD cruise-control for Follow task: modulates speed based on gap to nearest peer.
+/// PD cruise-control teacher for Follow, using an explicit simulator-oracle target.
 ///
-/// Same lateral/heading control as `pd_cruise_baseline_with_road`, but the speed
-/// command is adjusted by the gap error: if the peer is too close, slow down;
-/// if too far, speed up (up to 120% of target).
+/// An absent, stale, future-dated or malformed target produces the baseline
+/// command. The legacy nearest_peer_distance mesh aggregate is never used as
+/// an implicit Follow fallback.
 pub fn pd_cruise_with_follow(
     state: &VehicleState,
     target_speed: f64,
     road_heading: f64,
     target_gap: f64,
+    target: Option<&SimulatorOracleFollowTarget>,
 ) -> VehicleCommand {
-    // Gap-modulated speed: speed_cmd = target_speed + gap_error * 0.3
-    let gap_error = state.nearest_peer_distance - target_gap;
-    let speed_cmd = (target_speed + gap_error * 0.3).clamp(0.0, target_speed * 1.2);
+    let Some(target) = target.filter(|target| target.is_current_at(state.timestamp)) else {
+        return pd_cruise_baseline_with_road(state, target_speed, road_heading);
+    };
+
+    // Gap term responds to headway error; relative-speed term anticipates closing
+    // or opening motion instead of reacting only to a distance snapshot.
+    let gap_error = target.gap_m - target_gap;
+    let speed_cmd = (target_speed + gap_error * 0.3 + target.relative_speed_mps * 0.5)
+        .clamp(0.0, target_speed * 1.2);
 
     pd_cruise_baseline_with_road(state, speed_cmd, road_heading)
 }
@@ -1049,34 +1091,97 @@ mod tests {
     }
 
     #[test]
-    fn test_pd_follow_slows_for_close_peer() {
-        let mut state = VehicleState::cruising(13.4);
-        state.nearest_peer_distance = 15.0; // closer than target gap
-        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0);
-        // Gap error = 15 - 30 = -15 → speed_cmd = 13.4 + (-15)*0.3 = 8.9
-        // At 13.4 m/s with target 8.9 → speed_error negative → should brake or reduce throttle
+    fn test_pd_follow_slows_for_close_oracle_target() {
+        let state = VehicleState::cruising(13.4);
+        let target = SimulatorOracleFollowTarget {
+            actor_id: 1,
+            gap_m: 15.0,
+            relative_speed_mps: 0.0,
+            snapshot_time_s: state.timestamp,
+            max_age_s: 0.05,
+        };
+        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&target));
         let baseline = pd_cruise_baseline(&state, 13.4);
         assert!(
             cmd.throttle < baseline.throttle || cmd.brake > baseline.brake,
-            "Close peer → reduced throttle or increased brake: follow={:?}, baseline={:?}",
+            "Close oracle target → reduced throttle or increased brake: follow={:?}, baseline={:?}",
             cmd,
             baseline
         );
     }
 
     #[test]
-    fn test_pd_follow_speeds_for_far_peer() {
-        let mut state = VehicleState::cruising(10.0);
-        state.nearest_peer_distance = 60.0; // farther than target gap
-        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0);
-        // Gap error = 60 - 30 = 30 → speed_cmd = 13.4 + 30*0.3 = 22.4, clamped to 16.08
-        // At 10.0 m/s with target 16.08 → should throttle harder than baseline at 13.4
+    fn test_pd_follow_speeds_for_far_oracle_target() {
+        let state = VehicleState::cruising(10.0);
+        let target = SimulatorOracleFollowTarget {
+            actor_id: 1,
+            gap_m: 60.0,
+            relative_speed_mps: 0.0,
+            snapshot_time_s: state.timestamp,
+            max_age_s: 0.05,
+        };
+        let cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&target));
         let baseline = pd_cruise_baseline_with_road(&state, 13.4, 0.0);
         assert!(
             cmd.throttle >= baseline.throttle,
-            "Far peer → increased throttle: follow={:?}, baseline={:?}",
+            "Far oracle target → increased throttle: follow={:?}, baseline={:?}",
             cmd,
             baseline
+        );
+    }
+
+    #[test]
+    fn test_pd_follow_uses_relative_speed_to_anticipate_closing() {
+        let state = VehicleState::cruising(13.4);
+        let closing = SimulatorOracleFollowTarget {
+            actor_id: 1,
+            gap_m: 30.0,
+            relative_speed_mps: -3.0,
+            snapshot_time_s: state.timestamp,
+            max_age_s: 0.05,
+        };
+        let opening = SimulatorOracleFollowTarget {
+            relative_speed_mps: 3.0,
+            ..closing
+        };
+        let close_cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&closing));
+        let open_cmd = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&opening));
+        assert!(
+            close_cmd.throttle < open_cmd.throttle || close_cmd.brake > open_cmd.brake,
+            "Closing lead motion must reduce the commanded speed"
+        );
+    }
+
+    #[test]
+    fn test_pd_follow_never_falls_back_to_legacy_mesh_distance() {
+        let mut state = VehicleState::cruising(13.4);
+        state.nearest_peer_distance = 2.0;
+        let without_target = pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, None);
+        let baseline = pd_cruise_baseline(&state, 13.4);
+        assert_eq!(without_target, baseline);
+    }
+
+    #[test]
+    fn test_pd_follow_rejects_stale_or_future_oracle_target() {
+        let state = VehicleState::cruising(13.4);
+        let stale = SimulatorOracleFollowTarget {
+            actor_id: 1,
+            gap_m: 10.0,
+            relative_speed_mps: -2.0,
+            snapshot_time_s: -1.0,
+            max_age_s: 0.05,
+        };
+        let future = SimulatorOracleFollowTarget {
+            snapshot_time_s: state.timestamp + 1.0,
+            ..stale
+        };
+        assert_eq!(
+            pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&stale)),
+            pd_cruise_baseline(&state, 13.4)
+        );
+        assert_eq!(
+            pd_cruise_with_follow(&state, 13.4, 0.0, 30.0, Some(&future)),
+            pd_cruise_baseline(&state, 13.4)
         );
     }
 }
