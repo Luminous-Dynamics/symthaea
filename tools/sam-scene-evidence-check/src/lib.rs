@@ -1203,6 +1203,13 @@ fn validate_follow_target_context(
     if context_frame.is_none_or(|frame| !frame_ids.contains(frame)) {
         errors.push("follow_target_context: coordinate_frame_id must resolve in the scene".into());
     }
+    let source_frame = source.get("reference_frame_id").and_then(Value::as_str);
+    if source_frame != context_frame {
+        errors.push(
+            "follow_target_context: evidence source frame must match the declared target frame"
+                .into(),
+        );
+    }
     let road_frame_is_local = snapshot
         .get("reference_frames")
         .and_then(Value::as_array)
