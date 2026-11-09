@@ -222,7 +222,8 @@
               }
             ]
           }
-        ]
+        ],
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
       }
     },
     {
@@ -352,7 +353,8 @@
               }
             ]
           }
-        ]
+        ],
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
       }
     },
     {
@@ -506,7 +508,8 @@
               }
             ]
           }
-        ]
+        ],
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
       }
     },
     {
@@ -661,7 +664,8 @@
               }
             ]
           }
-        ]
+        ],
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
       }
     },
     {
@@ -816,7 +820,8 @@
               }
             ]
           }
-        ]
+        ],
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
       }
     },
     {
@@ -971,7 +976,8 @@
               }
             ]
           }
-        ]
+        ],
+        "scenario_version": "ev-diagnostic-voi-scenario/0.1"
       }
     }
   ]
