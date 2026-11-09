@@ -11,6 +11,7 @@ on:
       - "docs/research/rea-proof-obligation-acquisition-grader-v0.schema.json"
       - "docs/research/rea-proof-obligation-acquisition-grader-v0.json"
       - "docs/research/rea-proof-obligation-policy-run-v0.schema.json"
+      - "examples/rea-proof-obligation-policy-run-v0.cost-only.synthetic.json"
       - "tools/rea-proof-obligation-fixture-check/**"
       - ".github/workflows/rea-proof-obligation-fixtures.yml"
   workflow_dispatch:
@@ -68,6 +69,25 @@ jobs:
 
       - name: Schema, fixture integrity and mutation controls
         run: cargo test --manifest-path tools/rea-proof-obligation-fixture-check/Cargo.toml --locked
+
+      - name: Score cost-only synthetic policy baseline
+        run: |
+          mkdir -p artifacts
+          cargo run --manifest-path tools/rea-proof-obligation-fixture-check/Cargo.toml --locked --bin rea-proof-obligation-score -- \
+            docs/research/rea-proof-obligation-acquisition-agent-view-v0.json \
+            docs/research/rea-proof-obligation-acquisition-grader-v0.json \
+            examples/rea-proof-obligation-policy-run-v0.cost-only.synthetic.json \
+            > artifacts/rea-proof-obligation-policy-score.synthetic.json
+          test -s artifacts/rea-proof-obligation-policy-score.synthetic.json
+
+      - name: Archive synthetic policy score report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-proof-obligation-policy-score-synthetic
+          path: artifacts/rea-proof-obligation-policy-score.synthetic.json
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Warnings-denied Clippy
         run: cargo clippy --manifest-path tools/rea-proof-obligation-fixture-check/Cargo.toml --all-targets --locked -- -D warnings
