@@ -1,0 +1,21 @@
+{
+  "schema_version": "luminous.synthetic-universe.v1",
+  "universe_id": "SYNTHETIC_TWO_ASSET_V1",
+  "base_currency": "USD",
+  "membership_known_at": "2026-01-02T16:00:05Z",
+  "instruments": [
+    {
+      "instrument_id": "SYN-EQ-A",
+      "listing_status": "listed",
+      "valid_from": "2025-01-01T00:00:00Z",
+      "known_at": "2025-01-01T00:00:00Z"
+    },
+    {
+      "instrument_id": "SYN-EQ-B",
+      "listing_status": "listed",
+      "valid_from": "2025-01-01T00:00:00Z",
+      "known_at": "2025-01-01T00:00:00Z"
+    }
+  ],
+  "note": "Fictional instruments for schema and accounting conformance only."
+}
