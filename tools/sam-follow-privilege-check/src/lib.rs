@@ -18,7 +18,9 @@ pub fn validate_files(schema_path: &Path, report_path: &Path) -> Result<(), Vec<
 
 pub fn validate_values(schema: &Value, report: &Value) -> Result<(), Vec<String>> {
     if !jsonschema::meta::is_valid(schema) {
-        return Err(vec!["schema is invalid under its declared JSON Schema meta-schema".into()]);
+        return Err(vec![
+            "schema is invalid under its declared JSON Schema meta-schema".into(),
+        ]);
     }
     let validator = jsonschema::options()
         .offline()
@@ -29,7 +31,11 @@ pub fn validate_values(schema: &Value, report: &Value) -> Result<(), Vec<String>
         .map(|error| format!("schema {}: {error}", error.instance_path()))
         .collect();
     errors.extend(validate_semantics(report));
-    if errors.is_empty() { Ok(()) } else { Err(errors) }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
 
 fn validate_semantics(report: &Value) -> Vec<String> {
@@ -53,7 +59,10 @@ fn validate_semantics(report: &Value) -> Vec<String> {
                     ("teacher_supervision", "disabled"),
                     ("learning_updates", "disabled"),
                     ("evaluator_truth", "post_commit_only"),
-                    ("observation_profile", "simulation_20d_with_sim_peer_channels"),
+                    (
+                        "observation_profile",
+                        "simulation_20d_with_sim_peer_channels",
+                    ),
                 ];
                 for (field, expected) in disabled {
                     if arm.get(field).and_then(Value::as_str) != Some(expected) {
@@ -68,8 +77,7 @@ fn validate_semantics(report: &Value) -> Vec<String> {
                 errors.push("arm D must remain blocked until scene admission".into());
             }
             if id == Some("E")
-                && arm.get("eligibility").and_then(Value::as_str)
-                    != Some("non_authoritative_only")
+                && arm.get("eligibility").and_then(Value::as_str) != Some("non_authoritative_only")
             {
                 errors.push("arm E must remain non-authoritative".into());
             }
@@ -99,7 +107,9 @@ fn validate_semantics(report: &Value) -> Vec<String> {
             let intervention = trial.get("intervention_kind").and_then(Value::as_str);
             match pair_role {
                 Some("standalone") if pair_id.is_some() || intervention != Some("none") => {
-                    errors.push(format!("{prefix}: standalone trial cannot declare a pair or intervention"));
+                    errors.push(format!(
+                        "{prefix}: standalone trial cannot declare a pair or intervention"
+                    ));
                 }
                 Some("baseline") if pair_id.is_none() || intervention != Some("none") => {
                     errors.push(format!("{prefix}: baseline trial requires paired_case_id and intervention_kind=none"));
@@ -110,11 +120,16 @@ fn validate_semantics(report: &Value) -> Vec<String> {
                 _ => {}
             }
             if let Some(pair_id) = pair_id {
-                paired_trials.entry(pair_id.to_owned()).or_default().push(trial);
+                paired_trials
+                    .entry(pair_id.to_owned())
+                    .or_default()
+                    .push(trial);
             }
             let arm_id = trial.get("arm_id").and_then(Value::as_str);
             let Some(arm) = arm_id.and_then(|id| arms.get(id).copied()) else {
-                errors.push(format!("{prefix}: arm_id does not resolve in benchmark arms"));
+                errors.push(format!(
+                    "{prefix}: arm_id does not resolve in benchmark arms"
+                ));
                 continue;
             };
             validate_trial(&mut errors, &prefix, trial, arm);
@@ -124,24 +139,27 @@ fn validate_semantics(report: &Value) -> Vec<String> {
     errors
 }
 
-fn validate_paired_trials(
-    errors: &mut Vec<String>,
-    groups: &BTreeMap<String, Vec<&Value>>,
-) {
+fn validate_paired_trials(errors: &mut Vec<String>, groups: &BTreeMap<String, Vec<&Value>>) {
     for (pair_id, trials) in groups {
         let prefix = format!("paired_case[{pair_id}]");
         if trials.len() != 2 {
-            errors.push(format!("{prefix}: paired case must contain exactly two trials"));
+            errors.push(format!(
+                "{prefix}: paired case must contain exactly two trials"
+            ));
             continue;
         }
-        let baseline = trials.iter().copied().find(|trial| {
-            trial.get("paired_role").and_then(Value::as_str) == Some("baseline")
-        });
-        let intervention = trials.iter().copied().find(|trial| {
-            trial.get("paired_role").and_then(Value::as_str) == Some("intervention")
-        });
+        let baseline = trials
+            .iter()
+            .copied()
+            .find(|trial| trial.get("paired_role").and_then(Value::as_str) == Some("baseline"));
+        let intervention = trials
+            .iter()
+            .copied()
+            .find(|trial| trial.get("paired_role").and_then(Value::as_str) == Some("intervention"));
         let (Some(baseline), Some(intervention)) = (baseline, intervention) else {
-            errors.push(format!("{prefix}: requires exactly one baseline and one intervention"));
+            errors.push(format!(
+                "{prefix}: requires exactly one baseline and one intervention"
+            ));
             continue;
         };
         for field in [
@@ -164,7 +182,9 @@ fn validate_paired_trials(
         match kind {
             "oracle_sidecar_mutation" => {
                 if intervention.get("arm_id").and_then(Value::as_str) != Some("B") {
-                    errors.push(format!("{prefix}: oracle-sidecar mutation requires masked-observation Arm B"));
+                    errors.push(format!(
+                        "{prefix}: oracle-sidecar mutation requires masked-observation Arm B"
+                    ));
                 }
                 let before = baseline
                     .get("observation")
@@ -189,31 +209,57 @@ fn validate_paired_trials(
             }
             "raw_v2x_mutation" => {
                 if intervention.get("arm_id").and_then(Value::as_str) != Some("E") {
-                    errors.push(format!("{prefix}: V2X mutation requires cooperative-advisory Arm E"));
+                    errors.push(format!(
+                        "{prefix}: V2X mutation requires cooperative-advisory Arm E"
+                    ));
                 }
                 if baseline.get("follow_target") != intervention.get("follow_target") {
-                    errors.push(format!("{prefix}: V2X mutation changed the local Follow target"));
+                    errors.push(format!(
+                        "{prefix}: V2X mutation changed the local Follow target"
+                    ));
                 }
                 if role_evidence_map(baseline, "remote_cooperative_claim")
                     == role_evidence_map(intervention, "remote_cooperative_claim")
                 {
-                    errors.push(format!("{prefix}: V2X intervention did not change remote-claim evidence"));
+                    errors.push(format!(
+                        "{prefix}: V2X intervention did not change remote-claim evidence"
+                    ));
                 }
             }
             "post_commit_shadow_teacher" => {
                 if intervention.get("arm_id").and_then(Value::as_str) != Some("C") {
-                    errors.push(format!("{prefix}: post-commit shadow teacher requires frozen Arm C"));
+                    errors.push(format!(
+                        "{prefix}: post-commit shadow teacher requires frozen Arm C"
+                    ));
                 }
-                if baseline.get("actions").and_then(|x| x.get("executed_action_digest"))
-                    != intervention.get("actions").and_then(|x| x.get("executed_action_digest"))
+                if baseline
+                    .get("actions")
+                    .and_then(|x| x.get("executed_action_digest"))
+                    != intervention
+                        .get("actions")
+                        .and_then(|x| x.get("executed_action_digest"))
                 {
-                    errors.push(format!("{prefix}: post-commit shadow teacher changed executed action"));
+                    errors.push(format!(
+                        "{prefix}: post-commit shadow teacher changed executed action"
+                    ));
                 }
                 let teacher = intervention.get("teacher");
-                if teacher.and_then(|x| x.get("evaluation_only")).and_then(Value::as_bool) != Some(true)
-                    || teacher.and_then(|x| x.get("reference_only")).and_then(Value::as_bool) != Some(true)
-                    || teacher.and_then(|x| x.get("blended")).and_then(Value::as_bool) != Some(false)
-                    || teacher.and_then(|x| x.get("supervised")).and_then(Value::as_bool) != Some(false)
+                if teacher
+                    .and_then(|x| x.get("evaluation_only"))
+                    .and_then(Value::as_bool)
+                    != Some(true)
+                    || teacher
+                        .and_then(|x| x.get("reference_only"))
+                        .and_then(Value::as_bool)
+                        != Some(true)
+                    || teacher
+                        .and_then(|x| x.get("blended"))
+                        .and_then(Value::as_bool)
+                        != Some(false)
+                    || teacher
+                        .and_then(|x| x.get("supervised"))
+                        .and_then(Value::as_bool)
+                        != Some(false)
                 {
                     errors.push(format!("{prefix}: intervention must be an evaluator-only, reference-only, unblended and unsupervised teacher"));
                 }
@@ -242,9 +288,13 @@ fn role_evidence_map(trial: &Value, role: &str) -> BTreeMap<String, String> {
 
 fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &Value) {
     let observation = trial.get("observation");
-    let profile = observation.and_then(|x| x.get("profile_id")).and_then(Value::as_str);
+    let profile = observation
+        .and_then(|x| x.get("profile_id"))
+        .and_then(Value::as_str);
     if arm.get("arm_id").and_then(Value::as_str) == Some("D") {
-        errors.push(format!("{prefix}: Arm D is blocked until scene-admitted local perception is qualified"));
+        errors.push(format!(
+            "{prefix}: Arm D is blocked until scene-admitted local perception is qualified"
+        ));
     }
     let sources = observation
         .and_then(|x| x.get("sources"))
@@ -252,12 +302,19 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
         .cloned()
         .unwrap_or_default();
     if profile != arm.get("observation_profile").and_then(Value::as_str) {
-        errors.push(format!("{prefix}.observation: profile does not match declared benchmark arm"));
+        errors.push(format!(
+            "{prefix}.observation: profile does not match declared benchmark arm"
+        ));
     }
     let observation_tick = trial.get("action_observation_tick").and_then(Value::as_u64);
     let commit_tick = trial.get("action_commit_tick").and_then(Value::as_u64);
-    if !observation_tick.zip(commit_tick).is_some_and(|(observed, committed)| observed <= committed) {
-        errors.push(format!("{prefix}: action observation tick must not exceed action commit tick"));
+    if !observation_tick
+        .zip(commit_tick)
+        .is_some_and(|(observed, committed)| observed <= committed)
+    {
+        errors.push(format!(
+            "{prefix}: action observation tick must not exceed action commit tick"
+        ));
     }
     let mut source_roles = BTreeMap::new();
     for (index, source) in sources.iter().enumerate() {
@@ -265,8 +322,13 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
         let role = source.get("source_role").and_then(Value::as_str);
         let visible = source.get("policy_visible").and_then(Value::as_bool) == Some(true);
         if let (Some(source_id), Some(role)) = (source_id, role) {
-            if source_roles.insert(source_id.to_owned(), role.to_owned()).is_some() {
-                errors.push(format!("{prefix}.observation.sources[{index}]: duplicate source_id {source_id}"));
+            if source_roles
+                .insert(source_id.to_owned(), role.to_owned())
+                .is_some()
+            {
+                errors.push(format!(
+                    "{prefix}.observation.sources[{index}]: duplicate source_id {source_id}"
+                ));
             }
             if matches!(
                 profile,
@@ -283,7 +345,10 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
             }
             if visible
                 && !observation_tick.is_some_and(|tick| {
-                    source.get("received_tick").and_then(Value::as_u64).is_some_and(|received| received <= tick)
+                    source
+                        .get("received_tick")
+                        .and_then(Value::as_u64)
+                        .is_some_and(|received| received <= tick)
                 })
             {
                 errors.push(format!("{prefix}.observation.sources[{index}]: policy-visible source was received after the action observation tick"));
@@ -292,50 +357,103 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
     }
 
     let teacher = trial.get("teacher");
-    let computed = teacher.and_then(|x| x.get("action_computed")).and_then(Value::as_bool) == Some(true);
-    let blended = teacher.and_then(|x| x.get("blended")).and_then(Value::as_bool) == Some(true);
-    let coefficient = teacher.and_then(|x| x.get("blend_coefficient")).and_then(Value::as_f64).unwrap_or(-1.0);
-    let supervised = teacher.and_then(|x| x.get("supervised")).and_then(Value::as_bool) == Some(true);
-    let evaluation_only = teacher.and_then(|x| x.get("evaluation_only")).and_then(Value::as_bool) == Some(true);
-    let reference_only = teacher.and_then(|x| x.get("reference_only")).and_then(Value::as_bool) == Some(true);
+    let computed = teacher
+        .and_then(|x| x.get("action_computed"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    let blended = teacher
+        .and_then(|x| x.get("blended"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    let coefficient = teacher
+        .and_then(|x| x.get("blend_coefficient"))
+        .and_then(Value::as_f64)
+        .unwrap_or(-1.0);
+    let supervised = teacher
+        .and_then(|x| x.get("supervised"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    let evaluation_only = teacher
+        .and_then(|x| x.get("evaluation_only"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    let reference_only = teacher
+        .and_then(|x| x.get("reference_only"))
+        .and_then(Value::as_bool)
+        == Some(true);
     let teacher_digest = teacher.and_then(|x| x.get("action_digest"));
 
     if blended && (!computed || coefficient <= 0.0) {
-        errors.push(format!("{prefix}.teacher: blending requires a computed action and positive coefficient"));
+        errors.push(format!(
+            "{prefix}.teacher: blending requires a computed action and positive coefficient"
+        ));
     }
     if !blended && coefficient != 0.0 {
-        errors.push(format!("{prefix}.teacher: blend coefficient must be zero when not blended"));
+        errors.push(format!(
+            "{prefix}.teacher: blend coefficient must be zero when not blended"
+        ));
     }
     if supervised && !computed {
-        errors.push(format!("{prefix}.teacher: supervision requires a computed teacher action"));
+        errors.push(format!(
+            "{prefix}.teacher: supervision requires a computed teacher action"
+        ));
     }
     if computed && teacher_digest.and_then(Value::as_str).is_none() {
-        errors.push(format!("{prefix}.teacher: computed teacher action requires an action digest"));
+        errors.push(format!(
+            "{prefix}.teacher: computed teacher action requires an action digest"
+        ));
     }
     if !computed {
         let no_use = !blended && !supervised && !evaluation_only && !reference_only;
         if !no_use || teacher_digest.is_some_and(|x| !x.is_null()) {
-            errors.push(format!("{prefix}.teacher: absent teacher action cannot have use flags or a digest"));
+            errors.push(format!(
+                "{prefix}.teacher: absent teacher action cannot have use flags or a digest"
+            ));
         }
     }
     if reference_only && (!computed || blended || supervised) {
-        errors.push(format!("{prefix}.teacher: reference_only requires computed, unblended and unsupervised action"));
+        errors.push(format!(
+            "{prefix}.teacher: reference_only requires computed, unblended and unsupervised action"
+        ));
     }
     if evaluation_only && (!reference_only || blended || supervised) {
-        errors.push(format!("{prefix}.teacher: evaluation_only must be reference_only, unblended and unsupervised"));
+        errors.push(format!(
+            "{prefix}.teacher: evaluation_only must be reference_only, unblended and unsupervised"
+        ));
     }
 
     let learning = trial.get("learning");
-    let optimizer = learning.and_then(|x| x.get("optimizer_update")).and_then(Value::as_bool) == Some(true);
-    let replay_insert = learning.and_then(|x| x.get("replay_inserted")).and_then(Value::as_bool) == Some(true);
-    let replay_sample = learning.and_then(|x| x.get("replay_sampled")).and_then(Value::as_bool) == Some(true);
-    let exploration = learning.and_then(|x| x.get("exploration_applied")).and_then(Value::as_bool) == Some(true);
-    let before = learning.and_then(|x| x.get("parameter_digest_before")).and_then(Value::as_str);
-    let after = learning.and_then(|x| x.get("parameter_digest_after")).and_then(Value::as_str);
-    let weights_changed = learning.and_then(|x| x.get("weights_changed")).and_then(Value::as_bool) == Some(true);
+    let optimizer = learning
+        .and_then(|x| x.get("optimizer_update"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    let replay_insert = learning
+        .and_then(|x| x.get("replay_inserted"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    let replay_sample = learning
+        .and_then(|x| x.get("replay_sampled"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    let exploration = learning
+        .and_then(|x| x.get("exploration_applied"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    let before = learning
+        .and_then(|x| x.get("parameter_digest_before"))
+        .and_then(Value::as_str);
+    let after = learning
+        .and_then(|x| x.get("parameter_digest_after"))
+        .and_then(Value::as_str);
+    let weights_changed = learning
+        .and_then(|x| x.get("weights_changed"))
+        .and_then(Value::as_bool)
+        == Some(true);
     let digest_changed = before.zip(after).is_some_and(|(a, b)| a != b);
     if weights_changed != digest_changed {
-        errors.push(format!("{prefix}.learning: weights_changed flag disagrees with parameter digests"));
+        errors.push(format!(
+            "{prefix}.learning: weights_changed flag disagrees with parameter digests"
+        ));
     }
 
     if arm.get("arm_id").and_then(Value::as_str) == Some("C") {
@@ -343,71 +461,140 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
             errors.push(format!("{prefix}: arm C must disable teacher blend/supervision, optimizer, replay and exploration"));
         }
         if weights_changed || before != after {
-            errors.push(format!("{prefix}: arm C must preserve exact parameter digest"));
+            errors.push(format!(
+                "{prefix}: arm C must preserve exact parameter digest"
+            ));
         }
-        if trial.get("evaluator_truth").and_then(|x| x.get("available")).and_then(Value::as_bool) == Some(true) {
+        if trial
+            .get("evaluator_truth")
+            .and_then(|x| x.get("available"))
+            .and_then(Value::as_bool)
+            == Some(true)
+        {
             let commit = trial.get("action_commit_tick").and_then(Value::as_u64);
-            let delivered = trial.get("evaluator_truth").and_then(|x| x.get("delivered_tick")).and_then(Value::as_u64);
+            let delivered = trial
+                .get("evaluator_truth")
+                .and_then(|x| x.get("delivered_tick"))
+                .and_then(Value::as_u64);
             if !commit.zip(delivered).is_some_and(|(c, d)| d > c) {
-                errors.push(format!("{prefix}: arm C evaluator truth must be delivered strictly after action commit"));
+                errors.push(format!(
+                    "{prefix}: arm C evaluator truth must be delivered strictly after action commit"
+                ));
             }
-            if trial.get("evaluator_truth").and_then(|x| x.get("policy_visible")).and_then(Value::as_bool) == Some(true) {
-                errors.push(format!("{prefix}: arm C evaluator truth cannot be policy-visible"));
+            if trial
+                .get("evaluator_truth")
+                .and_then(|x| x.get("policy_visible"))
+                .and_then(Value::as_bool)
+                == Some(true)
+            {
+                errors.push(format!(
+                    "{prefix}: arm C evaluator truth cannot be policy-visible"
+                ));
             }
         }
     }
 
     let inference = trial.get("inference_state");
-    let recurrent_changed = inference.and_then(|x| x.get("recurrent_digest_before")).and_then(Value::as_str)
-        .zip(inference.and_then(|x| x.get("recurrent_digest_after")).and_then(Value::as_str))
+    let recurrent_changed = inference
+        .and_then(|x| x.get("recurrent_digest_before"))
+        .and_then(Value::as_str)
+        .zip(
+            inference
+                .and_then(|x| x.get("recurrent_digest_after"))
+                .and_then(Value::as_str),
+        )
         .is_some_and(|(a, b)| a != b);
-    let recurrent_evolved = inference.and_then(|x| x.get("recurrent_evolved")).and_then(Value::as_bool) == Some(true);
+    let recurrent_evolved = inference
+        .and_then(|x| x.get("recurrent_evolved"))
+        .and_then(Value::as_bool)
+        == Some(true);
     if recurrent_changed != recurrent_evolved {
-        errors.push(format!("{prefix}.inference_state: recurrent_evolved flag disagrees with recurrent digests"));
+        errors.push(format!(
+            "{prefix}.inference_state: recurrent_evolved flag disagrees with recurrent digests"
+        ));
     }
 
     let truth = trial.get("evaluator_truth");
-    let truth_available = truth.and_then(|x| x.get("available")).and_then(Value::as_bool) == Some(true);
+    let truth_available = truth
+        .and_then(|x| x.get("available"))
+        .and_then(Value::as_bool)
+        == Some(true);
     if !truth_available {
-        if truth.and_then(|x| x.get("delivered_tick")).is_some_and(|tick| !tick.is_null())
-            || truth.and_then(|x| x.get("source_ids")).and_then(Value::as_array).is_some_and(|ids| !ids.is_empty())
+        if truth
+            .and_then(|x| x.get("delivered_tick"))
+            .is_some_and(|tick| !tick.is_null())
+            || truth
+                .and_then(|x| x.get("source_ids"))
+                .and_then(Value::as_array)
+                .is_some_and(|ids| !ids.is_empty())
         {
             errors.push(format!("{prefix}.evaluator_truth: unavailable truth must not carry a delivery tick or source IDs"));
         }
     }
     if truth_available {
         let commit = trial.get("action_commit_tick").and_then(Value::as_u64);
-        let delivered = truth.and_then(|x| x.get("delivered_tick")).and_then(Value::as_u64);
-        if !commit.zip(delivered).is_some_and(|(c, d)| d > c) && arm.get("evaluator_truth").and_then(Value::as_str) == Some("post_commit_only") {
-            errors.push(format!("{prefix}.evaluator_truth: post_commit_only truth must arrive after action commit"));
+        let delivered = truth
+            .and_then(|x| x.get("delivered_tick"))
+            .and_then(Value::as_u64);
+        if !commit.zip(delivered).is_some_and(|(c, d)| d > c)
+            && arm.get("evaluator_truth").and_then(Value::as_str) == Some("post_commit_only")
+        {
+            errors.push(format!(
+                "{prefix}.evaluator_truth: post_commit_only truth must arrive after action commit"
+            ));
         }
-        if truth.and_then(|x| x.get("policy_visible")).and_then(Value::as_bool) == Some(true) {
+        if truth
+            .and_then(|x| x.get("policy_visible"))
+            .and_then(Value::as_bool)
+            == Some(true)
+        {
             errors.push(format!("{prefix}.evaluator_truth cannot be policy-visible"));
         }
-        if let Some(ids) = truth.and_then(|x| x.get("source_ids")).and_then(Value::as_array) {
+        if let Some(ids) = truth
+            .and_then(|x| x.get("source_ids"))
+            .and_then(Value::as_array)
+        {
             for id in ids {
                 let Some(id) = id.as_str() else { continue };
-                if sources.iter().any(|source| source.get("source_id").and_then(Value::as_str) == Some(id)
-                    && source.get("policy_visible").and_then(Value::as_bool) == Some(true))
-                {
-                    errors.push(format!("{prefix}.evaluator_truth source {id} is also policy-visible"));
+                if sources.iter().any(|source| {
+                    source.get("source_id").and_then(Value::as_str) == Some(id)
+                        && source.get("policy_visible").and_then(Value::as_bool) == Some(true)
+                }) {
+                    errors.push(format!(
+                        "{prefix}.evaluator_truth source {id} is also policy-visible"
+                    ));
                 }
             }
         }
     }
 
     let target = trial.get("follow_target");
-    let available = target.and_then(|x| x.get("available")).and_then(Value::as_bool) == Some(true);
-    let target_role = target.and_then(|x| x.get("source_role")).and_then(Value::as_str).unwrap_or("unknown");
-    let target_status = target.and_then(|x| x.get("status")).and_then(Value::as_str).unwrap_or("unknown");
+    let available = target
+        .and_then(|x| x.get("available"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    let target_role = target
+        .and_then(|x| x.get("source_role"))
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let target_status = target
+        .and_then(|x| x.get("status"))
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
     if available {
         if !matches!(target_status, "current") {
-            errors.push(format!("{prefix}.follow_target: available target must have current status"));
+            errors.push(format!(
+                "{prefix}.follow_target: available target must have current status"
+            ));
         }
-        let id = target.and_then(|x| x.get("target_id")).and_then(Value::as_str);
+        let id = target
+            .and_then(|x| x.get("target_id"))
+            .and_then(Value::as_str);
         let age = target.and_then(|x| x.get("age_ms")).and_then(Value::as_f64);
         if id.is_none() || age.is_none() {
-            errors.push(format!("{prefix}.follow_target: available target requires ID and age"));
+            errors.push(format!(
+                "{prefix}.follow_target: available target requires ID and age"
+            ));
         }
         let allowed_role = match arm.get("arm_id").and_then(Value::as_str) {
             Some("A") | Some("B") | Some("C") => target_role == "simulator_oracle",
@@ -415,25 +602,39 @@ fn validate_trial(errors: &mut Vec<String>, prefix: &str, trial: &Value, arm: &V
             _ => false,
         };
         if !allowed_role {
-            errors.push(format!("{prefix}.follow_target: source role {target_role} is not admissible for this arm"));
+            errors.push(format!(
+                "{prefix}.follow_target: source role {target_role} is not admissible for this arm"
+            ));
         }
         let source_exists = sources.iter().any(|source| {
             source.get("source_role").and_then(Value::as_str) == Some(target_role)
                 && source.get("source_id").and_then(Value::as_str)
-                    == target.and_then(|x| x.get("target_id")).and_then(Value::as_str)
+                    == target
+                        .and_then(|x| x.get("target_id"))
+                        .and_then(Value::as_str)
         });
         if !source_exists {
-            errors.push(format!("{prefix}.follow_target: target source must resolve in observation sources"));
+            errors.push(format!(
+                "{prefix}.follow_target: target source must resolve in observation sources"
+            ));
         }
     } else {
         if !matches!(target_status, "missing" | "stale" | "rejected" | "unknown") {
             errors.push(format!("{prefix}.follow_target: unavailable target must state missing/stale/rejected/unknown"));
         }
-        if target.and_then(|x| x.get("target_id")).is_some_and(|id| !id.is_null())
-            || target.and_then(|x| x.get("age_ms")).is_some_and(|age| !age.is_null())
-            || target.and_then(|x| x.get("frame_id")).is_some_and(|frame| !frame.is_null())
+        if target
+            .and_then(|x| x.get("target_id"))
+            .is_some_and(|id| !id.is_null())
+            || target
+                .and_then(|x| x.get("age_ms"))
+                .is_some_and(|age| !age.is_null())
+            || target
+                .and_then(|x| x.get("frame_id"))
+                .is_some_and(|frame| !frame.is_null())
         {
-            errors.push(format!("{prefix}.follow_target: unavailable target must not carry target ID, age or frame"));
+            errors.push(format!(
+                "{prefix}.follow_target: unavailable target must not carry target ID, age or frame"
+            ));
         }
     }
 }
@@ -443,13 +644,17 @@ mod tests {
     use super::*;
 
     fn schema() -> Value {
-        serde_json::from_str(include_str!("../../../docs/autonomy/SAM_FOLLOW_PRIVILEGE_BENCHMARK_SCHEMA_V0_1.json"))
-            .expect("schema JSON")
+        serde_json::from_str(include_str!(
+            "../../../docs/autonomy/SAM_FOLLOW_PRIVILEGE_BENCHMARK_SCHEMA_V0_1.json"
+        ))
+        .expect("schema JSON")
     }
 
     fn fixture() -> Value {
-        serde_json::from_str(include_str!("../../../docs/autonomy/fixtures/SAM_FOLLOW_PRIVILEGE_BENCHMARK_V0_1.json"))
-            .expect("fixture JSON")
+        serde_json::from_str(include_str!(
+            "../../../docs/autonomy/fixtures/SAM_FOLLOW_PRIVILEGE_BENCHMARK_V0_1.json"
+        ))
+        .expect("fixture JSON")
     }
 
     fn digest(ch: char) -> String {
@@ -508,12 +713,7 @@ mod tests {
         })
     }
 
-    fn set_pair_identity(
-        trial: &mut Value,
-        pair_id: &str,
-        role: &str,
-        intervention: &str,
-    ) {
+    fn set_pair_identity(trial: &mut Value, pair_id: &str, role: &str, intervention: &str) {
         trial["paired_case_id"] = Value::String(pair_id.to_owned());
         trial["paired_role"] = Value::String(role.to_owned());
         trial["intervention_kind"] = Value::String(intervention.to_owned());
@@ -665,8 +865,7 @@ mod tests {
         );
         intervention["observation"]["sources"][0]["evidence_ref"] =
             Value::String("sim-truth-tick-99-mutated".into());
-        intervention["actions"]["student_raw_action_digest"] =
-            Value::String(digest('g'));
+        intervention["actions"]["student_raw_action_digest"] = Value::String(digest('g'));
         let report = campaign_report(vec![baseline, intervention]);
         assert!(validate_values(&schema(), &report).is_err());
     }
@@ -685,8 +884,7 @@ mod tests {
         );
         intervention["observation"]["sources"][1]["evidence_ref"] =
             Value::String("remote-claim-version-02".into());
-        intervention["observation"]["policy_input_digest"] =
-            Value::String(digest('9'));
+        intervention["observation"]["policy_input_digest"] = Value::String(digest('9'));
         validate_values(&schema(), &campaign_report(vec![baseline, intervention]))
             .expect("V2X mutation must preserve local track identity/evidence");
     }
