@@ -268,8 +268,8 @@ impl SwarmSimulator {
 
             let dx = peer_state.position_x - ego_state.position_x;
             let dy = peer_state.position_y - ego_state.position_y;
-            let local_forward = dx * ego_projection.road_heading.cos()
-                + dy * ego_projection.road_heading.sin();
+            let local_forward =
+                dx * ego_projection.road_heading.cos() + dy * ego_projection.road_heading.sin();
             if !local_forward.is_finite() || local_forward <= 0.0 {
                 continue;
             }
@@ -280,10 +280,7 @@ impl SwarmSimulator {
             } else {
                 raw_gap
             };
-            if !gap_m.is_finite()
-                || gap_m <= 0.0
-                || gap_m > self.config.follow_max_range_m
-            {
+            if !gap_m.is_finite() || gap_m <= 0.0 || gap_m > self.config.follow_max_range_m {
                 continue;
             }
 
@@ -496,10 +493,7 @@ mod tests {
     #[test]
     fn test_follow_oracle_aligns_to_nonzero_simulation_time_origin() {
         let start_time_s = 0.75;
-        let swarm = SwarmSimulator::new_at_time(
-            SwarmConfig::convoy_straight(1),
-            start_time_s,
-        );
+        let swarm = SwarmSimulator::new_at_time(SwarmConfig::convoy_straight(1), start_time_s);
         let mut ego = VehicleState::cruising(13.4);
         ego.timestamp = start_time_s;
 
@@ -514,8 +508,7 @@ mod tests {
     #[test]
     fn test_follow_oracle_keeps_nonzero_clock_origin_after_step() {
         let start_time_s = 2.25;
-        let mut swarm =
-            SwarmSimulator::new_at_time(SwarmConfig::convoy_straight(1), start_time_s);
+        let mut swarm = SwarmSimulator::new_at_time(SwarmConfig::convoy_straight(1), start_time_s);
         swarm.step(0.005);
         let mut ego = VehicleState::cruising(13.4);
         ego.timestamp = start_time_s;
