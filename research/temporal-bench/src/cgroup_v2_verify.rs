@@ -749,7 +749,7 @@ mod tests {
 
     fn systemd_show_output() -> String {
         format!(
-            "Id=ceb-candidate-test.scope\nActiveState=active\nSubState=running\nControlGroup={}\nMemoryMax=134217728\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1000000\nTasksMax=16\nRuntimeMaxUSec=30000000\nOOMPolicy=kill\n",
+            "Id=ceb-candidate-test.scope\nActiveState=active\nSubState=running\nControlGroup={}\nMemoryMax=134217728\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nTasksMax=16\nRuntimeMaxUSec=30s\nOOMPolicy=kill\n",
             expected().control_group
         )
     }
