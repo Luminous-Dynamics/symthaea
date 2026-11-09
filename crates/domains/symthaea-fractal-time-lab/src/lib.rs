@@ -14,6 +14,7 @@
 
 pub mod cognitive_coherence;
 pub mod correlation_auditor;
+pub mod dtc_sensing;
 pub mod exact_floquet;
 pub mod exact_heisenberg;
 pub mod floquet_time_crystal;
@@ -32,6 +33,11 @@ pub mod stability_profiler;
 pub mod structural_fidelity;
 pub mod topological_analysis;
 
+pub use dtc_sensing::{
+    DtcProbeConfig, DtcProbeError, DtcProbeSensingReport, MagnetizationReadout,
+    SubharmonicLifetime, cramer_rao_standard_error, estimate_subharmonic_lifetime,
+    evaluate_dtc_probe_sensing, readout_distribution, MAX_DTC_PROBE_PERIODS,
+};
 pub use metrics::{
     ExperimentScorecard, FractalMetric, IntegrationSurvivalScore, SelfSimilarityScore,
     SubharmonicScore, effect_size, mean, scorecards_to_csv, scorecards_to_json_array, std_dev,
