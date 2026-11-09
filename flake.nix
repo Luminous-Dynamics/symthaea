@@ -1110,7 +1110,9 @@ EOF
             buildInputs = rustBuildInputs;
             inherit nativeBuildInputs;
             buildPhase = ''
-              cargo test --manifest-path crates/core/nixward/Cargo.toml --lib parser::eval_diagnostics -- --nocapture
+              cargo test --manifest-path crates/core/nixward/Cargo.toml --features cli --lib parser::eval_diagnostics -- --nocapture
+              cargo test --manifest-path crates/core/nixward/Cargo.toml --features cli --lib cli::commands::tests -- --nocapture
+              cargo check --manifest-path crates/core/nixward/Cargo.toml --features cli --bin nixward
             '';
             installText = "Nixward evaluation diagnostic tests passed";
           };
