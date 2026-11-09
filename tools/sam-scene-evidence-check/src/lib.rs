@@ -1837,6 +1837,7 @@ mod tests {
         context["actor_id"] = Value::String("track-42".into());
         context["target_reference_kind"] = Value::String("tracked_object_hypothesis".into());
         context["target_reference_id"] = Value::String("object-hyp-42".into());
+        context["distance_uncertainty_m"] = Value::from(0.7);
         validate_values(&schema, &fixture)
             .expect("synthetic sensor observations may test the local perception adapter path");
     }
@@ -1922,6 +1923,33 @@ mod tests {
         let (schema, mut fixture) = load_fixture();
         fixture["snapshot"]["follow_target_context"]["relative_speed_mps"] = Value::from(25.0);
         assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn rejects_local_follow_uncertainty_below_un correlated_covariance_bound() {
+        let (schema, mut fixture) = load_fixture();
+        let context = &mut fixture["snapshot"]["follow_target_context"];
+        context["consumer_profile"] = Value::String("local_perception".into());
+        context["evidence_source_ref"] = Value::String("local-lidar-track-fixture-01".into());
+        context["actor_id"] = Value::String("track-42".into());
+        context["target_reference_kind"] = Value::String("tracked_object_hypothesis".into());
+        context["target_reference_id"] = Value::String("object-hyp-42".into());
+        context["distance_uncertainty_m"] = Value::from(0.69);
+        assert!(validate_values(&schema, &fixture).is_err());
+    }
+
+    #[test]
+    fn accepts_local_follow_uncertainty_at_conservative_covariance_bound() {
+        let (schema, mut fixture) = load_fixture();
+        let context = &mut fixture["snapshot"]["follow_target_context"];
+        context["consumer_profile"] = Value::String("local_perception".into());
+        context["evidence_source_ref"] = Value::String("local-lidar-track-fixture-01".into());
+        context["actor_id"] = Value::String("track-42".into());
+        context["target_reference_kind"] = Value::String("tracked_object_hypothesis".into());
+        context["target_reference_id"] = Value::String("object-hyp-42".into());
+        context["distance_uncertainty_m"] = Value::from(0.7);
+        validate_values(&schema, &fixture)
+            .expect("reported gap uncertainty should meet the conservative covariance bound");
     }
 
     #[test]
