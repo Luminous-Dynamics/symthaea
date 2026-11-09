@@ -402,6 +402,13 @@ pub enum ModelDiscriminationError {
         experiment_id: String,
         model_id: String,
     },
+    #[error("experiment {experiment_id} contains a detection probability for unknown model {model_id}")]
+    UnexpectedDetectionProbability {
+        experiment_id: String,
+        model_id: String,
+    },
+    #[error("detection-channel inputs are dimensionally inconsistent or numerically invalid")]
+    InvalidDetectionChannel,
     #[error("detection-channel mutual information exceeded prior entropy for experiment {0}")]
     DetectionInformationExceedsPriorEntropy(String),
     #[error("numerical overflow while evaluating experiment {0}")]
@@ -651,8 +658,7 @@ pub fn rank_model_discriminating_experiments(
 ///
 /// The measurement-value EIG reuses the existing Gaussian quadrature kernel
 /// with the prior reweighted by each model's detection probability. The
-/// wrapped `availability_probability` is treated as a separate, model-
-—independent execution probability. A failed execution is assumed
+/// wrapped `availability_probability` is treated as a separate, model-independent execution probability. A failed execution is assumed
 /// uninformative; model-dependent detection only applies after execution.
 ///
 /// This is not a censored-value likelihood or a model for different failure
@@ -747,7 +753,8 @@ pub fn rank_detection_aware_model_discriminating_experiments(
                 .iter()
                 .zip(&detection_probabilities)
                 .map(|(probability, detection)| probability * detection)
-                .sum();
+                .sum::<f64>()
+                .clamp(0.0, 1.0);
 
             let detection_indicator_eig = binary_channel_mutual_information(
                 &prior,
@@ -922,7 +929,7 @@ fn validate_detection_probabilities(
     let mut actual = BTreeMap::new();
     for detection in &candidate.detection_probabilities {
         if !expected.contains(detection.model_id.as_str()) {
-            return Err(ModelDiscriminationError::MissingDetectionProbability {
+            return Err(ModelDiscriminationError::UnexpectedDetectionProbability {
                 experiment_id: experiment_id.clone(),
                 model_id: detection.model_id.clone(),
             });
@@ -972,7 +979,7 @@ fn binary_channel_mutual_information(
         || !marginal_detection_probability.is_finite()
         || !(0.0..=1.0).contains(&marginal_detection_probability)
     {
-        return Err(ModelDiscriminationError::InvalidGaussianKlInputs);
+        return Err(ModelDiscriminationError::InvalidDetectionChannel);
     }
     let conditional_entropy: f64 = prior
         .iter()
@@ -981,7 +988,7 @@ fn binary_channel_mutual_information(
         .sum();
     let information = binary_entropy(marginal_detection_probability) - conditional_entropy;
     if !information.is_finite() || information < -1.0e-9 {
-        return Err(ModelDiscriminationError::InvalidGaussianKlInputs);
+        return Err(ModelDiscriminationError::InvalidDetectionChannel);
     }
     Ok(information.max(0.0))
 }
@@ -1965,6 +1972,39 @@ mod tests {
         direct += integral * step / 3.0;
         direct *= 0.7;
         assert!((observed - direct).abs() < 2.0e-6);
+    }
+
+    #[test]
+    fn certain_model_independent_detection_has_zero_indicator_information() {
+        let hypotheses = vec![hypothesis("model-a", b'a'), hypothesis("model-b", b'b')];
+        for probability in [0.0, 1.0] {
+            let candidate = detection_candidate(
+                "certain-detection",
+                1.0,
+                vec![
+                    prediction("model-a", Some(-0.5), Some(0.1)),
+                    prediction("model-b", Some(0.5), Some(0.1)),
+                ],
+                vec![
+                    detection_prediction("model-a", probability),
+                    detection_prediction("model-b", probability),
+                ],
+            );
+            let report = rank_detection_aware_model_discriminating_experiments(
+                &hypotheses,
+                &[candidate],
+                &config(vec![equal_prior()], 256),
+            )
+            .unwrap();
+            let scenario = &report.experiments[0].prior_scenario_scores[0];
+            assert!(scenario.detection_indicator_eig_nats.abs() < 1.0e-12);
+            assert!((scenario.expected_detection_probability - probability).abs() < 1.0e-12);
+            if probability == 0.0 {
+                assert_eq!(scenario.conditional_detected_value_eig_nats, None);
+            } else {
+                assert!(scenario.conditional_detected_value_eig_nats.unwrap() > 0.0);
+            }
+        }
     }
 
     #[test]
