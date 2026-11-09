@@ -271,6 +271,7 @@ pub enum ReasonCode {
     RightsProofDispositionMismatch,
     RightsProofNotYetValid,
     RightsProofExpired,
+    RightsProofInvalidInterval,
     RightsProofMalformedVerifier,
     KnownAtMissing,
     AvailabilityProofMissing,
@@ -302,6 +303,7 @@ impl ReasonCode {
             Self::RightsProofDispositionMismatch => "RIGHTS_PROOF_DISPOSITION_MISMATCH",
             Self::RightsProofNotYetValid => "RIGHTS_PROOF_NOT_YET_VALID",
             Self::RightsProofExpired => "RIGHTS_PROOF_EXPIRED",
+            Self::RightsProofInvalidInterval => "RIGHTS_PROOF_INVALID_INTERVAL",
             Self::RightsProofMalformedVerifier => "RIGHTS_PROOF_MALFORMED_VERIFIER",
             Self::KnownAtMissing => "KNOWN_AT_MISSING",
             Self::AvailabilityProofMissing => "AVAILABILITY_PROOF_MISSING",
@@ -455,7 +457,7 @@ pub fn evaluate_evidence(record: &EvidenceVersion, context: &EvaluationContext) 
             }
             if let (Some(start), Some(end)) = (*valid_from, *valid_until) {
                 if end <= start {
-                    reasons.push(ReasonCode::RightsProofMalformedVerifier);
+                    reasons.push(ReasonCode::RightsProofInvalidInterval);
                     failed = true;
                 }
             }
@@ -851,6 +853,48 @@ mod tests {
         );
         assert_eq!(result.disposition, Disposition::Indeterminate);
         assert!(result.reasons.contains(&ReasonCode::RightsProofMissing));
+    }
+
+
+    #[test]
+    fn rights_proof_cannot_be_used_before_its_validity_starts() {
+        let mut record = evidence("evidence:rights-not-yet-valid", "2026-11-08T09:00:00Z", "2026-11-08T09:05:00Z");
+        if let RightsProof::Verified { valid_from, .. } = &mut record.rights_proof {
+            *valid_from = Some(ts("2026-11-10T00:00:00Z"));
+        }
+        let result = evaluate_evidence(
+            &record,
+            &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"),
+        );
+        assert_eq!(result.disposition, Disposition::Fail);
+        assert!(result.reasons.contains(&ReasonCode::RightsProofNotYetValid));
+    }
+
+    #[test]
+    fn malformed_rights_verifier_identity_or_validity_interval_fails() {
+        let mut malformed_verifier = evidence("evidence:rights-bad-verifier", "2026-11-08T09:00:00Z", "2026-11-08T09:05:00Z");
+        if let RightsProof::Verified { verifier_id, verifier_build_sha256, .. } = &mut malformed_verifier.rights_proof {
+            verifier_id.clear();
+            *verifier_build_sha256 = "not-a-digest".into();
+        }
+        let result = evaluate_evidence(
+            &malformed_verifier,
+            &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"),
+        );
+        assert_eq!(result.disposition, Disposition::Fail);
+        assert!(result.reasons.contains(&ReasonCode::RightsProofMalformedVerifier));
+
+        let mut malformed_interval = evidence("evidence:rights-bad-interval", "2026-11-08T09:00:00Z", "2026-11-08T09:05:00Z");
+        if let RightsProof::Verified { valid_from, valid_until, .. } = &mut malformed_interval.rights_proof {
+            *valid_from = Some(ts("2026-11-10T00:00:00Z"));
+            *valid_until = Some(ts("2026-11-09T00:00:00Z"));
+        }
+        let result = evaluate_evidence(
+            &malformed_interval,
+            &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"),
+        );
+        assert_eq!(result.disposition, Disposition::Fail);
+        assert!(result.reasons.contains(&ReasonCode::RightsProofInvalidInterval));
     }
 
     #[test]
