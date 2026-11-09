@@ -591,6 +591,8 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
 
     let mut expected_by_key = BTreeSet::new();
     let mut observation_receipts: BTreeMap<(String, String), String> = BTreeMap::new();
+    let mut observation_classes_by_receipt: BTreeMap<(String, String), String> =
+        BTreeMap::new();
     for (index, expected) in input.expected_cells.iter().enumerate() {
         validate_cell_key(errors, &format!("expected_cells[{index}].key"), &expected.key);
         require_non_empty(
@@ -625,6 +627,22 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
                 class_key,
                 expected.observation_equivalence_receipt_digest.clone(),
             );
+        }
+
+        let receipt_key = (
+            expected.key.parent_action_id.clone(),
+            expected.observation_equivalence_receipt_digest.clone(),
+        );
+        if let Some(existing_class) = observation_classes_by_receipt.get(&receipt_key) {
+            if existing_class != &expected.key.observation_class_id {
+                errors.push(format!(
+                    "one observation receipt is assigned to multiple classes for parent action {}",
+                    expected.key.parent_action_id
+                ));
+            }
+        } else {
+            observation_classes_by_receipt
+                .insert(receipt_key, expected.key.observation_class_id.clone());
         }
     }
 
@@ -1156,6 +1174,31 @@ mod tests {
                 "reference-a",
                 "different-observation-receipt",
                 &[("brake", "feasible"), ("coast", "feasible")],
+                "cell-receipt-b",
+            ),
+        ];
+        assert!(evaluate_option_preservation(&input(cells)).is_err());
+    }
+
+    #[test]
+    fn one_observation_receipt_cannot_be_split_into_multiple_classes() {
+        let cells = vec![
+            cell(
+                "continue",
+                "observation-a",
+                "hidden-a",
+                "reference-a",
+                "same-observation-receipt",
+                &[("brake", "feasible"), ("coast", "infeasible")],
+                "cell-receipt-a",
+            ),
+            cell(
+                "continue",
+                "observation-b",
+                "hidden-b",
+                "reference-a",
+                "same-observation-receipt",
+                &[("brake", "infeasible"), ("coast", "feasible")],
                 "cell-receipt-b",
             ),
         ];
