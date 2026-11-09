@@ -1192,6 +1192,46 @@ mod tests {
             Err(SequentialWeightProgramError::InvalidVerifierSignature)
         ));
 
+        let mut wrong_statistical_report = correctly_bound.clone();
+        wrong_statistical_report.claims.statistical_verification_report_digest = digest('4');
+        let message = sequential_verifier_attestation_message(&wrong_statistical_report.claims)
+            .expect("message for re-signed mismatched statistical report");
+        wrong_statistical_report.signature = signing_key.sign(&message).to_bytes().to_vec();
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &evidence_binding,
+                &wrong_statistical_report,
+                &pinned_key,
+            ),
+            Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                "statistical_verification_report_digest"
+            ))
+        ));
+
+        let mut wrong_precondition = correctly_bound.clone();
+        wrong_precondition.claims.precondition_gate_digest = digest('3');
+        let message = sequential_verifier_attestation_message(&wrong_precondition.claims)
+            .expect("message for re-signed mismatched precondition");
+        wrong_precondition.signature = signing_key.sign(&message).to_bytes().to_vec();
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &evidence_binding,
+                &wrong_precondition,
+                &pinned_key,
+            ),
+            Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                "precondition_gate_digest"
+            ))
+        ));
+
         let untrusted_key = SigningKey::from_bytes(&[46_u8; 32]).verifying_key();
         assert!(matches!(
             accept_verified_sequential_candidate(
