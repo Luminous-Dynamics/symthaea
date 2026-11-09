@@ -1178,6 +1178,28 @@ mod tests {
     }
 
     #[test]
+    fn rejects_nul_in_pair_manifest_path() {
+        let mut manifest = fixture();
+        manifest.pairs[0].counterfactual_pair_manifest_path = "pair-manifests/bad\0name.json".into();
+        assert!(matches!(
+            validate_cohort_manifest(&manifest),
+            Err(CohortAdmissionError::InvalidPairManifestPath(_))
+        ));
+    }
+
+    #[test]
+    fn missing_pair_manifest_artifact_fails_closed() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut manifest = fixture();
+        manifest.pairs[0].counterfactual_pair_manifest_path =
+            "pair-manifests/missing.json".into();
+        assert!(matches!(
+            verify_counterfactual_pair_manifest_artifacts(&manifest, temp.path()),
+            Err(CohortAdmissionError::ArtifactIo { .. })
+        ));
+    }
+
+    #[test]
     fn rejects_pair_manifest_digest_mismatch() {
         let temp = tempfile::tempdir().unwrap();
         let dir = temp.path().join("pair-manifests");
