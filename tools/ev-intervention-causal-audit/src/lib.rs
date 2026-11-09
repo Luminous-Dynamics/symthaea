@@ -385,8 +385,16 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
         if !matches!(case.expected_disposition.as_str(), "estimated" | "abstain" | "rejected") {
             return Err(format!("case {} has an unknown expected disposition", case.case_id));
         }
-        if !validator.is_valid(&case.scenario) {
-            return Err(format!("case {} fails the scenario JSON Schema", case.case_id));
+        let schema_errors: Vec<String> = validator
+            .iter_errors(&case.scenario)
+            .map(|error| error.to_string())
+            .collect();
+        if !schema_errors.is_empty() {
+            return Err(format!(
+                "case {} fails the scenario JSON Schema: {}",
+                case.case_id,
+                schema_errors.join("; ")
+            ));
         }
         let scenario_id = case.scenario.get("scenario_id").and_then(Value::as_str).map(str::to_owned);
         let parsed: Result<Scenario, _> = serde_json::from_value(case.scenario);
