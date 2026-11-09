@@ -161,6 +161,8 @@ pub struct CohortPair {
     pub baseline_record_id: String,
     /// Variant record.
     pub variant_record_id: String,
+    /// SHA-256 of the exact #11157 counterfactual pair manifest.
+    pub counterfactual_pair_manifest_sha256: String,
     /// Split containing both records.
     pub split: CohortSplit,
     /// Whether this pair is for preference training or evaluation.
@@ -316,7 +318,7 @@ pub fn validate_cohort_manifest(
             &record.annotation_manifest_sha256,
         )?;
 
-        if record.source_audio_sha256 != record.evaluation_audio_sha256 {
+        if !record.source_audio_sha256.eq_ignore_ascii_case(&record.evaluation_audio_sha256) {
             let derivation = record
                 .derivation_manifest_sha256
                 .as_deref()
@@ -488,6 +490,10 @@ pub fn validate_cohort_manifest(
                 pair.pair_id.clone(),
             ));
         }
+        check_digest(
+            "counterfactual_pair_manifest_sha256",
+            &pair.counterfactual_pair_manifest_sha256,
+        )?;
         let expected_split = pair.purpose.required_split();
         if pair.split != expected_split {
             return Err(CohortAdmissionError::PairPurposeSplitMismatch(
@@ -726,6 +732,7 @@ mod tests {
                     pair_id: "pilot-pair".into(),
                     baseline_record_id: "pilot-a".into(),
                     variant_record_id: "pilot-b".into(),
+                    counterfactual_pair_manifest_sha256: A.into(),
                     split: CohortSplit::Pilot,
                     purpose: PairPurpose::PilotEvaluation,
                 },
@@ -733,6 +740,7 @@ mod tests {
                     pair_id: "pref-pair".into(),
                     baseline_record_id: "pref-a".into(),
                     variant_record_id: "pref-b".into(),
+                    counterfactual_pair_manifest_sha256: A.into(),
                     split: CohortSplit::PreferenceTraining,
                     purpose: PairPurpose::PreferenceTraining,
                 },
@@ -871,6 +879,7 @@ mod tests {
             pair_id: "confirm-pair".into(),
             baseline_record_id: "confirm-a".into(),
             variant_record_id: "confirm-b".into(),
+            counterfactual_pair_manifest_sha256: A.into(),
             split: CohortSplit::Confirmatory,
             purpose: PairPurpose::ConfirmatoryEvaluation,
         });
@@ -894,6 +903,7 @@ mod tests {
             pair_id: "confirm-pair".into(),
             baseline_record_id: "confirm-a".into(),
             variant_record_id: "confirm-b".into(),
+            counterfactual_pair_manifest_sha256: A.into(),
             split: CohortSplit::Confirmatory,
             purpose: PairPurpose::ConfirmatoryEvaluation,
         });
@@ -931,6 +941,7 @@ mod tests {
             pair_id: "pilot-pair-2".into(),
             baseline_record_id: "pilot-a".into(),
             variant_record_id: "pilot-b".into(),
+            counterfactual_pair_manifest_sha256: A.into(),
             split: CohortSplit::Pilot,
             purpose: PairPurpose::PilotEvaluation,
         });
@@ -996,6 +1007,26 @@ mod tests {
             validate_cohort_manifest(&manifest),
             Err(CohortAdmissionError::OrphanPairRecord(_))
         ));
+    }
+
+    #[test]
+    fn rejects_invalid_counterfactual_pair_manifest_digest() {
+        let mut manifest = fixture();
+        manifest.pairs[0].counterfactual_pair_manifest_sha256 = "not-a-digest".into();
+        assert!(matches!(
+            validate_cohort_manifest(&manifest),
+            Err(CohortAdmissionError::InvalidDigest(
+                "counterfactual_pair_manifest_sha256",
+                _
+            ))
+        ));
+    }
+
+    #[test]
+    fn accepts_hex_digest_case_insensitively_for_same_audio() {
+        let mut manifest = fixture();
+        manifest.records[1].evaluation_audio_sha256 = A.to_ascii_uppercase();
+        assert!(validate_cohort_manifest(&manifest).is_ok());
     }
 
     #[test]
