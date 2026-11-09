@@ -292,10 +292,34 @@ pub struct GroupIntervalCoverageCounts {
     pub expected_eligibility_generation: u64,
     /// Digest of the exact query vector used to produce every group interval.
     pub query_digest: [u8; 32],
+    /// Eligibility scope/policy/source-ledger/bitemporal binding from #11003.
+    pub scope_binding: HmeEligibilityScopeBinding,
     /// Number of unopened groups without an admissible aggregate interval.
     pub unbounded_unopened_groups: usize,
 }
 
+
+/// Identity of the authoritative eligibility decision used to construct a
+/// group partition. Values must come from the existing #11003 eligibility
+/// owner; this HME data type does not decide authorization or validate policy.
+///
+/// The bitemporal digest commits to valid_at and known_at. The principal-scope
+/// and policy digests prevent a partition receipt from being replayed across
+/// tenants, namespaces or policy revisions, even when the visible member set
+/// happens to be unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HmeEligibilityScopeBinding {
+    /// Principal/tenant/namespace/scope digest from the eligibility owner.
+    pub principal_scope_digest: [u8; 32],
+    /// Policy identity/version/content digest from the eligibility owner.
+    pub policy_digest: [u8; 32],
+    /// Monotonic policy generation pinned by the query.
+    pub policy_generation: u64,
+    /// Source-event ledger generation pinned by the query.
+    pub source_ledger_generation: u64,
+    /// Digest of the exact valid_at/known_at query coordinates.
+    pub bitemporal_query_digest: [u8; 32],
+}
 
 /// Opaque build-time proof that a set of group envelopes is a disjoint,
 /// complete partition of one manifest/eligibility snapshot.
@@ -311,6 +335,7 @@ pub struct GroupPartitionCoverageReceipt {
     eligibility_generation: u64,
     eligible_records: usize,
     eligible_member_set_digest: [u8; 32],
+    scope_binding: HmeEligibilityScopeBinding,
     group_count: usize,
     partition_digest: [u8; 32],
 }
@@ -363,6 +388,8 @@ pub enum GroupPartitionReceiptError {
     },
     /// Supplied group rosters do not match the authoritative eligible-member digest.
     EligibleMemberSetDigestMismatch,
+    /// Query scope/policy/source-ledger/bitemporal binding differs from the receipt.
+    EligibilityScopeMismatch,
     /// Query group directory does not match this receipt.
     ReceiptMismatch,
 }
@@ -400,6 +427,9 @@ impl std::fmt::Display for GroupPartitionReceiptError {
             Self::EligibleMemberSetDigestMismatch => {
                 write!(f, "group rosters do not match authoritative eligible-member digest")
             }
+            Self::EligibilityScopeMismatch => {
+                write!(f, "query eligibility scope, policy or bitemporal binding differs")
+            }
             Self::ReceiptMismatch => write!(f, "group directory does not match its partition receipt"),
         }
     }
@@ -416,6 +446,7 @@ impl GroupPartitionCoverageReceipt {
         envelopes: &[ContinuousHVGroupEnvelope],
         expected_eligible_records: usize,
         expected_eligible_member_set_digest: [u8; 32],
+        scope_binding: HmeEligibilityScopeBinding,
     ) -> Result<Self, GroupPartitionReceiptError> {
         let first = envelopes.first().ok_or(GroupPartitionReceiptError::EmptyPartition)?;
         let manifest_generation = first.manifest_generation();
@@ -491,6 +522,11 @@ impl GroupPartitionCoverageReceipt {
         hasher.update(b"hme_group_partition_coverage_receipt_v1");
         hasher.update(&manifest_generation.to_le_bytes());
         hasher.update(&eligibility_generation.to_le_bytes());
+        hasher.update(&scope_binding.principal_scope_digest);
+        hasher.update(&scope_binding.policy_digest);
+        hasher.update(&scope_binding.policy_generation.to_le_bytes());
+        hasher.update(&scope_binding.source_ledger_generation.to_le_bytes());
+        hasher.update(&scope_binding.bitemporal_query_digest);
         hasher.update(&(member_count as u64).to_le_bytes());
         hasher.update(&actual_member_set_digest);
         hasher.update(&(group_identities.len() as u64).to_le_bytes());
@@ -505,6 +541,7 @@ impl GroupPartitionCoverageReceipt {
             eligibility_generation,
             eligible_records: member_count,
             eligible_member_set_digest: actual_member_set_digest,
+            scope_binding,
             group_count: envelopes.len(),
             partition_digest: *hasher.finalize().as_bytes(),
         })
@@ -552,6 +589,11 @@ impl GroupPartitionCoverageReceipt {
         hasher.update(b"hme_group_partition_coverage_receipt_v1");
         hasher.update(&self.manifest_generation.to_le_bytes());
         hasher.update(&self.eligibility_generation.to_le_bytes());
+        hasher.update(&self.scope_binding.principal_scope_digest);
+        hasher.update(&self.scope_binding.policy_digest);
+        hasher.update(&self.scope_binding.policy_generation.to_le_bytes());
+        hasher.update(&self.scope_binding.source_ledger_generation.to_le_bytes());
+        hasher.update(&self.scope_binding.bitemporal_query_digest);
         hasher.update(&(member_count as u64).to_le_bytes());
         hasher.update(&self.eligible_member_set_digest);
         hasher.update(&(identities.len() as u64).to_le_bytes());
@@ -584,6 +626,11 @@ impl GroupPartitionCoverageReceipt {
     /// Authoritative eligible-member-set digest matched at build time.
     pub fn eligible_member_set_digest(&self) -> [u8; 32] {
         self.eligible_member_set_digest
+    }
+
+    /// Exact principal/policy/source-ledger/bitemporal scope binding.
+    pub fn scope_binding(&self) -> HmeEligibilityScopeBinding {
+        self.scope_binding
     }
 
     /// Number of groups covered by this partition.
@@ -1316,6 +1363,11 @@ pub fn select_group_refinement_set_with_partition_receipt(
     receipt
         .verify_group_records(groups)
         .map_err(GroupIntervalSelectionError::PartitionReceipt)?;
+    if coverage.scope_binding != receipt.scope_binding {
+        return Err(GroupIntervalSelectionError::PartitionReceipt(
+            GroupPartitionReceiptError::EligibilityScopeMismatch,
+        ));
+    }
     if coverage.expected_manifest_generation != receipt.manifest_generation
         || coverage.expected_eligibility_generation != receipt.eligibility_generation
         || coverage.eligible_records != receipt.eligible_records
