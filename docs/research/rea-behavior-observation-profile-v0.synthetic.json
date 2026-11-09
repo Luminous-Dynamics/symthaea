@@ -12,7 +12,8 @@
         "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "executable_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "platform": "linux-x86_64",
-        "architecture": "x86_64"
+        "architecture": "x86_64",
+        "execution_role": "original_reference"
       },
       "evidence_binding": {
         "evidence_id": "ev_1111111111111111111111111111111111111111111111111111111111111111",
@@ -107,7 +108,8 @@
         "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "executable_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "platform": "linux-x86_64",
-        "architecture": "x86_64"
+        "architecture": "x86_64",
+        "execution_role": "original_reference"
       },
       "evidence_binding": {
         "evidence_id": "ev_2222222222222222222222222222222222222222222222222222222222222222",
@@ -193,7 +195,8 @@
         "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "executable_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "platform": "linux-x86_64",
-        "architecture": "x86_64"
+        "architecture": "x86_64",
+        "execution_role": "original_reference"
       },
       "evidence_binding": {
         "evidence_id": "ev_3333333333333333333333333333333333333333333333333333333333333333",
@@ -256,6 +259,102 @@
         }
       },
       "assertions": []
+    },
+    {
+      "observation_id": "REA-OBS-004",
+      "claim_scope": "exact_invocation_and_environment_only",
+      "target": {
+        "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executable_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "platform": "linux-x86_64",
+        "architecture": "x86_64",
+        "execution_role": "reconstruction_candidate"
+      },
+      "evidence_binding": {
+        "evidence_id": "ev_4444444444444444444444444444444444444444444444444444444444444444",
+        "evidence_raw_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "subject_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "admission_state": "unverified_reference"
+      },
+      "runner": {
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "os_release": "Ubuntu 24.04 synthetic fixture",
+        "architecture": "x86_64",
+        "locale": "C.UTF-8",
+        "timezone": "UTC",
+        "isolation": "container",
+        "network": "disabled"
+      },
+      "invocation": {
+        "argv": [
+          {
+            "bytes_base64": "L3Vzci9iaW4vcHJpbnRm",
+            "sha256": "11876b7927efb46ce1638a9a33bb14f95c957c6773e185d419f6083b1000dfd4",
+            "byte_length": 15
+          },
+          {
+            "bytes_base64": "JXM=",
+            "sha256": "f684c73cba75b2ba0b6833f62a8fa8af6b8a2d3711b775d52596105f4917e38d",
+            "byte_length": 2
+          },
+          {
+            "bytes_base64": "aGVsbG8=",
+            "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+            "byte_length": 5
+          }
+        ],
+        "stdin": {
+          "state": "not_applicable",
+          "reason": "No stdin stream supplied in this synthetic invocation"
+        },
+        "working_directory": ".",
+        "environment": [],
+        "timeout_ms": 1000
+      },
+      "result": {
+        "started_at": "2026-11-09T07:03:00Z",
+        "ended_at": "2026-11-09T07:03:00.010Z",
+        "termination": {
+          "kind": "exit",
+          "exit_code": 0
+        },
+        "stdout": {
+          "state": "complete",
+          "bytes_base64": "aGVsbG8=",
+          "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          "byte_length": 5
+        },
+        "stderr": {
+          "state": "complete",
+          "bytes_base64": "",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "byte_length": 0
+        },
+        "filesystem": {
+          "state": "complete",
+          "entries": []
+        }
+      },
+      "assertions": [
+        {
+          "assertion_id": "stdout_matches",
+          "predicate": "stdout_sha256",
+          "capture_ref": "stdout",
+          "observed_value": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        },
+        {
+          "assertion_id": "exit_zero",
+          "predicate": "exit_code",
+          "capture_ref": "termination",
+          "observed_value": 0
+        },
+        {
+          "assertion_id": "no_filesystem_changes",
+          "predicate": "filesystem_diff_empty",
+          "capture_ref": "filesystem",
+          "observed_value": true
+        }
+      ]
     }
   ],
   "behavioral_spec": {
