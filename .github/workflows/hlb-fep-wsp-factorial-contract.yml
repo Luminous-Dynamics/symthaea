@@ -10,8 +10,6 @@ on:
       - "crates/core/symthaea-core/Cargo.toml"
       - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
       - "docs/research/hlb-fep-wsp-factorial-v1.json"
-      - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
-      - "crates/core/symthaea-fep/src/lib.rs"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
@@ -27,8 +25,6 @@ on:
       - "crates/core/symthaea-core/Cargo.toml"
       - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
       - "docs/research/hlb-fep-wsp-factorial-v1.json"
-      - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
-      - "crates/core/symthaea-fep/src/lib.rs"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
@@ -92,8 +88,6 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/weight_space_program.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/weight_program_adapter.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs
-          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/hierarchical_information_gain.rs
-          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/lib.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/weight_program_adapter.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/network.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/mod.rs
@@ -103,7 +97,6 @@ jobs:
           set -euo pipefail
           cargo metadata --locked --format-version 1 --no-deps > /dev/null
           cargo test --locked --release -p symthaea-core --lib weight_space_program::tests -- --nocapture
-          cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --lib hdc::weight_program_adapter::tests -- --nocapture
           cargo test --locked --release -p symthaea --lib dynamics::cfc::weight_program_adapter::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract -- --nocapture
