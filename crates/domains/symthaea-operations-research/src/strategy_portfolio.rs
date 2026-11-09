@@ -16,13 +16,13 @@
 //! remains the authority for whether the Skolem/Herbrand functions win.
 
 use super::decomposition::CnfProblem;
+use super::quantified_game_dag::{
+    QbfGameDagBudget, QbfGameDagError, QbfGameDagNodeKind, QbfGameDagVerificationReport,
+    QbfGameProofDag, ResidualLiteral, verify_qbf_game_proof_dag,
+};
 use super::quantified_proof::{
     QbfGameProof, QbfProofNodeKind, QbfProofVerificationReport, QuantifiedProofBudget,
     QuantifiedProofError, verify_qbf_game_proof,
-};
-use super::quantified_game_dag::{
-    QbfGameDagBudget, QbfGameDagError, QbfGameDagVerificationReport, QbfGameProofDag,
-    QbfGameDagNodeKind, ResidualLiteral, verify_qbf_game_proof_dag,
 };
 use super::quantified_scope::{Quantifier, ValidatedQuantifierPrefix};
 use super::quantified_strategy::{
@@ -1092,13 +1092,8 @@ pub fn verify_and_compile_qbf_dag_evidence_portfolio(
     if decoded_dag != *proof {
         return Err(StrategyPortfolioError::ProofEncodingRoundTripMismatch);
     }
-    let decoded_verification = verify_qbf_game_proof_dag(
-        problem,
-        prefix,
-        &decoded_dag,
-        dag_budget,
-    )
-    .map_err(StrategyPortfolioError::GameDag)?;
+    let decoded_verification = verify_qbf_game_proof_dag(problem, prefix, &decoded_dag, dag_budget)
+        .map_err(StrategyPortfolioError::GameDag)?;
     if decoded_verification != dag_verification {
         return Err(StrategyPortfolioError::ProofEncodingRoundTripMismatch);
     }
@@ -1367,13 +1362,12 @@ mod tests {
     fn dag_proof_and_strategy_portfolio_roundtrip_as_source_bound_evidence() {
         let (problem, prefix) = equality_qbf();
         let candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
-        let (proof, _) =
-            super::super::quantified_game_dag::build_qbf_game_proof_dag(
-                &problem,
-                &prefix,
-                dag_budget(),
-            )
-            .unwrap();
+        let (proof, _) = super::super::quantified_game_dag::build_qbf_game_proof_dag(
+            &problem,
+            &prefix,
+            dag_budget(),
+        )
+        .unwrap();
         let portfolio = verify_and_compile_qbf_dag_evidence_portfolio(
             &problem,
             &prefix,
@@ -1399,13 +1393,12 @@ mod tests {
     #[test]
     fn dag_proof_encoder_rejects_unknown_tags_and_trailing_bytes() {
         let (problem, prefix) = equality_qbf();
-        let (proof, _) =
-            super::super::quantified_game_dag::build_qbf_game_proof_dag(
-                &problem,
-                &prefix,
-                dag_budget(),
-            )
-            .unwrap();
+        let (proof, _) = super::super::quantified_game_dag::build_qbf_game_proof_dag(
+            &problem,
+            &prefix,
+            dag_budget(),
+        )
+        .unwrap();
         let mut bytes = encode_qbf_game_proof_dag(&proof, encoding_budget()).unwrap();
         bytes.push(0);
         assert!(matches!(
@@ -1419,13 +1412,12 @@ mod tests {
         let (problem, prefix) = equality_qbf();
         let mut candidate = evaluate_qbf_with_strategy(&problem, &prefix, qbf_budget()).unwrap();
         candidate.value = false;
-        let (proof, _) =
-            super::super::quantified_game_dag::build_qbf_game_proof_dag(
-                &problem,
-                &prefix,
-                dag_budget(),
-            )
-            .unwrap();
+        let (proof, _) = super::super::quantified_game_dag::build_qbf_game_proof_dag(
+            &problem,
+            &prefix,
+            dag_budget(),
+        )
+        .unwrap();
         assert!(matches!(
             verify_and_compile_qbf_dag_evidence_portfolio(
                 &problem,
