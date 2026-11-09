@@ -105,6 +105,7 @@ symthaea-communication = { path = "../symthaea-communication" }
 
 # Core hashing
 blake3 = { workspace = true }
+sha2 = "0.10"
 
 # CLI
 clap = { workspace = true }
