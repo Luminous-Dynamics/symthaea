@@ -36,6 +36,8 @@ Primary metrics:
 - melisma vowel-span coverage, including rests within a melisma;
 - per-phone and per-register breakdowns.
 
+**Pitch-oracle safeguard:** report both the score-conditioned F0 tracker and a score-independent autocorrelation estimate. A target-conditioned tracker can select a nearby octave/subharmonic because its search window is centered on the expected note; that estimate must not be the only evidence used to certify pitch. The current singing-quality report exposes the score-independent median/p95 error, valid-frame fraction, prior-mismatch count/fraction and an optional audit status. It uses a broad 40–1200 Hz search, separate from the legacy score-conditioned tracker. A high-confidence mismatch (more than 10% of matched frames under the current provisional guard) blocks objective pass; insufficient independent coverage is reported as undefined. This 10% is an engineering safeguard, not a human-calibrated universal threshold. Calibrate on licensed, independently annotated human and model singing before publication claims.
+
 ### Track B — Zero-shot identity and voice consistency
 
 Provide a consented, licensed reference identity and test on held-out lyrics, melodies, registers and styles.
