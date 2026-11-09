@@ -28,3 +28,7 @@ path = "examples/model_discrimination_reference.rs"
 [[example]]
 name = "model_recovery_reference"
 path = "examples/model_recovery_reference.rs"
+
+[[example]]
+name = "model_detection_reference"
+path = "examples/model_detection_reference.rs"
