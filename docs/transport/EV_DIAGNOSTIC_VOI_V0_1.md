@@ -60,13 +60,16 @@ Scenarios and internal records are sorted by stable identifiers before calculati
 - IDs are unique and all values/costs are finite and non-negative;
 - test applicability and all preconditions are satisfied before selection.
 
-The frozen corpus contains positive, no-decision-value, out-of-domain, abstention and negative controls. All current scenarios and loss/cost values are synthetic.
+The frozen corpus contains positive, no-decision-value, out-of-domain, wrong-configuration, abstention and negative controls. All current scenarios and loss/cost values are synthetic.
 
 ## Important limitations
 
 - The finite-state oracle is supplied by the benchmark fixture; it is not inferred from a battery.
 - The v0.1 likelihoods are declared, not estimated or calibrated from field data.
-- Costs are synthetic decision-loss units; real deployment requires a reviewed normalization of financial cost, downtime, service risk and other impacts.
+- Each scenario binds the exact vehicle/pack configuration, observation-batch digest, pack-capability-profile digest, prior-model digest and decision-loss-model digest. Each test binds its target configuration, protocol, equipment, calibration and cost-source reference/digest. A configuration mismatch makes a test ineligible.
+- A scenario's state hypotheses are treated as mutually exclusive and exhaustive. A test's outcome likelihoods must sum to one for every state.
+- An action marked `gate_status: satisfied` must be independently approved as admissible across the full support of the scenario's declared prior. Expected loss cannot compensate for an unapproved safety action; blocked or unknown actions are excluded.
+- Costs are synthetic decision-loss units; real deployment requires a reviewed normalization of financial cost, downtime, service risk and other impacts. The cost source and evidence digest are required even for synthetic fixtures.
 - There is no electrochemistry, pack-topology or degradation simulation in this crate.
 - No physical test, maintenance action, BMS change, charging change or safety conclusion is produced.
 
