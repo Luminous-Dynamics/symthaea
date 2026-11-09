@@ -1430,6 +1430,42 @@ fn select_group_refinement_set_impl(
 
 
 
+/// Perform hierarchical group-then-member selection with defensive per-query
+/// member-disjointness validation.
+pub fn select_hierarchical_refinement_set(
+    groups: &[GroupScoreIntervalRecord],
+    member_records: &[GroupMemberScoreIntervalRecord],
+    top_k: usize,
+    coverage: GroupIntervalCoverageCounts,
+) -> Result<HierarchicalIntervalSelectionPlan, HierarchicalIntervalSelectionError> {
+    select_hierarchical_refinement_set_impl(
+        groups,
+        member_records,
+        top_k,
+        coverage,
+        None,
+    )
+}
+
+/// Perform hierarchical selection using an authenticated build-time partition
+/// receipt. Global group selection is O(G); member rosters are only traversed
+/// for groups that survive stage one.
+pub fn select_hierarchical_refinement_set_with_partition_receipt(
+    groups: &[GroupScoreIntervalRecord],
+    member_records: &[GroupMemberScoreIntervalRecord],
+    top_k: usize,
+    coverage: GroupIntervalCoverageCounts,
+    receipt: &GroupPartitionCoverageReceipt,
+) -> Result<HierarchicalIntervalSelectionPlan, HierarchicalIntervalSelectionError> {
+    select_hierarchical_refinement_set_impl(
+        groups,
+        member_records,
+        top_k,
+        coverage,
+        Some(receipt),
+    )
+}
+
 /// Perform hierarchical interval-first refinement.
 ///
 /// Stage 1 scans one verified interval per group and uses weighted lower
@@ -1449,14 +1485,23 @@ fn select_group_refinement_set_impl(
 /// surviving group, but it need not load original vector payloads until the
 /// final member refinement set is known. Incomplete membership coverage or a
 /// disjoint intersection fails closed.
-pub fn select_hierarchical_refinement_set(
+fn select_hierarchical_refinement_set_impl(
     groups: &[GroupScoreIntervalRecord],
     member_records: &[GroupMemberScoreIntervalRecord],
     top_k: usize,
     coverage: GroupIntervalCoverageCounts,
+    partition_receipt: Option<&GroupPartitionCoverageReceipt>,
 ) -> Result<HierarchicalIntervalSelectionPlan, HierarchicalIntervalSelectionError> {
-    let group_plan = select_group_refinement_set(groups, top_k, coverage)
-        .map_err(HierarchicalIntervalSelectionError::GroupSelection)?;
+    let group_plan = match partition_receipt {
+        Some(receipt) => select_group_refinement_set_with_partition_receipt(
+            groups,
+            top_k,
+            coverage,
+            receipt,
+        ),
+        None => select_group_refinement_set(groups, top_k, coverage),
+    }
+    .map_err(HierarchicalIntervalSelectionError::GroupSelection)?;
 
     let selected_identities: BTreeSet<GroupScoreIntervalIdentity> =
         group_plan.refinement_groups.iter().copied().collect();
