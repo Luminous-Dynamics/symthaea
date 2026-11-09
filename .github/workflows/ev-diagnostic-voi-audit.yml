@@ -37,9 +37,9 @@ jobs:
             --corpus fixtures/ev_battery/diagnostic_voi_scenarios_v0_1.json \
             > "$RUNNER_TEMP/ev-diagnostic-voi-report.json"
           jq -e '
-            .scenario_count == 4 and
+            .scenario_count == 5 and
             .selected_test_count == 1 and
-            .no_test_count == 2 and
+            .no_test_count == 3 and
             .abstain_count == 1 and
             (.report_sha256 | test("^[a-f0-9]{64}$"))
           ' "$RUNNER_TEMP/ev-diagnostic-voi-report.json"
