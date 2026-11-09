@@ -529,6 +529,17 @@ pub struct VehicleTelemetry {
     pub tau_factor: f32,
     pub control_effort: f32,
     pub mesh_peers_visible: usize,
+    /// Whether an admissible simulator-oracle target was available for Follow at this step.
+    #[serde(default)]
+    pub follow_oracle_available: bool,
+    /// Simulator actor selected by the Follow oracle, if available.
+    pub follow_oracle_actor_id: Option<u64>,
+    /// Along-road gap to the selected simulator actor (m).
+    pub follow_oracle_gap_m: Option<f64>,
+    /// Lead actor speed minus ego speed along the road (m/s).
+    pub follow_oracle_relative_speed_mps: Option<f64>,
+    /// Age of the exact simulator snapshot relative to the ego observation (s).
+    pub follow_oracle_snapshot_age_s: Option<f64>,
 }
 
 /// Configuration for the vehicle training system.
