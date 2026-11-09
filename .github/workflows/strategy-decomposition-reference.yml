@@ -42,6 +42,7 @@ jobs:
           rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/quantified_game_values.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/quantified_strategy.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/qbf_strategy_count.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/maxqbf.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/strategy_bdd.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/strategy_aig.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/strategy_portfolio.rs
