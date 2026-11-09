@@ -1,0 +1,870 @@
+{
+  "corpus_version": "ev-intervention-causal-corpus/0.1",
+  "cases": [
+    {
+      "case_id": "positive-durable-effect",
+      "expected_disposition": "estimated",
+      "expected_did_effect": 7,
+      "expected_tolerance": 1e-9,
+      "scenario": {
+        "scenario_version": "ev-intervention-causal-scenario/0.1",
+        "scenario_id": "synthetic-positive-effect",
+        "evidence_class": "synthetic_fixture",
+        "estimand": "matched_difference_in_differences",
+        "outcome_metric": "reference_usable_energy",
+        "outcome_unit": "kWh",
+        "outcome_direction": "higher_is_better",
+        "matched_sets": [
+          {
+            "match_set_id": "matched-1",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+            "treated": {
+              "unit_id": "treated-1",
+              "vehicle_ref": "vehicle-treated-1",
+              "pack_ref": "pack-treated-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 78,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-1",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002bf"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-1",
+              "vehicle_ref": "vehicle-control-1",
+              "pack_ref": "pack-control-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f8",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 71,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025c",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          },
+          {
+            "match_set_id": "matched-2",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "treated": {
+              "unit_id": "treated-2",
+              "vehicle_ref": "vehicle-treated-2",
+              "pack_ref": "pack-treated-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000131",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000195",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f9",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 77,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025d",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-2",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002c1"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-2",
+              "vehicle_ref": "vehicle-control-2",
+              "pack_ref": "pack-control-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000132",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000196",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001fa",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 70,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025e",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "regression-to-mean-negative-control",
+      "expected_disposition": "estimated",
+      "expected_did_effect": 0,
+      "expected_tolerance": 1e-9,
+      "scenario": {
+        "scenario_version": "ev-intervention-causal-scenario/0.1",
+        "scenario_id": "synthetic-regression-to-mean",
+        "evidence_class": "synthetic_fixture",
+        "estimand": "matched_difference_in_differences",
+        "outcome_metric": "reference_usable_energy",
+        "outcome_unit": "kWh",
+        "outcome_direction": "higher_is_better",
+        "matched_sets": [
+          {
+            "match_set_id": "matched-1",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+            "treated": {
+              "unit_id": "treated-1",
+              "vehicle_ref": "vehicle-treated-1",
+              "pack_ref": "pack-treated-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 75,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-1",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002bf"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-1",
+              "vehicle_ref": "vehicle-control-1",
+              "pack_ref": "pack-control-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f8",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 75,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025c",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          },
+          {
+            "match_set_id": "matched-2",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "treated": {
+              "unit_id": "treated-2",
+              "vehicle_ref": "vehicle-treated-2",
+              "pack_ref": "pack-treated-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000131",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000195",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f9",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 74,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025d",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-2",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002c1"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-2",
+              "vehicle_ref": "vehicle-control-2",
+              "pack_ref": "pack-control-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000132",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000196",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001fa",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 74,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025e",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "harmful-intervention",
+      "expected_disposition": "estimated",
+      "expected_did_effect": -5,
+      "expected_tolerance": 1e-9,
+      "scenario": {
+        "scenario_version": "ev-intervention-causal-scenario/0.1",
+        "scenario_id": "synthetic-harmful-effect",
+        "evidence_class": "synthetic_fixture",
+        "estimand": "matched_difference_in_differences",
+        "outcome_metric": "reference_usable_energy",
+        "outcome_unit": "kWh",
+        "outcome_direction": "higher_is_better",
+        "matched_sets": [
+          {
+            "match_set_id": "matched-1",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+            "treated": {
+              "unit_id": "treated-1",
+              "vehicle_ref": "vehicle-treated-1",
+              "pack_ref": "pack-treated-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 67,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-1",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002bf"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-1",
+              "vehicle_ref": "vehicle-control-1",
+              "pack_ref": "pack-control-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f8",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 71,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025c",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          },
+          {
+            "match_set_id": "matched-2",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "treated": {
+              "unit_id": "treated-2",
+              "vehicle_ref": "vehicle-treated-2",
+              "pack_ref": "pack-treated-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000131",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000195",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f9",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 66,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025d",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-2",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002c1"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-2",
+              "vehicle_ref": "vehicle-control-2",
+              "pack_ref": "pack-control-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000132",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000196",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001fa",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 72,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025e",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "censoring-forces-abstention",
+      "expected_disposition": "abstain",
+      "expected_did_effect": null,
+      "expected_tolerance": null,
+      "scenario": {
+        "scenario_version": "ev-intervention-causal-scenario/0.1",
+        "scenario_id": "synthetic-censored-follow-up",
+        "evidence_class": "synthetic_fixture",
+        "estimand": "matched_difference_in_differences",
+        "outcome_metric": "reference_usable_energy",
+        "outcome_unit": "kWh",
+        "outcome_direction": "higher_is_better",
+        "matched_sets": [
+          {
+            "match_set_id": "matched-1",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+            "treated": {
+              "unit_id": "treated-1",
+              "vehicle_ref": "vehicle-treated-1",
+              "pack_ref": "pack-treated-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 76,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-1",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002bf"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-1",
+              "vehicle_ref": "vehicle-control-1",
+              "pack_ref": "pack-control-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f8",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 71,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025c",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          },
+          {
+            "match_set_id": "matched-2",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "treated": {
+              "unit_id": "treated-2",
+              "vehicle_ref": "vehicle-treated-2",
+              "pack_ref": "pack-treated-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000131",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000195",
+              "follow_up_status": "lost_to_follow_up",
+              "censoring_reason": "no reference outcome at the prespecified horizon",
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f9",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": null,
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-2",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002c1"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-2",
+              "vehicle_ref": "vehicle-control-2",
+              "pack_ref": "pack-control-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000132",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000196",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001fa",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 71,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025e",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "work-order-is-not-completion",
+      "expected_disposition": "rejected",
+      "expected_did_effect": null,
+      "expected_tolerance": null,
+      "scenario": {
+        "scenario_version": "ev-intervention-causal-scenario/0.1",
+        "scenario_id": "synthetic-unverified-work-order",
+        "evidence_class": "synthetic_fixture",
+        "estimand": "matched_difference_in_differences",
+        "outcome_metric": "reference_usable_energy",
+        "outcome_unit": "kWh",
+        "outcome_direction": "higher_is_better",
+        "matched_sets": [
+          {
+            "match_set_id": "matched-1",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+            "treated": {
+              "unit_id": "treated-1",
+              "vehicle_ref": "vehicle-treated-1",
+              "pack_ref": "pack-treated-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 76,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "work_order_only",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-1",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": null
+              }
+            },
+            "comparator": {
+              "unit_id": "control-1",
+              "vehicle_ref": "vehicle-control-1",
+              "pack_ref": "pack-control-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f8",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 71,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025c",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          },
+          {
+            "match_set_id": "matched-2",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "treated": {
+              "unit_id": "treated-2",
+              "vehicle_ref": "vehicle-treated-2",
+              "pack_ref": "pack-treated-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000131",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000195",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f9",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 75,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025d",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-2",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002c1"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-2",
+              "vehicle_ref": "vehicle-control-2",
+              "pack_ref": "pack-control-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000132",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000196",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001fa",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 71,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025e",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "protocol-drift-is-rejected",
+      "expected_disposition": "rejected",
+      "expected_did_effect": null,
+      "expected_tolerance": null,
+      "scenario": {
+        "scenario_version": "ev-intervention-causal-scenario/0.1",
+        "scenario_id": "synthetic-protocol-drift",
+        "evidence_class": "synthetic_fixture",
+        "estimand": "matched_difference_in_differences",
+        "outcome_metric": "reference_usable_energy",
+        "outcome_unit": "kWh",
+        "outcome_direction": "higher_is_better",
+        "matched_sets": [
+          {
+            "match_set_id": "matched-1",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+            "treated": {
+              "unit_id": "treated-1",
+              "vehicle_ref": "vehicle-treated-1",
+              "pack_ref": "pack-treated-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 76,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+                "protocol_digest": "00000000000000000000000000000000000000000000000000000000000003e7",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-1",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002bf"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-1",
+              "vehicle_ref": "vehicle-control-1",
+              "pack_ref": "pack-control-1",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f8",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 71,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025c",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          },
+          {
+            "match_set_id": "matched-2",
+            "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "treated": {
+              "unit_id": "treated-2",
+              "vehicle_ref": "vehicle-treated-2",
+              "pack_ref": "pack-treated-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000131",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000195",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001f9",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 75,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025d",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "verified_complete",
+                "family": "balancing_service",
+                "procedure_ref": "procedure://balancing/v1",
+                "service_event_ref": "service-event-treated-2",
+                "authority_ref": "authority://independent-service-provider",
+                "completion_digest": "00000000000000000000000000000000000000000000000000000000000002c1"
+              }
+            },
+            "comparator": {
+              "unit_id": "control-2",
+              "vehicle_ref": "vehicle-control-2",
+              "pack_ref": "pack-control-2",
+              "matching_profile_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "pre_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000132",
+              "post_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000196",
+              "follow_up_status": "complete",
+              "censoring_reason": null,
+              "pre": {
+                "value": 70,
+                "observation_digest": "00000000000000000000000000000000000000000000000000000000000001fa",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "post": {
+                "value": 71,
+                "observation_digest": "000000000000000000000000000000000000000000000000000000000000025e",
+                "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+                "condition_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+              },
+              "intervention": {
+                "status": "no_intervention",
+                "family": null,
+                "procedure_ref": null,
+                "service_event_ref": null,
+                "authority_ref": null,
+                "completion_digest": null
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
