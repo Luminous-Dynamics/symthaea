@@ -458,7 +458,7 @@ mod tests {
         assert_eq!(normalized.words[0].raw_ipa, "doʊnt");
         assert_eq!(normalized.words[1].raw_ipa, "");
         assert_eq!(normalized.words[1].resolution_status, "empty_hypothesis");
-        assert_eq!(normalized.words[2].raw_ipa, "g oʊ".replace(' ', "").as_str());
+        assert_eq!(normalized.words[2].raw_ipa, "goʊ");
         assert_eq!(normalized.punctuation.len(), 1);
         assert_eq!(normalized.punctuation[0].word_index, 0);
         assert_eq!(normalized.punctuation[0].after_ipa_character_index, 4);
