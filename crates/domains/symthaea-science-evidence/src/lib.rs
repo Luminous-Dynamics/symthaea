@@ -50,6 +50,7 @@ pub use model_discrimination::{
 pub use model_recovery::{
     MAX_MODEL_RECOVERY_GENERATORS, MAX_MODEL_RECOVERY_TRIALS, ModelRecoveryError,
     ModelRecoveryReport, RecoveryGenerator, evaluate_model_recovery,
+    evaluate_model_recovery_with_predictive_adequacy,
 };
 pub use theory_prediction::{
     ComparisonBlocker, MeasurementNoiseModel, ModelPredictionComparison, NoiseCalibrationStatus,
