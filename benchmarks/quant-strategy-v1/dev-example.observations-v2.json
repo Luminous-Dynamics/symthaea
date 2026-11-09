@@ -48,7 +48,23 @@
             "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
             "verifier_id": "fixture-only-not-a-verifier",
             "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            "binding_sha256": "88d642d79f19bde346b7de7d742fef67259fa50d6059083677ea0080bf890333",
+            "binding": {
+              "evidence_id": "ev.synthetic.price.asset-a.2026-01-05",
+              "source_id": "synthetic-source.market-price.v1",
+              "source_record_id": "SYN-PRICE-A-20260105",
+              "source_version_id": "SYN-PRICE-A-20260105-v1",
+              "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "principal_id": "principal:synthetic-public-research",
+              "rights_profile_id": "rights:synthetic-dev",
+              "binding_type": "availability",
+              "domain": "luminous.financial.availability-proof-binding.v1",
+              "binding_version": "1",
+              "precision": "exact_instant",
+              "known_at": "2026-01-05T15:59:10Z",
+              "interval": null,
+              "retrieved_at": "2026-01-05T15:59:10Z"
+            }
           }
         },
         "retrieved_at": "2026-01-05T15:59:10Z",
@@ -66,7 +82,22 @@
             "verification_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
             "verifier_id": "fixture-only-not-a-verifier",
             "verifier_build_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "binding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            "binding_sha256": "9ff178d78139fa3fd1104bb9a90c8ef1cceb7f932c23d05b882764ef450115b2",
+            "binding": {
+              "evidence_id": "ev.synthetic.price.asset-a.2026-01-05",
+              "source_id": "synthetic-source.market-price.v1",
+              "source_record_id": "SYN-PRICE-A-20260105",
+              "source_version_id": "SYN-PRICE-A-20260105-v1",
+              "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "principal_id": "principal:synthetic-public-research",
+              "rights_profile_id": "rights:synthetic-dev",
+              "binding_type": "rights",
+              "domain": "luminous.financial.rights-proof-binding.v1",
+              "binding_version": "1",
+              "disposition": "authorized",
+              "valid_from": "2026-01-01T00:00:00Z",
+              "valid_until": null
+            }
           }
         },
         "provenance": {
