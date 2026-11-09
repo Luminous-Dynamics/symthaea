@@ -19,19 +19,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     let published_finite_cone_means = [0.8332_f64, 0.7290, 0.6807];
     let published_product_window_means = [0.8862_f64, 0.8930, 0.9064];
 
-    println!("epistemic_status=ANALYTIC_LINK_SAMPLING_REFERENCE_NOT_SPRINKLING_OR_PHYSICS_VALIDATION");
+    println!(
+        "epistemic_status=ANALYTIC_LINK_SAMPLING_REFERENCE_NOT_SPRINKLING_OR_PHYSICS_VALIDATION"
+    );
     println!("source=arXiv:2610.03247_Boguna_Krioukov_2026");
     println!("density={DENSITY}");
     println!("ambient_time_extent={AMBIENT_TIME}");
     println!("mu={MU}");
     println!("eta={ETA}");
-    println!("spatial_dimension,volume_coefficient,T_hat,finite_cone_mean,published_finite_cone_mean,finite_delta,product_tauhat_cutoff,product_mean,published_product_mean,product_delta,rapidity_cutoff,root_admissibility");
+    println!(
+        "spatial_dimension,volume_coefficient,T_hat,finite_cone_mean,published_finite_cone_mean,finite_delta,product_tauhat_cutoff,product_mean,published_product_mean,product_delta,rapidity_cutoff,root_admissibility"
+    );
 
     for spatial_dimension in 1..=3 {
         let volume_coefficient = alexandrov_volume_coefficient(spatial_dimension)?;
         let spacetime_dimension = (spatial_dimension + 1) as f64;
-        let t_hat = AMBIENT_TIME
-            * (DENSITY * volume_coefficient).powf(1.0 / spacetime_dimension);
+        let t_hat = AMBIENT_TIME * (DENSITY * volume_coefficient).powf(1.0 / spacetime_dimension);
         let finite_cone = FiniteConeLinkProfile::new(spatial_dimension, t_hat)?;
         let double_scaling = double_scaling_product_window(
             spatial_dimension,
@@ -62,6 +65,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!("comparison_status=FINITE_CONE_TABLE_I_DISCREPANCY_REQUIRES_CONVENTION_AUDIT");
-    println!("claim_boundary=ANALYTIC_FORMULA_REPRODUCTION_ONLY_NO_CONTINUUM_OR_QUANTUM_GRAVITY_CLAIM");
+    println!(
+        "claim_boundary=ANALYTIC_FORMULA_REPRODUCTION_ONLY_NO_CONTINUUM_OR_QUANTUM_GRAVITY_CLAIM"
+    );
     Ok(())
 }
