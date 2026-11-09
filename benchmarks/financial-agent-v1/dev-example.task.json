@@ -1,0 +1,35 @@
+{
+  "schema_version": "luminous.financial-research-task.v1",
+  "task_id": "dev.synthetic.supplier-energy-shock.0001",
+  "cohort": "development_public",
+  "category": "supply_chain_risk",
+  "language": "en",
+  "complexity": 2,
+  "decision_at": "2026-10-01T12:00:00Z",
+  "prompt": "Using only the supplied evidence, summarize the observed supplier and energy observations, identify what remains unknown, and give two competing hypotheses for how the disruption could affect the fictional buyer's operations. Do not infer a causal effect or financial impact not established by the evidence.",
+  "evidence_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "evidence_ids": [
+    "ev.synthetic.supplier-status.0001",
+    "ev.synthetic.energy-index.0001"
+  ],
+  "allowed_tools": [
+    "evidence_lookup",
+    "date_compare",
+    "unit_check"
+  ],
+  "budget": {
+    "max_wall_ms": 30000,
+    "max_tool_calls": 8,
+    "max_input_tokens": 12000,
+    "max_output_tokens": 2000,
+    "max_cost_minor_units": null,
+    "currency": "USD"
+  },
+  "scoring_profile": "claim-grounding-v1",
+  "rights_profile": "synthetic-public-development",
+  "tags": [
+    "synthetic",
+    "point-in-time",
+    "development-only"
+  ]
+}
