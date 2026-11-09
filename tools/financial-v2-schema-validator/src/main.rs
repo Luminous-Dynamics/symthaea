@@ -577,6 +577,49 @@ mod tests {
         repository_root()
     }
 
+
+    #[test]
+    fn proof_binding_digest_is_stable_under_property_order() {
+        let first = serde_json::json!({"z": "last", "a": "first", "m": null});
+        let second = serde_json::json!({"m": null, "a": "first", "z": "last"});
+        assert_eq!(
+            proof_binding_sha256(&first).unwrap(),
+            proof_binding_sha256(&second).unwrap()
+        );
+    }
+
+    #[test]
+    fn mutated_proof_binding_digest_is_rejected() {
+        let root = fixture_root();
+        let mut evidence = load_json(&root, RESEARCH_EXAMPLE_PATH).unwrap()["artifacts"][0].clone();
+        evidence["availability"]["proof"]["binding_sha256"] =
+            Value::String("0".repeat(64));
+        assert!(validate_evidence_semantics(
+            &evidence,
+            "principal:synthetic-public-research",
+            "rights:synthetic-dev",
+            "synthetic_development_only",
+            "2026-10-01T12:00:00Z",
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn source_version_substitution_in_proof_preimage_is_rejected() {
+        let root = fixture_root();
+        let mut evidence = load_json(&root, RESEARCH_EXAMPLE_PATH).unwrap()["artifacts"][0].clone();
+        evidence["availability"]["proof"]["binding"]["source_version_id"] =
+            Value::String("SYN-REC-SUPPLIER-0001-v99".to_owned());
+        assert!(validate_evidence_semantics(
+            &evidence,
+            "principal:synthetic-public-research",
+            "rights:synthetic-dev",
+            "synthetic_development_only",
+            "2026-10-01T12:00:00Z",
+        )
+        .is_err());
+    }
+
     #[test]
     fn public_v2_examples_validate_offline_and_remain_synthetic_only() {
         run(&fixture_root()).expect("v2 schemas, examples and semantic bindings must validate");
