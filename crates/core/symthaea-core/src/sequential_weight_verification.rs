@@ -127,12 +127,88 @@ pub enum SequentialWeightVerificationError {
     ObservationBudgetExhausted,
     #[error("candidate evaluation is already terminal")]
     AlreadyTerminal,
+    #[error("confirmatory data shard has already been assigned in this campaign")]
+    ConfirmatoryShardAlreadyUsed,
+    #[error("candidate model digest has already been evaluated in this campaign")]
+    CandidateModelAlreadyEvaluated,
+    #[error("candidate ordinal space is exhausted")]
+    CandidateIndexExhausted,
     #[error("failed to serialize sequential verification report")]
     ReportSerialization,
 }
 
+/// Campaign ledger that fixes alpha and the evaluation protocol across candidate edits.
+/// It prevents reuse of candidate model digests and confirmatory data shards.
+#[derive(Debug)]
+pub struct SequentialWeightVerificationCampaign {
+    config: SequentialWeightVerificationConfig,
+    evaluation_protocol_digest: String,
+    next_candidate_index: u64,
+    used_candidate_digests: BTreeSet<String>,
+    used_confirmatory_shards: BTreeSet<String>,
+}
+
+impl SequentialWeightVerificationCampaign {
+    /// Start a campaign with one family-wise alpha budget and a frozen protocol.
+    pub fn new(
+        config: SequentialWeightVerificationConfig,
+        evaluation_protocol_digest: String,
+    ) -> Result<Self, SequentialWeightVerificationError> {
+        validate_config(config)?;
+        validate_hex_digest(&evaluation_protocol_digest, "evaluation_protocol_digest")?;
+        Ok(Self {
+            config,
+            evaluation_protocol_digest,
+            next_candidate_index: 1,
+            used_candidate_digests: BTreeSet::new(),
+            used_confirmatory_shards: BTreeSet::new(),
+        })
+    }
+
+    /// Start the next candidate with a fresh confirmatory data shard.
+    /// The campaign assigns the ordinal and enforces the shared alpha budget.
+    pub fn start_candidate(
+        &mut self,
+        baseline_model_digest: String,
+        candidate_model_digest: String,
+        confirmatory_shard_digest: String,
+    ) -> Result<SequentialWeightVerification, SequentialWeightVerificationError> {
+        if self.next_candidate_index == u64::MAX {
+            return Err(SequentialWeightVerificationError::CandidateIndexExhausted);
+        }
+        if self.used_candidate_digests.contains(&candidate_model_digest) {
+            return Err(SequentialWeightVerificationError::CandidateModelAlreadyEvaluated);
+        }
+        if self.used_confirmatory_shards.contains(&confirmatory_shard_digest) {
+            return Err(SequentialWeightVerificationError::ConfirmatoryShardAlreadyUsed);
+        }
+        let binding = WeightVerificationBinding {
+            candidate_index: self.next_candidate_index,
+            baseline_model_digest,
+            candidate_model_digest: candidate_model_digest.clone(),
+            evaluation_protocol_digest: self.evaluation_protocol_digest.clone(),
+            confirmatory_shard_digest: confirmatory_shard_digest.clone(),
+        };
+        let verifier = SequentialWeightVerification::from_binding(binding, self.config)?;
+        self.used_candidate_digests.insert(candidate_model_digest);
+        self.used_confirmatory_shards.insert(confirmatory_shard_digest);
+        self.next_candidate_index += 1;
+        Ok(verifier)
+    }
+
+    /// Return the next candidate ordinal to be assigned.
+    pub fn next_candidate_index(&self) -> u64 {
+        self.next_candidate_index
+    }
+
+    /// Return the number of confirmatory shards reserved by this campaign.
+    pub fn used_confirmatory_shard_count(&self) -> usize {
+        self.used_confirmatory_shards.len()
+    }
+}
+
 /// Incremental verifier for one frozen baseline/candidate/protocol triple.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SequentialWeightVerification {
     binding: WeightVerificationBinding,
     config: SequentialWeightVerificationConfig,
@@ -144,8 +220,8 @@ pub struct SequentialWeightVerification {
 }
 
 impl SequentialWeightVerification {
-    /// Start a new confirmatory stream for a frozen candidate.
-    pub fn new(
+    /// Construct only after the campaign ledger assigns the binding.
+    fn from_binding(
         binding: WeightVerificationBinding,
         config: SequentialWeightVerificationConfig,
     ) -> Result<Self, SequentialWeightVerificationError> {
@@ -324,6 +400,20 @@ struct ReportDigestClaims<'a> {
     status: SequentialWeightVerificationStatus,
 }
 
+fn validate_hex_digest(
+    value: &str,
+    name: &'static str,
+) -> Result<(), SequentialWeightVerificationError> {
+    if value.len() != DIGEST_HEX_LEN
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(SequentialWeightVerificationError::InvalidDigest(name));
+    }
+    Ok(())
+}
+
 fn validate_binding(
     binding: &WeightVerificationBinding,
 ) -> Result<(), SequentialWeightVerificationError> {
@@ -385,14 +475,8 @@ fn validate_config(
 mod tests {
     use super::*;
 
-    fn binding(candidate_index: u64) -> WeightVerificationBinding {
-        WeightVerificationBinding {
-            candidate_index,
-            baseline_model_digest: "a".repeat(64),
-            candidate_model_digest: "b".repeat(64),
-            evaluation_protocol_digest: "c".repeat(64),
-            confirmatory_shard_digest: "d".repeat(64),
-        }
+    fn digest(byte: char) -> String {
+        std::iter::repeat_n(byte, 64).collect()
     }
 
     fn config(
@@ -405,6 +489,27 @@ mod tests {
             minimum_observations: 2,
             maximum_observations,
         }
+    }
+
+    fn campaign(
+        minimum_improvement: f64,
+        maximum_observations: u64,
+    ) -> SequentialWeightVerificationCampaign {
+        SequentialWeightVerificationCampaign::new(
+            config(minimum_improvement, maximum_observations),
+            digest('c'),
+        )
+        .expect("valid campaign")
+    }
+
+    fn candidate(
+        campaign: &mut SequentialWeightVerificationCampaign,
+        model_marker: char,
+        shard_marker: char,
+    ) -> SequentialWeightVerification {
+        campaign
+            .start_candidate(digest('a'), digest(model_marker), digest(shard_marker))
+            .expect("fresh candidate")
     }
 
     fn observation(index: u64, baseline_loss: f64, candidate_loss: f64) -> PairedLossObservation {
@@ -425,8 +530,8 @@ mod tests {
 
     #[test]
     fn strong_paired_improvement_is_established_with_anytime_valid_bounds() {
-        let mut verifier = SequentialWeightVerification::new(binding(1), config(0.05, 2_000))
-            .expect("valid verifier");
+        let mut campaign = campaign(0.05, 2_000);
+        let mut verifier = candidate(&mut campaign, 'b', 'd');
         let mut report = verifier.report().expect("empty report");
         for index in 0..600 {
             report = verifier
@@ -447,8 +552,8 @@ mod tests {
 
     #[test]
     fn no_effect_is_not_misreported_as_superiority() {
-        let mut verifier = SequentialWeightVerification::new(binding(1), config(0.1, 6_000))
-            .expect("valid verifier");
+        let mut campaign = campaign(0.1, 6_000);
+        let mut verifier = candidate(&mut campaign, 'b', 'd');
         let mut report = verifier.report().expect("empty report");
         for index in 0..6_000 {
             report = verifier
@@ -467,20 +572,44 @@ mod tests {
 
     #[test]
     fn later_candidates_receive_smaller_alpha_allocation() {
-        let mut first = SequentialWeightVerification::new(binding(1), config(0.2, 100))
-            .expect("first candidate");
-        let mut later = SequentialWeightVerification::new(binding(7), config(0.2, 100))
-            .expect("later candidate");
+        let mut campaign = campaign(0.2, 100);
+        let mut first = candidate(&mut campaign, 'b', 'd');
         let first_report = first.observe(observation(0, 0.8, 0.5)).expect("first look");
-        let later_report = later.observe(observation(0, 0.8, 0.5)).expect("later look");
+        let mut seventh = candidate(&mut campaign, 'c', 'e');
+        for (model, shard) in [('e', 'f'), ('f', '1'), ('1', '2'), ('2', '3'), ('3', '4')] {
+            seventh = candidate(&mut campaign, model, shard);
+        }
+        let later_report = seventh
+            .observe(observation(0, 0.8, 0.5))
+            .expect("seventh candidate look");
+        assert_eq!(later_report.binding.candidate_index, 7);
         assert!(later_report.alpha_at_look < first_report.alpha_at_look);
         assert!(later_report.confidence_radius > first_report.confidence_radius);
     }
 
     #[test]
+    fn campaign_assigns_ordinals_and_prevents_candidate_or_shard_reuse() {
+        let mut campaign = campaign(0.1, 10);
+        let first = candidate(&mut campaign, 'b', 'd');
+        assert_eq!(first.binding.candidate_index, 1);
+        assert_eq!(campaign.next_candidate_index(), 2);
+        assert_eq!(campaign.used_confirmatory_shard_count(), 1);
+        assert!(matches!(
+            campaign.start_candidate(digest('a'), digest('b'), digest('e')),
+            Err(SequentialWeightVerificationError::CandidateModelAlreadyEvaluated)
+        ));
+        assert!(matches!(
+            campaign.start_candidate(digest('a'), digest('c'), digest('d')),
+            Err(SequentialWeightVerificationError::ConfirmatoryShardAlreadyUsed)
+        ));
+        assert_eq!(campaign.next_candidate_index(), 2);
+        assert_eq!(campaign.used_confirmatory_shard_count(), 1);
+    }
+
+    #[test]
     fn duplicate_episode_ids_are_rejected_without_consuming_budget() {
-        let mut verifier =
-            SequentialWeightVerification::new(binding(1), config(0.1, 10)).expect("valid verifier");
+        let mut campaign = campaign(0.1, 10);
+        let mut verifier = candidate(&mut campaign, 'b', 'd');
         verifier
             .observe(observation(1, 0.8, 0.4))
             .expect("first episode");
@@ -493,15 +622,21 @@ mod tests {
 
     #[test]
     fn malformed_digests_losses_and_budgets_fail_closed() {
-        let mut invalid_binding = binding(1);
-        invalid_binding.candidate_model_digest = "not-a-digest".into();
         assert!(matches!(
-            SequentialWeightVerification::new(invalid_binding, config(0.1, 10)),
+            SequentialWeightVerificationCampaign::new(config(0.1, 10), "bad".into()),
             Err(SequentialWeightVerificationError::InvalidDigest(_))
         ));
+        assert!(matches!(
+            SequentialWeightVerificationCampaign::new(config(0.1, 0), digest('c')),
+            Err(SequentialWeightVerificationError::InvalidObservationBudget)
+        ));
 
-        let mut verifier =
-            SequentialWeightVerification::new(binding(1), config(0.1, 10)).expect("valid verifier");
+        let mut campaign = campaign(0.1, 10);
+        assert!(matches!(
+            campaign.start_candidate(digest('a'), "not-a-digest".into(), digest('d')),
+            Err(SequentialWeightVerificationError::InvalidDigest(_))
+        ));
+        let mut verifier = candidate(&mut campaign, 'b', 'd');
         assert!(matches!(
             verifier.observe(observation(1, 1.1, 0.1)),
             Err(SequentialWeightVerificationError::InvalidLoss)
@@ -511,24 +646,21 @@ mod tests {
 
     #[test]
     fn report_digest_is_replay_deterministic_and_binds_the_evidence_stream() {
-        let mut left =
-            SequentialWeightVerification::new(binding(2), config(0.05, 20)).expect("left verifier");
-        let mut right = SequentialWeightVerification::new(binding(2), config(0.05, 20))
-            .expect("right verifier");
-        let episodes = episodes_for_replay_test();
+        let mut left_campaign = campaign(0.05, 20);
+        let mut right_campaign = campaign(0.05, 20);
+        let mut left = candidate(&mut left_campaign, 'b', 'd');
+        let mut right = candidate(&mut right_campaign, 'b', 'd');
         let mut left_report = left.report().expect("initial");
         let mut right_report = right.report().expect("initial");
-        for episode in episodes {
+        for episode in episodes_for_replay_test() {
             left_report = left.observe(episode.clone()).expect("left");
             right_report = right.observe(episode).expect("right");
         }
-        assert_eq!(
-            left_report.observation_digest,
-            right_report.observation_digest
-        );
+        assert_eq!(left_report.observation_digest, right_report.observation_digest);
         assert_eq!(left_report.report_digest, right_report.report_digest);
-        let mut altered = SequentialWeightVerification::new(binding(2), config(0.05, 20))
-            .expect("altered-evidence verifier");
+
+        let mut altered_campaign = campaign(0.05, 20);
+        let mut altered = candidate(&mut altered_campaign, 'b', 'e');
         let mut altered_report = altered.report().expect("initial");
         for (index, episode) in episodes_for_replay_test().into_iter().enumerate() {
             let changed = if index == 2 {
@@ -546,8 +678,8 @@ mod tests {
 
     #[test]
     fn inconclusive_budget_is_terminal_and_cannot_be_extended() {
-        let mut verifier =
-            SequentialWeightVerification::new(binding(1), config(0.5, 2)).expect("valid verifier");
+        let mut campaign = campaign(0.5, 2);
+        let mut verifier = candidate(&mut campaign, 'b', 'd');
         verifier
             .observe(observation(1, 0.5, 0.5))
             .expect("first episode");
