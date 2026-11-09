@@ -342,6 +342,39 @@ A useful starting design is six or more structural families, with separate ident
 - Improvement over the incumbent must survive independent re-evaluation.
 - No benchmark edits after confirmation results are visible.
 
+### M6 — Open-support and model-repair capability
+- F1a unsupported parameter/system controls must produce no-compatible-model rather than a nearest false law.
+- F1b behaviorally equivalent parameterizations must be accepted as equivalence classes, without false exact-parameter claims.
+- F2–F5 structural, measurement, regime and stochastic shifts must each have independent hidden generators and confirmation.
+- Detecting misspecification and repairing the model are separate gates.
+
+### M7 — Scientific validity and candidate selection
+- Reproduce SciLaws-Bench Real and Parallel tasks under exact pinned protocol.
+- Score predictive fit (S_N), scientific validity (S_V) and structural recovery (S_S) separately.
+- Retain every generated candidate and measure selection regret / Pareto domination.
+- Add held-out group transfer and evidence-withdrawal/reversal controls.
+
+## 5A. Competitive target hierarchy
+
+Do not set one aggregate "AI scientist" score. Use this ordered promotion ladder:
+
+1. **Non-compensatory correctness:** 100% exact-oracle agreement on declared identifiable microcosms; zero false unique claims on known non-identifiable controls; F1a reject and F1b equivalence acceptance both correct; no critical truth/evidence/confirmation leakage.
+2. **Strong matched baselines:** beat the strongest assumption-compatible fixed, random, symbolic and domain-specific baselines under equal task access and inclusive resource budgets.
+3. **External reproduction:** run the exact public task revision, scorer, seeds, action/cost limits and failure denominator before comparing against any published score.
+4. **Held-out lift:** require task-family-clustered uncertainty intervals and protected-capability non-inferiority; use a second independent domain before general claims.
+5. **Efficiency and reproducibility:** reduce cost to independently confirmed improvement, not merely tokens or experiments, while retaining complete traces and reproducible receipts.
+
+Prospective stretch hypotheses after exact parity:
+- **DiscoverPhysics:** ≥+5 absolute percentage points on Pass@1 and Pass@5 on the same public pool/seed/scorer, with no per-world trajectory or explanation regression.
+- **Unsatz:** exceed the highest reported 60% result on the same 80-system / 20-domain release, with the weakest structural families improving; do not transplant the percentage to a different task DSL.
+- **ACDB:** ≥+5 absolute points in directed F1 and lower SHD than its strongest matched active baseline, under the same intervention budget.
+- **FrontierPhysics:** ≥35% Pass@1 on the same 56 tasks, with verifier and expert-blocker gates both satisfied.
+- **SciLaws-Bench:** improve S_V and S_S over the frozen matched incumbent while keeping S_N non-inferior; reduce candidate-selection regret by at least 50% under the same candidate-generation and selection budget. Calibrate the margin with the pilot, then freeze it before confirmation.
+- **ASI-Bench:** improve B3 under matched task/model/harness/round/cost budgets while preserving B1 within a predeclared non-inferiority margin; B4 should remain close to B3 for genuinely non-essential distractors.
+- **Terminal-Bench Science:** compare only on an identical task/verifier/harness/time cap and report cost separately. A pass-rate gain purchased with materially more compute or human intervention is a trade-off, not unconditional superiority.
+
+These targets are hypotheses, not current Symthaea results and not transferable between benchmarks. If no method beats a simple baseline or the confidence interval overlaps no effect, keep the simpler policy and preserve the null result.
+
 ## 6. Near-term target policy
 
 Do not choose an arbitrary headline A2 accuracy before the baseline campaign.
@@ -411,7 +444,7 @@ For a matched B1–B4 track, report the per-level score and artifact validity, t
 
 ### Immediate benchmark consequence
 
-The microcosm now scores the projected structural-family set independently of the full parameterized-model version space. This is required because an agent can correctly identify a direct-response mechanism while gain and sensor scale remain equivalent; conversely, an uninformative constant sensor can leave multiple mechanisms compatible. Report both results, with identifiable and non-identifiable strata, rather than one "model accuracy" number.
+The microcosm scores the projected structural-family set independently of the full parameterized-model version space, and now also separates exact generating-parameter membership from bounded behavioral representation. An agent can correctly identify a direct-response observable law while gain and sensor scale remain equivalent; conversely, an uninformative constant sensor can leave multiple mechanisms compatible. Report all three: exact parameter recovery, behavioral/equivalence-class coverage and structural-family recovery. For the current numeric reference, behavioral equality is checked over all 81 length-4 intervention sequences; it is a finite oracle, not a universal functional-equivalence proof.
 
 Before any leaderboard comparison, preregister matched tasks, action semantics, budgets, held-out worlds, run denominators, model access, and external dependencies. A benchmark score is not comparable if one system receives the true variable set, executable oracle, extra interventions, paper abstracts, or more wall-time than its comparator.
 
