@@ -164,6 +164,20 @@ jobs:
             cat model-discrimination-eig.txt
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Run model-dependent detection and non-detection EIG reference
+        if: matrix.package == 'symthaea-science-evidence'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-science-evidence --example model_detection_reference | tee model-detection-eig.txt
+          grep -q 'epistemic_status=SYNTHETIC_BERNOULLI_GAUSSIAN_DETECTION_CHANNEL_NOT_PHYSICAL_VALIDATION' model-detection-eig.txt
+          grep -q 'I_model_detection=' model-detection-eig.txt
+          grep -q 'I_value_given_detection=' model-detection-eig.txt
+          {
+            echo "## Synthetic model-dependent detection EIG"
+            cat model-detection-eig.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run nominal and robust target-region sensor placement
         if: matrix.package == 'symthaea-uap-observatory'
         shell: bash
