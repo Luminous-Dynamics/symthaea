@@ -30,14 +30,24 @@ def word_hypothesis(index: int, raw_ipa: str) -> dict:
     }
 
 
-def normalized_hypothesis(words: list[str], punctuation: list[dict] | None = None) -> str:
+def normalized_hypothesis(
+    words: list[str],
+    punctuation: list[dict] | None = None,
+    raw_tokens: list[str] | None = None,
+) -> str:
+    if raw_tokens is None:
+        raw_tokens = []
+        for index, word in enumerate(words):
+            if index:
+                raw_tokens.append(" ")
+            raw_tokens.extend(list(word))
     return json.dumps(
         {
             "language": "en",
             "provider": "piper-plus-g2p",
             "provider_version": "0.5.3",
-            "raw_tokens": [],
-            "raw_prosody": [],
+            "raw_tokens": raw_tokens,
+            "raw_prosody": [None] * len(raw_tokens),
             "punctuation": punctuation or [],
             "words": [word_hypothesis(index, word) for index, word in enumerate(words)],
         },
@@ -64,7 +74,7 @@ def write_candidates(path: Path, rows: list[tuple[str, str, list[str], list[str]
                     "text": text,
                     "piper_ipa_tokens": repr(raw_tokens),
                     "normalized_word_hypotheses_json": normalized_hypothesis(
-                        piper_words, punctuation
+                        piper_words, punctuation, raw_tokens
                     ),
                     "muse_word_ipa_tokens": repr(muse_words),
                     "prosody_debug": "[]",
@@ -96,13 +106,19 @@ class G2PReferenceScorerTests(unittest.TestCase):
         )
 
     def test_structured_word_hypotheses_preserve_empty_slots_and_keep_punctuation_separate(self):
+        raw_tokens = [
+            "“", "h", "ə", "l", "ˈ", "o", "ʊ", ",", " ",
+            " ", "w", "ˈ", "ɜ", "ː", "l", "d", "!", "”",
+        ]
         hypothesis = normalized_hypothesis(
             ["həloʊ", "", "wɜːld"],
             [
                 {"raw_token_index": 0, "word_index": 0, "after_ipa_character_index": 0, "token": "“"},
                 {"raw_token_index": 7, "word_index": 0, "after_ipa_character_index": 5, "token": ","},
-                {"raw_token_index": 9, "word_index": 2, "after_ipa_character_index": 5, "token": "!"},
+                {"raw_token_index": 16, "word_index": 2, "after_ipa_character_index": 5, "token": "!"},
+                {"raw_token_index": 17, "word_index": 2, "after_ipa_character_index": 5, "token": "”"},
             ],
+            raw_tokens,
         )
         words = split_normalized_piper_words(hypothesis)
         self.assertEqual(words, [list("həloʊ"), [], list("wɜːld")])
