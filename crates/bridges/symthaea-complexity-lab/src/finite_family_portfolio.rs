@@ -2874,6 +2874,23 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
         next_model_index: 0,
         clusters: Vec::new(),
     });
+    let root_frontier_bytes = outer_frontier_bytes(&frontier)?;
+    if root_frontier_bytes > budget.max_frontier_memory_bytes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "outer root frontier memory bytes",
+            required: root_frontier_bytes,
+            limit: budget.max_frontier_memory_bytes,
+        });
+    }
+    let root_total_bytes = cached_bytes.checked_add(root_frontier_bytes)
+        .ok_or(PolicyPortfolioError::DimensionOverflow)?;
+    if root_total_bytes > budget.max_total_memory_bytes {
+        return Err(PolicyPortfolioError::BudgetExceeded {
+            resource: "outer root total memory bytes",
+            required: root_total_bytes,
+            limit: budget.max_total_memory_bytes,
+        });
+    }
 
     let mut transcript = Sha256::new();
     transcript.update(b"SYMPGM-FINITE-UMDP-OUTER-PARTITION-TRANSCRIPT\0\x01");
@@ -3027,8 +3044,9 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
         );
 
         let can_create_cluster = node.clusters.len() < max_portfolio_size;
+        let new_cluster_choice = if can_create_cluster { 1usize } else { 0usize };
         let child_count = node.clusters.len()
-            .checked_add(usize::from(can_create_cluster))
+            .checked_add(new_cluster_choice)
             .ok_or(PolicyPortfolioError::DimensionOverflow)?;
         let next_frontier_count = frontier.len().checked_add(child_count)
             .ok_or(PolicyPortfolioError::DimensionOverflow)?;
@@ -3086,7 +3104,8 @@ pub fn solve_exact_finite_family_policy_portfolio_bnb(
                 child_clusters.push(new_cluster);
             }
             let child = OuterPartitionSearchNode {
-                next_model_index: node.next_model_index + 1,
+                next_model_index: node.next_model_index.checked_add(1)
+                    .ok_or(PolicyPortfolioError::DimensionOverflow)?,
                 clusters: child_clusters,
             };
             split_frontier_bytes = split_frontier_bytes
