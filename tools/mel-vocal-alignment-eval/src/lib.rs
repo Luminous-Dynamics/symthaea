@@ -698,6 +698,9 @@ mod tests {
         assert_eq!(result.phone_error_rate, 0.0);
         assert_eq!(result.reference_phone_match_fraction, 1.0);
         assert_eq!(result.reference_identity_match_fraction, 0.0);
+        assert_eq!(result.timing.joint_onset_within_20ms_fraction, 0.0);
+        assert_eq!(result.timing.joint_onset_within_50ms_fraction, 0.0);
+        assert_eq!(result.timing.joint_onset_within_100ms_fraction, 0.0);
         assert_eq!(result.timing.exact_phone_pairs, 0);
         assert_eq!(result.timing.onset_mae_ms, None);
     }
