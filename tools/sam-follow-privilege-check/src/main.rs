@@ -16,9 +16,15 @@ fn main() {
         std::process::exit(2);
     }
     match validate_files(&schema, &report) {
-        Ok(()) => println!("PASS: {} conforms to {} (Draft 2020-12 + SAM privilege semantics)", report.display(), schema.display()),
+        Ok(()) => println!(
+            "PASS: {} conforms to {} (Draft 2020-12 + SAM privilege semantics)",
+            report.display(),
+            schema.display()
+        ),
         Err(errors) => {
-            for error in errors { eprintln!("ERROR: {error}"); }
+            for error in errors {
+                eprintln!("ERROR: {error}");
+            }
             std::process::exit(1);
         }
     }
