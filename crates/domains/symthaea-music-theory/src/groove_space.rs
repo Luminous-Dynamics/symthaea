@@ -228,6 +228,24 @@ mod tests {
     }
 
     #[test]
+    fn common_phase_translation_preserves_circular_gap_profile() {
+        let original = analyze_groove_space(&groove(vec![5, 29, 61]), 20).unwrap();
+        let translated = analyze_groove_space(&groove(vec![22, 46, 78]), 20).unwrap();
+        assert_eq!(
+            original.layers[0].inter_onset_gaps_ticks,
+            translated.layers[0].inter_onset_gaps_ticks
+        );
+        assert_eq!(
+            original.layers[0].long_gap_span_basis_points,
+            translated.layers[0].long_gap_span_basis_points
+        );
+        assert_eq!(
+            original.layers[0].longest_inter_onset_gap_ticks,
+            translated.layers[0].longest_inter_onset_gap_ticks
+        );
+    }
+
+    #[test]
     fn rejects_zero_or_overlong_thresholds() {
         assert_eq!(
             analyze_groove_space(&groove(vec![0, 48]), 0)
