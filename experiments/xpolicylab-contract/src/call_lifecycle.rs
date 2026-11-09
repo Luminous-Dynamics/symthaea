@@ -60,6 +60,7 @@ pub enum CallLifecycleError {
     UnknownRequest(String),
     ConflictingCachedResponse,
     RequestAlreadyCompleted,
+    RequestBudgetExhausted,
     TrialAborted(TrialAbortReason),
     LateResponseAfterAbort(TrialAbortReason),
 }
@@ -138,7 +139,7 @@ impl PolicyCallLedger {
         }
 
         if self.requests.len() >= self.max_requests {
-            return Err(CallLifecycleError::RequestIdentityMismatch);
+            return Err(CallLifecycleError::RequestBudgetExhausted);
         }
 
         self.requests.insert(
@@ -394,7 +395,7 @@ mod tests {
         );
         assert_eq!(
             state.begin(identity("request-2", 2)),
-            Err(CallLifecycleError::RequestIdentityMismatch)
+            Err(CallLifecycleError::RequestBudgetExhausted)
         );
     }
 }
