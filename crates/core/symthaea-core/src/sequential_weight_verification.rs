@@ -40,6 +40,8 @@ pub struct WeightVerificationBinding {
     pub evaluation_protocol_digest: String,
     /// Digest of the fresh, candidate-specific confirmatory data shard.
     pub confirmatory_shard_digest: String,
+    /// Digest of the open-world/model-adequacy precondition report.
+    pub precondition_gate_digest: String,
 }
 
 /// Alpha-spending and practical-effect requirements for a repair candidate.
@@ -172,6 +174,7 @@ impl SequentialWeightVerificationCampaign {
         baseline_model_digest: String,
         candidate_model_digest: String,
         confirmatory_shard_digest: String,
+        precondition_gate_digest: String,
     ) -> Result<SequentialWeightVerification, SequentialWeightVerificationError> {
         if self.next_candidate_index == u64::MAX {
             return Err(SequentialWeightVerificationError::CandidateIndexExhausted);
@@ -188,6 +191,7 @@ impl SequentialWeightVerificationCampaign {
             candidate_model_digest: candidate_model_digest.clone(),
             evaluation_protocol_digest: self.evaluation_protocol_digest.clone(),
             confirmatory_shard_digest: confirmatory_shard_digest.clone(),
+            precondition_gate_digest,
         };
         let verifier = SequentialWeightVerification::from_binding(binding, self.config)?;
         self.used_candidate_digests.insert(candidate_model_digest);
@@ -437,6 +441,10 @@ fn validate_binding(
             "confirmatory_shard_digest",
             binding.confirmatory_shard_digest.as_str(),
         ),
+        (
+            "precondition_gate_digest",
+            binding.precondition_gate_digest.as_str(),
+        ),
     ] {
         if value.len() != DIGEST_HEX_LEN
             || !value
@@ -508,7 +516,7 @@ mod tests {
         shard_marker: char,
     ) -> SequentialWeightVerification {
         campaign
-            .start_candidate(digest('a'), digest(model_marker), digest(shard_marker))
+            .start_candidate(digest('a'), digest(model_marker), digest(shard_marker), digest('e'))
             .expect("fresh candidate")
     }
 
@@ -595,11 +603,11 @@ mod tests {
         assert_eq!(campaign.next_candidate_index(), 2);
         assert_eq!(campaign.used_confirmatory_shard_count(), 1);
         assert!(matches!(
-            campaign.start_candidate(digest('a'), digest('b'), digest('e')),
+            campaign.start_candidate(digest('a'), digest('b'), digest('e'), digest('e')),
             Err(SequentialWeightVerificationError::CandidateModelAlreadyEvaluated)
         ));
         assert!(matches!(
-            campaign.start_candidate(digest('a'), digest('c'), digest('d')),
+            campaign.start_candidate(digest('a'), digest('c'), digest('d'), digest('e')),
             Err(SequentialWeightVerificationError::ConfirmatoryShardAlreadyUsed)
         ));
         assert_eq!(campaign.next_candidate_index(), 2);
@@ -633,7 +641,12 @@ mod tests {
 
         let mut campaign = campaign(0.1, 10);
         assert!(matches!(
-            campaign.start_candidate(digest('a'), "not-a-digest".into(), digest('d')),
+            campaign.start_candidate(
+                digest('a'),
+                "not-a-digest".into(),
+                digest('d'),
+                digest('e'),
+            ),
             Err(SequentialWeightVerificationError::InvalidDigest(_))
         ));
         let mut verifier = candidate(&mut campaign, 'b', 'd');
