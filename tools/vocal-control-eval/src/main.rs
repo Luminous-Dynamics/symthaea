@@ -24,7 +24,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let path = std::env::args_os().nth(1).ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "usage: vocal-control-eval <control-case.json>",
+            "usage: vocal-control-eval <control-case.json|control-suite.json|noop-calibration.json>",
         )
     })?;
     let bytes = std::fs::read(path)?;
