@@ -26,15 +26,47 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  formatting:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.96.0
-      - name: Validate schemas, references, examples and fail-closed semantics offline
+        with:
+          components: rustfmt
+      - name: Produce rustfmt snapshot
         working-directory: tools/financial-v2-schema-validator
         run: |
-          cargo fmt -- --check
-          cargo test --locked
-          cargo run --locked
+          cargo fmt
+          mkdir -p /tmp/financial-v2-rustfmt
+          cp src/main.rs /tmp/financial-v2-rustfmt/main.rs
+      - name: Upload rustfmt snapshot for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-v2-validator-rustfmt
+          path: /tmp/financial-v2-rustfmt/main.rs
+          retention-days: 1
+      - name: Require committed source to match rustfmt
+        run: git diff --exit-code -- tools/financial-v2-schema-validator/src/main.rs
+
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Generate initial dependency lock
+        working-directory: tools/financial-v2-schema-validator
+        run: cargo generate-lockfile
+      - name: Test offline Draft 2020-12 validation and negative mutations
+        working-directory: tools/financial-v2-schema-validator
+        run: cargo test --locked
+      - name: Validate all committed v2 examples
+        working-directory: tools/financial-v2-schema-validator
+        run: cargo run --locked
+      - name: Upload generated Cargo lock for reproducible follow-up
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-v2-validator-cargo-lock
+          path: tools/financial-v2-schema-validator/Cargo.lock
+          retention-days: 1
