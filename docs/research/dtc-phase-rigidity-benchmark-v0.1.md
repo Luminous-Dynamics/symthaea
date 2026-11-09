@@ -105,7 +105,12 @@ The fractal-time crate now includes a separate finite-system sensing path:
   
   (F(A)=\sum_k [\partial_A p_k(A)]^2/p_k(A)).
 
-- The report includes Fisher information per final readout and divided by simulated Floquet periods, plus finite-window subharmonic order and an explicitly right-censored lifetime estimate.
+- The pure-state quantum Fisher information is also estimated from the centered state-vector derivative:
+  
+  \(F_Q(A)=4(\langle\partial_A\psi|\partial_A\psi\rangle-|\langle\psi|\partial_A\psi\rangle|^2)\).
+
+- The report shows the CFI/QFI ratio and a numerical consistency flag. QFI is an upper bound for measurements on the declared pure state; it is not the achieved total-Z readout information.
+- Both information measures are reported per final readout and divided by simulated Floquet periods, alongside finite-window subharmonic order and an explicitly right-censored lifetime estimate.
 
 This is a closed-system, small-N, sampled-kick model. It is **not** a reproduction of the 13C diamond device, which uses dipolar-coupled spins, a two-tone Floquet protocol, quasi-continuous NMR readout, and an AC-field-mediated lifetime-extension mechanism. The experiment reports frequency-selective response with linewidth below 70 mHz and an interaction-assisted lifetime extension up to three orders of magnitude; those device results are experimental references, not validation targets that the toy model can claim to match. (Moon et al., *Nature Physics* 22, 367–373 (2026), DOI: 10.1038/s41567-025-03163-6.)
 
