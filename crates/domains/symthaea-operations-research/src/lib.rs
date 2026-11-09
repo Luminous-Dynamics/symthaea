@@ -23,9 +23,25 @@
 //! assert!((MM1 { arrival_rate: 2.0, service_rate: 3.0 }.avg_in_system() - 2.0).abs() < 1e-12);
 //! ```
 
+pub mod decomposition;
 pub mod graph;
 pub mod inventory;
+pub mod maxqbf;
 pub mod queue;
+pub mod quantified_proof;
+pub mod quantified_game_dag;
+pub mod quantified_game_values;
+pub mod quantified_scope;
+pub mod quantified_strategy;
+pub mod qbf_strategy_count;
+pub mod qdimacs;
+pub mod strategy_bdd;
+pub mod strategy_aig;
+pub mod strategy_portfolio;
+pub mod synqbf;
+pub mod synqbf_artifact;
+pub mod synqbf_construction;
+pub mod synqbf_pipeline;
 
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;

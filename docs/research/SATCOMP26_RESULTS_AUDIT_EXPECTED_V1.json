@@ -1,0 +1,156 @@
+{
+  "schema_version": "symthaea.satcomp26-results-audit.expected.v1",
+  "observed_on": "2026-11-07",
+  "source": {
+    "repository": "satcompetition/2026",
+    "repository_commit": "3e2dee7cf5aa643c77bf946280a3c1c520756ef9",
+    "path": "downloads/scores.csv",
+    "git_blob_sha": "9c926b2bd35ac0fb4f3d0cf8f58c97178d43faef",
+    "byte_size": 1262695,
+    "official_index": "https://github.com/satcompetition/2026/blob/main/index.html",
+    "official_csv": "https://github.com/satcompetition/2026/blob/main/downloads/scores.csv",
+    "summary_html_warning": "The repository results.html still contains older VBS=347 and kissat-sc2024=306 rows. Use the pinned instance-wise CSV."
+  },
+  "input": {
+    "header": [
+      "solverid",
+      "instanceid",
+      "runtime",
+      "status",
+      "score",
+      "vresult"
+    ],
+    "record_count": 13200,
+    "unique_solver_ids": 33,
+    "unique_instance_ids": 400,
+    "score_decimal_places": 2
+  },
+  "integrity_checks": {
+    "unique_solver_instance_pairs": 13200,
+    "duplicate_solver_instance_pairs": 0,
+    "solvers_with_exactly_400_rows": 33,
+    "solvers_with_exactly_400_unique_instance_ids": 33,
+    "common_instance_universe_across_solvers": true,
+    "malformed_rows": 0,
+    "malformed_score_fields": 0,
+    "verified_sat_truth_mismatches": 0,
+    "verified_unsat_truth_mismatches": 0,
+    "accepted_statuses": [
+      "sat-verified",
+      "unsat-verified"
+    ],
+    "rejected_or_unverified_statuses": [
+      "solver-timeout",
+      "unknown",
+      "crash",
+      "unsat",
+      "checker-memout",
+      "checker-timeout",
+      "solver-memout"
+    ],
+    "status_counts": {
+      "sat-verified": 4160,
+      "unsat-verified": 3150,
+      "solver-timeout": 5569,
+      "unknown": 134,
+      "crash": 26,
+      "unsat": 146,
+      "checker-memout": 1,
+      "checker-timeout": 12,
+      "solver-memout": 2
+    }
+  },
+  "solver_groups": {
+    "main": 19,
+    "main-ai": 12,
+    "exp-ai": 1,
+    "exp": 1
+  },
+  "main_track_single_solver_baselines": [
+    {
+      "solver_id": "anders_satsuma-iter-kissat[main]",
+      "instances": 400,
+      "solved": 276,
+      "sat_verified": 127,
+      "unsat_verified": 149,
+      "score_sum": "1458807.87",
+      "par2": "3647.019675"
+    },
+    {
+      "solver_id": "anders_satsuma-iter-ae-kissat-mab[main]",
+      "instances": 400,
+      "solved": 269,
+      "sat_verified": 136,
+      "unsat_verified": 133,
+      "score_sum": "1478737.20",
+      "par2": "3696.843000"
+    },
+    {
+      "solver_id": "zheng_kissat-mab-hypre[main]",
+      "instances": 400,
+      "solved": 255,
+      "sat_verified": 134,
+      "unsat_verified": 121,
+      "score_sum": "1598517.37",
+      "par2": "3996.293425"
+    }
+  ],
+  "derived_virtual_best_diagnostics": {
+    "official_leaderboard_row": false,
+    "derivation": [
+      "For each instance, consider only sat-verified and unsat-verified rows.",
+      "Select the minimum score among accepted rows.",
+      "If no accepted row exists for an instance, assign the 10000 score penalty (2 x 5000 seconds).",
+      "Sum the 400 per-instance values and divide by 400.",
+      "Count SAT and UNSAT using the selected accepted status, separately."
+    ],
+    "main_only": {
+      "solver_count": 19,
+      "instances": 400,
+      "solved": 324,
+      "unsolved": 76,
+      "sat_verified": 161,
+      "unsat_verified": 163,
+      "score_sum": "904447.93",
+      "par2": "2261.119825",
+      "gap_over_best_single_main_solver": 48
+    },
+    "main_ai_only": {
+      "solver_count": 12,
+      "instances": 400,
+      "solved": 321,
+      "unsolved": 79,
+      "sat_verified": 176,
+      "unsat_verified": 145,
+      "score_sum": "952071.54",
+      "par2": "2380.178850"
+    },
+    "main_plus_main_ai": {
+      "solver_count": 31,
+      "instances": 400,
+      "solved": 344,
+      "unsolved": 56,
+      "sat_verified": 181,
+      "unsat_verified": 163,
+      "score_sum": "689460.07",
+      "par2": "1723.650175",
+      "note": "Diagnostic oracle across two submission groups; do not call this the conventional Main-only virtual best solver."
+    }
+  },
+  "lymphosat_ai_track_distinction": {
+    "sat_only_verified_solver_id": "green_lymphosat-verified[main-ai]",
+    "sat_only_solved": 146,
+    "sat_only_sat_verified": 146,
+    "sat_only_unsat_verified": 0,
+    "full_solver_id": "green_lymphosat[main-ai]",
+    "full_solver_solved": 251,
+    "full_solver_sat_verified": 146,
+    "full_solver_unsat_verified": 105,
+    "rule": "Keep the SAT-only AI subtrack result separate from the full Main-AI solver result."
+  },
+  "non_claims": [
+    "The derived VBS values are hindsight diagnostics, not executable solvers.",
+    "No Symthaea solver performance is reported by this fixture.",
+    "The fixture does not independently establish the correctness of the official competition's source code; it pins and audits the supplied result rows."
+  ]
+}
