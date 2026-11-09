@@ -763,14 +763,20 @@ impl ContinuousHVGroupEnvelope {
         self.radius_l2_upper
     }
 
-    /// Coordinate-wise minimum extrema used by the box envelope.
-    pub fn coordinate_minima(&self) -> &[f32] {
-        &self.coordinate_minima
+    /// Coordinate-wise minimum extrema used by the exact box envelope.
+    ///
+    /// Returns None for BallOnly and QuantizedBoxAndBall profiles, which store
+    /// no f32 extrema array. Quantized endpoints are decoded outward only inside
+    /// the score-interval routine and must not be treated as exact f32 extrema.
+    pub fn coordinate_minima(&self) -> Option<&[f32]> {
+        self.coordinate_minima.as_deref()
     }
 
-    /// Coordinate-wise maximum extrema used by the box envelope.
-    pub fn coordinate_maxima(&self) -> &[f32] {
-        &self.coordinate_maxima
+    /// Coordinate-wise maximum extrema used by the exact box envelope.
+    ///
+    /// Returns None for BallOnly and QuantizedBoxAndBall profiles.
+    pub fn coordinate_maxima(&self) -> Option<&[f32]> {
+        self.coordinate_maxima.as_deref()
     }
 
     /// Query-specific interval enclosing every member score for a pinned group.
