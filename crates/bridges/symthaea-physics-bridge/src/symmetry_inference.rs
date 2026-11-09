@@ -13,8 +13,8 @@
 //! Two narrow but high-value patterns that cover the Ramanujan Protocol
 //! showcase's canonical invariants:
 //!
-//! 1. **Sum of squared variables** — `x² + y²`, `x² + y² + z²`, `px² + py² + pz²`
-//!    → SO(n) where n = number of distinct squared variables.
+//! 1. **Equal-coefficient sum of squared variables** — `x² + y²`, `x² + y² + z²`, `px² + py² + pz²`
+//!    → SO(n) where n = number of distinct squared variables. A shared finite nonzero scalar is allowed; unequal per-variable weights are rejected.
 //!    Matches Harmonic Oscillator, kinetic energy, `r² = x² + y² + z²`.
 //!
 //! 2. **2D antisymmetric cross product** — `a·b - c·d` where `{a,c}` and
@@ -300,7 +300,7 @@ fn squared_term(expr: &Expr) -> Option<(String, f64)> {
             match (l.as_ref(), r.as_ref()) {
                 (Expr::Const(coefficient), other) | (other, Expr::Const(coefficient)) => {
                     let (name, inner_coefficient) = squared_term(other)?;
-                    let total = coefficient * inner_coefficient;
+                    let total = *coefficient * inner_coefficient;
                     total.is_finite().then_some((name, total))
                 }
                 _ => None,
