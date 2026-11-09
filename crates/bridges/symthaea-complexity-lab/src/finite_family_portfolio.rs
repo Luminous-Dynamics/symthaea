@@ -1464,6 +1464,51 @@ pub struct ExactClusterPolicySearchBudget {
     pub max_total_memory_bytes: usize,
 }
 
+/// Aggregate fail-closed limits for the outer finite-family partition search.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ExactPolicyPortfolioSearchBudget {
+    pub per_cluster: ExactClusterPolicySearchBudget,
+    pub max_outer_search_nodes: usize,
+    pub max_total_inner_dp_multiply_adds: usize,
+    pub max_frontier_nodes: usize,
+    pub max_frontier_memory_bytes: usize,
+    pub max_cached_cluster_solutions: usize,
+    pub max_cached_cluster_bytes: usize,
+    pub max_total_memory_bytes: usize,
+}
+
+/// Complete exact minimax-regret portfolio result for an explicit finite family.
+/// Each cluster contributes one deterministic time-dependent Markov policy.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedFiniteFamilyPolicyPortfolioOptimum {
+    pub model_family_sha256: [u8; 32],
+    pub policy_manifest_sha256: [u8; 32],
+    pub discount: CheckedRational,
+    pub max_portfolio_size: usize,
+    /// Canonical restricted-growth partition; model indices are sorted per cluster.
+    pub partition: Vec<Vec<usize>>,
+    pub cluster_solutions: Vec<VerifiedClusterPolicyOptimum>,
+    pub model_optimal_values: Vec<CheckedRational>,
+    /// Model-major, selected-cluster-policy order.
+    pub model_policy_values: Vec<Vec<CheckedRational>>,
+    pub model_portfolio_values: Vec<CheckedRational>,
+    pub model_regrets: Vec<CheckedRational>,
+    pub worst_case_model_indices: Vec<usize>,
+    pub minimax_regret: CheckedRational,
+    /// Equal to the upper bound only after the complete outer frontier is closed.
+    pub global_lower_bound: CheckedRational,
+    pub global_upper_bound: CheckedRational,
+    pub outer_search_nodes: usize,
+    pub outer_pruned_nodes: usize,
+    pub complete_partitions_evaluated: usize,
+    pub cached_cluster_solutions: usize,
+    pub total_cluster_search_nodes: usize,
+    pub total_dp_multiply_adds: usize,
+    pub partition_transcript_sha256: [u8; 32],
+    pub certificate_sha256: [u8; 32],
+    pub optimality_proven: bool,
+}
+
 /// Exact minimax-regret policy for one model cluster. Equal-regret policies
 /// resolve to the lexicographically least time-major/state-major action vector.
 #[derive(Clone, Debug, PartialEq, Eq)]
