@@ -88,6 +88,11 @@ impl EvidenceRate {
 /// may legitimately support two distinct claims and are counted once per claim.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EvidenceSpanResult {
+    /// Exact trial and audio coordinate identity used by this result.
+    pub trial_id: String,
+    pub source_audio_sha256: String,
+    pub sample_rate_hz: u32,
+    pub sample_count: u64,
     pub total_reference_claims: usize,
     pub total_predicted_claims: usize,
     pub matched_claims: usize,
@@ -273,6 +278,10 @@ pub fn score_evidence_spans(
         .saturating_sub(overlapping_support_samples);
 
     Ok(EvidenceSpanResult {
+        trial_id: trial.trial_id.clone(),
+        source_audio_sha256: trial.source_audio_sha256.clone(),
+        sample_rate_hz: trial.sample_rate_hz,
+        sample_count: trial.sample_count,
         total_reference_claims: trial.reference_claims.len(),
         total_predicted_claims: trial.predicted_claims.len(),
         matched_claims,
