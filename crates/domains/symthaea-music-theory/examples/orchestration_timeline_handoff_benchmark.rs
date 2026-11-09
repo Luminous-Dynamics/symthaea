@@ -100,7 +100,7 @@ fn main() {
         ],
     };
 
-    let accepted = validate_orchestration_timeline(&score, &plan, &instruments);
+    let accepted = validate_orchestration_timeline(&score, &plan, &instruments, &plan.score_sha256);
     assert!(accepted.valid, "valid handoff rejected: {:?}", accepted.issues);
     println!(
         "PASS synthetic cello -> horn handoff: {} persistent part, {} segments, {} instrument instances",
@@ -109,7 +109,7 @@ fn main() {
 
     let mut crossing_score = score.clone();
     crossing_score.notes[0].duration = Duration::new(3, 1);
-    let rejected = validate_orchestration_timeline(&crossing_score, &plan, &instruments);
+    let rejected = validate_orchestration_timeline(&crossing_score, &plan, &instruments, &plan.score_sha256);
     assert!(!rejected.valid, "note crossing handoff was accepted");
     assert!(
         rejected.issues.iter().any(|issue| {
