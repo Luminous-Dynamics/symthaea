@@ -810,26 +810,24 @@ impl ContinuousHVGroupEnvelope {
             )
             .map_err(GroupEnvelopeError::ScoreInterval)?;
 
-        let decoded_bounds;
-        let (minima, maxima): (&[f32], &[f32]) =
-            if let (Some(minima), Some(maxima)) =
-                (&self.coordinate_minima, &self.coordinate_maxima)
-            {
-                (minima, maxima)
-            } else if let (Some(minima), Some(maxima)) =
-                (&self.coordinate_minima_u16, &self.coordinate_maxima_u16)
-            {
-                decoded_bounds = (
-                    minima.iter().copied().map(decode_lower_coordinate).collect::<Vec<_>>(),
-                    maxima.iter().copied().map(decode_upper_coordinate).collect::<Vec<_>>(),
-                );
-                (&decoded_bounds.0, &decoded_bounds.1)
-            } else {
-                return Ok(centroid_ball);
-            };
-        let component_box = query
-            .similarity_interval_full_resolution_for_component_bounds(minima, maxima)
-            .map_err(GroupEnvelopeError::ScoreInterval)?;
+        let component_box = match (
+            (&self.coordinate_minima, &self.coordinate_maxima),
+            (&self.coordinate_minima_u16, &self.coordinate_maxima_u16),
+        ) {
+            ((Some(minima), Some(maxima)), (None, None)) => query
+                .similarity_interval_full_resolution_for_component_bounds(minima, maxima)
+                .map_err(GroupEnvelopeError::ScoreInterval)?,
+            ((None, None), (Some(minima), Some(maxima))) => query
+                .similarity_interval_full_resolution_for_component_bounds_with(|index| {
+                    (
+                        decode_lower_coordinate(minima[index]),
+                        decode_upper_coordinate(maxima[index]),
+                    )
+                })
+                .map_err(GroupEnvelopeError::ScoreInterval)?,
+            ((None, None), (None, None)) => return Ok(centroid_ball),
+            _ => return Ok(ContinuousHVScoreInterval::uninformative()),
+        };
 
         // Both enclosures contain every member. Their intersection is also a
         // valid enclosure and is no wider than either synopsis independently.
