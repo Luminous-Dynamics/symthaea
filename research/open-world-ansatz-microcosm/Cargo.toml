@@ -1,0 +1,16 @@
+[package]
+name = "open-world-ansatz-microcosm"
+default-run = "open-world-ansatz-microcosm"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Executable finite-state reference world and exhaustive structural oracle"
+
+[workspace]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"

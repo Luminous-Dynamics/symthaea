@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/discoverphysics-protocol-audit-v0.schema.json",
+  "title": "DiscoverPhysics pinned protocol audit v0",
+  "type": "object",
+  "required": [
+    "audit_version",
+    "audit_date",
+    "status",
+    "benchmark_claim_allowed",
+    "upstream",
+    "source_files",
+    "thresholds",
+    "world_inventory",
+    "seed_and_aggregation",
+    "adapter_decision"
+  ],
+  "properties": {
+    "audit_version": {
+      "const": "discoverphysics-protocol-audit-v0"
+    },
+    "audit_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "enum": [
+        "blocked_on_protocol_parity",
+        "parity_confirmed"
+      ]
+    },
+    "benchmark_claim_allowed": {
+      "type": "boolean"
+    },
+    "upstream": {
+      "type": "object",
+      "required": [
+        "repository",
+        "commit_sha",
+        "signature_status",
+        "license"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "signature_status": {
+          "enum": [
+            "verified",
+            "unknown",
+            "invalid"
+          ]
+        },
+        "license": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "source_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "git_blob_sha",
+          "role"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "git_blob_sha": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "thresholds": {
+      "type": "object"
+    },
+    "world_inventory": {
+      "type": "object"
+    },
+    "seed_and_aggregation": {
+      "type": "object"
+    },
+    "adapter_decision": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}
