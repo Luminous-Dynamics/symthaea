@@ -184,14 +184,14 @@ where A is the dimensionless sampled probe-kick amplitude and phi is the initial
 
 `delta_t = -delta_phi / (2 pi f)`
 
-The conversion is undefined at f=0; this is a deliberate phase-nonidentifiable control.
+The conversion is undefined at f=0 because a static kick has no clock-offset interpretation. The phase remains a parameter through A cos(phi): at nonzero nominal phase, amplitude and phase are locally confounded, which is tested as a singular joint-Fisher control. At nominal phase zero, the first-order phase derivative vanishes, so the local FI alone does not reveal the global ambiguity.
 
 The implementation now runs matched nominal, +/-amplitude and +/-phase state-vector trajectories. It reports:
 - the 2x2 classical FI matrix for the exact N+1 total-down-spin readout outcomes;
 - the 2x2 pure-state QFIM for the same amplitude/phase parameterization;
 - amplitude information after eliminating phase as a nuisance using the Schur complement;
 - joint local CRLB covariance matrices when the parameter pair is identifiable;
-- the phase-to-clock-offset conversion in drive periods per radian;
+- the phase-to-clock-offset conversion in drive periods per radian (undefined for a static f=0 probe);
 - a positive-semidefinite matrix comparison of CFI against QFIM, separate from the existing scalar diagonal check.
 
 The known-phase scalar values remain available as the amplitude diagonal, but must be described as conditional. Do not use them as the amplitude sensitivity bound when phase is unknown. A singular joint matrix must not be hidden by falling back to the known-phase result.
@@ -206,7 +206,7 @@ An independent small-system Python reference for one representative six-spin con
 
 This is one finite-system synthetic setting, not a universal ratio, experiment reproduction or sensitivity result. It illustrates that the actual collective readout and phase nuisance can change the inferential value substantially; the QFI remains an upper bound, not achieved information.
 
-Acceptance requires independent analytic QFIM/CFI oracles, PSD checks, finite-difference convergence, phase-origin invariance, a zero-frequency control, and a matched known-phase versus unknown-phase comparison. The full experiment budget still needs preparation, readout, reset, dead time, time jitter, calibration drift and a conventional Ramsey/lock-in baseline before any sensitivity comparison.
+Acceptance requires independent analytic QFIM/CFI oracles, PSD checks, finite-difference convergence, phase-origin invariance, both zero-frequency nominal-phase and nonzero-phase confounding controls, and a matched known-phase versus unknown-phase comparison. The full experiment budget still needs preparation, readout, reset, dead time, time jitter, calibration drift and a conventional Ramsey/lock-in baseline before any sensitivity comparison.
 
 ## Claim ceiling
 
