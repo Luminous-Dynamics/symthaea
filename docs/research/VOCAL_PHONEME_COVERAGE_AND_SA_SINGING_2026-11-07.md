@@ -56,7 +56,7 @@ The current Muse English G2P is a small dictionary plus ASCII letter fallback. I
 
 ### Candidate A — Piper Plus G2P 0.5.3
 
-Piper Plus G2P 0.5.3 (26 October 2026) is a Rust crate documented as MIT-licensed and IPA-first. Its language backends include English (rule-based, CMUdict-derived), Japanese, Chinese, Korean, Spanish, French, Portuguese and Swedish. The direct output API includes IPA tokens and prosody; its separate encoder supports strict unknown-token behavior.
+Piper Plus G2P 0.5.3 (26 October 2026) is a Rust crate documented as MIT-licensed and IPA-first. Its language backends include English (CMUdict JSON lookup, ARPAbet-to-IPA rules, function-word destressing and suffix-based morphology), Japanese, Chinese, Korean, Spanish, French, Portuguese and Swedish. The Rust English source notes that truly OOV words without a morphology match produce no output. That makes OOV detection an explicit benchmark dimension, not a reason to trust all returned tokens. The direct output API includes IPA tokens and prosody; its separate encoder supports strict unknown-token behavior. The spike now enables `bundled-dicts` and uses `EnglishPhonemizer::new_bundled()` so CI does not rely on a preinstalled CMU dictionary file.
 
 This makes it a good *engineering candidate* for a reproducible spike, not yet a quality winner. Its English backend is itself rule/dictionary based. It does not cover isiZulu or isiXhosa, and a supported language label does not imply good singing pronunciation or dialect adaptation.
 
@@ -102,7 +102,8 @@ Do not use a library's own output as ground truth for scoring that library. For 
 
 ### Sources
 
-- Piper Plus G2P 0.5.3 documentation and feature/license details: https://docs.rs/crate/piper-plus-g2p/latest
+- Piper Plus G2P 0.5.3 documentation and feature/license details: https://docs.rs/crate/piper-plus-g2p/0.5.3
+- English implementation (CMUdict lookup, IPA mapping, OOV behavior): https://docs.rs/piper-plus-g2p/0.5.3/src/piper_plus_g2p/english.rs.html
 - CMUdict project and license/accuracy notice: https://github.com/cmusphinx/cmudict
 - Pure Rust eSpeak NG API and GPL-3.0-or-later license: https://github.com/eugenehp/espeak-ng-rs
 
