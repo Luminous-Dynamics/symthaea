@@ -27,6 +27,25 @@ The source snapshot date is **2026-11-09**. Each item below records the date pri
 
 A result captured on this page is a research lead until the upstream artifacts and exact protocol are pinned.
 
+
+## Benchmark validity is a prerequisite, not a reporting detail
+
+A June 2026 benchmark audit, presented at CoRL 2026, identifies four ways a manipulation benchmark can fail as a proxy for general capability:
+
+1. **Shortcut solvability:** a high score may be achievable without the capability the benchmark claims to test.
+2. **Statistical insignificance:** an aggregate score without episode-level outcomes, sample size and uncertainty cannot establish that a gain is real.
+3. **Creeping overfitting:** fixed task instances or narrow test distributions become tuning targets; small changes within the nominal training distribution expose brittleness.
+4. **Data-source dependence:** a score can reward training data collected close to the evaluation distribution rather than transferable skill.
+
+The paper audits LIBERO, CALVIN, SimplerEnv, RoboCasa and RoboTwin 2.0. In its analysis, only 19.8% of LIBERO and 19.7% of SimplerEnv SOTA claims were provably significant, compared with 53.3% for RoboCasa and 73.7% for RoboTwin 2.0. It also found a 0.09B probe without a language encoder could approach reported LIBERO SOTA, and resampling CALVIN block poses within the training range reduced average tasks completed from 4.17 to 3.14. These findings are specific to the audited paper/protocol; they do not invalidate every use of those benchmarks, and they do not establish that a different benchmark is automatically valid.
+
+Sources:
+- Paper: https://arxiv.org/abs/2606.04233
+- Diagnostics and artifacts: https://ripl.github.io/manipulation_benchmark_audit/
+- Code: https://github.com/ripl/ManipulationBenchmarkAudit
+
+**Luminous benchmark-entry gate:** every benchmark used to support a comparative claim must include (a) a capability-free / shortcut probe, (b) paired or otherwise justified statistical comparison with confidence intervals and raw numerators/denominators, (c) within-distribution perturbation plus held-out instance/scene tests, and (d) training-data proximity/overlap disclosure and a matched-data control. A benchmark failing a diagnostic can still be used for debugging, but its claim ceiling must be reduced accordingly. No headline average is promoted to general capability evidence until these diagnostics pass or the limitations are made explicit.
+
 ## External benchmark references
 
 ### RoboCasa365 — generalist multi-task manipulation
@@ -66,6 +85,21 @@ A separate public leaderboard aggregator shows a later protocol label, `robotwin
 Additional cross-reference: https://openstarmap.com/en/benchmarks/robotwin2
 
 **Luminous use:** target the C2R robustness gap, but report C2C and C2R separately; include the task-level distribution, severity/strata, and physical transfer. A high average must not hide a collapse on randomized conditions.
+
+
+### RMMBench — continuous-space navigation + manipulation
+
+**Paper:** https://arxiv.org/abs/2610.05414  
+**Project page:** https://mxxq-stack.github.io/rmmbench-project/  
+**Code:** https://github.com/mxxq-stack/RMMBench
+
+RMMBench evaluates language-instructed, long-horizon mobile manipulation in continuous spaces and combines localized manipulation with composite navigation. It is useful because it stresses spatial grounding and navigation/manipulation composition, complementing RoboCasa365's manipulation-heavy suite and RoboCasa-Mem's explicit history-dependent decision points.
+
+**Important source/version discrepancy:** the arXiv abstract describes 70 canonical task scenarios, while the current project page describes 90. Do not select either count by assumption. Freeze the exact code commit, asset pack, episode configuration and task manifest before adapting it.
+
+**Protocol aids and claim ceiling:** the project page describes head/wrist camera inputs, optional bird's-eye view, a Hanan-grid navigation interface, GraspNet-generated manipulation candidates, and a human-verified fallback candidate. The public GitHub README lists Python 3.10, dm_control/MuJoCo, a separate GraspNet installation/checkpoint and a configurable VLM server. A result should therefore disclose the exact skill library, candidate-generation aids, fallback availability, modalities, VLM endpoint/model and simulator revision. It must not be called pure end-to-end visual autonomy unless those aids are disabled and the policy still performs the relevant perception, grounding and action selection.
+
+**Luminous use:** add RMMBench as the spatial/mobile task suite, not as a memory-specific benchmark. Run separate modality strata (head/wrist only; optional BEV; LiDAR/geometry aid where the exact release supports it), navigation-only, manipulation-only and full composition. Measure localization errors, route completion, grasp/placement success, task progress, interventions, and recovery separately. Keep the upstream benchmark score separate from Luminous extensions. The upstream Python stack should remain an external adapter dependency; do not introduce its Python runtime into Symtropy's production Rust bridge.
 
 ### MOST — task-state memory for long-horizon mobile manipulation
 
