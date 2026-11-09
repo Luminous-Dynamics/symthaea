@@ -13,7 +13,7 @@
 // reads. It cannot establish physical disk I/O, page faults, cache residency,
 // or production compression ratios.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::hint::black_box;
 use std::time::Instant;
@@ -283,6 +283,22 @@ fn run() -> Result<(), String> {
     )
     .map_err(|error| format!("metadata estimate failed: {error}"))?;
 
+    for _ in 0..3 {
+        black_box(
+            select_group_refinement_set(&group_records, cfg.top_k, coverage)
+                .expect("defensive selector warmup must succeed"),
+        );
+        black_box(
+            select_group_refinement_set_with_partition_receipt(
+                &group_records,
+                cfg.top_k,
+                coverage,
+                &partition_receipt,
+            )
+            .expect("receipt-backed selector warmup must succeed"),
+        );
+    }
+
     let defensive_samples = timed_samples(cfg.repeats, || {
         let plan = select_group_refinement_set(
             black_box(&group_records),
@@ -360,10 +376,17 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("group selection failed: {error}"))?;
         group_select_samples.push(group_start.elapsed().as_nanos());
 
+        let selected_identities: BTreeSet<[u8; 32]> = group_plan
+            .refinement_groups
+            .iter()
+            .map(|identity| identity.member_set_digest)
+            .collect();
         let selected: BTreeMap<[u8; 32], usize> = group_records
             .iter()
             .enumerate()
-            .filter(|(_, group)| group_plan.refinement_groups.contains(&group.identity()))
+            .filter(|(_, group)| {
+                selected_identities.contains(&group.identity().member_set_digest)
+            })
             .map(|(index, group)| (group.identity().member_set_digest, index))
             .collect();
 
@@ -465,16 +488,22 @@ fn run() -> Result<(), String> {
     println!("group_partition_receipt_query_verification=O(G_log_G)");
     println!("receipt_selector_p50_ns={}", percentile_ns(&receipt_samples, 50));
     println!("receipt_selector_p95_ns={}", percentile_ns(&receipt_samples, 95));
+    println!("receipt_selector_p99_ns={}", percentile_ns(&receipt_samples, 99));
     println!("defensive_selector_p50_ns={}", percentile_ns(&defensive_samples, 50));
     println!("defensive_selector_p95_ns={}", percentile_ns(&defensive_samples, 95));
+    println!("defensive_selector_p99_ns={}", percentile_ns(&defensive_samples, 99));
     println!("stage1_group_select_p50_ns={}", percentile_ns(&group_select_samples, 50));
     println!("stage1_group_select_p95_ns={}", percentile_ns(&group_select_samples, 95));
+    println!("stage1_group_select_p99_ns={}", percentile_ns(&group_select_samples, 99));
     println!("member_interval_materialization_p50_ns={}", percentile_ns(&member_interval_samples, 50));
     println!("member_interval_materialization_p95_ns={}", percentile_ns(&member_interval_samples, 95));
+    println!("member_interval_materialization_p99_ns={}", percentile_ns(&member_interval_samples, 99));
     println!("hierarchical_selector_p50_ns={}", percentile_ns(&hierarchy_samples, 50));
     println!("hierarchical_selector_p95_ns={}", percentile_ns(&hierarchy_samples, 95));
+    println!("hierarchical_selector_p99_ns={}", percentile_ns(&hierarchy_samples, 99));
     println!("exact_rerank_p50_ns={}", percentile_ns(&exact_rerank_samples, 50));
     println!("exact_rerank_p95_ns={}", percentile_ns(&exact_rerank_samples, 95));
+    println!("exact_rerank_p99_ns={}", percentile_ns(&exact_rerank_samples, 99));
     println!("dataset_generation_ns={dataset_build_ns}");
     println!("group_envelope_build_ns={envelope_build_ns}");
     println!("partition_receipt_build_ns={partition_receipt_build_ns}");
