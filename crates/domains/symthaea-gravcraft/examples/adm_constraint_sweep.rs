@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("convention=K_ij=+0.5*(partial_i_beta_j+partial_j_beta_i)");
     println!("coordinates=(ct,x,y,z)=(0,15,0.5,0.25)_m");
     println!(
-        "step_m,K_trace_per_m,KijKij_per_m2,H_geometric_per_m2,rho_4d_per_m2,H_residual_per_m2,M_x_residual_per_m2,M_y_residual_per_m2,M_z_residual_per_m2,M_norm_per_m2"
+        "step_m,K_trace_per_m,KijKij_per_m2,H_geometric_per_m2,16pi_rho_4d_per_m2,H_residual_per_m2,Mgeo_x_per_m2,Mgeo_y_per_m2,Mgeo_z_per_m2,8pi_j_x_per_m2,8pi_j_y_per_m2,8pi_j_z_per_m2,Mres_x_per_m2,Mres_y_per_m2,Mres_z_per_m2,M_norm_per_m2"
     );
 
     for step_m in steps_m {
@@ -44,12 +44,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         field.derivative_step_m = step_m;
         let diagnostics = adm_constraint_diagnostics(&field, coordinates, 96)?;
         println!(
-            "{step_m:.9e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
+            "{step_m:.9e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e},{:.12e}",
             diagnostics.extrinsic_curvature_trace,
             diagnostics.extrinsic_curvature_squared,
             diagnostics.hamiltonian_geometric_term,
-            diagnostics.eulerian_energy_density,
+            16.0 * std::f64::consts::PI * diagnostics.eulerian_energy_density,
             diagnostics.hamiltonian_residual,
+            diagnostics.momentum_geometric_term[0],
+            diagnostics.momentum_geometric_term[1],
+            diagnostics.momentum_geometric_term[2],
+            8.0 * std::f64::consts::PI * diagnostics.eulerian_momentum_density[0],
+            8.0 * std::f64::consts::PI * diagnostics.eulerian_momentum_density[1],
+            8.0 * std::f64::consts::PI * diagnostics.eulerian_momentum_density[2],
             diagnostics.momentum_constraint_residual[0],
             diagnostics.momentum_constraint_residual[1],
             diagnostics.momentum_constraint_residual[2],
