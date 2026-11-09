@@ -200,7 +200,15 @@ pub enum AvailabilityProofKind {
 /// must use Unverifiable in v0.1; never coerce them to midnight or invent a release time.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AvailabilityProof {
-    Verified { proof_ref: String, kind: AvailabilityProofKind, evidence_id: String, principal_id: String, available_at: Timestamp },
+    Verified {
+        proof_ref: String,
+        kind: AvailabilityProofKind,
+        evidence_id: String,
+        principal_id: String,
+        available_at: Timestamp,
+        verifier_id: String,
+        verifier_build_sha256: String,
+    },
     Missing,
     Unverifiable,
 }
@@ -278,6 +286,7 @@ pub enum ReasonCode {
     AvailabilityProofUnverifiable,
     AvailabilityProofIdentityMismatch,
     AvailabilityProofTimeMismatch,
+    AvailabilityProofMalformedVerifier,
     RetrievedBeforeKnownAt,
     FutureKnownEvidence,
     LateIngestion,
@@ -310,6 +319,7 @@ impl ReasonCode {
             Self::AvailabilityProofUnverifiable => "AVAILABILITY_PROOF_UNVERIFIABLE",
             Self::AvailabilityProofIdentityMismatch => "AVAILABILITY_PROOF_IDENTITY_MISMATCH",
             Self::AvailabilityProofTimeMismatch => "AVAILABILITY_PROOF_TIME_MISMATCH",
+            Self::AvailabilityProofMalformedVerifier => "AVAILABILITY_PROOF_MALFORMED_VERIFIER",
             Self::RetrievedBeforeKnownAt => "RETRIEVED_BEFORE_KNOWN_AT",
             Self::FutureKnownEvidence => "FUTURE_KNOWN_EVIDENCE",
             Self::LateIngestion => "LATE_INGESTION",
@@ -493,9 +503,24 @@ pub fn evaluate_evidence(record: &EvidenceVersion, context: &EvaluationContext) 
         indeterminate = true;
     }
     match &record.availability_proof {
-        AvailabilityProof::Verified { proof_ref, evidence_id, principal_id, available_at, .. } => {
+        AvailabilityProof::Verified {
+            proof_ref,
+            evidence_id,
+            principal_id,
+            available_at,
+            verifier_id,
+            verifier_build_sha256,
+            ..
+        } => {
             if proof_ref.trim().is_empty() || evidence_id != &record.evidence_id || principal_id != &context.principal_id {
                 reasons.push(ReasonCode::AvailabilityProofIdentityMismatch);
+                failed = true;
+            }
+            if verifier_id.trim().is_empty()
+                || verifier_build_sha256.len() != 64
+                || !verifier_build_sha256.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            {
+                reasons.push(ReasonCode::AvailabilityProofMalformedVerifier);
                 failed = true;
             }
             if record.known_at.is_some_and(|known_at| known_at != *available_at) {
@@ -694,6 +719,8 @@ mod tests {
                 evidence_id: id.into(),
                 principal_id: "researcher:public-profile".into(),
                 available_at: known_at,
+                verifier_id: "mycelix-availability-verifier:v1".into(),
+                verifier_build_sha256: "b".repeat(64),
             },
             supersedes: Vec::new(),
         }
@@ -812,6 +839,31 @@ mod tests {
         assert_eq!(evaluate_evidence(&unknown, &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")).disposition, Disposition::Indeterminate);
     }
 
+
+
+    #[test]
+    fn availability_proof_requires_verifier_identity_and_build_digest() {
+        let mut record = evidence(
+            "evidence:availability-bad-verifier",
+            "2026-11-08T09:00:00Z",
+            "2026-11-08T09:05:00Z",
+        );
+        if let AvailabilityProof::Verified {
+            verifier_id,
+            verifier_build_sha256,
+            ..
+        } = &mut record.availability_proof
+        {
+            verifier_id.clear();
+            *verifier_build_sha256 = "not-a-digest".into();
+        }
+        let result = evaluate_evidence(
+            &record,
+            &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"),
+        );
+        assert_eq!(result.disposition, Disposition::Fail);
+        assert!(result.reasons.contains(&ReasonCode::AvailabilityProofMalformedVerifier));
+    }
 
     #[test]
     fn rights_proof_is_bound_to_principal_profile_and_decision_frontier() {
