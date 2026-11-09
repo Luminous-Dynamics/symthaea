@@ -1020,9 +1020,7 @@ const NUMERIC_BEHAVIORAL_EQUIVALENCE_HORIZON: usize = 4;
 /// candidate ModelHypothesis::predict implementation. All possible length-4
 /// intervention sequences are included, so a parameter/sensor reparameterization
 /// is recognized when it is observationally identical over the declared domain.
-fn numeric_truth_signature(
-    truth: &numeric::ModelHypothesis,
-) -> Result<Vec<i64>, ProtocolError> {
+fn numeric_truth_signature(truth: &numeric::ModelHypothesis) -> Result<Vec<i64>, ProtocolError> {
     let horizon = NUMERIC_BEHAVIORAL_EQUIVALENCE_HORIZON;
     let sequence_count = numeric::INPUT_LEVELS.len().pow(horizon as u32);
     let mut signature = Vec::with_capacity(sequence_count * horizon);
