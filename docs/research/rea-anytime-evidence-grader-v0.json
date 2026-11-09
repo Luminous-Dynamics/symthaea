@@ -1,0 +1,823 @@
+{
+  "schema_version": "0.1.0",
+  "dataset_id": "rea-anytime-evidence-acquisition",
+  "status": "design_fixture_only",
+  "source_policy": "grader_only_synthetic_events",
+  "access_policy": "never_mount_in_agent_workspace",
+  "not_human_adjudicated": true,
+  "episodes": [
+    {
+      "episode_id": "REA-STOP-001",
+      "world_state_oracle": "firmware_vulnerable",
+      "events": [
+        {
+          "event_id": "001-e1",
+          "trigger_kind": "observed_action",
+          "action_id": "static_function_probe",
+          "outcome": "function_found",
+          "obligation_updates": [],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "001-e2",
+          "trigger_kind": "observed_action",
+          "action_id": "verify_deployment_manifest",
+          "outcome": "digest_match",
+          "obligation_updates": [
+            {
+              "obligation_id": "deployment_binding",
+              "resulting_status": "satisfied",
+              "evidence_class": "deployment_manifest",
+              "source_family_id": "synthetic:deployment-ledger-001"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "001-e3",
+          "trigger_kind": "observed_action",
+          "action_id": "controlled_reproduction",
+          "outcome": "reproduced",
+          "obligation_updates": [
+            {
+              "obligation_id": "behavior_reproduction",
+              "resulting_status": "satisfied",
+              "evidence_class": "isolated_target_reproduction",
+              "source_family_id": "synthetic:lab-repro-001"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "001-e4",
+          "trigger_kind": "observed_action",
+          "action_id": "negative_control",
+          "outcome": "control_pass",
+          "obligation_updates": [],
+          "duty_updates": [
+            {
+              "duty_id": "negative_control_complete",
+              "resulting_status": "satisfied",
+              "evidence_class": "authorized_negative_control",
+              "source_family_id": "synthetic:negative-control-001"
+            }
+          ],
+          "invalidated_evidence_ids": []
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 1,
+          "decision": "continue",
+          "claim_id": null,
+          "action_id": "verify_deployment_manifest",
+          "reason": "Static function discovery does not close target binding or behavior."
+        },
+        {
+          "after_event_index": 3,
+          "decision": "continue",
+          "claim_id": null,
+          "action_id": "negative_control",
+          "reason": "The stronger claim still has an unrun defeater duty."
+        },
+        {
+          "after_event_index": 4,
+          "decision": "stop_ready",
+          "claim_id": "deployed_firmware_is_vulnerable",
+          "action_id": null,
+          "reason": "All proof obligations and the declared challenge are satisfied."
+        }
+      ],
+      "final_ready_claim_id": "deployed_firmware_is_vulnerable"
+    },
+    {
+      "episode_id": "REA-STOP-002",
+      "world_state_oracle": "counterexample_invalidates_claim",
+      "events": [
+        {
+          "event_id": "002-e1",
+          "trigger_kind": "external_update",
+          "action_id": null,
+          "outcome": "independent_counterexample_arrived",
+          "obligation_updates": [
+            {
+              "obligation_id": "vulnerability_reproduction",
+              "resulting_status": "conflicted",
+              "evidence_class": "independent_counterexample",
+              "source_family_id": "synthetic:counterexample-root-002"
+            }
+          ],
+          "duty_updates": [
+            {
+              "duty_id": "counterexample_search_complete",
+              "resulting_status": "failed",
+              "evidence_class": "independent_negative_test",
+              "source_family_id": "synthetic:counterexample-root-002"
+            }
+          ],
+          "invalidated_evidence_ids": [
+            "ev-repro-002"
+          ]
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 0,
+          "decision": "stop_ready",
+          "claim_id": "current_release_vulnerable",
+          "action_id": null,
+          "reason": "Initial evidence supports readiness before the update."
+        },
+        {
+          "after_event_index": 1,
+          "decision": "stop_unresolved",
+          "claim_id": null,
+          "action_id": null,
+          "reason": "The independent counterexample revokes readiness."
+        }
+      ],
+      "final_ready_claim_id": "package_advisory_match"
+    },
+    {
+      "episode_id": "REA-STOP-003",
+      "world_state_oracle": "same_upstream_root",
+      "events": [
+        {
+          "event_id": "003-e1",
+          "trigger_kind": "external_update",
+          "action_id": null,
+          "outcome": "lineage_disclosure",
+          "obligation_updates": [
+            {
+              "obligation_id": "source_independence",
+              "resulting_status": "conflicted",
+              "evidence_class": "lineage_audit",
+              "source_family_id": "synthetic:lineage-audit-003"
+            }
+          ],
+          "duty_updates": [
+            {
+              "duty_id": "lineage_challenge_complete",
+              "resulting_status": "failed",
+              "evidence_class": "dependency_lineage_audit",
+              "source_family_id": "synthetic:lineage-audit-003"
+            }
+          ],
+          "invalidated_evidence_ids": [
+            "ev-feed-a",
+            "ev-feed-b"
+          ]
+        },
+        {
+          "event_id": "003-e2",
+          "trigger_kind": "observed_action",
+          "action_id": "obtain_independent_record",
+          "outcome": "corroborates",
+          "obligation_updates": [
+            {
+              "obligation_id": "source_independence",
+              "resulting_status": "satisfied",
+              "evidence_class": "independent_primary_record",
+              "source_family_id": "synthetic:independent-root-003"
+            }
+          ],
+          "duty_updates": [
+            {
+              "duty_id": "lineage_challenge_complete",
+              "resulting_status": "satisfied",
+              "evidence_class": "independent_primary_record",
+              "source_family_id": "synthetic:independent-root-003"
+            }
+          ],
+          "invalidated_evidence_ids": []
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 0,
+          "decision": "stop_ready",
+          "claim_id": "independent_sources_corroborate",
+          "action_id": null,
+          "reason": "Initial lineage assertions appear sufficient."
+        },
+        {
+          "after_event_index": 1,
+          "decision": "continue",
+          "claim_id": null,
+          "action_id": "obtain_independent_record",
+          "reason": "Late common-root evidence revokes independence."
+        },
+        {
+          "after_event_index": 2,
+          "decision": "stop_ready",
+          "claim_id": "independent_sources_corroborate",
+          "action_id": null,
+          "reason": "An independent primary record closes the reopened obligation."
+        }
+      ],
+      "final_ready_claim_id": "independent_sources_corroborate"
+    },
+    {
+      "episode_id": "REA-STOP-004",
+      "world_state_oracle": "current_release_superseded",
+      "events": [
+        {
+          "event_id": "004-e1",
+          "trigger_kind": "external_update",
+          "action_id": null,
+          "outcome": "supersession_notice",
+          "obligation_updates": [
+            {
+              "obligation_id": "current_release_validity",
+              "resulting_status": "stale",
+              "evidence_class": "supersession_history",
+              "source_family_id": "synthetic:supersession-004"
+            }
+          ],
+          "duty_updates": [
+            {
+              "duty_id": "supersession_check_complete",
+              "resulting_status": "satisfied",
+              "evidence_class": "supersession_history",
+              "source_family_id": "synthetic:supersession-004b"
+            }
+          ],
+          "invalidated_evidence_ids": [
+            "ev-current-004"
+          ]
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 0,
+          "decision": "stop_ready",
+          "claim_id": "current_version_is_affected",
+          "action_id": null,
+          "reason": "Current evidence initially supports the current-version claim."
+        },
+        {
+          "after_event_index": 1,
+          "decision": "stop_bounded",
+          "claim_id": "historical_version_was_affected",
+          "action_id": null,
+          "reason": "Current applicability is stale; historical validity remains."
+        }
+      ],
+      "final_ready_claim_id": "historical_version_was_affected"
+    },
+    {
+      "episode_id": "REA-STOP-005",
+      "world_state_oracle": "artifact_digest_mismatch",
+      "events": [
+        {
+          "event_id": "005-e1",
+          "trigger_kind": "observed_action",
+          "action_id": "independent_reacquisition",
+          "outcome": "different_digest",
+          "obligation_updates": [
+            {
+              "obligation_id": "artifact_identity",
+              "resulting_status": "conflicted",
+              "evidence_class": "independent_artifact_reacquisition",
+              "source_family_id": "synthetic:second-acquisition-005"
+            },
+            {
+              "obligation_id": "behavior_reproduction",
+              "resulting_status": "stale",
+              "evidence_class": "independent_artifact_reacquisition",
+              "source_family_id": "synthetic:second-acquisition-005"
+            }
+          ],
+          "duty_updates": [
+            {
+              "duty_id": "artifact_binding_challenge",
+              "resulting_status": "failed",
+              "evidence_class": "independent_artifact_reacquisition",
+              "source_family_id": "synthetic:second-acquisition-005"
+            }
+          ],
+          "invalidated_evidence_ids": [
+            "ev-hash-005",
+            "ev-behavior-005"
+          ]
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 0,
+          "decision": "stop_ready",
+          "claim_id": "behavior_verified_for_exact_artifact",
+          "action_id": null,
+          "reason": "Initial artifact-bound result appears ready."
+        },
+        {
+          "after_event_index": 1,
+          "decision": "stop_bounded",
+          "claim_id": "provider_report_reproduced",
+          "action_id": null,
+          "reason": "Digest mismatch invalidates artifact and behavior descendants, but not the provider report."
+        }
+      ],
+      "final_ready_claim_id": "provider_report_reproduced"
+    },
+    {
+      "episode_id": "REA-STOP-006",
+      "world_state_oracle": "one_session_only_no_event",
+      "events": [
+        {
+          "event_id": "006-e1",
+          "trigger_kind": "observed_action",
+          "action_id": "capture_complete_session",
+          "outcome": "no_network_event",
+          "obligation_updates": [
+            {
+              "obligation_id": "session_log_complete",
+              "resulting_status": "satisfied",
+              "evidence_class": "complete_session_log",
+              "source_family_id": "synthetic:session-006"
+            },
+            {
+              "obligation_id": "event_absence_in_session",
+              "resulting_status": "satisfied",
+              "evidence_class": "complete_session_log",
+              "source_family_id": "synthetic:session-006"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "006-e2",
+          "trigger_kind": "observed_action",
+          "action_id": "verify_session_integrity",
+          "outcome": "integrity_valid",
+          "obligation_updates": [],
+          "duty_updates": [
+            {
+              "duty_id": "session_integrity_check",
+              "resulting_status": "satisfied",
+              "evidence_class": "session_integrity_verification",
+              "source_family_id": "synthetic:session-006-integrity"
+            }
+          ],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "006-e3",
+          "trigger_kind": "observed_action",
+          "action_id": "run_cross_condition_tests",
+          "outcome": "not_executable",
+          "obligation_updates": [],
+          "duty_updates": [
+            {
+              "duty_id": "cross_condition_negative_tests",
+              "resulting_status": "unavailable",
+              "evidence_class": "authorized_negative_test",
+              "source_family_id": "synthetic:cross-condition-006"
+            }
+          ],
+          "invalidated_evidence_ids": []
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 2,
+          "decision": "stop_bounded",
+          "claim_id": "no_network_event_in_session",
+          "action_id": null,
+          "reason": "The bounded session claim is ready; universal absence is not."
+        }
+      ],
+      "final_ready_claim_id": "no_network_event_in_session"
+    },
+    {
+      "episode_id": "REA-STOP-007",
+      "world_state_oracle": "control_has_counterexample",
+      "events": [
+        {
+          "event_id": "007-e1",
+          "trigger_kind": "observed_action",
+          "action_id": "execute_negative_control",
+          "outcome": "counterexample_found",
+          "obligation_updates": [
+            {
+              "obligation_id": "control_behavior",
+              "resulting_status": "contradicted",
+              "evidence_class": "authorized_negative_control",
+              "source_family_id": "synthetic:control-counterexample-007"
+            }
+          ],
+          "duty_updates": [
+            {
+              "duty_id": "negative_control_complete",
+              "resulting_status": "failed",
+              "evidence_class": "authorized_negative_control",
+              "source_family_id": "synthetic:control-counterexample-007"
+            }
+          ],
+          "invalidated_evidence_ids": [
+            "ev-control-007"
+          ]
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 0,
+          "decision": "continue",
+          "claim_id": null,
+          "action_id": "execute_negative_control",
+          "reason": "Mandatory challenge duty remains unrun."
+        },
+        {
+          "after_event_index": 1,
+          "decision": "stop_bounded",
+          "claim_id": "control_passed_initial_test",
+          "action_id": null,
+          "reason": "The strong claim fails; the historical initial-test result remains valid."
+        }
+      ],
+      "final_ready_claim_id": "control_passed_initial_test"
+    },
+    {
+      "episode_id": "REA-STOP-008",
+      "world_state_oracle": "cause_unknown_budget_exhausted",
+      "events": [
+        {
+          "event_id": "008-e1",
+          "trigger_kind": "observed_action",
+          "action_id": "read_only_log_review",
+          "outcome": "incomplete",
+          "obligation_updates": [],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 0,
+          "decision": "stop_unresolved",
+          "claim_id": null,
+          "action_id": null,
+          "reason": "No eligible experiment fits the action and cost budget."
+        }
+      ],
+      "final_ready_claim_id": null
+    },
+    {
+      "episode_id": "REA-STOP-009",
+      "world_state_oracle": "staging_fault_reproducible",
+      "events": [
+        {
+          "event_id": "009-e1",
+          "trigger_kind": "observed_action",
+          "action_id": "authorized_staging_probe",
+          "outcome": "reproduced",
+          "obligation_updates": [
+            {
+              "obligation_id": "fault_reproduction",
+              "resulting_status": "satisfied",
+              "evidence_class": "authorized_staging_reproduction",
+              "source_family_id": "synthetic:staging-probe-009"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 0,
+          "decision": "continue",
+          "claim_id": null,
+          "action_id": "authorized_staging_probe",
+          "reason": "The production restart is denied and irreversible."
+        },
+        {
+          "after_event_index": 1,
+          "decision": "stop_ready",
+          "claim_id": "fault_reproduced_in_staging",
+          "action_id": null,
+          "reason": "Authorized staging observation closes the scoped claim."
+        }
+      ],
+      "final_ready_claim_id": "fault_reproduced_in_staging"
+    },
+    {
+      "episode_id": "REA-STOP-010",
+      "world_state_oracle": "one_member_unprocessable",
+      "events": [
+        {
+          "event_id": "010-e1",
+          "trigger_kind": "observed_action",
+          "action_id": "retry_unsupported_member",
+          "outcome": "still_unsupported",
+          "obligation_updates": [
+            {
+              "obligation_id": "processing_complete",
+              "resulting_status": "incomplete",
+              "evidence_class": "per_member_processing_ledger",
+              "source_family_id": "synthetic:reader-retry-010"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 0,
+          "decision": "stop_bounded",
+          "claim_id": "archive_inventory_is_complete",
+          "action_id": null,
+          "reason": "Enumeration is ready; processing remains unresolved."
+        },
+        {
+          "after_event_index": 1,
+          "decision": "stop_bounded",
+          "claim_id": "archive_inventory_is_complete",
+          "action_id": null,
+          "reason": "Reader retry confirms a processing gap."
+        }
+      ],
+      "final_ready_claim_id": "archive_inventory_is_complete"
+    },
+    {
+      "episode_id": "REA-STOP-011",
+      "world_state_oracle": "two_tools_same_session_one_acquisition",
+      "events": [
+        {
+          "event_id": "011-e1",
+          "trigger_kind": "observed_action",
+          "action_id": "run_second_tool_same_mount",
+          "outcome": "same_result",
+          "obligation_updates": [
+            {
+              "obligation_id": "independent_acquisition",
+              "resulting_status": "unknown",
+              "evidence_class": "same_session_derived_observation",
+              "source_family_id": "synthetic:session-root-011"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "011-e2",
+          "trigger_kind": "observed_action",
+          "action_id": "audit_acquisition_lineage",
+          "outcome": "same_session",
+          "obligation_updates": [
+            {
+              "obligation_id": "independent_acquisition",
+              "resulting_status": "unknown",
+              "evidence_class": "same_session_derived_observation",
+              "source_family_id": "synthetic:session-root-011"
+            }
+          ],
+          "duty_updates": [
+            {
+              "duty_id": "acquisition_lineage_audit",
+              "resulting_status": "failed",
+              "evidence_class": "acquisition_lineage_audit",
+              "source_family_id": "synthetic:session-root-011"
+            }
+          ],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "011-e3",
+          "trigger_kind": "observed_action",
+          "action_id": "independent_device_acquisition",
+          "outcome": "same_digest",
+          "obligation_updates": [
+            {
+              "obligation_id": "independent_acquisition",
+              "resulting_status": "satisfied",
+              "evidence_class": "independent_target_acquisition",
+              "source_family_id": "synthetic:independent-device-011"
+            }
+          ],
+          "duty_updates": [
+            {
+              "duty_id": "acquisition_lineage_audit",
+              "resulting_status": "satisfied",
+              "evidence_class": "independent_target_acquisition",
+              "source_family_id": "synthetic:independent-device-011"
+            }
+          ],
+          "invalidated_evidence_ids": []
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 1,
+          "decision": "continue",
+          "claim_id": null,
+          "action_id": "audit_acquisition_lineage",
+          "reason": "Different tools on one mounted image do not prove independent acquisition."
+        },
+        {
+          "after_event_index": 2,
+          "decision": "continue",
+          "claim_id": null,
+          "action_id": "independent_device_acquisition",
+          "reason": "The lineage audit reveals a shared session."
+        },
+        {
+          "after_event_index": 3,
+          "decision": "stop_ready",
+          "claim_id": "independent_acquisitions_corroborate_behavior",
+          "action_id": null,
+          "reason": "Independent device acquisition closes the remaining obligation."
+        }
+      ],
+      "final_ready_claim_id": "independent_acquisitions_corroborate_behavior"
+    },
+    {
+      "episode_id": "REA-STOP-012",
+      "world_state_oracle": "all_three_criteria_hold",
+      "events": [
+        {
+          "event_id": "012-e1",
+          "trigger_kind": "observed_action",
+          "action_id": "acquire_digest",
+          "outcome": "digest_match",
+          "obligation_updates": [
+            {
+              "obligation_id": "artifact_identity",
+              "resulting_status": "satisfied",
+              "evidence_class": "locally_computed_digest",
+              "source_family_id": "synthetic:digest-012"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "012-e2",
+          "trigger_kind": "observed_action",
+          "action_id": "acquire_independent_measurement",
+          "outcome": "corroborates",
+          "obligation_updates": [
+            {
+              "obligation_id": "source_independence",
+              "resulting_status": "satisfied",
+              "evidence_class": "independent_measurement",
+              "source_family_id": "synthetic:measurement-012"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "012-e3",
+          "trigger_kind": "observed_action",
+          "action_id": "resolve_current_record",
+          "outcome": "current",
+          "obligation_updates": [
+            {
+              "obligation_id": "current_validity",
+              "resulting_status": "satisfied",
+              "evidence_class": "current_vendor_record",
+              "source_family_id": "synthetic:current-record-012"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 3,
+          "decision": "stop_ready",
+          "claim_id": "current_package_claim",
+          "action_id": null,
+          "reason": "All current proof obligations are satisfied."
+        }
+      ],
+      "final_ready_claim_id": "current_package_claim"
+    },
+    {
+      "episode_id": "REA-STOP-013",
+      "world_state_oracle": "all_three_criteria_hold",
+      "events": [
+        {
+          "event_id": "013-e1",
+          "trigger_kind": "observed_action",
+          "action_id": "resolve_current_record",
+          "outcome": "current",
+          "obligation_updates": [
+            {
+              "obligation_id": "current_validity",
+              "resulting_status": "satisfied",
+              "evidence_class": "current_vendor_record",
+              "source_family_id": "synthetic:current-record-013"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "013-e2",
+          "trigger_kind": "observed_action",
+          "action_id": "acquire_independent_measurement",
+          "outcome": "corroborates",
+          "obligation_updates": [
+            {
+              "obligation_id": "source_independence",
+              "resulting_status": "satisfied",
+              "evidence_class": "independent_measurement",
+              "source_family_id": "synthetic:measurement-013"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        },
+        {
+          "event_id": "013-e3",
+          "trigger_kind": "observed_action",
+          "action_id": "acquire_digest",
+          "outcome": "digest_match",
+          "obligation_updates": [
+            {
+              "obligation_id": "artifact_identity",
+              "resulting_status": "satisfied",
+              "evidence_class": "locally_computed_digest",
+              "source_family_id": "synthetic:digest-013"
+            }
+          ],
+          "duty_updates": [],
+          "invalidated_evidence_ids": []
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 3,
+          "decision": "stop_ready",
+          "claim_id": "current_package_claim",
+          "action_id": null,
+          "reason": "Same final evidence state, different action order."
+        }
+      ],
+      "final_ready_claim_id": "current_package_claim"
+    },
+    {
+      "episode_id": "REA-STOP-014",
+      "world_state_oracle": "api_snapshot_has_late_page_gap",
+      "events": [
+        {
+          "event_id": "014-e1",
+          "trigger_kind": "external_update",
+          "action_id": null,
+          "outcome": "retention_audit_gap",
+          "obligation_updates": [
+            {
+              "obligation_id": "page_chain_complete",
+              "resulting_status": "incomplete",
+              "evidence_class": "retention_audit",
+              "source_family_id": "synthetic:retention-audit-014"
+            },
+            {
+              "obligation_id": "acquisition_complete",
+              "resulting_status": "incomplete",
+              "evidence_class": "retention_audit",
+              "source_family_id": "synthetic:retention-audit-014"
+            }
+          ],
+          "duty_updates": [
+            {
+              "duty_id": "retention_gap_challenge",
+              "resulting_status": "failed",
+              "evidence_class": "retention_audit",
+              "source_family_id": "synthetic:retention-audit-014"
+            }
+          ],
+          "invalidated_evidence_ids": [
+            "ev-page-chain-014",
+            "ev-acquire-014"
+          ]
+        }
+      ],
+      "checkpoints": [
+        {
+          "after_event_index": 0,
+          "decision": "stop_ready",
+          "claim_id": "whole_snapshot_was_acquired",
+          "action_id": null,
+          "reason": "Initial reconciliation appears complete."
+        },
+        {
+          "after_event_index": 1,
+          "decision": "stop_bounded",
+          "claim_id": "query_definition_is_bound",
+          "action_id": null,
+          "reason": "A late gap revokes whole-snapshot completeness."
+        }
+      ],
+      "final_ready_claim_id": "query_definition_is_bound"
+    }
+  ]
+}
