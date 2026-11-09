@@ -227,9 +227,57 @@ impl VehicleTrainer {
         physics: &mut dyn VehiclePhysicsSimulator,
         episode: usize,
     ) -> EpisodeMetrics {
+        self.run_episode_with_sim_mode(encoder, controller, fep_agent, physics, episode, true)
+    }
+
+    /// Run a frozen-policy evaluation episode with any physics simulator.
+    ///
+    /// This path disables PD action blending, BPTT supervision, replay updates
+    /// and exploration noise. Simulator-oracle targets may still be retained
+    /// for outcome/reward measurement, but are not passed to the policy or
+    /// training target. The student still consumes the existing simulated
+    /// VehicleState vector; this is not a local-sensor-only deployment test.
+    pub fn run_evaluation_episode_with_sim(
+        &self,
+        encoder: &mut VehicleHdcEncoder,
+        controller: &mut VehicleController,
+        fep_agent: &mut ActiveInferenceVehicleAgent,
+        physics: &mut dyn VehiclePhysicsSimulator,
+        episode: usize,
+    ) -> EpisodeMetrics {
+        self.run_episode_with_sim_mode(encoder, controller, fep_agent, physics, episode, false)
+    }
+
+    /// Run a frozen-policy evaluation episode using the bicycle-model simulator.
+    pub fn run_evaluation_episode(
+        &self,
+        encoder: &mut VehicleHdcEncoder,
+        controller: &mut VehicleController,
+        fep_agent: &mut ActiveInferenceVehicleAgent,
+        episode: usize,
+    ) -> EpisodeMetrics {
+        let mut physics = BicycleModelSimulator::at_speed(self.config.init_speed());
+        self.run_evaluation_episode_with_sim(encoder, controller, fep_agent, &mut physics, episode)
+    }
+
+    fn run_episode_with_sim_mode(
+        &self,
+        encoder: &mut VehicleHdcEncoder,
+        controller: &mut VehicleController,
+        fep_agent: &mut ActiveInferenceVehicleAgent,
+        physics: &mut dyn VehiclePhysicsSimulator,
+        episode: usize,
+        train_controller: bool,
+    ) -> EpisodeMetrics {
         let dt = self.config.physics_dt();
         let cognitive_interval = self.config.cognitive_interval();
-        let (task, pd_weight, target_speed, use_perturbations) = self.curriculum(episode);
+        let (task, curriculum_pd_weight, target_speed, use_perturbations) = self.curriculum(episode);
+        // Evaluation never inherits the curriculum's teacher blend.
+        let pd_weight = if train_controller {
+            curriculum_pd_weight
+        } else {
+            0.0
+        };
 
         // For EmergencyStop: PD teacher, reward, and FEP all target zero speed,
         // even though the sim starts at cruising speed (init_speed).
@@ -443,8 +491,8 @@ impl VehicleTrainer {
             let sensor_hv = encoder.encode(&state);
             let student_proposal_command = controller.forward(&sensor_hv, dt as f32);
             let train_this_step = step % self.config.train_every == 0;
-            let teacher_action_needed =
-                pd_weight > 0.01 || train_this_step || self.config.collect_telemetry;
+            let teacher_action_needed = train_controller
+                && (pd_weight > 0.01 || train_this_step || self.config.collect_telemetry);
             let teacher_command = if teacher_action_needed {
                 Some(match task {
                     VehicleTask::Follow { target_gap } => pd_cruise_with_follow(
@@ -484,10 +532,13 @@ impl VehicleTrainer {
             }
             let blended_action_command = command;
 
-            // Add exploration noise after recording the pre-noise blended proposal.
-            if let Some(noise) = &fep_result.exploration_noise {
-                command = command.with_noise(*noise);
-                exploration_count += 1;
+            // Training may explore; frozen-policy evaluation is deterministic
+            // with respect to the controller proposal and has no exploration noise.
+            if train_controller {
+                if let Some(noise) = &fep_result.exploration_noise {
+                    command = command.with_noise(*noise);
+                    exploration_count += 1;
+                }
             }
             let executed_action_command = command;
 
@@ -552,6 +603,12 @@ impl VehicleTrainer {
                         .map(|target| target.relative_speed_mps()),
                     follow_oracle_snapshot_age_s: follow_oracle_target
                         .map(|target| (state.timestamp - target.snapshot_time_s()).max(0.0)),
+                    training_enabled: train_controller,
+                    follow_oracle_used_for_policy: follow_oracle_target.is_some()
+                        && (teacher_action_used_for_blend
+                            || (train_controller
+                                && train_this_step
+                                && teacher_command.is_some())),
                     student_proposal_steering: student_proposal_command.steering,
                     student_proposal_throttle: student_proposal_command.throttle,
                     student_proposal_brake: student_proposal_command.brake,
@@ -565,7 +622,9 @@ impl VehicleTrainer {
                             / 3.0
                     }),
                     teacher_action_used_for_blend,
-                    teacher_action_used_for_supervision: train_this_step && teacher_command.is_some(),
+                    teacher_action_used_for_supervision: train_controller
+                        && train_this_step
+                        && teacher_command.is_some(),
                     pd_teacher_blend_weight,
                     blended_action_steering: blended_action_command.steering,
                     blended_action_throttle: blended_action_command.throttle,
@@ -577,7 +636,7 @@ impl VehicleTrainer {
             }
 
             // -- TRAINING (every train_every steps, 50Hz) --
-            if train_this_step {
+            if train_controller && train_this_step {
                 let target = teacher_command
                     .expect("training step must have a computed teacher target");
 
