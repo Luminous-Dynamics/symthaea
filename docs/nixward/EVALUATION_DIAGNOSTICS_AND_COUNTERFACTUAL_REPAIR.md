@@ -43,6 +43,30 @@ are warnings and do not become the primary failure. The parser does not invoke
 Nix, read configuration files, inspect credentials, write files, update
 flake.lock, or authorize system changes.
 
+## CLI use
+
+The read-only CLI accepts a captured stderr file or stdin:
+
+```bash
+# Capture a non-activating build/evaluation attempt.
+sudo nixos-rebuild build --flake /etc/nixos#luminous-laptop --show-trace 2> rebuild.stderr
+
+# Human-readable diagnosis.
+nixward diagnose rebuild.stderr
+
+# Machine-readable report.
+nixward --format json diagnose rebuild.stderr
+
+# Or pipe a captured log; no file is read implicitly.
+cat rebuild.stderr | nixward --format json diagnose
+```
+
+The command does not invoke Nix or read the host configuration. It only
+analyzes the bytes supplied by the operator. JSON output includes every
+recognized finding, raw evidence lines, source frames, and review prompts.
+It exits non-zero when a fatal diagnostic is recognized; warnings alone do
+not fail the command.
+
 ## Paradigm shift: diagnose a system transition, not a terminal message
 
 The intended control loop is:
@@ -156,9 +180,10 @@ nixpkgs revisions, and failed cases.
 
 ## Immediate engineering sequence
 
-1. Land the deterministic stderr classifier with regression fixtures.
-2. Add a JSON report command that only consumes an explicitly supplied log;
-   no implicit host reads.
+1. Finish formatting, compile, and test qualification for the deterministic
+   stderr classifier and read-only diagnose CLI.
+2. Add structured ingestion for Nix internal JSON log events and
+   nix-eval-jobs JSON records.
 3. Add a source/flake evidence collector that is read-only and content-addressed.
 4. Add the first counterfactual runner using a temporary Git worktree and a
    constrained command allowlist.
