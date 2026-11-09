@@ -723,8 +723,10 @@ mod tests {
             sensor: numeric::SensorMap::Identity,
         });
         let policy = policies()[4];
-        let a0 = run_arm(truth, CampaignArm::A0, policy, 6, "paired-smoke-a0").unwrap();
-        let a2 = run_arm(truth, CampaignArm::A2, policy, 6, "paired-smoke-a2").unwrap();
+        let (a0, work_a0) =
+            run_arm(truth, CampaignArm::A0, policy, 6, "paired-smoke-a0").unwrap();
+        let (a2, work_a2) =
+            run_arm(truth, CampaignArm::A2, policy, 6, "paired-smoke-a2").unwrap();
 
         assert!(a0.generating_model_in_version_space);
         assert!(a2.generating_model_in_version_space);
@@ -732,6 +734,10 @@ mod tests {
         assert!(a2.set_score.exact_version_space_match);
         assert!(a0.probe_count <= 6);
         assert!(a2.probe_count <= 6);
+        assert!(work_a0.legal_actions_scored > 0);
+        assert!(work_a2.legal_actions_scored > 0);
+        assert!(work_a0.model_prediction_evaluations > 0);
+        assert!(work_a2.model_prediction_evaluations > 0);
     }
 
     #[test]
