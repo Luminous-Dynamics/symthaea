@@ -194,7 +194,7 @@ fn validate_unit(unit: &UnitRecord, treated: bool) -> Result<(), String> {
             let post = unit
                 .post
                 .as_ref()
-                .ok_or_else(|| format!("unit {} lacks its required post measurement", unit.unit_id))?;
+                .ok_or_else(|| format!("unit {} missing post measurement", unit.unit_id))?;
             if unit.censoring_reason.is_some() {
                 return Err(format!("unit {} marks complete follow-up as censored", unit.unit_id));
             }
@@ -203,7 +203,7 @@ fn validate_unit(unit: &UnitRecord, treated: bool) -> Result<(), String> {
                 || !is_digest(&post.protocol_digest)
                 || !is_digest(&post.condition_digest)
             {
-                return Err(format!("unit {} has invalid post-intervention measurement", unit.unit_id));
+                return Err(format!("unit {} has invalid post measurement", unit.unit_id));
             }
             if post.protocol_digest != unit.pre.protocol_digest
                 || post.condition_digest != unit.pre.condition_digest
@@ -215,9 +215,11 @@ fn validate_unit(unit: &UnitRecord, treated: bool) -> Result<(), String> {
             }
         }
         "administrative_censoring" | "lost_to_follow_up" | "retired_due_to_fault" => {
-            if unit.post.is_some() || unit.censoring_reason.as_deref().is_none_or(|v| !nonempty(v)) {
+            if unit.post.is_some()
+                || unit.censoring_reason.as_deref().is_none_or(|v| !nonempty(v))
+            {
                 return Err(format!(
-                    "unit {} must preserve a censoring reason and must not fabricate a post measurement",
+                    "unit {} needs a censoring reason and no fabricated post measurement",
                     unit.unit_id
                 ));
             }
@@ -297,7 +299,10 @@ fn evaluate(scenario: Scenario) -> Result<Evaluation, String> {
             || set.treated.matching_profile_digest != set.matching_profile_digest
             || set.comparator.matching_profile_digest != set.matching_profile_digest
         {
-            return Err(format!("matched set {} has inconsistent matching evidence", set.match_set_id));
+            return Err(format!(
+                "matched set {} has inconsistent matching evidence",
+                set.match_set_id
+            ));
         }
         validate_unit(&set.treated, true)?;
         validate_unit(&set.comparator, false)?;
@@ -312,7 +317,9 @@ fn evaluate(scenario: Scenario) -> Result<Evaluation, String> {
             );
             if let Some(expected) = &reference {
                 if expected != &key {
-                    return Err("matched units do not share the same reference protocol and conditions".to_owned());
+                    return Err(
+                        "matched units do not share reference protocol and conditions".to_owned(),
+                    );
                 }
             } else {
                 reference = Some(key);
@@ -333,7 +340,9 @@ fn evaluate(scenario: Scenario) -> Result<Evaluation, String> {
             comparator_mean_change: None,
             did_effect: None,
             disposition: "abstain".to_owned(),
-            reason: Some("censored follow-up prevents the v0.1 fixed-horizon DiD estimate".to_owned()),
+            reason: Some(
+                "censored follow-up prevents the v0.1 fixed-horizon DiD estimate".to_owned(),
+            ),
         });
     }
 
@@ -411,7 +420,8 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
         }
     }
 
-    let canonical = serde_json::to_vec(&corpus).map_err(|error| format!("canonical corpus: {error}"))?;
+    let canonical = serde_json::to_vec(&corpus)
+        .map_err(|error| format!("canonical corpus: {error}"))?;
     let report_sha256 = sha256(&canonical);
     let mut reports = Vec::new();
     let mut seen = BTreeSet::new();
@@ -437,7 +447,11 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
                 schema_errors.join("; ")
             ));
         }
-        let scenario_id = case.scenario.get("scenario_id").and_then(Value::as_str).map(str::to_owned);
+        let scenario_id = case
+            .scenario
+            .get("scenario_id")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
         let parsed: Result<Scenario, _> = serde_json::from_value(case.scenario);
         let evaluated = parsed
             .map_err(|error| format!("scenario decode: {error}"))
