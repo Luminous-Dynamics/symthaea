@@ -769,10 +769,58 @@ mod tests {
         std::iter::repeat_n(byte, 64).collect()
     }
 
+    fn statistical_evidence_binding(
+        session: &SequentialEditSession,
+        candidate_native_model_digest: &str,
+    ) -> SequentialVerifierEvidenceBinding {
+        use crate::sequential_weight_verification::{
+            PairedLossObservation, SequentialWeightVerificationCampaign,
+            SequentialWeightVerificationConfig,
+        };
+        let mut campaign = SequentialWeightVerificationCampaign::new(
+            SequentialWeightVerificationConfig {
+                campaign_alpha: 0.05,
+                minimum_improvement: 0.05,
+                minimum_observations: 2,
+                maximum_observations: 600,
+            },
+            digest('8'),
+        )
+        .expect("valid statistical campaign");
+        let mut verifier = campaign
+            .start_candidate(
+                session.latest_candidate_model_digest.clone(),
+                candidate_native_model_digest.to_owned(),
+                digest('6'),
+                digest('5'),
+            )
+            .expect("fresh statistical candidate");
+        let mut report = verifier.report().expect("initial statistical report");
+        for index in 0..600 {
+            report = verifier
+                .observe(PairedLossObservation {
+                    episode_id: format!("confirmatory-{index}"),
+                    baseline_loss: 0.9,
+                    candidate_loss: 0.5,
+                })
+                .expect("paired confirmatory observation");
+            if report.status == crate::sequential_weight_verification::SequentialWeightVerificationStatus::BenefitEstablished {
+                break;
+            }
+        }
+        bind_sequential_verification_evidence(
+            session,
+            candidate_native_model_digest,
+            &report,
+        )
+        .expect("statistical report bound to sequential edit candidate")
+    }
+
     fn signed_attestation(
         session: &SequentialEditSession,
         prepared: &PreparedSequentialCandidate,
         candidate_native_model_digest: &str,
+        evidence_binding: &SequentialVerifierEvidenceBinding,
         accepted: bool,
         signing_key: &SigningKey,
     ) -> SignedSequentialVerifierAttestation {
@@ -791,6 +839,10 @@ mod tests {
             observation_manifest_digest: prepared.batch.observation_manifest_digest.clone(),
             program_digest: prepared.candidate.receipt.program_digest.clone(),
             candidate_snapshot_digest: prepared.candidate.receipt.candidate_snapshot_digest.clone(),
+            precondition_gate_digest: evidence_binding.precondition_gate_digest().to_owned(),
+            statistical_verification_report_digest: evidence_binding
+                .statistical_verification_report_digest()
+                .to_owned(),
             accepted,
         };
         let message =
