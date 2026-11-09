@@ -627,3 +627,127 @@ The critical comparison is a six-way Pareto surface:
 6. memory quality, provenance, scope integrity and lifecycle safety.
 
 A speedup that silently lowers eligibility correctness or increases stale-memory emissions is not an improvement. Unauthorized reads, revoked-source emissions, stale receipt reuse and deletion resurrection remain hard gates, not weighted score terms.
+
+
+## 18. Synopsis-memory Pareto and certified coordinate quantization (2026-11-09)
+
+A storage audit exposed a serious scaling issue in the first group envelope: retaining coordinate minima and maxima as f32 arrays plus an f32 centroid costs approximately 12 bytes per dimension per group, before IDs, payload digests, allocator headers or page indexes. At 256K dimensions and 1M records grouped by 64, the numeric group synopsis alone is approximately 45.78 GiB.
+
+The group envelope now has three explicit source storage profiles:
+
+| Profile | Numeric storage per group | Bytes/dimension | Intended tradeoff |
+|---|---:|---:|---|
+| BoxAndBall | 3D f32 + radius | 12 | Tightest of the three; highest metadata |
+| QuantizedBoxAndBall | D f32 + 2D u16 + radius | 8 | Intermediate metadata; outward-expanded coordinate box |
+| BallOnly | D f32 + radius | 4 | Lowest metadata; potentially looser group intervals |
+
+The 4-byte radius is additional per group. Stable ID strings and 32-byte member payload digests are per-record costs shared across modes.
+
+GroupEnvelopeMode::BoxAndBall remains the default. QuantizedBoxAndBall stores 16-bit min/max codes over the admitted [-1,1] coordinate domain. Encoding widens the scaled value down before floor and up before ceil. Decoding widens the f64 division and subtraction separately, then widens again at f32 conversion. The interval kernel receives decoded f32 endpoints, not the quantized codes. The profile tag is included in the group content digest; a receipt from one mode cannot be silently replayed against another.
+
+BallOnly drops both coordinate-extrema arrays entirely while retaining the centroid and independently verified L2 radius. This creates a clean metadata/pruning comparison.
+
+### Analytical memory estimates
+
+For 1M eligible members and group size 64, the numeric synopsis estimates are:
+
+| Dimension | BoxAndBall | QuantizedBoxAndBall | BallOnly |
+|---:|---:|---:|---:|
+| 16K | 2.86 GiB | 1.91 GiB | 0.95 GiB |
+| 64K | 11.44 GiB | 7.63 GiB | 3.81 GiB |
+| 256K | 45.78 GiB | 30.52 GiB | 15.26 GiB |
+
+At group size 1024, the corresponding 256K figures fall to approximately 2.86, 1.91 and 0.95 GiB. That does not prove the larger group size is better: larger groups may be substantially harder to prune. Choose the mode and group size jointly.
+
+The full 81-scenario analytical matrix is in docs/research/fixtures/hme_group_synopsis_memory_budget_v0.json. It also counts 32-byte member payload digests and an illustrative 24-byte mean stable-ID size, but excludes allocator/Arc/String headers, indexes, checksums, alignment, page padding and query caches. The numeric GiB figures are formula outputs, not measured RSS or serialized bytes.
+
+The source now provides estimate_group_envelope_memory(...) and numeric_synopsis_bytes(). Authored tests cover:
+- the exact 12D/8D/4D storage arithmetic;
+- 100,000 deterministic coordinate values and endpoints/subnormals;
+- adjacent f32 values around all 65,536 quantizer-bin boundaries;
+- high-dimensional member-score containment for all three profiles;
+- mode-specific content identity.
+
+No Rust test or build is claimed. The environment still lacks cargo/rustc. QuantizedBoxAndBall must remain experimental and cannot authorize selector pruning until #11243's test/compiler/target gates pass.
+
+### The next optimization question
+
+The objective is not minimum synopsis bytes or narrowest intervals independently. It is:
+
+\[
+\operatorname{minimize}\ \text{query cost} =
+\text{synopsis bytes touched}
++\text{member metadata bytes touched}
++\text{cold original payload bytes}
++\text{refinement compute}
+\]
+
+subject to exact top-k equality, complete eligibility coverage and zero false prunes.
+
+A larger exact synopsis is worth keeping only when the cold payload bytes it saves outweigh the extra memory footprint, cache misses and build/compaction cost. A quantized synopsis is useful only if outward endpoint widening does not erase enough pruning power to lose against BallOnly. Group size must be swept alongside the codec.
+
+The promotion matrix is in #11243. #10917 owns the physical I/O/segment measurements; #11059 owns group-bound correctness; #11221 owns persistent and reopen-authenticated partition receipts.
+
+## 19. Competitive frontier refresh (2026-11-09)
+
+### LongMemEval: a stronger production reference
+
+Redis' September 21, 2026 agent-memory report describes a 500-question LongMemEval Small reproduction using the official GPT-4o binary judge and a common GPT-4o answer backbone for its comparable reproduced systems. Its Remis + Instruct combination reports 86.5% task-averaged accuracy, 1.78s query latency and about $0.0703/session under the report's cost model. The report also notes discrepancies between published and reproduced numbers, including a 42.4% reproduced Vertex Memory Bank result versus roughly 70% previously associated with the underlying method.
+
+Treat 86.5% as a strong vendor-published reproduced result, not an independently verified universal leaderboard. HME should reproduce it under the same split, answer model, judge, retrieval budget and session cost methodology before making a ranking claim.
+
+The architectural lesson is important: Redis' raw evidence path and extracted fact path have complementary failure modes. HME should preserve both source-native evidence and structured, versioned claims with provenance/dependencies. The structured claim layer should not destroy the raw record that would let a later query inspect exact wording, timestamps or corrections.
+
+### GroupMemBench: multi-party memory is a separate hard problem
+
+GroupMemBench (arXiv:2605.14498) reports 46.0% average accuracy for its strongest tested memory system; knowledge update is 27.1% and term ambiguity 37.7%. Its authors report that a simple BM25 baseline matches or exceeds many agent-memory systems.
+
+This is a warning against optimizing a single-user, dense-semantic retrieval score and assuming multi-party memory is solved. HME needs:
+- asker-conditioned retrieval;
+- speaker/writer attribution;
+- per-person and per-role belief separation;
+- audience/namespace-aware activation;
+- lexical/exact-identifier retrieval alongside HDC similarity;
+- knowledge-update and abstention tests;
+- zero unauthorized pre-read and emission.
+
+COLLABMEM is complementary: it fixes the trace, target role, answerer and judge to isolate sharing, access, routing, provenance, authority and retention. Its authors report 69.6% non-Oracle average for TMS-GRAPH++. Keep this separate from GroupMemBench and LongMemEval.
+
+### Memory evolution and governed use
+
+TAME / Trust-Memevo (EMNLP 2026) finds that benign test-time memory evolution can reduce agent trustworthiness. Its authors report a 14.6 percentage-point AIME accuracy improvement on GPT-5.2 while maintaining competitive trustworthiness. That is a test-time evolution result, not a vector retrieval score. For HME, evaluate utility gain and safety/privacy drift on separate axes; hard governance invariants remain zero-tolerance gates.
+
+TimlMemBench provides a governed-activation diagnostic: a remembered fact can be revoked, superseded, private to a different context or irrelevant to the current request. It has 208 reviewed bilingual samples, 1,566 sessions, 1,715 questions and 1,821 governance/activation cases. HME should measure correct non-use as well as correct recall.
+
+MEMOBench (EMNLP 2026 Findings) exposes process-level memory operations for robotics: 30 history-dependent tasks, 1,500 expert demonstrations and 4,200 executable checkpoints from 84 templates. Its strongest reported memory-module baseline averages 31.9% task success. This is an embodied process-memory track, not a pure retrieval leaderboard.
+
+### Vector retrieval and system baselines
+
+- PQR-Search (arXiv:2611.07579, Nov 5) highlights that an average Recall@K target is not a per-query guarantee: indexes tuned to average 0.99 reportedly left 5–19% of in-distribution queries below target and as many as 99.6% of OOD queries below target when not query-log tuned. HME approximate mode should publish the full per-query recall distribution, fraction below tau, OOD failure rate and update drift. Keep its probabilistic guarantee class separate from HME deterministic exactness.
+- Recast (arXiv:2611.02765, Nov 2) is the relevant storage/refinement competitor: it keeps compact codes in memory, raw vectors on disk and chooses a minimal refinement set using uncertainty intervals. It reports 1.56–2.01x QPS at 0.99 recall under its tested matched-memory conditions and lower external storage. HME should compare cold bytes and matched quality, not claim equivalence to its probability-based interval assumptions.
+- QBAT (PVLDB 2026) reports up to 68.8% less searched budget in its ScaNN consistency mode using query-aware budget allocation. HME should schedule by expected certified work saved per unit cost while preserving its separate eligibility and coverage gates.
+- VectorDBBench's September 2026 integration registers all 24 VIBE HDF5 datasets and multimodal VDBBench datasets at 1M/10M/100M scale. This improves reproducibility for public embedding workloads. HME's 16K–256K ContinuousHV profile still needs a separate native workload; do not compare it as if it were a standard 768/1536-dimensional embedding benchmark.
+
+### HME's honest competitive thesis
+
+HME should not claim to beat Redis on LongMemEval, PQR-Search on ANN throughput, or Recast on disk QPS yet. There are no HME benchmark runs. The near-term differentiator is a testable combination:
+1. deterministic exact retrieval where intervals can be certified;
+2. provenance-carrying source/claim memory rather than destructive summarization;
+3. bitemporal revision, dependency invalidation and typed absence;
+4. role/scope/authority-aware eligibility before payload reads;
+5. a cost model that counts synopsis memory, metadata traffic and cold payload bytes.
+
+The first external goal is reproducible parity with strong baselines under frozen answer/judge protocols. The stretch goal is a strictly better multi-objective Pareto frontier, with no safety or exactness regression.
+
+### References refreshed
+
+- Redis LongMemEval agent-memory reproduction (2026-09-21): https://redis.io/resources/agent-memory-benchmark-report/
+- GroupMemBench (arXiv:2605.14498): https://arxiv.org/abs/2605.14498
+- COLLABMEM (EMNLP 2026): https://aclanthology.org/2026.emnlp-main.1194/
+- TAME (EMNLP 2026): https://aclanthology.org/2026.emnlp-main.2100/
+- TimlMemBench (Findings EMNLP 2026): https://aclanthology.org/2026.findings-emnlp.507/
+- MEMOBench (Findings EMNLP 2026): https://aclanthology.org/2026.findings-emnlp.333/
+- PQR-Search (2026-11-05): https://arxiv.org/abs/2611.07579
+- Recast (2026-11-02): https://arxiv.org/abs/2611.02765
+- QBAT (PVLDB 2026): https://research.google/pubs/qbat-model-based-query-budget-autotuner-for-clustering-based-approximate-nearest-neighbor-search/
+- VectorDBBench 2026 VIBE dataset support: https://github.com/zilliztech/VectorDBBench/blob/main/docs/release/2026-09-hugging-face-datasets.md
