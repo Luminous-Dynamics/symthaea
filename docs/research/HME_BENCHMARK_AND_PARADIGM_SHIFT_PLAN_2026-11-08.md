@@ -594,3 +594,36 @@ The winning HME story should not be "another database with high QPS." It should 
 - Agent Memory Leaderboard Cycle 2: https://agentmemories.ai/evaluation
 - VectorDBBench September 2026 VIBE dataset update: https://github.com/zilliztech/VectorDBBench
 - PQR-Search: https://arxiv.org/abs/2611.07579
+
+
+## 17. Eligibility-scope binding and benchmark execution contract (2026-11-09)
+
+The group query records and partition receipt now carry HmeEligibilityScopeBinding, a typed identity containing:
+- principal/tenant/namespace scope digest;
+- policy identity/version digest and policy generation;
+- source-ledger generation;
+- bitemporal query digest covering valid_at and known_at.
+
+Each query-specific GroupScoreIntervalRecord carries this binding. GroupIntervalCoverageCounts carries the same binding. The partition receipt commits to it, the fast path checks the coverage binding against the receipt, and both fast and defensive selector paths reject group intervals carrying a different scope. The GroupIntervalSelectionPlan preserves the binding for downstream completion receipts.
+
+This is deliberately an integration contract with #11003, not a new policy engine. The binding fields must be produced from the authoritative eligibility/policy/source-ledger decision. Constructing an HmeEligibilityScopeBinding in application code does not prove authorization. The HME layer verifies consistency; #11003 remains the owner of eligibility truth and #11221 owns persistent receipt authentication after reopen.
+
+The new machine-readable benchmark contract is docs/research/fixtures/hme_benchmark_matrix_v0.json. It separates:
+- exact full-resolution HDC retrieval and receipt-backed hierarchy;
+- approximate per-query ANN quality;
+- systems and physical I/O;
+- public agent-memory benchmarks;
+- lifecycle/deletion/governance diagnostics;
+- exactness, privacy, stale-generation and unauthorized-read hard gates.
+
+It specifies the required 16K/64K/256K ContinuousHV dimensional sweep and 1K/10K/100K/1M corpus sizes, query strata (IID, clustered, OOD, near-tie, adversarial, zero/near-zero), cold/warm cache profiles and top-k values. It is an execution contract only; no benchmark results are implied.
+
+The critical comparison is a six-way Pareto surface:
+1. exact agreement / guarantee class;
+2. cold original-payload bytes;
+3. metadata bytes and member roster work;
+4. p50/p95/p99 latency and peak memory;
+5. ingest, update, delete and compaction cost;
+6. memory quality, provenance, scope integrity and lifecycle safety.
+
+A speedup that silently lowers eligibility correctness or increases stale-memory emissions is not an improvement. Unauthorized reads, revoked-source emissions, stale receipt reuse and deletion resurrection remain hard gates, not weighted score terms.
