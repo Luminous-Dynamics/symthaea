@@ -722,6 +722,19 @@ pub enum GroupIntervalSelectionError {
         /// Later duplicate index.
         duplicate_index: usize,
     },
+    /// Group envelopes belong to different manifest or eligibility snapshots.
+    MixedSnapshot {
+        /// Pinned manifest generation shared by preceding groups.
+        expected_manifest_generation: u64,
+        /// Manifest generation of the mismatched group.
+        actual_manifest_generation: u64,
+        /// Pinned eligibility generation shared by preceding groups.
+        expected_eligibility_generation: u64,
+        /// Eligibility generation of the mismatched group.
+        actual_eligibility_generation: u64,
+        /// Index of the mismatched group.
+        group_index: usize,
+    },
     /// Group member IDs overlap, so the group partition is not disjoint.
     DuplicateMemberAcrossGroups {
         /// Stable member identifier appearing in multiple groups.
@@ -776,6 +789,16 @@ impl std::fmt::Display for GroupIntervalSelectionError {
             Self::DuplicateGroupId { first_index, duplicate_index } => write!(
                 f,
                 "duplicate group ID at indices {first_index} and {duplicate_index}"
+            ),
+            Self::MixedSnapshot {
+                expected_manifest_generation,
+                actual_manifest_generation,
+                expected_eligibility_generation,
+                actual_eligibility_generation,
+                group_index,
+            } => write!(
+                f,
+                "group {group_index} snapshot ({actual_manifest_generation}, {actual_eligibility_generation}) does not match pinned snapshot ({expected_manifest_generation}, {expected_eligibility_generation})"
             ),
             Self::DuplicateMemberAcrossGroups {
                 member_id,
@@ -991,8 +1014,29 @@ pub fn select_group_refinement_set(
     let mut first_group_by_member_id = BTreeMap::new();
     let mut lower_order: Vec<&GroupScoreIntervalRecord> =
         Vec::with_capacity(groups.len());
+    let pinned_snapshot = groups.first().map(|group| {
+        (
+            group.identity.manifest_generation,
+            group.identity.eligibility_generation,
+        )
+    });
 
     for (group_index, group) in groups.iter().enumerate() {
+        if let Some((expected_manifest_generation, expected_eligibility_generation)) =
+            pinned_snapshot
+        {
+            if group.identity.manifest_generation != expected_manifest_generation
+                || group.identity.eligibility_generation != expected_eligibility_generation
+            {
+                return Err(GroupIntervalSelectionError::MixedSnapshot {
+                    expected_manifest_generation,
+                    actual_manifest_generation: group.identity.manifest_generation,
+                    expected_eligibility_generation,
+                    actual_eligibility_generation: group.identity.eligibility_generation,
+                    group_index,
+                });
+            }
+        }
         if group.member_count == 0 {
             return Err(GroupIntervalSelectionError::EmptyGroup { group_index });
         }
@@ -1894,6 +1938,23 @@ mod tests {
         assert!(matches!(
             select_hierarchical_refinement_set(&[group], &[other_query_member], 1, coverage),
             Err(HierarchicalIntervalSelectionError::UnexpectedMemberGroup { .. })
+        ));
+    }
+
+    #[test]
+    fn group_selector_rejects_mixed_manifest_or_eligibility_generations() {
+        let first = synthetic_group("snapshot-a", 1, 0.2, 0.8);
+        let mut stale = synthetic_group("snapshot-b", 1, -0.2, 0.1);
+        stale.identity.eligibility_generation = 2;
+        let groups = vec![first, stale];
+        assert!(matches!(
+            select_group_refinement_set(&groups, 1, complete_group_coverage(&groups)),
+            Err(GroupIntervalSelectionError::MixedSnapshot {
+                expected_eligibility_generation: 1,
+                actual_eligibility_generation: 2,
+                group_index: 1,
+                ..
+            })
         ));
     }
 
