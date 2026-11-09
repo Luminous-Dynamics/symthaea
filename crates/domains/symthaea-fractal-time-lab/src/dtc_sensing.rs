@@ -58,7 +58,10 @@ impl DtcProbeConfig {
             || self.longitudinal_fields.len() != self.n_spins
             || !self.nearest_neighbor_coupling.is_finite()
             || !self.pulse_angle_rad.is_finite()
-            || self.longitudinal_fields.iter().any(|value| !value.is_finite())
+            || self
+                .longitudinal_fields
+                .iter()
+                .any(|value| !value.is_finite())
             || self.periods < 32
             || self.periods > MAX_DTC_PROBE_PERIODS
             || self.analysis_start >= self.periods
@@ -85,9 +88,7 @@ impl DtcProbeConfig {
 pub enum DtcProbeError {
     InvalidConfiguration,
     InvalidProbabilityDistribution,
-    SingularReadoutSupport {
-        outcome_down_spins: usize,
-    },
+    SingularReadoutSupport { outcome_down_spins: usize },
     NonFiniteFisherInformation,
     InvalidStateVector,
     Floquet(FloquetError),
@@ -100,7 +101,10 @@ impl fmt::Display for DtcProbeError {
                 write!(f, "finite-Floquet probe-sensing configuration is invalid")
             }
             Self::InvalidProbabilityDistribution => {
-                write!(f, "computational-basis readout probabilities are not normalized")
+                write!(
+                    f,
+                    "computational-basis readout probabilities are not normalized"
+                )
             }
             Self::SingularReadoutSupport { outcome_down_spins } => write!(
                 f,
@@ -253,9 +257,8 @@ pub fn evaluate_dtc_probe_sensing(
 
     let mut baseline_model = build_model(config)?;
     let baseline_signal = baseline_model.stroboscopic_magnetization(config.periods);
-    let baseline_response =
-        analyze_subharmonic_response(&baseline_signal, config.analysis_start)
-            .ok_or(DtcProbeError::InvalidConfiguration)?;
+    let baseline_response = analyze_subharmonic_response(&baseline_signal, config.analysis_start)
+        .ok_or(DtcProbeError::InvalidConfiguration)?;
     let baseline_lifetime = estimate_subharmonic_lifetime(
         &baseline_signal,
         config.analysis_start,
@@ -490,7 +493,11 @@ pub fn cramer_rao_standard_error(
     {
         return None;
     }
-    Some((fisher_information_per_shot * repetitions as f64).sqrt().recip())
+    Some(
+        (fisher_information_per_shot * repetitions as f64)
+            .sqrt()
+            .recip(),
+    )
 }
 
 fn build_model(config: &DtcProbeConfig) -> Result<KickedIsingFloquet, DtcProbeError> {
@@ -530,10 +537,12 @@ mod tests {
         let readout = readout_distribution(&model);
         assert!(readout.normalization_error < 1.0e-12);
         assert_eq!(readout.probability_by_down_spins.len(), 7);
-        assert!(readout
-            .probability_by_down_spins
-            .iter()
-            .all(|probability| *probability >= 0.0));
+        assert!(
+            readout
+                .probability_by_down_spins
+                .iter()
+                .all(|probability| *probability >= 0.0)
+        );
         assert!((readout.mean_magnetization - model.magnetization()).abs() < 1.0e-12);
     }
 
@@ -544,7 +553,11 @@ mod tests {
         assert!(report.classical_fisher_information_per_shot >= 0.0);
         assert!(report.fisher_information_per_drive_period.is_finite());
         assert!(report.quantum_fisher_information_per_shot.is_finite());
-        assert!(report.quantum_fisher_information_per_drive_period.is_finite());
+        assert!(
+            report
+                .quantum_fisher_information_per_drive_period
+                .is_finite()
+        );
         assert!(report.norm_error < 1.0e-10);
     }
 
@@ -583,11 +596,7 @@ mod tests {
         let signal: Vec<f64> = (0..100)
             .map(|period| {
                 let envelope = (-(period as f64) / 25.0).exp();
-                if period % 2 == 0 {
-                    envelope
-                } else {
-                    -envelope
-                }
+                if period % 2 == 0 { envelope } else { -envelope }
             })
             .collect();
         assert!(matches!(
