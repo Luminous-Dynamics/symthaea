@@ -1471,15 +1471,15 @@ mod tests {
             gain: 7,
             ..direct_numeric_truth()
         };
-        assert!(matches!(
+        assert!(
             BlindEpisode::new_numeric(
                 "closed-support-out-of-catalogue-gain",
                 truth,
                 StructureAccess::NumericWithheld,
                 2,
-            ),
-            Ok(_)
-        ));
+            )
+            .is_ok()
+        );
         let mut episode = BlindEpisode::new_numeric(
             "closed-support-out-of-catalogue-gain-score",
             truth,
