@@ -53,6 +53,10 @@ pub struct ModelRecoveryReport {
     /// final column reserved for abstentions.
     pub confusion_counts: Vec<Vec<u64>>,
     pub samples_per_generator: usize,
+    pub availability_probability: f64,
+    /// Number of trials per generator that produced no usable observation.
+    /// These are counted as abstentions, not discarded from the denominator.
+    pub unavailable_observations_by_generator: Vec<u64>,
     pub abstention_threshold: f64,
     /// Fraction correctly recovered across named generating models, with
     /// equal sampling per named model.
@@ -139,6 +143,14 @@ pub fn evaluate_model_recovery(
 ) -> Result<ModelRecoveryReport, ModelRecoveryError> {
     if samples_per_generator == 0 {
         return Err(ModelRecoveryError::InvalidSampleCount);
+    }
+    if !experiment.availability_probability.is_finite()
+        || !(0.0..=1.0).contains(&experiment.availability_probability)
+    {
+        return Err(ModelDiscriminationError::InvalidAvailabilityProbability(
+            experiment.experiment_id.clone(),
+        )
+        .into());
     }
     if !minimum_posterior_probability.is_finite()
         || minimum_posterior_probability <= 0.0
@@ -386,6 +398,7 @@ pub fn evaluate_model_recovery(
     let mut rng = SplitMix64::new(seed);
     let abstain_column = model_ids.len();
     let mut confusion_counts = vec![vec![0_u64; model_ids.len() + 1]; generators.len()];
+    let mut unavailable_observations_by_generator = vec![0_u64; generators.len()];
     let mut named_correct = 0_u64;
     let mut named_assigned = 0_u64;
     let mut named_abstained = 0_u64;
@@ -399,6 +412,14 @@ pub fn evaluate_model_recovery(
             });
         }
         for _ in 0..samples_per_generator {
+            if rng.unit_open() > experiment.availability_probability {
+                confusion_counts[generator_index][abstain_column] += 1;
+                unavailable_observations_by_generator[generator_index] += 1;
+                if generator.generator_id != OTHER_UNRESOLVED_MODEL_ID {
+                    named_abstained += 1;
+                }
+                continue;
+            }
             let observation = generator.predictive_mean + generator_sigma * rng.standard_normal();
             if !observation.is_finite() {
                 return Err(ModelRecoveryError::NonFiniteSyntheticCalculation);
@@ -477,6 +498,8 @@ pub fn evaluate_model_recovery(
         generator_ids,
         confusion_counts,
         samples_per_generator,
+        availability_probability: experiment.availability_probability,
+        unavailable_observations_by_generator,
         abstention_threshold: minimum_posterior_probability,
         named_model_accuracy,
         prior_weighted_named_model_accuracy: prior_weighted_accuracy,
@@ -583,6 +606,88 @@ mod tests {
             scenario_weight: 1.0,
             probabilities: vec![1.0, 1.0, 1.0],
         }
+    }
+
+    #[test]
+    fn unavailable_trials_remain_in_denominator_as_explicit_abstentions() {
+        let hypotheses = vec![hypothesis("a", b'a'), hypothesis("b", b'b')];
+        let mut candidate = experiment(vec![
+            prediction("a", 0.0, 0.0),
+            prediction("b", 5.0, 0.0),
+        ]);
+        candidate.availability_probability = 0.0;
+        let generators = vec![
+            RecoveryGenerator {
+                generator_id: "a".to_string(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.0,
+            },
+            RecoveryGenerator {
+                generator_id: "b".to_string(),
+                predictive_mean: 5.0,
+                predictive_sigma: 0.0,
+            },
+            RecoveryGenerator {
+                generator_id: OTHER_UNRESOLVED_MODEL_ID.to_string(),
+                predictive_mean: 20.0,
+                predictive_sigma: 0.0,
+            },
+        ];
+        let report = evaluate_model_recovery(
+            &hypotheses,
+            &candidate,
+            &prior(),
+            &generators,
+            64,
+            123,
+            0.8,
+        )
+        .unwrap();
+
+        assert_eq!(report.availability_probability, 0.0);
+        assert_eq!(report.unavailable_observations_by_generator, vec![64, 64, 64]);
+        assert_eq!(report.named_model_accuracy, 0.0);
+        assert_eq!(report.named_model_coverage, 0.0);
+        assert_eq!(report.named_model_selective_accuracy, None);
+        assert_eq!(report.open_world_false_confident_assignment_rate, Some(0.0));
+        assert_eq!(report.open_world_abstention_rate, Some(1.0));
+        assert!(report.confusion_counts.iter().all(|row| row[2] == 64));
+    }
+
+    #[test]
+    fn fully_available_recovery_has_no_unavailable_trials() {
+        let hypotheses = vec![hypothesis("a", b'a'), hypothesis("b", b'b')];
+        let candidate = experiment(vec![
+            prediction("a", 0.0, 0.0),
+            prediction("b", 5.0, 0.0),
+        ]);
+        let generators = vec![
+            RecoveryGenerator {
+                generator_id: "a".to_string(),
+                predictive_mean: 0.0,
+                predictive_sigma: 0.0,
+            },
+            RecoveryGenerator {
+                generator_id: "b".to_string(),
+                predictive_mean: 5.0,
+                predictive_sigma: 0.0,
+            },
+        ];
+        let report = evaluate_model_recovery(
+            &hypotheses,
+            &candidate,
+            &prior(),
+            &generators,
+            32,
+            456,
+            0.8,
+        )
+        .unwrap();
+
+        assert_eq!(report.availability_probability, 1.0);
+        assert_eq!(report.unavailable_observations_by_generator, vec![0, 0]);
+        assert_eq!(report.named_model_coverage, 1.0);
+        assert_eq!(report.named_model_accuracy, 1.0);
     }
 
     #[test]
