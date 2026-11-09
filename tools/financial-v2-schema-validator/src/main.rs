@@ -226,6 +226,9 @@ fn validate_evidence_semantics(
                 if known > frontier {
                     return Err("future-known evidence cannot qualify at this frontier".to_owned());
                 }
+                if qualification == "prospective_shadow" && retrieved_at > frontier {
+                    return Err("prospective shadow evidence was ingested after the decision frontier".to_owned());
+                }
             }
         }
         "bounded_interval" => {
@@ -557,6 +560,26 @@ mod tests {
             "rights:synthetic-dev",
             "synthetic_development_only",
             "2026-10-02T12:00:00Z",
+        )
+        .is_err());
+    }
+
+
+    #[test]
+    fn prospective_shadow_rejects_late_local_ingestion() {
+        let root = fixture_root();
+        let mut evidence = load_json(&root, RESEARCH_EXAMPLE_PATH).unwrap()["artifacts"][0].clone();
+        evidence["qualification"] = Value::String("prospective_shadow".to_owned());
+        evidence["availability"]["proof"]["state"] = Value::String("verified".to_owned());
+        evidence["rights_authorization"]["proof"]["state"] = Value::String("verified".to_owned());
+        evidence["availability"]["known_at"] = Value::String("2026-10-01T08:00:00Z".to_owned());
+        evidence["retrieved_at"] = Value::String("2026-10-01T10:01:00Z".to_owned());
+        assert!(validate_evidence_semantics(
+            &evidence,
+            "principal:synthetic-public-research",
+            "rights:synthetic-dev",
+            "prospective_shadow",
+            "2026-10-01T10:00:00Z",
         )
         .is_err());
     }
