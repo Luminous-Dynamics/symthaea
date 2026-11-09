@@ -1288,6 +1288,99 @@
         "https://www.sota2.com/research/sota/end-to-end-driving-on-waymo-e2e-driving-challenge-leaderboard",
         "https://waymo.com/open/challenges/"
       ]
+    },
+    {
+      "id": "navsim-v2-closed-loop-planning-display-2026",
+      "name": "NAVSIM v2 — SOTA2 closed-loop-planning display (separate task view)",
+      "category": "planning_pseudo_simulation",
+      "capability_target": [
+        "trajectory_planning",
+        "component_safety_comfort_progress",
+        "secondary_leaderboard_comparison"
+      ],
+      "protocol": {
+        "kind": "NAVSIM_v2_two_stage_pseudo_simulation_non_interactive",
+        "leaderboard_view": "SOTA2 Closed-loop Planning on NAVSIM v2",
+        "devkit_version": "not_exposed_by_secondary_board",
+        "official_protocol_note": "NAVSIM v2 pseudo-simulation is not sequential or interactive; a leaderboard title using closed-loop wording does not make it reciprocal online simulation.",
+        "shares_base_protocol_with": "navsim-v2-epdms-2026",
+        "component_metrics": [
+          "NC",
+          "DAC",
+          "DDC",
+          "TLC",
+          "EP",
+          "TTC",
+          "LK",
+          "HC",
+          "EC",
+          "EPDMS"
+        ]
+      },
+      "metrics": [
+        "NC",
+        "DAC",
+        "DDC",
+        "TLC",
+        "EP",
+        "TTC",
+        "LK",
+        "HC",
+        "EC",
+        "EPDMS"
+      ],
+      "source_status": "secondary_leaderboard_snapshot",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "secondary_board": "SOTA2",
+        "snapshot_observed_date": "2026-11-09",
+        "board_last_updated_relative": "about five months ago",
+        "methods": [
+          {
+            "name": "CLEAR",
+            "backbone": "ViT/L",
+            "release_label": "2026.06",
+            "NC": 99,
+            "DAC": 98.7,
+            "DDC": 99.6,
+            "TLC": 96.9,
+            "EP": 91,
+            "TTC": 98.4,
+            "LK": 92.9,
+            "HC": 96.4,
+            "EC": 79.5,
+            "EPDMS": 88.6
+          },
+          {
+            "name": "Drive-JEPA",
+            "backbone": "ResNet34",
+            "release_label": "2026.06",
+            "NC": 98.8,
+            "DAC": 97.4,
+            "DDC": 99,
+            "TLC": 99.8,
+            "EP": 83.5,
+            "TTC": 98,
+            "LK": 96.2,
+            "HC": 98.1,
+            "EC": 85.6,
+            "EPDMS": 85.4
+          }
+        ],
+        "unit": "percentage points unless upstream evaluator specifies otherwise"
+      },
+      "caveats": [
+        "This is a separate SOTA2 task display from the NAVSIM v2 planning page already recorded under navsim-v2-epdms-2026. Do not merge submission tables or assume identical evaluator settings.",
+        "The NAVSIM v2 protocol is two-stage pseudo-simulation with precomputed follow-up scenes; it is not reciprocal online ego/actor policy simulation, despite the display title.",
+        "Values are secondary leaderboard snapshots and have not been reproduced by SAM.",
+        "Exact devkit version, test split, observation privilege, filtering and evaluator revision are not exposed by the secondary page and must be pinned before comparisons.",
+        "Report all component metrics; EPDMS alone does not expose the metric profile."
+      ],
+      "sources": [
+        "https://www.sota2.com/research/sota/closed-loop-planning-on-navsim-v2",
+        "https://github.com/autonomousvision/navsim/blob/main/README.md",
+        "https://github.com/autonomousvision/navsim/releases"
+      ]
     }
   ],
   "prospective_targets": {
