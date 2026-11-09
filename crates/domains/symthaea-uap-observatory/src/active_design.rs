@@ -18,7 +18,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
-use std::f64::consts::PI;
 use std::fmt;
 
 const COARSE_QUADRATURE_INTERVALS: usize = 1024;
@@ -445,73 +444,75 @@ fn gaussian_hypothesis_eig(
         return None;
     }
 
-    let mut lower = f64::INFINITY;
-    let mut upper = f64::NEG_INFINITY;
-    for mean in means {
-        let lo = mean - GAUSSIAN_TAIL_SIGMAS * sigma;
-        let hi = mean + GAUSSIAN_TAIL_SIGMAS * sigma;
-        if !lo.is_finite() || !hi.is_finite() {
-            return None;
-        }
-        lower = lower.min(lo);
-        upper = upper.max(hi);
-    }
-    let width = upper - lower;
-    if !width.is_finite() || width <= 0.0 {
-        return Some(0.0);
-    }
+    // Integrate the expectation under each hypothesis in its own standard
+    // normal coordinate z. This remains well-resolved when model means are
+    // many thousands of sigma apart; integrating across the global span
+    // would undersample the narrow likelihood peaks.
+    let step = (2.0 * GAUSSIAN_TAIL_SIGMAS) / intervals as f64;
+    let log_sigma = sigma.ln();
+    let normalizer = log_sigma + LOG_SQRT_TWO_PI;
+    let mut eig = 0.0;
 
-    let step = width / intervals as f64;
-    let integrand = |observation: f64| -> Option<f64> {
-        let mut log_likelihoods = Vec::with_capacity(means.len());
-        let mut maximum_log_weight = f64::NEG_INFINITY;
-        for ((probability, mean), _) in probabilities.iter().zip(means).zip(0..) {
-            let standardized = (observation - mean) / sigma;
-            let log_pdf = -0.5 * standardized * standardized
-                - sigma.ln()
-                - LOG_SQRT_TWO_PI;
-            let log_weight = probability.ln() + log_pdf;
-            if !log_weight.is_finite() && log_weight != f64::NEG_INFINITY {
+    for hypothesis_index in 0..means.len() {
+        let mean_i = means[hypothesis_index];
+        let probability_i = probabilities[hypothesis_index];
+        let integrand = |z: f64| -> Option<f64> {
+            let observation = mean_i + sigma * z;
+            if !observation.is_finite() {
                 return None;
             }
-            maximum_log_weight = maximum_log_weight.max(log_weight);
-            log_likelihoods.push((log_pdf, log_weight));
-        }
 
-        let mixture_scaled = log_likelihoods
-            .iter()
-            .map(|(_, log_weight)| (*log_weight - maximum_log_weight).exp())
-            .sum::<f64>();
-        if !mixture_scaled.is_finite() || mixture_scaled <= 0.0 {
-            return Some(0.0);
-        }
-        let log_mixture = maximum_log_weight + mixture_scaled.ln();
-        let mut value = 0.0;
-        for (index, (log_pdf, _)) in log_likelihoods.iter().enumerate() {
-            let log_joint_density = probabilities[index].ln() + log_pdf;
-            if log_joint_density > -745.0 {
-                let joint_density = log_joint_density.exp();
-                value += joint_density * (log_pdf - log_mixture);
+            let log_pdf_i = -0.5 * z * z - normalizer;
+            let mut log_weights = Vec::with_capacity(means.len());
+            let mut maximum_log_weight = f64::NEG_INFINITY;
+
+            for (probability, mean) in probabilities.iter().zip(means) {
+                let standardized = (observation - mean) / sigma;
+                let log_pdf = -0.5 * standardized * standardized - normalizer;
+                let log_weight = probability.ln() + log_pdf;
+                if !log_weight.is_finite() && log_weight != f64::NEG_INFINITY {
+                    return None;
+                }
+                maximum_log_weight = maximum_log_weight.max(log_weight);
+                log_weights.push(log_weight);
             }
-        }
-        if value.is_finite() { Some(value) } else { None }
-    };
 
-    // Composite Simpson quadrature over a finite interval covering +/-10 sigma
-    // around every model mean. The omitted Gaussian tails are negligible for
-    // the declared scalar Gaussian model.
-    let mut sum = match (integrand(lower)?, integrand(upper)?) {
-        (left, right) => left + right,
-    };
-    for index in 1..intervals {
-        let y = lower + index as f64 * step;
-        let value = integrand(y)?;
-        let weight = if index % 2 == 0 { 2.0 } else { 4.0 };
-        sum += weight * value;
+            if !maximum_log_weight.is_finite() {
+                return None;
+            }
+            let mixture_scaled = log_weights
+                .iter()
+                .map(|log_weight| (*log_weight - maximum_log_weight).exp())
+                .sum::<f64>();
+            if !mixture_scaled.is_finite() || mixture_scaled <= 0.0 {
+                return None;
+            }
+            let log_mixture = maximum_log_weight + mixture_scaled.ln();
+            let standard_normal_density = (-0.5 * z * z - LOG_SQRT_TWO_PI).exp();
+            let value = standard_normal_density * (log_pdf_i - log_mixture);
+            if value.is_finite() { Some(value) } else { None }
+        };
+
+        // Composite Simpson quadrature over z in [-10, 10]. The omitted
+        // standard-normal tails are negligible for this declared model.
+        let lower = -GAUSSIAN_TAIL_SIGMAS;
+        let upper = GAUSSIAN_TAIL_SIGMAS;
+        let mut integral = integrand(lower)? + integrand(upper)?;
+        for index in 1..intervals {
+            let z = lower + index as f64 * step;
+            let value = integrand(z)?;
+            let weight = if index % 2 == 0 { 2.0 } else { 4.0 };
+            integral += weight * value;
+        }
+        let conditional_kl = integral * step / 3.0;
+        if !conditional_kl.is_finite() {
+            return None;
+        }
+        eig += probability_i * conditional_kl;
     }
-    let result = sum * step / 3.0;
-    if result.is_finite() {
-        Some(result.max(0.0))
+
+    if eig.is_finite() {
+        Some(eig.max(0.0))
     } else {
         None
     }
