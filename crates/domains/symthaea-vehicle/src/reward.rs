@@ -247,8 +247,13 @@ mod tests {
     #[test]
     fn test_follow_reward_on_oracle_target() {
         let state = VehicleState::cruising(13.4);
-        let target =
-            SimulatorOracleFollowTarget::from_simulator_snapshot(1, 30.0, 0.0, state.timestamp, 0.05);
+        let target = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            30.0,
+            0.0,
+            state.timestamp,
+            0.05,
+        );
         let reward = follow_distance_reward_with_oracle(&state, 30.0, Some(&target));
         assert!(
             (reward - 1.0).abs() < 1e-6,
@@ -259,8 +264,13 @@ mod tests {
     #[test]
     fn test_follow_reward_off_target_uses_oracle_gap() {
         let state = VehicleState::cruising(13.4);
-        let target =
-            SimulatorOracleFollowTarget::from_simulator_snapshot(1, 60.0, 0.0, state.timestamp, 0.05);
+        let target = SimulatorOracleFollowTarget::from_simulator_snapshot(
+            1,
+            60.0,
+            0.0,
+            state.timestamp,
+            0.05,
+        );
         let reward = follow_distance_reward_with_oracle(&state, 30.0, Some(&target));
         assert!(reward < 0.1, "Far from target gap should be low: {reward}");
     }
