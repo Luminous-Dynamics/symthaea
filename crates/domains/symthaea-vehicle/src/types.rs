@@ -11,9 +11,10 @@ pub const NUM_ACTUATORS: usize = 3;
 /// Explicit simulation-oracle target used by the Follow curriculum.
 ///
 /// This capability-bearing value is intentionally not serializable or
-/// deserializable, and its fields are private. Only the in-crate simulator
-/// selector may construct it. It is not a local perception observation or
-/// a V2X claim, and must never be populated from legacy mesh aggregates.
+/// deserializable, and its fields are private. Its only constructor is
+/// crate-private; the current constructor call site is the simulator selector.
+/// Other crate-internal code remains trusted. It is not a local perception
+/// observation or a V2X claim and must never come from legacy mesh aggregates.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SimulatorOracleFollowTarget {
     actor_id: u64,
