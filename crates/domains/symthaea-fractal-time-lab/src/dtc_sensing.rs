@@ -905,14 +905,17 @@ mod tests {
 
         for period in 0..64 {
             let sample_time = period as f64 + 0.5;
+            let base_phase =
+                2.0 * std::f64::consts::PI * frequency * sample_time + initial_phase;
             let phase_with_clock_offset =
                 2.0 * std::f64::consts::PI * frequency * (sample_time - clock_offset)
                     + initial_phase;
-            let equivalent_phase_parameter = 2.0 * std::f64::consts::PI * frequency * sample_time
-                + initial_phase
-                - 2.0 * std::f64::consts::PI * frequency * clock_offset;
+            let observed_phase_shift = phase_with_clock_offset - base_phase;
+            let expected_phase_shift =
+                -2.0 * std::f64::consts::PI * frequency * clock_offset;
             assert!(
-                (phase_with_clock_offset.cos() - equivalent_phase_parameter.cos()).abs() < 1.0e-14
+                (observed_phase_shift - expected_phase_shift).abs() < 1.0e-12,
+                "period={period}, observed shift={observed_phase_shift}, expected={expected_phase_shift}"
             );
         }
     }
