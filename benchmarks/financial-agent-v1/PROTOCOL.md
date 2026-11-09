@@ -177,6 +177,18 @@ The second calibration artifact [BLINDED_AI_ADJUDICATION_PILOT_V2_2026-11-09.md]
 
 The next benchmark construct is [SYM-FIN-SEQ-001 #11290](https://github.com/Luminous-Dynamics/symthaea/issues/11290): prequential financial evidence revision and forecast calibration. It tests immutable snapshots at every frontier, justified updates as evidence arrives, conflict preservation, irrelevant-update stability and properly timed probabilistic forecasts. Keep this sequential construct separate from the static task/report score vector and from the quantitative portfolio tournament.
 
+## 8f. Sequential supplier-correction development fixture
+
+The first six-frontier public synthetic stream is in `sequential-v0/`:
+- `supplier-correction.stream.json` — six versions/events and F0–F5 decision frontiers;
+- `supplier-correction.oracle.json` — expected admissible evidence, claims, unknowns and hard gates;
+- `README.md` — candidate delivery/oracle isolation contract;
+- `BLINDED_AI_SEQUENTIAL_PILOT_2026-11-09.md` — one AI-only adjudication of authored masked trajectories.
+
+The fixture tests an original supplier report, later source correction, buyer component purchase-share evidence, a copied mirror, inventory buffer, and a later shipment receipt. It explicitly makes F5 unavailable to F0–F4, keeps component-specific 35% exposure scoped, and expires the inventory snapshot before F5.
+
+**Claim ceiling:** this is a public synthetic development fixture, not a sealed cohort. The AI pilot uses authored candidate probes, not live systems or human raters. Its 20/20 vs 1/20 diagnostic is not a benchmark result, inter-rater statistic or SOTA claim. A real tournament must stream one frontier at a time and keep the event tape and oracle outside candidate access.
+
 ## 9. Non-compensable hard gates
 
 Any of the following blocks a qualified label, whatever the average score:
