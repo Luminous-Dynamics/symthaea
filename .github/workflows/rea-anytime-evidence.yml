@@ -47,8 +47,18 @@ jobs:
           cargo --version
           sha256sum tools/rea-anytime-evidence-checker/Cargo.lock
 
-      - name: Rust formatting
-        run: cargo fmt --manifest-path tools/rea-anytime-evidence-checker/Cargo.toml -- --check
+      - name: Apply rustfmt and verify formatting
+        run: |
+          cargo fmt --manifest-path tools/rea-anytime-evidence-checker/Cargo.toml
+          cargo fmt --manifest-path tools/rea-anytime-evidence-checker/Cargo.toml -- --check
+
+      - name: Archive rustfmt-normalized checker source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-anytime-evidence-rustfmt-source
+          path: tools/rea-anytime-evidence-checker/src/lib.rs
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Schema, stopping, revocation and mutation tests
         run: cargo test --manifest-path tools/rea-anytime-evidence-checker/Cargo.toml --locked
