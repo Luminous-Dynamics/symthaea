@@ -166,6 +166,25 @@ pub enum RightsDisposition {
     Unknown,
 }
 
+/// Independently verified entitlement proof. This is separate from availability: a source
+/// can be known but not licensed for the evaluated principal, or licensed but not yet known.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RightsProof {
+    Verified {
+        proof_ref: String,
+        evidence_id: String,
+        principal_id: String,
+        rights_profile_id: String,
+        disposition: RightsDisposition,
+        valid_from: Option<Timestamp>,
+        valid_until: Option<Timestamp>,
+        verifier_id: String,
+        verifier_build_sha256: String,
+    },
+    Missing,
+    Unverifiable,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AvailabilityProofKind {
     PrimaryReleaseRecord,
@@ -205,6 +224,7 @@ pub struct EvidenceVersion {
     pub retrieved_at: Timestamp,
     pub rights_profile_id: String,
     pub rights: RightsDisposition,
+    pub rights_proof: RightsProof,
     pub availability_proof: AvailabilityProof,
     /// Evidence IDs of prior versions replaced by this version.
     pub supersedes: Vec<String>,
@@ -244,6 +264,14 @@ pub enum ReasonCode {
     RightsProfileMismatch,
     RightsDenied,
     RightsUnknown,
+    RightsProofMissing,
+    RightsProofUnverifiable,
+    RightsProofIdentityMismatch,
+    RightsProofProfileMismatch,
+    RightsProofDispositionMismatch,
+    RightsProofNotYetValid,
+    RightsProofExpired,
+    RightsProofMalformedVerifier,
     KnownAtMissing,
     AvailabilityProofMissing,
     AvailabilityProofUnverifiable,
@@ -267,6 +295,14 @@ impl ReasonCode {
             Self::RightsProfileMismatch => "RIGHTS_PROFILE_MISMATCH",
             Self::RightsDenied => "RIGHTS_DENIED",
             Self::RightsUnknown => "RIGHTS_UNKNOWN",
+            Self::RightsProofMissing => "RIGHTS_PROOF_MISSING",
+            Self::RightsProofUnverifiable => "RIGHTS_PROOF_UNVERIFIABLE",
+            Self::RightsProofIdentityMismatch => "RIGHTS_PROOF_IDENTITY_MISMATCH",
+            Self::RightsProofProfileMismatch => "RIGHTS_PROOF_PROFILE_MISMATCH",
+            Self::RightsProofDispositionMismatch => "RIGHTS_PROOF_DISPOSITION_MISMATCH",
+            Self::RightsProofNotYetValid => "RIGHTS_PROOF_NOT_YET_VALID",
+            Self::RightsProofExpired => "RIGHTS_PROOF_EXPIRED",
+            Self::RightsProofMalformedVerifier => "RIGHTS_PROOF_MALFORMED_VERIFIER",
             Self::KnownAtMissing => "KNOWN_AT_MISSING",
             Self::AvailabilityProofMissing => "AVAILABILITY_PROOF_MISSING",
             Self::AvailabilityProofUnverifiable => "AVAILABILITY_PROOF_UNVERIFIABLE",
@@ -377,6 +413,75 @@ pub fn evaluate_evidence(record: &EvidenceVersion, context: &EvaluationContext) 
         }
         RightsDisposition::Unknown => {
             reasons.push(ReasonCode::RightsUnknown);
+            indeterminate = true;
+        }
+    }
+
+    match &record.rights_proof {
+        RightsProof::Verified {
+            proof_ref,
+            evidence_id,
+            principal_id,
+            rights_profile_id,
+            disposition,
+            valid_from,
+            valid_until,
+            verifier_id,
+            verifier_build_sha256,
+        } => {
+            if proof_ref.trim().is_empty()
+                || evidence_id != &record.evidence_id
+                || principal_id != &context.principal_id
+            {
+                reasons.push(ReasonCode::RightsProofIdentityMismatch);
+                failed = true;
+            }
+            if rights_profile_id != &context.rights_profile_id
+                || rights_profile_id != &record.rights_profile_id
+            {
+                reasons.push(ReasonCode::RightsProofProfileMismatch);
+                failed = true;
+            }
+            if disposition != &record.rights {
+                reasons.push(ReasonCode::RightsProofDispositionMismatch);
+                failed = true;
+            }
+            if verifier_id.trim().is_empty()
+                || verifier_build_sha256.len() != 64
+                || !verifier_build_sha256.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            {
+                reasons.push(ReasonCode::RightsProofMalformedVerifier);
+                failed = true;
+            }
+            if let (Some(start), Some(end)) = (*valid_from, *valid_until) {
+                if end <= start {
+                    reasons.push(ReasonCode::RightsProofMalformedVerifier);
+                    failed = true;
+                }
+            }
+            if valid_from.is_some_and(|start| context.decision_frontier < start) {
+                reasons.push(ReasonCode::RightsProofNotYetValid);
+                failed = true;
+            }
+            if valid_until.is_some_and(|end| context.decision_frontier >= end) {
+                reasons.push(ReasonCode::RightsProofExpired);
+                failed = true;
+            }
+            if *disposition == RightsDisposition::NotAuthorized {
+                reasons.push(ReasonCode::RightsDenied);
+                failed = true;
+            }
+            if *disposition == RightsDisposition::Unknown {
+                reasons.push(ReasonCode::RightsUnknown);
+                indeterminate = true;
+            }
+        }
+        RightsProof::Missing => {
+            reasons.push(ReasonCode::RightsProofMissing);
+            indeterminate = true;
+        }
+        RightsProof::Unverifiable => {
+            reasons.push(ReasonCode::RightsProofUnverifiable);
             indeterminate = true;
         }
     }
@@ -570,6 +675,17 @@ mod tests {
             retrieved_at: ts(retrieved),
             rights_profile_id: "public-research-v1".into(),
             rights: RightsDisposition::Authorized,
+            rights_proof: RightsProof::Verified {
+                proof_ref: format!("rights-proof:{id}"),
+                evidence_id: id.into(),
+                principal_id: "researcher:public-profile".into(),
+                rights_profile_id: "public-research-v1".into(),
+                disposition: RightsDisposition::Authorized,
+                valid_from: Some(ts("2026-01-01T00:00:00Z")),
+                valid_until: None,
+                verifier_id: "mycelix-rights-verifier:v1".into(),
+                verifier_build_sha256: "a".repeat(64),
+            },
             availability_proof: AvailabilityProof::Verified {
                 proof_ref: format!("proof:{id}"),
                 kind: AvailabilityProofKind::PrimaryReleaseRecord,
@@ -686,11 +802,69 @@ mod tests {
         let mut unknown = denied;
         unknown.evidence_id = "evidence:rights-unknown".into();
         unknown.rights = RightsDisposition::Unknown;
+        unknown.rights_proof = RightsProof::Unverifiable;
         if let AvailabilityProof::Verified { evidence_id, proof_ref, .. } = &mut unknown.availability_proof {
             *evidence_id = unknown.evidence_id.clone();
             *proof_ref = "proof:rights-unknown".into();
         }
         assert_eq!(evaluate_evidence(&unknown, &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z")).disposition, Disposition::Indeterminate);
+    }
+
+
+    #[test]
+    fn rights_proof_is_bound_to_principal_profile_and_decision_frontier() {
+        let base = evidence("evidence:rights-proof", "2026-11-08T09:00:00Z", "2026-11-08T09:05:00Z");
+        let ctx = context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z");
+
+        let mut wrong_principal = base.clone();
+        if let RightsProof::Verified { principal_id, .. } = &mut wrong_principal.rights_proof {
+            *principal_id = "researcher:other-profile".into();
+        }
+        let result = evaluate_evidence(&wrong_principal, &ctx);
+        assert_eq!(result.disposition, Disposition::Fail);
+        assert!(result.reasons.contains(&ReasonCode::RightsProofIdentityMismatch));
+
+        let mut wrong_profile = base.clone();
+        if let RightsProof::Verified { rights_profile_id, .. } = &mut wrong_profile.rights_proof {
+            *rights_profile_id = "restricted-research-v2".into();
+        }
+        let result = evaluate_evidence(&wrong_profile, &ctx);
+        assert_eq!(result.disposition, Disposition::Fail);
+        assert!(result.reasons.contains(&ReasonCode::RightsProofProfileMismatch));
+
+        let mut expired = base;
+        if let RightsProof::Verified { valid_until, .. } = &mut expired.rights_proof {
+            *valid_until = Some(ts("2026-11-09T12:00:00Z"));
+        }
+        let result = evaluate_evidence(&expired, &ctx);
+        assert_eq!(result.disposition, Disposition::Fail);
+        assert!(result.reasons.contains(&ReasonCode::RightsProofExpired));
+    }
+
+    #[test]
+    fn self_asserted_authorized_rights_without_proof_are_indeterminate() {
+        let mut record = evidence("evidence:rights-missing", "2026-11-08T09:00:00Z", "2026-11-08T09:05:00Z");
+        record.rights_proof = RightsProof::Missing;
+        let result = evaluate_evidence(
+            &record,
+            &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"),
+        );
+        assert_eq!(result.disposition, Disposition::Indeterminate);
+        assert!(result.reasons.contains(&ReasonCode::RightsProofMissing));
+    }
+
+    #[test]
+    fn rights_proof_disposition_must_match_evidence_rights_state() {
+        let mut record = evidence("evidence:rights-mismatch", "2026-11-08T09:00:00Z", "2026-11-08T09:05:00Z");
+        if let RightsProof::Verified { disposition, .. } = &mut record.rights_proof {
+            *disposition = RightsDisposition::NotAuthorized;
+        }
+        let result = evaluate_evidence(
+            &record,
+            &context(EvaluationMode::HistoricalReconstruction, "2026-11-09T12:00:00Z"),
+        );
+        assert_eq!(result.disposition, Disposition::Fail);
+        assert!(result.reasons.contains(&ReasonCode::RightsProofDispositionMismatch));
     }
 
     #[test]
