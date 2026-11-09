@@ -1996,7 +1996,11 @@ mod tests {
         }
         direct += integral * step / 3.0;
         direct *= 0.7;
-        assert!((observed - direct).abs() < 2.0e-6);
+        assert!(
+            (observed - direct).abs() < 2.0e-6,
+            "observed={observed:.12}, direct={direct:.12}, absolute_error={:.6e}",
+            (observed - direct).abs()
+        );
     }
 
     #[test]
