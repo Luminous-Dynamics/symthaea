@@ -18,7 +18,7 @@
       "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "source_manifest_sha256": "ee3d073fa690832b7d79aab5e04827582a7fd8b56d4a4a2d608155859484e622",
-      "annotation_manifest_sha256": "255a50e9c2b0036e229d0b873d2ca19189da4091eeec87b18601e6d4ac95505b",
+      "annotation_manifest_sha256": "348f34c7946b5c37a359046137f68eb29bee04f3dd6d61c618a0778d527eb848",
       "derivation_manifest_sha256": null,
       "reviewer_ids": [
         "reviewer-a",
@@ -57,7 +57,7 @@
       "source_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "evaluation_audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "source_manifest_sha256": "ee3d073fa690832b7d79aab5e04827582a7fd8b56d4a4a2d608155859484e622",
-      "annotation_manifest_sha256": "255a50e9c2b0036e229d0b873d2ca19189da4091eeec87b18601e6d4ac95505b",
+      "annotation_manifest_sha256": "348f34c7946b5c37a359046137f68eb29bee04f3dd6d61c618a0778d527eb848",
       "derivation_manifest_sha256": null,
       "reviewer_ids": [
         "reviewer-a",
@@ -96,7 +96,7 @@
       "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "evaluation_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "source_manifest_sha256": "ee3d073fa690832b7d79aab5e04827582a7fd8b56d4a4a2d608155859484e622",
-      "annotation_manifest_sha256": "255a50e9c2b0036e229d0b873d2ca19189da4091eeec87b18601e6d4ac95505b",
+      "annotation_manifest_sha256": "348f34c7946b5c37a359046137f68eb29bee04f3dd6d61c618a0778d527eb848",
       "derivation_manifest_sha256": null,
       "reviewer_ids": [
         "reviewer-a",
@@ -135,7 +135,7 @@
       "source_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "evaluation_audio_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "source_manifest_sha256": "ee3d073fa690832b7d79aab5e04827582a7fd8b56d4a4a2d608155859484e622",
-      "annotation_manifest_sha256": "255a50e9c2b0036e229d0b873d2ca19189da4091eeec87b18601e6d4ac95505b",
+      "annotation_manifest_sha256": "348f34c7946b5c37a359046137f68eb29bee04f3dd6d61c618a0778d527eb848",
       "derivation_manifest_sha256": null,
       "reviewer_ids": [
         "reviewer-a",
