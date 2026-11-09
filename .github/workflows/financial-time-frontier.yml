@@ -39,5 +39,6 @@ jobs:
       - name: Require committed source to match rustfmt
         run: git diff --exit-code -- benchmarks/financial-time-frontier/src/lib.rs
       - name: Run unit and adversarial tests
+        if: always()
         working-directory: benchmarks/financial-time-frontier
         run: cargo test
