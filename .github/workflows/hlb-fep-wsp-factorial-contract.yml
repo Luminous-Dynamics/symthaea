@@ -98,46 +98,16 @@ jobs:
           rustfmt --edition 2024 --check src/dynamics/cfc/network.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/mod.rs
 
-      - name: Test four-factor contract invariants
-        run: |
-          set -euo pipefail
-          cargo metadata --locked --format-version 1 --no-deps > /dev/null
-
       - name: Assert hierarchical information-gain test discovery
         run: |
           set -euo pipefail
           cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --list > /tmp/hierarchical-information-gain-tests.txt
           test -s /tmp/hierarchical-information-gain-tests.txt
-          grep -q "hierarchical_information_gain::tests" /tmp/hierarchical-information-gain-tests.txt || (echo "ERROR: no hierarchical information-gain tests discovered"; exit 1)
-
+          grep -q "hierarchical_information_gain::tests" /tmp/hierarchical-information-gain-tests.txt || { echo "ERROR: no hierarchical information-gain tests discovered"; exit 1; }
       - name: Test four-factor contract invariants
         run: |
           set -euo pipefail
           cargo metadata --locked --format-version 1 --no-deps > /dev/null
-          cargo test --locked --release -p symthaea-core --lib weight_space_program::tests -- --nocapture
-          cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --nocapture
-          cargo test --locked --release -p symthaea-core --lib hdc::weight_program_adapter::tests -- --nocapture
-          cargo test --locked --release -p symthaea --lib dynamics::cfc::weight_program_adapter::tests -- --nocapture
-          cargo test --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract -- --nocapture
-      - name: Generate source-bound protocol receipt
-        env:
-          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          set -euo pipefail
-          mkdir -p research-results
-          cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
-          sha256sum docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log > research-results/SHA256SUMS
-          cat research-results/SHA256SUMS
-
-      - name: Upload protocol-validation receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: hlb-fep-wsp-factorial-contract-${{ github.event.pull_request.head.sha || github.sha }}
-          path: research-results/
-          if-no-files-found: warn
-          retention-days: 30
- /tmp/hierarchical-information-gain-tests.txt || { echo 'ERROR: no hierarchical information-gain unit tests were discovered'; exit 1; }
           cargo test --locked --release -p symthaea-core --lib weight_space_program::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --lib hdc::weight_program_adapter::tests -- --nocapture
