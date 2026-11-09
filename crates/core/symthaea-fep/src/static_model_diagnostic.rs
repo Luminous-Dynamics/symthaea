@@ -258,6 +258,11 @@ pub enum StaticModelDiagnosticError {
     NoFeasiblePolicy,
     #[error("rectangular risk {rectangular_risk} is below static risk {static_risk}")]
     RectangularityInvariant { static_risk: f64, rectangular_risk: f64 },
+    #[error("rectangular evaluation of the static policy {rectangular_risk} is below its static risk {static_risk}")]
+    StaticPolicyRectangularityInvariant {
+        static_risk: f64,
+        rectangular_risk: f64,
+    },
     #[error("clairvoyant lower bound {clairvoyant_risk} exceeds static robust risk {static_risk}")]
     ClairvoyanceInvariant { clairvoyant_risk: f64, static_risk: f64 },
     #[error("public observation history is unknown or has zero predictive probability")]
@@ -393,6 +398,10 @@ pub fn evaluate_static_model_diagnostic_problem(
     }
 
     let one_shot = evaluate_one_shot(problem)?;
+    let one_shot_decision_masks = 1_u64 << problem.one_shot_outcome_ids.len();
+    let one_shot_policy_evaluations =
+        (problem.one_shot_action_ids.len() as u64) * one_shot_decision_masks;
+    policy_evaluations += one_shot_policy_evaluations;
     let no_probe_robust_risk = no_probe_risk(problem);
     let rectangular_risk_of_static_policy = problem
         .model_vertices
@@ -406,6 +415,12 @@ pub fn evaluate_static_model_diagnostic_problem(
             )
         })
         .fold(0.0_f64, f64::max);
+    if rectangular_risk_of_static_policy + RISK_TOL < best_static.static_robust_risk {
+        return Err(StaticModelDiagnosticError::StaticPolicyRectangularityInvariant {
+            static_risk: best_static.static_robust_risk,
+            rectangular_risk: rectangular_risk_of_static_policy,
+        });
+    }
     let cross_stage_switching_stress_risk = cross_stage_switching_risk(
         problem,
         &best_static.action_indices,
@@ -801,6 +816,11 @@ fn validate_problem(
     for cost in &problem.one_shot_action_costs {
         if !cost.is_finite() || *cost < 0.0 {
             return Err(StaticModelDiagnosticError::InvalidCost);
+        }
+        if *cost > problem.maximum_worst_branch_cost + RISK_TOL {
+            return Err(StaticModelDiagnosticError::InvalidActionMenu(
+                "one-shot action exceeds the shared cost ceiling".to_owned(),
+            ));
         }
     }
 
@@ -1413,6 +1433,7 @@ mod tests {
         assert_eq!(result.report.no_probe_robust_risk, 0.5);
         assert!((result.report.one_shot.best_worst_case_risk - 0.5).abs() < 1e-12);
         assert_eq!(result.report.static_policy.worst_branch_cost, 2.0);
+        assert_eq!(result.report.policy_evaluations, 264);
         assert_eq!(result.report.static_policy.root_action_id, "CALIBRATE");
         assert!(result.report.static_policy.second_stage_action_by_history.iter().any(|x| {
             x.first_stage_history_id == "CAL-A" && x.action_id == "ACTION-A"
