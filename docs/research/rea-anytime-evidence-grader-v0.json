@@ -384,7 +384,7 @@
       ],
       "checkpoints": [
         {
-          "after_event_index": 2,
+          "after_event_index": 3,
           "decision": "stop_bounded",
           "claim_id": "no_network_event_in_session",
           "action_id": null,
