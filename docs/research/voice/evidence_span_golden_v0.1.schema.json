@@ -68,11 +68,11 @@
     "citation": {
       "type": "object",
       "required": [
-        "source_audio_sha256",
+        "evaluation_audio_sha256",
         "interval"
       ],
       "properties": {
-        "source_audio_sha256": {
+        "evaluation_audio_sha256": {
           "$ref": "#/$defs/digest"
         },
         "interval": {
@@ -233,7 +233,7 @@
       "type": "object",
       "required": [
         "id",
-        "source_audio_sha256",
+        "evaluation_audio_sha256",
         "sample_rate_hz",
         "sample_count",
         "reference_claims",
@@ -245,7 +245,7 @@
           "type": "string",
           "minLength": 1
         },
-        "source_audio_sha256": {
+        "evaluation_audio_sha256": {
           "$ref": "#/$defs/digest"
         },
         "sample_rate_hz": {
@@ -279,7 +279,7 @@
       "type": "object",
       "required": [
         "id",
-        "source_audio_sha256",
+        "evaluation_audio_sha256",
         "expected_error"
       ],
       "properties": {
@@ -287,10 +287,10 @@
           "type": "string",
           "minLength": 1
         },
-        "source_audio_sha256": {
+        "evaluation_audio_sha256": {
           "$ref": "#/$defs/digest"
         },
-        "citation_source_audio_sha256": {
+        "citation_evaluation_audio_sha256": {
           "$ref": "#/$defs/digest"
         },
         "sample_count": {
@@ -302,7 +302,7 @@
         },
         "expected_error": {
           "enum": [
-            "CitationSourceDigestMismatch",
+            "CitationEvaluationDigestMismatch",
             "InvalidInterval"
           ]
         }
