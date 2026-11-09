@@ -83,6 +83,10 @@ pub struct CandidateExperiment {
     pub measurement_sigma: Option<f64>,
     pub noise_calibration: NoiseCalibrationStatus,
     pub calibration_reference: Option<String>,
+    /// Probability this experiment returns a usable observation. Missingness
+    /// is assumed uninformative in this reference model, so adjusted EIG is
+    /// this probability multiplied by conditional model-identity EIG.
+    pub availability_probability: f64,
     pub cost: f64,
     /// Optional mutual-exclusion group for downstream portfolio selection.
     pub exclusive_group: Option<String>,
@@ -142,8 +146,14 @@ pub enum ExperimentDiscriminationStatus {
 pub struct PriorScenarioEIG {
     pub scenario_id: String,
     pub prior_entropy_nats: f64,
+    /// EIG conditional on obtaining a usable observation.
     pub coarse_eig_nats: f64,
+    /// EIG conditional on obtaining a usable observation.
     pub refined_eig_nats: f64,
+    /// Availability-adjusted EIG under the uninformative-missingness model.
+    pub availability_adjusted_eig_nats: f64,
+    /// Expected posterior entropy after accounting for missing observations.
+    pub expected_posterior_entropy_nats: f64,
     pub quadrature_error_nats: f64,
     pub converged: bool,
 }
@@ -154,11 +164,14 @@ pub struct ExperimentDiscriminationScore {
     pub experiment_id: String,
     pub observable_id: String,
     pub cost: f64,
+    pub availability_probability: f64,
     pub status: ExperimentDiscriminationStatus,
     pub prior_scenario_scores: Vec<PriorScenarioEIG>,
     pub worst_case_model_identity_eig_nats: Option<f64>,
     pub weighted_mean_model_identity_eig_nats: Option<f64>,
+    /// Availability-adjusted worst-case EIG per cost.
     pub worst_case_eig_per_cost: Option<f64>,
+    /// Availability-adjusted weighted-mean EIG per cost.
     pub weighted_mean_eig_per_cost: Option<f64>,
     /// True means OTHER_UNRESOLVED and any unenumerated model are outside the
     /// numerical EIG calculation; the report does not claim open-world closure.
@@ -229,6 +242,8 @@ pub enum ModelDiscriminationError {
     },
     #[error("experiment {0} must have a finite positive cost")]
     InvalidExperimentCost(String),
+    #[error("experiment {0} availability probability must be finite and in [0, 1]")]
+    InvalidAvailabilityProbability(String),
     #[error("experiment {0} has an empty mutual-exclusion group")]
     EmptyExclusiveGroup(String),
     #[error("experiment {experiment_id} has {actual} prediction rows; expected {expected}")]
@@ -549,6 +564,13 @@ fn validate_experiment(
     }
     if !experiment.cost.is_finite() || experiment.cost <= 0.0 {
         return Err(ModelDiscriminationError::InvalidExperimentCost(
+            experiment.experiment_id.clone(),
+        ));
+    }
+    if !experiment.availability_probability.is_finite()
+        || !(0.0..=1.0).contains(&experiment.availability_probability)
+    {
+        return Err(ModelDiscriminationError::InvalidAvailabilityProbability(
             experiment.experiment_id.clone(),
         ));
     }
