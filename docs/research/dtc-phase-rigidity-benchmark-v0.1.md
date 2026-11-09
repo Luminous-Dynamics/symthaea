@@ -94,6 +94,31 @@ A perfect-pi-pulse noninteracting trace can satisfy the finite-sweep frequency-l
 
 The UAP Observatory's new `observability::analyze_jacobian` follows the same epistemic rule in another domain: return data-only rank/null directions before priors are considered. Neither module is itself a physical discovery claim.
 
+## Executable AC-probe information benchmark
+
+The fractal-time crate now includes a separate finite-system sensing path:
+
+- `exact_floquet::KickedIsingFloquet::step_with_uniform_ac_probe` applies a declared sampled longitudinal probe kick coupled to the total (Z) magnetization.
+- `dtc_sensing::evaluate_dtc_probe_sensing` compares a zero-probe baseline with a nominal probe and symmetric amplitude perturbations, all with the same initial state, Hamiltonian, pulse, frequency, duration and measurement.
+- The final readout is the exact (N+1)-outcome distribution of total down-spin count, obtained by aggregating computational-basis probabilities by Hamming weight.
+- The local classical Fisher information is calculated from the full distribution using a centered finite difference in probe-kick amplitude:
+  
+  (F(A)=\sum_k [\partial_A p_k(A)]^2/p_k(A)).
+
+- The report includes Fisher information per final readout and divided by simulated Floquet periods, plus finite-window subharmonic order and an explicitly right-censored lifetime estimate.
+
+This is a closed-system, small-N, sampled-kick model. It is **not** a reproduction of the 13C diamond device, which uses dipolar-coupled spins, a two-tone Floquet protocol, quasi-continuous NMR readout, and an AC-field-mediated lifetime-extension mechanism. The experiment reports frequency-selective response with linewidth below 70 mHz and an interaction-assisted lifetime extension up to three orders of magnitude; those device results are experimental references, not validation targets that the toy model can claim to match. (Moon et al., *Nature Physics* 22, 367–373 (2026), DOI: 10.1038/s41567-025-03163-6.)
+
+The intended initial benchmark is a matched-budget scan over coupling and AC frequency, including:
+- (J=0) noninteracting control;
+- interacting nearest-neighbour kicked-Ising controls;
+- fixed spin count, pulse detuning, initial product state, probe amplitudes, total Floquet periods and readout;
+- finite-difference step convergence for the amplitude derivative;
+- probability normalization, state-vector norm, and singular readout-support checks;
+- Fisher information per shot and per drive period, reported separately from the lifetime and subharmonic response.
+
+A strong result would be a reproducible coupling/frequency region in which the interaction changes the calibrated readout information under matched resource constraints, with independent reproduction and robustness to initial-state family, finite-difference step, readout observable and noise. A large Fisher value at one parameter point, a narrow zero-padded FFT bin or a long-lived finite trace is not sufficient to claim a time-crystal sensor or a quantum advantage.
+
 ## Baselines
 
 1. finite-window FFT maximum only;
