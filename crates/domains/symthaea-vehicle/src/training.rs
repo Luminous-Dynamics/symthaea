@@ -492,8 +492,13 @@ impl VehicleTrainer {
             let sensor_hv = encoder.encode(&state);
             let student_proposal_command = controller.forward(&sensor_hv, dt as f32);
             let train_this_step = step % self.config.train_every == 0;
-            let teacher_action_needed = train_controller
-                && (pd_weight > 0.01 || train_this_step || self.config.collect_telemetry);
+            let teacher_action_needed = if train_controller {
+                pd_weight > 0.01 || train_this_step || self.config.collect_telemetry
+            } else {
+                // In frozen evaluation, compute a shadow teacher only for
+                // telemetry comparison. It is never blended or supervised.
+                self.config.collect_telemetry
+            };
             let teacher_command = if teacher_action_needed {
                 Some(match task {
                     VehicleTask::Follow { target_gap } => pd_cruise_with_follow(
@@ -624,6 +629,7 @@ impl VehicleTrainer {
                     teacher_action_used_for_supervision: train_controller
                         && train_this_step
                         && teacher_command.is_some(),
+                    teacher_action_evaluation_only: !train_controller && teacher_command.is_some(),
                     pd_teacher_blend_weight,
                     blended_action_steering: blended_action_command.steering,
                     blended_action_throttle: blended_action_command.throttle,
@@ -875,7 +881,7 @@ impl VehicleTrainer {
                 if !metrics.telemetry.is_empty() {
                     let step_path = format!("{}/episode_{:04}.csv", dir, ep);
                     let mut csv = String::from(
-                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers,follow_oracle_available,follow_oracle_actor_id,follow_oracle_gap_m,follow_oracle_relative_speed_mps,follow_oracle_snapshot_age_s,student_proposal_steering,student_proposal_throttle,student_proposal_brake,teacher_target_steering,teacher_target_throttle,teacher_target_brake,student_teacher_action_delta_l1,teacher_action_used_for_blend,teacher_action_used_for_supervision,pd_teacher_blend_weight,blended_action_steering,blended_action_throttle,blended_action_brake,executed_action_steering,executed_action_throttle,executed_action_brake,training_enabled,follow_oracle_used_for_policy\n",
+                        "step,time,speed,heading,lateral_offset,tire_slip_front,tire_slip_rear,episode_reward,free_energy,tau_factor,control_effort,mesh_peers,follow_oracle_available,follow_oracle_actor_id,follow_oracle_gap_m,follow_oracle_relative_speed_mps,follow_oracle_snapshot_age_s,student_proposal_steering,student_proposal_throttle,student_proposal_brake,teacher_target_steering,teacher_target_throttle,teacher_target_brake,student_teacher_action_delta_l1,teacher_action_used_for_blend,teacher_action_used_for_supervision,teacher_action_evaluation_only,pd_teacher_blend_weight,blended_action_steering,blended_action_throttle,blended_action_brake,executed_action_steering,executed_action_throttle,executed_action_brake,training_enabled,follow_oracle_used_for_policy\n",
                     );
                     for t in &metrics.telemetry {
                         let actor_id = t
@@ -911,7 +917,7 @@ impl VehicleTrainer {
                             .map(|value| format!("{value:.6}"))
                             .unwrap_or_default();
                         csv.push_str(&format!(
-                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
+                            "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{},{},{},{:.6},{:.6},{:.6},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{}\n",
                             t.step,
                             t.time,
                             t.speed,
@@ -938,6 +944,7 @@ impl VehicleTrainer {
                             student_teacher_delta,
                             t.teacher_action_used_for_blend,
                             t.teacher_action_used_for_supervision,
+                            t.teacher_action_evaluation_only,
                             t.pd_teacher_blend_weight,
                             t.blended_action_steering,
                             t.blended_action_throttle,
