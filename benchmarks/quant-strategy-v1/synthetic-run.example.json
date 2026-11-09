@@ -5,7 +5,7 @@
   "decision_time": "2026-01-05T16:00:00Z",
   "universe": {
     "profile_id": "SYNTHETIC_TWO_ASSET_V1",
-    "membership_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "membership_sha256": "a155604089947b3a57c62b6c389ce7a11ff1027fb50ceea13979bae3ce570ecf",
     "delisted_included": true,
     "corporate_action_profile": "synthetic_no_actions_v1"
   },
@@ -18,7 +18,7 @@
   },
   "data_frontier": {
     "mode": "streaming_known_at",
-    "source_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "source_manifest_sha256": "058371794a488288f69c8608bba85ad2584f077734f1394d10a9809942182b16",
     "point_in_time": true,
     "event_time_and_known_at_separate": true
   },
