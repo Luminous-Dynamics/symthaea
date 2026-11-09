@@ -611,10 +611,7 @@ mod tests {
     #[test]
     fn unavailable_trials_remain_in_denominator_as_explicit_abstentions() {
         let hypotheses = vec![hypothesis("a", b'a'), hypothesis("b", b'b')];
-        let mut candidate = experiment(vec![
-            prediction("a", 0.0, 0.0),
-            prediction("b", 5.0, 0.0),
-        ]);
+        let mut candidate = experiment(vec![prediction("a", 0.0, 0.0), prediction("b", 5.0, 0.0)]);
         candidate.availability_probability = 0.0;
         let generators = vec![
             RecoveryGenerator {
@@ -633,19 +630,15 @@ mod tests {
                 predictive_sigma: 0.0,
             },
         ];
-        let report = evaluate_model_recovery(
-            &hypotheses,
-            &candidate,
-            &prior(),
-            &generators,
-            64,
-            123,
-            0.8,
-        )
-        .unwrap();
+        let report =
+            evaluate_model_recovery(&hypotheses, &candidate, &prior(), &generators, 64, 123, 0.8)
+                .unwrap();
 
         assert_eq!(report.availability_probability, 0.0);
-        assert_eq!(report.unavailable_observations_by_generator, vec![64, 64, 64]);
+        assert_eq!(
+            report.unavailable_observations_by_generator,
+            vec![64, 64, 64]
+        );
         assert_eq!(report.named_model_accuracy, 0.0);
         assert_eq!(report.named_model_coverage, 0.0);
         assert_eq!(report.named_model_selective_accuracy, None);
@@ -657,10 +650,7 @@ mod tests {
     #[test]
     fn fully_available_recovery_has_no_unavailable_trials() {
         let hypotheses = vec![hypothesis("a", b'a'), hypothesis("b", b'b')];
-        let candidate = experiment(vec![
-            prediction("a", 0.0, 0.0),
-            prediction("b", 5.0, 0.0),
-        ]);
+        let candidate = experiment(vec![prediction("a", 0.0, 0.0), prediction("b", 5.0, 0.0)]);
         let generators = vec![
             RecoveryGenerator {
                 generator_id: "a".to_string(),
@@ -673,16 +663,9 @@ mod tests {
                 predictive_sigma: 0.0,
             },
         ];
-        let report = evaluate_model_recovery(
-            &hypotheses,
-            &candidate,
-            &prior(),
-            &generators,
-            32,
-            456,
-            0.8,
-        )
-        .unwrap();
+        let report =
+            evaluate_model_recovery(&hypotheses, &candidate, &prior(), &generators, 32, 456, 0.8)
+                .unwrap();
 
         assert_eq!(report.availability_probability, 1.0);
         assert_eq!(report.unavailable_observations_by_generator, vec![0, 0]);
