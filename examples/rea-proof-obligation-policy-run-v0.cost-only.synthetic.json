@@ -1,0 +1,97 @@
+{
+  "schema_version": "0.1.0",
+  "dataset_id": "rea-proof-obligation-acquisition",
+  "policy_id": "cheapest-eligible-baseline-v0",
+  "cases": [
+    {
+      "case_id": "REA-POA-001",
+      "selected_experiment_id": "verify_deployment_manifest",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-002",
+      "selected_experiment_id": "fetch_second_advisory_mirror",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-003",
+      "selected_experiment_id": "replay_provider_response",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-004",
+      "selected_experiment_id": "trust_terminal_cursor",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-005",
+      "selected_experiment_id": "replay_transparency_checkpoint",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-006",
+      "selected_experiment_id": "repeat_filtered_query",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-007",
+      "selected_experiment_id": "reuse_old_advisory",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-008",
+      "selected_experiment_id": "collect_more_cache_logs",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-009",
+      "selected_experiment_id": "average_scanner_scores",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-010",
+      "selected_experiment_id": "convert_to_f64_and_compare",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-011",
+      "selected_experiment_id": "compare_si_dimensions_only",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-012",
+      "selected_experiment_id": "claim_absence_from_no_event",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-013",
+      "selected_experiment_id": "authorized_staging_reproduction",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-014",
+      "selected_experiment_id": "run_disposable_clone_migration",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-015",
+      "selected_experiment_id": "count_acquired_files",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-016",
+      "selected_experiment_id": "replay_public_log_again",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-017",
+      "selected_experiment_id": "run_second_tool_on_same_mount",
+      "claimed_ready_before_action": false
+    },
+    {
+      "case_id": "REA-POA-018",
+      "selected_experiment_id": "collect_crash_logs_first",
+      "claimed_ready_before_action": false
+    }
+  ]
+}
