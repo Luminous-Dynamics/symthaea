@@ -12,6 +12,8 @@
 //! A successful floating-point check is an evidence-qualified numerical
 //! certificate under those tolerances, not a formal exact-arithmetic proof.
 
+use core::cmp::Ordering;
+
 #[derive(Debug, Clone)]
 pub struct LpProblem {
     pub rows: usize,
@@ -552,6 +554,304 @@ fn normalized_ratio(numerator: f64, denominator: f64) -> f64 {
     }
 }
 
+
+// --- Exact certificate checks for binary64 input values --------------------
+//
+// Every finite f64 is an exact dyadic rational. A product of two f64 values
+// therefore has an integer significand of at most 106 bits and a power-of-two
+// exponent in [-2148, 1942]. The accumulator below sums those products exactly
+// using separate positive/negative fixed-width unsigned superaccumulators.
+// 68 limbs cover the complete binary64 product exponent span plus the maximum
+// possible usize-sized term count on 64-bit targets.
+//
+// These routines certify algebraic signs/equalities of the exact binary64
+// inputs. They do not certify decimal values that were rounded before input,
+// nor do they turn an approximate solver iterate into an exact certificate.
+
+const EXACT_ACCUMULATOR_LIMBS: usize = 68;
+const EXACT_PRODUCT_EXPONENT_OFFSET: i32 = 2148;
+
+fn add_word(
+    words: &mut [u64; EXACT_ACCUMULATOR_LIMBS],
+    mut index: usize,
+    mut value: u64,
+) -> Result<(), VerifyError> {
+    while value != 0 {
+        if index >= EXACT_ACCUMULATOR_LIMBS {
+            return Err(VerifyError::NonFiniteArithmetic);
+        }
+        let sum = words[index] as u128 + value as u128;
+        words[index] = sum as u64;
+        value = (sum >> 64) as u64;
+        index += 1;
+    }
+    Ok(())
+}
+
+fn add_shifted_product(
+    words: &mut [u64; EXACT_ACCUMULATOR_LIMBS],
+    product: u128,
+    shift: usize,
+) -> Result<(), VerifyError> {
+    let word_index = shift / 64;
+    let bit_shift = shift % 64;
+    let low = product as u64;
+    let high = (product >> 64) as u64;
+
+    if bit_shift == 0 {
+        add_word(words, word_index, low)?;
+        add_word(words, word_index + 1, high)?;
+    } else {
+        let low_part = low << bit_shift;
+        let middle_part =
+            (low >> (64 - bit_shift)) | (high << bit_shift);
+        let high_part = high >> (64 - bit_shift);
+        add_word(words, word_index, low_part)?;
+        add_word(words, word_index + 1, middle_part)?;
+        add_word(words, word_index + 2, high_part)?;
+    }
+    Ok(())
+}
+
+fn exact_sum_products(terms: &[(f64, f64, bool)]) -> Result<Ordering, VerifyError> {
+    let mut positive = [0_u64; EXACT_ACCUMULATOR_LIMBS];
+    let mut negative = [0_u64; EXACT_ACCUMULATOR_LIMBS];
+
+    for &(left, right, subtract) in terms {
+        if !left.is_finite() || !right.is_finite() {
+            return Err(VerifyError::NonFiniteInput);
+        }
+
+        let left_bits = left.to_bits();
+        let right_bits = right.to_bits();
+        let left_exp = ((left_bits >> 52) & 0x7ff) as i32;
+        let right_exp = ((right_bits >> 52) & 0x7ff) as i32;
+        let fraction_mask = (1_u64 << 52) - 1;
+        let left_fraction = left_bits & fraction_mask;
+        let right_fraction = right_bits & fraction_mask;
+
+        let (left_mantissa, left_exponent) = if left_exp == 0 {
+            (left_fraction, -1074)
+        } else {
+            ((1_u64 << 52) | left_fraction, left_exp - 1023 - 52)
+        };
+        let (right_mantissa, right_exponent) = if right_exp == 0 {
+            (right_fraction, -1074)
+        } else {
+            ((1_u64 << 52) | right_fraction, right_exp - 1023 - 52)
+        };
+
+        if left_mantissa == 0 || right_mantissa == 0 {
+            continue;
+        }
+
+        let product = (left_mantissa as u128) * (right_mantissa as u128);
+        let product_exponent = left_exponent + right_exponent;
+        let shift = product_exponent + EXACT_PRODUCT_EXPONENT_OFFSET;
+        if shift < 0 {
+            return Err(VerifyError::NonFiniteArithmetic);
+        }
+
+        let is_negative =
+            (left_bits >> 63 != 0) ^ (right_bits >> 63 != 0) ^ subtract;
+        if is_negative {
+            add_shifted_product(&mut negative, product, shift as usize)?;
+        } else {
+            add_shifted_product(&mut positive, product, shift as usize)?;
+        }
+    }
+
+    Ok(positive.iter().rev().cmp(negative.iter().rev()))
+}
+
+fn exact_dot_sign(left: &[f64], right: &[f64]) -> Result<Ordering, VerifyError> {
+    if left.len() != right.len() {
+        return Err(VerifyError::InvalidDimensions);
+    }
+    let terms: Vec<(f64, f64, bool)> = left
+        .iter()
+        .copied()
+        .zip(right.iter().copied())
+        .map(|(a, b)| (a, b, false))
+        .collect();
+    exact_sum_products(&terms)
+}
+
+/// Exact sign of constant - dot(left, right).
+fn exact_affine_sign(
+    constant: f64,
+    left: &[f64],
+    right: &[f64],
+) -> Result<Ordering, VerifyError> {
+    if left.len() != right.len() {
+        return Err(VerifyError::InvalidDimensions);
+    }
+    let mut terms = Vec::with_capacity(left.len() + 1);
+    terms.push((constant, 1.0, false));
+    terms.extend(
+        left.iter()
+            .copied()
+            .zip(right.iter().copied())
+            .map(|(a, b)| (a, b, true)),
+    );
+    exact_sum_products(&terms)
+}
+
+fn exact_difference_of_dots_sign(
+    left_a: &[f64],
+    left_b: &[f64],
+    right_a: &[f64],
+    right_b: &[f64],
+) -> Result<Ordering, VerifyError> {
+    if left_a.len() != left_b.len() || right_a.len() != right_b.len() {
+        return Err(VerifyError::InvalidDimensions);
+    }
+    let mut terms = Vec::with_capacity(left_a.len() + right_a.len());
+    terms.extend(
+        left_a
+            .iter()
+            .copied()
+            .zip(left_b.iter().copied())
+            .map(|(a, b)| (a, b, false)),
+    );
+    terms.extend(
+        right_a
+            .iter()
+            .copied()
+            .zip(right_b.iter().copied())
+            .map(|(a, b)| (a, b, true)),
+    );
+    exact_sum_products(&terms)
+}
+
+/// Exact optimality check over the finite binary64 values in the original model.
+///
+/// This requires exact primal equalities, nonnegative primal values, exact dual
+/// inequalities and exact primal/dual objective equality. Approximate solver
+/// outputs should use verify_optimal() instead and retain its tolerance label.
+pub fn verify_optimal_exact(
+    problem: &LpProblem,
+    certificate: &OptimalCertificate,
+) -> Result<(), VerifyError> {
+    problem.validate()?;
+    if certificate.primal.len() != problem.cols || certificate.dual.len() != problem.rows {
+        return Err(VerifyError::InvalidDimensions);
+    }
+    if !all_finite(&certificate.primal) || !all_finite(&certificate.dual) {
+        return Err(VerifyError::NonFiniteInput);
+    }
+    if certificate.primal.iter().any(|value| *value < 0.0) {
+        return Err(VerifyError::PrimalNonnegativeViolation);
+    }
+
+    for row in 0..problem.rows {
+        let start = row * problem.cols;
+        let end = start + problem.cols;
+        if exact_affine_sign(
+            problem.b[row],
+            &problem.a[start..end],
+            &certificate.primal,
+        )? != Ordering::Equal
+        {
+            return Err(VerifyError::PrimalInfeasible);
+        }
+    }
+
+    for col in 0..problem.cols {
+        let column: Vec<f64> = (0..problem.rows)
+            .map(|row| problem.a[row * problem.cols + col])
+            .collect();
+        if exact_affine_sign(problem.c[col], &column, &certificate.dual)?
+            == Ordering::Less
+        {
+            return Err(VerifyError::DualInfeasible);
+        }
+    }
+
+    if exact_difference_of_dots_sign(
+        &problem.c,
+        &certificate.primal,
+        &problem.b,
+        &certificate.dual,
+    )? != Ordering::Equal
+    {
+        return Err(VerifyError::DualityGapTooLarge);
+    }
+    Ok(())
+}
+
+/// Exact Farkas check over finite binary64 input values. Unlike the
+/// tolerance-based verifier, this requires A^T y >= 0 and b^T y < 0 exactly.
+pub fn verify_infeasible_exact(
+    problem: &LpProblem,
+    certificate: &FarkasCertificate,
+) -> Result<(), VerifyError> {
+    problem.validate()?;
+    if certificate.y.len() != problem.rows {
+        return Err(VerifyError::InvalidDimensions);
+    }
+    if !all_finite(&certificate.y) {
+        return Err(VerifyError::NonFiniteInput);
+    }
+
+    for col in 0..problem.cols {
+        let column: Vec<f64> = (0..problem.rows)
+            .map(|row| problem.a[row * problem.cols + col])
+            .collect();
+        if exact_dot_sign(&column, &certificate.y)? == Ordering::Less {
+            return Err(VerifyError::FarkasConeViolation);
+        }
+    }
+    if exact_dot_sign(&problem.b, &certificate.y)? != Ordering::Less {
+        return Err(VerifyError::NoStrictFarkasContradiction);
+    }
+    Ok(())
+}
+
+/// Exact unboundedness check over finite binary64 input values.
+pub fn verify_unbounded_exact(
+    problem: &LpProblem,
+    certificate: &UnboundedCertificate,
+) -> Result<(), VerifyError> {
+    problem.validate()?;
+    if certificate.feasible_point.len() != problem.cols
+        || certificate.improving_ray.len() != problem.cols
+    {
+        return Err(VerifyError::InvalidDimensions);
+    }
+    if !all_finite(&certificate.feasible_point) || !all_finite(&certificate.improving_ray) {
+        return Err(VerifyError::NonFiniteInput);
+    }
+    if certificate.feasible_point.iter().any(|value| *value < 0.0) {
+        return Err(VerifyError::RayNotFeasible);
+    }
+    if certificate.improving_ray.iter().any(|value| *value < 0.0) {
+        return Err(VerifyError::RayNotNonnegative);
+    }
+
+    for row in 0..problem.rows {
+        let start = row * problem.cols;
+        let end = start + problem.cols;
+        let matrix_row = &problem.a[start..end];
+        if exact_affine_sign(
+            problem.b[row],
+            matrix_row,
+            &certificate.feasible_point,
+        )? != Ordering::Equal
+        {
+            return Err(VerifyError::RayNotFeasible);
+        }
+        if exact_dot_sign(matrix_row, &certificate.improving_ray)? != Ordering::Equal {
+            return Err(VerifyError::RayNotFeasible);
+        }
+    }
+
+    if exact_dot_sign(&problem.c, &certificate.improving_ray)? != Ordering::Less {
+        return Err(VerifyError::RayNotImproving);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -560,6 +860,135 @@ mod tests {
         Tolerances::strict()
     }
 
+
+    #[test]
+    fn exact_optimality_accepts_binary64_exact_fixture() {
+        let problem = LpProblem {
+            rows: 1,
+            cols: 3,
+            a: vec![1.0, 1.0, 1.0],
+            b: vec![1.0],
+            c: vec![-3.0, -2.0, 0.0],
+        };
+        let certificate = OptimalCertificate {
+            primal: vec![1.0, 0.0, 0.0],
+            dual: vec![-3.0],
+        };
+        assert_eq!(verify_optimal_exact(&problem, &certificate), Ok(()));
+    }
+
+    #[test]
+    fn exact_optimality_rejects_tolerance_only_primal_point() {
+        let problem = LpProblem {
+            rows: 1,
+            cols: 2,
+            a: vec![1.0, 1.0],
+            b: vec![1.0],
+            c: vec![-1.0, 0.0],
+        };
+        let certificate = OptimalCertificate {
+            primal: vec![0.5, 0.5000000000001],
+            dual: vec![-1.0],
+        };
+        assert!(verify_optimal(&problem, &certificate, tolerances()).is_ok());
+        assert_eq!(
+            verify_optimal_exact(&problem, &certificate),
+            Err(VerifyError::PrimalInfeasible)
+        );
+    }
+
+    #[test]
+    fn exact_farkas_rejects_tiny_negative_cone_component() {
+        let problem = LpProblem {
+            rows: 2,
+            cols: 2,
+            a: vec![1.0e12, 0.0, 0.0, -1.0],
+            b: vec![-1.0, 0.0],
+            c: vec![0.0, 0.0],
+        };
+        let certificate = FarkasCertificate { y: vec![1.0, 1.0e-12] };
+        assert_eq!(
+            verify_infeasible(&problem, &certificate, tolerances()),
+            Ok(FarkasMetrics {
+                dual_cone_violation: 1.0e-12,
+                contradiction_margin: 1.0,
+                b_transpose_y: -1.0,
+            })
+        );
+        assert_eq!(
+            verify_infeasible_exact(&problem, &certificate),
+            Err(VerifyError::FarkasConeViolation)
+        );
+    }
+
+    #[test]
+    fn exact_farkas_accepts_valid_certificate() {
+        let problem = LpProblem {
+            rows: 1,
+            cols: 2,
+            a: vec![1.0, 1.0],
+            b: vec![-1.0],
+            c: vec![0.0, 0.0],
+        };
+        let certificate = FarkasCertificate { y: vec![1.0] };
+        assert_eq!(verify_infeasible_exact(&problem, &certificate), Ok(()));
+    }
+
+    #[test]
+    fn exact_unboundedness_accepts_valid_ray() {
+        let problem = LpProblem {
+            rows: 1,
+            cols: 1,
+            a: vec![0.0],
+            b: vec![0.0],
+            c: vec![-1.0],
+        };
+        let certificate = UnboundedCertificate {
+            feasible_point: vec![0.0],
+            improving_ray: vec![1.0],
+        };
+        assert_eq!(verify_unbounded_exact(&problem, &certificate), Ok(()));
+    }
+
+    #[test]
+    fn exact_unboundedness_rejects_tiny_nonzero_nullspace_residual() {
+        let problem = LpProblem {
+            rows: 1,
+            cols: 1,
+            a: vec![1.0],
+            b: vec![0.0],
+            c: vec![-1.0],
+        };
+        let certificate = UnboundedCertificate {
+            feasible_point: vec![0.0],
+            improving_ray: vec![1.0e-200],
+        };
+        assert_eq!(
+            verify_unbounded_exact(&problem, &certificate),
+            Err(VerifyError::RayNotFeasible)
+        );
+    }
+
+    #[test]
+    fn exact_dot_sign_survives_cancellation_and_subnormal_term() {
+        let tiny = f64::from_bits(1);
+        assert_eq!(
+            exact_dot_sign(
+                &[1.0e308, 1.0e308, 1.0],
+                &[1.0e-308, -1.0e-308, -tiny],
+            ),
+            Ok(Ordering::Less)
+        );
+    }
+
+    #[test]
+    fn exact_dot_sign_handles_large_exponent_separation() {
+        let tiny = f64::from_bits(1);
+        assert_eq!(
+            exact_dot_sign(&[1.0, tiny], &[1.0, 1.0]),
+            Ok(Ordering::Greater)
+        );
+    }
     #[test]
     fn accepts_primal_dual_optimality_certificate() {
         // min -3x0 -2x1 subject to x0 + x1 + x2 = 1, x >= 0.
