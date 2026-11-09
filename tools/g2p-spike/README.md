@@ -1,6 +1,6 @@
 # G2P comparison spike
 
-This standalone Rust crate probes `piper-plus-g2p = 0.5.3` against a fixed English challenge set. It is deliberately outside the production workspace and has no effect on the active Muse/DiffSinger frontend.
+This standalone Rust crate probes `piper-plus-g2p = 0.5.3` against a fixed English challenge set. It enables the crate's `bundled-dicts` feature and uses `EnglishPhonemizer::new_bundled()`, so a clean CI runner does not depend on an ambient `cmudict_data.json`. It is deliberately outside the production workspace and has no effect on the active Muse/DiffSinger frontend.
 
 ## Run
 
