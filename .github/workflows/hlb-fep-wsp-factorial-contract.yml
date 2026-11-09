@@ -5,7 +5,6 @@ on:
     branches: [main, research/swi-001-weight-space-introspection]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
-      - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
@@ -20,7 +19,6 @@ on:
   push:
     branches: [research/hlb-fep-wsp-factorial-v2]
     paths:
-      - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
       - "crates/core/symthaea-core/Cargo.toml"
       - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
