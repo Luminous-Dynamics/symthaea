@@ -890,8 +890,7 @@ mod tests {
                         count_qbf_winning_strategy_profiles(&problem, &prefix, budget()).unwrap();
                     let expected = independent_profile_count(&problem, &prefix);
                     assert_eq!(
-                        actual.winning_strategy_profiles,
-                        expected,
+                        actual.winning_strategy_profiles, expected,
                         "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}"
                     );
                     assert_eq!(
