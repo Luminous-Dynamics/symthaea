@@ -112,11 +112,11 @@ Qualification states:
 - **Collecting:** neither condition holds and the budget remains.
 - **Inconclusive at budget:** the maximum confirmatory sample is exhausted without either conclusion.
 
-The campaign object owns the common alpha budget, frozen protocol digest, candidate ordinal sequence, and no-reuse registries for candidate-model and confirmatory-shard digests. Each candidate verifier also binds its precondition-gate digest.
+The campaign object owns the common alpha budget, frozen protocol digest, candidate ordinal sequence, and no-reuse registries for candidate-model digests, confirmatory-shard digests, and canonical confirmatory episode-ID digests. Each candidate must supply a sorted, unique, non-empty episode manifest with at least the maximum observation budget. The manifest digest is bound into the candidate binding, report, and checkpoint. The campaign reserves every episode identity before evaluation; a second candidate is rejected even when the same episodes are presented under a different shard digest. Each candidate verifier also binds its precondition-gate digest.
 
 ### Restartable evidence state
 
-The campaign exposes a deterministic checkpoint containing its fixed alpha/configuration, frozen protocol digest, next candidate ordinal, and sorted no-reuse registries for candidate and confirmatory-shard digests. Restore validates the checkpoint version, digest, registry cardinalities, and duplicate entries before another candidate can be assigned.
+The campaign exposes a deterministic checkpoint containing its fixed alpha/configuration, frozen protocol digest, next candidate ordinal, and sorted no-reuse registries for candidate, shard, and episode-ID digests. Restore validates the checkpoint version, digest, registry cardinalities, sorted uniqueness, digest formats, and a lower bound on reserved episode IDs implied by the number of candidates and maximum observation budget. A restored campaign cannot silently reset its episode reservations.
 
 Each in-progress candidate can also be checkpointed with its immutable binding, frozen test configuration, and ordered paired observations. Restore rebuilds the running mean, duplicate-episode set, and observation hash by replaying every observation. It rejects altered checkpoint contents, a report digest that does not reproduce, malformed losses, duplicate episodes, and evidence appearing after a terminal decision.
 
@@ -124,9 +124,9 @@ The checkpoint digest is an integrity check, not authentication. Durable storage
 
 ### Assumptions and limitations
 
-The guarantee is conditional on bounded paired losses, a frozen candidate, a fixed evaluation protocol, and a valid confirmatory sampling process. Candidate-specific shards must be fresh and not reused to select later edits. The campaign ledger prevents duplicate shard digests within a campaign and its checkpoint preserves that registry across authenticated restarts. It still cannot prove that a caller has truthfully described the underlying data split or that two different digests do not encode overlapping observations.
+The guarantee is conditional on bounded paired losses, a frozen candidate, a fixed evaluation protocol, stable canonical episode IDs, and a valid confirmatory sampling process. Candidate-specific shards must be fresh and not reused to select later edits. The campaign now rejects overlapping episode IDs across different shard digests and preserves those reservations across authenticated restarts. An episode-ID manifest is a strong identity guard, not a proof that source records are unique: a caller could still alias the same underlying record under different IDs. The independent evaluator must authenticate the mapping from canonical IDs to immutable source records and payloads, and the shard digest must bind the actual source data and split provenance.
 
-The current implementation uses conservative Hoeffding bounds. It does not yet implement task-family guardrail sequences, a campaign-level episode-content overlap oracle, empirical-Bernstein confidence sequences, or betting-based e-process comparisons. These are tracked in #11278.
+The current implementation uses conservative Hoeffding bounds and an ID-overlap registry. It does not yet implement authenticated source-record identity, a content-level deduplication oracle, task-family guardrail sequences, empirical-Bernstein confidence sequences, or betting-based e-process comparisons. These remain tracked in #11278.
 
 ## 4. Evidence chain
 
@@ -135,8 +135,8 @@ A candidate evaluation should be reproducible from:
 1. Base model and candidate model digests.
 2. WeightProgram digest, typed target manifest, and edit-budget claims.
 3. Open-world adequacy report and gate-decision digest.
-4. Frozen evaluation-protocol digest and candidate-specific confirmatory-shard digest.
-5. Ordered paired episode IDs and baseline/candidate loss values.
+4. Frozen evaluation-protocol digest, candidate-specific confirmatory-shard digest, and canonical confirmatory episode-manifest digest.
+5. Authenticated source-record identity for every episode ID, plus ordered paired episode IDs and baseline/candidate loss values.
 6. Sequential confidence-sequence report and digest.
 7. Protected-behavior, negative-control, rollback, and independent-verifier result manifests.
 8. Signed acceptance or rejection receipt.
@@ -166,7 +166,7 @@ These are proposed targets, not measured Symthaea results:
 | Power | At least 90% for the declared minimum detectable paired effect at the fixed evaluation budget |
 | No-effect behavior | No candidate accepted when the true improvement is below the practical threshold, within the family-wise error guarantee |
 | Evidence binding | 100% exact digest agreement across candidate, protocol, shard, precondition, and result receipts |
-| Data isolation | Zero confirmatory-shard reuse within a campaign |
+| Data isolation | Zero confirmatory-shard reuse and zero cross-candidate episode-ID overlap within a campaign; independently authenticated source-record identity required |
 | Capability preservation | No protected task family exceeds its preregistered non-inferiority margin |
 | Decision efficiency | Fewer probes or lower regret than matched EIG, greedy, always-inspect, and RL baselines where decision-relevant information is available |
 | Compute efficiency | Report latency, memory, allocations and energy at matched outcome quality |
