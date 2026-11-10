@@ -1381,6 +1381,91 @@
         "https://github.com/autonomousvision/navsim/blob/main/README.md",
         "https://github.com/autonomousvision/navsim/releases"
       ]
+    },
+    {
+      "id": "bench2drive-robust-2026",
+      "name": "Bench2Drive-Robust: Closed-Loop Autonomous Driving under Deployment Perturbations",
+      "category": "closed_loop_deployment_robustness",
+      "capability_target": [
+        "closed_loop_robustness",
+        "sensor_stream_fault_response",
+        "localization_error_robustness",
+        "compute_latency_robustness",
+        "speed_estimation_robustness"
+      ],
+      "protocol": {
+        "kind": "bench2drive_compatible_closed_loop_fixed_policy_perturbation",
+        "simulator": "CARLA 0.9.15",
+        "compatibility": "upstream states Bench2Drive route/scenario compatibility; exact route asset revision to be pinned during reproduction",
+        "robustness_finetuning_during_evaluation": false,
+        "evaluated_models": [
+          "SimLingo-base",
+          "TCP-traj",
+          "UniAD",
+          "VAD"
+        ],
+        "perturbations": [
+          {
+            "type": "gps_localization_noise",
+            "settings_m": [
+              5,
+              15
+            ]
+          },
+          {
+            "type": "inference_control_latency",
+            "settings_ms": [
+              100,
+              200,
+              500
+            ],
+            "mechanism": "FIFO action buffering"
+          },
+          {
+            "type": "cached_burst_camera_frame_drop",
+            "settings_ticks": [
+              20,
+              60
+            ]
+          },
+          {
+            "type": "partial_camera_observation",
+            "settings_percent": [
+              50,
+              80
+            ],
+            "mechanism": "random rectangular occlusion"
+          },
+          {
+            "type": "multiplicative_ego_speed_noise",
+            "settings": [
+              "eta~N(0.5,0.2^2)",
+              "eta~N(0.2,0.2^2)"
+            ]
+          }
+        ]
+      },
+      "metrics": [
+        "closed_loop_route_outcomes",
+        "success_rate",
+        "driving_score",
+        "efficiency",
+        "comfort",
+        "per_perturbation_degradation"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "The authors test fixed policies without robustness fine-tuning.",
+        "Upstream README states CARLA 0.9.15 and Bench2Drive route/scenario compatibility; exact route files and all revisions must be pinned before reproduction.",
+        "Perturbation values are benchmark settings, not universal sensor-fault severities.",
+        "This is not physical sensor qualification, a vehicle safety case, or real-world crash-risk evidence.",
+        "SAM has not reproduced this benchmark."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2605.18059",
+        "https://github.com/Thinklab-SJTU/Bench2Drive-Robust"
+      ]
     }
   ],
   "prospective_targets": {
