@@ -89,7 +89,9 @@ struct Model {
     protocol_ref: String,
     protocol_digest: String,
     calibration_digest: String,
+    calibration_evidence_class: String,
     domain_scope_digest: String,
+    domain_scope_evidence_class: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -99,6 +101,7 @@ struct Pulse {
     duration_s: f64,
     ambient_temperature_upper_c: f64,
     ambient_evidence_digest: String,
+    ambient_evidence_class: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -124,8 +127,10 @@ struct Cell {
     temperature_evidence_class: String,
     minimum_voltage_v: f64,
     voltage_limit_evidence_digest: String,
+    voltage_limit_evidence_class: String,
     maximum_discharge_current_lower_a: f64,
     current_limit_evidence_digest: String,
+    current_limit_evidence_class: String,
     thermal_resistance_upper_k_per_w: f64,
     thermal_capacity_lower_j_per_k: f64,
     thermal_evidence_digest: String,
@@ -291,7 +296,9 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         || !is_digest(&model.protocol_digest)
         || !nonempty(&model.protocol_ref)
         || !is_digest(&model.calibration_digest)
+        || !valid_class(&model.calibration_evidence_class)
         || !is_digest(&model.domain_scope_digest)
+        || !valid_class(&model.domain_scope_evidence_class)
         || !model.soc_valid_min.is_finite()
         || !model.soc_valid_max.is_finite()
         || model.soc_valid_min < 0.0
@@ -316,6 +323,7 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         || profile.pulse.duration_s > 600.0
         || !profile.pulse.ambient_temperature_upper_c.is_finite()
         || !is_digest(&profile.pulse.ambient_evidence_digest)
+        || !valid_class(&profile.pulse.ambient_evidence_class)
     {
         errors.push("pulse direction, duration or ambient evidence is invalid".to_owned());
     }
@@ -377,12 +385,14 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         if !cell.minimum_voltage_v.is_finite()
             || cell.minimum_voltage_v <= 0.0
             || !is_digest(&cell.voltage_limit_evidence_digest)
+            || !valid_class(&cell.voltage_limit_evidence_class)
         {
             errors.push(format!("cell {} voltage floor/evidence is invalid", cell.cell_ref));
         }
         if !cell.maximum_discharge_current_lower_a.is_finite()
             || cell.maximum_discharge_current_lower_a <= 0.0
             || !is_digest(&cell.current_limit_evidence_digest)
+            || !valid_class(&cell.current_limit_evidence_class)
         {
             errors.push(format!("cell {} current rating/evidence is invalid", cell.cell_ref));
         }
@@ -477,10 +487,22 @@ fn build_evidence(profile: &Profile) -> Vec<EvidenceRef> {
         evidence("topology_descriptor", &profile.topology.topology_digest, None),
         evidence("model", &profile.model.model_digest, None),
         evidence("model_equation_parameters", &profile.model.parameter_digest, None),
-        evidence("calibration", &profile.model.calibration_digest, None),
-        evidence("domain_scope", &profile.model.domain_scope_digest, None),
+        evidence(
+            "calibration",
+            &profile.model.calibration_digest,
+            Some(&profile.model.calibration_evidence_class),
+        ),
+        evidence(
+            "domain_scope",
+            &profile.model.domain_scope_digest,
+            Some(&profile.model.domain_scope_evidence_class),
+        ),
         evidence("model_protocol", &profile.model.protocol_digest, None),
-        evidence("ambient_temperature", &profile.pulse.ambient_evidence_digest, None),
+        evidence(
+            "ambient_temperature",
+            &profile.pulse.ambient_evidence_digest,
+            Some(&profile.pulse.ambient_evidence_class),
+        ),
     ];
     if let Some(qualification) = &profile.topology.qualification {
         rows.push(evidence(
@@ -524,12 +546,12 @@ fn build_evidence(profile: &Profile) -> Vec<EvidenceRef> {
             evidence(
                 &format!("voltage_limit:{}", cell.cell_ref),
                 &cell.voltage_limit_evidence_digest,
-                None,
+                Some(&cell.voltage_limit_evidence_class),
             ),
             evidence(
                 &format!("current_limit:{}", cell.cell_ref),
                 &cell.current_limit_evidence_digest,
-                None,
+                Some(&cell.current_limit_evidence_class),
             ),
             evidence(
                 &format!("thermal:{}", cell.cell_ref),
