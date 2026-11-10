@@ -4518,6 +4518,233 @@ mod tests {
     }
 
     #[test]
+    fn every_four_unit_permutation_round_trips_through_canonicalization() {
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 4,
+            num_layers: 1,
+            output_dim: 2,
+            cell_config: CfCConfig {
+                input_dim: 2,
+                hidden_dim: 4,
+                use_backbone: false,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            ..Default::default()
+        };
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
+            "symthaea-swi-permutation-orbit-v1",
+        );
+        let source = CfCNetwork::from_genesis(config, &genesis, "permutation-orbit");
+        let task_digest = digest('d');
+        let snapshot =
+            cfc_weight_model_snapshot(&source, task_digest.clone()).expect("source snapshot");
+        let permutations = enumerate_hidden_unit_permutations(4);
+        assert_eq!(permutations.len(), 24, "the complete S4 orbit must be covered");
+
+        let get = |id: CfCWeightGroupId| {
+            snapshot
+                .groups
+                .iter()
+                .find(|group| group.target == WeightProgramTarget::CfC(id.clone()))
+                .expect("parameter group")
+                .values
+                .clone()
+        };
+        let input_projection = get(CfCWeightGroupId::CellInputProjection { cell: 0 });
+        let recurrent_projection = get(CfCWeightGroupId::CellRecurrentProjection { cell: 0 });
+        let hidden_bias = get(CfCWeightGroupId::CellHiddenBias { cell: 0 });
+        let time_constants = get(CfCWeightGroupId::CellTimeConstant { cell: 0 });
+        let output_projection = get(CfCWeightGroupId::OutputProjection);
+
+        let probes = vec![
+            CfCFunctionalProbe {
+                input: vec![0.25, -0.75],
+                dt: 0.05,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.4, 0.6],
+                dt: 0.2,
+            },
+            CfCFunctionalProbe {
+                input: vec![0.9, 0.1],
+                dt: 0.1,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.2, -0.8],
+                dt: 0.15,
+            },
+            CfCFunctionalProbe {
+                input: vec![0.71, -0.19],
+                dt: 0.03,
+            },
+        ];
+        let source_signatures =
+            cfc_hidden_unit_activation_signatures(&source, 0, &probes).expect("source signatures");
+        let source_digest = source
+            .fingerprint()
+            .expect("source fingerprint")
+            .model_digest;
+
+        let mut maximum_precanonical_function_error = 0.0_f64;
+        let mut maximum_canonical_function_error = 0.0_f64;
+        let mut verified_orbit_members = 0usize;
+
+        for (permutation_index, permutation) in permutations.iter().enumerate() {
+            let program = WeightProgram {
+                format_version: 1,
+                architecture_digest: snapshot.architecture_digest.clone(),
+                manifest_digest: snapshot.manifest_digest.clone(),
+                base_model_digest: snapshot.model_digest.clone(),
+                target_specification_digest: task_digest.clone(),
+                fault_hypothesis_ids: vec![
+                    "hypothesis:function-preserving-hidden-unit-permutation".to_owned(),
+                ],
+                evidence_receipt_ids: vec![format!("receipt:permutation-orbit-{permutation_index}")],
+                max_changed_parameters: 40,
+                max_total_l2_delta: 100.0,
+                max_abs_delta: 100.0,
+                operations: vec![
+                    WeightProgramOperation::ReplaceGroup {
+                        target: WeightProgramTarget::CfC(
+                            CfCWeightGroupId::CellInputProjection { cell: 0 },
+                        ),
+                        values: permute_rows(&input_projection, 4, 2, permutation),
+                    },
+                    WeightProgramOperation::ReplaceGroup {
+                        target: WeightProgramTarget::CfC(
+                            CfCWeightGroupId::CellRecurrentProjection { cell: 0 },
+                        ),
+                        values: permute_square(&recurrent_projection, 4, permutation),
+                    },
+                    WeightProgramOperation::ReplaceGroup {
+                        target: WeightProgramTarget::CfC(
+                            CfCWeightGroupId::CellHiddenBias { cell: 0 },
+                        ),
+                        values: permutation.iter().map(|index| hidden_bias[*index]).collect(),
+                    },
+                    WeightProgramOperation::ReplaceGroup {
+                        target: WeightProgramTarget::CfC(
+                            CfCWeightGroupId::CellTimeConstant { cell: 0 },
+                        ),
+                        values: permutation.iter().map(|index| time_constants[*index]).collect(),
+                    },
+                    WeightProgramOperation::ReplaceGroup {
+                        target: WeightProgramTarget::CfC(CfCWeightGroupId::OutputProjection),
+                        values: permute_columns(&output_projection, 2, 4, permutation),
+                    },
+                ],
+            };
+            let permuted_candidate = materialize_cfc_weight_program(
+                &source,
+                task_digest.clone(),
+                &program,
+            )
+            .expect("function-preserving permutation candidate");
+
+            // The raw parameter digest must distinguish a different coordinate
+            // representation, even when the represented function is unchanged.
+            if *permutation != [0, 1, 2, 3] {
+                assert_ne!(
+                    permuted_candidate.candidate_native_model_digest,
+                    source_digest
+                );
+            }
+
+            let candidate_signatures = cfc_hidden_unit_activation_signatures(
+                &permuted_candidate.network,
+                0,
+                &probes,
+            )
+            .expect("candidate signatures");
+            let alignment = align_cfc_hidden_unit_signatures(
+                &source_signatures,
+                &candidate_signatures,
+            )
+            .expect("permutation-orbit alignment");
+
+            let mut expected_source_to_candidate = vec![0usize; 4];
+            for (new_index, old_index) in permutation.iter().copied().enumerate() {
+                expected_source_to_candidate[old_index] = new_index;
+            }
+            assert_eq!(
+                alignment.source_to_candidate,
+                expected_source_to_candidate,
+                "permutation orbit member {permutation_index}: {permutation:?}"
+            );
+            assert!(
+                alignment.mean_squared_activation_error < 1e-10,
+                "permutation orbit member {permutation_index} alignment error {}",
+                alignment.mean_squared_activation_error
+            );
+            assert!(
+                alignment.minimum_assignment_margin.is_some_and(|margin| margin > 0.0),
+                "permutation orbit member {permutation_index} must have a unique registered assignment"
+            );
+
+            let canonicalization = build_cfc_hidden_unit_canonicalization_program(
+                &source,
+                &permuted_candidate.network,
+                task_digest.clone(),
+                &alignment,
+                CfCAlignmentAcceptancePolicy {
+                    max_mean_squared_activation_error: 1e-10,
+                    min_assignment_margin: 0.0,
+                },
+            )
+            .expect("canonicalization program from orbit alignment");
+            let canonicalized = materialize_cfc_weight_program(
+                &permuted_candidate.network,
+                task_digest.clone(),
+                &canonicalization,
+            )
+            .expect("canonicalized orbit candidate");
+            assert_eq!(
+                canonicalized.candidate_native_model_digest,
+                source_digest,
+                "inverse transport must recover the exact source parameter representation"
+            );
+
+            let mut source_eval = source.clone();
+            let mut permuted_eval = permuted_candidate.network.clone();
+            let mut canonical_eval = canonicalized.network;
+            for probe in &probes {
+                let input = ndarray::Array1::from_vec(probe.input.clone());
+                let expected = source_eval.forward(&input, probe.dt);
+                let equivalent = permuted_eval.forward(&input, probe.dt);
+                let restored = canonical_eval.forward(&input, probe.dt);
+                for ((source_value, permuted_value), canonical_value) in
+                    expected.iter().zip(equivalent.iter()).zip(restored.iter())
+                {
+                    maximum_precanonical_function_error = maximum_precanonical_function_error
+                        .max(f64::from((*source_value - *permuted_value).abs()));
+                    maximum_canonical_function_error = maximum_canonical_function_error
+                        .max(f64::from((*source_value - *canonical_value).abs()));
+                }
+            }
+            verified_orbit_members += 1;
+        }
+
+        assert_eq!(verified_orbit_members, 24);
+        assert!(
+            maximum_precanonical_function_error < 1e-5,
+            "function-preserving orbit error {maximum_precanonical_function_error}"
+        );
+        assert!(
+            maximum_canonical_function_error < 1e-5,
+            "canonical transport function error {maximum_canonical_function_error}"
+        );
+        assert_eq!(
+            source.fingerprint().expect("source remains immutable").model_digest,
+            source_digest
+        );
+    }
+
+    #[test]
     fn invalid_target_specification_is_rejected_before_clone_edit() {
         let config = CfCNetworkConfig {
             input_dim: 2,
