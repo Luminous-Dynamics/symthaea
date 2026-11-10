@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-delib-control-001/DELIB_CONTROL_SCENARIOS_V0_1.schema.json",
+  "title": "IG-DELIB-CONTROL-001 deterministic scenarios v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "benchmark_id",
+    "owner_issue",
+    "runner_owner",
+    "revision_ledger",
+    "comm_graph_owner",
+    "confidence_owner",
+    "fixture_count",
+    "family_count",
+    "families",
+    "agreement_threshold",
+    "scenarios",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-delib-control-scenarios-v0.1"
+    },
+    "status": {
+      "enum": [
+        "synthetic_scenarios_unexecuted",
+        "synthetic_scenarios_frozen"
+      ]
+    },
+    "benchmark_id": {
+      "const": "IG-DELIB-CONTROL-001"
+    },
+    "owner_issue": {
+      "type": "string"
+    },
+    "runner_owner": {
+      "type": "string"
+    },
+    "revision_ledger": {
+      "type": "string"
+    },
+    "comm_graph_owner": {
+      "type": "string"
+    },
+    "confidence_owner": {
+      "type": "string"
+    },
+    "fixture_count": {
+      "const": 40
+    },
+    "family_count": {
+      "const": 8
+    },
+    "families": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "factual_evidence_closure",
+              "false_consensus",
+              "minority_preservation",
+              "open_world",
+              "normative_pluralism",
+              "controller_adversary",
+              "budget_and_cost",
+              "trajectory_value"
+            ]
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "agreement_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 40,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "family_id",
+          "scenario_note",
+          "state",
+          "expected_action",
+          "expected_agreement_baseline_stop",
+          "expected_fixed_round_baseline_stop"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family_id": {
+            "enum": [
+              "factual_evidence_closure",
+              "false_consensus",
+              "minority_preservation",
+              "open_world",
+              "normative_pluralism",
+              "controller_adversary",
+              "budget_and_cost",
+              "trajectory_value"
+            ]
+          },
+          "scenario_note": {
+            "type": "string",
+            "minLength": 20
+          },
+          "state": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "task_truth_profile",
+              "input_integrity_valid",
+              "budget_remaining",
+              "rounds_used",
+              "round_limit",
+              "agent_agreement",
+              "evidence_complete",
+              "high_impact_unresolved_count",
+              "contradictory_source_count",
+              "hypothesis_diversity_count",
+              "minority_candidate_state",
+              "minority_preserved",
+              "common_mode_signal",
+              "orchestrator_compromise",
+              "source_lineage_compromised",
+              "confidence_signal"
+            ],
+            "properties": {
+              "task_truth_profile": {
+                "enum": [
+                  "SyntheticKnownAnswer",
+                  "OpenWorldIndeterminate",
+                  "NormativePluralism"
+                ]
+              },
+              "input_integrity_valid": {
+                "type": "boolean"
+              },
+              "budget_remaining": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "rounds_used": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "round_limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "agent_agreement": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "evidence_complete": {
+                "type": "boolean"
+              },
+              "high_impact_unresolved_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "contradictory_source_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "hypothesis_diversity_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "minority_candidate_state": {
+                "enum": [
+                  "None",
+                  "Unverified",
+                  "Verified"
+                ]
+              },
+              "minority_preserved": {
+                "type": "boolean"
+              },
+              "common_mode_signal": {
+                "type": "boolean"
+              },
+              "orchestrator_compromise": {
+                "type": "boolean"
+              },
+              "source_lineage_compromised": {
+                "type": "boolean"
+              },
+              "confidence_signal": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "status",
+                  "probability_correct",
+                  "calibration_profile_sha256"
+                ],
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "NotProvided",
+                      "SelfReported",
+                      "CalibratedInScope",
+                      "OutOfDomain"
+                    ]
+                  },
+                  "probability_correct": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "calibration_profile_sha256": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            }
+          },
+          "expected_action": {
+            "enum": [
+              "ContinueDebate",
+              "DiversifyHypotheses",
+              "RequestEvidence",
+              "VerifyClaim",
+              "AdversarialChallenge",
+              "PreserveMinority",
+              "IndependentAdjudication",
+              "FinalizeSupported",
+              "FinalizeIndeterminate",
+              "PluralisticMultiplePositions",
+              "StopBudgetExhausted",
+              "StopInvalid"
+            ]
+          },
+          "expected_agreement_baseline_stop": {
+            "type": "boolean"
+          },
+          "expected_fixed_round_baseline_stop": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 60
+    }
+  }
+}
