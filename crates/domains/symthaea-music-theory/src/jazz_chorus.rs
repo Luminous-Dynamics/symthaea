@@ -53,7 +53,14 @@ use crate::composer::MusicalIntent;
 use crate::form::{Form, Section};
 use crate::harmony::Key;
 use crate::phrase::{Period, Phrase};
-use crate::score::Score;
+use crate::score::{PartId, Score, VoiceRole};
+
+// This engine authors one continuous lead across choruses, with independent
+// bass and chordal accompaniment parts. Chorus role changes do not create
+// new performers or new PartIds.
+const JAZZ_LEAD_PART: PartId = PartId(0);
+const JAZZ_BASS_PART: PartId = PartId(1);
+const JAZZ_HARMONY_PART: PartId = PartId(2);
 use crate::spec::CompositionSpec;
 
 /// This family's own chorus length: JazzBallad's declared changes are an
@@ -166,8 +173,9 @@ pub fn realize_jazz_chorus(
     let mut prev_bass: Option<crate::pitch::Pitch> = None;
     let pattern = spec.accompaniment(intent.seed);
 
-    crate::composer::realize_melody(
+    crate::composer::realize_melody_for_part(
         &mut score,
+        JAZZ_LEAD_PART,
         &form,
         intent,
         crate::rhythm::Duration::zero(),
@@ -179,8 +187,9 @@ pub fn realize_jazz_chorus(
     // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
     // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
     // and never read each other's state, so the emitted NOTES are unchanged.
-    crate::composer::realize_bass(
+    crate::composer::realize_bass_for_part(
         &mut score,
+        JAZZ_BASS_PART,
         &form,
         meter,
         intent,
@@ -189,8 +198,9 @@ pub fn realize_jazz_chorus(
         false,
         false,
     );
-    crate::composer::realize_harmony(
+    crate::composer::realize_harmony_for_part(
         &mut score,
+        JAZZ_HARMONY_PART,
         &form,
         meter,
         intent,
@@ -370,6 +380,41 @@ mod tests {
         assert!(
             varied,
             "expected at least one seed to vary melody across choruses"
+        );
+    }
+
+    #[test]
+    fn every_jazz_chorus_note_has_one_of_three_generator_authored_parts() {
+        let realized = realize_jazz_chorus(
+            &MusicalIntent {
+                bars: 24,
+                ..intent()
+            },
+            &jazz_spec(),
+        );
+        let score = &realized.score;
+        assert!(score.has_part_identity());
+
+        let actual: std::collections::BTreeSet<u16> =
+            score.parts().into_iter().map(|part| part.0).collect();
+        let expected: std::collections::BTreeSet<u16> =
+            [JAZZ_LEAD_PART.0, JAZZ_BASS_PART.0, JAZZ_HARMONY_PART.0]
+                .into_iter()
+                .collect();
+        assert_eq!(actual, expected);
+
+        assert!(score.notes.iter().all(|note| match note.part {
+            JAZZ_LEAD_PART => note.role == VoiceRole::Melody,
+            JAZZ_BASS_PART => note.role == VoiceRole::Bass,
+            JAZZ_HARMONY_PART => note.role == VoiceRole::Harmony,
+            _ => false,
+        }));
+        let lead_notes: Vec<_> = score.notes.iter()
+            .filter(|note| note.part == JAZZ_LEAD_PART)
+            .collect();
+        assert!(
+            lead_notes.iter().any(|note| note.onset.beats() >= 8.0 * jazz_spec().meter as f64),
+            "the same continuing lead must carry material into later choruses"
         );
     }
 
