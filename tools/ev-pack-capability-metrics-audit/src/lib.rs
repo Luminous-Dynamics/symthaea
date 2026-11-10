@@ -90,6 +90,7 @@ struct ReferenceConditions {
 struct CapacityCondition {
     condition_ref: String,
     temperature_c: f64,
+    maximum_measurement_skew_ms: u64,
     c_rate: f64,
     lower_cutoff_voltage_v: f64,
     upper_cutoff_voltage_v: f64,
@@ -131,6 +132,7 @@ struct Unit {
 struct CapacityMeasurement {
     value_ah: f64,
     uncertainty_ah: f64,
+    measurement_time_ms: u64,
     evidence_class: String,
     method: String,
     evidence_digest: String,
@@ -156,6 +158,7 @@ struct SocSnapshot {
     pack_configuration_digest: String,
     condition_ref: String,
     maximum_sample_skew_ms: u64,
+    maximum_soh_measurement_age_ms: u64,
     snapshot_digest: String,
     observations: Vec<SocObservation>,
 }
@@ -168,6 +171,7 @@ struct SocObservation {
     sample_time_ms: u64,
     evidence_digest: String,
     evidence_class: String,
+    soh_measurement_digest: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -176,6 +180,11 @@ struct LifetimeEvidence {
     eol_rule_ref: String,
     eol_threshold_soh_fraction: f64,
     evidence_digest: String,
+    pack_configuration_digest: String,
+    eol_rule_digest: String,
+    service_history_digest: String,
+    efc_method_ref: String,
+    efc_method_digest: String,
     units: Vec<LifetimeUnit>,
 }
 
@@ -398,6 +407,7 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         || !nonempty(&capacity.protocol_ref)
         || !is_digest(&capacity.protocol_digest)
         || !capacity.temperature_c.is_finite()
+        || capacity.maximum_measurement_skew_ms == 0
         || !capacity.c_rate.is_finite()
         || capacity.c_rate <= 0.0
         || !capacity.lower_cutoff_voltage_v.is_finite()
@@ -406,6 +416,14 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         || capacity.upper_cutoff_voltage_v <= capacity.lower_cutoff_voltage_v
     {
         errors.push("capacity reference condition is invalid".to_owned());
+    }
+    let capacity_times: Vec<u64> = profile.units.iter()
+        .map(|unit| unit.capacity.measurement_time_ms)
+        .collect();
+    if let (Some(minimum), Some(maximum)) = (capacity_times.iter().min(), capacity_times.iter().max()) {
+        if maximum - minimum > capacity.maximum_measurement_skew_ms {
+            errors.push("per-cell SOH capacity measurements exceed the declared common-time window".to_owned());
+        }
     }
     let resistance = &profile.reference_conditions.resistance;
     if !nonempty(&resistance.condition_ref)
@@ -502,6 +520,9 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         }
         let mut observed = BTreeSet::new();
         let mut times = Vec::new();
+        if snapshot.maximum_soh_measurement_age_ms == 0 {
+            errors.push("maximum SOH measurement age must be positive".to_owned());
+        }
         for row in &snapshot.observations {
             if !unit_ids.contains(&row.unit_ref) || !observed.insert(row.unit_ref.clone()) {
                 errors.push(format!(
@@ -512,6 +533,7 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
             if !row.soc_fraction.is_finite()
                 || !(0.0..=1.0).contains(&row.soc_fraction)
                 || !is_digest(&row.evidence_digest)
+                || !is_digest(&row.soh_measurement_digest)
                 || !matches!(
                     row.evidence_class.as_str(),
                     "reference_test_measurement"
@@ -523,6 +545,23 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
                 )
             {
                 errors.push(format!("SOC observation for {} is invalid", row.unit_ref));
+            }
+            let unit = profile.units.iter().find(|unit| unit.unit_ref == row.unit_ref);
+            if let Some(unit) = unit {
+                if unit.capacity.evidence_digest != row.soh_measurement_digest {
+                    errors.push(format!(
+                        "SOC observation for {} references a different SOH measurement",
+                        row.unit_ref
+                    ));
+                }
+                if row.sample_time_ms.abs_diff(unit.capacity.measurement_time_ms)
+                    > snapshot.maximum_soh_measurement_age_ms
+                {
+                    errors.push(format!(
+                        "SOC/SOH temporal alignment for {} exceeds the declared age window",
+                        row.unit_ref
+                    ));
+                }
             }
             times.push(row.sample_time_ms);
         }
@@ -536,6 +575,11 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
 
     if let Some(lifetime) = &profile.lifetime_evidence {
         if !nonempty(&lifetime.eol_rule_ref)
+            || lifetime.pack_configuration_digest != profile.asset.pack_configuration_digest
+            || !is_digest(&lifetime.eol_rule_digest)
+            || !is_digest(&lifetime.service_history_digest)
+            || !nonempty(&lifetime.efc_method_ref)
+            || !is_digest(&lifetime.efc_method_digest)
             || !lifetime.eol_threshold_soh_fraction.is_finite()
             || !(0.0..=1.0).contains(&lifetime.eol_threshold_soh_fraction)
             || lifetime.eol_threshold_soh_fraction == 0.0
