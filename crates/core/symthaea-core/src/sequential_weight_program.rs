@@ -841,6 +841,10 @@ mod tests {
         session: &SequentialEditSession,
         candidate_native_model_digest: &str,
     ) -> SequentialVerifierEvidenceBinding {
+        use crate::family_noninferiority::{
+            FamilyGuardrailBinding, FamilyGuardrailObservation, FamilyGuardrailPlan,
+            FamilyGuardrailSpec, FamilyNonInferiorityGate,
+        };
         use crate::sequential_weight_verification::{
             ConfirmatoryEpisodeManifest, PairedLossObservation,
             SequentialWeightVerificationCampaign, SequentialWeightVerificationConfig,
@@ -855,10 +859,11 @@ mod tests {
             digest('8'),
         )
         .expect("valid statistical campaign");
+        let episode_ids = (0..600)
+            .map(|index| format!("confirmatory-{index}"))
+            .collect::<Vec<_>>();
         let confirmatory_episode_manifest = ConfirmatoryEpisodeManifest::new(
-            (0..600)
-                .map(|index| format!("confirmatory-{index}"))
-                .collect(),
+            episode_ids.clone(),
         )
         .expect("valid confirmatory episode manifest");
         let mut verifier = campaign
@@ -870,21 +875,66 @@ mod tests {
                 digest('5'),
             )
             .expect("fresh statistical candidate");
+
+        let family_plan = FamilyGuardrailPlan::new(vec![FamilyGuardrailSpec {
+            family_id: "all-protected-tasks".to_owned(),
+            non_inferiority_margin: 0.05,
+            minimum_observations: 2,
+            maximum_observations: 600,
+            episode_ids,
+        }])
+        .expect("valid family plan");
+        let family_binding = FamilyGuardrailBinding {
+            baseline_model_digest: session.latest_candidate_model_digest.clone(),
+            candidate_model_digest: candidate_native_model_digest.to_owned(),
+            evaluation_protocol_digest: digest('8'),
+            confirmatory_episode_manifest_digest: family_plan
+                .confirmatory_episode_manifest_digest(),
+            precondition_gate_digest: digest('5'),
+            maximum_total_observations: family_plan.maximum_total_observations(),
+        };
+        let mut family_gate = FamilyNonInferiorityGate::new(
+            family_plan.clone(),
+            0.05,
+            1,
+            family_binding,
+        )
+        .expect("valid family non-inferiority gate");
+
         let mut report = verifier.report().expect("initial statistical report");
+        let mut family_report = family_gate.report().expect("initial family report");
         for index in 0..600 {
+            let baseline_loss = 0.9;
+            let candidate_loss = 0.5;
             report = verifier
                 .observe(PairedLossObservation {
                     episode_id: format!("confirmatory-{index}"),
-                    baseline_loss: 0.9,
-                    candidate_loss: 0.5,
+                    baseline_loss,
+                    candidate_loss,
                 })
                 .expect("paired confirmatory observation");
-            if report.status == crate::sequential_weight_verification::SequentialWeightVerificationStatus::BenefitEstablished {
+            family_report = family_gate
+                .observe(FamilyGuardrailObservation {
+                    episode_id: format!("confirmatory-{index}"),
+                    family_id: "all-protected-tasks".to_owned(),
+                    baseline_loss,
+                    candidate_loss,
+                })
+                .expect("paired family guardrail observation");
+            if report.status == crate::sequential_weight_verification::SequentialWeightVerificationStatus::BenefitEstablished
+                && family_report.status == crate::family_noninferiority::FamilyGuardrailStatus::AllFamiliesNonInferior
+            {
                 break;
             }
         }
-        bind_sequential_verification_evidence(session, candidate_native_model_digest, &report)
-            .expect("statistical report bound to sequential edit candidate")
+        bind_sequential_verification_evidence(
+            session,
+            candidate_native_model_digest,
+            &report,
+            &family_plan,
+            &family_report,
+        )
+        .expect("statistical and family reports bound to sequential edit candidate")
     }
 
     fn signed_attestation(
