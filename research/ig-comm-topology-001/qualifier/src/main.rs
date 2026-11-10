@@ -116,7 +116,9 @@ fn graph_snapshot_at(profile: &Value, round: u64) -> Result<GraphSnapshot, Strin
             .as_u64()
             .ok_or_else(|| format!("node {id} active_from_round must be an integer"))?;
         if node.get("active_until_round").is_none() {
-            return Err(format!("node {id} active_until_round must be present (null means unbounded)"));
+            return Err(format!(
+                "node {id} active_until_round must be present (null means unbounded)"
+            ));
         }
         let end = node["active_until_round"].as_u64();
         if end.is_some_and(|end| end <= start) {
@@ -145,14 +147,18 @@ fn graph_snapshot_at(profile: &Value, round: u64) -> Result<GraphSnapshot, Strin
             .as_u64()
             .ok_or_else(|| format!("channel {channel_id} active_from_round must be an integer"))?;
         if edge.get("active_until_round").is_none() {
-            return Err(format!("channel {channel_id} active_until_round must be present (null means unbounded)"));
+            return Err(format!(
+                "channel {channel_id} active_until_round must be present (null means unbounded)"
+            ));
         }
         let end = edge["active_until_round"].as_u64();
         if end.is_some_and(|end| end <= start) {
             return Err(format!("channel {channel_id} has an empty or reversed active interval"));
         }
         if !all_nodes.contains_key(from) || !all_nodes.contains_key(to) {
-            return Err(format!("channel {channel_id} references an unknown AgentInstanceId endpoint"));
+            return Err(format!(
+                "channel {channel_id} references an unknown AgentInstanceId endpoint"
+            ));
         }
         if from == to {
             return Err(format!("channel {channel_id} is a forbidden self-loop"));
@@ -324,7 +330,11 @@ fn validate_centrality(profile: &Value, errors: &mut Vec<String>) {
     match field(reference, "status") {
         Some("Pass") => {
             if ids.len() < 3 {
-                add(errors, context, "centrality PASS requires at least three active AgentInstanceId nodes");
+                add(
+                    errors,
+                    context,
+                    "centrality PASS requires at least three active AgentInstanceId nodes",
+                );
                 return;
             }
             if !is_strongly_connected(adjacency) {
@@ -332,7 +342,11 @@ fn validate_centrality(profile: &Value, errors: &mut Vec<String>) {
                 return;
             }
             if field(reference, "reciprocity") != Some("required") || !is_reciprocal(adjacency) {
-                add(errors, context, "centrality PASS requires explicit reciprocal MessageChannel arcs");
+                add(
+                    errors,
+                    context,
+                    "centrality PASS requires explicit reciprocal MessageChannel arcs",
+                );
                 return;
             }
             if field(reference, "algorithm_id") != Some("normalized_betweenness_v1")
@@ -346,7 +360,11 @@ fn validate_centrality(profile: &Value, errors: &mut Vec<String>) {
             let actual = normalized_betweenness(adjacency);
             let declared = reference["values"].as_array().cloned().unwrap_or_default();
             if declared.len() != ids.len() {
-                add(errors, context, "centrality value count differs from active snapshot node count");
+                add(
+                    errors,
+                    context,
+                    "centrality value count differs from active snapshot node count",
+                );
                 return;
             }
             for (index, item) in declared.iter().enumerate() {
@@ -355,7 +373,11 @@ fn validate_centrality(profile: &Value, errors: &mut Vec<String>) {
                 if declared_id != Some(ids[index].as_str())
                     || declared_score.is_none_or(|score| (score - actual[index]).abs() > 1e-8)
                 {
-                    add(errors, context, "centrality score or node order differs from snapshot recomputation");
+                    add(
+                        errors,
+                        context,
+                        "centrality score or node order differs from snapshot recomputation",
+                    );
                     break;
                 }
             }
@@ -366,7 +388,11 @@ fn validate_centrality(profile: &Value, errors: &mut Vec<String>) {
                 || strings(&reference["minimum_tie_set"]) != min_ids
                 || strings(&reference["maximum_tie_set"]) != max_ids
             {
-                add(errors, context, "centrality extrema or tie sets differ from snapshot recomputation");
+                add(
+                    errors,
+                    context,
+                    "centrality extrema or tie sets differ from snapshot recomputation",
+                );
             }
             if field(reference, "minimum_selected_agent_instance_id")
                 != min_ids.first().map(String::as_str)
@@ -387,24 +413,41 @@ fn validate_centrality(profile: &Value, errors: &mut Vec<String>) {
             let max_ids = strings(&reference["maximum_tie_set"]);
             if is_strongly_connected(adjacency) {
                 let actual = normalized_betweenness(adjacency);
-                let (minimum, maximum, actual_min_ids, actual_max_ids) = centrality_ties(ids, &actual);
+                let (minimum, maximum, actual_min_ids, actual_max_ids) =
+                    centrality_ties(ids, &actual);
                 if actual_min_ids != actual_max_ids {
-                    add(errors, context, "Unsupported centrality on a connected graph requires no distinct extrema");
+                    add(
+                        errors,
+                        context,
+                        "Unsupported centrality on a connected graph requires no distinct extrema",
+                    );
                 }
                 let declared = reference["values"].as_array().cloned().unwrap_or_default();
                 if declared.len() != ids.len()
                     || strings(&reference["minimum_tie_set"]) != actual_min_ids
                     || strings(&reference["maximum_tie_set"]) != actual_max_ids
-                    || (reference["minimum_score"].as_f64().unwrap_or(f64::NAN) - minimum).abs() > 1e-8
-                    || (reference["maximum_score"].as_f64().unwrap_or(f64::NAN) - maximum).abs() > 1e-8
+                    || (reference["minimum_score"].as_f64().unwrap_or(f64::NAN) - minimum).abs()
+                        > 1e-8
+                    || (reference["maximum_score"].as_f64().unwrap_or(f64::NAN) - maximum).abs()
+                        > 1e-8
                 {
-                    add(errors, context, "Unsupported centrality tie control differs from recomputation");
+                    add(
+                        errors,
+                        context,
+                        "Unsupported centrality tie control differs from recomputation",
+                    );
                 } else {
                     for (index, item) in declared.iter().enumerate() {
                         if field(item, "agent_instance_id") != Some(ids[index].as_str())
-                            || item["score"].as_f64().is_none_or(|score| (score - actual[index]).abs() > 1e-8)
+                            || item["score"]
+                                .as_f64()
+                                .is_none_or(|score| (score - actual[index]).abs() > 1e-8)
                         {
-                            add(errors, context, "Unsupported centrality values differ from recomputation");
+                            add(
+                                errors,
+                                context,
+                                "Unsupported centrality values differ from recomputation",
+                            );
                             break;
                         }
                     }
@@ -417,7 +460,11 @@ fn validate_centrality(profile: &Value, errors: &mut Vec<String>) {
                 || !reference["minimum_selected_agent_instance_id"].is_null()
                 || !reference["maximum_selected_agent_instance_id"].is_null()
             {
-                add(errors, context, "Disconnected snapshots must not publish global centrality scores or extrema");
+                add(
+                    errors,
+                    context,
+                    "Disconnected snapshots must not publish global centrality scores or extrema",
+                );
             }
         }
         _ => add(errors, context, "centrality status must be Pass or Unsupported"),
@@ -457,16 +504,28 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                 }
                 for channel_id in channel_ids {
                     let Some(edge) = edge_by_id(profile, &channel_id) else {
-                        add(errors, context, format!("revoke references unknown channel {channel_id}"));
+                        add(
+                            errors,
+                            context,
+                            format!("revoke references unknown channel {channel_id}"),
+                        );
                         continue;
                     };
                     if !revoked_channels.insert(channel_id.clone()) {
-                        add(errors, context, format!("channel {channel_id} is revoked more than once"));
+                        add(
+                            errors,
+                            context,
+                            format!("channel {channel_id} is revoked more than once"),
+                        );
                     }
                     if edge["active_until_round"].as_u64() != Some(round)
                         || edge["active_from_round"].as_u64().is_none_or(|start| start >= round)
                     {
-                        add(errors, context, format!("channel {channel_id} interval does not implement revoke at round {round}"));
+                        add(
+                            errors,
+                            context,
+                            format!("channel {channel_id} interval does not implement revoke at round {round}"),
+                        );
                     }
                 }
             }
@@ -474,20 +533,34 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                 let old_ids = strings(&event["channel_ids"]);
                 let new_ids = strings(&event["new_channel_ids"]);
                 if old_ids.is_empty() || old_ids.len() != new_ids.len() {
-                    add(errors, context, "restore_channel requires paired old and new channel ID sets");
+                    add(
+                        errors,
+                        context,
+                        "restore_channel requires paired old and new channel ID sets",
+                    );
                     continue;
                 }
-                if !string_set(&event["channel_ids"]).is_disjoint(&string_set(&event["new_channel_ids"])) {
+                if !string_set(&event["channel_ids"])
+                    .is_disjoint(&string_set(&event["new_channel_ids"]))
+                {
                     add(errors, context, "restore must use new channel identities");
                 }
                 let mut matched_new = BTreeSet::new();
                 for old_id in old_ids {
                     if !revoked_channels.contains(&old_id) {
-                        add(errors, context, format!("restore references channel {old_id} without a prior revoke"));
+                        add(
+                            errors,
+                            context,
+                            format!("restore references channel {old_id} without a prior revoke"),
+                        );
                         continue;
                     }
                     let Some(old_edge) = edge_by_id(profile, &old_id) else {
-                        add(errors, context, format!("restore references unknown old channel {old_id}"));
+                        add(
+                            errors,
+                            context,
+                            format!("restore references unknown old channel {old_id}"),
+                        );
                         continue;
                     };
                     let replacement = new_ids.iter().find(|new_id| {
@@ -497,23 +570,40 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                         })
                     });
                     let Some(new_id) = replacement else {
-                        add(errors, context, format!("restore for {old_id} has no replacement with identical direction/endpoints"));
+                        add(
+                            errors,
+                            context,
+                            format!("restore for {old_id} has no replacement with identical direction/endpoints"),
+                        );
                         continue;
                     };
                     matched_new.insert(new_id.clone());
-                    let new_edge = edge_by_id(profile, new_id).expect("replacement was found above");
+                    let new_edge =
+                        edge_by_id(profile, new_id).expect("replacement was found above");
                     if new_edge["active_from_round"].as_u64() != Some(round) {
-                        add(errors, context, format!("replacement channel {new_id} must activate at restore round {round}"));
+                        add(
+                            errors,
+                            context,
+                            format!("replacement channel {new_id} must activate at restore round {round}"),
+                        );
                     }
                 }
                 if matched_new.len() != new_ids.len() {
-                    add(errors, context, "restore new_channel_ids do not map one-to-one to revoked directed channels");
+                    add(
+                        errors,
+                        context,
+                        "restore new_channel_ids do not map one-to-one to revoked directed channels",
+                    );
                 }
             }
             Some("agent_exit") => {
                 let id = field(event, "agent_instance_id").unwrap_or_default();
                 let Some(node) = node_by_id(profile, id) else {
-                    add(errors, context, format!("agent_exit references unknown AgentInstanceId {id}"));
+                    add(
+                        errors,
+                        context,
+                        format!("agent_exit references unknown AgentInstanceId {id}"),
+                    );
                     continue;
                 };
                 if !exited_agents.insert(id.to_string()) {
@@ -522,28 +612,52 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                 if node["active_until_round"].as_u64() != Some(round)
                     || node["active_from_round"].as_u64().is_none_or(|start| start >= round)
                 {
-                    add(errors, context, format!("AgentInstanceId {id} node interval does not implement exit at round {round}"));
+                    add(
+                        errors,
+                        context,
+                        format!("AgentInstanceId {id} node interval does not implement exit at round {round}"),
+                    );
                 }
             }
             Some("agent_rejoin") => {
                 let old_id = field(event, "agent_instance_id").unwrap_or_default();
                 let new_id = field(event, "new_agent_instance_id").unwrap_or_default();
                 let Some(old_node) = node_by_id(profile, old_id) else {
-                    add(errors, context, format!("agent_rejoin references unknown old AgentInstanceId {old_id}"));
+                    add(
+                        errors,
+                        context,
+                        format!("agent_rejoin references unknown old AgentInstanceId {old_id}"),
+                    );
                     continue;
                 };
                 let Some(new_node) = node_by_id(profile, new_id) else {
-                    add(errors, context, format!("agent_rejoin references unknown new AgentInstanceId {new_id}"));
+                    add(
+                        errors,
+                        context,
+                        format!("agent_rejoin references unknown new AgentInstanceId {new_id}"),
+                    );
                     continue;
                 };
                 if !exited_agents.contains(old_id) || old_id == new_id {
-                    add(errors, context, "agent_rejoin requires a previously exited ID and a distinct new AgentInstanceId");
+                    add(
+                        errors,
+                        context,
+                        "agent_rejoin requires a previously exited ID and a distinct new AgentInstanceId",
+                    );
                 }
                 if new_node["active_from_round"].as_u64() != Some(round) {
-                    add(errors, context, format!("new AgentInstanceId {new_id} must activate at rejoin round {round}"));
+                    add(
+                        errors,
+                        context,
+                        format!("new AgentInstanceId {new_id} must activate at rejoin round {round}"),
+                    );
                 }
                 if field(old_node, "principal_ref") != field(new_node, "principal_ref") {
-                    add(errors, context, "rejoin AgentInstanceId must preserve the declared PrincipalId binding");
+                    add(
+                        errors,
+                        context,
+                        "rejoin AgentInstanceId must preserve the declared PrincipalId binding",
+                    );
                 }
             }
             Some(_) | None => add(errors, context, "unknown or missing temporal event kind"),
@@ -607,15 +721,25 @@ fn validate_profile(profile: &Value) -> Vec<String> {
         let start = edge["active_from_round"].as_u64();
         let end = edge["active_until_round"].as_u64();
         if start.is_none() || end.is_some_and(|end| end <= start.unwrap_or(0)) {
-            add(&mut errors, context, format!("channel {id} active interval is missing or invalid"));
+            add(
+                &mut errors,
+                context,
+                format!("channel {id} active interval is missing or invalid"),
+            );
         } else if let Some(start) = start {
             for endpoint in [sender, recipient] {
                 if let Some((node_start, node_end)) = node_windows.get(endpoint) {
                     if start < *node_start
                         || (node_end.is_some() && end.is_none())
-                        || node_end.is_some_and(|node_end| end.is_some_and(|edge_end| edge_end > node_end))
+                        || node_end.is_some_and(|node_end| {
+                            end.is_some_and(|edge_end| edge_end > node_end)
+                        })
                     {
-                        add(&mut errors, context, format!("channel {id} outlives the active interval of endpoint {endpoint}"));
+                        add(
+                            &mut errors,
+                            context,
+                            format!("channel {id} outlives the active interval of endpoint {endpoint}"),
+                        );
                     }
                 }
             }
@@ -680,7 +804,11 @@ fn validate_manifest(manifest: &Value, schema: &Value) -> Result<Report, Vec<Str
         || manifest["delegation_graph_issue"].as_str()
             != Some("https://github.com/Luminous-Dynamics/symthaea/issues/11248")
     {
-        add(&mut errors, "manifest", "communication and delegation graph owners must remain distinct");
+        add(
+            &mut errors,
+            "manifest",
+            "communication and delegation graph owners must remain distinct",
+        );
     }
 
     let Some(profiles) = manifest["profiles"].as_array() else {
@@ -734,16 +862,26 @@ fn validate_manifest(manifest: &Value, schema: &Value) -> Result<Report, Vec<Str
             add(&mut errors, &format!("fixtures[{index}]"), "profile_ref does not resolve");
         }
         if field(fixture, "kind") == Some("centrality_known_answer") {
-            if let Some(profile) = profiles.iter().find(|p| field(p, "profile_id") == Some(profile_ref)) {
+            if let Some(profile) = profiles
+                .iter()
+                .find(|p| field(p, "profile_id") == Some(profile_ref))
+            {
                 if field(&profile["centrality_reference"], "status") != Some("Pass") {
-                    add(&mut errors, &format!("fixtures[{index}]"), "centrality fixture must reference supported profile");
+                    add(
+                        &mut errors,
+                        &format!("fixtures[{index}]"),
+                        "centrality fixture must reference supported profile",
+                    );
                 }
                 if let Some(family) = field(profile, "topology_family") {
                     centrality_families.insert(family.to_string());
                 }
             }
         }
-        if !matches!(field(fixture, "expected_status"), Some("Pass" | "Fail" | "Unsupported" | "Indeterminate")) {
+        if !matches!(
+            field(fixture, "expected_status"),
+            Some("Pass" | "Fail" | "Unsupported" | "Indeterminate")
+        ) {
             add(&mut errors, &format!("fixtures[{index}]"), "invalid expected_status");
         }
     }
@@ -794,7 +932,9 @@ fn main() -> ExitCode {
                 "QUALIFIED COMMUNICATION GRAPH FIXTURES: profiles={} topologies={} fixtures={}",
                 report.profiles, report.topology_families, report.fixtures
             );
-            println!("NOT EXECUTED: channel reachability is not message delivery; no agent interaction was run.");
+            println!(
+                "NOT EXECUTED: channel reachability is not message delivery; no agent interaction was run."
+            );
             ExitCode::SUCCESS
         }
         Err(errors) => {
@@ -942,7 +1082,10 @@ mod tests {
         profile["centrality_reference"]["values"][0]["score"] = Value::from(0.5);
         let mut errors = Vec::new();
         validate_centrality(&profile, &mut errors);
-        assert!(errors.iter().any(|error| error.contains("Unsupported centrality values differ from recomputation")
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("Unsupported centrality values differ from recomputation")
             || error.contains("Unsupported centrality tie control differs from recomputation")));
     }
 
@@ -1065,7 +1208,11 @@ mod tests {
         let old_ids = profile["temporal_events"][1]["channel_ids"].clone();
         profile["temporal_events"][1]["new_channel_ids"] = old_ids;
         let errors = validate_profile(&profile);
-        assert!(errors.iter().any(|error| error.contains("restore must use new channel identities")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("restore must use new channel identities"))
+        );
     }
 
     #[test]
