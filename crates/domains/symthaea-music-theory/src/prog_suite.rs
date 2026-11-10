@@ -230,22 +230,19 @@ mod tests {
 
         // The continuing lead and accompaniment identities survive all
         // four section splices, including the foreign-meter bridge.
-        for section_start in [0.0, 16.0, 44.0, 64.0] {
-            assert!(score.notes.iter().any(|note| {
-                note.part == PROG_LEAD_PART
-                    && note.onset.beats() >= section_start
-                    && note.onset.beats() < section_start + 32.0
-            }));
-            assert!(score.notes.iter().any(|note| {
-                note.part == PROG_BASS_PART
-                    && note.onset.beats() >= section_start
-                    && note.onset.beats() < section_start + 32.0
-            }));
-            assert!(score.notes.iter().any(|note| {
-                note.part == PROG_HARMONY_PART
-                    && note.onset.beats() >= section_start
-                    && note.onset.beats() < section_start + 32.0
-            }));
+        for (section_start, section_end) in [
+            (0.0, 16.0),  // A: 4 bars x 4 beats
+            (16.0, 44.0), // B: 4 bars x 7 beats
+            (44.0, 64.0), // C: 4 bars x 5 beats
+            (64.0, 80.0), // ReturnA: 4 bars x 4 beats
+        ] {
+            for part in [PROG_LEAD_PART, PROG_BASS_PART, PROG_HARMONY_PART] {
+                assert!(score.notes.iter().any(|note| {
+                    note.part == part
+                        && note.onset.beats() >= section_start
+                        && note.onset.beats() < section_end
+                }), "PartId {:?} missing from section [{section_start}, {section_end})", part);
+            }
         }
     }
 
