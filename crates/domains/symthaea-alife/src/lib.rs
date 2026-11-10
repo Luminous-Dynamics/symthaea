@@ -43,8 +43,9 @@ pub mod predator_prey;
 pub mod types;
 
 pub use agnostic_evidence::{
-    AlternativeHypothesis, EvidenceBasis, EvidenceRecord, EvidenceState, HypothesisClass,
-    ObservationCoverage, Property, PropertyFinding, SystemProfile, OLI_SCHEMA_VERSION,
+    AlternativeHypothesis, EvidenceBasis, EvidenceOutcome, EvidenceRecord, HypothesisClass,
+    ObservationCoverage, Property, PropertyAssessment, PropertyFinding, SystemProfile,
+    OLI_SCHEMA_VERSION,
 };
 pub use agent_id::{AgentId, AgentIdAllocator};
 pub use coalition::{Coalition, detect_coalitions, detect_paying_coalitions};
