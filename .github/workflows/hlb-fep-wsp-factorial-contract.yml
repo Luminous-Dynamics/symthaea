@@ -2,7 +2,7 @@ name: HLB FEP-WSP Factorial Contract
 
 on:
   pull_request:
-    branches: [main, research/swi-001-weight-space-introspection]
+    branches: [main, research/swi-001-weight-space-introspection, research/hlb-fep-wsp-factorial-v2]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
@@ -37,6 +37,7 @@ on:
       - "crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs"
       - "crates/core/symthaea-fep/Cargo.toml"
       - "crates/core/symthaea-fep/src/lib.rs"
+      - "crates/core/symthaea-fep/src/vssi_mechanical_fixture.rs"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
@@ -48,7 +49,7 @@ on:
       - "src/dynamics/cfc/mod.rs"
       - "src/dynamics/cfc/network.rs"
   push:
-    branches: [research/hlb-fep-wsp-factorial-v2]
+    branches: [research/hlb-fep-wsp-factorial-v2, research/hlb-vssi-mechanical-fixture-v0]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - ".github/scripts/assert-hlb-test-discovery.sh"
@@ -82,6 +83,7 @@ on:
       - "crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs"
       - "crates/core/symthaea-fep/Cargo.toml"
       - "crates/core/symthaea-fep/src/lib.rs"
+      - "crates/core/symthaea-fep/src/vssi_mechanical_fixture.rs"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
@@ -162,6 +164,7 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/open_world_weight_program_gate.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/static_model_diagnostic.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/vssi_mechanical_fixture.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs
@@ -218,6 +221,7 @@ jobs:
           cargo test --locked --release -p symthaea-fep --lib sequential_diagnostic_planning::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib sequential_diagnostic_benchmark::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib static_model_diagnostic::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib vssi_mechanical_fixture::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --example hlb_static_model_diagnostic -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib decision_diagnostic_benchmark::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --example hlb_decision_diagnostic_benchmark -- --nocapture
