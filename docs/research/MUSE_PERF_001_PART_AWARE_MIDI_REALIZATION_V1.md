@@ -43,6 +43,7 @@ The exporter computes the canonical Score digest using the existing score-demand
 - Zero-velocity note events are rejected rather than turned into MIDI NoteOn events with velocity zero (which MIDI receivers interpret as NoteOff).
 - Every source note receives one note receipt containing its original score-array ordinal, PartId, segment, instrument instance, track, pitch, velocity and exact start/end ticks.
 - Source note ordinals are scoped to the Score digest. They are not persistent EventIds; event correspondence after edits must use the explicit event-remap contract.
+- A focused exact-head workflow runs Muse formatting and the MIDI performance unit tests on Rust 1.96.0 for relevant pull requests and direct branch pushes.
 - The manifest includes score, timeline, binding, structural capability-inventory, MIDI and manifest digests. The supplied structural capability set is hashed in canonical instrument-ID order; this binds the exact limits used by the timeline validator but does not establish the evidence authority of those limits. Frozen inputs must produce byte-identical MIDI and manifest output.
 
 ### Explicit V1 limits
@@ -55,7 +56,7 @@ The exporter computes the canonical Score digest using the existing score-demand
 
 ## 3. Implementation and test inventory
 
-The Rust module currently authors 12 focused tests:
+The Rust module currently authors 13 focused tests:
 
 1. Two same-role parts are exported as distinct generator-authored parts.
 2. A cello-to-horn handoff preserves one PartId across two tracks.
@@ -69,6 +70,7 @@ The Rust module currently authors 12 focused tests:
 10. Every source note receives exactly one ordinal receipt.
 11. A GM program outside 0–127 is rejected.
 12. More than fifteen active pitched instrument instances is refused explicitly.
+13. The structural instrument-capability inventory is bound into the realization manifest.
 
 These are authored regression tests, not executed test results. No compilation, rustfmt, Clippy, local test, or CI pass is claimed in this draft.
 
