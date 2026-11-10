@@ -1,0 +1,131 @@
+{
+  "schema_version": "hardsec-challenge-profile-v1",
+  "challenge_id": "seqcube-reference-ctrl-0001",
+  "dataset_id": "seqcube-ht-witness-validation-artifact-v1.0",
+  "dataset_role": "reference_fixture_only",
+  "validity_status": "witness_validated",
+  "subject": {
+    "design_id": "seqctrl_infected",
+    "netlist_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
+    "local_path": "netlists/seqctrl_infected.v"
+  },
+  "trigger": {
+    "activation": {
+      "status": "observed",
+      "method": "recorded_replay",
+      "stimuli_count": 10,
+      "activation_count": 1,
+      "trace_sha256": "d2f865eb22c41c32a941007d44efefd5ac010d00e6baa623e8afa2072e5a7c8a",
+      "budget_cycles": 10,
+      "witness_evidence_id": "seqcube-active-cover"
+    },
+    "scoap": {
+      "status": "not_measured"
+    },
+    "temporal": {
+      "status": "measured",
+      "phase_count": 3,
+      "interphase_gaps": [
+        2,
+        2
+      ],
+      "method": "independent replay of pinned reference package"
+    }
+  },
+  "payload": {
+    "status": "observed",
+    "observation_boundary": "primary output y",
+    "first_effect_cycle": 8,
+    "effect_sha256": "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d",
+    "witness_evidence_id": "seqcube-active-payload",
+    "paired_inactive_control": {
+      "status": "passed",
+      "trace_evidence_id": "seqcube-inactive-trace",
+      "budget_cycles": 10,
+      "effect_observed": false
+    }
+  },
+  "structure": {
+    "netlist_metrics": {
+      "status": "measured",
+      "cell_count": 83,
+      "state_bit_count": 20,
+      "method": "pinned package manifest cross-checked by upstream netlist parser"
+    },
+    "graph_metrics": {
+      "status": "not_measured"
+    }
+  },
+  "equivalence": {
+    "status": "not_applicable"
+  },
+  "provenance": {
+    "host_id": "seqctrl-reference-ctrl-0001",
+    "host_family_id": "seqctrl-reference-family",
+    "source_group_id": "seqcube-ht-witness-validation-artifact-v1.0",
+    "generator_id": "not_included_in_public_reference_package",
+    "generation_seed": null,
+    "split": "not_applicable",
+    "source_commit": "e5acac37af6dbe1fa53b0be93199bb81a62c5320"
+  },
+  "resources": {
+    "status": "not_measured"
+  },
+  "evidence": [
+    {
+      "evidence_id": "seqcube-active-cover",
+      "kind": "active_trace",
+      "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/active.csv",
+      "local_path": "replay/active.csv",
+      "sha256": "d2f865eb22c41c32a941007d44efefd5ac010d00e6baa623e8afa2072e5a7c8a",
+      "scope": "reset-consistent active trace; trigger phases at cycles 2, 4 and 6",
+      "status": "pass",
+      "proof_scope": "bounded",
+      "formal_result": "cover_reached",
+      "bound_cycles": 10,
+      "property_id": "three_phase_trigger_path"
+    },
+    {
+      "evidence_id": "seqcube-active-payload",
+      "kind": "payload_effect",
+      "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/expected_boundary.json",
+      "local_path": "replay/expected_boundary.json",
+      "sha256": "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d",
+      "scope": "paired clean/infected primary output difference at y, cycle 8",
+      "status": "pass"
+    },
+    {
+      "evidence_id": "seqcube-inactive-trace",
+      "kind": "inactive_trace",
+      "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/inactive.csv",
+      "local_path": "replay/inactive.csv",
+      "sha256": "3d7cf845a7d530a2d4356aa264ec4b3fea13308f9dc2b3e4fe5295f50c4f9359",
+      "scope": "ten-cycle inactive control; trigger not observed under this sequence",
+      "status": "pass"
+    },
+    {
+      "evidence_id": "seqcube-inactive-payload",
+      "kind": "payload_effect",
+      "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/expected_boundary.json",
+      "local_path": "replay/expected_boundary.json",
+      "sha256": "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d",
+      "scope": "paired primary output effect was not observed on the inactive control",
+      "status": "pass"
+    },
+    {
+      "evidence_id": "seqcube-inactive-bounded-audit",
+      "kind": "formal_proof",
+      "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/audit/inactive.smt2",
+      "local_path": "audit/inactive.smt2",
+      "sha256": "b93fddb6a38e1ef148e8a259bf26634d031c44dccbc168c50161c1e50846379f",
+      "scope": "inactive trigger activation query bounded to the recorded reset/vector sequence",
+      "status": "pass",
+      "proof_scope": "bounded",
+      "formal_result": "bounded_no_counterexample",
+      "bound_cycles": 10,
+      "property_id": "inactive_trigger_activation",
+      "assumptions_sha256": "2aa4fe1cd30f8282baf052dac354b296cff93b703cbe5ed4e59285510b61e4d9",
+      "assumptions_local_path": "metadata/config.json"
+    }
+  ]
+}
