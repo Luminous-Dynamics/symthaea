@@ -115,7 +115,22 @@
           "Policy scenarios and fuel-price assumptions: printed pp. 25–26",
           "TCO results: printed pp. 27–29",
           "Speed-power-CAPEX explanation and study limitations: printed pp. 31–32"
-        ]
+        ],
+        "policy_modeling_notes": {
+          "nuclear_surplus_unit_revenue_under_nzf": true,
+          "nuclear_znz_reward_modeled": false,
+          "e_fuel_znz_reward_modeled": true,
+          "interpretation": "The report says its reward mechanism is included for e-fuels such as e-ammonia but not nuclear SMR; it notes that reactors could in principle be eligible if well-to-wake zero-GHG emissions are delivered. Keep eligibility as a separate policy sensitivity rather than silently crediting nuclear.",
+          "low_speed_low_capex_case": "Least-cost from NOAK nuclear introduction in 2040 under NZF scenarios.",
+          "no_policy_case": "No GFI targets or surplus-unit revenue; no nuclear case is cheaper than the conventional vessel."
+        },
+        "power_speed_scaling": {
+          "propulsion_power_scaling": "cube law",
+          "reactor_capex_scaling": "linear in installed electrical kWe",
+          "nuclear_installed_power_ratio_25_knots_to_14_85_knots": 3.1987156320369188,
+          "annual_distance_ratio_25_knots_to_14_85_knots": 1.3207759347764971,
+          "interpretation": "Published model inputs imply installed-power scaling of about 3.20x for about 1.32x annual distance. Ratios are arithmetic derived from the published inputs, not additional measured data."
+        }
       },
       "known_cost_limitations": [
         "Nuclear-specific insurance is not included.",
@@ -187,7 +202,9 @@
           "modeled_production_cost_usd_per_kw_max": 1000
         },
         "fuel_cycle_years_approximately": 5,
-        "public_evidence_boundary": "Public case-study summary; detailed ship power, CAPEX, financing and full cost model inputs are not disclosed in the summary."
+        "public_evidence_boundary": "Public case-study summary; detailed ship power, CAPEX, financing and full cost model inputs are not disclosed in the summary.",
+        "relative_speed_comparison_basis": "The summary describes the 25-knot nuclear case as 39% faster than conventional vessels; it does not state the exact conventional reference speed in that public summary.",
+        "public_data_sufficiency": "The public summary is enough to freeze headline service/cost-threshold claims, but not enough to reconstruct full installed power, financing, detailed cost ledger, route assumptions or uncertainty distributions."
       }
     },
     {
