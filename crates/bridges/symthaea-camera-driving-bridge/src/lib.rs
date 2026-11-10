@@ -356,7 +356,7 @@ impl CameraDrivingBridge {
             hdc_dimension: HDC_DIMENSION,
             vehicle_encoder_levels: MAX_VEHICLE_ENCODER_LEVELS,
             raw_frame_sha256,
-            visual_state_sha256,
+            visual_state_sha256: visual_state_sha256.clone(),
             vehicle_state_sha256: vehicle_state_sha256.clone(),
             previous_vehicle_state_sha256,
             previous_visual_state_sha256,
@@ -481,22 +481,24 @@ fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
     hasher.update(receipt.schema_version.to_le_bytes());
     hasher.update([u8::from(receipt.previous_vehicle_state_sha256.is_some())]);
     hasher.update([u8::from(receipt.previous_visual_state_sha256.is_some())]);
+    let previous_vehicle_state = receipt.previous_vehicle_state_sha256.as_deref().unwrap_or("");
+    let previous_visual_state = receipt.previous_visual_state_sha256.as_deref().unwrap_or("");
     for value in [
-        &receipt.identity.run_id,
-        &receipt.identity.episode_id,
-        &receipt.identity.scenario_id,
-        &receipt.identity.camera_id,
-        &receipt.identity.simulator_revision,
-        &receipt.identity.policy_revision,
-        &receipt.vision_config_sha256,
-        &receipt.vehicle_encoder_seed_sha256,
-        &receipt.raw_frame_sha256,
-        &receipt.visual_state_sha256,
-        &receipt.vehicle_state_sha256,
-        &receipt.previous_vehicle_state_sha256.as_deref().unwrap_or(""),
-        &receipt.previous_visual_state_sha256.as_deref().unwrap_or(""),
-        &receipt.proprioceptive_hv_sha256,
-        &receipt.fused_policy_input_sha256,
+        receipt.identity.run_id.as_str(),
+        receipt.identity.episode_id.as_str(),
+        receipt.identity.scenario_id.as_str(),
+        receipt.identity.camera_id.as_str(),
+        receipt.identity.simulator_revision.as_str(),
+        receipt.identity.policy_revision.as_str(),
+        receipt.vision_config_sha256.as_str(),
+        receipt.vehicle_encoder_seed_sha256.as_str(),
+        receipt.raw_frame_sha256.as_str(),
+        receipt.visual_state_sha256.as_str(),
+        receipt.vehicle_state_sha256.as_str(),
+        previous_vehicle_state,
+        previous_visual_state,
+        receipt.proprioceptive_hv_sha256.as_str(),
+        receipt.fused_policy_input_sha256.as_str(),
     ] {
         hasher.update((value.len() as u64).to_le_bytes());
         hasher.update(value.as_bytes());
