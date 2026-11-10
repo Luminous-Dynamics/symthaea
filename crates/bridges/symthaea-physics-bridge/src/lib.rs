@@ -72,7 +72,13 @@ pub use recognize::{
     RecognitionReport, expr_to_equation_node, recognize_expr, recognize_expr_with_units,
 };
 pub use symmetry::SymmetryEncoder;
-pub use symmetry_inference::infer_symmetry;
+pub use symmetry_inference::{
+    ExactPolynomialLieProfileV1, ExactPolynomialSearchStatus, NumericLieDerivativeProfileV1,
+    LieDerivativeSampleStatisticsV1, StructuralSymmetryPattern, SymmetryInferenceEvidence,
+    SymmetryInferenceReport,
+    SymmetryInferenceSearchStatus, infer_symmetry, infer_symmetry_numeric,
+    infer_symmetry_numeric_with_evidence, infer_symmetry_with_evidence,
+};
 pub use tensor_structure::TensorEncoder;
 pub use typed_generation::random_expr_with_dimension;
 pub use types::*;
