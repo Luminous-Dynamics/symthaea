@@ -18,7 +18,7 @@ The v0.3 crate estimates, for a supplied sequence of steady-flight mission segme
 
 
 
-The dedicated uncertainty module adds a deterministic adverse-corner screening evaluator. It applies declared one-sided bounds to mass, speed, L/D, climb, auxiliary demand, battery capacity/voltage/resistance/power/current/thermal limits and scalar propulsion efficiencies. It preserves both the nominal result and the exact adjusted input and adverse-corner outcome. It is not Monte Carlo, a confidence interval, a probabilistic worst-case proof or a certification method; it currently wraps the scalar mission evaluator rather than the characterized-map paths.
+The dedicated uncertainty module adds deterministic adverse-corner screening for both scalar and fully characterized missions. The characterized path takes propulsion-efficiency and battery OCV/resistance uncertainty from their evidence-bound maps and rejects duplicated scalar perturbations to those same fields. It preserves the nominal result, budget, exact adjusted inputs and adverse-corner outcome. It is not Monte Carlo, a confidence interval, a probabilistic worst-case proof or a certification method.
 
 Battery OCV and internal-resistance maps are two-dimensional over SOC and pack temperature. Both map families reject extrapolation and record the dataset IDs used. Evidence SHA-256 fields are syntax-checked at construction. The verified-map API can hash caller-supplied bytes and reject missing or mismatched payloads; URI resolution, signatures, source authority and configuration approval remain external. See docs/ROBUST_UNCERTAINTY.md.
 
