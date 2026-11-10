@@ -1,0 +1,58 @@
+name: HLB Composite Family Acceptance Contract
+
+on:
+  pull_request:
+    branches: [research/hlb-family-guardrail-v0]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/core/symthaea-core/src/sequential_weight_program.rs"
+      - "crates/core/symthaea-core/src/family_guardrail.rs"
+      - "crates/core/symthaea-core/src/sequential_weight_verification.rs"
+      - ".github/workflows/hlb-composite-family-acceptance-contract.yml"
+  push:
+    branches: [research/hlb-composite-family-acceptance-v0]
+    paths:
+      - "crates/core/symthaea-core/src/sequential_weight_program.rs"
+      - ".github/workflows/hlb-composite-family-acceptance-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hlb-composite-family-acceptance-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  family-acceptance:
+    name: Aggregate + family evidence composition
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format composite evidence module
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/src/sequential_weight_program.rs
+
+      - name: Test aggregate and family acceptance contract
+        run: |
+          set -euo pipefail
+          cargo test --locked --release -p symthaea-core --lib sequential_weight_program::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --lib family_guardrail::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --lib sequential_weight_verification::tests -- --nocapture
+
+      - name: Check core crate with Clippy
+        run: cargo clippy --locked -p symthaea-core --lib -- -D warnings
