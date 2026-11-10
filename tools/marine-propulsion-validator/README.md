@@ -65,7 +65,7 @@ cargo run --bin marine-causal-protocol-audit -- \
 
 The causal audit checks schema conformance, estimand/outcome linkage, preregistration timing, evidence-source references, confounder roles, observational overlap/effective sample size, battery SOC boundaries, identification-gate status and negative-control outcomes. It reports protocol readiness only; it does not estimate or certify causal effects.
 
-Audit the dated regulatory rule register:
+Audit the retained v0.1.0 regulatory snapshot (historical):
 
 ~~~sh
 cargo run --bin marine-regulatory-rule-audit -- \
@@ -115,6 +115,9 @@ The v0.2.0 profile is documented in `docs/research/marine/MARINE-SERVICE-FINGERP
 - marine-propulsion-case-v0.3.0.schema.json adds calibration evidence source, certificate
   digest, reviewer, method and rights metadata; timebase evidence/rights metadata; sample-rate
   basis; and a declared half-open sample-window convention with count/rate tolerance.
+- `marine-regulatory-rule-register-v0.2.0.schema.json` and its dated register are the preferred current snapshot; they keep emissions year, surrender year, route coverage and gas-scope years separate.
+- `marine-causal-study-protocol-v0.1.0.schema.json` defines preregistered estimands, treatment states, confounders, battery boundaries, identification gates and negative controls. Its synthetic fixture is deliberately NOT_READY.
+- The package also contains standalone audit binaries for the regulatory register and causal-study protocol. They check contract/readiness conditions only; neither is a regulatory decision nor a causal estimator.
 - v0.2.0 and v0.3.0 fixtures are synthetic. Their registry entries are software-test data,
   not calibration, metrology or operational evidence. The v0.2.0 service fingerprint is a
   known-answer software test vector.
