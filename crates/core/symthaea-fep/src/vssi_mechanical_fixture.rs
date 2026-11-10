@@ -20,6 +20,8 @@
 //! forced classification or a parameter patch.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use thiserror::Error;
 
 /// Fault family selected by the benchmark generator, never included in the
@@ -47,7 +49,7 @@ pub enum VssiDisposition {
 }
 
 /// Registered observation or intervention protocol.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum VssiExperimentKind {
     PassiveObservation,
     ThermalImpulse,
@@ -120,6 +122,255 @@ pub struct VssiPublicTask {
     pub observation_covariance: [[f64; 2]; 2],
 }
 
+/// One completed experiment with provenance, budget accounting and a chained digest.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VssiExperimentReceipt {
+    /// Self-describing receipt schema version.
+    pub schema_version: String,
+    /// Investigator-visible scenario identity.
+    pub scenario_id: String,
+    /// Digest of the complete investigator-visible task envelope.
+    pub public_task_digest: String,
+    /// One-based sequence number within this evaluator-held environment.
+    pub experiment_index: u64,
+    /// Experiment protocol that produced the observation batch.
+    pub kind: VssiExperimentKind,
+    /// Digest of the exact registered protocol specification in the public task.
+    pub experiment_spec_digest: String,
+    /// Abstract fixture cost charged for this protocol.
+    pub observation_cost: f64,
+    /// Remaining abstract cost budget immediately before the experiment.
+    pub budget_before: f64,
+    /// Remaining abstract cost budget immediately after the experiment.
+    pub budget_after: f64,
+    /// Digest of the exact observations released by this experiment.
+    pub observations_digest: String,
+    /// Previous receipt in the same environment's evidence chain.
+    pub previous_receipt_digest: Option<String>,
+    /// Domain-separated digest of all receipt claims.
+    pub receipt_digest: String,
+}
+
+/// Observations released to the investigator together with their receipt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VssiExperimentResult {
+    pub observations: Vec<VssiObservation>,
+    pub receipt: VssiExperimentReceipt,
+}
+
+impl VssiExperimentReceipt {
+    /// Recompute the receipt's claim digest without trusting its stored digest.
+    pub fn validate(&self) -> Result<(), VssiFixtureError> {
+        let expected_budget_after = (self.budget_before - self.observation_cost).max(0.0);
+        if self.schema_version != "vssi-experiment-receipt-v1"
+            || self.scenario_id.trim().is_empty()
+            || self.experiment_index == 0
+            || !self.observation_cost.is_finite()
+            || self.observation_cost < 0.0
+            || !self.budget_before.is_finite()
+            || self.budget_before < 0.0
+            || !self.budget_after.is_finite()
+            || self.budget_after < 0.0
+            || self.observation_cost > self.budget_before + 1e-12
+            || (self.budget_after - expected_budget_after).abs() > 1e-12
+        {
+            return Err(VssiFixtureError::InvalidReceiptClaims);
+        }
+        if !is_sha256_hex(&self.public_task_digest)
+            || !is_sha256_hex(&self.experiment_spec_digest)
+            || !is_sha256_hex(&self.observations_digest)
+            || !is_sha256_hex(&self.receipt_digest)
+            || self
+                .previous_receipt_digest
+                .as_ref()
+                .is_some_and(|digest| !is_sha256_hex(digest))
+        {
+            return Err(VssiFixtureError::InvalidReceiptDigest);
+        }
+        let claims = VssiExperimentReceiptClaims {
+            schema_version: &self.schema_version,
+            scenario_id: &self.scenario_id,
+            public_task_digest: &self.public_task_digest,
+            experiment_index: self.experiment_index,
+            kind: self.kind,
+            experiment_spec_digest: &self.experiment_spec_digest,
+            observation_cost: self.observation_cost,
+            budget_before: self.budget_before,
+            budget_after: self.budget_after,
+            observations_digest: &self.observations_digest,
+            previous_receipt_digest: self.previous_receipt_digest.as_deref(),
+        };
+        if sha256_serializable(b"symthaea-vssi-experiment-receipt-v1\0", &claims)?
+            != self.receipt_digest
+        {
+            return Err(VssiFixtureError::ReceiptDigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+impl VssiExperimentResult {
+    /// Recompute both observation and receipt digests for this released batch.
+    pub fn validate(&self) -> Result<(), VssiFixtureError> {
+        self.receipt.validate()?;
+        let digest =
+            sha256_serializable(b"symthaea-vssi-observation-batch-v1\0", &self.observations)?;
+        if digest != self.receipt.observations_digest {
+            return Err(VssiFixtureError::ObservationDigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+/// Validate sequence continuity and the hash chain for one environment ledger.
+///
+/// This establishes internal integrity and ordering, not signer authenticity:
+/// the fixture does not hold a signing key or provide an OS process sandbox.
+pub fn validate_vssi_experiment_receipt_chain(
+    receipts: &[VssiExperimentReceipt],
+) -> Result<(), VssiFixtureError> {
+    for (index, receipt) in receipts.iter().enumerate() {
+        receipt.validate()?;
+        if receipt.experiment_index != index as u64 + 1 {
+            return Err(VssiFixtureError::ReceiptChainMismatch {
+                index: receipt.experiment_index,
+            });
+        }
+        if index == 0 {
+            if receipt.previous_receipt_digest.is_some() {
+                return Err(VssiFixtureError::ReceiptChainMismatch {
+                    index: receipt.experiment_index,
+                });
+            }
+        } else {
+            let previous = &receipts[index - 1];
+            if receipt.scenario_id != previous.scenario_id
+                || receipt.public_task_digest != previous.public_task_digest
+                || receipt.previous_receipt_digest.as_deref()
+                    != Some(previous.receipt_digest.as_str())
+                || (receipt.budget_before - previous.budget_after).abs() > 1e-12
+            {
+                return Err(VssiFixtureError::ReceiptChainMismatch {
+                    index: receipt.experiment_index,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Independently validate released experiment batches against the public task.
+/// This checks the complete task digest, exact registered protocol specification,
+/// one-use protocol identity, observation payload digest and cumulative budget.
+/// It does not authenticate an actor or provide an OS process boundary.
+pub fn validate_vssi_experiment_results(
+    task: &VssiPublicTask,
+    results: &[VssiExperimentResult],
+) -> Result<(), VssiFixtureError> {
+    if task.scenario_id.trim().is_empty()
+        || !task.observation_budget.is_finite()
+        || task.observation_budget < 0.0
+    {
+        return Err(VssiFixtureError::InvalidReceiptClaims);
+    }
+    let mut registered = BTreeSet::new();
+    for spec in &task.available_experiments {
+        if !registered.insert(spec.kind)
+            || !spec.observation_cost.is_finite()
+            || spec.observation_cost < 0.0
+            || !spec.minimum_load.is_finite()
+            || !spec.maximum_load.is_finite()
+            || spec.minimum_load > spec.maximum_load
+            || spec.duration_ticks == 0
+        {
+            return Err(VssiFixtureError::ReceiptSpecMismatch);
+        }
+    }
+
+    let task_digest =
+        sha256_serializable(b"symthaea-vssi-public-task-v1\0", task)?;
+    let mut previous_receipt_digest: Option<&str> = None;
+    let mut remaining_budget = task.observation_budget;
+    let mut used_protocols = BTreeSet::new();
+    for (index, result) in results.iter().enumerate() {
+        result.validate()?;
+        let receipt = &result.receipt;
+        if receipt.scenario_id != task.scenario_id || receipt.public_task_digest != task_digest {
+            return Err(VssiFixtureError::ReceiptTaskMismatch);
+        }
+        if receipt.experiment_index != index as u64 + 1
+            || receipt.previous_receipt_digest.as_deref() != previous_receipt_digest
+            || (receipt.budget_before - remaining_budget).abs() > 1e-12
+        {
+            return Err(VssiFixtureError::ReceiptChainMismatch {
+                index: receipt.experiment_index,
+            });
+        }
+        if !used_protocols.insert(receipt.kind) {
+            return Err(VssiFixtureError::DuplicateReceiptExperiment);
+        }
+        let spec = task
+            .available_experiments
+            .iter()
+            .find(|candidate| candidate.kind == receipt.kind)
+            .ok_or(VssiFixtureError::ReceiptSpecMismatch)?;
+        let expected_spec_digest =
+            sha256_serializable(b"symthaea-vssi-experiment-spec-v1\0", spec)?;
+        if receipt.experiment_spec_digest != expected_spec_digest
+            || (receipt.observation_cost - spec.observation_cost).abs() > 1e-12
+            || receipt.observation_cost > remaining_budget + 1e-12
+        {
+            return Err(VssiFixtureError::ReceiptSpecMismatch);
+        }
+
+        for observation in &result.observations {
+            if !observation.event_time.is_finite()
+                || observation.event_time <= 3.0
+                || (observation.temperature.is_none() && observation.vibration.is_none())
+            {
+                return Err(VssiFixtureError::ReceiptObservationOutOfRange);
+            }
+            for reading in [observation.temperature, observation.vibration]
+                .into_iter()
+                .flatten()
+            {
+                if !reading.value.is_finite()
+                    || !reading.acquired_at.is_finite()
+                    || reading.acquired_at <= observation.event_time
+                {
+                    return Err(VssiFixtureError::ReceiptObservationOutOfRange);
+                }
+            }
+        }
+
+        remaining_budget = (remaining_budget - spec.observation_cost).max(0.0);
+        if (receipt.budget_after - remaining_budget).abs() > 1e-12 {
+            return Err(VssiFixtureError::ReceiptChainMismatch {
+                index: receipt.experiment_index,
+            });
+        }
+        previous_receipt_digest = Some(receipt.receipt_digest.as_str());
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct VssiExperimentReceiptClaims<'a> {
+    schema_version: &'a str,
+    scenario_id: &'a str,
+    public_task_digest: &'a str,
+    experiment_index: u64,
+    kind: VssiExperimentKind,
+    experiment_spec_digest: &'a str,
+    observation_cost: f64,
+    budget_before: f64,
+    budget_after: f64,
+    observations_digest: &'a str,
+    previous_receipt_digest: Option<&'a str>,
+}
+
 /// Evaluator-only hidden mechanism. Its fields are private by design.
 #[derive(Debug, Clone)]
 struct HiddenMechanism {
@@ -133,12 +384,15 @@ struct HiddenMechanism {
 
 /// Environment handle. Pass the public task and selected experiment
 /// observations to the investigator, but keep this handle in the evaluator.
-#[derive(Debug, Clone)]
+/// It is intentionally not `Clone`: cloning an environment would fork its
+/// one-use intervention ledger and duplicate the available observation budget.
+#[derive(Debug)]
 pub struct VssiMechanicalEnvironment {
     task: VssiPublicTask,
     hidden: HiddenMechanism,
     spent_observation_cost: f64,
     completed_experiments: Vec<VssiExperimentKind>,
+    experiment_receipts: Vec<VssiExperimentReceipt>,
 }
 
 /// A disposition score intended only for the independent benchmark evaluator.
@@ -161,6 +415,26 @@ pub enum VssiFixtureError {
     ExperimentAlreadyPerformed { kind: VssiExperimentKind },
     #[error("experiment cost {requested} exceeds remaining budget {remaining}")]
     BudgetExceeded { remaining: f64, requested: f64 },
+    #[error("failed to serialize deterministic experiment evidence for hashing")]
+    ReceiptSerialization,
+    #[error("receipt contains invalid sequence, cost, or budget claims")]
+    InvalidReceiptClaims,
+    #[error("receipt sequence or previous-digest link is inconsistent at index {index}")]
+    ReceiptChainMismatch { index: u64 },
+    #[error("receipt contains a malformed SHA-256 digest")]
+    InvalidReceiptDigest,
+    #[error("experiment receipt digest does not match its claims")]
+    ReceiptDigestMismatch,
+    #[error("released observations do not match the experiment receipt digest")]
+    ObservationDigestMismatch,
+    #[error("experiment receipt is not bound to the supplied public task")]
+    ReceiptTaskMismatch,
+    #[error("experiment receipt does not match its registered experiment specification")]
+    ReceiptSpecMismatch,
+    #[error("experiment protocol appears more than once in a receipt sequence")]
+    DuplicateReceiptExperiment,
+    #[error("released observation is outside the allowed post-intervention time/quality contract")]
+    ReceiptObservationOutOfRange,
 }
 
 impl VssiMechanicalEnvironment {
@@ -220,6 +494,7 @@ impl VssiMechanicalEnvironment {
             hidden,
             spent_observation_cost: 0.0,
             completed_experiments: Vec::new(),
+            experiment_receipts: Vec::new(),
         })
     }
 
@@ -234,10 +509,25 @@ impl VssiMechanicalEnvironment {
     /// selected intervention begins at tick 4. A protocol may be requested
     /// only once per environment; replaying an identical counterfactual would
     /// otherwise return duplicate deterministic observations.
+    ///
+    /// The compatibility method still returns observations only; every
+    /// successful call records a receipt in the evaluator-held ledger.
     pub fn observe_experiment(
         &mut self,
         kind: VssiExperimentKind,
     ) -> Result<Vec<VssiObservation>, VssiFixtureError> {
+        Ok(self.observe_experiment_with_receipt(kind)?.observations)
+    }
+
+    /// Release observations and return the exact provenance/budget receipt.
+    ///
+    /// Receipt serialization and hashing complete before the environment is
+    /// mutated or observations are released. Failed requests therefore do not
+    /// consume budget, advance the receipt chain, or reveal a partial result.
+    pub fn observe_experiment_with_receipt(
+        &mut self,
+        kind: VssiExperimentKind,
+    ) -> Result<VssiExperimentResult, VssiFixtureError> {
         let spec = self
             .task
             .available_experiments
@@ -248,20 +538,76 @@ impl VssiMechanicalEnvironment {
         if self.completed_experiments.contains(&kind) {
             return Err(VssiFixtureError::ExperimentAlreadyPerformed { kind });
         }
-        let remaining = self.remaining_observation_budget();
-        if spec.observation_cost > remaining + 1e-12 {
+        let budget_before = self.remaining_observation_budget();
+        if spec.observation_cost > budget_before + 1e-12 {
             return Err(VssiFixtureError::BudgetExceeded {
-                remaining,
+                remaining: budget_before,
                 requested: spec.observation_cost,
             });
         }
+
         let observations = simulate(&self.hidden, kind)?
             .into_iter()
             .filter(|observation| observation.event_time > 3.0)
-            .collect();
+            .collect::<Vec<_>>();
+        let budget_after = (budget_before - spec.observation_cost).max(0.0);
+        let public_task_digest =
+            sha256_serializable(b"symthaea-vssi-public-task-v1\0", &self.task)?;
+        let observations_digest =
+            sha256_serializable(b"symthaea-vssi-observation-batch-v1\0", &observations)?;
+        let experiment_spec_digest =
+            sha256_serializable(b"symthaea-vssi-experiment-spec-v1\0", &spec)?;
+        let experiment_index = self.experiment_receipts.len() as u64 + 1;
+        let previous_receipt_digest = self
+            .experiment_receipts
+            .last()
+            .map(|receipt| receipt.receipt_digest.clone());
+        let schema_version = "vssi-experiment-receipt-v1".to_owned();
+        let claims = VssiExperimentReceiptClaims {
+            schema_version: &schema_version,
+            scenario_id: &self.task.scenario_id,
+            public_task_digest: &public_task_digest,
+            experiment_index,
+            kind,
+            experiment_spec_digest: &experiment_spec_digest,
+            observation_cost: spec.observation_cost,
+            budget_before,
+            budget_after,
+            observations_digest: &observations_digest,
+            previous_receipt_digest: previous_receipt_digest.as_deref(),
+        };
+        let receipt_digest =
+            sha256_serializable(b"symthaea-vssi-experiment-receipt-v1\0", &claims)?;
+        let receipt = VssiExperimentReceipt {
+            schema_version,
+            scenario_id: self.task.scenario_id.clone(),
+            public_task_digest,
+            experiment_index,
+            kind,
+            experiment_spec_digest,
+            observation_cost: spec.observation_cost,
+            budget_before,
+            budget_after,
+            observations_digest,
+            previous_receipt_digest,
+            receipt_digest,
+        };
+
+        let result = VssiExperimentResult {
+            observations,
+            receipt,
+        };
+        result.validate()?;
+
         self.spent_observation_cost += spec.observation_cost;
         self.completed_experiments.push(kind);
-        Ok(observations)
+        self.experiment_receipts.push(result.receipt.clone());
+        Ok(result)
+    }
+
+    /// Receipts for all successful experiments, in immutable execution order.
+    pub fn experiment_receipts(&self) -> &[VssiExperimentReceipt] {
+        &self.experiment_receipts
     }
 
     /// Cumulative abstract experiment cost consumed by this environment.
@@ -303,6 +649,25 @@ impl VssiMechanicalEnvironment {
                 && proposed == VssiDisposition::Abstain,
         }
     }
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn sha256_serializable<T: Serialize>(
+    domain: &[u8],
+    value: &T,
+) -> Result<String, VssiFixtureError> {
+    let encoded = serde_json::to_vec(value).map_err(|_| VssiFixtureError::ReceiptSerialization)?;
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    hasher.update((encoded.len() as u64).to_le_bytes());
+    hasher.update(encoded);
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn hidden_mechanism(
@@ -559,6 +924,163 @@ mod tests {
                 assert!(reading.value.is_finite());
             }
         }
+    }
+
+    #[test]
+    fn experiment_receipts_chain_task_identity_observations_and_budget() {
+        let mut environment = VssiMechanicalEnvironment::new(
+            "vssi-receipt-chain-control",
+            VssiFixtureCase::HealthyControl,
+        )
+        .unwrap();
+
+        let first = environment
+            .observe_experiment_with_receipt(VssiExperimentKind::PassiveObservation)
+            .unwrap();
+        assert_eq!(first.receipt.experiment_index, 1);
+        assert_eq!(first.receipt.kind, VssiExperimentKind::PassiveObservation);
+        assert_eq!(first.receipt.observation_cost, 0.25);
+        assert_eq!(first.receipt.budget_before, 1.2);
+        assert!((first.receipt.budget_after - 0.95).abs() < 1e-12);
+        assert_eq!(first.receipt.previous_receipt_digest, None);
+        assert_eq!(first.receipt.observations_digest.len(), 64);
+        assert_eq!(first.receipt.public_task_digest.len(), 64);
+        first.validate().unwrap();
+        assert_eq!(
+            first.receipt.observations_digest,
+            sha256_serializable(
+                b"symthaea-vssi-observation-batch-v1\0",
+                &first.observations
+            )
+            .unwrap()
+        );
+
+        let second = environment
+            .observe_experiment_with_receipt(VssiExperimentKind::ThermalImpulse)
+            .unwrap();
+        assert_eq!(second.receipt.experiment_index, 2);
+        assert_eq!(
+            second.receipt.previous_receipt_digest.as_deref(),
+            Some(first.receipt.receipt_digest.as_str())
+        );
+        assert!((second.receipt.budget_before - first.receipt.budget_after).abs() < 1e-12);
+        assert!(second.receipt.budget_after < second.receipt.budget_before);
+        assert_eq!(environment.experiment_receipts().len(), 2);
+        assert_eq!(
+            environment.experiment_receipts()[1].receipt_digest,
+            second.receipt.receipt_digest
+        );
+        validate_vssi_experiment_receipt_chain(environment.experiment_receipts()).unwrap();
+
+        let mut reordered = environment.experiment_receipts().to_vec();
+        reordered.swap(0, 1);
+        assert!(matches!(
+            validate_vssi_experiment_receipt_chain(&reordered),
+            Err(VssiFixtureError::ReceiptChainMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn independent_verifier_binds_receipts_to_public_task_and_registered_specs() {
+        let mut environment = VssiMechanicalEnvironment::new(
+            "vssi-independent-receipt-verifier-control",
+            VssiFixtureCase::HealthyControl,
+        )
+        .unwrap();
+        let public_task = environment.public_task().clone();
+        let first = environment
+            .observe_experiment_with_receipt(VssiExperimentKind::PassiveObservation)
+            .unwrap();
+        let second = environment
+            .observe_experiment_with_receipt(VssiExperimentKind::ThermalImpulse)
+            .unwrap();
+        let results = vec![first, second];
+
+        validate_vssi_experiment_results(&public_task, &results).unwrap();
+
+        let mut wrong_task = public_task.clone();
+        wrong_task.observation_budget += 0.1;
+        assert_eq!(
+            validate_vssi_experiment_results(&wrong_task, &results),
+            Err(VssiFixtureError::ReceiptTaskMismatch)
+        );
+
+        let mut wrong_spec_cost = results.clone();
+        wrong_spec_cost[0].receipt.observation_cost += 0.01;
+        wrong_spec_cost[0].receipt.budget_after -= 0.01;
+        let claims = VssiExperimentReceiptClaims {
+            schema_version: &wrong_spec_cost[0].receipt.schema_version,
+            scenario_id: &wrong_spec_cost[0].receipt.scenario_id,
+            public_task_digest: &wrong_spec_cost[0].receipt.public_task_digest,
+            experiment_index: wrong_spec_cost[0].receipt.experiment_index,
+            kind: wrong_spec_cost[0].receipt.kind,
+            experiment_spec_digest: &wrong_spec_cost[0].receipt.experiment_spec_digest,
+            observation_cost: wrong_spec_cost[0].receipt.observation_cost,
+            budget_before: wrong_spec_cost[0].receipt.budget_before,
+            budget_after: wrong_spec_cost[0].receipt.budget_after,
+            observations_digest: &wrong_spec_cost[0].receipt.observations_digest,
+            previous_receipt_digest: wrong_spec_cost[0]
+                .receipt
+                .previous_receipt_digest
+                .as_deref(),
+        };
+        wrong_spec_cost[0].receipt.receipt_digest =
+            sha256_serializable(b"symthaea-vssi-experiment-receipt-v1\0", &claims).unwrap();
+        assert_eq!(
+            validate_vssi_experiment_results(&public_task, &wrong_spec_cost),
+            Err(VssiFixtureError::ReceiptSpecMismatch)
+        );
+    }
+
+    #[test]
+    fn experiment_result_detects_observation_and_receipt_tampering() {
+        let mut environment = VssiMechanicalEnvironment::new(
+            "vssi-receipt-tamper-control",
+            VssiFixtureCase::HealthyControl,
+        )
+        .unwrap();
+        let result = environment
+            .observe_experiment_with_receipt(VssiExperimentKind::ThermalImpulse)
+            .unwrap();
+        result.validate().unwrap();
+
+        let mut altered_observations = result.clone();
+        altered_observations.observations[0].event_time += 0.25;
+        assert_eq!(
+            altered_observations.validate(),
+            Err(VssiFixtureError::ObservationDigestMismatch)
+        );
+
+        let mut altered_receipt = result;
+        altered_receipt.receipt.budget_after += 0.01;
+        assert_eq!(
+            altered_receipt.validate(),
+            Err(VssiFixtureError::InvalidReceiptClaims)
+        );
+    }
+
+    #[test]
+    fn failed_experiment_does_not_advance_receipt_chain_or_budget() {
+        let mut environment = VssiMechanicalEnvironment::new(
+            "vssi-failed-receipt-control",
+            VssiFixtureCase::HealthyControl,
+        )
+        .unwrap();
+        let first = environment
+            .observe_experiment_with_receipt(VssiExperimentKind::ThermalImpulse)
+            .unwrap();
+        let receipts_before = environment.experiment_receipts().len();
+        let spent_before = environment.spent_observation_cost();
+
+        let rejected =
+            environment.observe_experiment_with_receipt(VssiExperimentKind::AlternatingLoad);
+        assert!(matches!(rejected, Err(VssiFixtureError::BudgetExceeded { .. })));
+        assert_eq!(environment.experiment_receipts().len(), receipts_before);
+        assert_eq!(environment.spent_observation_cost(), spent_before);
+        assert_eq!(
+            environment.experiment_receipts().last().unwrap().receipt_digest,
+            first.receipt.receipt_digest
+        );
     }
 
     #[test]
