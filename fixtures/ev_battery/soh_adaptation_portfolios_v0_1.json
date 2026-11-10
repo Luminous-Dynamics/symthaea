@@ -1,0 +1,1951 @@
+{
+  "corpus_version": "ev-soh-adaptation-portfolio-corpus/0.1",
+  "schema_id": "https://luminousdynamics.io/schemas/transport/ev_soh_adaptation_portfolio/0.1",
+  "cases": [
+    {
+      "case_id": "zero-shot-selected",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "zero-shot-selected",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "zero"
+      }
+    },
+    {
+      "case_id": "unlabeled-tta-selected",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "unlabeled-tta-selected",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "tta"
+      }
+    },
+    {
+      "case_id": "supervised-finetune-selected",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "supervised-finetune-selected",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "ft"
+      }
+    },
+    {
+      "case_id": "few-shot-maml-selected",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "few-shot-maml-selected",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "maml"
+      }
+    },
+    {
+      "case_id": "no-eligible-expert-abstains",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "no-eligible-expert-abstains",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "abstain",
+            "strategy": "abstain",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000c5",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "abstain",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000129"
+          }
+        ],
+        "selected_expert_id": "abstain"
+      }
+    },
+    {
+      "case_id": "router-uses-test-labels",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "router-uses-test-labels",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": true,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "zero"
+      }
+    },
+    {
+      "case_id": "target-adaptation-overlaps-evaluation",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "target-adaptation-overlaps-evaluation",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "zero"
+      }
+    },
+    {
+      "case_id": "expert-evaluation-splits-differ",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "expert-evaluation-splits-differ",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "0000000000000000000000000000000000000000000000000000000000000063"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "zero"
+      }
+    },
+    {
+      "case_id": "zero-shot-has-target-budget",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "zero-shot-has-target-budget",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 1,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "zero"
+      }
+    },
+    {
+      "case_id": "unlabeled-tta-claims-labels",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "unlabeled-tta-claims-labels",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 1,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000014d",
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "zero"
+      }
+    },
+    {
+      "case_id": "fine-tuning-missing-label-evidence",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "fine-tuning-missing-label-evidence",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "zero"
+      }
+    },
+    {
+      "case_id": "feature-after-selection-time",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "feature-after-selection-time",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 1001,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "zero"
+      }
+    },
+    {
+      "case_id": "maml-below-minimum-support",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "maml-below-minimum-support",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture"
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142"
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca"
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb"
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 1,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc"
+          }
+        ],
+        "selected_expert_id": "zero"
+      }
+    }
+  ]
+}
