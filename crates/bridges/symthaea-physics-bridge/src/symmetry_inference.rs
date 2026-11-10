@@ -1211,7 +1211,12 @@ fn exact_polynomial_vector_field_generator_residual(
                     continue;
                 }
 
-                let term = polynomial_multiply_variable(&derivative, state_column, profile)?;
+                let column_variable = variable_names
+                    .iter()
+                    .position(|name| name == &coordinate_names[state_column])
+                    .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+                let term =
+                    polynomial_multiply_variable(&derivative, column_variable, profile)?;
                 charge_exact_polynomial_operations(operation_count, term.len(), profile)?;
                 for (monomial, term_coefficient) in &term {
                     let scaled_coefficient = term_coefficient
@@ -1310,20 +1315,24 @@ pub fn check_exact_linear_action_vector_field_equivariance(
         return Err(LinearActionVectorFieldErrorV1::ResourceLimitExceeded);
     }
 
-    let components = vector_field_components
-        .iter()
-        .map(|component| parse_exact_polynomial(component, &variable_names, profile))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| match error {
-            ExactPolynomialError::UnsupportedExpression => {
-                LinearActionVectorFieldErrorV1::UnsupportedExpression
-            }
-            ExactPolynomialError::ResourceLimitExceeded => {
-                LinearActionVectorFieldErrorV1::ResourceLimitExceeded
-            }
-        })?;
-
     let mut operation_count = 0usize;
+    let mut components = Vec::with_capacity(vector_field_components.len());
+    for component in vector_field_components {
+        let polynomial = parse_exact_polynomial(component, &variable_names, profile).map_err(
+            |error| match error {
+                ExactPolynomialError::UnsupportedExpression => {
+                    LinearActionVectorFieldErrorV1::UnsupportedExpression
+                }
+                ExactPolynomialError::ResourceLimitExceeded => {
+                    LinearActionVectorFieldErrorV1::ResourceLimitExceeded
+                }
+            },
+        )?;
+        charge_exact_polynomial_operations(&mut operation_count, polynomial.len(), profile)
+            .map_err(|_| LinearActionVectorFieldErrorV1::ResourceLimitExceeded)?;
+        components.push(polynomial);
+    }
+
     let mut generator_results = Vec::with_capacity(declaration.generators.len());
     for generator in &declaration.generators {
         let component_residuals = exact_polynomial_vector_field_generator_residual(
