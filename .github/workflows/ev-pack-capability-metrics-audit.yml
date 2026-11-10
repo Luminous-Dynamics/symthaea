@@ -41,5 +41,6 @@ jobs:
             .accepted_count == 6 and
             .rejected_count == 2 and
             (.report_sha256 | test("^[a-f0-9]{64}$")) and
-            (.cases[0].summary.inconsistency_metrics.sigma_soh.status == "COMPUTED")
+            any(.cases[]; .case_id == "complete-qualified-series-pack" and
+              .summary.inconsistency_metrics.sigma_soh.status == "COMPUTED")
           ' "$RUNNER_TEMP/ev-pack-capability-metrics-report.json"
