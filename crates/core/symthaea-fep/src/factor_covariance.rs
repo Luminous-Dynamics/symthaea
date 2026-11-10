@@ -31,8 +31,6 @@ use thiserror::Error;
 const MAX_FEATURES: usize = 4096;
 const MAX_FACTORS: usize = 64;
 const DIGEST_LENGTH: usize = 64;
-const NUMERIC_TOLERANCE: f64 = 1e-12;
-
 /// Declared covariance model Sigma = D + U U^T.
 ///
 /// Rows of loadings correspond to feature_ids. Columns correspond to factor_ids.
@@ -507,6 +505,7 @@ fn is_lowercase_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const NUMERIC_TOLERANCE: f64 = 1e-12;
 
     fn fixture(dimension: usize, rank: usize) -> FactorCovarianceModel {
         let feature_ids = (0..dimension)
