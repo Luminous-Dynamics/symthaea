@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-causal-primitives-001/IG_CAUSAL_PRIMITIVES_PROTOCOL_V0_1.schema.json",
+  "title": "IG-CAUSAL-PRIMITIVES-001 protocol v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_id",
+    "version",
+    "status",
+    "objective",
+    "primitives",
+    "domains",
+    "design",
+    "required_controls",
+    "evaluation_rules",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "protocol_id": {
+      "const": "IG-CAUSAL-PRIMITIVES-001"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "type": "string"
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 40
+    },
+    "ownership": {
+      "type": "object"
+    },
+    "primitives": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "tasks",
+          "metric_families"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "causal_prior",
+              "forward_state_tracing",
+              "belief_updating",
+              "agency_sensitivity"
+            ]
+          },
+          "tasks": {
+            "const": 12
+          },
+          "metric_families": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "domains": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "mechanical_infrastructure",
+          "institutional_resource",
+          "abstract_synthetic"
+        ]
+      }
+    },
+    "design": {
+      "type": "object"
+    },
+    "required_controls": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "string"
+      }
+    },
+    "external_comparators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "venue",
+          "role",
+          "url"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "evaluation_rules": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "string"
+      }
+    },
+    "staged_targets": {
+      "type": "object"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 80
+    }
+  }
+}
