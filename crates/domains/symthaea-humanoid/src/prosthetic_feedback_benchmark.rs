@@ -40,6 +40,8 @@ pub struct FeedbackRecognitionTrialV1 {
     pub session_ref: String,
     pub condition: FeedbackModalityCondition,
     pub mapping_id: String,
+    /// Shared stimulus/trial identity used only for paired crossover analysis.
+    pub paired_trial_ref: Option<String>,
     pub evidence_class: SensoryEvidenceClass,
     pub expected: Option<HapticCueSemantic>,
     pub reported: Option<HapticCueSemantic>,
@@ -103,6 +105,193 @@ pub enum FeedbackBenchmarkError {
     MixedParticipantSessionModalityOrMapping,
     InvalidResponseLatency { trial_id: String },
     LatencyWithoutResponse { trial_id: String },
+    MissingPairIdentity { trial_id: String },
+    DuplicatePairIdentity { pair_ref: String },
+    PairSetsDoNotMatch,
+    PairedExpectedCueMismatch { pair_ref: String },
+    SameModalityCondition,
+    DifferentParticipantOrSession,
+    InvalidReferenceStratum,
+    InvalidCandidateStratum,
+}
+
+/// Outcome for one identical stimulus presented under both conditions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PairedFeedbackPairResult {
+    pub paired_trial_ref: String,
+    pub expected: Option<HapticCueSemantic>,
+    pub reference_reported: Option<HapticCueSemantic>,
+    pub candidate_reported: Option<HapticCueSemantic>,
+    pub reference_correct: bool,
+    pub candidate_correct: bool,
+    /// Candidate minus reference latency when both answers are correct and measured.
+    pub candidate_minus_reference_latency_ms: Option<f64>,
+}
+
+/// Descriptive within-participant crossover comparison. This function does not
+/// estimate a population treatment effect or statistical significance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PairedFeedbackComparisonV1 {
+    pub participant_ref: String,
+    pub session_ref: String,
+    pub reference_condition: FeedbackModalityCondition,
+    pub candidate_condition: FeedbackModalityCondition,
+    pub reference_mapping_id: String,
+    pub candidate_mapping_id: String,
+    pub pair_count: u64,
+    pub both_correct: u64,
+    pub candidate_only_correct: u64,
+    pub reference_only_correct: u64,
+    pub both_incorrect: u64,
+    /// (candidate correct - reference correct) / pair_count.
+    pub paired_accuracy_difference: Option<f64>,
+    /// Negative values mean the candidate was faster.
+    pub median_candidate_minus_reference_latency_ms: Option<f64>,
+    pub pairs: Vec<PairedFeedbackPairResult>,
+}
+
+/// Compare two conditions using exactly matched stimuli for one participant
+/// and session. Mapping IDs may differ because each modality can have its own
+/// user-configured codebook; both identities are retained in the output.
+pub fn compare_paired_feedback_conditions(
+    reference: &[FeedbackRecognitionTrialV1],
+    candidate: &[FeedbackRecognitionTrialV1],
+) -> Result<PairedFeedbackComparisonV1, FeedbackBenchmarkError> {
+    let reference_summary = evaluate_feedback_recognition(reference)
+        .map_err(|_| FeedbackBenchmarkError::InvalidReferenceStratum)?;
+    let candidate_summary = evaluate_feedback_recognition(candidate)
+        .map_err(|_| FeedbackBenchmarkError::InvalidCandidateStratum)?;
+
+    if reference_summary.participant_ref != candidate_summary.participant_ref
+        || reference_summary.session_ref != candidate_summary.session_ref
+        || reference_summary.evidence_class != candidate_summary.evidence_class
+    {
+        return Err(FeedbackBenchmarkError::DifferentParticipantOrSession);
+    }
+    if reference_summary.condition == candidate_summary.condition {
+        return Err(FeedbackBenchmarkError::SameModalityCondition);
+    }
+
+    let mut candidate_by_pair = std::collections::HashMap::new();
+    for trial in candidate {
+        let pair_ref = trial
+            .paired_trial_ref
+            .as_deref()
+            .filter(|reference| !reference.trim().is_empty())
+            .ok_or_else(|| FeedbackBenchmarkError::MissingPairIdentity {
+                trial_id: trial.trial_id.clone(),
+            })?;
+        if candidate_by_pair.insert(pair_ref, trial).is_some() {
+            return Err(FeedbackBenchmarkError::DuplicatePairIdentity {
+                pair_ref: pair_ref.to_string(),
+            });
+        }
+    }
+
+    let mut seen_reference_pairs = HashSet::new();
+    let mut pairs = Vec::with_capacity(reference.len());
+    let mut both_correct = 0u64;
+    let mut candidate_only_correct = 0u64;
+    let mut reference_only_correct = 0u64;
+    let mut both_incorrect = 0u64;
+    let mut latency_differences = Vec::new();
+
+    for reference_trial in reference {
+        let pair_ref = reference_trial
+            .paired_trial_ref
+            .as_deref()
+            .filter(|reference| !reference.trim().is_empty())
+            .ok_or_else(|| FeedbackBenchmarkError::MissingPairIdentity {
+                trial_id: reference_trial.trial_id.clone(),
+            })?;
+        if !seen_reference_pairs.insert(pair_ref) {
+            return Err(FeedbackBenchmarkError::DuplicatePairIdentity {
+                pair_ref: pair_ref.to_string(),
+            });
+        }
+        let candidate_trial = candidate_by_pair
+            .get(pair_ref)
+            .ok_or(FeedbackBenchmarkError::PairSetsDoNotMatch)?;
+
+        if reference_trial.expected != candidate_trial.expected {
+            return Err(FeedbackBenchmarkError::PairedExpectedCueMismatch {
+                pair_ref: pair_ref.to_string(),
+            });
+        }
+
+        let reference_correct = reference_trial.expected == reference_trial.reported;
+        let candidate_correct = candidate_trial.expected == candidate_trial.reported;
+        match (reference_correct, candidate_correct) {
+            (true, true) => {
+                both_correct += 1;
+                if let (Some(reference_latency), Some(candidate_latency)) = (
+                    reference_trial.response_latency_ms,
+                    candidate_trial.response_latency_ms,
+                ) {
+                    latency_differences.push(candidate_latency - reference_latency);
+                }
+            }
+            (false, true) => candidate_only_correct += 1,
+            (true, false) => reference_only_correct += 1,
+            (false, false) => both_incorrect += 1,
+        }
+
+        let candidate_minus_reference_latency_ms =
+            if reference_correct && candidate_correct {
+                match (
+                    reference_trial.response_latency_ms,
+                    candidate_trial.response_latency_ms,
+                ) {
+                    (Some(reference_latency), Some(candidate_latency)) => {
+                        Some(candidate_latency - reference_latency)
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+
+        pairs.push(PairedFeedbackPairResult {
+            paired_trial_ref: pair_ref.to_string(),
+            expected: reference_trial.expected,
+            reference_reported: reference_trial.reported,
+            candidate_reported: candidate_trial.reported,
+            reference_correct,
+            candidate_correct,
+            candidate_minus_reference_latency_ms,
+        });
+    }
+
+    if seen_reference_pairs.len() != candidate_by_pair.len() {
+        return Err(FeedbackBenchmarkError::PairSetsDoNotMatch);
+    }
+
+    let pair_count = pairs.len() as u64;
+    let accuracy_difference = if pair_count == 0 {
+        None
+    } else {
+        Some(
+            (candidate_only_correct as f64 - reference_only_correct as f64)
+                / pair_count as f64,
+        )
+    };
+
+    Ok(PairedFeedbackComparisonV1 {
+        participant_ref: reference_summary.participant_ref,
+        session_ref: reference_summary.session_ref,
+        reference_condition: reference_summary.condition,
+        candidate_condition: candidate_summary.condition,
+        reference_mapping_id: reference_summary.mapping_id,
+        candidate_mapping_id: candidate_summary.mapping_id,
+        pair_count,
+        both_correct,
+        candidate_only_correct,
+        reference_only_correct,
+        both_incorrect,
+        paired_accuracy_difference: accuracy_difference,
+        median_candidate_minus_reference_latency_ms: median(&mut latency_differences),
+        pairs,
+    })
 }
 
 /// Evaluate one immutable stratum. Callers must group data by participant,
@@ -337,6 +526,7 @@ mod tests {
             session_ref: "session:s1".into(),
             condition: FeedbackModalityCondition::Vibrotactile,
             mapping_id: "mapping:v1".into(),
+            paired_trial_ref: None,
             evidence_class: SensoryEvidenceClass::HumanObserved,
             expected,
             reported,
@@ -455,6 +645,110 @@ mod tests {
             Err(FeedbackBenchmarkError::DuplicateTrialId {
                 trial_id: "same".into()
             })
+        );
+    }
+
+    #[test]
+    fn paired_modality_comparison_reports_improved_and_degraded_trials() {
+        use crate::prosthetic_sensory::HandDigit;
+        let thumb = HapticCueSemantic::Contact(HandDigit::Thumb);
+        let index = HapticCueSemantic::Contact(HandDigit::Index);
+
+        let mut reference = vec![
+            trial("r1", Some(thumb), None, None),
+            trial("r2", Some(thumb), Some(thumb), Some(220.0)),
+            trial("r3", Some(thumb), Some(index), Some(300.0)),
+            trial("r4", Some(thumb), Some(thumb), Some(180.0)),
+        ];
+        let mut candidate = vec![
+            trial("c1", Some(thumb), Some(thumb), Some(160.0)),
+            trial("c2", Some(thumb), Some(thumb), Some(180.0)),
+            trial("c3", Some(thumb), Some(thumb), Some(210.0)),
+            trial("c4", Some(thumb), None, None),
+        ];
+
+        for (index, pair_ref) in ["pair-1", "pair-2", "pair-3", "pair-4"]
+            .into_iter()
+            .enumerate()
+        {
+            reference[index].paired_trial_ref = Some(pair_ref.into());
+            candidate[index].paired_trial_ref = Some(pair_ref.into());
+        }
+        reference[0].condition = FeedbackModalityCondition::NoFeedback;
+        reference[0].mapping_id = "no-feedback".into();
+        for trial in &mut reference {
+            trial.condition = FeedbackModalityCondition::NoFeedback;
+            trial.mapping_id = "no-feedback".into();
+        }
+        for trial in &mut candidate {
+            trial.condition = FeedbackModalityCondition::Vibrotactile;
+            trial.mapping_id = "user-haptic-map-v2".into();
+        }
+
+        let comparison = compare_paired_feedback_conditions(&reference, &candidate).unwrap();
+        assert_eq!(comparison.pair_count, 4);
+        assert_eq!(comparison.both_correct, 1);
+        assert_eq!(comparison.candidate_only_correct, 2);
+        assert_eq!(comparison.reference_only_correct, 1);
+        assert_eq!(comparison.both_incorrect, 0);
+        assert_eq!(comparison.paired_accuracy_difference, Some(0.25));
+        // Both-correct pair 2: 180 ms candidate vs 220 ms reference.
+        // Pair 4 is a candidate miss, so it is excluded from correct-response latency.
+        assert_eq!(
+            comparison.median_candidate_minus_reference_latency_ms,
+            Some(-40.0)
+        );
+        assert_eq!(comparison.reference_mapping_id, "no-feedback");
+        assert_eq!(comparison.candidate_mapping_id, "user-haptic-map-v2");
+    }
+
+    #[test]
+    fn paired_comparison_rejects_unmatched_or_different_expected_stimuli() {
+        let contact = HapticCueSemantic::Contact(
+            crate::prosthetic_sensory::HandDigit::Thumb,
+        );
+        let mut reference = vec![trial("r1", Some(contact), Some(contact), Some(100.0))];
+        let mut candidate = vec![trial("c1", Some(contact), Some(contact), Some(90.0))];
+        reference[0].paired_trial_ref = Some("stimulus-1".into());
+        candidate[0].paired_trial_ref = Some("stimulus-2".into());
+        candidate[0].condition = FeedbackModalityCondition::Auditory;
+        assert_eq!(
+            compare_paired_feedback_conditions(&reference, &candidate),
+            Err(FeedbackBenchmarkError::PairSetsDoNotMatch)
+        );
+
+        candidate[0].paired_trial_ref = Some("stimulus-1".into());
+        candidate[0].expected = None;
+        assert_eq!(
+            compare_paired_feedback_conditions(&reference, &candidate),
+            Err(FeedbackBenchmarkError::PairedExpectedCueMismatch {
+                pair_ref: "stimulus-1".into()
+            })
+        );
+    }
+
+    #[test]
+    fn paired_comparison_rejects_different_participant_and_modality_identity() {
+        let contact = HapticCueSemantic::Contact(
+            crate::prosthetic_sensory::HandDigit::Thumb,
+        );
+        let mut reference = vec![trial("r1", Some(contact), Some(contact), Some(100.0))];
+        let mut candidate = vec![trial("c1", Some(contact), Some(contact), Some(90.0))];
+        reference[0].paired_trial_ref = Some("stimulus-1".into());
+        candidate[0].paired_trial_ref = Some("stimulus-1".into());
+        candidate[0].condition = FeedbackModalityCondition::Auditory;
+        candidate[0].participant_ref = "participant:p2".into();
+        assert_eq!(
+            compare_paired_feedback_conditions(&reference, &candidate),
+            Err(FeedbackBenchmarkError::DifferentParticipantOrSession)
+        );
+
+        candidate[0].participant_ref = "participant:p1".into();
+        candidate[0].condition = FeedbackModalityCondition::Vibrotactile;
+        candidate[0].session_ref = "session:s2".into();
+        assert_eq!(
+            compare_paired_feedback_conditions(&reference, &candidate),
+            Err(FeedbackBenchmarkError::DifferentParticipantOrSession)
         );
     }
 
