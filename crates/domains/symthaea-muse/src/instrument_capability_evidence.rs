@@ -12,7 +12,7 @@
 //! existing renderer-independent InstrumentCapabilityV1 contract.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use symthaea_music_theory::orchestration::{
     InstrumentCapabilityV1, InstrumentKindV1, SoundingRangeV1,
@@ -78,6 +78,8 @@ pub struct EvidenceProvenanceV1 {
     pub source_revision: Option<String>,
     /// SHA-256 of the captured evidence artifact, not a path/size manifest.
     pub content_sha256: Option<String>,
+    /// Exact asset bytes used by this claim, distinct from the evidence-record digest.
+    pub bound_asset_sha256: Option<String>,
     pub method: Option<String>,
     pub environment: Option<String>,
     pub parent_evidence_ids: Vec<String>,
@@ -158,6 +160,9 @@ pub enum CapabilityEvidenceIssueCodeV1 {
     InvalidScope,
     InvalidCapabilityValue,
     MalformedContentDigest,
+    AssetDigestMismatch,
+    QualifiedAssetWithoutLicense,
+    EmptyClaims,
     InvalidUncertainty,
     MissingMeasuredEvidence,
     MissingSourceCitation,
@@ -296,12 +301,34 @@ fn validate_evidence(
         .content_sha256
         .as_ref()
         .is_some_and(|digest| !valid_sha256_hex_v1(digest))
+        || evidence
+            .bound_asset_sha256
+            .as_ref()
+            .is_some_and(|digest| !valid_sha256_hex_v1(digest))
     {
         report.push(
             CapabilityEvidenceIssueCodeV1::MalformedContentDigest,
             Some(&claim.claim_id),
-            "content_sha256 must be 64 lowercase hexadecimal characters",
+            "evidence and bound-asset digests must be 64 lowercase hexadecimal characters",
         );
+    }
+    if let Some(asset_sha256) = &claim.scope.asset_sha256 {
+        if evidence.bound_asset_sha256.as_ref() != Some(asset_sha256) {
+            report.push(
+                CapabilityEvidenceIssueCodeV1::AssetDigestMismatch,
+                Some(&claim.claim_id),
+                "asset-scoped claims must bind the exact asset SHA-256 in their evidence record",
+            );
+        }
+        if claim.disposition == QualificationDispositionV1::Qualified
+            && evidence.license != ReusePermissionV1::Permitted
+        {
+            report.push(
+                CapabilityEvidenceIssueCodeV1::QualifiedAssetWithoutLicense,
+                Some(&claim.claim_id),
+                "qualified asset-scoped claims require explicit permitted license status",
+            );
+        }
     }
     if evidence
         .uncertainty
@@ -418,8 +445,17 @@ pub fn validate_instrument_capability_evidence_v1(
         );
     }
 
+    if profile.claims.is_empty() {
+        report.push(
+            CapabilityEvidenceIssueCodeV1::EmptyClaims,
+            None,
+            "an evidence profile must contain at least one capability claim",
+        );
+    }
     let mut claim_ids = BTreeSet::new();
-    let mut evidence_ids = BTreeSet::new();
+    // One immutable evidence artifact may support several claims. Repeated
+    // evidence IDs are allowed only when their provenance records are identical.
+    let mut evidence_records = BTreeMap::<String, EvidenceProvenanceV1>::new();
     for claim in &profile.claims {
         if claim.claim_id.trim().is_empty() {
             report.push(
@@ -434,14 +470,21 @@ pub fn validate_instrument_capability_evidence_v1(
                 "claim_id must be unique within the profile",
             );
         }
-        if !claim.evidence.evidence_id.trim().is_empty()
-            && !evidence_ids.insert(claim.evidence.evidence_id.as_str())
-        {
-            report.push(
-                CapabilityEvidenceIssueCodeV1::DuplicateEvidenceId,
-                Some(&claim.claim_id),
-                "evidence_id must be unique within the profile",
-            );
+        if !claim.evidence.evidence_id.trim().is_empty() {
+            if let Some(existing) = evidence_records.get(&claim.evidence.evidence_id) {
+                if existing != &claim.evidence {
+                    report.push(
+                        CapabilityEvidenceIssueCodeV1::DuplicateEvidenceId,
+                        Some(&claim.claim_id),
+                        "a reused evidence_id must have identical provenance in every claim",
+                    );
+                }
+            } else {
+                evidence_records.insert(
+                    claim.evidence.evidence_id.clone(),
+                    claim.evidence.clone(),
+                );
+            }
         }
         if !validate_scope(&claim.scope) {
             report.push(
@@ -498,13 +541,29 @@ pub fn materialize_qualified_instrument_capability_v1(
         .collect();
 
     if ranges.is_empty() {
-        return Err(CapabilityMaterializationErrorV1::MissingQualifiedSoundingRange);
+        let exists_at_another_scope = profile.claims.iter().any(|claim| {
+            claim.disposition == QualificationDispositionV1::Qualified
+                && matches!(&claim.value, CapabilityValueV1::SoundingRange { .. })
+        });
+        return Err(if exists_at_another_scope {
+            CapabilityMaterializationErrorV1::ScopeMismatch
+        } else {
+            CapabilityMaterializationErrorV1::MissingQualifiedSoundingRange
+        });
     }
     if ranges.len() > 1 {
         return Err(CapabilityMaterializationErrorV1::DuplicateQualifiedSoundingRange);
     }
     if polyphony.is_empty() {
-        return Err(CapabilityMaterializationErrorV1::MissingQualifiedPolyphony);
+        let exists_at_another_scope = profile.claims.iter().any(|claim| {
+            claim.disposition == QualificationDispositionV1::Qualified
+                && matches!(&claim.value, CapabilityValueV1::MaxPolyphony { .. })
+        });
+        return Err(if exists_at_another_scope {
+            CapabilityMaterializationErrorV1::ScopeMismatch
+        } else {
+            CapabilityMaterializationErrorV1::MissingQualifiedPolyphony
+        });
     }
     if polyphony.len() > 1 {
         return Err(CapabilityMaterializationErrorV1::DuplicateQualifiedPolyphony);
@@ -585,6 +644,7 @@ mod tests {
             source_uri: Some("https://example.invalid/measurement-record".into()),
             source_revision: Some("fixture-v1".into()),
             content_sha256: Some(sha('b')),
+            bound_asset_sha256: None,
             method: Some("calibrated note-range protocol".into()),
             environment: Some("fixture performer, room and recording chain".into()),
             parent_evidence_ids: Vec::new(),
@@ -601,13 +661,18 @@ mod tests {
         scope: CapabilityScopeV1,
         evidence_id: &str,
     ) -> CapabilityClaimV1 {
+        let mut evidence = measured(evidence_id);
+        if let Some(asset_sha256) = &scope.asset_sha256 {
+            evidence.bound_asset_sha256 = Some(asset_sha256.clone());
+            evidence.license = ReusePermissionV1::Permitted;
+        }
         CapabilityClaimV1 {
             claim_id: claim_id.into(),
             value,
             scope,
             disposition: QualificationDispositionV1::Qualified,
             qualification_record_id: Some(format!("review-{claim_id}")),
-            evidence: measured(evidence_id),
+            evidence,
         }
     }
 
