@@ -233,7 +233,7 @@ Do not add these concepts as undocumented JSON extensions. Evolve the schema wit
 1. Keep the Rust validator isolated and fail-closed; add exact-head tests and a lockfile before calling it executable.
 2. Resolve calibration/timebase/sample-completeness registry gaps in a schema version increment.
 3. Add paired baseline/candidate fixtures, including mismatched routes, forecasts, boundaries, lifecycle horizons, unknown gates and stale calibration.
-4. Reproduce the Du et al. coastal hybrid case at the published-information level; declare unavailable raw inputs.
+4. Reproduce the Du et al. coastal hybrid case at the published-information level; preserve the unresolved Table 5 (2 × 2,250 kW DG) vs Table 8 (2,300 kW P_eng,max) interpretation conflict until author clarification.
 5. Define one deep-sea WAPS service contract and source minimum operator/device data.
 6. Connect specialist ship/CFD/propulsor/energy solvers through versioned adapters.
 7. Freeze route/season holdouts and forecast-degradation experiments before optimization.
@@ -275,6 +275,22 @@ Evaluate local safe operation without cloud/shore connectivity, segmentation of 
 Include stale/forged wind or shaft data, GNSS/AIS anomalies, timebase drift, telemetry replay, forecast compromise, converter/BMS communication loss, remote-maintenance compromise, network partition and update rollback in the degraded-mode test matrix. Link cyber faults to the same service-availability and evidence dispositions as mechanical faults.
 
 Reference the current IMO Guidelines on Maritime Cyber Risk Management (MSC-FAL.1/Circ.3/Rev.4) and applicable IACS UR E26/E27 requirements. Applicability depends on vessel type, size, build contract, class, flag and equipment; this research document is not a compliance assessment or approval.
+
+### 14.5 Regulatory route and emissions exposure
+
+The route-robustness benchmark must also preserve a versioned regulatory exposure map. Physical service, whole-vessel energy, well-to-wake emissions, statutory CII/EEXI/EEDI, EU ETS covered emissions, FuelEU intensity and ECA fuel constraints are separate outputs. Do not collapse them into one score.
+
+MEPC 84 initiated phase-two review of EEXI/SEEMP/CII, including wind-propulsion accounting work; this is a review, not an adopted WAPS credit formula. EU ETS, FuelEU and the North-East Atlantic ECA add voyage- and date-dependent exposure. The IMO Net-Zero Framework remains a proposal/negotiation scenario as of 10 November 2026, not an effective rule.
+
+The versioned rule engine and route segmentation are specified in [MARINE-REGULATORY-ROUTE-001](./MARINE-REGULATORY-ROUTE-001.md) and tracked in [#11469](https://github.com/Luminous-Dynamics/symthaea/issues/11469).
+
+### 14.6 Deployable energy-management regret
+
+Separate the offline perfect-foresight dynamic-programming result from deployable forecast-aware policy. The former is a clairvoyant reference, not an operational controller. The benchmark should measure the regret of rule-based, greedy, receding-horizon and robust/stochastic policies under forecasts available at decision time, forecast degradation, missing data, battery degradation and equipment failures.
+
+The 2026 JMSE physics-informed daily-fuel paper provides a leakage-resistant methodology comparator (time-block R² 0.943, random-split optimism gap +0.032) but its three measured vessels are cruise/offshore-support types and its target is total daily onboard fuel, not cargo-vessel propulsion-only fuel. FuelCast licensing also limits reuse. It cannot support a WAPS cargo-performance claim.
+
+A WAPS-specific predictor should test conditional physical constraints against longitudinal aerodynamic assistance/resistance and declared device state rather than impose a blanket monotonic rule on raw wind speed. The corresponding experiment is specified in [MARINE-EMS-FORECAST-REGRET-001](./MARINE-EMS-FORECAST-REGRET-001.md) and tracked in [#11473](https://github.com/Luminous-Dynamics/symthaea/issues/11473).
 
 ## 15. Sources
 
