@@ -1,0 +1,206 @@
+{
+  "dataset_id": "SA-PORT-SHOREPOWER-CONNECTION-2025",
+  "schema_version": "1.0.0",
+  "prepared_at": "2026-11-10",
+  "country": "South Africa",
+  "status": "PUBLISHED_ESTIMATES_FOR_SCREENING_NOT_METERED_LOAD_OR_CONNECTION_APPROVAL",
+  "source_class": "PUBLISHED_ESTIMATE",
+  "currency": null,
+  "units": {
+    "shore_power_demand": "MW",
+    "spare_port_intake_capacity_mva": "MVA",
+    "spare_port_intake_capacity_mw": "MW"
+  },
+  "sources": [
+    {
+      "source_id": "CSIR-PTX-SHOREPOWER-2025",
+      "title": "Shore Power Demand for South African Ports",
+      "publisher": "CSIR / International PtX Hub / GIZ",
+      "published_at": "2025-09",
+      "source_url": "https://ptx-hub.org/wp-content/uploads/2025/10/PtX-Hub-Shore-Power-Demand-for-South-African-Ports-2.pdf",
+      "publication_page": "https://ptx-hub.org/publication/shore-power-demand-for-south-african-ports/",
+      "method": [
+        "TNPA vessel movement logs for financial years 2018–2025",
+        "Data cleaning and filtering",
+        "Arrival/departure and berth-time reconstruction where needed",
+        "Vessel type normalization and vessel size proxies",
+        "Regression-based estimation of missing critical demand inputs",
+        "Estimated average-maximum and absolute-maximum shore-power demand time series"
+      ],
+      "limitations": [
+        "Some port/year data were omitted where vessel-type classification was incorrect.",
+        "Demand values are estimates derived from vessel activity and reference demand data, not port-side interval-meter measurements.",
+        "The estimate depends on vessel categorization, vessel size proxies, berth-time data and model assumptions."
+      ],
+      "relevant_page": 6
+    },
+    {
+      "source_id": "CSIR-PTX-PORT-CONNECTION-2025",
+      "title": "Load Connection Capacity Assessment of South African National Ports",
+      "publisher": "CSIR / International PtX Hub / GIZ",
+      "published_at": "2025-09",
+      "source_url": "https://ptx-hub.org/wp-content/uploads/2025/11/PtX-Hub-Load-Connection-Capacity-Assessment-of-South-African-National-Ports_final-1.pdf",
+      "publication_page": "https://ptx-hub.org/publication/load-connection-capactiy-assessment-of-south-african-national-ports/",
+      "method": [
+        "Pre-feasibility review of port power-intake firm supply and notified maximum demand",
+        "Estimated spare capacity in MVA",
+        "Estimated spare MW calculated as 0.9 × (firm supply MVA − notified maximum demand MVA)",
+        "Connection-risk label based on estimated spare capacity"
+      ],
+      "limitations": [
+        "Risk labels are based solely on estimated spare capacity.",
+        "Ranking does not account for substation space, accessibility, electrical servitudes, routing or detailed connection requirements.",
+        "Upstream network capacity and utility/municipality connection studies remain necessary.",
+        "Estimated spare capacity at a port intake is not an allocation, connection offer or guarantee of firm capacity."
+      ],
+      "relevant_page": 34
+    }
+  ],
+  "shore_power_demand_estimates": [
+    {
+      "port": "Durban",
+      "average_maximum_mw": 20.3,
+      "absolute_maximum_mw": 47.19
+    },
+    {
+      "port": "Cape Town",
+      "average_maximum_mw": 12.71,
+      "absolute_maximum_mw": 27.16
+    },
+    {
+      "port": "Richards Bay",
+      "average_maximum_mw": 6.51,
+      "absolute_maximum_mw": 15.95
+    },
+    {
+      "port": "Gqeberha",
+      "average_maximum_mw": 6.02,
+      "absolute_maximum_mw": 12.71
+    },
+    {
+      "port": "Ngqura / Coega",
+      "average_maximum_mw": 5.77,
+      "absolute_maximum_mw": 12.56
+    },
+    {
+      "port": "Saldanha Bay",
+      "average_maximum_mw": 3.68,
+      "absolute_maximum_mw": 5.98
+    },
+    {
+      "port": "East London",
+      "average_maximum_mw": 3.32,
+      "absolute_maximum_mw": 6.3
+    },
+    {
+      "port": "Mossel Bay",
+      "average_maximum_mw": 2.15,
+      "absolute_maximum_mw": 3.78
+    }
+  ],
+  "estimated_spare_port_intake_capacity": [
+    {
+      "rank": 1,
+      "port": "Ngqura",
+      "spare_mva": 19,
+      "spare_mw": 17.1,
+      "connection_risk_label": "LOW"
+    },
+    {
+      "rank": 2,
+      "port": "East London",
+      "spare_mva": 18,
+      "spare_mw": 16.2,
+      "connection_risk_label": "LOW"
+    },
+    {
+      "rank": 3,
+      "port": "Gqeberha",
+      "spare_mva": 15,
+      "spare_mw": 13.5,
+      "connection_risk_label": "LOW"
+    },
+    {
+      "rank": 4,
+      "port": "Richards Bay",
+      "spare_mva": 11.5,
+      "spare_mw": 10.35,
+      "connection_risk_label": "LOW"
+    },
+    {
+      "rank": 5,
+      "port": "Mossel Bay",
+      "spare_mva": 7,
+      "spare_mw": 6.3,
+      "connection_risk_label": "MEDIUM"
+    },
+    {
+      "rank": 6,
+      "port": "Durban",
+      "spare_mva": 4,
+      "spare_mw": 3.6,
+      "connection_risk_label": "MEDIUM"
+    },
+    {
+      "rank": 7,
+      "port": "Cape Town",
+      "spare_mva": 0,
+      "spare_mw": 0,
+      "connection_risk_label": "HIGH"
+    },
+    {
+      "rank": 8,
+      "port": "Saldanha Bay",
+      "spare_mva": 0,
+      "spare_mw": 0,
+      "connection_risk_label": "HIGH"
+    }
+  ],
+  "spare_capacity_estimation": {
+    "formula": "0.9 * (firm_supply_mva - notified_maximum_demand_mva)",
+    "assumed_power_factor": 0.9,
+    "note": "The formula reproduces the report's estimated MW conversion; it is not a load-flow calculation or supply-authority approval."
+  },
+  "suggested_reference_case_roles": [
+    {
+      "port": "Durban",
+      "role": "HIGH_SHORE_POWER_DEMAND_STRESS_CASE",
+      "rationale": "Largest estimated shore-power average-maximum and absolute-maximum demands in the eight-port dataset.",
+      "nuclear_siting_inference": "NONE"
+    },
+    {
+      "port": "Ngqura / Coega",
+      "role": "HIGHER_ESTIMATED_SPARE_CAPACITY_SCREENING_CASE",
+      "rationale": "Highest estimated spare port-intake capacity in the connection assessment, alongside a lower shore-power estimate than Durban or Cape Town.",
+      "nuclear_siting_inference": "NONE"
+    },
+    {
+      "port": "Cape Town",
+      "role": "HIGH_DEMAND_LOW_ESTIMATED_SPARE_CAPACITY_CONTRAST",
+      "rationale": "Second-highest estimated shore-power demand with zero estimated spare port-intake capacity in the pre-feasibility ranking.",
+      "nuclear_siting_inference": "NONE"
+    },
+    {
+      "port": "Richards Bay",
+      "role": "INDUSTRIAL_PORT_CASE_FOR_FURTHER_DEMAND_DATA",
+      "rationale": "Useful industrial-port comparison, but this dataset contains no complete port-wide industrial demand profile.",
+      "nuclear_siting_inference": "NONE"
+    }
+  ],
+  "prohibited_inferences": [
+    "Do not treat shore_power_demand_estimates as directly metered port electrical loads.",
+    "Do not subtract spare port-intake capacity from shore-power demand as if both were a synchronized power-flow study.",
+    "Do not treat estimated spare capacity as a grid connection offer, reserved capacity or guaranteed firm supply.",
+    "Do not treat a connection-risk label as a complete grid feasibility result.",
+    "Do not infer site suitability, nuclear feasibility, nuclear safety, port authorization or community acceptance.",
+    "Do not size a reactor from shore-power demand alone.",
+    "Do not treat one annual peak or maximum as an hourly load curve."
+  ],
+  "required_next_evidence": [
+    "Current port-side interval-meter data and synchronized berth/vessel schedules.",
+    "Current port single-line diagrams, substation and transformer ratings, protection studies and connection-point definition.",
+    "Utility/municipality/Eskom load-flow and N-1 connection study for each candidate configuration.",
+    "Port-wide industrial, city, cold-chain, water, shore-power and future expansion load profiles.",
+    "Tariff, demand-charge, curtailment, power-quality and connection-cost data with currency/base year."
+  ]
+}
