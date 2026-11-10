@@ -185,3 +185,38 @@ The differentiator is not a novel motor-efficiency formula or an unsupported cla
 ## Promotion rule
 
 A document/schema milestone is not a physical characterization milestone. A passing analytical fixture is not a component test. A component map is not integrated aircraft validation. Integrated ground evidence is not flight qualification. Any consumer that cannot establish the exact configuration, map domain, calibration state and evidence digest must return UNKNOWN/OOD or non-PASS instead of silently using a nominal value.
+
+
+## Synthetic gearbox known-answer fixture (not measured hardware)
+
+Use this fixture to extend the independent reference with shaft kinematics. All numbers are analytical and synthetic.
+
+**Inputs**
+- Rotor shaft demand: 10,000 W at 3,000 RPM.
+- Motor-to-rotor speed ratio: g = 5.0, meaning motor speed is five times rotor speed in the declared motoring direction.
+- Transmission efficiency: 0.90.
+- Motor efficiency: 0.95.
+- Inverter efficiency: 0.98.
+- DC-bus voltage: 400 V.
+- Evaluation duration: 12 s.
+
+**Expected shaft operating points**
+- Rotor angular velocity: 314.159265 rad/s.
+- Rotor torque: 31.830989 N m.
+- Motor speed: 15,000 RPM (1,570.796327 rad/s).
+- Motor mechanical output power: 11,111.111 W.
+- Motor shaft torque: 7.073553 N m.
+
+**Expected electrical boundaries**
+- Motor electrical input: 11,695.906 W.
+- DC-bus input: 11,934.598 W.
+- DC-bus current: 29.836496 A.
+- Transmission loss: 1,111.111 W.
+- Motor loss: 584.795 W.
+- Inverter loss: 238.692 W.
+- Total conversion loss: 1,934.598 W.
+- Total conversion-loss energy over 12 s: 23,215.181 J.
+
+The test must verify the declared ratio convention, shaft-side torque/speed, each loss exactly once, and energy closure. It must also include negative controls for zero/negative/non-finite ratio, ratio overflow, direction mismatch and an unsupported operating-map domain. A direct-drive fixture explicitly sets g = 1.0 and transmission efficiency = 1.0.
+
+This fixture validates arithmetic and interface semantics only. It is not motor/gearbox characterization, does not establish a safe operating point, and must never be cited as a physical efficiency result.
