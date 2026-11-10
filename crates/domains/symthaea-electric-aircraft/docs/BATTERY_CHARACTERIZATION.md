@@ -57,6 +57,6 @@ Do not use this model to size cell-level protection, establish safe operating li
 
 ## Evidence handling
 
-The grid requires a dataset ID, URI, evidence class, description and 64-character SHA-256 digest string. Current code validates digest syntax only. The surrounding evidence pipeline must resolve the URI, hash the exact immutable artifact bytes, verify signatures/authority where applicable, and bind the dataset to the exact battery configuration before it is treated as verified evidence.
+The grid requires a dataset ID, URI, evidence class, description and 64-character SHA-256 digest string. Ordinary characterization evaluation validates digest syntax only. BatteryCharacterization::verify_evidence_payloads recomputes SHA-256 over caller-supplied immutable bytes and rejects missing or mismatched payloads; evaluate_mission_fully_verified applies this check to both propulsion and battery datasets. URI resolution, publisher/signature trust, source authority and exact configuration approval remain responsibilities of the surrounding evidence pipeline.
 
 Synthetic test surfaces are explicitly labelled Simulation and do not represent physical measurements.
