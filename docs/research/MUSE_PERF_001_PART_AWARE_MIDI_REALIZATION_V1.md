@@ -207,3 +207,16 @@ Exact score digests, event maps and channel constraints are objectively testable
 ## 9. Claim boundary
 
 This PR authors a new part-aware export path and synthetic tests. It does not yet establish compilation, runtime correctness, DAW interoperability, audio quality, instrument playability, expert preference, benchmark leadership, or SOTA performance. All such claims require the stated evidence and exact-head verification.
+
+
+## 10. Research references
+
+- YuE2, *Unifying Symbolic and Audio Music Generation at Frontier Quality* (2026): https://arxiv.org/abs/2609.33757
+- WildSongBench, public results and evaluation scope (12 September 2026 snapshot): https://huggingface.co/datasets/m-a-p/WildSongBench/blob/main/benchmark/results.md
+- Audio Editing Challenge / MMAE official leaderboard and schedule: https://audio-editing-challenge.github.io/leaderboard/
+- MAGE, *Modality-Agnostic Music Generation and Editing* (2026): https://arxiv.org/abs/2604.09803
+- NotaGen, *Advancing Musicality in Symbolic Music Generation with Large Language Model Training Paradigms* (IJCAI 2025): https://ijcai.org/proceedings/2025/1134
+- Duan, Yu and Briot, *Recent advances in music generation: methods, evaluation, and challenges* (2026): https://doi.org/10.1007/s10462-026-11582-x
+- Pan et al., *Audio Editing in the Era of Foundation Models: A Survey* (Findings of AACL-IJCNLP 2026): https://aclanthology.org/2026.findings-aacl.78/
+
+These sources motivate the benchmark design; they do not validate this implementation or provide a measured Melothaea result.
