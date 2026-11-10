@@ -116,6 +116,12 @@ There is no aggregate contagion, alignment, influence or governance score.
 
 The programme's differentiation target is not more rounds or more consensus. It is a verifiable account of which revisions were evidence-supported, how social topology changed exposure, where persuasion bypassed evidence, and where no single normative answer exists. It must also establish whether evaluator panels align with blind human judgments and whether operational attack attempts ever cross a real capability/effect boundary.
 
+## Industry positioning
+
+The benchmark is designed to run through adapters for existing orchestration stacks, not replace them. OpenAI Agents SDK documents handoffs, guardrails, sessions, tracing and trace grading; Microsoft Agent Framework documents multi-provider orchestration, typed state, OpenTelemetry, checkpoint/restart and human review; Anthropic's multi-agent research pattern emphasizes long-horizon context management and durable subagent artifacts.
+
+Our target differentiation is the assurance layer above those runtimes: evidence-bound revision receipts, matched causal-input checks, communication-versus-delegation graph separation, human-alignment and evaluator-dependence checks, portable effect-boundary receipts, and explicit handling of uncertainty and normative disagreement. The crosswalk defines a matched adapter comparison; no head-to-head superiority result has been run.
+
 ## Ownership boundaries
 
 - **#11248:** deterministic graph/topology generation.
