@@ -1,0 +1,473 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-soh-benchmark-protocol/0.1",
+  "title": "EV SOH benchmark protocol manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "benchmark_id",
+    "dataset_sources",
+    "target",
+    "evaluation",
+    "observations",
+    "preprocessing",
+    "model_selection",
+    "metrics",
+    "uncertainty",
+    "execution"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "ev-soh-benchmark-protocol/0.1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dataset_name",
+          "version",
+          "source_ref",
+          "license_ref",
+          "retrieved_on",
+          "source_digest"
+        ],
+        "properties": {
+          "dataset_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "license_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retrieved_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "source_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quantity",
+        "numerator_ref",
+        "denominator_basis",
+        "denominator_ref",
+        "unit",
+        "reference_protocol_ref",
+        "reference_protocol_digest",
+        "target_definition_digest"
+      ],
+      "properties": {
+        "quantity": {
+          "enum": [
+            "soh_fraction",
+            "capacity_ah"
+          ]
+        },
+        "numerator_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "denominator_basis": {
+          "enum": [
+            "nominal_capacity",
+            "initial_measured_capacity",
+            "none_direct_capacity"
+          ]
+        },
+        "denominator_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unit": {
+          "enum": [
+            "fraction",
+            "Ah"
+          ]
+        },
+        "reference_protocol_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_protocol_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "target_definition_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relation",
+        "disjoint_key",
+        "split_manifest_digest",
+        "train_partition",
+        "validation_partition",
+        "test_partition"
+      ],
+      "properties": {
+        "relation": {
+          "enum": [
+            "same_cell_temporal",
+            "unseen_cell",
+            "unseen_pack",
+            "unseen_vehicle",
+            "unseen_lab",
+            "unseen_domain",
+            "cross_fidelity"
+          ]
+        },
+        "disjoint_key": {
+          "enum": [
+            "cell_identity_digest",
+            "pack_identity_digest",
+            "vehicle_identity_digest",
+            "lab_identity_digest",
+            "domain_identity_digest",
+            "none_temporal"
+          ]
+        },
+        "split_manifest_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "train_partition": {
+          "const": "train"
+        },
+        "validation_partition": {
+          "const": "validation"
+        },
+        "test_partition": {
+          "const": "test"
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "dataset_digest",
+          "partition",
+          "time_index",
+          "physical_identities",
+          "target_digest"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "dataset_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "partition": {
+            "enum": [
+              "train",
+              "validation",
+              "test"
+            ]
+          },
+          "time_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "target_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "physical_identities": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cell_identity_digest",
+              "pack_identity_digest",
+              "vehicle_identity_digest",
+              "lab_identity_digest",
+              "domain_identity_digest"
+            ],
+            "properties": {
+              "cell_identity_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "pack_identity_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "vehicle_identity_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "lab_identity_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "domain_identity_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "preprocessing": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step_id",
+          "transform_ref",
+          "fit_scope",
+          "transform_digest"
+        ],
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "transform_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fit_scope": {
+            "enum": [
+              "train_only",
+              "fixed_predeclared",
+              "validation",
+              "test",
+              "all_data"
+            ]
+          },
+          "transform_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "model_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tuning_partition",
+        "test_labels_used",
+        "configuration_digest",
+        "feature_selection_fit_scope"
+      ],
+      "properties": {
+        "tuning_partition": {
+          "enum": [
+            "validation",
+            "nested_group_validation",
+            "none"
+          ]
+        },
+        "test_labels_used": {
+          "type": "boolean"
+        },
+        "configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "feature_selection_fit_scope": {
+          "enum": [
+            "train_only",
+            "fixed_predeclared",
+            "validation",
+            "test",
+            "all_data"
+          ]
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_name",
+          "aggregation",
+          "unit",
+          "value",
+          "sample_count",
+          "result_digest"
+        ],
+        "properties": {
+          "metric_name": {
+            "enum": [
+              "MAE",
+              "RMSE",
+              "R2"
+            ]
+          },
+          "aggregation": {
+            "enum": [
+              "sample_pooled",
+              "macro_per_cell",
+              "macro_per_domain",
+              "worst_domain"
+            ]
+          },
+          "unit": {
+            "enum": [
+              "fraction",
+              "percentage_points",
+              "Ah"
+            ]
+          },
+          "value": {
+            "type": "number"
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "result_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "reported",
+            "not_reported"
+          ]
+        },
+        "method_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nominal_interval_level": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "observed_coverage": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "calibration_partition": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "validation",
+            "nested_group_validation",
+            null
+          ]
+        },
+        "calibration_group_disjointness": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_commit_digest",
+        "toolchain",
+        "dependencies_digest",
+        "hardware",
+        "training_wallclock_seconds",
+        "peak_memory_bytes",
+        "energy_joules"
+      ],
+      "properties": {
+        "source_commit_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "toolchain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dependencies_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "hardware": {
+          "type": "string",
+          "minLength": 1
+        },
+        "training_wallclock_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "energy_joules": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
