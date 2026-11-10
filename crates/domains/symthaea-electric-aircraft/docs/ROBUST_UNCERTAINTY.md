@@ -46,6 +46,8 @@ This is a deterministic adverse-corner check. It does not:
 - evaluate characterized efficiency maps or SOC/temperature-dependent battery maps yet; it currently calls the scalar mission evaluator;
 - replace FMEA/FMECA, FHA/PSSA/SSA, fault-tree/common-cause analysis or certification compliance.
 
+The same adverse-corner budget can now be evaluated through the fully characterized propulsion and battery maps. In that path, propulsion-efficiency, battery-OCV and battery-resistance uncertainty are taken from the map samples; nonzero scalar perturbations to those mapped quantities are rejected to prevent silent omission or double counting. Mass, speed, L/D, climb, auxiliary demand, SOH/capacity, power/current ceilings and lumped thermal parameters remain eligible budget dimensions.
+
 The caller must source each bound from evidence, engineering judgement or an explicitly labelled analyst assumption. Evidence IDs and source/configuration applicability should be maintained by the surrounding evidence pipeline. Do not call a chosen percentage a confidence interval unless a valid statistical method and calibration study support that interpretation.
 
 ## Next uncertainty increment
@@ -55,4 +57,5 @@ The caller must source each bound from evidence, engineering judgement or an exp
 3. Add repeatable scenario manifests and evidence digests.
 4. Validate prediction interval coverage on independent component/mission holdout datasets.
 5. Add multi-fidelity uncertainty propagation around CFD, FEA, electrical and electro-thermal solvers.
-6. Preserve Incomplete for missing data, unsupported model domains and uncharacterized operating points.
+6. Extend the characterized-map robust evaluator to parameter-specific map uncertainty, correlated uncertainty groups and structured scenario manifests.
+7. Preserve Incomplete for missing data, unsupported model domains and uncharacterized operating points.
