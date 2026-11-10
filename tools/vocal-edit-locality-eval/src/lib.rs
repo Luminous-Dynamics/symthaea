@@ -144,11 +144,13 @@ fn validate_inputs(
         return Err("at least one target and one protected region are required".into());
     }
     if !thresholds.minimum_target_rms_delta.is_finite()
-        || thresholds.minimum_target_rms_delta < 0.0
+        || thresholds.minimum_target_rms_delta <= 0.0
         || !thresholds.maximum_protected_rms_delta.is_finite()
         || thresholds.maximum_protected_rms_delta < 0.0
     {
-        return Err("edit locality thresholds must be finite and non-negative".into());
+        return Err(
+            "minimum target RMS delta must be finite and positive; maximum protected RMS delta must be finite and non-negative".into(),
+        );
     }
     for (index, sample) in before.iter().enumerate() {
         if !sample.is_finite() {
@@ -167,6 +169,12 @@ fn validate_inputs(
     for (index, region) in regions.iter().enumerate() {
         if region.label.trim().is_empty() {
             return Err(format!("region {index} has an empty label"));
+        }
+        if regions[..index]
+            .iter()
+            .any(|previous| previous.label == region.label)
+        {
+            return Err(format!("region {index} has a duplicate label"));
         }
         if region.start_frame != cursor
             || region.start_frame >= region.end_frame
@@ -390,6 +398,34 @@ mod tests {
                 &non_finite,
                 &regions(),
                 thresholds(0.0, 0.0)
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn zero_minimum_target_change_and_duplicate_labels_are_rejected() {
+        let audio = source();
+        assert!(
+            score_edit_locality(
+                48_000,
+                &audio,
+                &audio,
+                &regions(),
+                thresholds(0.0, 0.0)
+            )
+            .is_err()
+        );
+
+        let mut duplicated = regions();
+        duplicated[1].label = "intro".into();
+        assert!(
+            score_edit_locality(
+                48_000,
+                &audio,
+                &audio,
+                &duplicated,
+                thresholds(0.001, 0.0)
             )
             .is_err()
         );
