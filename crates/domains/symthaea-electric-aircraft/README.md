@@ -22,9 +22,9 @@ It is dependency-free Rust and uses fail-closed errors for invalid inputs, MTOW 
 
 From this crate directory:
 
-\`\`\`sh
+```sh
 cargo test
-\`\`\`
+```
 
 The crate is included automatically by the Symthaea workspace's crates/domains/* member glob. It intentionally has no third-party dependencies in this first increment.
 
