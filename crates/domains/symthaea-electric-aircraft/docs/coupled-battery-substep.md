@@ -41,3 +41,8 @@ This is a reduced-order pack model. The numerical fixed point is not proof that 
 - Eight Rust tests are authored in this module, including a frozen analytical electrical reference, temperature/resistance feedback, no-load behavior, out-of-domain rejection, typed power/current/reserve failures, thermal-limit and iteration-limit failures, and an impossible electrical root.
 - Tests have not been executed locally in the authoring environment; a dedicated exact-path GitHub Actions workflow runs format, test and Clippy checks.
 - Synthetic fixtures are not physical battery measurements. No aircraft performance, pack safety, thermal-runaway, flight-test or certification claim is made.
+## Differential reference tests
+
+The integration tests in [`tests/coupled_battery_differential.rs`](../tests/coupled_battery_differential.rs) compile the independent scalar oracle source as a test-only module and compare it with the production substep on two matched cases: constant resistance and temperature-dependent resistance feedback. The production side uses the multi-node thermal-network implementation reduced to one node; the reference side uses its separate scalar bisection solver. Comparisons cover OCV, resistance, current, terminal voltage, terminal/chemical/ohmic energy, final temperature and SOC.
+
+This is an implementation-equivalence check for the matched one-node model only. It does not validate either model against a physical battery or justify extrapolation to cell-level or aircraft-level behavior. The reference oracle's own unit tests are also compiled in this test module.
