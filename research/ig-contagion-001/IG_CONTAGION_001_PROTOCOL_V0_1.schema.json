@@ -28,7 +28,9 @@
     "non_goals",
     "external_research",
     "paired_content_artifact",
-    "task_truth_profiles"
+    "task_truth_profiles",
+    "communication_graph_semantics",
+    "centrality_measure_definition"
   ],
   "properties": {
     "protocol_id": {
@@ -98,6 +100,10 @@
           "format": "uri"
         },
         "participant_conditioned_summary": {
+          "type": "string",
+          "format": "uri"
+        },
+        "delegation_topology_taxonomy": {
           "type": "string",
           "format": "uri"
         }
@@ -262,7 +268,7 @@
     },
     "metrics": {
       "type": "array",
-      "minItems": 4,
+      "minItems": 9,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -304,7 +310,11 @@
         "include_false_claim_then_correction",
         "include_missing_measurement_negative_control",
         "include_normative_pluralism_controls",
-        "include_frozen_paired_message_agent_and_evidence_digests"
+        "include_frozen_paired_message_agent_and_evidence_digests",
+        "communication_graph_semantics_separate_from_delegation",
+        "centrality_preconditions_and_tie_breaks_explicit",
+        "include_confidence_and_diversity_controls",
+        "include_consensus_free_trajectory_baseline"
       ],
       "properties": {
         "fixture_count": {
@@ -341,6 +351,18 @@
           "const": true
         },
         "include_frozen_paired_message_agent_and_evidence_digests": {
+          "const": true
+        },
+        "communication_graph_semantics_separate_from_delegation": {
+          "const": true
+        },
+        "centrality_preconditions_and_tie_breaks_explicit": {
+          "const": true
+        },
+        "include_confidence_and_diversity_controls": {
+          "const": true
+        },
+        "include_consensus_free_trajectory_baseline": {
           "const": true
         }
       }
@@ -404,7 +426,7 @@
       "properties": {
         "required_commitments": {
           "type": "array",
-          "minItems": 10,
+          "minItems": 28,
           "uniqueItems": true,
           "items": {
             "type": "string"
@@ -463,7 +485,7 @@
     },
     "external_research": {
       "type": "array",
-      "minItems": 5,
+      "minItems": 8,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -552,6 +574,132 @@
             "type": "string",
             "minLength": 30
           }
+        }
+      }
+    },
+    "communication_graph_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "communication_graph_owner",
+        "delegation_graph_owner",
+        "node_identity",
+        "optional_principal_binding",
+        "edge_identity",
+        "non_implications",
+        "reciprocal_centrality_control"
+      ],
+      "properties": {
+        "communication_graph_owner": {
+          "type": "string",
+          "format": "uri"
+        },
+        "delegation_graph_owner": {
+          "type": "string",
+          "format": "uri"
+        },
+        "node_identity": {
+          "const": "AgentInstanceId"
+        },
+        "optional_principal_binding": {
+          "type": "string",
+          "minLength": 30
+        },
+        "edge_identity": {
+          "type": "string",
+          "minLength": 20
+        },
+        "non_implications": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 20
+          }
+        },
+        "reciprocal_centrality_control": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "centrality_measure_definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "graph_type",
+        "direction",
+        "edge_weights",
+        "shortest_path_cost",
+        "self_loops",
+        "preconditions",
+        "formula",
+        "selection",
+        "tie_policy",
+        "receipt_bindings",
+        "unsupported_conditions",
+        "normative_boundary"
+      ],
+      "properties": {
+        "profile_id": {
+          "const": "normalized_betweenness_v1"
+        },
+        "graph_type": {
+          "const": "CommunicationGraph"
+        },
+        "direction": {
+          "const": "directed"
+        },
+        "edge_weights": {
+          "const": "unweighted"
+        },
+        "shortest_path_cost": {
+          "const": "hop_count"
+        },
+        "self_loops": {
+          "const": "forbidden"
+        },
+        "preconditions": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "formula": {
+          "type": "string",
+          "minLength": 80
+        },
+        "selection": {
+          "type": "string",
+          "minLength": 20
+        },
+        "tie_policy": {
+          "type": "string",
+          "minLength": 40
+        },
+        "receipt_bindings": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "unsupported_conditions": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "normative_boundary": {
+          "type": "string",
+          "minLength": 50
         }
       }
     }
