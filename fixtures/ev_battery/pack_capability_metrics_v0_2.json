@@ -264,7 +264,8 @@
               "evidence_class": "synthetic_fixture",
               "method": "synthetic-reference-capacity",
               "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006e",
-              "condition_ref": "capacity-ref-25c"
+              "condition_ref": "capacity-ref-25c",
+              "measurement_time_ms": 1800000000100
             },
             "resistance": {
               "value_mohm": 30,
@@ -284,7 +285,8 @@
               "evidence_class": "synthetic_fixture",
               "method": "synthetic-reference-capacity",
               "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006f",
-              "condition_ref": "capacity-ref-25c"
+              "condition_ref": "capacity-ref-25c",
+              "measurement_time_ms": 1800000000110
             },
             "resistance": {
               "value_mohm": 31,
