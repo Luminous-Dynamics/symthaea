@@ -737,6 +737,7 @@ mod tests {
             disposition: ScoreEventDispositionV1::Modified {
                 candidate_index: 0,
                 changed_fields: vec![ScoreEventFieldV1::Velocity],
+                operation_id: "bad-declaration".into(),
             },
         }];
         let report = validate(&source, &candidate, &remap);
@@ -750,7 +751,10 @@ mod tests {
         let mut remap = base_remap(&source, &candidate);
         remap.source_entries = vec![ScoreEventRemapEntryV1 {
             source_index: 0,
-            disposition: ScoreEventDispositionV1::Split { candidate_indices: vec![0, 1] },
+            disposition: ScoreEventDispositionV1::Split {
+                candidate_indices: vec![0, 1],
+                operation_id: "split-ornament".into(),
+            },
         }];
         let report = validate(&source, &candidate, &remap);
         assert!(report.valid, "{:?}", report.issues);
@@ -845,11 +849,65 @@ mod tests {
         remap.source_entries = vec![ScoreEventRemapEntryV1 {
             source_index: 0,
             disposition: ScoreEventDispositionV1::Modified {
-                candidate_index: 0, changed_fields: vec![],
+                candidate_index: 0,
+                changed_fields: vec![],
+                operation_id: "wrong-part".into(),
             },
         }];
         let report = validate(&source, &candidate, &remap);
         assert!(report.issues.iter().any(|issue| issue.code == ScoreEventRemapIssueCodeV1::PartIdentityChanged));
+    }
+
+    #[test]
+    fn rejects_a_candidate_event_declared_as_both_inserted_and_source_derived() {
+        let source = score(vec![note(1, 60, 0, 1, 0.8)]);
+        let candidate = score(vec![note(1, 60, 0, 1, 0.8)]);
+        let mut remap = base_remap(&source, &candidate);
+        remap.source_entries = vec![ScoreEventRemapEntryV1 {
+            source_index: 0,
+            disposition: ScoreEventDispositionV1::Retained { candidate_index: 0 },
+        }];
+        remap.insertions = vec![ScoreEventInsertionV1 {
+            candidate_index: 0,
+            part_id: 1,
+            operation_id: "duplicate-origin".into(),
+        }];
+        let report = validate(&source, &candidate, &remap);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == ScoreEventRemapIssueCodeV1::CandidateReferenceConflict
+        }));
+    }
+
+    #[test]
+    fn rejects_a_merge_group_that_combines_different_parts() {
+        let source = score(vec![note(1, 60, 0, 1, 0.8), note(2, 60, 1, 1, 0.8)]);
+        let candidate = score(vec![note(1, 60, 0, 2, 0.8)]);
+        let mut remap = base_remap(&source, &candidate);
+        remap.source_entries = vec![
+            ScoreEventRemapEntryV1 {
+                source_index: 0,
+                disposition: ScoreEventDispositionV1::Merged {
+                    candidate_index: 0,
+                    merge_group_id: "cross-part-merge".into(),
+                    operation_id: "merge-voices".into(),
+                },
+            },
+            ScoreEventRemapEntryV1 {
+                source_index: 1,
+                disposition: ScoreEventDispositionV1::Merged {
+                    candidate_index: 0,
+                    merge_group_id: "cross-part-merge".into(),
+                    operation_id: "merge-voices".into(),
+                },
+            },
+        ];
+        let report = validate(&source, &candidate, &remap);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == ScoreEventRemapIssueCodeV1::MergeSourcePartMismatch
+        }));
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == ScoreEventRemapIssueCodeV1::PartIdentityChanged
+        }));
     }
 
     #[test]
