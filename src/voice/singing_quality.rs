@@ -501,6 +501,96 @@ fn estimate_f0_near(x: &[f32], rate: u32, expected: f32) -> Option<f32> {
     (best.0 > 0 && best.1 >= 0.12).then(|| rate as f32 / best.0 as f32)
 }
 
+/// YIN-style difference-function pitch estimator over a broad singing range.
+///
+/// This implementation is intentionally small and dependency-free. It uses a
+/// cumulative-mean-normalized difference function and the first credible local
+/// minimum. It is an independent algorithmic cross-check, not a calibrated
+/// replacement for pYIN, CREPE, or human-annotated F0.
+fn estimate_f0_yin(samples: &[f32], sample_rate: u32) -> Option<f32> {
+    if sample_rate == 0 || samples.len() < 8 || samples.iter().any(|sample| !sample.is_finite()) {
+        return None;
+    }
+    let rms = (samples
+        .iter()
+        .map(|sample| sample * sample)
+        .sum::<f32>()
+        / samples.len() as f32)
+        .sqrt();
+    if rms < 0.003 {
+        return None;
+    }
+
+    const MIN_FREQUENCY_HZ: f64 = 40.0;
+    const MAX_FREQUENCY_HZ: f64 = 1_200.0;
+    const CMND_THRESHOLD: f64 = 0.15;
+    const FALLBACK_THRESHOLD: f64 = 0.30;
+
+    let minimum_lag = ((sample_rate as f64 / MAX_FREQUENCY_HZ).floor() as usize).max(2);
+    let maximum_lag = ((sample_rate as f64 / MIN_FREQUENCY_HZ).ceil() as usize)
+        .min(samples.len() / 2);
+    if maximum_lag <= minimum_lag {
+        return None;
+    }
+
+    let mut difference = vec![0.0f64; maximum_lag + 1];
+    for lag in 1..=maximum_lag {
+        let mut sum = 0.0f64;
+        for index in 0..(samples.len() - lag) {
+            let delta = f64::from(samples[index]) - f64::from(samples[index + lag]);
+            sum += delta * delta;
+        }
+        difference[lag] = sum;
+    }
+
+    let mut cumulative = 0.0f64;
+    let mut normalized = vec![1.0f64; maximum_lag + 1];
+    for lag in 1..=maximum_lag {
+        cumulative += difference[lag];
+        normalized[lag] = if cumulative > 1e-18 {
+            difference[lag] * lag as f64 / cumulative
+        } else {
+            1.0
+        };
+    }
+
+    let mut selected_lag = None;
+    let mut lag = minimum_lag;
+    while lag < maximum_lag {
+        if normalized[lag] < CMND_THRESHOLD {
+            while lag + 1 < maximum_lag && normalized[lag + 1] < normalized[lag] {
+                lag += 1;
+            }
+            selected_lag = Some(lag);
+            break;
+        }
+        lag += 1;
+    }
+    if selected_lag.is_none() {
+        selected_lag = (minimum_lag..=maximum_lag)
+            .min_by(|left, right| normalized[*left].total_cmp(&normalized[*right]))
+            .filter(|index| normalized[*index] < FALLBACK_THRESHOLD);
+    }
+    let integer_lag = selected_lag?;
+    let refined_lag = if integer_lag > minimum_lag && integer_lag < maximum_lag {
+        let left = normalized[integer_lag - 1];
+        let center = normalized[integer_lag];
+        let right = normalized[integer_lag + 1];
+        let denominator = left - 2.0 * center + right;
+        if denominator.abs() > 1e-12 {
+            integer_lag as f64 + 0.5 * (left - right) / denominator
+        } else {
+            integer_lag as f64
+        }
+    } else {
+        integer_lag as f64
+    };
+    let frequency = sample_rate as f64 / refined_lag;
+    (frequency.is_finite()
+        && (MIN_FREQUENCY_HZ..=MAX_FREQUENCY_HZ).contains(&frequency))
+        .then_some(frequency as f32)
+}
+
 fn expected_pitch_at(performance: &VocalPerformance, time: f32) -> Option<f32> {
     performance.target_pitch_at(time)
 }
@@ -772,6 +862,65 @@ mod tests {
         assert_eq!(metrics.score_independent_pitch_audit_pass, None);
         assert_eq!(metrics.score_independent_pitch_valid_fraction, 0.0);
         assert!(!metrics.objective_pass);
+    }
+
+    #[test]
+    fn yin_difference_estimator_tracks_low_center_and_high_register_sines() {
+        let sample_rate = 24_000;
+        for expected_hz in [80.0f32, 220.0, 480.0, 800.0, 1_000.0] {
+            let samples: Vec<_> = (0..sample_rate / 20)
+                .map(|index| {
+                    (std::f32::consts::TAU * expected_hz * index as f32
+                        / sample_rate as f32)
+                        .sin()
+                        * 0.2
+                })
+                .collect();
+            let measured = estimate_f0_yin(&samples, sample_rate)
+                .expect("periodic test tone should have a YIN estimate");
+            assert!(
+                (measured - expected_hz).abs() < 2.0,
+                "expected {expected_hz} Hz, observed {measured} Hz"
+            );
+        }
+    }
+
+    #[test]
+    fn yin_pitch_audit_independently_detects_octave_prior_reassurance() {
+        let note = symthaea_muse::Note {
+            frequency: 240.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.8,
+        };
+        let mut performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        performance.syllables[0].vibrato_depth_cents = 0.0;
+        let sample_rate = 24_000;
+        let actual_hz = 480.0;
+        let samples: Vec<_> = (0..sample_rate / 2)
+            .map(|index| {
+                (std::f32::consts::TAU * actual_hz * index as f32 / sample_rate as f32).sin()
+                    * 0.2
+            })
+            .collect();
+        let stem = VocalStem {
+            samples,
+            sample_rate,
+            backend: "test".into(),
+        };
+        let metrics = analyze_vocal_stem(&performance, &stem);
+        assert!(
+            (metrics.yin_pitch_median_error_cents - 1_200.0).abs() < 5.0,
+            "YIN should detect the octave mismatch independently: {metrics:?}"
+        );
+        assert!(metrics.yin_pitch_prior_mismatch_frames > 0, "{metrics:?}");
+        assert_eq!(metrics.yin_pitch_audit_pass, Some(false));
+        assert!(!metrics.objective_pass);
+    }
+
+    #[test]
+    fn yin_pitch_support_is_undefined_for_silence() {
+        assert_eq!(estimate_f0_yin(&[0.0; 1_200], 24_000), None);
     }
 
     #[test]
