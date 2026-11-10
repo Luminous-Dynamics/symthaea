@@ -143,6 +143,20 @@ The proposed advantage is a reproducible evidence chain connecting:
 
 We should prove improvements on independent public test sets before claiming superiority to specialist naval architecture or CFD software.
 
+## 7. Dynamic manoeuvrability and model-identification extension
+
+Steady 3-DOF force equilibrium is necessary for energy accounting but does not establish dynamic course-keeping or emergency manoeuvrability. The complementary [#11521 WAPS manoeuvrability benchmark](https://github.com/Luminous-Dynamics/symthaea/issues/11521) adds a dynamic MMG layer and free-running validation.
+
+The 2025 Alexandersson et al. work uses a modular MMG manoeuvring model, virtual captive tests to identify damping, a fully nonlinear potential-flow panel method for added mass, and inverse-dynamics comparisons against free-running test data for wPCC and Optiwise. The reported wPCC test also demonstrates that inaccurate wave-generation/roll assumptions can invalidate VCT-derived identification, even where captive-force fit appears good.
+
+Treat these as separate evidence levels:
+- VCT force fitting and derivative identification;
+- inverse dynamics against free-running trajectories;
+- independent free-running manoeuvre reproduction;
+- wind/wave/gust cases and device transition/failure states.
+
+The benchmark should include turning circles, 10°/10° and 20°/20° zig-zags, stopping where applicable, course keeping, gust rejection, rudder authority and wind-device fail-safe transitions. Use MSC.137(76) only where its traditional-propulsion scope is applicable and the Administration agrees; it is not a WAPS certification shortcut.
+
 ## 8. Sources
 
 - ITTC 7.5-02-03-01.9 (2024), *Predicting the Power Saving of Wind Powered Ships*: https://ittc.info/media/11806/75-02-03-019.pdf
