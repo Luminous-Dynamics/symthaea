@@ -1044,10 +1044,228 @@ mod tests {
             squared_cosine_tolerance: 1e-8,
             maximum_samples: 32,
             maximum_expression_variables: 64,
+            maximum_expression_evaluation_cost: 1_000_000,
             minimum_informative_samples: 4,
             maximum_direction_basis_condition: 1e6,
             maximum_directional_reconstruction_relative_residual: 1e-8,
         }
+    }
+
+    #[test]
+    fn sampled_linear_action_is_invariant_to_expression_amplitude() {
+        let states = [
+            [0.7, 1.1],
+            [1.2, 0.8],
+            [1.7, 2.1],
+            [2.3, 1.4],
+            [0.9, 2.5],
+            [2.6, 2.1],
+        ];
+        let radial = add(square("x"), square("y"));
+        let mut baseline: Option<f64> = None;
+        for amplitude in [1e-200, 1.0, 1e200] {
+            let expression = mul(Expr::Const(amplitude), radial.clone());
+            let report = evaluate_linear_action_samples(
+                &expression,
+                &canonical_action(),
+                &samples(&states, [[1.0, 0.0], [0.0, 1.0]]),
+                sampling_profile(),
+            )
+            .unwrap();
+            let maximum = report.generator_statistics[0].maximum_normalized_squared_residual;
+            assert!(report.invariant_within_tolerance());
+            if let Some(expected) = baseline {
+                assert!(
+                    (maximum - expected).abs() < 1e-10,
+                    "residual changed under expression amplitude {amplitude}"
+                );
+            } else {
+                baseline = Some(maximum);
+            }
+        }
+    }
+
+    #[test]
+    fn sampled_linear_action_hashes_expression_action_samples_and_profile() {
+        let states = [
+            [0.7, 1.1],
+            [1.2, 0.8],
+            [1.7, 2.1],
+            [2.3, 1.4],
+        ];
+        let expression = add(square("x"), square("y"));
+        let action = canonical_action();
+        let sample_batch = samples(&states, [[1.0, 0.0], [0.0, 1.0]]);
+        let first = evaluate_linear_action_samples(
+            &expression,
+            &action,
+            &sample_batch,
+            sampling_profile(),
+        )
+        .unwrap();
+        let repeated = evaluate_linear_action_samples(
+            &expression,
+            &action,
+            &sample_batch,
+            sampling_profile(),
+        )
+        .unwrap();
+
+        assert_eq!(first.expression_blake3.len(), 64);
+        assert_eq!(first.declared_action_blake3.len(), 64);
+        assert_eq!(first.sample_batch_blake3.len(), 64);
+        assert_eq!(first.sampling_profile_blake3.len(), 64);
+        assert_eq!(first.expression_blake3, repeated.expression_blake3);
+        assert_eq!(first.declared_action_blake3, repeated.declared_action_blake3);
+        assert_eq!(first.sample_batch_blake3, repeated.sample_batch_blake3);
+        assert_eq!(first.sampling_profile_blake3, repeated.sampling_profile_blake3);
+
+        let mut changed_samples = sample_batch.clone();
+        changed_samples[0].state[0] = 0.7000000000000001;
+        let changed = evaluate_linear_action_samples(
+            &expression,
+            &action,
+            &changed_samples,
+            sampling_profile(),
+        )
+        .unwrap();
+        assert_ne!(first.sample_batch_blake3, changed.sample_batch_blake3);
+
+        let changed_expression = add(square("x"), mul(Expr::Const(2.0), square("y")));
+        let changed = evaluate_linear_action_samples(
+            &changed_expression,
+            &action,
+            &sample_batch,
+            sampling_profile(),
+        )
+        .unwrap();
+        assert_ne!(first.expression_blake3, changed.expression_blake3);
+
+        let changed_profile = LinearActionSamplingProfileV1 {
+            finite_difference_step: 2e-5,
+            ..sampling_profile()
+        };
+        let changed = evaluate_linear_action_samples(
+            &expression,
+            &action,
+            &sample_batch,
+            changed_profile,
+        )
+        .unwrap();
+        assert_ne!(first.sampling_profile_blake3, changed.sampling_profile_blake3);
+    }
+
+    #[test]
+    fn sampled_linear_action_lexically_scopes_sum_variables() {
+        use symthaea_core::hdc::conjecture_engine::Expr;
+
+        // (n+1)(x²+y²)+n is SO(2)-invariant in x,y. k is a bound
+        // summation variable and must not be copied into the sampled state.
+        let sum = Expr::Sum(Box::new(add(square("x"), square("y"))), "k".to_string());
+        let expression = add(sum, Expr::Var("n".to_string()));
+        let sample_batch: Vec<LinearActionSampleV1> = [
+            [0.7, 1.1, 3.0],
+            [1.2, 0.8, 3.0],
+            [1.7, 2.1, 3.0],
+            [2.3, 1.4, 3.0],
+            [0.9, 2.5, 3.0],
+            [2.6, 2.1, 3.0],
+        ]
+        .iter()
+        .enumerate()
+        .map(|(index, state)| LinearActionSampleV1 {
+            sample_id: format!("sum-{index}"),
+            state: state.to_vec(),
+            direction_basis: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+        })
+        .collect();
+        let report = evaluate_linear_action_samples(
+            &expression,
+            &canonical_action(),
+            &sample_batch,
+            sampling_profile(),
+        )
+        .unwrap();
+        assert!(report.invariant_within_tolerance());
+        assert_eq!(
+            report.generator_statistics[0].informative_sample_count,
+            sample_batch.len()
+        );
+    }
+
+    #[test]
+    fn sampled_linear_action_rejects_nonfinite_and_zero_fd_perturbations() {
+        let states = [[0.7, 1.1], [1.2, 0.8], [1.7, 2.1], [2.3, 1.4]];
+        let large_step = LinearActionSamplingProfileV1 {
+            finite_difference_step: 1e308,
+            minimum_informative_samples: 1,
+            ..sampling_profile()
+        };
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &add(square("x"), square("y")),
+                &canonical_action(),
+                &samples(&states, [[2.0, 0.0], [0.0, 1.0]]),
+                large_step
+            ),
+            Err(LinearActionSamplingErrorV1::NonFinitePerturbation { .. })
+        ));
+
+        let tiny_direction = [
+            LinearActionSampleV1 {
+                sample_id: "tiny-0".to_string(),
+                state: states[0].to_vec(),
+                direction_basis: vec![vec![1e-320, 0.0], vec![0.0, 1.0]],
+            },
+            LinearActionSampleV1 {
+                sample_id: "tiny-1".to_string(),
+                state: states[1].to_vec(),
+                direction_basis: vec![vec![1e-320, 0.0], vec![0.0, 1.0]],
+            },
+            LinearActionSampleV1 {
+                sample_id: "tiny-2".to_string(),
+                state: states[2].to_vec(),
+                direction_basis: vec![vec![1e-320, 0.0], vec![0.0, 1.0]],
+            },
+            LinearActionSampleV1 {
+                sample_id: "tiny-3".to_string(),
+                state: states[3].to_vec(),
+                direction_basis: vec![vec![1e-320, 0.0], vec![0.0, 1.0]],
+            },
+        ];
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &add(square("x"), square("y")),
+                &canonical_action(),
+                &tiny_direction,
+                sampling_profile()
+            ),
+            Err(LinearActionSamplingErrorV1::ZeroDisplacementDirection { .. })
+                | Err(LinearActionSamplingErrorV1::DirectionBasisIllConditioned { .. })
+        ));
+    }
+
+    #[test]
+    fn sampled_linear_action_enforces_ast_evaluation_budget() {
+        let states = [[0.7, 1.1], [1.2, 0.8], [1.7, 2.1], [2.3, 1.4]];
+        let expression = Expr::Sum(
+            Box::new(add(square("x"), square("y"))),
+            "k".to_string(),
+        );
+        let profile = LinearActionSamplingProfileV1 {
+            maximum_expression_evaluation_cost: 100,
+            minimum_informative_samples: 1,
+            ..sampling_profile()
+        };
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &expression,
+                &canonical_action(),
+                &samples(&states, [[1.0, 0.0], [0.0, 1.0]]),
+                profile
+            ),
+            Err(LinearActionSamplingErrorV1::ExpressionEvaluationBudgetExceeded { .. })
+        ));
     }
 
     #[test]
