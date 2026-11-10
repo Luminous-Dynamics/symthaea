@@ -1038,7 +1038,13 @@ fn validate(
     check_schema_header(
         content_schema,
         "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-contagion-001/IG_CONTAGION_001_MATCHED_CONTENT_V0_1.schema.json",
-        &["schema_version", "status", "agent_profile", "evidence_packet", "paired_content"],
+        &[
+            "schema_version",
+            "status",
+            "agent_profile",
+            "evidence_packet",
+            "paired_content",
+        ],
         "matched_content_schema",
         &mut errors,
     );
@@ -1147,8 +1153,7 @@ mod tests {
     const MATRIX: &str = include_str!("../../IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.json");
     const MATRIX_SCHEMA: &str =
         include_str!("../../IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.schema.json");
-    const CONTENT: &str =
-        include_str!("../../IG_CONTAGION_001_MATCHED_CONTENT_V0_1.json");
+    const CONTENT: &str = include_str!("../../IG_CONTAGION_001_MATCHED_CONTENT_V0_1.json");
     const CONTENT_SCHEMA: &str =
         include_str!("../../IG_CONTAGION_001_MATCHED_CONTENT_V0_1.schema.json");
 
@@ -1163,11 +1168,9 @@ mod tests {
             Value::String("https://github.com/Luminous-Dynamics/symthaea/issues/11248".into());
         let mut errors = Vec::new();
         validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
-        assert!(
-            errors
-                .iter()
-                .any(|error| error.contains("communication graph generator must compose with Symthaea #11337"))
-        );
+        assert!(errors.iter().any(|error| {
+            error.contains("communication graph generator must compose with Symthaea #11337")
+        }));
     }
 
     #[test]
@@ -1428,11 +1431,9 @@ mod tests {
         second["agent_placement"] = Value::String("leaf_or_periphery".into());
         let mut errors = Vec::new();
         validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
-        assert!(
-            errors
-                .iter()
-                .any(|error| error.contains("must contrast minimum with maximum normalized betweenness placement"))
-        );
+        assert!(errors.iter().any(|error| {
+            error.contains("must contrast minimum with maximum normalized betweenness placement")
+        }));
     }
 
     #[test]
@@ -1484,7 +1485,9 @@ mod tests {
             let reference = field(message, "paired_content_ref").unwrap();
             assert_eq!(
                 sha256_value(message).unwrap(),
-                content["message_sha256_by_pair"][reference].as_str().unwrap()
+                content["message_sha256_by_pair"][reference]
+                    .as_str()
+                    .unwrap()
             );
         }
     }
