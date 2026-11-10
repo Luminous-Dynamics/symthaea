@@ -75,14 +75,15 @@ The qualification receipt fields are passed through as upstream evidence identit
 - A missing expected successor cell is incomplete.
 - A missing action disposition is incomplete.
 - An explicit unknown disposition widens the upper set and never enters the lower set.
-- A duplicate cell key or cell receipt is rejected.
+- A duplicate cell key, cell receipt or execution receipt is rejected.
+- The expected-cell manifest digest is recomputed from a canonical key-sorted manifest; content mutation is rejected and input ordering does not affect the digest.
 - An undeclared action or mismatched action-set/evaluator digest is rejected.
 - Hidden-state/reference IDs cannot split one observation class.
 - Different actions may be selected only across distinct receipt-backed observation classes.
 - An unqualified upstream reference or action-domain receipt blocks the option claim.
 - No probabilities are inferred from counts of references, hidden states, cells or actions.
 
-The expected-cell manifest is the finite universe being measured. Its digest is retained, not recomputed here. Completeness of that upstream manifest remains the responsibility of its owning scenario, action-domain, observation-partition and reference-qualification systems.
+The expected-cell manifest is the finite universe being measured. Its BLAKE3 digest is recomputed from canonical serialized entries (sorted by complete cell key) to detect mutation and ordering ambiguity. This does not prove that the upstream manifest is exhaustive; completeness remains the responsibility of its owning scenario, action-domain, observation-partition and reference-qualification systems.
 
 ## 6. Benchmark plan
 
