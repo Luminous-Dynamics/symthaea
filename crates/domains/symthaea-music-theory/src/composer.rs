@@ -3237,18 +3237,29 @@ fn apply_hidden_bass_quote(
     };
     let quote_start = (start_bar + bars / 2) as f64 * meter_beats;
     let span = 2.0 * hook.beats();
-    // The quote replaces the existing bass line inside this window; retain
-    // the exact source part identity rather than inventing a new performer.
-    let bass_part = score
+    // This transformation replaces the bass line inside the window. It is
+    // safe only when exactly one real source PartId owns every overlapping
+    // bass event. Multiple or unassigned source parts would be collapsed by
+    // the replacement, so abstain without mutating the score.
+    let bass_parts: std::collections::BTreeSet<PartId> = score
         .notes
         .iter()
-        .find(|note| {
+        .filter(|note| {
             note.role == VoiceRole::Bass
                 && note.onset.beats() < quote_start + span
                 && (note.onset + note.duration).beats() > quote_start
         })
         .map(|note| note.part)
-        .unwrap_or(PartId::UNASSIGNED);
+        .collect();
+    if bass_parts.len() != 1 {
+        return;
+    }
+    let Some(bass_part) = bass_parts.iter().next().copied() else {
+        return;
+    };
+    if !bass_part.is_assigned() {
+        return;
+    }
     // Clear the window (overlap-aware, per the exposed-climax lesson).
     score.notes.retain(|n| {
         !(n.role == VoiceRole::Bass
@@ -5136,6 +5147,54 @@ mod tests {
         ] {
             assert!(ids.contains(&required), "missing primary part id {required}");
         }
+    }
+
+    #[test]
+    fn hidden_bass_quote_abstains_when_the_window_contains_multiple_bass_parts() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for part in [PartId(80), PartId(81)] {
+            score.push(ScoreNote {
+                part,
+                pitch: Pitch::from_midi(36 + part.0 as u8 % 12),
+                onset: Duration::new(16, 1),
+                duration: Duration::new(8, 1),
+                velocity: 0.5,
+                role: VoiceRole::Bass,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        let original = score.clone();
+        let phrase = crate::phrase::Phrase {
+            line: Motif::new(Vec::new()),
+            progression: vec![1, 4, 5, 1],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![crate::form::Section {
+                role: SectionRole::B,
+                key,
+                period: crate::phrase::Period {
+                    antecedent: phrase.clone(),
+                    consequent: phrase,
+                },
+            }],
+        };
+        let hook = crate::hook::HookCell {
+            notes: vec![(1, Duration::quarter()), (3, Duration::quarter())],
+        };
+        apply_hidden_bass_quote(
+            &mut score,
+            &form,
+            4.0,
+            &MusicalIntent::default(),
+            &hook,
+        );
+        assert_eq!(
+            score, original,
+            "the edit must abstain instead of collapsing two persistent bass parts"
+        );
     }
 
     #[test]
