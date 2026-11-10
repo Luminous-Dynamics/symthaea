@@ -34,7 +34,7 @@
     },
     "fixture_count": {
       "type": "integer",
-      "minimum": 40
+      "minimum": 45
     },
     "family_count": {
       "type": "integer",
@@ -68,7 +68,7 @@
     },
     "fixtures": {
       "type": "array",
-      "minItems": 40,
+      "minItems": 45,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -85,7 +85,8 @@
           "seed",
           "condition",
           "expected_measurement_properties",
-          "scenario_note"
+          "scenario_note",
+          "paired_content_ref"
         ],
         "properties": {
           "fixture_id": {
@@ -139,6 +140,12 @@
           "scenario_note": {
             "type": "string",
             "minLength": 20
+          },
+          "paired_content_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }
