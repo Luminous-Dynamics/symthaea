@@ -243,6 +243,7 @@ pub struct QualifiedInstrumentCapabilityV1 {
     pub claim_ids: Vec<String>,
     pub evidence_ids: Vec<String>,
     pub qualification_record_ids: Vec<String>,
+    pub qualification_record_sha256s: Vec<String>,
 }
 
 pub fn instrument_capability_profile_sha256_v1(
@@ -693,6 +694,10 @@ pub fn materialize_qualified_instrument_capability_v1(
         .iter()
         .filter_map(|claim| claim.qualification_record_id.clone())
         .collect();
+    let qualification_record_sha256s = required_claims
+        .iter()
+        .filter_map(|claim| claim.qualification_record_sha256.clone())
+        .collect();
 
     Ok(QualifiedInstrumentCapabilityV1 {
         capability: InstrumentCapabilityV1 {
@@ -708,6 +713,7 @@ pub fn materialize_qualified_instrument_capability_v1(
         claim_ids,
         evidence_ids,
         qualification_record_ids,
+        qualification_record_sha256s,
     })
 }
 
@@ -848,6 +854,11 @@ mod tests {
         assert_eq!(capability.claim_ids.len(), 3);
         assert_eq!(capability.evidence_ids.len(), 3);
         assert_eq!(capability.qualification_record_ids.len(), 3);
+        assert_eq!(capability.qualification_record_sha256s.len(), 3);
+        assert!(capability
+            .qualification_record_sha256s
+            .iter()
+            .all(|digest| valid_sha256_hex_v1(digest)));
         assert_eq!(capability.performance_scope, required_performance_scope);
         assert_eq!(capability.renderer_scope, Some(renderer_scope.clone()));
     }
@@ -930,6 +941,16 @@ mod tests {
         let report = validate_instrument_capability_evidence_v1(&profile);
         assert!(report.issues.iter().any(|issue| {
             issue.code == CapabilityEvidenceIssueCodeV1::MalformedContentDigest
+        }));
+    }
+
+    #[test]
+    fn qualified_claim_requires_a_valid_qualification_record_digest() {
+        let (mut profile, _, _) = valid_profile(false);
+        profile.claims[0].qualification_record_sha256 = Some("not-a-digest".into());
+        let report = validate_instrument_capability_evidence_v1(&profile);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == CapabilityEvidenceIssueCodeV1::MalformedQualificationRecordDigest
         }));
     }
 
