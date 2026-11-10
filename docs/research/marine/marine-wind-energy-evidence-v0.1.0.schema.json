@@ -1,0 +1,698 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-wind-energy-evidence:0.1.0",
+  "title": "Luminous Marine Wind-Energy Evidence v0.1.0",
+  "description": "Traceable WAPS device, onboard-energy and wind-energy-method evidence. Supports COM(2026)620 proposal scenarios but does not implement a future statutory method.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "record_status",
+    "proposal_basis",
+    "vessel",
+    "reporting_window",
+    "devices",
+    "observation_channel_ids",
+    "energy_sources",
+    "wind_energy_assessment",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "enum": [
+        "synthetic",
+        "research_record",
+        "method_derived",
+        "certified"
+      ]
+    },
+    "proposal_basis": {
+      "$ref": "#/$defs/proposal"
+    },
+    "vessel": {
+      "$ref": "#/$defs/vessel"
+    },
+    "reporting_window": {
+      "$ref": "#/$defs/time_window"
+    },
+    "devices": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/device"
+      }
+    },
+    "observation_channel_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "energy_sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/energy_source"
+      }
+    },
+    "wind_energy_assessment": {
+      "$ref": "#/$defs/wind_assessment"
+    },
+    "research_wind_contribution": {
+      "$ref": "#/$defs/research_energy"
+    },
+    "counterfactual_avoided_propulsion_energy": {
+      "$ref": "#/$defs/counterfactual"
+    },
+    "battery_boundary": {
+      "$ref": "#/$defs/battery"
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "excluded_intervals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/exclusion"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument",
+        "procedure_id",
+        "published_on",
+        "legal_status",
+        "snapshot_date",
+        "limitations"
+      ],
+      "properties": {
+        "instrument": {
+          "const": "COM(2026)620"
+        },
+        "procedure_id": {
+          "const": "2026/0210(COD)"
+        },
+        "published_on": {
+          "const": "2026-07-17"
+        },
+        "legal_status": {
+          "const": "proposal_not_in_force"
+        },
+        "snapshot_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "vessel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vessel_id",
+        "configuration_id",
+        "configuration_revision",
+        "configuration_sha256",
+        "service_fingerprint"
+      ],
+      "properties": {
+        "vessel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "service_fingerprint": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "time_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "location_state",
+        "timebase_id"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "location_state": {
+          "enum": [
+            "at_sea",
+            "at_berth",
+            "mixed_reporting_period"
+          ]
+        },
+        "timebase_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id",
+        "device_type",
+        "identity",
+        "geometry_revision",
+        "control_software_revision",
+        "commanded_state",
+        "achieved_state",
+        "evidence_channel_ids",
+        "limitations"
+      ],
+      "properties": {
+        "device_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "device_type": {
+          "enum": [
+            "rotor_sail",
+            "kite",
+            "rigid_sail",
+            "soft_sail",
+            "suction_wing",
+            "turbine",
+            "other_declared"
+          ]
+        },
+        "other_device_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "geometry_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "control_software_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commanded_state": {
+          "enum": [
+            "deployed",
+            "active",
+            "trimmed",
+            "feathered",
+            "furled",
+            "stowed",
+            "retracted",
+            "unavailable",
+            "faulted",
+            "unknown"
+          ]
+        },
+        "achieved_state": {
+          "enum": [
+            "deployed",
+            "active",
+            "trimmed",
+            "feathered",
+            "furled",
+            "stowed",
+            "retracted",
+            "unavailable",
+            "faulted",
+            "unknown"
+          ]
+        },
+        "evidence_channel_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "device_type": {
+                "const": "other_declared"
+              }
+            },
+            "required": [
+              "device_type"
+            ]
+          },
+          "then": {
+            "required": [
+              "other_device_type"
+            ]
+          }
+        }
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "serial_number": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "quantity": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "unit",
+            "uncertainty",
+            "evidence_source_id"
+          ],
+          "properties": {
+            "value": {
+              "type": "number",
+              "minimum": 0
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uncertainty": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "reason_or_method"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "unknown",
+                    "standard",
+                    "interval"
+                  ]
+                },
+                "reason_or_method": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "evidence_source_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "unit",
+            "unknown_reason",
+            "evidence_source_id"
+          ],
+          "properties": {
+            "value": {
+              "type": "null"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unknown_reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_source_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "energy_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "energy_source_id",
+        "source_type",
+        "consumer_boundary",
+        "energy_gj",
+        "method_id",
+        "limitations"
+      ],
+      "properties": {
+        "energy_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "enum": [
+            "main_propulsion_fuel",
+            "auxiliary_fuel",
+            "boiler_fuel",
+            "shore_electricity",
+            "onboard_renewable_electricity",
+            "wind_assistance",
+            "other_substitute_source"
+          ]
+        },
+        "consumer_boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "energy_gj": {
+          "$ref": "#/$defs/quantity"
+        },
+        "fuel_or_electricity_pathway_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "wind_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "regulatory_energy_gj",
+        "method_basis",
+        "method_id",
+        "limitations"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_determined",
+            "research_estimate",
+            "standard_derived",
+            "certified"
+          ]
+        },
+        "regulatory_energy_gj": {
+          "$ref": "#/$defs/quantity"
+        },
+        "method_basis": {
+          "enum": [
+            "none",
+            "research_method",
+            "international_standard",
+            "implementing_act_standard"
+          ]
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "standard_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "implementing_act_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "certificate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "certificate_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "certification_body": {
+          "type": "string",
+          "minLength": 1
+        },
+        "certificate_valid_from": {
+          "type": "string",
+          "format": "date"
+        },
+        "certificate_valid_until": {
+          "type": "string",
+          "format": "date"
+        },
+        "verifier_attestation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "research_energy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "energy_gj",
+        "method_id",
+        "model_id",
+        "model_revision",
+        "uncertainty_method",
+        "limitations"
+      ],
+      "properties": {
+        "energy_gj": {
+          "$ref": "#/$defs/quantity"
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "counterfactual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "avoided_propulsion_energy_gj",
+        "estimand_id",
+        "counterfactual_method",
+        "model_id",
+        "model_revision",
+        "identifiability_status",
+        "limitations"
+      ],
+      "properties": {
+        "avoided_propulsion_energy_gj": {
+          "$ref": "#/$defs/quantity"
+        },
+        "estimand_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "counterfactual_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identifiability_status": {
+          "enum": [
+            "not_identifiable",
+            "insufficient_overlap",
+            "identified_for_declared_population",
+            "unknown"
+          ]
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "battery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "present",
+        "initial_soc",
+        "final_soc",
+        "charge_energy_gj",
+        "discharge_energy_gj",
+        "boundary_method",
+        "uncertainty_method"
+      ],
+      "properties": {
+        "present": {
+          "type": "boolean"
+        },
+        "initial_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "final_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "charge_energy_gj": {
+          "$ref": "#/$defs/quantity"
+        },
+        "discharge_energy_gj": {
+          "$ref": "#/$defs/quantity"
+        },
+        "boundary_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "exclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "reason"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
