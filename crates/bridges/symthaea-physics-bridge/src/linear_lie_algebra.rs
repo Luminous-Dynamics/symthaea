@@ -777,6 +777,9 @@ mod tests {
 
     #[test]
     fn generator_normalization_handles_extreme_input_scales() {
+        let canonical = so2_action()
+            .try_qualify_lie_algebra(LinearLieAlgebraProfileV1::default())
+            .unwrap();
         for scale in [1.0e-300, 1.0e300] {
             let scaled = action(
                 "scaled-so2",
@@ -798,6 +801,14 @@ mod tests {
                     < 1e-12
             );
             assert!(scaled.is_numerically_abelian());
+            for (canonical_row, scaled_row) in canonical.normalized_whitened_generators[0]
+                .iter()
+                .zip(scaled.normalized_whitened_generators[0].iter())
+            {
+                for (canonical_value, scaled_value) in canonical_row.iter().zip(scaled_row.iter()) {
+                    assert!((canonical_value - scaled_value).abs() < 1e-12);
+                }
+            }
         }
     }
 
