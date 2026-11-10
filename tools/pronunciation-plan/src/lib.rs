@@ -858,6 +858,7 @@ impl VocalScoreAlignment {
 #[serde(rename_all = "snake_case")]
 pub enum PhoneFeature {
     Voiced,
+    Sonorant,
     Nasal,
     Syllabic,
     Aspirated,
@@ -1254,6 +1255,10 @@ impl LanguageProfileManifest {
         for required in [
             LanguageTask::GraphemeToPhoneme,
             LanguageTask::Syllabification,
+            LanguageTask::Morphology,
+            LanguageTask::TonePrediction,
+            LanguageTask::SpeechSynthesis,
+            LanguageTask::SingingSynthesis,
         ] {
             if !tasks.contains(&required) {
                 return Err(format!(
@@ -1677,6 +1682,16 @@ mod tests {
         });
         let error = profile.validate().unwrap_err();
         assert!(error.contains("vowel-only"), "{error}");
+    }
+
+    #[test]
+    fn language_profile_requires_explicit_status_for_every_language_task() {
+        let mut profile = xhosa_profile_fixture();
+        profile
+            .capabilities
+            .retain(|capability| capability.task != LanguageTask::TonePrediction);
+        let error = profile.validate().unwrap_err();
+        assert!(error.contains("TonePrediction"), "{error}");
     }
 
     #[test]
