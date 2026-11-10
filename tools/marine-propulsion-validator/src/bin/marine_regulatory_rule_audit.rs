@@ -464,6 +464,58 @@ fn check_v0_2_semantics(register: &Value, findings: &mut Findings) {
         findings.push("/rules", "INCOMPLETE", "v0.2 register has no EU-MRV-MARITIME rule separate from EU ETS");
     }
 
+    for expected_id in [
+        "EU-ETS-DIRECTIVE-REVISION-2026-0212",
+        "EU-MRV-FUELEU-REVISION-2026-0210",
+    ] {
+        match rules.iter().find(|rule| rule.get("rule_id").and_then(Value::as_str) == Some(expected_id)) {
+            None => findings.push(
+                "/rules",
+                "INCOMPLETE",
+                format!("v0.2 proposal register is missing distinct legislative record '{expected_id}'"),
+            ),
+            Some(rule) => {
+                if !matches!(rule.get("rule_status").and_then(Value::as_str), Some("proposed" | "under_review"))
+                    || rule.get("legal_character").and_then(Value::as_str) != Some("negotiation_proposal")
+                {
+                    findings.push(
+                        format!("/rules/{expected_id}/rule_status"),
+                        "INVALID",
+                        "pending EU legislative proposal must remain proposed/under_review and negotiation_proposal",
+                    );
+                }
+                let dates = rule.get("dates").unwrap_or(&Value::Null);
+                if dates.get("entry_into_force_on").is_some()
+                    || dates.get("applies_from").is_some()
+                    || dates.get("applies_from_year").is_some()
+                {
+                    findings.push(
+                        format!("/rules/{expected_id}/dates"),
+                        "INVALID",
+                        "pending legislative proposal cannot carry an effective date",
+                    );
+                }
+                if rule.get("source_ids").and_then(Value::as_array).is_none_or(|ids|
+                    !ids.iter().any(|id| id.as_str()==Some(expected_id))
+                ) {
+                    findings.push(
+                        format!("/rules/{expected_id}/source_ids"),
+                        "INVALID",
+                        "proposal rule must cite its matching procedure source record",
+                    );
+                }
+            }
+        }
+    }
+
+    if rules.iter().any(|rule| rule.get("rule_id").and_then(Value::as_str)==Some("EU-ETS-TARGETED-REVISION-PROPOSAL-2026")) {
+        findings.push(
+            "/rules",
+            "INVALID",
+            "generic combined EU ETS/MRV proposal record is ambiguous; use distinct 2026/0212 and 2026/0210 procedure records",
+        );
+    }
+
     if let Some(eca) = rules.iter().find(|rule| rule.get("rule_id").and_then(Value::as_str) == Some("NE-ATLANTIC-ECA-2026")) {
         let dates = eca.get("dates").unwrap_or(&Value::Null);
         if dates.get("entry_into_force_on").and_then(Value::as_str) != Some("2027-09-01")
@@ -652,12 +704,27 @@ mod tests {
     }
 
     #[test]
-    fn negotiation_proposal_cannot_be_marked_in_force() {
-        let mut register: Value = serde_json::from_str(RULE_REGISTER).expect("rule register JSON");
-        register["rules"][5]["rule_status"] = serde_json::json!("in_force");
-        register["rules"][5]["dates"]["applies_from"] = serde_json::json!("2027-01-01");
+    fn v0_2_eu_mrv_wind_energy_proposal_cannot_be_marked_in_force() {
+        let mut register: Value = serde_json::from_str(RULE_REGISTER_V2).expect("v0.2 rule register JSON");
+        let proposal = register["rules"].as_array_mut().unwrap().iter_mut().find(|rule|
+            rule.get("rule_id").and_then(Value::as_str) == Some("EU-MRV-FUELEU-REVISION-2026-0210")
+        ).unwrap();
+        proposal["rule_status"] = serde_json::json!("in_force");
+        proposal["dates"]["applies_from"] = serde_json::json!("2027-01-01");
         let mut findings = Findings::default();
         check_registry_semantics(&register, &mut findings);
+        check_v0_2_semantics(&register, &mut findings);
         assert!(findings.invalid);
+    }
+
+    #[test]
+    fn v0_2_ets_and_mrv_revisions_are_distinct_procedure_records() {
+        let register: Value = serde_json::from_str(RULE_REGISTER_V2).expect("v0.2 rule register JSON");
+        let rules = register["rules"].as_array().unwrap();
+        let ets = rules.iter().find(|rule| rule.get("rule_id").and_then(Value::as_str)==Some("EU-ETS-DIRECTIVE-REVISION-2026-0212"));
+        let mrv = rules.iter().find(|rule| rule.get("rule_id").and_then(Value::as_str)==Some("EU-MRV-FUELEU-REVISION-2026-0210"));
+        assert!(ets.is_some());
+        assert!(mrv.is_some());
+        assert_ne!(ets.unwrap()["instrument"],mrv.unwrap()["instrument"]);
     }
 }
