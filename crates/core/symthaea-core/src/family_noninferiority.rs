@@ -1242,6 +1242,50 @@ mod tests {
     }
 
     #[test]
+    fn raw_family_observations_must_replay_the_exact_report() {
+        let plan = plan();
+        let binding = test_binding(&plan);
+        let observation = FamilyGuardrailObservation {
+            episode_id: "family-a-episode-0000".to_owned(),
+            family_id: "family-a".to_owned(),
+            baseline_loss: 0.8,
+            candidate_loss: 0.6,
+        };
+        let mut gate = FamilyNonInferiorityGate::new(
+            plan.clone(),
+            0.05,
+            1,
+            binding.clone(),
+        )
+        .unwrap();
+        let report = gate.observe(observation.clone()).unwrap();
+
+        validate_family_guardrail_report_for_candidate(
+            &report,
+            &plan,
+            &[observation.clone()],
+            &binding,
+            1,
+        )
+        .unwrap();
+
+        let tampered_observation = FamilyGuardrailObservation {
+            candidate_loss: 0.7,
+            ..observation
+        };
+        assert!(matches!(
+            validate_family_guardrail_report_for_candidate(
+                &report,
+                &plan,
+                &[tampered_observation],
+                &binding,
+                1
+            ),
+            Err(FamilyGuardrailError::ReportDigestMismatch)
+        ));
+    }
+
+    #[test]
     fn margins_and_observation_limits_fail_closed() {
         let invalid = FamilyGuardrailPlan::new(vec![FamilyGuardrailSpec {
             non_inferiority_margin: f64::NAN,
