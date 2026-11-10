@@ -49,6 +49,10 @@ pub struct LinearGroupActionV1 {
 /// coordinate scale, or tolerance is selected by the claim-bearing admission call.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LinearGroupActionAdmissionProfileV1 {
+    /// Maximum number of coordinates admitted in one action declaration.
+    pub maximum_dimension: usize,
+    /// Maximum number of infinitesimal generators admitted in one declaration.
+    pub maximum_generators: usize,
     /// Relative symmetry defect allowed for the supplied metric.
     pub metric_symmetry_relative_tolerance: f64,
     /// Relative defect allowed for A^T G + G A = 0, generator by generator.
@@ -58,6 +62,8 @@ pub struct LinearGroupActionAdmissionProfileV1 {
 impl Default for LinearGroupActionAdmissionProfileV1 {
     fn default() -> Self {
         Self {
+            maximum_dimension: 32,
+            maximum_generators: 128,
             metric_symmetry_relative_tolerance: 1e-12,
             metric_skew_relative_tolerance: 1e-12,
         }
@@ -71,7 +77,8 @@ pub enum LinearGroupActionAdmissionError {
     EmptyActionId,
     EmptyCoordinateBasisId,
     NoCoordinates,
-    CoordinateNameCountMismatch { expected: usize, actual: usize },
+    DimensionLimitExceeded { actual: usize, maximum: usize },
+    GeneratorCountLimitExceeded { actual: usize, maximum: usize },
     CoordinateUnitCountMismatch { expected: usize, actual: usize },
     EmptyCoordinateName { index: usize },
     EmptyCoordinateUnitId { index: usize },
@@ -165,7 +172,9 @@ impl LinearGroupActionV1 {
         &self,
         profile: LinearGroupActionAdmissionProfileV1,
     ) -> Result<AdmittedLinearGroupActionV1, LinearGroupActionAdmissionError> {
-        if !profile.metric_symmetry_relative_tolerance.is_finite()
+        if profile.maximum_dimension == 0
+            || profile.maximum_generators == 0
+            || !profile.metric_symmetry_relative_tolerance.is_finite()
             || profile.metric_symmetry_relative_tolerance < 0.0
             || !profile.metric_skew_relative_tolerance.is_finite()
             || profile.metric_skew_relative_tolerance < 0.0
@@ -182,6 +191,12 @@ impl LinearGroupActionV1 {
         let dimension = self.coordinate_names.len();
         if dimension == 0 {
             return Err(LinearGroupActionAdmissionError::NoCoordinates);
+        }
+        if dimension > profile.maximum_dimension {
+            return Err(LinearGroupActionAdmissionError::DimensionLimitExceeded {
+                actual: dimension,
+                maximum: profile.maximum_dimension,
+            });
         }
         if self.coordinate_unit_ids.len() != dimension {
             return Err(LinearGroupActionAdmissionError::CoordinateUnitCountMismatch {
@@ -210,6 +225,12 @@ impl LinearGroupActionV1 {
         validate_square_matrix(&self.metric, dimension, "metric")?;
         if self.generators.is_empty() {
             return Err(LinearGroupActionAdmissionError::NoGenerators);
+        }
+        if self.generators.len() > profile.maximum_generators {
+            return Err(LinearGroupActionAdmissionError::GeneratorCountLimitExceeded {
+                actual: self.generators.len(),
+                maximum: profile.maximum_generators,
+            });
         }
 
         let metric_scale = max_abs(&self.metric);
@@ -571,6 +592,38 @@ mod tests {
         action.generators[0].matrix = vec![vec![0.0, -1e-300], vec![1e-300, 0.0]];
         let admitted = action.try_admit(profile()).unwrap();
         assert_eq!(admitted.dimension(), 2);
+    }
+
+    #[test]
+    fn rejects_dimension_over_profile_budget() {
+        let mut action = canonical_so2();
+        let mut bounded = profile();
+        bounded.maximum_dimension = 1;
+        assert!(matches!(
+            action.try_admit(bounded),
+            Err(LinearGroupActionAdmissionError::DimensionLimitExceeded {
+                actual: 2,
+                maximum: 1
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_generator_count_over_profile_budget() {
+        let mut action = canonical_so2();
+        action.generators.push(LinearGeneratorV1 {
+            id: "J2".to_string(),
+            matrix: vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+        });
+        let mut bounded = profile();
+        bounded.maximum_generators = 1;
+        assert!(matches!(
+            action.try_admit(bounded),
+            Err(LinearGroupActionAdmissionError::GeneratorCountLimitExceeded {
+                actual: 2,
+                maximum: 1
+            })
+        ));
     }
 
     #[test]
