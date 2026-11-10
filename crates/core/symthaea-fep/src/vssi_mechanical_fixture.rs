@@ -138,6 +138,7 @@ pub struct VssiMechanicalEnvironment {
     task: VssiPublicTask,
     hidden: HiddenMechanism,
     spent_observation_cost: f64,
+    completed_experiments: Vec<VssiExperimentKind>,
 }
 
 /// A disposition score intended only for the independent benchmark evaluator.
@@ -156,6 +157,8 @@ pub enum VssiFixtureError {
     NonFiniteTrajectory { tick: u8 },
     #[error("experiment {kind:?} is not registered for this task")]
     UnregisteredExperiment { kind: VssiExperimentKind },
+    #[error("experiment protocol {kind:?} has already been performed")]
+    ExperimentAlreadyPerformed { kind: VssiExperimentKind },
     #[error("experiment cost {requested} exceeds remaining budget {remaining}")]
     BudgetExceeded { remaining: f64, requested: f64 },
 }
@@ -191,7 +194,7 @@ impl VssiMechanicalEnvironment {
                     observation_cost: 0.25,
                     minimum_load: 0.15,
                     maximum_load: 0.15,
-                    duration_ticks: 16,
+                    duration_ticks: 12,
                 },
                 VssiExperimentSpec {
                     kind: VssiExperimentKind::ThermalImpulse,
@@ -212,7 +215,12 @@ impl VssiMechanicalEnvironment {
             observation_covariance: [[0.04, 0.028], [0.028, 0.05]],
         };
 
-        Ok(Self { task, hidden, spent_observation_cost: 0.0 })
+        Ok(Self {
+            task,
+            hidden,
+            spent_observation_cost: 0.0,
+            completed_experiments: Vec::new(),
+        })
     }
 
     /// Return the investigator-visible task envelope.
@@ -220,19 +228,26 @@ impl VssiMechanicalEnvironment {
         &self.task
     }
 
-    /// Release observations for one selected, registered experiment.
+    /// Release the post-baseline observations for one selected experiment.
     ///
-    /// This method models the environment boundary: the investigator chooses
-    /// a protocol identifier and receives observations, not hidden state,
-    /// fault labels or simulator parameters.
+    /// Every protocol shares the same tick-0-through-tick-3 baseline. The
+    /// selected intervention begins at tick 4. A protocol may be requested
+    /// only once per environment; replaying an identical counterfactual would
+    /// otherwise return duplicate deterministic observations.
     pub fn observe_experiment(
         &mut self,
         kind: VssiExperimentKind,
     ) -> Result<Vec<VssiObservation>, VssiFixtureError> {
-        let spec = self.task.available_experiments.iter()
+        let spec = self
+            .task
+            .available_experiments
+            .iter()
             .find(|spec| spec.kind == kind)
             .copied()
             .ok_or(VssiFixtureError::UnregisteredExperiment { kind })?;
+        if self.completed_experiments.contains(&kind) {
+            return Err(VssiFixtureError::ExperimentAlreadyPerformed { kind });
+        }
         let remaining = self.remaining_observation_budget();
         if spec.observation_cost > remaining + 1e-12 {
             return Err(VssiFixtureError::BudgetExceeded {
@@ -240,8 +255,12 @@ impl VssiMechanicalEnvironment {
                 requested: spec.observation_cost,
             });
         }
-        let observations = simulate(&self.hidden, kind)?;
+        let observations = simulate(&self.hidden, kind)?
+            .into_iter()
+            .filter(|observation| observation.event_time > 3.0)
+            .collect();
         self.spent_observation_cost += spec.observation_cost;
+        self.completed_experiments.push(kind);
         Ok(observations)
     }
 
@@ -330,13 +349,17 @@ fn hidden_mechanism(
 }
 
 fn experiment_load(kind: VssiExperimentKind, tick: u8) -> f64 {
+    // Every experiment begins from the same pre-intervention operating history.
+    if tick < 4 {
+        return 0.15;
+    }
     match kind {
         VssiExperimentKind::PassiveObservation => 0.15,
         VssiExperimentKind::ThermalImpulse => {
             if (4..=6).contains(&tick) { 0.95 } else { 0.15 }
         }
         VssiExperimentKind::AlternatingLoad => {
-            if tick % 4 < 2 { 0.75 } else { -0.35 }
+            if (tick - 4) % 4 < 2 { 0.75 } else { -0.35 }
         }
     }
 }
@@ -554,7 +577,7 @@ mod tests {
             spec.observation_cost.is_finite()
                 && spec.observation_cost >= 0.0
                 && spec.minimum_load <= spec.maximum_load
-                && spec.duration_ticks == 16
+                && spec.duration_ticks == 12
         }));
         assert!(task.observation_covariance[0][1] > 0.0);
         assert_eq!(
@@ -583,23 +606,29 @@ mod tests {
     }
 
     #[test]
-    fn repeated_passive_acquisition_also_consumes_the_budget() {
+    fn repeating_the_same_experiment_is_rejected_without_duplicate_observations() {
         let mut environment = VssiMechanicalEnvironment::new(
-            "vssi-passive-budget-control",
+            "vssi-passive-replay-control",
             VssiFixtureCase::HealthyControl,
         )
         .unwrap();
 
-        for _ in 0..4 {
-            environment
-                .observe_experiment(VssiExperimentKind::PassiveObservation)
-                .unwrap();
-        }
-        assert!((environment.spent_observation_cost() - 1.0).abs() < 1e-12);
-
+        let first = environment
+            .observe_experiment(VssiExperimentKind::PassiveObservation)
+            .unwrap();
+        let spent_after_first = environment.spent_observation_cost();
         let rejected = environment.observe_experiment(VssiExperimentKind::PassiveObservation);
-        assert!(matches!(rejected, Err(VssiFixtureError::BudgetExceeded { .. })));
-        assert!((environment.spent_observation_cost() - 1.0).abs() < 1e-12);
+        assert!(matches!(
+            rejected,
+            Err(VssiFixtureError::ExperimentAlreadyPerformed {
+                kind: VssiExperimentKind::PassiveObservation
+            })
+        ));
+        assert_eq!(first, environment.observe_experiment(VssiExperimentKind::ThermalImpulse).unwrap_or_default());
+        // A distinct protocol is a separate counterfactual; its input history
+        // is unchanged until the declared intervention tick.
+        assert_eq!(spent_after_first, 0.25);
+        assert!(environment.spent_observation_cost() > spent_after_first);
     }
 
     #[test]
