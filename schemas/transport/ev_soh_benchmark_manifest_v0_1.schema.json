@@ -171,7 +171,8 @@
         "group_level",
         "generalization_claim",
         "split_manifest_digest",
-        "split_frozen_at_ms"
+        "split_frozen_at_ms",
+        "prediction_regime"
       ],
       "properties": {
         "mode": {
@@ -213,6 +214,14 @@
         "split_frozen_at_ms": {
           "type": "integer",
           "minimum": 1
+        },
+        "prediction_regime": {
+          "enum": [
+            "online_early_charge",
+            "online_operation",
+            "retrospective_full_cycle",
+            "service_bay"
+          ]
         }
       }
     },
@@ -563,7 +572,16 @@
               "lab_digest",
               "domain_digest",
               "observation_start_ms",
-              "observation_end_ms"
+              "observation_end_ms",
+              "feature_set_ref",
+              "feature_set_digest",
+              "feature_window_kind",
+              "feature_acquisition_mode",
+              "feature_window_start_ms",
+              "feature_window_end_ms",
+              "feature_available_at_ms",
+              "prediction_time_ms",
+              "target_reference_time_ms"
             ],
             "properties": {
               "sample_digest": {
@@ -621,6 +639,49 @@
                 "minimum": 0
               },
               "observation_end_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "feature_set_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "feature_set_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "feature_window_kind": {
+                "enum": [
+                  "partial_charge",
+                  "full_discharge",
+                  "routine_bms",
+                  "service_bay"
+                ]
+              },
+              "feature_acquisition_mode": {
+                "enum": [
+                  "streaming",
+                  "retrospective",
+                  "service_bay"
+                ]
+              },
+              "feature_window_start_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "feature_window_end_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "feature_available_at_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "prediction_time_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "target_reference_time_ms": {
                 "type": "integer",
                 "minimum": 0
               }
