@@ -26,16 +26,24 @@ pub(crate) enum SceneSourceRole {
 pub(crate) struct SceneSourceReceipt {
     source_id: String,
     source_event_id: String,
+    failure_domain_id: String,
     acquisition_tick_ns: u64,
     receive_tick_ns: u64,
+    /// Clock domain in which acquisition/receive ticks above are represented.
+    clock_domain_id: String,
+    /// Original source clock domain before the declared transform.
+    source_clock_domain_id: String,
+    clock_transform_id: String,
+    clock_transform_admitted: bool,
+    frame_id: String,
+    extrinsic_profile_id: String,
+    frame_transform_admitted: bool,
+    calibration_profile_id: String,
     role: SceneSourceRole,
     current: bool,
     calibration_current: bool,
-    frame_id: String,
-    clock_domain_id: String,
-    clock_transform_id: String,
-    calibration_profile_id: String,
-    extrinsic_profile_id: String,
+    current: bool,
+    calibration_current: bool,
 }
 
 /// Track state classification from the scene admission result.
@@ -401,8 +409,10 @@ pub(crate) fn admit_local_follow_target(
     for source in &receipt.sources {
         if source.source_id.is_empty()
             || source.source_event_id.is_empty()
+            || source.failure_domain_id.is_empty()
             || source.frame_id.is_empty()
             || source.clock_domain_id.is_empty()
+            || source.source_clock_domain_id.is_empty()
             || source.clock_transform_id.is_empty()
             || source.calibration_profile_id.is_empty()
             || source.extrinsic_profile_id.is_empty()
@@ -475,6 +485,10 @@ pub(crate) fn admit_local_follow_target(
         if source.role != SceneSourceRole::LocalSensorObservation
             || !source.current
             || !source.calibration_current
+            || !source.clock_transform_admitted
+            || !source.frame_transform_admitted
+            || source.clock_domain_id != receipt.clock_domain_id
+            || source.receive_tick_ns > receipt.evaluated_at_tick_ns
             || receipt.evaluated_at_tick_ns.saturating_sub(source.acquisition_tick_ns)
                 > (max_age_s * 1_000_000_000.0) as u64
         {
@@ -590,14 +604,18 @@ mod tests {
             vec![SceneSourceReceipt {
                 source_id: "front-lidar".into(),
                 source_event_id: "lidar-scan-12".into(),
+                failure_domain_id: "front-lidar-stack-a".into(),
                 acquisition_tick_ns: 12_000_000_000,
                 receive_tick_ns: 12_001_000_000,
                 role: SceneSourceRole::LocalSensorObservation,
                 current: true,
                 calibration_current: true,
-                frame_id: "road-local".into(),
+                frame_id: "lidar-optical".into(),
                 clock_domain_id: "vehicle-monotonic".into(),
+                source_clock_domain_id: "lidar-clock".into(),
                 clock_transform_id: "clock-transform-v1".into(),
+                clock_transform_admitted: true,
+                frame_transform_admitted: true,
                 calibration_profile_id: "lidar-cal-v1".into(),
                 extrinsic_profile_id: "lidar-extrinsic-v1".into(),
             }],
@@ -770,14 +788,18 @@ mod tests {
         receipt.sources.push(SceneSourceReceipt {
             source_id: "v2x-peer".into(),
             source_event_id: "peer-event-4".into(),
+            failure_domain_id: "remote-peer-stack-4".into(),
             acquisition_tick_ns: 12_000_000_000,
             receive_tick_ns: 12_001_000_000,
             role: SceneSourceRole::RemoteCooperativeClaim,
-            current: true,
-            calibration_current: true,
+            current: false,
+            calibration_current: false,
             frame_id: "peer-frame".into(),
             clock_domain_id: "peer-clock".into(),
+            source_clock_domain_id: "peer-clock".into(),
             clock_transform_id: "peer-to-vehicle-clock-v1".into(),
+            clock_transform_admitted: false,
+            frame_transform_admitted: false,
             calibration_profile_id: "peer-claim-only".into(),
             extrinsic_profile_id: "peer-claim-only".into(),
         });
