@@ -51,7 +51,7 @@ impl DrivingRunIdentity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BridgeConfig {
     pub identity: DrivingRunIdentity,
     pub max_width: u32,
@@ -112,7 +112,9 @@ pub struct UpstreamCameraObservation {
     pub capture_timestamp_us: u64,
     pub render_completed_timestamp_us: u64,
     pub delivered_timestamp_us: u64,
+    #[serde(rename = "frame_width")]
     pub width: u32,
+    #[serde(rename = "frame_height")]
     pub height: u32,
     pub channels: usize,
     pub applied_action_receipt_id: Option<String>,
@@ -816,6 +818,43 @@ mod tests {
 
     fn bridge() -> CameraDrivingBridge {
         CameraDrivingBridge::try_new(config(), VisionConfig::default()).unwrap()
+    }
+
+    #[test]
+    fn upstream_camera_receipt_accepts_renderer_policy_receipt_field_names() {
+        let json = serde_json::json!({
+            "schema_version": 1,
+            "observation_id": "a".repeat(64),
+            "pixel_format": "rgb8_srgb",
+            "episode_id": "episode-1",
+            "scenario_id": "scenario-1",
+            "agent_id": "ego",
+            "clock_id": "sim-clock-1",
+            "tick": 1,
+            "sequence": 1,
+            "applied_action_receipt_id": "action-1",
+            "applied_action_receipt_sha256": "b".repeat(64),
+            "applied_action_command_id": "command-1",
+            "applied_action_tick": 1,
+            "camera_id": "front",
+            "camera_calibration_sha256": "c".repeat(64),
+            "renderer_revision": "software-camera-q16-rgb-v1",
+            "capture_timestamp_us": 20_000,
+            "render_completed_timestamp_us": 20_800,
+            "delivered_timestamp_us": 21_000,
+            "frame_width": 16,
+            "frame_height": 16,
+            "channels": 3,
+            "frame_byte_len": 768,
+            "frame_sha256": "d".repeat(64),
+            "receipt_sha256": "e".repeat(64)
+        });
+        let parsed: UpstreamCameraObservation = serde_json::from_value(json).unwrap();
+        assert_eq!(parsed.width, 16);
+        assert_eq!(parsed.height, 16);
+        assert_eq!(parsed.channels, 3);
+        assert_eq!(parsed.frame_sha256, "d".repeat(64));
+        assert_eq!(parsed.applied_action_tick, Some(1));
     }
 
     #[test]
