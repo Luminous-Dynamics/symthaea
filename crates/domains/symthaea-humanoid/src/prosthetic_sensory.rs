@@ -236,10 +236,27 @@ impl ProstheticFeedbackPolicyV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CueEvidenceOrigin {
+    DirectMeasurement,
+    DerivedEstimate,
+    AvailabilityGate,
+}
+
+impl From<ObservationOrigin> for CueEvidenceOrigin {
+    fn from(origin: ObservationOrigin) -> Self {
+        match origin {
+            ObservationOrigin::DirectMeasurement => Self::DirectMeasurement,
+            ObservationOrigin::DerivedEstimate => Self::DerivedEstimate,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HapticCue {
     pub code_id: u16,
     pub semantic: HapticCueSemantic,
-    pub origin: ObservationOrigin,
+    pub origin: CueEvidenceOrigin,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -348,6 +365,10 @@ impl ProstheticFeedbackEncoder {
             ));
         }
 
+        // Consume the sequence before freshness/provenance/calibration gates.
+        // Repeated rejected frames must not repeatedly buzz the unavailable cue.
+        self.last_sequence = Some(observation.sequence);
+
         if now_monotonic_ns < observation.received_monotonic_ns {
             return Ok(self.unavailable(
                 observation,
@@ -380,10 +401,6 @@ impl ProstheticFeedbackEncoder {
             ));
         }
 
-        // Valid samples advance replay protection even when there is no event
-        // to communicate to the wearer.
-        self.last_sequence = Some(observation.sequence);
-
         let mut cues = Vec::new();
 
         // Slip has the highest semantic priority in the output ordering. This
@@ -393,7 +410,7 @@ impl ProstheticFeedbackEncoder {
                 cues.push(HapticCue {
                     code_id: self.codebook.slip_risk_code,
                     semantic: HapticCueSemantic::SlipRisk,
-                    origin: ObservationOrigin::DerivedEstimate,
+                    origin: CueEvidenceOrigin::DerivedEstimate,
                 });
             }
         }
@@ -414,7 +431,7 @@ impl ProstheticFeedbackEncoder {
             cues.push(HapticCue {
                 code_id: self.codebook.grip_codes[code_index],
                 semantic: HapticCueSemantic::Grip(band),
-                origin: grip.origin,
+                origin: grip.origin.into(),
             });
         }
 
@@ -423,7 +440,7 @@ impl ProstheticFeedbackEncoder {
                 cues.push(HapticCue {
                     code_id: self.codebook.contact_codes[contact.digit.index()],
                     semantic: HapticCueSemantic::Contact(contact.digit),
-                    origin: contact.origin,
+                    origin: contact.origin.into(),
                 });
             }
         }
@@ -452,7 +469,7 @@ impl ProstheticFeedbackEncoder {
             vec![HapticCue {
                 code_id: self.codebook.data_unavailable_code,
                 semantic: HapticCueSemantic::DataUnavailable,
-                origin: ObservationOrigin::DerivedEstimate,
+                origin: CueEvidenceOrigin::AvailabilityGate,
             }]
         } else {
             Vec::new()
@@ -623,6 +640,36 @@ mod tests {
             )
         );
         assert_eq!(frame.cues[0].semantic, HapticCueSemantic::DataUnavailable);
+    }
+
+    #[test]
+    fn repeated_stale_frame_does_not_repeat_unavailable_cue() {
+        let mut encoder = encoder();
+        let mut sample = observation(1);
+        sample.received_monotonic_ns = 0;
+        sample.contacts.push(ContactReading {
+            digit: HandDigit::Thumb,
+            in_contact: true,
+            origin: ObservationOrigin::DirectMeasurement,
+        });
+
+        let first = encoder.encode(&sample, 200).unwrap();
+        assert_eq!(
+            first.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::StaleReceiveTimestamp
+            )
+        );
+        assert_eq!(first.cues.len(), 1);
+
+        let replay = encoder.encode(&sample, 200).unwrap();
+        assert_eq!(
+            replay.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::ReplayOrOutOfOrder
+            )
+        );
+        assert_eq!(replay.cues.len(), 1);
     }
 
     #[test]
