@@ -84,6 +84,8 @@ pub mod kokoro_singing;
 pub mod singing_engine;
 #[cfg(feature = "singing")]
 pub mod singing_quality;
+#[cfg(feature = "singing")]
+pub mod resolved_singing_engine;
 
 // LTC-driven articulatory synthesis (Phase 17)
 pub mod vocal_tract_controller;

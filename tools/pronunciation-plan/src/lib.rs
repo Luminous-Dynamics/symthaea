@@ -858,6 +858,7 @@ impl VocalScoreAlignment {
 #[serde(rename_all = "snake_case")]
 pub enum PhoneFeature {
     Voiced,
+    Sonorant,
     Nasal,
     Syllabic,
     Aspirated,
@@ -868,6 +869,7 @@ pub enum PhoneFeature {
     ClickAlveolar,
     ClickPostAlveolar,
     ClickLateral,
+    Diphthong,
     LengthLong,
     LengthShort,
     VowelHigh,
@@ -877,14 +879,27 @@ pub enum PhoneFeature {
     VowelCentral,
     VowelBack,
     Rounded,
+    MannerPlosive,
+    MannerFricative,
+    MannerAffricate,
+    MannerApproximant,
+    MannerGlide,
+    MannerLiquid,
+    MannerLateral,
+    MannerTrill,
+    MannerStrident,
     PlaceBilabial,
+    PlaceLabial,
     PlaceLabiodental,
     PlaceDental,
     PlaceAlveolar,
     PlacePostAlveolar,
+    PlaceRetroflex,
     PlacePalatal,
     PlaceVelar,
     PlaceUvular,
+    PlacePharyngeal,
+    PlaceEpiglottal,
     PlaceGlottal,
 }
 
@@ -924,7 +939,7 @@ pub enum ResourceRightsStatus {
     Excluded,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LanguageTask {
     GraphemeToPhoneme,
@@ -998,7 +1013,6 @@ impl LanguageProfileManifest {
             ));
         }
         if self.profile_id.trim().is_empty()
-            || !valid_source_digest(&format!("git-sha1:{}", self.source_revision))
             || self.language_tag.trim().is_empty()
             || self
                 .language_tag
@@ -1053,6 +1067,29 @@ impl LanguageProfileManifest {
                                 | PhoneFeature::Aspirated
                                 | PhoneFeature::Ejective
                                 | PhoneFeature::Implosive
+                                | PhoneFeature::Nasal
+                                | PhoneFeature::MannerPlosive
+                                | PhoneFeature::MannerFricative
+                                | PhoneFeature::MannerAffricate
+                                | PhoneFeature::MannerApproximant
+                                | PhoneFeature::MannerGlide
+                                | PhoneFeature::MannerLiquid
+                                | PhoneFeature::MannerLateral
+                                | PhoneFeature::MannerTrill
+                                | PhoneFeature::MannerStrident
+                                | PhoneFeature::PlaceBilabial
+                                | PhoneFeature::PlaceLabial
+                                | PhoneFeature::PlaceLabiodental
+                                | PhoneFeature::PlaceDental
+                                | PhoneFeature::PlaceAlveolar
+                                | PhoneFeature::PlacePostAlveolar
+                                | PhoneFeature::PlaceRetroflex
+                                | PhoneFeature::PlacePalatal
+                                | PhoneFeature::PlaceVelar
+                                | PhoneFeature::PlaceUvular
+                                | PhoneFeature::PlacePharyngeal
+                                | PhoneFeature::PlaceEpiglottal
+                                | PhoneFeature::PlaceGlottal
                         )
                     }) {
                         return Err(format!("vowel {:?} has consonant-only features", phone.ipa));
@@ -1066,12 +1103,45 @@ impl LanguageProfileManifest {
                             phone.ipa
                         ));
                     }
+                    if features.iter().any(|feature| {
+                        matches!(
+                            feature,
+                            PhoneFeature::Diphthong
+                                | PhoneFeature::VowelHigh
+                                | PhoneFeature::VowelMid
+                                | PhoneFeature::VowelLow
+                                | PhoneFeature::VowelFront
+                                | PhoneFeature::VowelCentral
+                                | PhoneFeature::VowelBack
+                                | PhoneFeature::Rounded
+                        )
+                    }) {
+                        return Err(format!("consonant {:?} has vowel-only features", phone.ipa));
+                    }
                 }
                 PhoneKind::SyllabicConsonant => {
                     has_consonant = true;
                     if !features.contains(&PhoneFeature::Syllabic) {
                         return Err(format!(
                             "syllabic consonant {:?} lacks the syllabic feature",
+                            phone.ipa
+                        ));
+                    }
+                    if features.iter().any(|feature| {
+                        matches!(
+                            feature,
+                            PhoneFeature::Diphthong
+                                | PhoneFeature::VowelHigh
+                                | PhoneFeature::VowelMid
+                                | PhoneFeature::VowelLow
+                                | PhoneFeature::VowelFront
+                                | PhoneFeature::VowelCentral
+                                | PhoneFeature::VowelBack
+                                | PhoneFeature::Rounded
+                        )
+                    }) {
+                        return Err(format!(
+                            "syllabic consonant {:?} has vowel-only features",
                             phone.ipa
                         ));
                     }
@@ -1108,6 +1178,7 @@ impl LanguageProfileManifest {
             if resource.resource_id.trim().is_empty()
                 || !resource_ids.insert(resource.resource_id.as_str())
                 || resource.source_repository.trim().is_empty()
+                || !valid_source_digest(&format!("git-sha1:{}", resource.source_revision))
                 || !valid_source_digest(&resource.source_digest)
                 || !valid_source_digest(&resource.license_document_digest)
                 || resource.license_expression.trim().is_empty()
@@ -1184,6 +1255,10 @@ impl LanguageProfileManifest {
         for required in [
             LanguageTask::GraphemeToPhoneme,
             LanguageTask::Syllabification,
+            LanguageTask::Morphology,
+            LanguageTask::TonePrediction,
+            LanguageTask::SpeechSynthesis,
+            LanguageTask::SingingSynthesis,
         ] {
             if !tasks.contains(&required) {
                 return Err(format!(
@@ -1555,6 +1630,81 @@ mod tests {
                 .unwrap_err()
                 .contains("requires evidence reference and digest")
         );
+    }
+
+    #[test]
+    fn phone_inventory_preserves_manner_diphthong_and_compound_click_features() {
+        let mut profile = xhosa_profile_fixture();
+        profile.phone_inventory.push(LanguageProfilePhone {
+            ipa: "ɡ͡ǀ".into(),
+            kind: PhoneKind::Consonant,
+            features: vec![
+                PhoneFeature::Click,
+                PhoneFeature::ClickDental,
+                PhoneFeature::PlaceVelar,
+                PhoneFeature::Voiced,
+            ],
+        });
+        profile.phone_inventory.push(LanguageProfilePhone {
+            ipa: "t͡ɬʼ".into(),
+            kind: PhoneKind::Consonant,
+            features: vec![
+                PhoneFeature::MannerAffricate,
+                PhoneFeature::MannerLateral,
+                PhoneFeature::PlaceAlveolar,
+                PhoneFeature::Ejective,
+            ],
+        });
+        profile.phone_inventory.push(LanguageProfilePhone {
+            ipa: "aɪ".into(),
+            kind: PhoneKind::Vowel,
+            features: vec![PhoneFeature::Diphthong],
+        });
+        assert!(profile.validate().is_ok());
+    }
+
+    #[test]
+    fn phone_inventory_rejects_manner_features_on_vowels_and_vowel_features_on_consonants() {
+        let mut profile = xhosa_profile_fixture();
+        profile.phone_inventory.push(LanguageProfilePhone {
+            ipa: "aɪ".into(),
+            kind: PhoneKind::Vowel,
+            features: vec![PhoneFeature::MannerAffricate],
+        });
+        let error = profile.validate().unwrap_err();
+        assert!(error.contains("vowel-only") || error.contains("consonant-only"), "{error}");
+
+        let mut profile = xhosa_profile_fixture();
+        profile.phone_inventory.push(LanguageProfilePhone {
+            ipa: "p".into(),
+            kind: PhoneKind::Consonant,
+            features: vec![PhoneFeature::VowelHigh],
+        });
+        let error = profile.validate().unwrap_err();
+        assert!(error.contains("vowel-only"), "{error}");
+    }
+
+    #[test]
+    fn language_profile_requires_explicit_status_for_every_language_task() {
+        let mut profile = xhosa_profile_fixture();
+        profile
+            .capabilities
+            .retain(|capability| capability.task != LanguageTask::TonePrediction);
+        let error = profile.validate().unwrap_err();
+        assert!(error.contains("TonePrediction"), "{error}");
+    }
+
+    #[test]
+    fn language_profile_requires_an_exact_immutable_resource_revision() {
+        let mut profile = xhosa_profile_fixture();
+        profile.resources[0].source_revision = "main".into();
+        let error = profile.validate().unwrap_err();
+        assert!(error.contains("incomplete provenance/license metadata"), "{error}");
+
+        let mut profile = xhosa_profile_fixture();
+        profile.resources[0].source_revision = "59A93768D72B5804F8B87BC3DD409320C8F0C328".into();
+        let error = profile.validate().unwrap_err();
+        assert!(error.contains("incomplete provenance/license metadata"), "{error}");
     }
 
     #[test]

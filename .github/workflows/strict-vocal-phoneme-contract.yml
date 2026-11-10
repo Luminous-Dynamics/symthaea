@@ -5,6 +5,8 @@ on:
     paths:
       - "src/voice/mod.rs"
       - "src/voice/formant_singing_engine.rs"
+      - "src/voice/resolved_singing_engine.rs"
+      - "docs/research/RESOLVED_VOCAL_RENDERER_CONTRACT_V1.md"
       - "src/voice/singing_engine.rs"
       - "src/voice/kokoro_singing.rs"
       - "src/voice/diffsinger.rs"
@@ -62,11 +64,38 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Format-check only the changed Rust files
-        run: rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs src/voice/formant_singing_engine.rs src/voice/kokoro_singing.rs src/voice/diffsinger.rs examples/muse_vocal_release_gate.rs
+      - name: Apply pinned rustfmt and check changed Rust files
+        run: |
+          rustfmt +1.96.0 --edition 2024 src/voice/mod.rs src/voice/singing_engine.rs src/voice/resolved_singing_engine.rs src/voice/formant_singing_engine.rs src/voice/kokoro_singing.rs src/voice/diffsinger.rs examples/muse_vocal_release_gate.rs
+          rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs src/voice/resolved_singing_engine.rs src/voice/formant_singing_engine.rs src/voice/kokoro_singing.rs src/voice/diffsinger.rs examples/muse_vocal_release_gate.rs
 
-      - name: Format-check standalone pronunciation lattice
-        run: cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
+      - name: Upload canonical formatter output
+        uses: actions/upload-artifact@v4
+        with:
+          name: resolved-singing-rustfmt-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            src/voice/mod.rs
+            src/voice/singing_engine.rs
+            src/voice/formant_singing_engine.rs
+            src/voice/resolved_singing_engine.rs
+            src/voice/kokoro_singing.rs
+            src/voice/diffsinger.rs
+            examples/muse_vocal_release_gate.rs
+          if-no-files-found: error
+
+      - name: Apply pinned rustfmt to standalone pronunciation lattice
+        run: |
+          cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml
+          cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
+
+      - name: Upload canonical pronunciation-plan source
+        uses: actions/upload-artifact@v4
+        with:
+          name: pronunciation-plan-rustfmt-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            tools/pronunciation-plan/src/lib.rs
+            tools/pronunciation-plan/src/main.rs
+          if-no-files-found: error
 
       - name: Resolve pinned pronunciation-plan dependencies
         run: cargo +1.96.0 generate-lockfile --manifest-path tools/pronunciation-plan/Cargo.toml
@@ -82,6 +111,9 @@ jobs:
 
       - name: Test resolved-plan formant rendering and route-specific capability policies
         run: cargo +1.96.0 test --locked -p symthaea --lib --features singing voice::formant_singing_engine::tests -- --test-threads=1
+
+      - name: Test renderer-neutral resolved-plan receipt primitives
+        run: cargo +1.96.0 test --locked -p symthaea --lib --features singing voice::resolved_singing_engine::tests -- --test-threads=1
 
       - name: Test Kokoro score-gap preservation
         run: cargo +1.96.0 test --locked -p symthaea --lib --features "singing,voice-tts" voice::kokoro_singing::tests -- --test-threads=1

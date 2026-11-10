@@ -15,6 +15,9 @@ use symthaea_pronunciation_plan::{
 use symthaea_vocal_tract::speech::formants::formant_target_pub;
 use symthaea_vocal_tract::types::{FormantFrame, SourceType};
 
+use super::resolved_singing_engine::{
+    ResolvedScoreInput, ResolvedSingingVoiceEngine,
+};
 use super::singing_engine::{
     CapabilitySupport, ControlCapability, ExpressionPoint, SingingBackendCapabilities,
     SingingControl, SingingRenderPolicy, SingingVoiceEngine, VocalPerformance, VocalStem,
@@ -24,6 +27,7 @@ use super::vocoder::{FormantVocoder, VocoderConfig};
 const FRAME_RATE_HZ: f32 = 200.0;
 const FRAME_DT_S: f32 = 1.0 / FRAME_RATE_HZ;
 const BACKEND_ID: &str = "formant-vocoder-singing";
+const RESOLVED_BACKEND_ID: &str = "formant-vocoder-singing-resolved-plan-v1";
 
 /// An honest, executable baseline over the already-integrated Muse
 /// sing -> render_sung_frames -> FormantVocoder path.
@@ -71,7 +75,7 @@ impl FormantSingingEngine {
     /// portamento, phrase-expression or voice-identity controls.
     pub fn resolved_plan_capabilities() -> Result<SingingBackendCapabilities> {
         SingingBackendCapabilities::new(
-            format!("{BACKEND_ID}-resolved-plan-v1"),
+            RESOLVED_BACKEND_ID.to_string(),
             vec![
                 capability(
                     SingingControl::LyricText,
@@ -241,7 +245,7 @@ impl FormantSingingEngine {
         let stem = VocalStem {
             samples,
             sample_rate: self.sample_rate,
-            backend: format!("{BACKEND_ID}-resolved-plan-v1"),
+            backend: RESOLVED_BACKEND_ID.to_string(),
         };
         stem.validate()?;
         Ok(stem)
@@ -934,6 +938,38 @@ fn capability(
         control,
         support,
         rationale: rationale.to_string(),
+    }
+}
+
+impl ResolvedSingingVoiceEngine for FormantSingingEngine {
+    fn resolved_backend_id(&self) -> &str {
+        RESOLVED_BACKEND_ID
+    }
+
+    fn resolved_capabilities(&self) -> Result<SingingBackendCapabilities> {
+        Self::resolved_plan_capabilities()
+    }
+
+    fn render_resolved_unchecked(
+        &mut self,
+        pronunciation: &PronunciationPlan,
+        score: ResolvedScoreInput<'_>,
+    ) -> Result<VocalStem> {
+        match score {
+            ResolvedScoreInput::SecondsAlignment(alignment) => {
+                self.render_resolved_plan(pronunciation, alignment)
+            }
+            ResolvedScoreInput::BeatDomain {
+                score,
+                syllable_bindings,
+                phrases,
+            } => self.render_beat_domain_plan(
+                pronunciation,
+                score,
+                syllable_bindings,
+                phrases,
+            ),
+        }
     }
 }
 
@@ -1960,4 +1996,197 @@ mod tests {
             .to_string();
         assert!(error.contains("language='en' or 'en-US' only"), "{error}");
     }
+
+    #[test]
+    fn renderer_neutral_contract_renders_selected_plan_and_verifies_receipt() {
+        let (pronunciation, alignment) = resolved_read_now_fixture();
+        let policy = SingingRenderPolicy::score_conditioned_comparison();
+        let capabilities = FormantSingingEngine::resolved_plan_capabilities().unwrap();
+        let request = super::super::resolved_singing_engine::ResolvedSingingRequest {
+            pronunciation: &pronunciation,
+            score: ResolvedScoreInput::SecondsAlignment(&alignment),
+            policy: &policy,
+        };
+        let mut engine = FormantSingingEngine::default();
+        let renderer: &mut dyn ResolvedSingingVoiceEngine = &mut engine;
+        let output = renderer.render_request(request).unwrap();
+
+        assert_eq!(output.stem.backend, RESOLVED_BACKEND_ID);
+        assert_eq!(output.receipt.schema, "resolved-vocal-render-receipt/v1");
+        assert_eq!(output.receipt.backend_id, RESOLVED_BACKEND_ID);
+        assert_eq!(output.receipt.sample_rate_hz, output.stem.sample_rate);
+        assert_eq!(output.receipt.sample_count, output.stem.samples.len() as u64);
+        output
+            .receipt
+            .verify_against(
+                &capabilities,
+                &pronunciation,
+                ResolvedScoreInput::SecondsAlignment(&alignment),
+                &policy,
+                &output.stem,
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn resolved_render_receipt_rejects_tampered_audio_and_capability_identity() {
+        let (pronunciation, alignment) = resolved_read_now_fixture();
+        let policy = SingingRenderPolicy::score_conditioned_comparison();
+        let capabilities = FormantSingingEngine::resolved_plan_capabilities().unwrap();
+        let mut engine = FormantSingingEngine::default();
+        let output = engine
+            .render_request(super::super::resolved_singing_engine::ResolvedSingingRequest {
+                pronunciation: &pronunciation,
+                score: ResolvedScoreInput::SecondsAlignment(&alignment),
+                policy: &policy,
+            })
+            .unwrap();
+
+        let mut tampered_stem = output.stem.clone();
+        tampered_stem.samples[0] += 0.01;
+        assert!(
+            output
+                .receipt
+                .verify_against(
+                    &capabilities,
+                    &pronunciation,
+                    ResolvedScoreInput::SecondsAlignment(&alignment),
+                    &policy,
+                    &tampered_stem,
+                )
+                .is_err()
+        );
+
+        let wrong_capabilities = SingingBackendCapabilities::undeclared("other-renderer");
+        assert!(
+            output
+                .receipt
+                .verify_against(
+                    &wrong_capabilities,
+                    &pronunciation,
+                    ResolvedScoreInput::SecondsAlignment(&alignment),
+                    &policy,
+                    &output.stem,
+                )
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn resolved_render_policy_rejects_unsupported_controls_before_dispatch() {
+        let (pronunciation, alignment) = resolved_read_now_fixture();
+        let policy = SingingRenderPolicy::phrase_breath_comparison();
+        let mut engine = FormantSingingEngine::default();
+        let error = engine
+            .render_request(super::super::resolved_singing_engine::ResolvedSingingRequest {
+                pronunciation: &pronunciation,
+                score: ResolvedScoreInput::SecondsAlignment(&alignment),
+                policy: &policy,
+            })
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("cannot satisfy required control PhraseBreathTiming"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn renderer_neutral_contract_preserves_beat_domain_score_in_receipt() {
+        let (pronunciation, _) = resolved_read_now_fixture();
+        let score = BeatDomainScore {
+            schema_version: 1,
+            tempo_map: vec![
+                TempoChange {
+                    start_beat: 0.0,
+                    quarter_bpm: 120.0,
+                },
+                TempoChange {
+                    start_beat: 1.5,
+                    quarter_bpm: 60.0,
+                },
+            ],
+            events: vec![
+                BeatScoreEvent {
+                    start_beat: 0.0,
+                    duration_beats: 1.0,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 220.0,
+                        velocity: 0.7,
+                    },
+                },
+                BeatScoreEvent {
+                    start_beat: 1.0,
+                    duration_beats: 0.5,
+                    kind: ScoreEventKind::Rest,
+                },
+                BeatScoreEvent {
+                    start_beat: 1.5,
+                    duration_beats: 1.0,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 246.94,
+                        velocity: 0.7,
+                    },
+                },
+            ],
+        };
+        let bindings = vec![
+            SyllableNoteBinding {
+                word_index: 0,
+                syllable_index: 0,
+                spans: vec![ScoreEventSpan {
+                    event_index: 0,
+                    start_offset_s: 0.0,
+                    end_offset_s: 0.5,
+                }],
+                melisma_phone_index: None,
+            },
+            SyllableNoteBinding {
+                word_index: 1,
+                syllable_index: 0,
+                spans: vec![ScoreEventSpan {
+                    event_index: 2,
+                    start_offset_s: 0.0,
+                    end_offset_s: 1.0,
+                }],
+                melisma_phone_index: None,
+            },
+        ];
+        let phrases = vec![VocalPhraseSpan {
+            syllable_start: 0,
+            syllable_end: 2,
+            breath_before_s: 0.0,
+            breath_after_s: 0.1,
+        }];
+        let policy = SingingRenderPolicy::score_conditioned_comparison();
+        let capabilities = FormantSingingEngine::resolved_plan_capabilities().unwrap();
+        let mut engine = FormantSingingEngine::default();
+        let output = engine
+            .render_request(super::super::resolved_singing_engine::ResolvedSingingRequest {
+                pronunciation: &pronunciation,
+                score: ResolvedScoreInput::BeatDomain {
+                    score: &score,
+                    syllable_bindings: &bindings,
+                    phrases: &phrases,
+                },
+                policy: &policy,
+            })
+            .unwrap();
+        output
+            .receipt
+            .verify_against(
+                &capabilities,
+                &pronunciation,
+                ResolvedScoreInput::BeatDomain {
+                    score: &score,
+                    syllable_bindings: &bindings,
+                    phrases: &phrases,
+                },
+                &policy,
+                &output.stem,
+            )
+            .unwrap();
+        assert_eq!(output.stem.backend, RESOLVED_BACKEND_ID);
+    }
+
 }

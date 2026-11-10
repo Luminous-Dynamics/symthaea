@@ -35,8 +35,19 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Format-check standalone contract
-        run: cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
+      - name: Apply pinned formatter and verify standalone contract
+        run: |
+          cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml
+          cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
+
+      - name: Upload canonical formatted contract source
+        uses: actions/upload-artifact@v4
+        with:
+          name: pronunciation-plan-contract-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            tools/pronunciation-plan/src/lib.rs
+            tools/pronunciation-plan/src/main.rs
+          if-no-files-found: error
 
       - name: Resolve pinned dependencies
         run: cargo +1.96.0 generate-lockfile --manifest-path tools/pronunciation-plan/Cargo.toml
