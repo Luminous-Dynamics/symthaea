@@ -98,7 +98,10 @@ impl BridgeConfig {
 /// Digest fields are integrity pointers; this type does not authenticate the issuer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UpstreamCameraObservation {
+    pub schema_version: u32,
     pub observation_id: String,
+    pub pixel_format: String,
+    pub frame_byte_len: usize,
     pub receipt_sha256: String,
     pub frame_sha256: String,
     pub episode_id: String,
@@ -121,6 +124,72 @@ pub struct UpstreamCameraObservation {
     pub applied_action_receipt_sha256: Option<String>,
     pub applied_action_command_id: Option<String>,
     pub applied_action_tick: Option<u64>,
+}
+
+impl UpstreamCameraObservation {
+    /// Recompute the renderer's observation identity from policy-visible fields.
+    /// This verifies internal consistency, not publisher authenticity.
+    pub fn calculated_observation_id(&self) -> String {
+        let mut hasher = Sha256::new();
+        for value in [&self.episode_id, &self.agent_id, &self.clock_id] {
+            hasher.update((value.len() as u64).to_le_bytes());
+            hasher.update(value.as_bytes());
+        }
+        hasher.update(self.tick.to_le_bytes());
+        hasher.update(self.sequence.to_le_bytes());
+        for value in [
+            self.applied_action_receipt_id.as_deref().unwrap_or(""),
+            self.applied_action_receipt_sha256.as_deref().unwrap_or(""),
+            self.frame_sha256.as_str(),
+        ] {
+            hasher.update((value.len() as u64).to_le_bytes());
+            hasher.update(value.as_bytes());
+        }
+        digest_to_hex(&hasher.finalize())
+    }
+
+    /// Recompute the renderer's policy-receipt commitment. Pixel format is
+    /// currently pinned to RGB8 sRGB (enum discriminant zero).
+    pub fn calculated_receipt_sha256(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(self.schema_version.to_le_bytes());
+        let observation_id = self.observation_id.as_str();
+        hasher.update((observation_id.len() as u64).to_le_bytes());
+        hasher.update(observation_id.as_bytes());
+        hasher.update([0_u8]);
+        for value in [&self.episode_id, &self.agent_id, &self.clock_id] {
+            hasher.update((value.len() as u64).to_le_bytes());
+            hasher.update(value.as_bytes());
+        }
+        hasher.update(self.tick.to_le_bytes());
+        hasher.update(self.sequence.to_le_bytes());
+        for value in [
+            self.applied_action_receipt_id.as_deref().unwrap_or(""),
+            self.applied_action_receipt_sha256.as_deref().unwrap_or(""),
+            self.applied_action_command_id.as_deref().unwrap_or(""),
+            self.camera_id.as_str(),
+            self.camera_calibration_sha256.as_str(),
+            self.renderer_revision.as_str(),
+            self.frame_sha256.as_str(),
+        ] {
+            hasher.update((value.len() as u64).to_le_bytes());
+            hasher.update(value.as_bytes());
+        }
+        hasher.update([u8::from(self.applied_action_tick.is_some())]);
+        hasher.update(self.applied_action_tick.unwrap_or(0).to_le_bytes());
+        for value in [
+            self.capture_timestamp_us,
+            self.render_completed_timestamp_us,
+            self.delivered_timestamp_us,
+            u64::from(self.width),
+            u64::from(self.height),
+            self.channels as u64,
+            self.frame_byte_len as u64,
+        ] {
+            hasher.update(value.to_le_bytes());
+        }
+        digest_to_hex(&hasher.finalize())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +228,7 @@ pub enum BridgeError {
     NonFinitePerceptionOutput,
     LearningNotFrozen,
     UpstreamReceiptMalformed,
+    UpstreamReceiptCommitmentMismatch,
     UpstreamIdentityMismatch,
     UpstreamFrameMismatch,
     UpstreamSequenceMismatch,
@@ -543,7 +613,18 @@ impl CameraDrivingBridge {
         {
             return Err(BridgeError::UpstreamReceiptMalformed);
         }
-        if upstream.renderer_revision.len() > 128 {
+        if upstream.renderer_revision.len() > 128
+            || upstream.schema_version != RECEIPT_SCHEMA_VERSION
+            || upstream.pixel_format != "rgb8_srgb"
+            || upstream.channels != 3
+        {
+            return Err(BridgeError::UpstreamReceiptMalformed);
+        }
+        let expected_frame_bytes = (upstream.width as usize)
+            .checked_mul(upstream.height as usize)
+            .and_then(|pixels| pixels.checked_mul(upstream.channels))
+            .ok_or(BridgeError::UpstreamReceiptMalformed)?;
+        if upstream.frame_byte_len != expected_frame_bytes {
             return Err(BridgeError::UpstreamReceiptMalformed);
         }
         if upstream.sequence == 0 {
@@ -608,6 +689,11 @@ impl CameraDrivingBridge {
         }
         if digest_bytes(observation.pixels) != upstream.frame_sha256 {
             return Err(BridgeError::UpstreamFrameMismatch);
+        }
+        if upstream.calculated_observation_id() != upstream.observation_id
+            || upstream.calculated_receipt_sha256() != upstream.receipt_sha256
+        {
+            return Err(BridgeError::UpstreamReceiptCommitmentMismatch);
         }
         Ok(())
     }
@@ -781,7 +867,7 @@ mod tests {
         vehicle_state: &'a VehicleState,
     ) -> CapturedDrivingObservation<'a> {
         let tick = sequence;
-        CapturedDrivingObservation {
+        let mut captured = CapturedDrivingObservation {
             sequence,
             timestamp_us,
             vehicle_state_timestamp_us: timestamp_us,
@@ -791,8 +877,11 @@ mod tests {
             channels: 3,
             vehicle_state,
             upstream: UpstreamCameraObservation {
-                observation_id: digest_bytes(format!("observation-{sequence}").as_bytes()),
-                receipt_sha256: "c".repeat(64),
+                schema_version: 1,
+                observation_id: String::new(),
+                pixel_format: "rgb8_srgb".to_string(),
+                frame_byte_len: pixels.len(),
+                receipt_sha256: String::new(),
                 frame_sha256: digest_bytes(pixels),
                 episode_id: "episode-001".to_string(),
                 agent_id: "ego-001".to_string(),
@@ -813,7 +902,10 @@ mod tests {
                 applied_action_command_id: Some(format!("action-command-{sequence}")),
                 applied_action_tick: Some(tick),
             },
-        }
+        };
+        captured.upstream.observation_id = captured.upstream.calculated_observation_id();
+        captured.upstream.receipt_sha256 = captured.upstream.calculated_receipt_sha256();
+        captured
     }
 
     fn bridge() -> CameraDrivingBridge {
