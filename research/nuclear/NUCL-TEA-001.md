@@ -504,6 +504,18 @@ Each case has a frozen manifest, expected disposition, independent oracle and re
 | `EVIDENCE-HOSTILE-01` | Missing, stale, conflicting, revoked and misclassified inputs | Does the pipeline fail closed and retain contradictions? | Independent semantic oracle. |
 | `CHANGE-IMPACT-01` | Supplier interface/design revision | Are only affected downstream claims reopened, and are historical claims retained? | Exact synthetic lifecycle evidence. |
 
+### 11.1 Machine-readable economic benchmark registry
+
+The separate [marine economic reference-case registry](marine-economic-reference-cases-2026.json) preserves eight dated evidence anchors: UCL's November 2026 merchant-shipping TCO finding, Lloyd's Register's 15,000 TEU / 25-knot containership scenario, the June 2026 peer-reviewed containership model, IUMI and WTW insurance/liability positions, LR/BPA port-readiness guidance, the IMO regulatory workplan and the OECD NEA SMR dashboard.
+
+The UCL no-policy result is an obligatory negative control; the UCL 2040 result is a conditional policy/CAPEX case. The Lloyd's Register capacity and space estimates remain a separate industry-model scenario. The registry deliberately records missing assumptions and inference limits. It does not contain enough numerical inputs to reproduce either complete TCO model yet.
+
+### 11.2 Reference calculator implementation
+
+The first isolated Rust reference package is tracked in [NUCL-TEA-001A #11363](https://github.com/Luminous-Dynamics/symthaea/issues/11363) and added to the current draft research PR. It validates the SA port reference data, calculates discounted lifecycle costs and delivered service, requires source/fixture references, matches price/discount basis and blocks economic ranking where mandatory gates are failed, unknown, or lack an evidence locator.
+
+This is intentionally a small arithmetic and data-contract verifier, not a nuclear or grid simulator. Its source/fixture locators do not authenticate issuers or establish authority.
+
 ## 12. Staged execution
 
 1. **Freeze the data contract** — units, source class, currency year, context, uncertainty and authority fields.
