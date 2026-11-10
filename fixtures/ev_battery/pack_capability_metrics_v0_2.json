@@ -25,7 +25,13 @@
           "status": "qualified",
           "architecture": "series_single_parallel",
           "topology_ref": "topology-series-v1",
-          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004"
+          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "qualification": {
+            "qualification_ref": "qualification://complete-qualified-series-pack",
+            "authority_ref": "authority://independent-pack-configuration-review",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000001f40",
+            "evidence_class": "synthetic_fixture"
+          }
         },
         "reference_conditions": {
           "capacity": {
@@ -126,19 +132,22 @@
               "unit_ref": "cell-001",
               "soc_fraction": 0.95,
               "sample_time_ms": 1800000000000,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "soc_fraction": 0.9,
               "sample_time_ms": 1800000000010,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "soc_fraction": 0.85,
               "sample_time_ms": 1800000000020,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         },
@@ -152,21 +161,24 @@
               "status": "observed_eol",
               "efc_to_eol": 1000,
               "eol_event_ref": "eol-cell-001",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "status": "observed_eol",
               "efc_to_eol": 900,
               "eol_event_ref": "eol-cell-002",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "status": "observed_eol",
               "efc_to_eol": 800,
               "eol_event_ref": "eol-cell-003",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         }
@@ -195,7 +207,13 @@
           "status": "qualified",
           "architecture": "series_single_parallel",
           "topology_ref": "topology-series-v1",
-          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004"
+          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "qualification": {
+            "qualification_ref": "qualification://partial-population",
+            "authority_ref": "authority://independent-pack-configuration-review",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000001f41",
+            "evidence_class": "synthetic_fixture"
+          }
         },
         "reference_conditions": {
           "capacity": {
@@ -390,19 +408,22 @@
               "unit_ref": "cell-001",
               "soc_fraction": 0.95,
               "sample_time_ms": 1800000000000,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "soc_fraction": 0.9,
               "sample_time_ms": 1800000000010,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "soc_fraction": 0.85,
               "sample_time_ms": 1800000000020,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         },
@@ -416,21 +437,24 @@
               "status": "observed_eol",
               "efc_to_eol": 1000,
               "eol_event_ref": "eol-cell-001",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "status": "observed_eol",
               "efc_to_eol": 900,
               "eol_event_ref": "eol-cell-002",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "status": "observed_eol",
               "efc_to_eol": 800,
               "eol_event_ref": "eol-cell-003",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         }
@@ -459,7 +483,13 @@
           "status": "qualified",
           "architecture": "series_parallel",
           "topology_ref": "topology-series-v1",
-          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004"
+          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "qualification": {
+            "qualification_ref": "qualification://parallel-topology",
+            "authority_ref": "authority://independent-pack-configuration-review",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000001f42",
+            "evidence_class": "synthetic_fixture"
+          }
         },
         "reference_conditions": {
           "capacity": {
@@ -560,19 +590,22 @@
               "unit_ref": "cell-001",
               "soc_fraction": 0.95,
               "sample_time_ms": 1800000000000,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "soc_fraction": 0.9,
               "sample_time_ms": 1800000000010,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "soc_fraction": 0.85,
               "sample_time_ms": 1800000000020,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         },
@@ -586,21 +619,24 @@
               "status": "observed_eol",
               "efc_to_eol": 1000,
               "eol_event_ref": "eol-cell-001",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "status": "observed_eol",
               "efc_to_eol": 900,
               "eol_event_ref": "eol-cell-002",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "status": "observed_eol",
               "efc_to_eol": 800,
               "eol_event_ref": "eol-cell-003",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         }
@@ -629,7 +665,13 @@
           "status": "qualified",
           "architecture": "series_single_parallel",
           "topology_ref": "topology-series-v1",
-          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004"
+          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "qualification": {
+            "qualification_ref": "qualification://censored-lifetime",
+            "authority_ref": "authority://independent-pack-configuration-review",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000001f43",
+            "evidence_class": "synthetic_fixture"
+          }
         },
         "reference_conditions": {
           "capacity": {
@@ -730,19 +772,22 @@
               "unit_ref": "cell-001",
               "soc_fraction": 0.95,
               "sample_time_ms": 1800000000000,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "soc_fraction": 0.9,
               "sample_time_ms": 1800000000010,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "soc_fraction": 0.85,
               "sample_time_ms": 1800000000020,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         },
@@ -756,21 +801,24 @@
               "status": "observed_eol",
               "efc_to_eol": 1000,
               "eol_event_ref": "eol-cell-001",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "status": "observed_eol",
               "efc_to_eol": 900,
               "eol_event_ref": "eol-cell-002",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "status": "right_censored",
               "efc_to_eol": null,
               "eol_event_ref": null,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000018f"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000018f",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         }
@@ -799,7 +847,13 @@
           "status": "qualified",
           "architecture": "series_single_parallel",
           "topology_ref": "topology-series-v1",
-          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004"
+          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "qualification": {
+            "qualification_ref": "qualification://asynchronous-soc",
+            "authority_ref": "authority://independent-pack-configuration-review",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000001f44",
+            "evidence_class": "synthetic_fixture"
+          }
         },
         "reference_conditions": {
           "capacity": {
@@ -900,19 +954,22 @@
               "unit_ref": "cell-001",
               "soc_fraction": 0.95,
               "sample_time_ms": 1800000000000,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "soc_fraction": 0.9,
               "sample_time_ms": 1800000000020,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "soc_fraction": 0.85,
               "sample_time_ms": 1800000000120,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         },
@@ -926,21 +983,24 @@
               "status": "observed_eol",
               "efc_to_eol": 1000,
               "eol_event_ref": "eol-cell-001",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "status": "observed_eol",
               "efc_to_eol": 900,
               "eol_event_ref": "eol-cell-002",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "status": "observed_eol",
               "efc_to_eol": 800,
               "eol_event_ref": "eol-cell-003",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         }
@@ -969,7 +1029,13 @@
           "status": "qualified",
           "architecture": "series_single_parallel",
           "topology_ref": "topology-series-v1",
-          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004"
+          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "qualification": {
+            "qualification_ref": "qualification://duplicate-lifetime-unit",
+            "authority_ref": "authority://independent-pack-configuration-review",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000001f45",
+            "evidence_class": "synthetic_fixture"
+          }
         },
         "reference_conditions": {
           "capacity": {
@@ -1070,19 +1136,22 @@
               "unit_ref": "cell-001",
               "soc_fraction": 0.95,
               "sample_time_ms": 1800000000000,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "soc_fraction": 0.9,
               "sample_time_ms": 1800000000010,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "soc_fraction": 0.85,
               "sample_time_ms": 1800000000020,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         },
@@ -1096,21 +1165,24 @@
               "status": "observed_eol",
               "efc_to_eol": 1000,
               "eol_event_ref": "eol-cell-001",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "status": "observed_eol",
               "efc_to_eol": 900,
               "eol_event_ref": "eol-cell-002",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "status": "observed_eol",
               "efc_to_eol": 800,
               "eol_event_ref": "eol-cell-003",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         }
@@ -1139,7 +1211,13 @@
           "status": "qualified",
           "architecture": "series_single_parallel",
           "topology_ref": "topology-series-v1",
-          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004"
+          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "qualification": {
+            "qualification_ref": "qualification://module-resolution",
+            "authority_ref": "authority://independent-pack-configuration-review",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000001f46",
+            "evidence_class": "synthetic_fixture"
+          }
         },
         "reference_conditions": {
           "capacity": {
@@ -1240,19 +1318,22 @@
               "unit_ref": "cell-001",
               "soc_fraction": 0.95,
               "sample_time_ms": 1800000000000,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "soc_fraction": 0.9,
               "sample_time_ms": 1800000000010,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019b",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "soc_fraction": 0.85,
               "sample_time_ms": 1800000000020,
-              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c"
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         },
@@ -1266,21 +1347,24 @@
               "status": "observed_eol",
               "efc_to_eol": 1000,
               "eol_event_ref": "eol-cell-001",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-002",
               "status": "observed_eol",
               "efc_to_eol": 900,
               "eol_event_ref": "eol-cell-002",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137",
+              "evidence_class": "synthetic_fixture"
             },
             {
               "unit_ref": "cell-003",
               "status": "observed_eol",
               "efc_to_eol": 800,
               "eol_event_ref": "eol-cell-003",
-              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138"
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138",
+              "evidence_class": "synthetic_fixture"
             }
           ]
         }
