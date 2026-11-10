@@ -172,6 +172,18 @@ pub enum StructuralSymmetryPattern {
     },
 }
 
+/// Observed diagnostics for an accepted sampled Lie-derivative candidate.
+///
+/// The maximum is taken over every informative generator/sample pair evaluated
+/// by the declared profile. It is not a confidence interval or a proof.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct LieDerivativeSampleStatisticsV1 {
+    pub sample_count_per_generator: usize,
+    pub checked_generator_count: usize,
+    pub informative_evaluation_count: usize,
+    pub maximum_normalized_squared_residual: f64,
+}
+
 /// Evidence source for a candidate symmetry.
 ///
 /// `StructuralPatternMatch` means the expression matched a narrowly specified
@@ -191,6 +203,7 @@ pub enum SymmetryInferenceEvidence {
         profile: NumericLieDerivativeProfileV1,
         acted_on_variables: Vec<String>,
         group: LieGroup,
+        statistics: LieDerivativeSampleStatisticsV1,
     },
 }
 
@@ -368,7 +381,7 @@ fn infer_symmetry_numeric_with_profile(
     let n = var_names.len().min(profile.maximum_joint_dimension);
     let joint_algebra = lie_theory::so_n(n);
     let joint_indices: Vec<usize> = (0..n).collect();
-    if is_lie_invariant(expr, &var_names, &joint_indices, &joint_algebra, profile) {
+    if let Some(statistics) = is_lie_invariant(expr, &var_names, &joint_indices, &joint_algebra, profile) {
         let group = LieGroup::SO(n as u8);
         return SymmetryInferenceReport {
             candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
@@ -376,6 +389,7 @@ fn infer_symmetry_numeric_with_profile(
                 profile,
                 acted_on_variables: var_names[..n].to_vec(),
                 group,
+                statistics,
             }),
             search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
             numeric_profile: profile,
@@ -389,7 +403,7 @@ fn infer_symmetry_numeric_with_profile(
         let so2 = lie_theory::so_n(2);
         for i in 0..var_names.len() {
             for j in (i + 1)..var_names.len() {
-                if is_lie_invariant(expr, &var_names, &[i, j], &so2, profile) {
+                if let Some(statistics) = is_lie_invariant(expr, &var_names, &[i, j], &so2, profile) {
                     let group = LieGroup::SO(2);
                     return SymmetryInferenceReport {
                         candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
@@ -397,6 +411,7 @@ fn infer_symmetry_numeric_with_profile(
                             profile,
                             acted_on_variables: vec![var_names[i].clone(), var_names[j].clone()],
                             group,
+                            statistics,
                         }),
                         search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
                         numeric_profile: profile,
@@ -941,15 +956,16 @@ fn is_lie_invariant(
     active_indices: &[usize],
     algebra: &LieAlgebra,
     profile: NumericLieDerivativeProfileV1,
-) -> bool {
+) -> Option<LieDerivativeSampleStatisticsV1> {
     let samples = sample_states(var_names.len(), profile);
 
-    let mut informative = false;
+    let mut informative_evaluation_count = 0usize;
+    let mut maximum_normalized_squared_residual = 0.0_f64;
     for generator in &algebra.basis {
         for state in &samples {
             let grad = fd_gradient(expr, state, var_names, profile);
             if grad.iter().any(|g| !g.is_finite()) {
-                return false;
+                return None;
             }
 
             // flow[active_indices[gi]] = sum_gj generator[gi][gj] * state[active_indices[gj]]
@@ -965,18 +981,31 @@ fn is_lie_invariant(
             let lie: f64 = grad.iter().zip(flow.iter()).map(|(g, f)| g * f).sum();
             let grad_sq: f64 = active_indices.iter().map(|&vi| grad[vi] * grad[vi]).sum();
             if !lie.is_finite() || !grad_sq.is_finite() {
-                return false;
+                return None;
             }
             if grad_sq < profile.minimum_gradient_squared {
                 continue;
             }
-            informative = true;
-            if (lie * lie) / grad_sq > profile.normalized_squared_residual_tolerance {
-                return false;
+
+            let normalized_squared_residual = (lie * lie) / grad_sq;
+            if !normalized_squared_residual.is_finite()
+                || normalized_squared_residual > profile.normalized_squared_residual_tolerance
+            {
+                return None;
             }
+
+            informative_evaluation_count = informative_evaluation_count.saturating_add(1);
+            maximum_normalized_squared_residual =
+                maximum_normalized_squared_residual.max(normalized_squared_residual);
         }
     }
-    informative
+
+    (informative_evaluation_count > 0).then_some(LieDerivativeSampleStatisticsV1 {
+        sample_count_per_generator: samples.len(),
+        checked_generator_count: algebra.basis.len(),
+        informative_evaluation_count,
+        maximum_normalized_squared_residual,
+    })
 }
 
 /// Flatten an `Add` tree into a vector of leaf terms. Unlike the recognize
@@ -1163,6 +1192,13 @@ mod tests {
         assert_eq!(profile.finite_difference_step, 1e-5);
         assert_eq!(profile.sample_min_inclusive, 0.5);
         assert_eq!(profile.sample_max_exclusive, 3.0);
+        let Some(SymmetryInferenceEvidence::SampledLieDerivative { statistics, .. }) = report.evidence else {
+            panic!("sampled candidate must retain its measured diagnostics");
+        };
+        assert_eq!(statistics.sample_count_per_generator, 8);
+        assert_eq!(statistics.checked_generator_count, 1);
+        assert_eq!(statistics.informative_evaluation_count, 8);
+        assert!(statistics.maximum_normalized_squared_residual <= profile.normalized_squared_residual_tolerance);
         assert_eq!(
             report.search_status,
             SymmetryInferenceSearchStatus::NumericSearchCompleted
@@ -1183,10 +1219,12 @@ mod tests {
             report.candidate.as_ref().unwrap().lie_groups,
             vec![LieGroup::SO(2)]
         );
-        assert!(matches!(
-            report.evidence,
-            Some(SymmetryInferenceEvidence::SampledLieDerivative { .. })
-        ));
+        let Some(SymmetryInferenceEvidence::SampledLieDerivative { statistics, profile, .. }) = report.evidence else {
+            panic!("near-isotropic candidate must remain sampled evidence");
+        };
+        assert!(statistics.maximum_normalized_squared_residual > 0.0);
+        assert!(statistics.maximum_normalized_squared_residual <= profile.normalized_squared_residual_tolerance);
+        assert_eq!(statistics.sample_count_per_generator, profile.samples_per_generator);
         assert_eq!(
             report.exact_polynomial_status,
             ExactPolynomialSearchStatus::UnsupportedExpression
