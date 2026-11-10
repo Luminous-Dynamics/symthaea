@@ -998,7 +998,6 @@ impl LanguageProfileManifest {
             ));
         }
         if self.profile_id.trim().is_empty()
-            || !valid_source_digest(&format!("git-sha1:{}", self.source_revision))
             || self.language_tag.trim().is_empty()
             || self
                 .language_tag
@@ -1108,6 +1107,7 @@ impl LanguageProfileManifest {
             if resource.resource_id.trim().is_empty()
                 || !resource_ids.insert(resource.resource_id.as_str())
                 || resource.source_repository.trim().is_empty()
+                || !valid_source_digest(&format!("git-sha1:{}", resource.source_revision))
                 || !valid_source_digest(&resource.source_digest)
                 || !valid_source_digest(&resource.license_document_digest)
                 || resource.license_expression.trim().is_empty()
