@@ -1166,6 +1166,9 @@ mod tests {
             item.role == "capacity_soh:cell-001"
                 && item.evidence_class.as_deref() == Some("synthetic_fixture")
         }));
+        assert!(metrics.sigma_soh.evidence.iter().any(|item| {
+            item.role == "unit_inventory_and_nominal_capacity"
+        }));
         assert!(metrics.beta_soh.evidence.iter().any(|item| {
             item.role == "topology_qualification"
                 && item.evidence_class.as_deref() == Some("synthetic_fixture")
