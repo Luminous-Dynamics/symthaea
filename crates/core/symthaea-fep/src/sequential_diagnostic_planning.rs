@@ -89,6 +89,27 @@ pub struct BudgetedSequentialDiagnosticEvaluationWithReceipt {
     pub policy_receipt: SequentialDiagnosticPolicyReceipt,
 }
 
+/// Result of structurally verifying a budgeted sequential diagnostic receipt.
+///
+/// This verifies exact decision-problem identity, branch support and Bayes
+/// updates, recursive objective accounting, and the cumulative path-risk bound.
+/// It deliberately does not claim that the selected policy is globally optimal:
+/// that requires replay against a separately implemented optimizer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequentialDiagnosticPolicyVerificationReport {
+    pub schema_version: u32,
+    pub receipt_digest: String,
+    pub decision_problem_digest: String,
+    pub policy_tree_digest: String,
+    pub maximum_path_risk_upper_bound: f64,
+    pub modeled_terminal_path_count: usize,
+    pub branch_probabilities_verified: bool,
+    pub posterior_updates_verified: bool,
+    pub objective_accounting_verified: bool,
+    pub pathwise_risk_budget_verified: bool,
+    pub optimality_independently_reverified: bool,
+}
+
 /// Finite-horizon search limits.
 ///
 /// The expansion budget counts belief-state nodes in the search tree. In
@@ -193,6 +214,10 @@ pub enum SequentialDiagnosticError {
     InvalidPolicyTree,
     #[error("selected diagnostic policy path risk bound {bound} exceeds budget {budget}")]
     PolicyExceedsSafetyBudget { bound: f64, budget: f64 },
+    #[error("policy receipt does not match the supplied problem, budget, evaluation, or policy tree")]
+    PolicyReceiptMismatch,
+    #[error("diagnostic evaluation summary is inconsistent with the selected policy tree")]
+    InvalidEvaluationSummary,
 }
 
 /// Evaluate an adaptive diagnostic policy up to the requested horizon.
@@ -290,6 +315,7 @@ pub fn evaluate_sequential_decision_diagnostics_with_policy_receipt(
         hypotheses,
         actions,
         planning_config,
+        decision_config,
         &decision_problem_receipt,
         &budgeted_evaluation,
     )?;
@@ -310,6 +336,7 @@ fn compute_sequential_diagnostic_policy_receipt(
     hypotheses: &[DecisionHypothesis],
     actions: &[DiagnosticAction],
     planning_config: SequentialDiagnosticConfig,
+    decision_config: DecisionDiagnosticConfig,
     decision_problem_receipt: &CausalDiagnosticDecisionProblemReceipt,
     budgeted_evaluation: &BudgetedSequentialDiagnosticEvaluation,
 ) -> Result<SequentialDiagnosticPolicyReceipt, SequentialDiagnosticError> {
@@ -328,6 +355,7 @@ fn compute_sequential_diagnostic_policy_receipt(
             &budgeted_evaluation.evaluation.plan,
             hypotheses,
             actions,
+            decision_config,
             budgeted_evaluation.safety_budget.maximum_cumulative_risk,
         )?;
     if maximum_path_risk_upper_bound
@@ -400,73 +428,118 @@ fn compute_planning_config_digest(config: SequentialDiagnosticConfig) -> String 
     format!("{:x}", hasher.finalize())
 }
 
+#[derive(Debug, Clone, Copy)]
+struct PolicyAuditSummary {
+    maximum_path_risk: f64,
+    terminal_path_count: usize,
+}
+
 fn compute_policy_tree_digest(
     plan: &SequentialDiagnosticPlanNode,
     hypotheses: &[DecisionHypothesis],
     actions: &[DiagnosticAction],
+    decision_config: DecisionDiagnosticConfig,
     maximum_cumulative_risk: f64,
 ) -> Result<(String, f64, usize), SequentialDiagnosticError> {
-    if hypotheses.is_empty() || actions.is_empty() {
+    if hypotheses.is_empty() || actions.is_empty() || actions.len() > MAX_DIAGNOSTIC_ACTIONS {
         return Err(SequentialDiagnosticError::InvalidPolicyTree);
     }
-    let outcome_counts = &hypotheses[0].outcome_probabilities_by_action;
+    let posterior: Vec<f64> = hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.prior_probability)
+        .collect();
     let mut hasher = Sha256::new();
     hasher.update(b"symthaea-sequential-diagnostic-policy-tree-v1\0");
-    let (maximum_path_risk, terminal_path_count) = hash_policy_node(
+    let audit = audit_policy_node(
         &mut hasher,
         plan,
-        outcome_counts,
+        &posterior,
+        hypotheses,
         actions,
-        hypotheses.len(),
+        decision_config,
         maximum_cumulative_risk,
         0.0,
         0,
     )?;
-    Ok((format!("{:x}", hasher.finalize()), maximum_path_risk, terminal_path_count))
+    Ok((
+        format!("{:x}", hasher.finalize()),
+        audit.maximum_path_risk,
+        audit.terminal_path_count,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
-fn hash_policy_node(
+fn audit_policy_node(
     hasher: &mut Sha256,
     node: &SequentialDiagnosticPlanNode,
-    outcome_counts: &[Vec<f64>],
+    posterior: &[f64],
+    hypotheses: &[DecisionHypothesis],
     actions: &[DiagnosticAction],
-    hypothesis_count: usize,
+    decision_config: DecisionDiagnosticConfig,
     maximum_cumulative_risk: f64,
     risk_before_node: f64,
     used_actions: u64,
-) -> Result<(f64, usize), SequentialDiagnosticError> {
+) -> Result<PolicyAuditSummary, SequentialDiagnosticError> {
     hasher.update(b"node-v1\0");
-    let (risk_after_node, next_used_actions) = match node.selected_action_index {
-        Some(action_index) => {
-            let action = actions
-                .get(action_index)
-                .ok_or(SequentialDiagnosticError::InvalidPolicyTree)?;
-            if node.selected_action_id.as_deref() != Some(action.id.as_str())
-                || action_index >= 64
-                || used_actions & (1_u64 << action_index) != 0
-                || !action.safety_risk.is_finite()
-                || !(0.0..=1.0).contains(&action.safety_risk)
-            {
-                return Err(SequentialDiagnosticError::InvalidPolicyTree);
-            }
-            hasher.update([1]);
-            hasher.update((action_index as u64).to_le_bytes());
-            hash_receipt_field(hasher, "action_id", action.id.as_bytes());
-            hasher.update(action.safety_risk.to_bits().to_le_bytes());
-            (
-                risk_before_node + action.safety_risk,
-                used_actions | (1_u64 << action_index),
-            )
+    let hypothesis_count = hypotheses.len();
+    if posterior.len() != hypothesis_count
+        || posterior.iter().any(|probability| {
+            !probability.is_finite() || !(0.0..=1.0).contains(probability)
+        })
+        || (posterior.iter().sum::<f64>() - 1.0).abs() > 1e-8
+    {
+        return Err(SequentialDiagnosticError::InvalidPolicyTree);
+    }
+
+    for value in [
+        node.expected_total_cost,
+        node.expected_terminal_bayes_risk,
+        node.expected_observation_cost,
+        node.expected_safety_penalty,
+    ] {
+        if !value.is_finite() || value < 0.0 {
+            return Err(SequentialDiagnosticError::InvalidPolicyTree);
         }
-        None => {
-            if node.selected_action_id.is_some() || !node.branches.is_empty() {
-                return Err(SequentialDiagnosticError::InvalidPolicyTree);
-            }
-            hasher.update([0]);
-            (risk_before_node, used_actions)
+        hasher.update(value.to_bits().to_le_bytes());
+    }
+    hasher.update((node.branches.len() as u64).to_le_bytes());
+
+    let stop_risk = bayes_risk(
+        posterior,
+        hypotheses,
+        hypotheses[0].loss_by_final_decision.len(),
+    )?;
+    let Some(action_index) = node.selected_action_index else {
+        if node.selected_action_id.is_some()
+            || !node.branches.is_empty()
+            || !policy_values_match(node.expected_total_cost, stop_risk)
+            || !policy_values_match(node.expected_terminal_bayes_risk, stop_risk)
+            || !policy_values_match(node.expected_observation_cost, 0.0)
+            || !policy_values_match(node.expected_safety_penalty, 0.0)
+        {
+            return Err(SequentialDiagnosticError::InvalidPolicyTree);
         }
+        hasher.update([0]);
+        return Ok(PolicyAuditSummary {
+            maximum_path_risk: risk_before_node,
+            terminal_path_count: 1,
+        });
     };
+
+    let action = actions
+        .get(action_index)
+        .ok_or(SequentialDiagnosticError::InvalidPolicyTree)?;
+    if node.selected_action_id.as_deref() != Some(action.id.as_str())
+        || action_index >= MAX_DIAGNOSTIC_ACTIONS
+        || used_actions & (1_u64 << action_index) != 0
+        || !action.safety_risk.is_finite()
+        || !(0.0..=1.0).contains(&action.safety_risk)
+        || action.safety_risk > decision_config.maximum_safety_risk + RISK_TOLERANCE
+    {
+        return Err(SequentialDiagnosticError::InvalidPolicyTree);
+    }
+
+    let risk_after_node = risk_before_node + action.safety_risk;
     if !risk_after_node.is_finite()
         || risk_after_node > maximum_cumulative_risk + RISK_TOLERANCE
     {
@@ -476,51 +549,82 @@ fn hash_policy_node(
         });
     }
 
-    for value in [
-        node.expected_total_cost,
-        node.expected_terminal_bayes_risk,
-        node.expected_observation_cost,
-        node.expected_safety_penalty,
-    ] {
-        if !value.is_finite() {
-            return Err(SequentialDiagnosticError::InvalidPolicyTree);
-        }
-        hasher.update(value.to_bits().to_le_bytes());
-    }
-    hasher.update((node.branches.len() as u64).to_le_bytes());
+    hasher.update([1]);
+    hasher.update((action_index as u64).to_le_bytes());
+    hash_receipt_field(hasher, "action_id", action.id.as_bytes());
+    hasher.update(action.observation_cost.to_bits().to_le_bytes());
+    hasher.update(action.safety_risk.to_bits().to_le_bytes());
 
-    if node.branches.is_empty() {
-        return Ok((risk_after_node, 1));
-    }
-    let Some(action_index) = node.selected_action_index else {
-        return Err(SequentialDiagnosticError::InvalidPolicyTree);
-    };
-    let outcome_count = outcome_counts
+    let outcome_count = hypotheses[0]
+        .outcome_probabilities_by_action
         .get(action_index)
         .ok_or(SequentialDiagnosticError::InvalidPolicyTree)?
         .len();
-    let mut previous_outcome = None;
-    let mut maximum_descendant_risk = risk_after_node;
+    if outcome_count == 0 {
+        return Err(SequentialDiagnosticError::InvalidPolicyTree);
+    }
+    let mut branch_cursor = 0_usize;
+    let mut predictive_mass = 0.0_f64;
+    let mut expected_total_cost = decision_config.observation_cost_weight
+        * action.observation_cost
+        + decision_config.safety_risk_weight * action.safety_risk;
+    let mut expected_terminal_bayes_risk = 0.0_f64;
+    let mut expected_observation_cost = action.observation_cost;
+    let mut expected_safety_penalty =
+        decision_config.safety_risk_weight * action.safety_risk;
+    let mut maximum_path_risk = risk_after_node;
     let mut terminal_path_count = 0_usize;
+    let next_used_actions = used_actions | (1_u64 << action_index);
 
-    for branch in &node.branches {
-        if branch.outcome_index >= outcome_count
-            || previous_outcome.is_some_and(|previous| branch.outcome_index <= previous)
-            || !branch.outcome_probability.is_finite()
-            || branch.outcome_probability <= 0.0
-            || branch.outcome_probability > 1.0
-            || branch.posterior_model_probabilities.len() != hypothesis_count
-            || branch.posterior_model_probabilities.iter().any(|probability| {
-                !probability.is_finite() || !(0.0..=1.0).contains(probability)
+    for outcome_index in 0..outcome_count {
+        let outcome_probability = hypotheses
+            .iter()
+            .zip(posterior)
+            .map(|(hypothesis, prior)| {
+                prior
+                    * hypothesis.outcome_probabilities_by_action[action_index][outcome_index]
             })
+            .sum::<f64>();
+        if !outcome_probability.is_finite()
+            || outcome_probability < 0.0
+            || outcome_probability > 1.0 + 1e-8
         {
             return Err(SequentialDiagnosticError::InvalidPolicyTree);
         }
-        let posterior_mass: f64 = branch.posterior_model_probabilities.iter().sum();
-        if !posterior_mass.is_finite() || (posterior_mass - 1.0).abs() > 1e-8 {
+        predictive_mass += outcome_probability;
+        if outcome_probability == 0.0 {
+            continue;
+        }
+
+        let branch = node
+            .branches
+            .get(branch_cursor)
+            .ok_or(SequentialDiagnosticError::InvalidPolicyTree)?;
+        if branch.outcome_index != outcome_index
+            || !branch.outcome_probability.is_finite()
+            || !policy_values_match(branch.outcome_probability, outcome_probability)
+            || branch.posterior_model_probabilities.len() != hypothesis_count
+        {
             return Err(SequentialDiagnosticError::InvalidPolicyTree);
         }
-        previous_outcome = Some(branch.outcome_index);
+
+        let expected_posterior: Vec<f64> = hypotheses
+            .iter()
+            .zip(posterior)
+            .map(|(hypothesis, prior)| {
+                prior
+                    * hypothesis.outcome_probabilities_by_action[action_index][outcome_index]
+                    / outcome_probability
+            })
+            .collect();
+        if expected_posterior
+            .iter()
+            .zip(&branch.posterior_model_probabilities)
+            .any(|(expected, actual)| !policy_values_match(*expected, *actual))
+        {
+            return Err(SequentialDiagnosticError::InvalidPolicyTree);
+        }
+
         hasher.update((branch.outcome_index as u64).to_le_bytes());
         hasher.update(branch.outcome_probability.to_bits().to_le_bytes());
         hasher.update((branch.posterior_model_probabilities.len() as u64).to_le_bytes());
@@ -528,23 +632,57 @@ fn hash_policy_node(
             hasher.update(probability.to_bits().to_le_bytes());
         }
 
-        let (branch_maximum_risk, branch_path_count) = hash_policy_node(
+        let child = audit_policy_node(
             hasher,
             &branch.continuation,
-            outcome_counts,
+            &expected_posterior,
+            hypotheses,
             actions,
-            hypothesis_count,
+            decision_config,
             maximum_cumulative_risk,
             risk_after_node,
             next_used_actions,
         )?;
-        maximum_descendant_risk = maximum_descendant_risk.max(branch_maximum_risk);
+        expected_total_cost += outcome_probability
+            * branch.continuation.expected_total_cost;
+        expected_terminal_bayes_risk += outcome_probability
+            * branch.continuation.expected_terminal_bayes_risk;
+        expected_observation_cost += outcome_probability
+            * branch.continuation.expected_observation_cost;
+        expected_safety_penalty += outcome_probability
+            * branch.continuation.expected_safety_penalty;
+        maximum_path_risk = maximum_path_risk.max(child.maximum_path_risk);
         terminal_path_count = terminal_path_count
-            .checked_add(branch_path_count)
+            .checked_add(child.terminal_path_count)
             .ok_or(SequentialDiagnosticError::InvalidPolicyTree)?;
+        branch_cursor += 1;
     }
 
-    Ok((maximum_descendant_risk, terminal_path_count))
+    if !policy_values_match(predictive_mass, 1.0)
+        || branch_cursor != node.branches.len()
+        || !policy_values_match(node.expected_total_cost, expected_total_cost)
+        || !policy_values_match(
+            node.expected_terminal_bayes_risk,
+            expected_terminal_bayes_risk,
+        )
+        || !policy_values_match(node.expected_observation_cost, expected_observation_cost)
+        || !policy_values_match(node.expected_safety_penalty, expected_safety_penalty)
+        || terminal_path_count == 0
+    {
+        return Err(SequentialDiagnosticError::InvalidPolicyTree);
+    }
+
+    Ok(PolicyAuditSummary {
+        maximum_path_risk,
+        terminal_path_count,
+    })
+}
+
+fn policy_values_match(actual: f64, expected: f64) -> bool {
+    actual.is_finite()
+        && expected.is_finite()
+        && (actual - expected).abs()
+            <= 1e-8 * actual.abs().max(expected.abs()).max(1.0)
 }
 
 fn compute_policy_evaluation_digest(
@@ -599,6 +737,119 @@ fn hash_receipt_field(hasher: &mut Sha256, name: &str, value: &[u8]) {
 ///
 /// The digest binds the exact IEEE-754 bit pattern of the maximum cumulative
 /// risk together with the external risk-semantics/calibration digest.
+/// Verify a serialized policy receipt against its original decision inputs.
+///
+/// This independently recomputes causal problem identity, every reachable
+/// outcome probability and Bayes posterior, recursive objective accounting,
+/// and the maximum cumulative path-risk upper bound. It does not prove that the
+/// selected policy is globally optimal; use a separately implemented optimizer
+/// for that claim. It also does not authenticate external calibration sources.
+pub fn verify_sequential_diagnostic_policy_receipt(
+    hypotheses: &[DecisionHypothesis],
+    actions: &[DiagnosticAction],
+    causal_action_descriptors: &[CausalDiagnosticActionDescriptor],
+    decision_config: DecisionDiagnosticConfig,
+    planning_config: SequentialDiagnosticConfig,
+    expected_safety_budget: &SequentialDiagnosticSafetyBudget,
+    task_specification_digest: &str,
+    supplied: &BudgetedSequentialDiagnosticEvaluationWithReceipt,
+) -> Result<SequentialDiagnosticPolicyVerificationReport, SequentialDiagnosticError> {
+    let expected_problem_receipt = validate_causal_diagnostic_decision_problem(
+        actions,
+        causal_action_descriptors,
+        hypotheses,
+        decision_config,
+        task_specification_digest,
+    )?;
+    if supplied.decision_problem_receipt != expected_problem_receipt
+        || supplied.budgeted_evaluation.safety_budget != *expected_safety_budget
+        || supplied.budgeted_evaluation.evaluation.horizon != planning_config.horizon
+        || supplied.budgeted_evaluation.evaluation.expansions == 0
+        || supplied.budgeted_evaluation.evaluation.expansions
+            > planning_config.max_policy_expansions
+    {
+        return Err(SequentialDiagnosticError::PolicyReceiptMismatch);
+    }
+
+    let evaluation = &supplied.budgeted_evaluation.evaluation;
+    let one_step = evaluate_decision_focused_diagnostics(
+        hypotheses,
+        actions,
+        decision_config,
+    )?;
+    if evaluation.plan.selected_action_index != evaluation.selected_action_index
+        || !policy_values_match(evaluation.expected_total_cost, evaluation.plan.expected_total_cost)
+        || !policy_values_match(evaluation.no_probe_bayes_risk, one_step.prior_bayes_risk)
+    {
+        return Err(SequentialDiagnosticError::InvalidEvaluationSummary);
+    }
+
+    if planning_config.horizon == 0 {
+        if !evaluation.first_action_values.is_empty() {
+            return Err(SequentialDiagnosticError::InvalidEvaluationSummary);
+        }
+    } else {
+        if evaluation.first_action_values.len() != actions.len() {
+            return Err(SequentialDiagnosticError::InvalidEvaluationSummary);
+        }
+        for (index, (value, action)) in evaluation
+            .first_action_values
+            .iter()
+            .zip(actions)
+            .enumerate()
+        {
+            let expected_eligible = action.safety_risk
+                <= decision_config.maximum_safety_risk + RISK_TOLERANCE
+                && action.safety_risk
+                    <= expected_safety_budget.maximum_cumulative_risk + RISK_TOLERANCE;
+            if value.action_index != index
+                || value.action_id != action.id
+                || value.eligible != expected_eligible
+            {
+                return Err(SequentialDiagnosticError::InvalidEvaluationSummary);
+            }
+            let option_values = [
+                value.expected_total_cost,
+                value.expected_terminal_bayes_risk,
+                value.expected_observation_cost,
+                value.expected_safety_penalty,
+            ];
+            if (expected_eligible
+                && option_values.iter().any(|value| value.is_none_or(|x| !x.is_finite())))
+                || (!expected_eligible && option_values.iter().any(Option::is_some))
+            {
+                return Err(SequentialDiagnosticError::InvalidEvaluationSummary);
+            }
+        }
+    }
+
+    let expected_policy_receipt = compute_sequential_diagnostic_policy_receipt(
+        hypotheses,
+        actions,
+        planning_config,
+        decision_config,
+        &expected_problem_receipt,
+        &supplied.budgeted_evaluation,
+    )?;
+    if supplied.policy_receipt != expected_policy_receipt {
+        return Err(SequentialDiagnosticError::PolicyReceiptMismatch);
+    }
+
+    Ok(SequentialDiagnosticPolicyVerificationReport {
+        schema_version: 1,
+        receipt_digest: expected_policy_receipt.receipt_digest,
+        decision_problem_digest: expected_policy_receipt.decision_problem_digest,
+        policy_tree_digest: expected_policy_receipt.policy_tree_digest,
+        maximum_path_risk_upper_bound: expected_policy_receipt.maximum_path_risk_upper_bound,
+        modeled_terminal_path_count: expected_policy_receipt.modeled_terminal_path_count,
+        branch_probabilities_verified: true,
+        posterior_updates_verified: true,
+        objective_accounting_verified: true,
+        pathwise_risk_budget_verified: true,
+        optimality_independently_reverified: false,
+    })
+}
+
 pub fn compute_sequential_diagnostic_safety_budget_digest(
     safety_budget: &SequentialDiagnosticSafetyBudget,
 ) -> Result<String, SequentialDiagnosticError> {
