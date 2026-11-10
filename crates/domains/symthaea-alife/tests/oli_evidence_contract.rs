@@ -3,12 +3,12 @@
 
 use symthaea_alife::agnostic_evidence::{
     EvidenceBasis, EvidenceOutcome, EvidenceRecord, HypothesisClass, ObservationCoverage,
-    Property, PropertyAssessment, PropertyFinding, SystemProfile, OLI_SCHEMA_VERSION,
+    Property, PropertyAssessment, PropertyFinding, SystemProfile, SYMTHAEA_OLI_CONTEXT_VERSION,
 };
 
 fn profile() -> SystemProfile {
     SystemProfile {
-        schema_version: OLI_SCHEMA_VERSION.to_owned(),
+        schema_version: SYMTHAEA_OLI_CONTEXT_VERSION.to_owned(),
         system_id: "case:magnetized-discharge-001".to_owned(),
         substrate_family: "strongly magnetized low-pressure electric discharge".to_owned(),
         organizational_scale: "filamentary pattern".to_owned(),
