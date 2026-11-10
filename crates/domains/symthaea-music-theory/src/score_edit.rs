@@ -106,14 +106,24 @@ pub struct ScoreEditIssueV1 {
     pub message: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScoreNoteVelocityChangeV1 {
+    pub operation_id: String,
+    /// Event ordinal scoped exclusively to input_score_sha256, not a persistent EventId.
+    pub note_index: usize,
+    pub part_id: u16,
+    pub before: f32,
+    pub after: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoreEditReceiptV1 {
     pub schema: String,
     pub input_digest_schema: String,
     pub input_score_sha256: String,
     pub operation_ids: Vec<String>,
-    /// Event ordinals scoped exclusively to input_score_sha256.
-    pub changed_note_indices: Vec<usize>,
+    /// Exact reversible velocity deltas, each scoped to input_score_sha256.
+    pub changes: Vec<ScoreNoteVelocityChangeV1>,
     pub protected_window_ids: Vec<String>,
 }
 
@@ -604,24 +614,31 @@ pub fn apply_score_edit_plan(
     }
 
     let mut candidate = source.clone();
-    let mut changed_note_indices = Vec::new();
+    let mut changes = Vec::new();
     for item in &prepared {
         for &index in &item.note_indices {
             let note = &mut candidate.notes[index];
-            note.velocity = note.velocity * f32::from(item.operation.numerator)
+            let before = note.velocity;
+            let after = before * f32::from(item.operation.numerator)
                 / f32::from(item.operation.denominator);
-            changed_note_indices.push(index);
+            note.velocity = after;
+            changes.push(ScoreNoteVelocityChangeV1 {
+                operation_id: item.operation.id.clone(),
+                note_index: index,
+                part_id: item.operation.part_id,
+                before,
+                after,
+            });
         }
     }
-    changed_note_indices.sort_unstable();
-    changed_note_indices.dedup();
+    changes.sort_by_key(|change| change.note_index);
 
     let receipt = ScoreEditReceiptV1 {
         schema: SCORE_EDIT_SCHEMA_V1.into(),
         input_digest_schema: plan.input_digest_schema.clone(),
         input_score_sha256: plan.input_score_sha256.clone(),
         operation_ids: plan.operations.iter().map(|operation| operation.id.clone()).collect(),
-        changed_note_indices,
+        changes,
         protected_window_ids: plan.protected_windows.iter().map(|window| window.id.clone()).collect(),
     };
 
@@ -694,7 +711,14 @@ mod tests {
         assert_eq!(result.candidate.notes[1].velocity, 0.2);
         assert_eq!(result.candidate.notes[2].velocity, 0.7);
         assert_eq!(result.candidate.notes[3].velocity, 0.6);
-        assert_eq!(result.receipt.changed_note_indices, vec![0, 1]);
+        assert_eq!(
+            result.receipt.changes.iter().map(|change| change.note_index).collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+        assert_eq!(result.receipt.changes[0].part_id, 10);
+        assert_eq!(result.receipt.changes[0].operation_id, "soften-answer");
+        assert_eq!(result.receipt.changes[0].before, 0.8);
+        assert_eq!(result.receipt.changes[0].after, 0.4);
     }
 
     #[test]
@@ -721,7 +745,10 @@ mod tests {
             &plan(vec![operation("after-first-note", 1, 2)]),
             &digest(),
         ).expect("abutting note boundary is valid");
-        assert_eq!(result.receipt.changed_note_indices, vec![1]);
+        assert_eq!(
+            result.receipt.changes.iter().map(|change| change.note_index).collect::<Vec<_>>(),
+            vec![1]
+        );
         assert_eq!(result.candidate.notes[0].velocity, source.notes[0].velocity);
         assert_eq!(result.candidate.notes[1].velocity, source.notes[1].velocity / 2.0);
     }
