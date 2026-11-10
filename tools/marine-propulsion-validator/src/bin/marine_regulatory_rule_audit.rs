@@ -255,6 +255,160 @@ fn check_registry_semantics(register: &Value, findings: &mut Findings) {
     }
 }
 
+fn check_v0_2_semantics(register: &Value, findings: &mut Findings) {
+    if register.get("schema_version").and_then(Value::as_str) != Some("0.2.0") {
+        findings.push("/schema_version", "INVALID", "v0.2 audit requires schema_version 0.2.0");
+        return;
+    }
+    let Some(rules) = register.get("rules").and_then(Value::as_array) else { return; };
+
+    let Some(ets) = rules.iter().find(|rule| rule.get("rule_id").and_then(Value::as_str) == Some("EU-ETS-MARITIME")) else {
+        findings.push("/rules", "INCOMPLETE", "v0.2 register has no EU-ETS-MARITIME rule");
+        return;
+    };
+    let calc = ets.get("calculation_contract").unwrap_or(&Value::Null);
+
+    let phases = calc.get("surrender_phase_in").and_then(Value::as_array);
+    let Some(phases) = phases else {
+        findings.push("/rules/EU-ETS-MARITIME/calculation_contract/surrender_phase_in", "INVALID", "EU ETS v0.2 contract requires explicit emissions-year/surrender-year phase-in");
+        return;
+    };
+    if phases.is_empty() {
+        findings.push("/rules/EU-ETS-MARITIME/calculation_contract/surrender_phase_in", "INVALID", "phase-in schedule cannot be empty");
+    }
+
+    let mut emissions_years = BTreeSet::new();
+    let mut surrender_years = BTreeSet::new();
+    let mut previous_emissions_year: Option<i64> = None;
+    let mut previous_fraction: Option<f64> = None;
+
+    for (index, phase) in phases.iter().enumerate() {
+        let path = format!("/rules/EU-ETS-MARITIME/calculation_contract/surrender_phase_in/{index}");
+        let emissions_year = phase.get("emissions_year").and_then(Value::as_i64);
+        let surrender_year = phase.get("surrender_year").and_then(Value::as_i64);
+        let fraction = phase.get("surrender_fraction").and_then(Value::as_f64);
+
+        match (emissions_year, surrender_year) {
+            (Some(emissions), Some(surrender)) if surrender > emissions => {}
+            (Some(_), Some(_)) => findings.push(
+                path.clone(),
+                "INVALID",
+                "surrender_year must be later than emissions_year",
+            ),
+            _ => findings.push(
+                path.clone(),
+                "INVALID",
+                "phase-in must declare integer emissions_year and surrender_year",
+            ),
+        }
+
+        if let Some(year) = emissions_year {
+            if !emissions_years.insert(year) {
+                findings.push(format!("{path}/emissions_year"), "INVALID", "duplicate emissions_year in phase-in schedule");
+            }
+            if previous_emissions_year.is_some_and(|previous| year <= previous) {
+                findings.push(format!("{path}/emissions_year"), "INVALID", "phase-in entries must be ordered by strictly increasing emissions_year");
+            }
+            previous_emissions_year = Some(year);
+        }
+        if let Some(year) = surrender_year {
+            if !surrender_years.insert(year) {
+                findings.push(format!("{path}/surrender_year"), "INVALID", "duplicate surrender_year in phase-in schedule");
+            }
+        }
+        if let Some(fraction) = fraction {
+            if !(0.0..=1.0).contains(&fraction) {
+                findings.push(format!("{path}/surrender_fraction"), "INVALID", "surrender_fraction must be in [0,1]");
+            }
+            if previous_fraction.is_some_and(|previous| fraction < previous) {
+                findings.push(format!("{path}/surrender_fraction"), "INVALID", "surrender fractions cannot decrease across later emissions years in the declared phase-in schedule");
+            }
+            previous_fraction = Some(fraction);
+        } else {
+            findings.push(format!("{path}/surrender_fraction"), "INVALID", "surrender_fraction must be a numeric fraction in [0,1]");
+        }
+    }
+
+    let coverage = calc.get("voyage_coverage").and_then(Value::as_array);
+    if let Some(coverage) = coverage {
+        let mut coverage_ids = BTreeSet::new();
+        for (index, item) in coverage.iter().enumerate() {
+            let path = format!("/rules/EU-ETS-MARITIME/calculation_contract/voyage_coverage/{index}");
+            if let Some(id) = item.get("coverage_id").and_then(Value::as_str) {
+                if !coverage_ids.insert(id.to_owned()) {
+                    findings.push(format!("{path}/coverage_id"), "INVALID", format!("duplicate voyage coverage id '{id}'"));
+                }
+            }
+            if item.get("covered_fraction").and_then(Value::as_f64).is_none_or(|fraction| !(0.0..=1.0).contains(&fraction)) {
+                findings.push(format!("{path}/covered_fraction"), "INVALID", "covered_fraction must be a numeric fraction in [0,1]");
+            }
+        }
+        for required in ["EU_TO_EU", "EU_TO_NON_EU", "NON_EU_TO_EU", "WITHIN_EU_PORT"] {
+            if !coverage_ids.contains(required) {
+                findings.push(
+                    "/rules/EU-ETS-MARITIME/calculation_contract/voyage_coverage",
+                    "INCOMPLETE",
+                    format!("required voyage coverage case '{required}' is not represented"),
+                );
+            }
+        }
+    } else {
+        findings.push(
+            "/rules/EU-ETS-MARITIME/calculation_contract/voyage_coverage",
+            "INCOMPLETE",
+            "v0.2 route-specific ETS coverage fractions are absent",
+        );
+    }
+
+    let gases = calc.get("gas_scope").and_then(Value::as_array);
+    if let Some(gases) = gases {
+        let mut gas_years = std::collections::BTreeMap::new();
+        for (index, item) in gases.iter().enumerate() {
+            let path = format!("/rules/EU-ETS-MARITIME/calculation_contract/gas_scope/{index}");
+            let gas = item.get("gas").and_then(Value::as_str);
+            let year = item.get("included_from_emissions_year").and_then(Value::as_i64);
+            if let (Some(gas), Some(year)) = (gas, year) {
+                if gas_years.insert(gas.to_owned(), year).is_some() {
+                    findings.push(format!("{path}/gas"), "INVALID", format!("duplicate gas scope entry '{gas}'"));
+                }
+            } else {
+                findings.push(path, "INVALID", "gas scope requires gas and included_from_emissions_year");
+            }
+        }
+        if gas_years.get("CO2") != Some(&2024)
+            || gas_years.get("CH4") != Some(&2026)
+            || gas_years.get("N2O") != Some(&2026)
+        {
+            findings.push(
+                "/rules/EU-ETS-MARITIME/calculation_contract/gas_scope",
+                "INVALID",
+                "current EU ETS gas scope must retain CO2 from 2024 and CH4/N2O from 2026",
+            );
+        }
+    } else {
+        findings.push(
+            "/rules/EU-ETS-MARITIME/calculation_contract/gas_scope",
+            "INCOMPLETE",
+            "gas-specific emissions start years are absent",
+        );
+    }
+
+    if let Some(eca) = rules.iter().find(|rule| rule.get("rule_id").and_then(Value::as_str) == Some("NE-ATLANTIC-ECA-2026")) {
+        let dates = eca.get("dates").unwrap_or(&Value::Null);
+        if dates.get("entry_into_force_on").and_then(Value::as_str) != Some("2027-09-01")
+            || dates.get("applies_from").and_then(Value::as_str) != Some("2028-09-01")
+        {
+            findings.push(
+                "/rules/NE-ATLANTIC-ECA-2026/dates",
+                "INVALID",
+                "North-East Atlantic ECA snapshot must distinguish 2027-09-01 entry into force from 2028-09-01 application",
+            );
+        }
+    } else {
+        findings.push("/rules", "INCOMPLETE", "v0.2 register has no North-East Atlantic ECA rule");
+    }
+}
+
 fn run() -> Result<i32, String> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {
@@ -266,6 +420,9 @@ fn run() -> Result<i32, String> {
     let mut findings = Findings::default();
     validate_schema(&schema, &register, &mut findings);
     check_registry_semantics(&register, &mut findings);
+    if register.get("schema_version").and_then(Value::as_str) == Some("0.2.0") {
+        check_v0_2_semantics(&register, &mut findings);
+    }
 
     let report = AuditReport {
         auditor: "marine-regulatory-rule-audit",
@@ -301,6 +458,10 @@ mod tests {
         include_str!("../../../../docs/research/marine/marine-regulatory-rule-register-v0.1.0.schema.json");
     const RULE_REGISTER: &str =
         include_str!("../../../../docs/research/marine/marine-regulatory-rule-register-2026-11-10.json");
+    const RULE_SCHEMA_V2: &str =
+        include_str!("../../../../docs/research/marine/marine-regulatory-rule-register-v0.2.0.schema.json");
+    const RULE_REGISTER_V2: &str =
+        include_str!("../../../../docs/research/marine/marine-regulatory-rule-register-2026-11-10-v0.2.0.json");
 
     #[test]
     fn committed_regulatory_rule_register_matches_its_schema() {
@@ -320,6 +481,57 @@ mod tests {
         let mut findings = Findings::default();
         check_registry_semantics(&register, &mut findings);
         assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn v0_2_regulatory_register_matches_schema_and_explicit_timing_model() {
+        let schema: Value = serde_json::from_str(RULE_SCHEMA_V2).expect("v0.2 rule schema JSON");
+        let register: Value = serde_json::from_str(RULE_REGISTER_V2).expect("v0.2 rule register JSON");
+        assert!(jsonschema::draft202012::meta::is_valid(&schema));
+        let validator = jsonschema::draft202012::options()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("v0.2 schema compiles");
+        assert!(validator.is_valid(&register));
+        let mut findings = Findings::default();
+        check_registry_semantics(&register, &mut findings);
+        check_v0_2_semantics(&register, &mut findings);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn v0_2_ets_surrender_year_must_follow_emissions_year() {
+        let mut register: Value = serde_json::from_str(RULE_REGISTER_V2).expect("v0.2 rule register JSON");
+        register["rules"][2]["calculation_contract"]["surrender_phase_in"][0]["surrender_year"] =
+            serde_json::json!(2024);
+        let mut findings = Findings::default();
+        check_v0_2_semantics(&register, &mut findings);
+        assert!(findings.invalid);
+    }
+
+    #[test]
+    fn v0_2_ets_coverage_is_not_surrender_phase_in() {
+        let mut register: Value = serde_json::from_str(RULE_REGISTER_V2).expect("v0.2 rule register JSON");
+        register["rules"][2]["calculation_contract"]["voyage_coverage"][1]["covered_fraction"] =
+            serde_json::json!(0.7);
+        let mut findings = Findings::default();
+        check_v0_2_semantics(&register, &mut findings);
+        assert!(!findings.invalid);
+        assert!(!findings.incomplete);
+        // Coverage fraction (50%) is a different axis from the surrender phase-in (70%).
+        assert_ne!(
+            register["rules"][2]["calculation_contract"]["voyage_coverage"][1]["covered_fraction"],
+            register["rules"][2]["calculation_contract"]["surrender_phase_in"][1]["surrender_fraction"]
+        );
+    }
+
+    #[test]
+    fn v0_2_north_east_atlantic_eca_keeps_entry_and_application_dates_distinct() {
+        let mut register: Value = serde_json::from_str(RULE_REGISTER_V2).expect("v0.2 rule register JSON");
+        register["rules"][4]["dates"]["entry_into_force_on"] = serde_json::json!("2028-09-01");
+        let mut findings = Findings::default();
+        check_v0_2_semantics(&register, &mut findings);
+        assert!(findings.invalid);
     }
 
     #[test]
