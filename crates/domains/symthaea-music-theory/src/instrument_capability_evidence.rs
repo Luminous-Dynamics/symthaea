@@ -718,11 +718,20 @@ mod tests {
                 value: 2,
                 evidence_id: "polyphony".into(),
             }),
-            evidence: vec![
-                record("range", range_basis),
-                record("tessitura", range_basis),
-                record("polyphony", polyphony_basis),
-            ],
+            evidence: {
+                let mut evidence = Vec::new();
+                if range_basis == CapabilityEvidenceBasisV1::Derived
+                    || polyphony_basis == CapabilityEvidenceBasisV1::Derived
+                {
+                    evidence.push(record("parent", CapabilityEvidenceBasisV1::Measured));
+                }
+                evidence.extend([
+                    record("range", range_basis),
+                    record("tessitura", range_basis),
+                    record("polyphony", polyphony_basis),
+                ]);
+                evidence
+            },
         }
     }
 
