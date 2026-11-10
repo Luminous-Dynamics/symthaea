@@ -975,12 +975,25 @@ fn polynomial_depends_on_variable(polynomial: &ExactPolynomial, variable_index: 
         .keys()
         .any(|monomial| monomial.get(variable_index).is_some_and(|power| *power > 0))
 }
+fn charge_exact_polynomial_operations(
+    operation_count: &mut usize,
+    additional: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<(), ExactPolynomialError> {
+    *operation_count = operation_count.saturating_add(additional);
+    if *operation_count > profile.maximum_term_products {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    Ok(())
+}
+
 fn exact_polynomial_linear_action_lie_derivative(
     polynomial: &ExactPolynomial,
     variable_names: &[String],
     coordinate_names: &[String],
     generator: &crate::linear_group_action::LinearGeneratorV1,
     profile: ExactPolynomialLieProfileV1,
+    operation_count: &mut usize,
 ) -> Result<ExactPolynomial, ExactPolynomialError> {
     let mut residual = ExactPolynomial::new();
 
@@ -989,6 +1002,7 @@ fn exact_polynomial_linear_action_lie_derivative(
             .iter()
             .position(|name| name == &coordinate_names[row_index])
             .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+        charge_exact_polynomial_operations(operation_count, polynomial.len(), profile)?;
         let derivative = polynomial_derivative(polynomial, row_variable, profile)?;
 
         for (column_index, matrix_entry) in generator_row.iter().enumerate() {
@@ -1004,7 +1018,9 @@ fn exact_polynomial_linear_action_lie_derivative(
                 .iter()
                 .position(|name| name == &coordinate_names[column_index])
                 .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+            charge_exact_polynomial_operations(operation_count, derivative.len(), profile)?;
             let term = polynomial_multiply_variable(&derivative, column_variable, profile)?;
+            charge_exact_polynomial_operations(operation_count, term.len(), profile)?;
             for (monomial, term_coefficient) in &term {
                 let scaled_coefficient = term_coefficient
                     .checked_mul(coefficient)
@@ -1070,6 +1086,8 @@ pub fn check_exact_linear_action_invariance(
         .all(|monomial| monomial.iter().all(|exponent| *exponent == 0));
 
     let mut generator_results = Vec::with_capacity(declaration.generators.len());
+    // One operation budget is shared across every coordinate and generator.
+    let mut operation_count = 0usize;
     for generator in &declaration.generators {
         let residual = exact_polynomial_linear_action_lie_derivative(
             &polynomial,
@@ -1077,6 +1095,7 @@ pub fn check_exact_linear_action_invariance(
             &declaration.coordinate_names,
             generator,
             profile,
+            &mut operation_count,
         )
         .map_err(|error| match error {
             ExactPolynomialError::UnsupportedExpression => {
@@ -1600,6 +1619,17 @@ mod tests {
                 invalid
             ),
             Err(LinearActionPolynomialErrorV1::InvalidProfile)
+        );
+
+        let mut operation_limited = ExactPolynomialLieProfileV1::default();
+        operation_limited.maximum_term_products = 1;
+        assert_eq!(
+            check_exact_linear_action_invariance(
+                &expression,
+                &admitted_so2_action(),
+                operation_limited
+            ),
+            Err(LinearActionPolynomialErrorV1::ResourceLimitExceeded)
         );
     }
 
