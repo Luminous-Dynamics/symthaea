@@ -173,6 +173,12 @@ pub struct MissionThermalSegmentReport {
 pub struct MissionThermalReport {
     pub model_version: &'static str,
     pub source_energy_model_version: &'static str,
+    /// Upstream propulsion evidence records copied from the source MissionReport.
+    pub source_characterization_evidence_records: Vec<crate::characterization::EvidenceRecord>,
+    /// Upstream battery evidence records copied from the source MissionReport.
+    pub source_battery_characterization_evidence_records: Vec<crate::characterization::EvidenceRecord>,
+    /// Source MissionReport flag; this overlay copies but does not re-establish byte verification.
+    pub source_evidence_content_digests_verified: bool,
     pub segments: Vec<MissionThermalSegmentReport>,
     pub final_state: ThermalState,
     pub maximum_temperature_k: f64,
@@ -224,6 +230,7 @@ pub enum MissionThermalError {
     DuplicatePowerBasis(ComponentPowerBasis),
     UnknownThermalNode(String),
     MissionInput(crate::ModelError),
+    Characterization(crate::characterization::CharacterizationError),
     MissionReportShapeMismatch(&'static str),
     MissionReportInputMismatch {
         segment_id: String,
@@ -436,6 +443,12 @@ pub fn evaluate_mission_thermal_overlay(
     Ok(MissionThermalReport {
         model_version: MODEL_VERSION,
         source_energy_model_version: energy_report.model_version,
+        source_characterization_evidence_records:
+            energy_report.characterization_evidence_records.clone(),
+        source_battery_characterization_evidence_records:
+            energy_report.battery_characterization_evidence_records.clone(),
+        source_evidence_content_digests_verified:
+            energy_report.evidence_content_digests_verified,
         segments: segment_reports,
         final_state: state,
         maximum_temperature_k: mission_maximum_temperature_k,
@@ -577,6 +590,34 @@ fn validate_mission_report_pair(
             segment_id: "<mission>".into(),
             field: "all-up mass, pack specific energy, or available reserve energy",
         });
+    }
+
+    let propulsion_record_ids = report
+        .characterization_evidence_records
+        .iter()
+        .map(|record| record.id.clone())
+        .collect::<Vec<_>>();
+    let battery_record_ids = report
+        .battery_characterization_evidence_records
+        .iter()
+        .map(|record| record.id.clone())
+        .collect::<Vec<_>>();
+    if propulsion_record_ids != report.characterization_evidence_ids
+        || battery_record_ids != report.battery_characterization_evidence_ids
+    {
+        return Err(MissionThermalError::MissionReportInputMismatch {
+            segment_id: "<mission>".into(),
+            field: "characterization evidence IDs do not match source evidence records",
+        });
+    }
+    for record in report
+        .characterization_evidence_records
+        .iter()
+        .chain(&report.battery_characterization_evidence_records)
+    {
+        record
+            .validate()
+            .map_err(MissionThermalError::Characterization)?;
     }
 
     let mut previous_soc = battery.initial_state_of_charge;
@@ -1103,6 +1144,53 @@ mod tests {
         battery_curve.validate().unwrap();
         assert!((battery_curve.available_power_w(285.0).unwrap() - 50_000.0).abs() < 1e-9);
         assert!((battery_curve.available_power_w(390.0).unwrap() - 65_000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn source_evidence_records_and_digest_status_are_preserved() {
+        use crate::characterization::{EvidenceClass, EvidenceRecord};
+
+        let mission = baseline_mission();
+        let mut energy = evaluate_mission(&mission).unwrap();
+        let propulsion_record = EvidenceRecord {
+            id: "motor-map".into(),
+            uri: "artifact://test/motor-map".into(),
+            sha256: "a".repeat(64),
+            class: EvidenceClass::PhysicalMeasurement,
+            description: "Synthetic provenance fixture".into(),
+        };
+        let battery_record = EvidenceRecord {
+            id: "battery-map".into(),
+            uri: "artifact://test/battery-map".into(),
+            sha256: "b".repeat(64),
+            class: EvidenceClass::PhysicalMeasurement,
+            description: "Synthetic provenance fixture".into(),
+        };
+        energy.characterization_evidence_ids.push(propulsion_record.id.clone());
+        energy.characterization_evidence_records.push(propulsion_record.clone());
+        energy.battery_characterization_evidence_ids.push(battery_record.id.clone());
+        energy.battery_characterization_evidence_records.push(battery_record.clone());
+        energy.evidence_content_digests_verified = true;
+
+        let result = evaluate_mission_thermal_overlay(
+            &mission, &energy, &network(), &initial_state(), &config()
+        ).unwrap();
+
+        assert_eq!(result.source_characterization_evidence_records, vec![propulsion_record]);
+        assert_eq!(result.source_battery_characterization_evidence_records, vec![battery_record]);
+        assert!(result.source_evidence_content_digests_verified);
+    }
+
+    #[test]
+    fn evidence_id_record_mismatch_is_rejected() {
+        let mission = baseline_mission();
+        let mut energy = evaluate_mission(&mission).unwrap();
+        energy.characterization_evidence_ids.push("missing-record".into());
+
+        assert!(matches!(
+            evaluate_mission_thermal_overlay(&mission, &energy, &network(), &initial_state(), &config()),
+            Err(MissionThermalError::MissionReportInputMismatch { .. })
+        ));
     }
 
     #[test]
