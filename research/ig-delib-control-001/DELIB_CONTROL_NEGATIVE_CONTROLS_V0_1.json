@@ -18,7 +18,7 @@
     },
     {
       "fixture_id": "NEG-002",
-      "description": "negative budget",
+      "description": "A negative remaining-budget value is invalid.",
       "target_fixture_id": "DC-001-1",
       "mutation": {
         "operation": "set",
@@ -44,7 +44,7 @@
     },
     {
       "fixture_id": "NEG-004",
-      "description": "agreement above one",
+      "description": "An agreement estimate greater than one is invalid.",
       "target_fixture_id": "DC-001-1",
       "mutation": {
         "operation": "set",
@@ -57,7 +57,7 @@
     },
     {
       "fixture_id": "NEG-005",
-      "description": "zero round limit",
+      "description": "The fixed-round limit must be a positive integer.",
       "target_fixture_id": "DC-001-1",
       "mutation": {
         "operation": "set",
