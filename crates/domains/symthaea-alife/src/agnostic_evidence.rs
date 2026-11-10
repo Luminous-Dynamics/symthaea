@@ -1,75 +1,64 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Evidence contract for the Open Life & Intelligence (OLI) research programme.
+//! # OLI evidence adapter for Symthaea artificial-life research
 //!
-//! This module is deliberately an epistemic data model, not a life detector. It keeps
-//! observations, non-detections, contradictions, simulations, and hypotheses distinct.
-//! In particular, `NotDetected` is never equivalent to `Absent`: a non-detection is
-//! meaningful only together with its observation method and coverage context.
+//! This is Symthaea's typed, evidence-linked interpretation layer. It is not a second
+//! canonical fixture schema or a life detector. The interoperable M0 fixture contract and
+//! JSON Schema are owned by Symtropy's `tools/oli-m0-validator`; this module deliberately
+//! uses the same 16 property names and six property-assessment values.
 //!
-//! The schema does not calculate a universal "life score". Properties of life-like
-//! organization, agency, cognition, and collectives remain separately assessable.
+//! Raw observation outcomes are separate from property assessments. In particular,
+//! `NoDetection` describes what a measurement did not detect under its declared coverage.
+//! It is not a property state, and it is never equivalent to absence.
 
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-/// Current version of the experimental OLI interchange contract.
-pub const OLI_SCHEMA_VERSION: &str = "0.1.0";
+/// Property names and states are aligned with OLI M0 fixture v0.1.
+pub const OLI_SCHEMA_VERSION: &str = "oli-m0-fixture-v0.1";
 
-/// Independently testable system properties.
-///
-/// These axes are intentionally not a checklist that every living system must satisfy,
-/// and no aggregate score is defined. A finding on one axis does not imply a finding on
-/// another (for example, self-organization does not imply agency or life).
+/// Substrate-agnostic properties using the canonical OLI M0 property keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Property {
-    // Organization and maintenance
-    BoundaryMaintenance,
-    EnergyCoupling,
+    Organization,
+    Boundary,
+    EnergyMatterThroughput,
+    Persistence,
+    HomeostasisRegulation,
     SelfMaintenance,
-    MaterialTurnover,
-    InformationPersistence,
-    SelfRepair,
-    // Adaptation and evolution
-    EnvironmentalSensing,
-    AdaptiveResponse,
-    SelfProduction,
+    InformationRetention,
+    InformationTransfer,
+    Reproduction,
     Heredity,
-    CumulativeEvolution,
-    // Agency and cognition
-    GoalDirectedAgency,
-    CounterfactualSensitivity,
+    Adaptation,
     Learning,
-    Prediction,
-    Generalization,
-    ModelBasedPlanning,
-    // Collective organization
-    CollectiveCoordination,
+    Agency,
+    Intelligence,
+    CollectiveIntelligence,
+    SentienceConsciousness,
 }
 
-/// State of evidence for one property.
+/// The six property-assessment values in the canonical OLI M0 contract.
 ///
-/// `NotDetected` means only that the stated observation process did not detect the
-/// property. It does not establish that the property is absent. `NotAssessed` means
-/// that no adequate assessment has been made. These are intentionally different states.
+/// These are scoped evidence dispositions, not a universal life or intelligence score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EvidenceState {
-    Observed,
-    NotDetected,
-    Contradicted,
-    Conflicted,
-    NotAssessed,
-    NotApplicable,
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PropertyAssessment {
+    SupportedWithinScope,
+    ContradictedWithinScope,
+    InsufficientEvidence,
+    NotTested,
+    NotObservableWithCurrentInstrument,
+    ModelInadequate,
 }
 
-/// Provenance class for an evidence record.
+/// Provenance class of an evidence record.
 ///
-/// These categories must not be silently collapsed: a simulation result is not a
-/// laboratory observation, and a literature synthesis is not an independent replication.
+/// These classes must not be collapsed: a simulation result is not a laboratory
+/// observation, and a literature synthesis is not independent replication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceBasis {
@@ -80,27 +69,40 @@ pub enum EvidenceBasis {
     DerivedInference,
 }
 
-/// An evidence record with enough provenance to audit its origin.
+/// What happened in the observation or analysis record.
+///
+/// A non-detection is an observation outcome, not an assertion that a property is absent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceOutcome {
+    SignalDetected,
+    NoDetection,
+    InterventionResponse,
+    SimulationResult,
+    DerivedResult,
+    InvalidMeasurement,
+    NotAcquired,
+}
+
+/// Auditable evidence metadata.
+///
+/// `source_ref` may be a DOI, URL, repository path, archive identifier or other stable
+/// reference. `artifact_sha256` binds an acquired artifact when one is available.
+/// `independence_group` identifies known shared-source dependencies; a different record
+/// ID alone must never be treated as proof of independent evidence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvidenceRecord {
-    /// Stable identifier within this profile.
     pub id: String,
     pub basis: EvidenceBasis,
-    /// Instrument, protocol, simulator, or analytical method.
+    pub outcome: EvidenceOutcome,
     pub method: String,
-    /// DOI, URL, repository path, archive identifier, or other source reference.
     pub source_ref: Option<String>,
-    /// SHA-256 of the preserved source artifact, when available.
     pub artifact_sha256: Option<String>,
-    /// Shared identifier for observations that are not statistically independent.
     pub independence_group: Option<String>,
 }
 
-/// Observation opportunity and detector coverage for a non-detection.
-///
-/// At least one quantitative coverage field is required when this is used to support a
-/// `NotDetected` finding. The free-text scope records what the measurement actually
-/// covered; it must not be used as a substitute for reporting known detection limits.
+/// Observation opportunity and detector coverage for a non-detection or
+/// not-observable assessment.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObservationCoverage {
     pub modality: String,
@@ -108,7 +110,7 @@ pub struct ObservationCoverage {
     pub observation_duration_seconds: Option<f64>,
     /// Fraction of the relevant spatial domain sampled, in [0, 1].
     pub spatial_coverage_fraction: Option<f64>,
-    /// Instrument- or method-specific detection limit in the stated measurement units.
+    /// Instrument- or method-specific detection limit in the stated units.
     pub detection_limit: Option<f64>,
 }
 
@@ -120,57 +122,49 @@ impl ObservationCoverage {
         if self.scope.trim().is_empty() {
             issues.push(format!("{path}.scope must not be empty"));
         }
-
         if let Some(duration) = self.observation_duration_seconds
             && (!duration.is_finite() || duration <= 0.0)
         {
-            issues.push(format!(
-                "{path}.observation_duration_seconds must be finite and greater than zero"
-            ));
+            issues.push(format!("{path}.observation_duration_seconds must be finite and > 0"));
         }
-
         if let Some(fraction) = self.spatial_coverage_fraction
             && (!fraction.is_finite() || !(0.0..=1.0).contains(&fraction))
         {
-            issues.push(format!(
-                "{path}.spatial_coverage_fraction must be finite and in [0, 1]"
-            ));
+            issues.push(format!("{path}.spatial_coverage_fraction must be finite and in [0, 1]"));
         }
-
         if let Some(limit) = self.detection_limit
             && (!limit.is_finite() || limit < 0.0)
         {
-            issues.push(format!("{path}.detection_limit must be finite and non-negative"));
+            issues.push(format!("{path}.detection_limit must be finite and >= 0"));
         }
-
         if self.observation_duration_seconds.is_none()
             && self.spatial_coverage_fraction.is_none()
             && self.detection_limit.is_none()
         {
             issues.push(format!(
-                "{path} must include a quantitative duration, spatial coverage, or detection limit"
+                "{path} requires quantitative duration, spatial coverage, or detection limit"
             ));
         }
     }
 }
 
-/// Evidence attached to one independently assessed property.
+/// Evidence for one property, retaining the canonical M0 assessment vocabulary.
+///
+/// A `NoDetection` evidence record requires coverage metadata. It cannot be used as the
+/// sole basis for `SupportedWithinScope`. This prevents absence-by-default and obvious
+/// confidence laundering, while leaving scientific judgment about adequate detection
+/// power to the benchmark protocol and independent reviewers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PropertyFinding {
     pub property: Property,
-    pub state: EvidenceState,
+    pub assessment: PropertyAssessment,
     /// IDs of evidence records in the containing SystemProfile.
     pub evidence_ids: Vec<String>,
-    /// Required for `NotDetected`; describes the opportunity to observe the property.
     pub coverage: Option<ObservationCoverage>,
-    /// Scope, caveats, or rationale. This is not a substitute for evidence references.
     pub notes: String,
 }
 
 /// Broad mechanism family for an alternative explanation.
-///
-/// The labels are deliberately open to extension and do not assert that any one family
-/// exhausts the space of possible systems.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HypothesisClass {
@@ -183,23 +177,21 @@ pub enum HypothesisClass {
     Other,
 }
 
-/// A rival mechanism that can be challenged by an observation or intervention.
+/// A rival mechanism that must make discriminating predictions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AlternativeHypothesis {
     pub id: String,
     pub class: HypothesisClass,
     pub mechanism: String,
-    /// Observable outcomes that would discriminate this hypothesis from its rivals.
     pub discriminating_predictions: Vec<String>,
-    /// Evidence records relevant to this explanation.
     pub evidence_ids: Vec<String>,
 }
 
-/// A substrate-agnostic description of an investigated system.
+/// Symthaea's typed interpretation of a candidate system.
 ///
-/// `substrate_family` and `organizational_scale` are strings rather than closed enums:
-/// unfamiliar substrates and scales must not require a schema change before they can be
-/// recorded. This object contains no binary life verdict and no consciousness assertion.
+/// Substrate and organizational scale remain open strings so previously unimagined
+/// substrates do not require an enum migration. This profile intentionally has no
+/// `alive`, `intelligent`, or `conscious` scalar.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SystemProfile {
     pub schema_version: String,
@@ -212,11 +204,7 @@ pub struct SystemProfile {
 }
 
 impl SystemProfile {
-    /// Validate referential integrity and the minimum epistemic requirements.
-    ///
-    /// Validation is intentionally structural: it does not decide whether a scientific
-    /// interpretation is correct, whether evidence is independent, or whether a system
-    /// qualifies as life or intelligence.
+    /// Validate structure and evidence references, not scientific truth.
     pub fn validate(&self) -> Result<(), Vec<String>> {
         let mut issues = Vec::new();
 
@@ -254,7 +242,9 @@ impl SystemProfile {
             if let Some(digest) = &record.artifact_sha256
                 && (digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()))
             {
-                issues.push(format!("{path}.artifact_sha256 must be 64 hexadecimal characters"));
+                issues.push(format!(
+                    "{path}.artifact_sha256 must contain 64 hexadecimal characters"
+                ));
             }
         }
 
@@ -265,47 +255,68 @@ impl SystemProfile {
                 issues.push(format!("duplicate property finding: {:?}", finding.property));
             }
 
+            let mut no_detection = false;
             for evidence_id in &finding.evidence_ids {
-                if !evidence_ids.contains(evidence_id.as_str()) {
-                    issues.push(format!(
+                match self.evidence.iter().find(|record| record.id == *evidence_id) {
+                    Some(record) if record.outcome == EvidenceOutcome::NoDetection => {
+                        no_detection = true;
+                    }
+                    Some(_) => {}
+                    None => issues.push(format!(
                         "{path} references unknown evidence id: {evidence_id}"
-                    ));
+                    )),
                 }
             }
 
-            match finding.state {
-                EvidenceState::Observed | EvidenceState::Contradicted => {
+            match finding.assessment {
+                PropertyAssessment::SupportedWithinScope
+                | PropertyAssessment::ContradictedWithinScope => {
                     if finding.evidence_ids.is_empty() {
                         issues.push(format!(
-                            "{path} in state {:?} requires at least one evidence record",
-                            finding.state
+                            "{path} assessment {:?} requires at least one evidence record",
+                            finding.assessment
                         ));
                     }
                 }
-                EvidenceState::NotDetected => {
+                PropertyAssessment::NotObservableWithCurrentInstrument => {
                     if finding.evidence_ids.is_empty() {
                         issues.push(format!(
-                            "{path} NotDetected requires a record of the measurement that did not detect the property"
+                            "{path} NotObservable requires evidence about the instrument or measurement"
                         ));
                     }
-                    match &finding.coverage {
-                        Some(coverage) => coverage.validate(
-                            &format!("{path}.coverage"),
-                            &mut issues,
-                        ),
-                        None => issues.push(format!(
-                            "{path} NotDetected requires observation coverage"
-                        )),
-                    }
-                }
-                EvidenceState::Conflicted => {
-                    if finding.evidence_ids.len() < 2 {
+                    if finding.coverage.is_none() {
                         issues.push(format!(
-                            "{path} Conflicted requires at least two evidence records"
+                            "{path} NotObservable requires observation coverage"
                         ));
                     }
                 }
-                EvidenceState::NotAssessed | EvidenceState::NotApplicable => {}
+                PropertyAssessment::InsufficientEvidence
+                | PropertyAssessment::NotTested
+                | PropertyAssessment::ModelInadequate => {}
+            }
+
+            if no_detection {
+                match &finding.coverage {
+                    Some(coverage) => coverage.validate(&format!("{path}.coverage"), &mut issues),
+                    None => issues.push(format!(
+                        "{path} references NoDetection evidence and therefore requires coverage"
+                    )),
+                }
+                if finding.assessment == PropertyAssessment::SupportedWithinScope {
+                    let has_non_negative_basis = finding.evidence_ids.iter().any(|id| {
+                        self.evidence.iter().any(|record| {
+                            record.id == *id
+                                && record.outcome != EvidenceOutcome::NoDetection
+                                && record.outcome != EvidenceOutcome::InvalidMeasurement
+                                && record.outcome != EvidenceOutcome::NotAcquired
+                        })
+                    });
+                    if !has_non_negative_basis {
+                        issues.push(format!(
+                            "{path} cannot be SupportedWithinScope solely from NoDetection evidence"
+                        ));
+                    }
+                }
             }
         }
 
