@@ -242,37 +242,6 @@
               "type": "string",
               "minLength": 1
             },
-            "phase_in": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "year",
-                  "value",
-                  "unit",
-                  "meaning"
-                ],
-                "properties": {
-                  "year": {
-                    "type": "integer",
-                    "minimum": 1900,
-                    "maximum": 2200
-                  },
-                  "value": {
-                    "type": "number"
-                  },
-                  "unit": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "meaning": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            },
             "surrender_phase_in": {
               "type": "array",
               "items": {
