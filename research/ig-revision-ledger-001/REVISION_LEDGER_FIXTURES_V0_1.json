@@ -6,7 +6,7 @@
   "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
   "communication_graph_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
   "delegation_graph_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-  "fixture_count": 16,
+  "fixture_count": 17,
   "fixtures": [
     {
       "fixture_id": "REV-001",
@@ -72,7 +72,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -167,7 +171,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -244,7 +252,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -319,7 +331,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -390,7 +406,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -463,7 +483,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "NotRun",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -536,7 +560,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -613,7 +641,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -692,7 +724,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -764,8 +800,57 @@
           "matched_pair_id": "PAIR-10",
           "treatment_run_id": "RUN-TREAT-10",
           "control_run_id": "RUN-CONTROL-10",
-          "analysis_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
-          "effect_estimate_sha256": "0000000000000000000000000000000000000000000000000000000000000016"
+          "analysis_plan_sha256": "000000000000000000000000000000000000000000000000000000000000012c",
+          "effect_estimate_sha256": "000000000000000000000000000000000000000000000000000000000000012d",
+          "matched_inputs": {
+            "task_instance": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000064",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000064"
+            },
+            "model_profile": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000065",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000065"
+            },
+            "system_prompt": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000066",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000066"
+            },
+            "elicitation_prompt": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000067",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000067"
+            },
+            "evidence_packet": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000068",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000068"
+            },
+            "communication_graph": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000069",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000069"
+            },
+            "budget_profile": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006a",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006a"
+            },
+            "decoding_profile": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006b",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006b"
+            },
+            "rng_stream": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006c",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006c"
+            },
+            "evaluator_profile": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006d",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006d"
+            }
+          },
+          "varied_factor": {
+            "id": "persuasion_exposure",
+            "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000191",
+            "control_sha256": "0000000000000000000000000000000000000000000000000000000000000192"
+          },
+          "pair_validator_id": "independent-pair-validator/v1",
+          "pair_validation_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000193"
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -840,7 +925,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -905,7 +994,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "NotRun",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -976,7 +1069,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -1049,7 +1146,11 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -1122,8 +1223,57 @@
           "matched_pair_id": "PAIR-15",
           "treatment_run_id": "RUN-15",
           "control_run_id": "RUN-15",
-          "analysis_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000024",
-          "effect_estimate_sha256": "0000000000000000000000000000000000000000000000000000000000000025"
+          "analysis_plan_sha256": "000000000000000000000000000000000000000000000000000000000000012c",
+          "effect_estimate_sha256": "000000000000000000000000000000000000000000000000000000000000012d",
+          "matched_inputs": {
+            "task_instance": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000064",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000064"
+            },
+            "model_profile": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000065",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000065"
+            },
+            "system_prompt": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000066",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000066"
+            },
+            "elicitation_prompt": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000067",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000067"
+            },
+            "evidence_packet": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000068",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000068"
+            },
+            "communication_graph": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000069",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000069"
+            },
+            "budget_profile": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006a",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006a"
+            },
+            "decoding_profile": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006b",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006b"
+            },
+            "rng_stream": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006c",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006c"
+            },
+            "evaluator_profile": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006d",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006d"
+            }
+          },
+          "varied_factor": {
+            "id": "persuasion_exposure",
+            "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000191",
+            "control_sha256": "0000000000000000000000000000000000000000000000000000000000000192"
+          },
+          "pair_validator_id": "independent-pair-validator/v1",
+          "pair_validation_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000193"
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
@@ -1216,12 +1366,138 @@
           "treatment_run_id": null,
           "control_run_id": null,
           "analysis_plan_sha256": null,
-          "effect_estimate_sha256": null
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
         },
         "event_status": "Pass",
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
       },
       "expected_violations": []
+    },
+    {
+      "fixture_id": "REV-017",
+      "description": "Negative control: matched pair changes a supposedly common communication-graph input across treatment and control.",
+      "record": {
+        "revision_event_id": "REV-017",
+        "run_id": "RUN-REV-017",
+        "scenario_id": "SCENARIO-REV-017",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "00000000000000000000000000000000000000000000000000000000000001a1",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "00000000000000000000000000000000000000000000000000000000000001a2",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "MatchedPairEstimate",
+          "matched_pair_id": "PAIR-17",
+          "treatment_run_id": "RUN-TREAT-17",
+          "control_run_id": "RUN-CONTROL-17",
+          "analysis_plan_sha256": "000000000000000000000000000000000000000000000000000000000000012c",
+          "effect_estimate_sha256": "000000000000000000000000000000000000000000000000000000000000012d",
+          "matched_inputs": {
+            "task_instance": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000064",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000064"
+            },
+            "model_profile": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000065",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000065"
+            },
+            "system_prompt": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000066",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000066"
+            },
+            "elicitation_prompt": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000067",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000067"
+            },
+            "evidence_packet": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000068",
+              "control_sha256": "0000000000000000000000000000000000000000000000000000000000000068"
+            },
+            "communication_graph": {
+              "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000069",
+              "control_sha256": "00000000000000000000000000000000000000000000000000000000000003e7"
+            },
+            "budget_profile": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006a",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006a"
+            },
+            "decoding_profile": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006b",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006b"
+            },
+            "rng_stream": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006c",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006c"
+            },
+            "evaluator_profile": {
+              "treatment_sha256": "000000000000000000000000000000000000000000000000000000000000006d",
+              "control_sha256": "000000000000000000000000000000000000000000000000000000000000006d"
+            }
+          },
+          "varied_factor": {
+            "id": "persuasion_exposure",
+            "treatment_sha256": "0000000000000000000000000000000000000000000000000000000000000191",
+            "control_sha256": "0000000000000000000000000000000000000000000000000000000000000192"
+          },
+          "pair_validator_id": "independent-pair-validator/v1",
+          "pair_validation_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000193"
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Fixture-only negative control; no model behavior or causal effect is established."
+      },
+      "expected_violations": [
+        "causal_pair_shared_input_mismatch"
+      ]
     }
   ],
   "claim_ceiling": "The fixtures test observable transition, evidence, self-report and causal-layer separation. They do not inspect hidden model states, establish human psychology, or prove causal effects outside matched experiments."
