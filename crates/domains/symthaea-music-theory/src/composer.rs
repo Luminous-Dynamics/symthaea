@@ -26,14 +26,6 @@ const GENERAL_HARMONY_PART_V1: PartId = PartId(2);
 const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
 const GENERAL_GRIEF_SUSPENSION_PART_V1: PartId = PartId(4);
 
-/// Source-authored persistent parts for the general composer. IDs are scoped
-/// to one Score; local VoiceRole may change without changing these identities.
-const GENERAL_MELODY_PART_V1: PartId = PartId(0);
-const GENERAL_BASS_PART_V1: PartId = PartId(1);
-const GENERAL_HARMONY_PART_V1: PartId = PartId(2);
-const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
-const GENERAL_GRIEF_SUSPENSION_PART_V1: PartId = PartId(4);
-
 /// A muse-independent expressive intent. muse maps its cognitive state onto
 /// this; the composer maps this onto structure.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
