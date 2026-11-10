@@ -170,7 +170,7 @@ impl AdmittedLinearLieAlgebraV1 {
         self.generator_ids.len()
     }
 
-    pub fn is_abelian(&self) -> bool {
+    pub fn is_numerically_abelian(&self) -> bool {
         self.structure_constants
             .iter()
             .all(|bracket| {
@@ -667,7 +667,7 @@ mod tests {
         assert_eq!(qualified.diagnostics.estimated_basis_rank, 1);
         assert_eq!(qualified.structure_constants.len(), 0);
         assert_eq!(qualified.jacobi_diagnostics.len(), 0);
-        assert!(qualified.is_abelian());
+        assert!(qualified.is_numerically_abelian());
     }
 
     #[test]
@@ -767,6 +767,56 @@ mod tests {
             .coefficients_in_normalized_basis
             .iter()
             .all(|value| value.abs() < 1e-12));
+    }
+
+    #[test]
+    fn generator_normalization_handles_extreme_input_scales() {
+        for scale in [1.0e-300, 1.0e300] {
+            let scaled = action(
+                "scaled-so2",
+                vec!["x", "y"],
+                vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+                vec![(
+                    "J-scaled",
+                    vec![vec![0.0, -scale], vec![scale, 0.0]],
+                )],
+            )
+            .try_qualify_lie_algebra(LinearLieAlgebraProfileV1::default())
+            .unwrap();
+            assert!(
+                (scaled.generator_normalizations[0]
+                    .input_generator_maximum_absolute_entry
+                    - scale)
+                    .abs()
+                    / scale
+                    < 1e-12
+            );
+            assert!(scaled.is_numerically_abelian());
+        }
+    }
+
+    #[test]
+    fn rejects_ill_conditioned_but_numerically_full_rank_generator_basis() {
+        let mut generators = so3_generators();
+        let mut near_copy = generators[0].1.clone();
+        for (row, near_row) in near_copy.iter_mut().enumerate() {
+            for (column, value) in near_row.iter_mut().enumerate() {
+                *value += 1.0e-4 * generators[1].1[row][column];
+            }
+        }
+        generators[2] = ("near-copy-1e-4", near_copy);
+        let admitted = action(
+            "ill-conditioned-so3",
+            vec!["x", "y", "z"],
+            vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0], vec![0.0, 0.0, 1.0]],
+            generators,
+        );
+        let mut profile = LinearLieAlgebraProfileV1::default();
+        profile.maximum_basis_condition_number = 1.0e3;
+        assert!(matches!(
+            admitted.try_qualify_lie_algebra(profile),
+            Err(LinearLieAlgebraQualificationErrorV1::BasisIllConditioned { .. })
+        ));
     }
 
     #[test]
