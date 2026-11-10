@@ -76,6 +76,7 @@ struct Evaluation {
     group_level: String,
     generalization_claim: String,
     split_manifest_digest: String,
+    split_frozen_at_ms: u64,
 }
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -114,6 +115,8 @@ struct Preprocessing {
     fit_scope: String,
     uses_validation_or_test_labels: bool,
     transform_digest: String,
+    predeclared_at_ms: Option<u64>,
+    predeclaration_digest: Option<String>,
 }
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -150,6 +153,7 @@ struct Uncertainty {
     nominal_levels: Vec<f64>,
     calibration_partition: String,
     domain_stratified: bool,
+    calibration_source_digest: Option<String>,
 }
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -319,8 +323,11 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
         errors.push("operational target or label-uncertainty definition is incomplete".to_owned());
     }
     let e=&m.evaluation;
-    if !is_digest(&e.split_manifest_digest)||expected_claim(&e.mode)!=Some(e.generalization_claim.as_str())
-        ||expected_group(&e.mode)!=Some(e.group_level.as_str()) {
+    if !is_digest(&e.split_manifest_digest)
+        || e.split_frozen_at_ms == 0
+        || expected_claim(&e.mode) != Some(e.generalization_claim.as_str())
+        || expected_group(&e.mode) != Some(e.group_level.as_str())
+    {
         errors.push("evaluation mode, physical grouping level, claim or split digest is inconsistent".to_owned());
     }
     validate_split("train",&m.splits.train,&mut errors);
@@ -371,14 +378,38 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
             errors.push(format!("preprocessing transform {} uses validation/test labels",x.transform_id));
         }
         match x.fit_scope.as_str() {
-            "none"|"train_only" => {}
-            "unlabeled_target" => {
-                if m.target_adaptation.mode!="unlabeled_target"||m.target_adaptation.unlabeled_target_budget==0
-                    ||m.target_adaptation.labeled_target_budget!=0 {
-                    errors.push(format!("transform {} uses target adaptation without an explicit label-free budget",x.transform_id));
+            "none" | "train_only" => {
+                if x.predeclared_at_ms.is_some() || x.predeclaration_digest.is_some() {
+                    errors.push(format!(
+                        "transform {} unexpectedly carries a fixed-predeclaration receipt",
+                        x.transform_id
+                    ));
                 }
             }
-            _ => errors.push(format!("transform {} has a prohibited fit scope",x.transform_id)),
+            "fixed_predeclared" => {
+                if x.predeclared_at_ms.is_none_or(|at| at >= m.evaluation.split_frozen_at_ms)
+                    || x.predeclaration_digest.as_deref().is_none_or(|digest| !is_digest(digest))
+                {
+                    errors.push(format!(
+                        "fixed transform {} was not evidenced before the split freeze",
+                        x.transform_id
+                    ));
+                }
+            }
+            "unlabeled_target" => {
+                if m.target_adaptation.mode != "unlabeled_target"
+                    || m.target_adaptation.unlabeled_target_budget == 0
+                    || m.target_adaptation.labeled_target_budget != 0
+                    || x.predeclared_at_ms.is_some()
+                    || x.predeclaration_digest.is_some()
+                {
+                    errors.push(format!(
+                        "transform {} uses target adaptation without an explicit label-free budget",
+                        x.transform_id
+                    ));
+                }
+            }
+            _ => errors.push(format!("transform {} has a prohibited fit scope", x.transform_id)),
         }
     }
     let a=&m.target_adaptation;
@@ -391,19 +422,23 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
         errors.push("target adaptation must be explicitly label-free and budgeted".to_owned());
     }
 
-    let mut metric_names=BTreeSet::new();
+    let mut metric_keys = BTreeSet::new();
+    let mut seen_metrics = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut required_coverage_levels = BTreeSet::new();
+    let mut test_group_cache = BTreeMap::<String, BTreeSet<String>>::new();
     for metric in &m.metrics {
-        if !matches!(metric.name.as_str(),"mae"|"rmse"|"r2"|"interval_coverage_90"|"interval_coverage_95"|"mean_interval_score"|"p95_absolute_error")
-            ||!metric_names.insert(metric.name.clone())||!nonempty(&metric.formula)||!nonempty(&metric.unit)
-            ||!metric.value.is_finite()||metric.sample_count==0||!is_digest(&metric.result_digest) {
+        if !matches!(
+            metric.name.as_str(),
+            "mae" | "rmse" | "r2" | "interval_coverage_90" | "interval_coverage_95"
+                | "mean_interval_score" | "p95_absolute_error"
+        ) || !metric_keys.insert((metric.name.clone(), metric.aggregation.clone()))
+            || !nonempty(&metric.formula)
+            || !nonempty(&metric.unit)
+            || !metric.value.is_finite()
+            || metric.sample_count == 0
+            || !is_digest(&metric.result_digest)
+        {
             errors.push("metric definition, value or result evidence is invalid".to_owned());
-        }
-        let mut strata=BTreeSet::new();
-        for row in &metric.strata {
-            if !is_digest(&row.identity_digest)||!strata.insert(row.identity_digest.clone())
-                ||!row.value.is_finite()||row.sample_count==0 {
-                errors.push(format!("metric {} has invalid or duplicate strata",metric.name));
-            }
         }
         let required_group = match metric.aggregation.as_str() {
             "macro_cell" | "p95_cell" => Some("cell"),
@@ -411,41 +446,178 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
             "macro_vehicle" => Some("vehicle"),
             "macro_domain" | "worst_domain" => Some("domain"),
             "micro_sample" => None,
-            _ => None,
+            _ => {
+                errors.push(format!(
+                    "metric {} has an unknown aggregation rule",
+                    metric.name
+                ));
+                None
+            }
         };
-        if required_group.is_some_and(|group| group != m.evaluation.group_level) {
+        if let Some(group) = required_group {
+            let expected = test_group_cache.entry(group.to_owned()).or_insert_with(|| {
+                m.splits
+                    .test
+                    .entities
+                    .iter()
+                    .filter_map(|entity| entity_group(entity, group))
+                    .map(str::to_owned)
+                    .collect()
+            });
+            if expected.is_empty() {
+                errors.push(format!("test split has no {group} identities for metric {}", metric.name));
+            }
+            let mut strata = BTreeSet::new();
+            let mut count_sum = 0usize;
+            let mut values = Vec::new();
+            for row in &metric.strata {
+                if !is_digest(&row.identity_digest)
+                    || !strata.insert(row.identity_digest.clone())
+                    || !row.value.is_finite()
+                    || row.sample_count == 0
+                {
+                    errors.push(format!("metric {} has invalid or duplicate strata", metric.name));
+                }
+                if !expected.contains(&row.identity_digest) {
+                    errors.push(format!(
+                        "metric {} includes a stratum identity absent from the test split",
+                        metric.name
+                    ));
+                }
+                count_sum = count_sum.saturating_add(row.sample_count);
+                values.push(row.value);
+            }
+            if &strata != expected {
+                errors.push(format!(
+                    "metric {} strata do not exactly cover test {} identities",
+                    metric.name, group
+                ));
+            }
+            if count_sum != metric.sample_count {
+                errors.push(format!(
+                    "metric {} stratum sample counts do not sum to its reported sample count",
+                    metric.name
+                ));
+            }
+            if matches!(
+                metric.aggregation.as_str(),
+                "macro_cell" | "macro_pack" | "macro_vehicle" | "macro_domain"
+            ) {
+                let mean = values.iter().sum::<f64>() / values.len().max(1) as f64;
+                if !mean.is_finite() || (metric.value - mean).abs() > 1e-9 {
+                    errors.push(format!(
+                        "metric {} macro value does not equal the mean of its test strata",
+                        metric.name
+                    ));
+                }
+            }
+            if metric.aggregation == "p95_cell" {
+                let mut sorted = values.clone();
+                sorted.sort_by(f64::total_cmp);
+                let rank = ((0.95 * sorted.len() as f64).ceil() as usize)
+                    .max(1)
+                    .min(sorted.len());
+                if sorted.is_empty() || (metric.value - sorted[rank - 1]).abs() > 1e-9 {
+                    errors.push(format!(
+                        "metric {} p95 value does not equal the nearest-rank 95th percentile",
+                        metric.name
+                    ));
+                }
+            }
+            if metric.aggregation == "worst_domain" {
+                if group != "domain" || values.len() < 2 {
+                    errors.push(format!(
+                        "worst-domain metric {} needs at least two test-domain strata",
+                        metric.name
+                    ));
+                }
+                let worst = if matches!(
+                    metric.name.as_str(),
+                    "r2" | "interval_coverage_90" | "interval_coverage_95"
+                ) {
+                    values.iter().copied().fold(f64::INFINITY, f64::min)
+                } else {
+                    values.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+                };
+                if !worst.is_finite() || (metric.value - worst).abs() > 1e-9 {
+                    errors.push(format!(
+                        "metric {} worst-domain value does not match its domain strata",
+                        metric.name
+                    ));
+                }
+                if !m.uncertainty.domain_stratified {
+                    errors.push(format!(
+                        "worst-domain metric {} requires domain-stratified uncertainty reporting",
+                        metric.name
+                    ));
+                }
+            }
+        } else if !metric.strata.is_empty() {
             errors.push(format!(
-                "metric {} aggregation does not match the declared physical grouping level",
+                "micro-sample metric {} must not declare physical-group strata",
                 metric.name
             ));
         }
-        if matches!(metric.aggregation.as_str(), "macro_domain" | "worst_domain")
-            && metric.strata.len() < 2
-        {
-            errors.push(format!(
-                "domain metric {} requires at least two domain strata",
-                metric.name
-            ));
+        if metric.name == "interval_coverage_90" {
+            required_coverage_levels.insert(0.90f64.to_bits());
         }
-        if metric.aggregation == "worst_domain" && !m.uncertainty.domain_stratified {
-            errors.push(format!(
-                "worst-domain metric {} requires domain-stratified uncertainty reporting",
-                metric.name
-            ));
+        if metric.name == "interval_coverage_95" {
+            required_coverage_levels.insert(0.95f64.to_bits());
         }
+        seen_metrics
+            .entry(metric.name.clone())
+            .or_default()
+            .insert(metric.aggregation.clone());
+    }
+    if metric_keys.is_empty() {
+        errors.push("benchmark metric set must not be empty".to_owned());
     }
     let u=&m.uncertainty;
     match u.status.as_str() {
         "reported" => {
-            if u.method.as_deref().is_none_or(|s|!nonempty(s))||u.nominal_levels.is_empty()||u.calibration_partition=="none" {
-                errors.push("reported uncertainty requires method, nominal levels and calibration partition".to_owned());
+            if u.method.as_deref().is_none_or(|s| !nonempty(s))
+                || u.nominal_levels.is_empty()
+                || !matches!(u.calibration_partition.as_str(), "validation_only" | "external_calibration")
+            {
+                errors.push("reported uncertainty requires method, nominal levels and held-out calibration provenance".to_owned());
+            }
+            if u.calibration_partition == "external_calibration"
+                && u.calibration_source_digest.as_deref().is_none_or(|digest| !is_digest(digest))
+            {
+                errors.push("external uncertainty calibration requires a source digest".to_owned());
+            }
+            if u.calibration_partition == "validation_only" && u.calibration_source_digest.is_some() {
+                errors.push("validation-only calibration must not claim an external calibration source".to_owned());
+            }
+            for level in &u.nominal_levels {
+                let metric_name = if (*level - 0.90).abs() < 1e-9 {
+                    "interval_coverage_90"
+                } else if (*level - 0.95).abs() < 1e-9 {
+                    "interval_coverage_95"
+                } else {
+                    ""
+                };
+                if metric_name.is_empty()
+                    || !seen_metrics.get(metric_name).is_some_and(|aggregations| {
+                        aggregations.contains("worst_domain")
+                    })
+                {
+                    errors.push(format!(
+                        "reported uncertainty level {level} lacks a matching worst-domain coverage metric"
+                    ));
+                }
             }
             if u.nominal_levels.iter().any(|x|!x.is_finite()||*x<=0.0||*x>=1.0) {
                 errors.push("uncertainty nominal levels are invalid".to_owned());
             }
         }
         "not_reported" => {
-            if u.method.is_some()||!u.nominal_levels.is_empty()||u.calibration_partition!="none"||u.domain_stratified {
+            if u.method.is_some()
+                || !u.nominal_levels.is_empty()
+                || u.calibration_partition != "none"
+                || u.domain_stratified
+                || u.calibration_source_digest.is_some()
+            {
                 errors.push("not_reported uncertainty must not claim calibration evidence".to_owned());
             }
         }
@@ -454,6 +626,7 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
                 || !u.nominal_levels.is_empty()
                 || u.calibration_partition != "none"
                 || u.domain_stratified
+                || u.calibration_source_digest.is_some()
             {
                 errors.push(
                     "not_applicable uncertainty must not claim method or calibration evidence"
@@ -592,6 +765,47 @@ mod tests {
     fn frozen_corpus_accepts_three_and_rejects_three_controls(){
         let report=report();assert_eq!(report.payload.case_count,6);assert_eq!(report.payload.accepted_count,3);assert_eq!(report.payload.rejected_count,3);
     }
+    #[test]
+    fn metric_strata_are_bound_to_test_physical_groups_and_aggregate_values() {
+        let r = report();
+        let clean = r.payload.cases.iter()
+            .find(|c| c.case_id == "clean-unseen-cell")
+            .expect("clean benchmark");
+        assert!(clean.accepted);
+        for case_id in [
+            "metric-stratum-identity-outside-test-rejected",
+            "metric-stratum-count-mismatch-rejected",
+            "metric-aggregate-value-mismatch-rejected",
+        ] {
+            let case = r.payload.cases.iter().find(|c| c.case_id == case_id).unwrap();
+            assert!(!case.accepted);
+        }
+    }
+
+    #[test]
+    fn fixed_transforms_require_predeclaration_before_split_freeze() {
+        let r = report();
+        assert!(r.payload.cases.iter()
+            .find(|c| c.case_id == "fixed-predeclared-transform-before-split")
+            .unwrap().accepted);
+        assert!(!r.payload.cases.iter()
+            .find(|c| c.case_id == "fixed-predeclared-transform-after-split-rejected")
+            .unwrap().accepted);
+    }
+
+    #[test]
+    fn reported_uncertainty_requires_heldout_coverage_by_domain() {
+        let r = report();
+        let case = r.payload.cases.iter()
+            .find(|c| c.case_id == "reported-uncertainty-without-coverage-metrics-rejected")
+            .unwrap();
+        assert!(!case.accepted);
+        let train_calibration = r.payload.cases.iter()
+            .find(|c| c.case_id == "train-only-uncertainty-calibration-rejected")
+            .unwrap();
+        assert!(!train_calibration.accepted);
+    }
+
     #[test]
     fn unseen_cell_task_rejects_shared_physical_cell_identity(){
         let r=report();let c=r.payload.cases.iter().find(|c|c.case_id=="shared-cell-leak-in-unseen-cell-task").unwrap();assert!(!c.accepted);
