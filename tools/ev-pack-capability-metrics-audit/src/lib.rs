@@ -420,9 +420,14 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
     let capacity_times: Vec<u64> = profile.units.iter()
         .map(|unit| unit.capacity.measurement_time_ms)
         .collect();
-    if let (Some(minimum), Some(maximum)) = (capacity_times.iter().min(), capacity_times.iter().max()) {
+    if let (Some(minimum), Some(maximum)) =
+        (capacity_times.iter().min(), capacity_times.iter().max())
+    {
         if maximum - minimum > capacity.maximum_measurement_skew_ms {
-            errors.push("per-cell SOH capacity measurements exceed the declared common-time window".to_owned());
+            errors.push(
+                "per-cell SOH capacity measurements exceed the declared common-time window"
+                    .to_owned(),
+            );
         }
     }
     let resistance = &profile.reference_conditions.resistance;
