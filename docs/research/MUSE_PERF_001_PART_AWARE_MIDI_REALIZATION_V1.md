@@ -2,8 +2,8 @@
 
 **Status:** Research/implementation draft  
 **Date:** 2026-11-10  
-**Implementation:** \`crates/domains/symthaea-muse/src/midi_performance.rs\`  
-**Feature gate:** \`theory\`  
+**Implementation:** `crates/domains/symthaea-muse/src/midi_performance.rs`  
+**Feature gate:** `theory`  
 **Scope:** Symbolic Score → validated orchestration → MIDI 1.0 + provenance sidecar
 
 ## 1. Objective
@@ -21,15 +21,15 @@ This is an engineering integrity increment. It does not prove that an external s
 
 The intended pipeline is:
 
-\`Generator-authored Score\`  
+`Generator-authored Score`  
 → canonical Score SHA-256  
-→ \`OrchestrationTimelineV1\` validation  
+→ `OrchestrationTimelineV1` validation  
 → explicit instrument-instance / renderer / patch bindings  
 → exact beat-to-tick conversion  
 → multi-track MIDI 1.0  
 → content-addressed realization manifest
 
-The exporter computes the canonical Score digest using the existing score-demand serialization recipe: SHA-256 of the exact \`serde_json::to_vec(Score)\` bytes. It checks the caller's expected digest and validates the timeline against that exact Score.
+The exporter computes the canonical Score digest using the existing score-demand serialization recipe: SHA-256 of the exact `serde_json::to_vec(Score)` bytes. It checks the caller's expected digest and validates the timeline against that exact Score.
 
 ### Hard invariants
 
@@ -43,7 +43,7 @@ The exporter computes the canonical Score digest using the existing score-demand
 - Zero-velocity note events are rejected rather than turned into MIDI NoteOn events with velocity zero (which MIDI receivers interpret as NoteOff).
 - Every source note receives one note receipt containing its original score-array ordinal, PartId, segment, instrument instance, track, pitch, velocity and exact start/end ticks.
 - Source note ordinals are scoped to the Score digest. They are not persistent EventIds; event correspondence after edits must use the explicit event-remap contract.
-- The manifest includes score, timeline, binding, MIDI and manifest digests. Frozen inputs must produce byte-identical MIDI and manifest output.
+- The manifest includes score, timeline, binding, structural capability-inventory, MIDI and manifest digests. The supplied structural capability set is hashed in canonical instrument-ID order; this binds the exact limits used by the timeline validator but does not establish the evidence authority of those limits. Frozen inputs must produce byte-identical MIDI and manifest output.
 
 ### Explicit V1 limits
 
