@@ -233,14 +233,13 @@ pub fn analyze_score_demand(
 }
 
 fn score_input_sha256(score: &Score) -> Result<String, ScoreDemandError> {
-    // serde_json serializes this struct in declaration order; the domain tag
-    // prevents the same bytes from being confused with another artifact type.
+    // Use the canonical Muse score-artifact identity: SHA-256 over the exact
+    // serde_json bytes, matching muse_studio::serialized_sha256(&score) and
+    // GenealogyManifest::score_sha256. Keep the schema/domain identifier
+    // alongside the digest so consumers cannot silently mix hash contracts.
     let bytes = serde_json::to_vec(score)
         .map_err(|error| ScoreDemandError::ScoreSerialization(error.to_string()))?;
-    let mut hasher = Sha256::new();
-    hasher.update(b"symthaea:muse-score-demand-input:v1\n");
-    hasher.update(bytes);
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(format!("{:x}", Sha256::digest(&bytes)))
 }
 
 fn role_rank(role: VoiceRole) -> u8 {
@@ -540,6 +539,15 @@ mod tests {
             analyze_score_demand(&invalid),
             Err(ScoreDemandError::NonFiniteSectionIntensity { note_index: 0 })
         );
+    }
+
+    #[test]
+    fn score_digest_matches_the_canonical_muse_serialized_score_hash() {
+        let score = score();
+        let profile = analyze_score_demand(&score).unwrap();
+        let canonical_bytes = serde_json::to_vec(&score).unwrap();
+        let canonical_hash = format!("{:x}", Sha256::digest(&canonical_bytes));
+        assert_eq!(profile.score_sha256, canonical_hash);
     }
 
     #[test]
