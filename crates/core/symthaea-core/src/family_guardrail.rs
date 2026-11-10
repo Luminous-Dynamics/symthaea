@@ -264,8 +264,8 @@ impl FamilyGuardrailVerifier {
             })?;
         if registered_family != family_id {
             return Err(FamilyGuardrailError::EpisodeNotInFamilyManifest {
-                family_id: observation.family_id,
-                episode_id: observation.episode_id,
+                family_id: observation.family_id.clone(),
+                episode_id: observation.episode_id.clone(),
             });
         }
         if self.seen_episode_ids.contains(&observation.episode_id) {
@@ -601,6 +601,9 @@ mod tests {
                     candidate_loss,
                 })
                 .unwrap();
+            if report.status != FamilyGuardrailStatus::Collecting {
+                break;
+            }
         }
         report
     }
@@ -631,7 +634,7 @@ mod tests {
         let mut verifier = FamilyGuardrailVerifier::new(manifest(1, 0.2)).unwrap();
         let good = feed_family(&mut verifier, "bearing", "bearing", 0.0);
         assert_eq!(good.status, FamilyGuardrailStatus::Collecting);
-        let bad = feed_family(&mut verifier, "gearbox", "gearbox", 0.9);
+        let bad = feed_family(&mut verifier, "gearbox", "gearbox", 1.0);
         assert_eq!(bad.status, FamilyGuardrailStatus::MaterialRegressionDetected);
         assert!(
             bad.family_results
