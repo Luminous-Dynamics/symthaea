@@ -750,6 +750,14 @@ mod tests {
         }
     }
 
+    fn decision_config() -> DecisionDiagnosticConfig {
+        DecisionDiagnosticConfig {
+            observation_cost_weight: 1.0,
+            safety_risk_weight: 1.0,
+            maximum_safety_risk: 1.0,
+        }
+    }
+
     fn descriptor(
         id: &str,
         kind: CausalDiagnosticActionKind,
