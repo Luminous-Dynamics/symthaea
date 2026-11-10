@@ -99,7 +99,8 @@
     "method_id": "NOT_DETERMINED",
     "limitations": [
       "A research estimate or avoided-fuel counterfactual must not be used as this field."
-    ]
+    ],
+    "energy_source_id": "WIND-SOURCE"
   },
   "research_wind_contribution": {
     "energy_gj": {
@@ -159,5 +160,8 @@
   },
   "limitations": [
     "Synthetic fixture only; no vessel, WAPS installation, measured data, applicable standard or certificate exists."
+  ],
+  "evidence_source_ids": [
+    "SYNTHETIC-ONLY"
   ]
 }
