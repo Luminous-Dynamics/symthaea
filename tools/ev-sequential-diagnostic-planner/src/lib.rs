@@ -652,7 +652,7 @@ fn conditional_outcome_likelihood(
         if row
             .outcome_assignment
             .get(test_id)
-            .is_some_and(|value| value == outcome_id)
+            .is_some_and(|value| value.as_str() == outcome_id)
         {
             history_and_outcome_probability += row.probability;
         }
@@ -1305,6 +1305,19 @@ mod tests {
             assert!(!case.accepted);
             assert!(case.plan.is_none());
         }
+    }
+
+    #[test]
+    fn joint_assignment_table_cap_is_enforced_before_policy_expansion() {
+        let corpus: Value = serde_json::from_slice(CORPUS).expect("corpus JSON");
+        let scenario_value = corpus["cases"].as_array().unwrap().iter()
+            .find(|value| value["case_id"] == "perfectly-correlated-repeat-test-do-not-double-count")
+            .expect("correlated fixture")["scenario"].clone();
+        let mut scenario: Scenario = serde_json::from_value(scenario_value).expect("scenario");
+        let row = scenario.joint_likelihoods[0].clone();
+        scenario.joint_likelihoods = vec![row; MAX_JOINT_ASSIGNMENT_ROWS + 1];
+        let errors = validate_scenario(&scenario);
+        assert!(errors.iter().any(|error| error.contains("exceeds deterministic row cap")));
     }
 
     #[test]
