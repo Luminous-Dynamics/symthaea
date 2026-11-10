@@ -134,3 +134,12 @@ scenario_id scenario_family task_id trial_id seed split evidence_class arm progr
 The fields are tab-separated, in the exact order above. Numeric measurements may use `NA` only when unmeasured; the audit leaves them missing rather than treating them as zero. Every scenario/seed/split/evidence group must contain exactly one row for all five arms. Progress and completion must agree; acquisitions cannot exceed requests; probabilities and measurements are validated for finite ranges. Any declared safety violation produces a failed qualification result but remains in the printed ledger.
 
 The audit prints per-arm valid-run/completion/progress/calibration/resource metrics and paired candidate-minus-fixed-rate comparisons. Progress uncertainty is bootstrapped by scenario family, not individual rows. Fewer than five families or fewer than 100 replicates suppresses the interval; this is a screening limitation, not evidence of equivalence. The included 30-row example is synthetic arithmetic smoke data only. It demonstrates parsing, pairing, missing-cost handling and report formatting; it is not a RoboDojo score.
+
+
+## Episode-level safety outcome ledger
+
+The `episode_safety` module records the host benchmark's native task-success verdict separately from every evaluator-applicable safety specification. Its frozen manifest pins the task/spec roster, policy, evaluator, environment, robot configuration, instrument registry, seed and independent-unit identity. Per-spec outcomes require evaluator signal evidence; per-episode outcomes require a trajectory artifact and evaluator receipt.
+
+It reports native SR, episode-level safety compliance, successful-but-unsafe (SBU) rate, SBU conditional on success, and Luminous mean/max worst-violation depth as separate quantities. N/A is excluded from safety compliance, not turned into a fake-safe pass. A known violation remains unsafe even if another spec is missing; unknown/missing evidence remains unresolved. SBU is not inferred from task failure, and no weighted composite is produced.
+
+The normalized worst-violation depth is a Luminous scorecard metric; it is **not** advertised as the official SafeVLA-Bench VSI until that benchmark's exact source/normalization/aggregation is pinned. The module does not execute policies, inspect raw sensor files or authenticate digests. See [the episode safety outcome design note](../../docs/research/EPISODE_SAFETY_OUTCOME_CONTRACT_V0_1.md).
