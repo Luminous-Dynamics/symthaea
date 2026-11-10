@@ -1212,21 +1212,5 @@ mod tests {
 }
 
 
-// ─── Part-aware, timeline-bound MIDI realization ────────────────────────────
-//
-// This path deliberately does not replace the legacy role-based exporters.
-// It is the score-native realization boundary for callers that already have
-// a generator-authored PartId for every note and a validated time-indexed
-// orchestration timeline. It never reconstructs part identity from VoiceRole,
-// pitch register, velocity, or MIDI channel.
-//
-// The MIDI program mapping is caller supplied. This module does not infer a
-// patch from an instrument family and does not claim that a raw capability
-// profile is independently evidence-qualified. Qualification remains the
-// responsibility of the capability materializer and orchestration boundary.
-//
-// Note ordinals in the receipt are scoped to score_sha256. They are not
-// persistent EventIds and must not be reused after the source score changes.
-
 #[cfg(feature = "theory")]
 pub mod part_aware_v1;
