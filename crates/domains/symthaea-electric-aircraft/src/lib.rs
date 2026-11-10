@@ -348,7 +348,7 @@ where
         if !open_circuit_voltage_v.is_finite()
             || open_circuit_voltage_v <= 0.0
             || !internal_resistance_ohm.is_finite()
-            || internal_resistance_ohm <= 0.0
+            || internal_resistance_ohm < 0.0
         {
             return Err(ModelError::InvalidBatteryConfig(
                 "resolved battery OCV and internal resistance must be finite and positive",
