@@ -25,8 +25,9 @@ use crate::linear_group_action::AdmittedLinearGroupActionV1;
 pub struct LinearActionSampleV1 {
     /// Stable identity used to pair the same geometric sample across representations.
     pub sample_id: String,
-    /// Values for expression variables in first-seen order, followed by any
-    /// action coordinates absent from the expression.
+    /// Values for free expression variables in first-seen order, followed by
+    /// any action coordinates absent from the expression. Sum-bound variables
+    /// are supplied by lexical evaluation and are not part of this state vector.
     pub state: Vec<f64>,
     /// Full finite-difference direction basis; one vector per column.
     pub direction_basis: Vec<Vec<f64>>,
@@ -1158,10 +1159,15 @@ mod tests {
 
         assert_eq!(first.expression_blake3.len(), 64);
         assert_eq!(first.declared_action_blake3.len(), 64);
+        assert_eq!(first.action_admission_profile_blake3.len(), 64);
         assert_eq!(first.sample_batch_blake3.len(), 64);
         assert_eq!(first.sampling_profile_blake3.len(), 64);
         assert_eq!(first.expression_blake3, repeated.expression_blake3);
         assert_eq!(first.declared_action_blake3, repeated.declared_action_blake3);
+        assert_eq!(
+            first.action_admission_profile_blake3,
+            repeated.action_admission_profile_blake3
+        );
         assert_eq!(first.sample_batch_blake3, repeated.sample_batch_blake3);
         assert_eq!(first.sampling_profile_blake3, repeated.sampling_profile_blake3);
 
@@ -1340,6 +1346,12 @@ mod tests {
         assert!(report.direction_basis_diagnostics.iter().all(|diagnostic| {
             diagnostic.direction_basis_condition_number >= 1.0
         }));
+        let statistics = &report.generator_statistics[0];
+        assert!(statistics.median_normalized_squared_residual
+            <= statistics.p95_normalized_squared_residual);
+        assert!(statistics.p95_normalized_squared_residual
+            <= statistics.maximum_normalized_squared_residual);
+        assert!(statistics.standard_deviation_normalized_squared_residual.is_finite());
     }
 
     #[test]
@@ -1573,7 +1585,10 @@ mod tests {
                 &samples(&states, [[1.0, 0.0], [0.0, 1.0]]),
                 profile
             ),
-            Err(LinearActionSamplingErrorV1::InvalidProfile)
+            Err(LinearActionSamplingErrorV1::ExpressionVariableBudgetExceeded {
+                actual: 2,
+                maximum: 1
+            })
         ));
     }
 
