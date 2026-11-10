@@ -936,6 +936,12 @@ mod tests {
             mapped.characterization_evidence_ids,
             vec!["inverter-evidence", "motor-evidence", "propeller-evidence"]
         );
+        assert_eq!(
+            mapped.characterization_evidence_records[0].sha256,
+            "b".repeat(64)
+        );
+        assert_eq!(mapped.characterization_evidence_records[0].class, characterization::EvidenceClass::Simulation);
+        assert!(!mapped.evidence_content_digests_verified);
         assert!(mapped.mission_terminal_energy_wh > scalar.mission_terminal_energy_wh);
         // Independent numerical oracle for this synthetic map fixture.
         assert!((mapped.mission_terminal_energy_wh - 14_922.574_361_978_19).abs() < 1e-5);
@@ -979,6 +985,8 @@ mod tests {
             fully_mapped.battery_characterization_evidence_ids,
             vec!["pack-ocv-data", "pack-resistance-data"]
         );
+        assert_eq!(fully_mapped.battery_characterization_evidence_records[0].sha256, "c".repeat(64));
+        assert!(!fully_mapped.evidence_content_digests_verified);
         assert!(fully_mapped.segments[0].battery_open_circuit_voltage_used_v < 400.0);
         assert!(fully_mapped.segments[0].battery_internal_resistance_used_ohm > 0.04);
         assert!(fully_mapped.mission_chemical_energy_wh
@@ -1023,6 +1031,9 @@ mod tests {
         assert_eq!(report.model_version, "electric-fixed-wing-energy-v0.3.0");
         assert_eq!(report.characterization_evidence_ids.len(), 3);
         assert_eq!(report.battery_characterization_evidence_ids.len(), 2);
+        assert_eq!(report.characterization_evidence_records.len(), 3);
+        assert_eq!(report.battery_characterization_evidence_records.len(), 2);
+        assert!(report.evidence_content_digests_verified);
 
         let mut corrupt = payloads;
         corrupt.insert("motor-evidence".into(), b"changed bytes".to_vec());
