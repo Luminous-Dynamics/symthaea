@@ -2385,6 +2385,55 @@ mod tests {
     use super::*;
 
     #[test]
+    fn older_listen_note_payloads_deserialize_without_part_identity() {
+        let symbolic = serde_json::json!({
+            "id": "score-melody-0",
+            "midi": 60,
+            "pitch_name": "C4",
+            "onset": {"tick": 0, "beats": 0.0, "seconds": 0.0},
+            "duration_ticks": 480,
+            "duration_beats": 1.0,
+            "duration_seconds": 0.5,
+            "velocity": 0.7,
+            "voice_role": "Melody",
+            "emphasis": "normal",
+            "section_intensity": 1.0
+        });
+        let note: SymbolicNoteEvent = serde_json::from_value(symbolic).unwrap();
+        assert_eq!(note.part_id, None);
+
+        let voice = serde_json::json!({
+            "id": "melody",
+            "name": "Melody",
+            "instrument": "piano",
+            "note_count": 1
+        });
+        let summary: PerformanceVoiceSummary = serde_json::from_value(voice).unwrap();
+        assert_eq!(summary.part_id, None);
+        assert_eq!(summary.voice_role, None);
+
+        let performed = serde_json::json!({
+            "id": "performance-0-0",
+            "voice_id": "melody",
+            "source_note_id": "score-melody-0",
+            "start_seconds": 0.0,
+            "duration_seconds": 0.5,
+            "frequency_hz": 261.6,
+            "velocity": 0.7,
+            "onset_deviation_seconds": 0.0,
+            "duration_deviation_seconds": 0.0
+        });
+        let event: PerformedNoteEvent = serde_json::from_value(performed).unwrap();
+        assert_eq!(event.part_id, None);
+    }
+
+    #[test]
+    fn listen_bundle_versions_advance_for_part_identity_fields() {
+        assert_eq!(LISTEN_COMPOSITION_BUNDLE_VERSION, 3);
+        assert_eq!(LISTEN_PERFORMANCE_BUNDLE_VERSION, 2);
+    }
+
+    #[test]
     fn compose_request_round_trips() {
         let req = ComposeRequest {
             valence: 0.15,
