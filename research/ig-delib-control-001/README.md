@@ -14,7 +14,7 @@ The v0.1 reference controller is transparent and rule-based. It chooses among ev
 
 40 synthetic scenarios span eight families: factual evidence closure, false consensus, minority preservation, open-world uncertainty, normative pluralism, controller/orchestrator adversaries, budget/cost, and trajectory value.
 
-24 negative controls mutate a valid scenario and require exact violation codes for malformed truth profiles, budgets, round counts, evidence flags, unresolved counts, minority semantics, adversary flags, confidence signals, expected actions and baseline outcomes.
+30 negative controls mutate a valid scenario and require exact violation codes for malformed truth profiles, budgets, round counts, evidence flags, unresolved counts, minority semantics, adversary flags, confidence signals, expected actions and baseline outcomes.
 
 ## Reference policy
 
