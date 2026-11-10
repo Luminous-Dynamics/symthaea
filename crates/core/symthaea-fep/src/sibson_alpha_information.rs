@@ -543,6 +543,18 @@ mod tests {
     }
 
     #[test]
+    fn impossible_outcome_has_no_alpha_tilted_posterior() {
+        let hypotheses = two_hypotheses(
+            vec![vec![1.0, 0.0], vec![1.0, 0.0]],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+        );
+        assert!(matches!(
+            sibson_tilted_posterior(&hypotheses, 0.5, 0, 1),
+            Err(SibsonInformationError::ImpossibleOutcome)
+        ));
+    }
+
+    #[test]
     fn malformed_probability_mass_and_alpha_fail_closed() {
         let mut hypotheses = two_hypotheses(
             vec![vec![0.8, 0.2], vec![0.2, 0.8]],
