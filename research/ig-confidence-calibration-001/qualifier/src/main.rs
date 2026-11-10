@@ -545,6 +545,13 @@ mod tests {
         assert!(metrics.ece_equal_width.abs() < 1e-12);
         assert!((metrics.log_loss - 0.5004024235381879).abs() < 1e-12);
         assert_eq!(metrics.reliability_bins.len(), 2);
+        assert!((metrics.aurc - 0.29502585182722457).abs() < 1e-12);
+        assert_eq!(metrics.independent_group_count, 2);
+        assert_eq!(metrics.uncertainty_interval_status, "NotEstimated");
+        assert_eq!(
+            metrics.risk_at_coverage,
+            vec![(0.25, 0.2), (0.50, 0.2), (0.75, 0.4), (1.00, 0.5)]
+        );
     }
 
     #[test]
