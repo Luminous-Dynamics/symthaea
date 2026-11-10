@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-emissions-evidence:0.1.0",
+  "title": "Luminous Marine Gas-Resolved Emissions Evidence v0.1.0",
+  "description": "Per-engine methane/nitrous-oxide emissions measurement evidence aligned to IMO MEPC.414(84), .415(84) and .416(84). This is an evidence contract, not a compliance report.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "record_status",
+    "vessel_configuration_id",
+    "engine",
+    "measurement_method",
+    "method_revision",
+    "source_resolution_ids",
+    "measurement_window",
+    "expected_gases",
+    "gas_observations",
+    "unmeasured_gases",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "enum": [
+        "synthetic",
+        "test_bed",
+        "onboard_trial",
+        "operational_monitoring",
+        "reduced_from_raw"
+      ]
+    },
+    "vessel_configuration_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine_id",
+        "engine_revision",
+        "rated_power_kw",
+        "fuel_type",
+        "average_load_percent"
+      ],
+      "properties": {
+        "engine_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "engine_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rated_power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fuel_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "average_load_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "measurement_method": {
+      "enum": [
+        "test_bed_measurement",
+        "onboard_measurement",
+        "engine_load_monitoring",
+        "cems"
+      ]
+    },
+    "method_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_resolution_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "MEPC.414(84)",
+          "MEPC.415(84)",
+          "MEPC.416(84)"
+        ]
+      }
+    },
+    "measurement_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "timebase_id",
+        "sample_rate_hz",
+        "expected_sample_count",
+        "observed_sample_count",
+        "missing_sample_count",
+        "minimum_observed_fraction"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timebase_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expected_sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_observed_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "time_alignment_uncertainty_seconds": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "expected_gases": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "CH4",
+          "N2O"
+        ]
+      }
+    },
+    "gas_observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/gas_observation"
+      }
+    },
+    "unmeasured_gases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gas",
+          "reason"
+        ],
+        "properties": {
+          "gas": {
+            "enum": [
+              "CH4",
+              "N2O"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "gas_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "gas",
+        "mass_rate_kg_per_hour",
+        "uncertainty",
+        "evidence"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gas": {
+          "enum": [
+            "CH4",
+            "N2O"
+          ]
+        },
+        "mass_rate_kg_per_hour": {
+          "type": "number",
+          "minimum": 0
+        },
+        "uncertainty": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "standard_uncertainty_kg_per_hour",
+                "coverage_factor"
+              ],
+              "properties": {
+                "status": {
+                  "const": "quantified"
+                },
+                "standard_uncertainty_kg_per_hour": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "coverage_factor": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "reason"
+              ],
+              "properties": {
+                "status": {
+                  "const": "unknown"
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        },
+        "evidence": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "instrument_id",
+                "calibration_record_id",
+                "calibration_status",
+                "timebase_id",
+                "trace_sha256",
+                "rights_status"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "measured"
+                },
+                "instrument_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "calibration_record_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "calibration_status": {
+                  "enum": [
+                    "in_tolerance",
+                    "out_of_tolerance",
+                    "stale",
+                    "unknown"
+                  ]
+                },
+                "timebase_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "trace_sha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "rights_status": {
+                  "enum": [
+                    "public",
+                    "permissioned",
+                    "restricted",
+                    "unknown"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "engine_load_trace_sha256",
+                "calculation_method_id",
+                "model_id",
+                "input_source_id",
+                "rights_status"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "engine_load_calculated"
+                },
+                "engine_load_trace_sha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "calculation_method_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "model_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "input_source_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rights_status": {
+                  "enum": [
+                    "public",
+                    "permissioned",
+                    "restricted",
+                    "unknown"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
