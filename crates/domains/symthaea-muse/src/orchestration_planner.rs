@@ -20,9 +20,10 @@ use crate::instrument_capability_evidence::{
     QualifiedInstrumentCapabilityV1, valid_sha256_hex_v1,
 };
 use crate::score_demand::{
-    DemandIdentityBasis, SCORE_DEMAND_INPUT_DIGEST_SCHEMA, SCORE_DEMAND_PROFILE_SCHEMA,
-    ScoreDemandProfile, VoiceDemand,
+    analyze_score_demand, DemandIdentityBasis, SCORE_DEMAND_INPUT_DIGEST_SCHEMA,
+    SCORE_DEMAND_PROFILE_SCHEMA, ScoreDemandProfile, VoiceDemand,
 };
+use symthaea_music_theory::score::Score;
 
 pub const ORCHESTRATION_PLANNER_SCHEMA_V1: &str = "muse-orchestration-planner-v1";
 pub const ORCHESTRATION_CANDIDATE_DIGEST_SCHEMA_V1: &str =
@@ -66,6 +67,10 @@ pub struct OrchestrationPlannerRequestV1 {
     pub schema: String,
     /// Caller-supplied expected digest from the trusted source-score boundary.
     pub expected_score_sha256: String,
+    /// Exact source Score whose demand measurements are being planned.
+    /// The planner recomputes #9461 and requires exact profile equality; a
+    /// digest-only check cannot detect caller-forged measurements.
+    pub source_score: Score,
     pub score_demand: ScoreDemandProfile,
     /// One authored function/requirement record for every persistent PartId.
     pub part_requirements: Vec<PartRequirementV1>,
@@ -95,6 +100,8 @@ pub enum PlannerIssueCodeV1 {
     InvalidSchema,
     InvalidExpectedScoreDigest,
     ScoreDigestMismatch,
+    ScoreDemandDoesNotMatchSource,
+    SourceScoreDemandAnalysisFailed,
     InvalidScoreDemandSchema,
     InvalidScoreDemandDigestSchema,
     InvalidScoreDemandMetadata,
@@ -499,6 +506,32 @@ pub fn plan_orchestration_v1(
             "score-demand profile schema is not supported",
         );
     }
+    match analyze_score_demand(&request.source_score) {
+        Ok(recomputed) => {
+            if recomputed != request.score_demand {
+                report.push(
+                    PlannerIssueCodeV1::ScoreDemandDoesNotMatchSource,
+                    None,
+                    None,
+                    "score-demand values do not exactly match recomputation from the supplied source Score",
+                );
+            }
+            if recomputed.score_sha256 != request.expected_score_sha256 {
+                report.push(
+                    PlannerIssueCodeV1::ScoreDigestMismatch,
+                    None,
+                    None,
+                    "trusted expected digest does not match the exact source Score supplied to the planner",
+                );
+            }
+        }
+        Err(error) => report.push(
+            PlannerIssueCodeV1::SourceScoreDemandAnalysisFailed,
+            None,
+            None,
+            format!("source Score cannot produce a valid score-demand profile: {error:?}"),
+        ),
+    }
     if request.score_demand.input_digest_schema != SCORE_DEMAND_INPUT_DIGEST_SCHEMA {
         report.push(
             PlannerIssueCodeV1::InvalidScoreDemandDigestSchema,
@@ -819,10 +852,11 @@ pub fn plan_orchestration_v1(
 mod tests {
     use super::*;
     use crate::instrument_capability_evidence::CapabilityScopeV1;
-    use crate::score_demand::{
-        DemandIdentityBasis, VoiceDemand, SCORE_DEMAND_INPUT_DIGEST_SCHEMA,
-        SCORE_DEMAND_PROFILE_SCHEMA,
-    };
+    use crate::score_demand::analyze_score_demand;
+    use symthaea_music_theory::harmony::Key;
+    use symthaea_music_theory::pitch::{Pitch, PitchClass};
+    use symthaea_music_theory::rhythm::Duration;
+    use symthaea_music_theory::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
     use symthaea_music_theory::orchestration::{
         InstrumentCapabilityV1, InstrumentKindV1, SoundingRangeV1,
     };
@@ -832,51 +866,30 @@ mod tests {
         std::iter::repeat(ch).take(64).collect()
     }
 
-    fn demand(part_id: u16, min_midi: u8, max_midi: u8, peak: usize) -> VoiceDemand {
-        VoiceDemand {
-            part_id: Some(part_id),
-            roles: vec![VoiceRole::Melody],
-            identity_basis: DemandIdentityBasis::StablePartId,
-            note_count: 16,
-            min_midi,
-            max_midi,
-            mean_midi: (min_midi as f64 + max_midi as f64) / 2.0,
-            pitch_span_semitones: max_midi - min_midi,
-            distinct_onset_count: 16,
-            mean_note_duration_beats: 1.0,
-            peak_simultaneous_notes: peak,
-            first_onset_beat: 0.0,
-            last_note_end_beat: 16.0,
-            active_span_beats: 16.0,
-            notes_per_score_beat: 1.0,
-            notes_per_bar: Some(4.0),
+    fn source_score() -> Score {
+        let mut score = Score::new(Key::major(PitchClass::C), 100.0, 4);
+        for (part_id, lowest, highest) in [(1u16, 60u8, 72u8), (2u16, 55u8, 67u8)] {
+            for index in 0..16i64 {
+                let midi = if index == 0 {
+                    lowest
+                } else if index == 15 {
+                    highest
+                } else {
+                    (u16::from(lowest) + u16::from(highest)).div_ceil(2) as u8
+                };
+                score.push(ScoreNote {
+                    part: PartId(part_id),
+                    pitch: Pitch::from_midi(midi),
+                    onset: Duration::new(index, 1),
+                    duration: Duration::new(1, 1),
+                    velocity: 0.7,
+                    role: VoiceRole::Melody,
+                    emphasis: Emphasis::Normal,
+                    section_intensity: 1.0,
+                });
+            }
         }
-    }
-
-    fn score_demand(include_role_summary: bool) -> ScoreDemandProfile {
-        let mut voice_demands = vec![
-            demand(1, 60, 72, 1),
-            demand(2, 55, 67, 1),
-        ];
-        if include_role_summary {
-            let mut summary = demand(0, 55, 72, 2);
-            summary.part_id = None;
-            summary.identity_basis = DemandIdentityBasis::RoleAggregateSummary;
-            summary.roles = vec![VoiceRole::Melody];
-            voice_demands.push(summary);
-        }
-        ScoreDemandProfile {
-            schema: SCORE_DEMAND_PROFILE_SCHEMA.into(),
-            input_digest_schema: SCORE_DEMAND_INPUT_DIGEST_SCHEMA.into(),
-            score_sha256: sha('a'),
-            meter_beats: 4,
-            tempo_bpm: 100.0,
-            declared_score_span_beats: 16.0,
-            analyzed_span_beats: 16.0,
-            has_complete_part_identity: true,
-            assigned_part_note_fraction: 1.0,
-            voice_demands,
-        }
+        score
     }
 
     fn requirement(part_id: u16, function: &str) -> PartRequirementV1 {
@@ -946,10 +959,13 @@ mod tests {
     }
 
     fn request() -> OrchestrationPlannerRequestV1 {
+        let source_score = source_score();
+        let score_demand = analyze_score_demand(&source_score).expect("valid test Score");
         OrchestrationPlannerRequestV1 {
             schema: ORCHESTRATION_PLANNER_SCHEMA_V1.into(),
-            expected_score_sha256: sha('a'),
-            score_demand: score_demand(true),
+            expected_score_sha256: score_demand.score_sha256.clone(),
+            source_score,
+            score_demand,
             part_requirements: vec![
                 requirement(1, "primary-theme"),
                 requirement(2, "counter-theme"),
@@ -1052,6 +1068,43 @@ mod tests {
         assert!(report.issues.iter().any(|issue| {
             issue.code == PlannerIssueCodeV1::ScoreDigestMismatch
         }));
+    }
+
+    #[test]
+    fn forged_score_demand_metrics_are_rejected_even_when_score_digest_is_unchanged() {
+        let mut invalid = request();
+        let demand = invalid
+            .score_demand
+            .voice_demands
+            .iter_mut()
+            .find(|demand| demand.part_id == Some(1))
+            .expect("part 1 demand");
+        demand.max_midi = demand.max_midi.saturating_add(1);
+        // The caller retains the genuine score SHA-256. Only the measurements
+        // have been forged; recomputation from source_score must catch this.
+        assert_eq!(
+            invalid.score_demand.score_sha256,
+            invalid.expected_score_sha256
+        );
+        let report = plan_orchestration_v1(&invalid);
+        assert_eq!(report.disposition, PlannerDispositionV1::InvalidRequest);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == PlannerIssueCodeV1::ScoreDemandDoesNotMatchSource
+        }));
+        assert!(report.candidates.is_empty());
+    }
+
+    #[test]
+    fn changed_source_score_cannot_reuse_a_stale_demand_profile() {
+        let mut invalid = request();
+        invalid.source_score.notes[0].pitch = Pitch::from_midi(61);
+        let report = plan_orchestration_v1(&invalid);
+        assert_eq!(report.disposition, PlannerDispositionV1::InvalidRequest);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == PlannerIssueCodeV1::ScoreDemandDoesNotMatchSource
+                || issue.code == PlannerIssueCodeV1::ScoreDigestMismatch
+        }));
+        assert!(report.candidates.is_empty());
     }
 
     #[test]
