@@ -77,6 +77,66 @@ The reproduction adapter must not silently canonicalize away this distinction. P
 
 Ground-truth validation must use the original colony-forming criterion, not merely string membership or a model label. Report both raw-sequence and rotation-aware distances when analyzing spoof endpoints. This is a benchmark reproducibility requirement, not an assumption that all rotations are functionally equivalent in every Avida configuration.
 
+
+## Published attack baselines to reproduce
+
+The arXiv v2 paper gives a more complete reference table than the headline q=150 result. For the reference MLP, mean *best-seen* confidence was:
+
+| Model query | Random start | Uniform start |
+|---:|---:|---:|
+| 0 | 0.0000 | 0.1375 |
+| 25 | 0.3203 | 0.3409 |
+| 50 | 0.8266 | 0.7685 |
+| 75 | 0.9708 | 0.9532 |
+| 100 | 0.9972 | 0.9973 |
+| 125 | 0.9998 | 0.9997 |
+| 150 | 1.0000 | 1.0000 |
+| 175 | 1.0000 | 1.0000 |
+| 200 | 1.0000 | 1.0000 |
+
+At a fixed budget of 300 model queries, the paper's search-policy ablation reported:
+
+| Search policy | Uniform-start mean best confidence | Random-start mean best confidence | True replicator recovery |
+|---|---:|---:|---:|
+| Greedy hill climb | 100.00% | 100.00% | 0% |
+| Random walk | 28.70% | 19.30% | 0% |
+| Stochastic hill climb | 47.00% | 43.09% | 0% |
+| Tournament selection | 75.80% | 87.27% | 0% |
+| Truncation selection | 98.32% | 99.26% | 0% |
+
+The classifier ablation is also material. At 300 queries, logistic regression, SVM, and transformer reached 100% mean best-seen confidence on both start types; XGBoost reached 96.64% on both. Random forest was less susceptible (40.76% uniform / 74.53% random), but its best-seen endpoint was still a true replicator in only 12.69% / 26.03% of runs. CNN reached 76.55% / 100% confidence, with true-replicator endpoint rates 0.51% / 1.03%. This is why OLI should report confidence and oracle-verified function separately for every architecture and attack.
+
+Source: Gupta & Adami, arXiv:2604.11915v2, Tables 2–5 and supplementary attack discussion.
+
+## Search policies now implemented in the draft harness
+
+The Rust module now contains five query-budgeted policies:
+
+1. **Greedy ascent:** accept only strict confidence improvements.
+2. **Random walk:** accept every single-site mutation; keep best-seen separately.
+3. **Stochastic hill climb:** use a fixed, explicit Metropolis temperature to sometimes accept lower-confidence moves.
+4. **Tournament population:** choose parents through configurable k-way tournaments; use elitist top-N survival.
+5. **Truncation population:** choose parents uniformly from a configurable top fraction; use the same elitist top-N survival.
+
+The two population methods accept an ordered initial population. The model-call budget includes evaluation of the initial population. With a 30-member population and 300 total model calls, this implementation evaluates the initial population plus nine offspring populations. The paper's "30 members / 10 generations / 300 queries" accounting must be checked against its implementation details before a source-faithful comparison is claimed.
+
+The current tournament and truncation implementations are **explicit paper-inspired variants**, not asserted to be exact reproductions of the authors' code. The stochastic temperature, tournament size, truncation fraction, parent/survivor semantics, and initial-population construction are all recorded configuration and must be matched to source details before a benchmark replication is claimed.
+
+## Metrics required for every run
+
+- Mean and maximum **best-seen** confidence at fixed proposal/query checkpoints.
+- Terminal-state confidence, reported separately from best-seen confidence.
+- Ground-truth replicator recovery using the independent colony-forming oracle.
+- Query count to thresholds (0.5, 0.9, 0.99, 0.999).
+- Raw Hamming distance to nearest viable 9-mer; rotation-aware distance reported separately if the source oracle confirms circular equivalence.
+- Distinct endpoint count, repeated-attractor frequency and cross-seed variance.
+- Per-start-type and per-model-family results.
+- False-negative behavior and in-domain recall under any defense.
+- Runtime and candidate/model-evaluation cost.
+
+The paper's confidence curves are best-seen metrics. Reporting only final-state confidence would be a different statistic and must not be substituted.
+
+
 ## Minimum next benchmark increment
 
 1. Acquire or reconstruct the 9-mer ground-truth set from a source with reproducible provenance and permission to use it. The paper points to the complete genotype–phenotype map, but exact artifact/version and license must be confirmed before ingestion.
