@@ -94,6 +94,8 @@ pub struct NumericLieDerivativeProfileV1 {
     pub sample_min_inclusive: f64,
     pub sample_max_exclusive: f64,
     pub maximum_joint_dimension: usize,
+    /// Maximum variable subsets considered for joint SO(k) actions.
+    pub maximum_group_subsets: usize,
     pub pairwise_so2_search: bool,
 }
 
@@ -108,6 +110,7 @@ impl Default for NumericLieDerivativeProfileV1 {
             sample_min_inclusive: 0.5,
             sample_max_exclusive: 3.0,
             maximum_joint_dimension: 6,
+            maximum_group_subsets: 64,
             pairwise_so2_search: true,
         }
     }
@@ -128,6 +131,8 @@ pub struct ExactPolynomialLieProfileV1 {
     pub maximum_total_degree: usize,
     pub maximum_power: u32,
     pub maximum_dyadic_denominator_power: u32,
+    /// Maximum variable subsets considered for exact SO(k) actions.
+    pub maximum_group_subsets: usize,
     pub pairwise_so2_search: bool,
 }
 
@@ -140,6 +145,7 @@ impl Default for ExactPolynomialLieProfileV1 {
             maximum_total_degree: 48,
             maximum_power: 16,
             maximum_dyadic_denominator_power: 126,
+            maximum_group_subsets: 64,
             pairwise_so2_search: true,
         }
     }
@@ -377,32 +383,55 @@ fn infer_symmetry_numeric_with_profile(
         };
     }
 
-    // Joint rotation of the first n variables (bounded by the declared profile).
+    // Search deterministic variable subsets from largest to smallest. This finds
+    // maximal SO(k) subgroups embedded in expressions with unacted parameters,
+    // rather than downgrading every non-global result to the first SO(2) pair.
     let n = var_names.len().min(profile.maximum_joint_dimension);
-    let joint_algebra = lie_theory::so_n(n);
-    let joint_indices: Vec<usize> = (0..n).collect();
-    if let Some(statistics) = is_lie_invariant(expr, &var_names, &joint_indices, &joint_algebra, profile) {
-        let group = LieGroup::SO(n as u8);
+    let subset_count = group_subset_count(n, profile.pairwise_so2_search);
+    if subset_count > profile.maximum_group_subsets {
         return SymmetryInferenceReport {
-            candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
-            evidence: Some(SymmetryInferenceEvidence::SampledLieDerivative {
-                profile,
-                acted_on_variables: var_names[..n].to_vec(),
-                group,
-                statistics,
-            }),
+            candidate: None,
+            evidence: None,
             search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
             numeric_profile: profile,
             exact_polynomial_profile,
             exact_polynomial_status,
         };
     }
+    for subset_size in (2..=n).rev() {
+        if subset_size == 2 && !profile.pairwise_so2_search {
+            continue;
+        }
+        let algebra = lie_theory::so_n(subset_size);
+        for active_indices in index_combinations(n, subset_size) {
+            if let Some(statistics) = is_lie_invariant(expr, &var_names, &active_indices, &algebra, profile) {
+                let group = LieGroup::SO(subset_size as u8);
+                let acted_on_variables = active_indices.iter().map(|&i| var_names[i].clone()).collect();
+                return SymmetryInferenceReport {
+                    candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
+                    evidence: Some(SymmetryInferenceEvidence::SampledLieDerivative {
+                        profile,
+                        acted_on_variables,
+                        group,
+                        statistics,
+                    }),
+                    search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
+                    numeric_profile: profile,
+                    exact_polynomial_profile,
+                    exact_polynomial_status,
+                };
+            }
+        }
+    }
 
-    // Pairwise SO(2) search over every distinct variable pair when enabled.
-    if profile.pairwise_so2_search {
+    // Preserve pairwise coverage for variables beyond the bounded joint-search prefix.
+    if profile.pairwise_so2_search && var_names.len() > n {
         let so2 = lie_theory::so_n(2);
         for i in 0..var_names.len() {
             for j in (i + 1)..var_names.len() {
+                if i < n && j < n {
+                    continue;
+                }
                 if let Some(statistics) = is_lie_invariant(expr, &var_names, &[i, j], &so2, profile) {
                     let group = LieGroup::SO(2);
                     return SymmetryInferenceReport {
@@ -453,6 +482,49 @@ fn collect_var_names(expr: &Expr, out: &mut Vec<String>) {
             }
         }
     }
+}
+
+/// Number of group-action subsets in the bounded search (k >= 2, and optionally k = 2).
+fn group_subset_count(dimension: usize, include_so2: bool) -> usize {
+    if dimension < 2 {
+        return 0;
+    }
+    let all_nonempty = (1usize << dimension).saturating_sub(1);
+    let singletons = dimension;
+    let pairs = dimension.saturating_mul(dimension.saturating_sub(1)) / 2;
+    if include_so2 {
+        all_nonempty.saturating_sub(singletons)
+    } else {
+        all_nonempty.saturating_sub(singletons).saturating_sub(pairs)
+    }
+}
+
+/// Lexicographically ordered index combinations; caller chooses descending group size.
+fn index_combinations(dimension: usize, subset_size: usize) -> Vec<Vec<usize>> {
+    fn extend(
+        dimension: usize,
+        remaining: usize,
+        next_index: usize,
+        current: &mut Vec<usize>,
+        output: &mut Vec<Vec<usize>>,
+    ) {
+        if remaining == 0 {
+            output.push(current.clone());
+            return;
+        }
+        let last_start = dimension.saturating_sub(remaining);
+        for index in next_index..=last_start {
+            current.push(index);
+            extend(dimension, remaining - 1, index + 1, current, output);
+            current.pop();
+        }
+    }
+
+    let mut output = Vec::new();
+    if subset_size <= dimension && subset_size >= 2 {
+        extend(dimension, subset_size, 0, &mut Vec::new(), &mut output);
+    }
+    output
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -847,43 +919,44 @@ fn exact_polynomial_symmetry_candidate(
         return Ok(None);
     }
     let dimension = variable_names.len();
-    let generator_count = dimension * (dimension - 1) / 2;
+    let subset_count = group_subset_count(dimension, profile.pairwise_so2_search);
+    if subset_count > profile.maximum_group_subsets {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
 
-    let all_coordinates_present =
-        (0..dimension).all(|index| polynomial_depends_on_variable(&polynomial, index));
-    let mut all_generators_invariant = all_coordinates_present;
-    for i in 0..dimension {
-        for j in (i + 1)..dimension {
-            if !exact_polynomial_lie_derivative_is_zero(&polynomial, i, j, profile)? {
-                all_generators_invariant = false;
-                break;
+    // Maximal subgroup first: an expression may be SO(3)-invariant in
+    // (x,y,z) while a fourth variable acts as a parameter or independent term.
+    for subset_size in (2..=dimension).rev() {
+        if subset_size == 2 && !profile.pairwise_so2_search {
+            continue;
+        }
+        for active_indices in index_combinations(dimension, subset_size) {
+            if !active_indices.iter().all(|&index| polynomial_depends_on_variable(&polynomial, index)) {
+                continue;
             }
-        }
-        if !all_generators_invariant {
-            break;
-        }
-    }
-    if all_generators_invariant {
-        return Ok(Some((
-            LieGroup::SO(dimension as u8),
-            variable_names.to_vec(),
-            generator_count,
-        )));
-    }
 
-    if profile.pairwise_so2_search {
-        for i in 0..dimension {
-            for j in (i + 1)..dimension {
-                if polynomial_depends_on_variable(&polynomial, i)
-                    && polynomial_depends_on_variable(&polynomial, j)
-                    && exact_polynomial_lie_derivative_is_zero(&polynomial, i, j, profile)?
-                {
-                    return Ok(Some((
-                        LieGroup::SO(2),
-                        vec![variable_names[i].clone(), variable_names[j].clone()],
-                        1,
-                    )));
+            let mut all_generators_invariant = true;
+            for a in 0..active_indices.len() {
+                for b in (a + 1)..active_indices.len() {
+                    if !exact_polynomial_lie_derivative_is_zero(
+                        &polynomial,
+                        active_indices[a],
+                        active_indices[b],
+                        profile,
+                    )? {
+                        all_generators_invariant = false;
+                        break;
+                    }
                 }
+                if !all_generators_invariant {
+                    break;
+                }
+            }
+
+            if all_generators_invariant {
+                let variables = active_indices.iter().map(|&index| variable_names[index].clone()).collect();
+                let generator_count = subset_size * (subset_size - 1) / 2;
+                return Ok(Some((LieGroup::SO(subset_size as u8), variables, generator_count)));
             }
         }
     }
@@ -1283,6 +1356,48 @@ mod tests {
                 checked_generator_count: 1,
                 ..
             }) if acted_on_variables == vec!["x".to_string(), "y".to_string()]
+        ));
+    }
+
+    #[test]
+    fn exact_search_finds_maximal_so3_subgroup_on_nonleading_coordinates() {
+        // z is an unacted parameter; the SO(3) action is on x,y,w, not the first three AST variables.
+        let radial = add(add(pow2("x"), pow2("y")), pow2("w"));
+        let expr = mul(var("z"), radial);
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(
+            report.candidate.as_ref().unwrap().lie_groups,
+            vec![LieGroup::SO(3)]
+        );
+        assert!(matches!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
+                acted_on_variables,
+                checked_generator_count: 3,
+                group: LieGroup::SO(3),
+                ..
+            }) if acted_on_variables == vec!["x".to_string(), "y".to_string(), "w".to_string()]
+        ));
+    }
+
+    #[test]
+    fn sampled_search_finds_maximal_so3_subgroup_on_nonleading_coordinates() {
+        // sqrt(z*(x²+y²+w²)) is radially invariant in x,y,w for fixed z>0.
+        let radial = add(add(pow2("x"), pow2("y")), pow2("w"));
+        let expr = sqrt_of(mul(var("z"), radial));
+        let report = infer_symmetry_numeric_with_evidence(&expr);
+        assert_eq!(
+            report.candidate.as_ref().unwrap().lie_groups,
+            vec![LieGroup::SO(3)]
+        );
+        assert!(matches!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::SampledLieDerivative {
+                acted_on_variables,
+                group: LieGroup::SO(3),
+                statistics: LieDerivativeSampleStatisticsV1 { checked_generator_count: 3, .. },
+                ..
+            }) if acted_on_variables == vec!["x".to_string(), "y".to_string(), "w".to_string()]
         ));
     }
 
