@@ -224,6 +224,8 @@ pub enum SymmetryInferenceSearchStatus {
     ExactPolynomialSearchCompletedNoCandidate,
     /// The bounded numerical search ran to completion.
     NumericSearchCompleted,
+    /// The numerical subset search stopped before exhausting the candidate space.
+    NumericSearchBudgetExceeded,
     /// The expression had fewer than two free variables, so numerical rotation search was skipped.
     NumericSearchSkippedTooFewVariables,
 }
@@ -392,7 +394,7 @@ fn infer_symmetry_numeric_with_profile(
         return SymmetryInferenceReport {
             candidate: None,
             evidence: None,
-            search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
+            search_status: SymmetryInferenceSearchStatus::NumericSearchBudgetExceeded,
             numeric_profile: profile,
             exact_polynomial_profile,
             exact_polynomial_status,
@@ -424,14 +426,28 @@ fn infer_symmetry_numeric_with_profile(
         }
     }
 
-    // Preserve pairwise coverage for variables beyond the bounded joint-search prefix.
+    // Preserve pairwise coverage beyond the bounded joint-search prefix, but
+    // charge every additional pair against the same declared subset budget.
     if profile.pairwise_so2_search && var_names.len() > n {
         let so2 = lie_theory::so_n(2);
+        let remaining_pair_budget = profile.maximum_group_subsets.saturating_sub(subset_count);
+        let mut checked_extra_pairs = 0usize;
         for i in 0..var_names.len() {
             for j in (i + 1)..var_names.len() {
                 if i < n && j < n {
                     continue;
                 }
+                if checked_extra_pairs >= remaining_pair_budget {
+                    return SymmetryInferenceReport {
+                        candidate: None,
+                        evidence: None,
+                        search_status: SymmetryInferenceSearchStatus::NumericSearchBudgetExceeded,
+                        numeric_profile: profile,
+                        exact_polynomial_profile,
+                        exact_polynomial_status,
+                    };
+                }
+                checked_extra_pairs = checked_extra_pairs.saturating_add(1);
                 if let Some(statistics) = is_lie_invariant(expr, &var_names, &[i, j], &so2, profile) {
                     let group = LieGroup::SO(2);
                     return SymmetryInferenceReport {
@@ -1646,6 +1662,38 @@ mod tests {
         let expr = add(sub(var("x"), ln("x")), sub(var("y"), ln("y")));
         let sym = infer_symmetry_numeric(&expr);
         assert!(sym.lie_groups.is_empty());
+    }
+
+    #[test]
+    fn numeric_search_reports_budget_exhaustion_for_unsearched_extra_pairs() {
+        let mut expr = var("x0");
+        for index in 1..8 {
+            expr = add(expr, var(&format!("x{index}")));
+        }
+        let report = infer_symmetry_numeric_with_evidence(&expr);
+        assert!(report.candidate.is_none());
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::NumericSearchBudgetExceeded
+        );
+    }
+
+    #[test]
+    fn numeric_search_skips_pairwise_combinations_when_profile_disables_them() {
+        let expr = sqrt_of(add(pow2("x"), pow2("y")));
+        let mut profile = NumericLieDerivativeProfileV1::default();
+        profile.pairwise_so2_search = false;
+        let report = infer_symmetry_numeric_with_profile(
+            &expr,
+            profile,
+            ExactPolynomialLieProfileV1::default(),
+            ExactPolynomialSearchStatus::NotRequested,
+        );
+        assert!(report.candidate.is_none());
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::NumericSearchCompleted
+        );
     }
 
     #[test]
