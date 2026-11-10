@@ -58,6 +58,14 @@ EVSI(a) = R(q) -
 
 Probe selection should compare this benefit against explicit observation cost and safety constraints. No-probe remains a valid action. Multi-step planning is necessary when complementary observations have zero one-step value.
 
+### 2.1.1 Path-wise safety composition
+
+A per-probe safety threshold is not sufficient for an adaptive sequence: several individually admissible measurements can compose into an inadmissible path. The budgeted sequential planner therefore accepts a separate, provenance-bound cumulative-risk budget. Each action's risk value must be an externally calibrated upper bound on the conditional probability of an adverse safety event given any reachable observation history. By the union bound, the sum of those conditional upper bounds is a conservative upper bound on the probability of at least one adverse event along that path; independence is not assumed.
+
+The planner carries the remaining budget down every observation branch and makes a probe ineligible when its risk bound would exceed the remaining allowance. This is a path-wise hard constraint, not an expected-risk constraint: unsafe branches cannot be averaged away by safe branches. The budget carries a risk-semantics digest so the external calibration contract can be identified in receipts. This digest is an identity binding, not authentication or proof that the risk model is valid. A severity score or uncalibrated heuristic must not be supplied as a probability bound. The legacy planner API retains its prior per-action-only behavior; callers must explicitly opt into the cumulative budget.
+
+This control does not validate causal identification, establish that an intervention is physically safe, or authorize execution. It constrains planning only after a caller supplies a defensible risk bound.
+
 ### 2.2 In-family uncertainty is not model adequacy
 
 Bayesian posterior concentration is conditional on the supplied generative family. It does not demonstrate that the family itself is adequate.
