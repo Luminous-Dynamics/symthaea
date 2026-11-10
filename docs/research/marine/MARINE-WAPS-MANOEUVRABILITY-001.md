@@ -57,7 +57,7 @@ These levels are not interchangeable. A VCT force fit is not free-running valida
 - Gust rejection: peak excursion, peak roll, control reserve, settling time and whether stow/feather transitions are required.
 - Failure tests: one device stuck deployed, actuator loss, loss of sensor/forecast, rudder rate limit and loss of remote advisory.
 
-MSC.137(76) numerical criteria should be applied only where the ship falls within the resolution's applicability and the Administration confirms the interpretation. They are not automatically new WAPS-specific limits. WAPS-specific test conditions and performance margins should be agreed with the owner, class, flag and qualified manoeuvring test facility.
+MSC.137(76) scope must be evaluated using paragraph 3.1: all propulsion/rudder types for ships at least 100 m, plus chemical tankers and gas carriers of any length; high-speed craft are excluded by paragraph 3.4. The resolution's original principles still note that its trial concepts were developed for traditional propulsion/steering. Use it where applicable, subject to Administration interpretation; it is not a complete WAPS-specific gust, wind-device transition or degraded-course-keeping code.
 
 ## 6. Data and evidence contract
 
@@ -84,6 +84,14 @@ These are research aspirations, not statutory requirements or achieved results.
 - OPTIWISE, manoeuvrability and course-keeping methods for wind propulsion: https://www.optiwise-project.eu/exploitable-results
 - ITTC, *Free Running Model Tests*, Recommended Procedure 7.5-02-06-01: https://simman2014.dk/wp-content/uploads/2015/07/Free-model-tests-Free-Sailing-Model-Test-Procedure-No.-7.5-02-06-01-2008.pdf
 
-## 9. Claim ceiling
+## 10. Regulatory transition: existing ships versus new ships
+
+At SDC 12 (19–23 January 2026), IMO continued drafting goal-based amendments to SOLAS Chapter II-1 (Part C) and Chapter V for steering/propulsion systems, intended to cover conventional and non-traditional arrangements. SDC 12 also discussed draft International Ship Manoeuvrability Standards (ISSM) intended for new ships subject to those goal-based regulations; fundamental principles were agreed in principle, but further technical development was explicitly required.
+
+The current roadmap indicates further work at SDC 13 in 2027, expected adoption around 2029 and a target entry into force of 1 January 2032. These are planned milestones, not adopted/effective requirements as of 10 November 2026. The existing MSC.137(76) standards remain the reference for existing ships under the current roadmap. Track this as under-review regulatory work, never as current binding law.
+
+This distinction makes build-contract date, keel-laying/similar construction milestone, delivery date, ship type, length, and steering/propulsion architecture part of the design evidence record. Regulatory rules must remain versioned and date-scoped; see [#11469](https://github.com/Luminous-Dynamics/symthaea/issues/11469).
+
+## 11. Claim ceiling
 
 This benchmark does not provide manoeuvrability approval, a safety case or a class/flag determination. The applicability of MSC.137(76) is ship-specific. WAPS-specific limits need Administration/class/owner agreement. VCT, CFD, and free-running model tests each have distinct uncertainty and scale limits.
