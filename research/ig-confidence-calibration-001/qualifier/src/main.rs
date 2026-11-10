@@ -334,8 +334,8 @@ fn calculate_metrics(bundle: &Value) -> Option<CalibrationMetrics> {
             }).collect();
         if members.is_empty() { continue; }
         let count = members.len();
-        let mean_probability = members.iter().map(|(p, _)| p).sum::<f64>() / count as f64;
-        let observed_frequency = members.iter().map(|(_, y)| y).sum::<f64>() / count as f64;
+        let mean_probability = members.iter().map(|(p, _)| *p).sum::<f64>() / count as f64;
+        let observed_frequency = members.iter().map(|(_, y)| *y).sum::<f64>() / count as f64;
         ece += (count as f64 / n) * (mean_probability - observed_frequency).abs();
         bins.push(ReliabilityBin { lower, upper, count, mean_probability, observed_frequency });
     }
@@ -345,7 +345,7 @@ fn calculate_metrics(bundle: &Value) -> Option<CalibrationMetrics> {
     let mut errors = 0.0;
     let mut cumulative_risk_sum = 0.0;
     for (index, (_, y)) in ranked.iter().enumerate() {
-        errors += 1.0 - y;
+        errors += 1.0 - *y;
         cumulative_risk_sum += errors / (index + 1) as f64;
     }
     let aurc = cumulative_risk_sum / n;
@@ -353,7 +353,7 @@ fn calculate_metrics(bundle: &Value) -> Option<CalibrationMetrics> {
     let mut risk_at_coverage = Vec::new();
     for coverage in [0.25, 0.50, 0.75, 1.00] {
         let count = ((coverage * n).ceil() as usize).clamp(1, ranked.len());
-        let risk = ranked[..count].iter().map(|(_, y)| 1.0 - y).sum::<f64>() / count as f64;
+        let risk = ranked[..count].iter().map(|(_, y)| 1.0 - *y).sum::<f64>() / count as f64;
         risk_at_coverage.push((coverage, risk));
     }
 
@@ -416,7 +416,10 @@ fn main() -> ExitCode {
         let expected = string_set(&fixture["expected_violations"]);
         let actual: BTreeSet<String> = actual.into_iter().collect();
         if expected != actual {
-            findings.push(format!("negative_control_fixture_{}_oracle_mismatch", fixture["fixture_id"].as_str().unwrap_or("unknown")));
+            findings.push(format!(
+                "negative_control_fixture_{}_oracle_mismatch",
+                fixture["fixture_id"].as_str().unwrap_or("unknown")
+            ));
         }
     }
     if !findings.is_empty() {
@@ -431,12 +434,17 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
     println!("QUALIFIED STRUCTURAL CONFIDENCE EVALUATOR: n={}", metrics.sample_count);
-    println!("Brier={:.8} log_loss={:.8} ECE10={:.8} AURC={:.8}", metrics.brier_score, metrics.log_loss, metrics.ece_equal_width, metrics.aurc);
+    println!(
+        "Brier={:.8} log_loss={:.8} ECE10={:.8} AURC={:.8}",
+        metrics.brier_score, metrics.log_loss, metrics.ece_equal_width, metrics.aurc
+    );
     for (coverage, risk) in metrics.risk_at_coverage {
         println!("risk@coverage[{:.0}%]={:.8}", coverage * 100.0, risk);
     }
     println!("NOT A CALIBRATOR: no calibration map was fitted by this evaluator.");
-    println!("NOT AUTHORITY: confidence values do not create civic rights, voice, vote weight, or action authority.");
+    println!(
+        "NOT AUTHORITY: confidence values do not create civic rights, voice, vote weight, or action authority."
+    );
     println!("SYNTHETIC ONLY: the checked-in outcomes are fictional known-answer controls.");
     ExitCode::SUCCESS
 }
