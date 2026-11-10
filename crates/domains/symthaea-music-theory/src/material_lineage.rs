@@ -887,6 +887,31 @@ mod tests {
         }
     }
 
+    fn event_remap(
+        source: &Score,
+        candidate: &Score,
+        source_entries: Vec<ScoreEventRemapEntryV1>,
+    ) -> ScoreEventRemapV1 {
+        ScoreEventRemapV1 {
+            schema: crate::score_event_remap::SCORE_EVENT_REMAP_SCHEMA_V1.into(),
+            digest_schema: crate::score_event_remap::SCORE_EVENT_REMAP_DIGEST_SCHEMA_V1.into(),
+            source_score_sha256: digest(),
+            candidate_score_sha256: "b".repeat(64),
+            transformation_sha256: "c".repeat(64),
+            source_event_count: source.notes.len(),
+            candidate_event_count: candidate.notes.len(),
+            source_entries,
+            insertions: Vec::new(),
+        }
+    }
+
+    fn retained(source_index: usize, candidate_index: usize) -> ScoreEventRemapEntryV1 {
+        ScoreEventRemapEntryV1 {
+            source_index,
+            disposition: ScoreEventDispositionV1::Retained { candidate_index },
+        }
+    }
+
     #[test]
     fn accepts_source_authored_material_handoff_across_parts() {
         let timeline = timeline(
@@ -1058,4 +1083,241 @@ mod tests {
             issue.code == MaterialLineageIssueCodeV1::ResourceLimitExceeded
         }));
     }
+    #[test]
+    fn rebinds_velocity_only_edit_with_total_one_to_one_event_map() {
+        let source = score();
+        let mut candidate = source.clone();
+        candidate.notes[0].velocity = 0.35;
+
+        let source_timeline = timeline(
+            vec![
+                instance("theme-opening", "theme-alpha", 1, 0, 1, vec![0]),
+                instance("theme-return", "theme-alpha", 1, 1, 2, vec![1]),
+            ],
+            vec![edge("return-edge", "theme-opening", "theme-return")],
+        );
+        let remap = event_remap(
+            &source,
+            &candidate,
+            vec![
+                ScoreEventRemapEntryV1 {
+                    source_index: 0,
+                    disposition: ScoreEventDispositionV1::Modified {
+                        candidate_index: 0,
+                        changed_fields: vec![crate::score_event_remap::ScoreEventFieldV1::Velocity],
+                        operation_id: "soften-opening".into(),
+                    },
+                },
+                retained(1, 1),
+                retained(2, 2),
+                retained(3, 3),
+            ],
+        );
+
+        let rebound = rebind_material_lineage_through_event_remap(
+            &source, &candidate, &source_timeline, &remap,
+            &digest(), &"b".repeat(64), &"c".repeat(64),
+        ).expect("valid velocity-only material rebind");
+
+        assert_eq!(rebound.score_sha256, "b".repeat(64));
+        assert_eq!(rebound.instances, source_timeline.instances);
+        assert_eq!(rebound.edges, source_timeline.edges);
+        assert_eq!(
+            rebound.edges[0].evidence_basis,
+            MaterialEvidenceBasisV1::SourceAuthoredIntent
+        );
+        assert!(validate_material_lineage(&candidate, &rebound, &"b".repeat(64)).valid);
+    }
+
+    #[test]
+    fn rebind_expands_material_membership_for_one_to_many_split() {
+        let source = score();
+        let mut candidate = source.clone();
+        candidate.notes[0].duration = Duration::new(1, 2);
+        let mut child = source.notes[0];
+        child.pitch = Pitch::from_midi(61);
+        child.onset = Duration::new(1, 2);
+        child.duration = Duration::new(1, 2);
+        candidate.notes.push(child);
+
+        let source_timeline = timeline(
+            vec![instance("ornamented-theme", "theme-alpha", 1, 0, 1, vec![0])],
+            Vec::new(),
+        );
+        let remap = event_remap(
+            &source,
+            &candidate,
+            vec![
+                ScoreEventRemapEntryV1 {
+                    source_index: 0,
+                    disposition: ScoreEventDispositionV1::Split {
+                        candidate_indices: vec![0, 4],
+                        operation_id: "split-appoggiatura".into(),
+                    },
+                },
+                retained(1, 1),
+                retained(2, 2),
+                retained(3, 3),
+            ],
+        );
+
+        let rebound = rebind_material_lineage_through_event_remap(
+            &source, &candidate, &source_timeline, &remap,
+            &digest(), &"b".repeat(64), &"c".repeat(64),
+        ).expect("valid split rebind");
+        assert_eq!(rebound.instances[0].event_indices, vec![0, 4]);
+        assert!(validate_material_lineage(&candidate, &rebound, &"b".repeat(64)).valid);
+    }
+
+    #[test]
+    fn rebind_deduplicates_many_to_one_merge_inside_material_instance() {
+        let source = score();
+        let mut candidate = source.clone();
+        candidate.notes[0].duration = Duration::new(2, 1);
+        candidate.notes.remove(1);
+
+        let source_timeline = timeline(
+            vec![instance("tied-theme", "theme-alpha", 1, 0, 2, vec![0, 1])],
+            Vec::new(),
+        );
+        let remap = event_remap(
+            &source,
+            &candidate,
+            vec![
+                ScoreEventRemapEntryV1 {
+                    source_index: 0,
+                    disposition: ScoreEventDispositionV1::Merged {
+                        candidate_index: 0,
+                        merge_group_id: "tie-merge".into(),
+                        operation_id: "tie-notes".into(),
+                    },
+                },
+                ScoreEventRemapEntryV1 {
+                    source_index: 1,
+                    disposition: ScoreEventDispositionV1::Merged {
+                        candidate_index: 0,
+                        merge_group_id: "tie-merge".into(),
+                        operation_id: "tie-notes".into(),
+                    },
+                },
+                retained(2, 1),
+                retained(3, 2),
+            ],
+        );
+
+        let rebound = rebind_material_lineage_through_event_remap(
+            &source, &candidate, &source_timeline, &remap,
+            &digest(), &"b".repeat(64), &"c".repeat(64),
+        ).expect("valid merge rebind");
+        assert_eq!(rebound.instances[0].event_indices, vec![0]);
+        assert!(validate_material_lineage(&candidate, &rebound, &"b".repeat(64)).valid);
+    }
+
+    #[test]
+    fn refuses_to_silently_drop_a_deleted_material_event() {
+        let source = score();
+        let mut candidate = source.clone();
+        candidate.notes.remove(0);
+        let source_timeline = timeline(
+            vec![instance("theme-alpha", "theme-alpha", 1, 0, 1, vec![0])],
+            Vec::new(),
+        );
+        let remap = event_remap(
+            &source,
+            &candidate,
+            vec![
+                ScoreEventRemapEntryV1 {
+                    source_index: 0,
+                    disposition: ScoreEventDispositionV1::Deleted {
+                        reason: "remove theme event".into(),
+                        operation_id: "delete-theme-event".into(),
+                    },
+                },
+                retained(1, 0),
+                retained(2, 1),
+                retained(3, 2),
+            ],
+        );
+
+        let error = rebind_material_lineage_through_event_remap(
+            &source, &candidate, &source_timeline, &remap,
+            &digest(), &"b".repeat(64), &"c".repeat(64),
+        ).unwrap_err();
+        assert!(error.issues.iter().any(|issue| {
+            issue.code == MaterialLineageRebindIssueCodeV1::ReferencedMaterialEventDeleted
+                && issue.instance_id.as_deref() == Some("theme-alpha")
+                && issue.source_index == Some(0)
+        }));
+    }
+
+    #[test]
+    fn rejects_rebinding_when_a_split_child_escapes_the_material_envelope() {
+        let source = score();
+        let mut candidate = source.clone();
+        candidate.notes[0].duration = Duration::new(1, 2);
+        let mut child = source.notes[0];
+        child.pitch = Pitch::from_midi(63);
+        child.onset = Duration::new(2, 1);
+        child.duration = Duration::new(1, 2);
+        candidate.notes.push(child);
+
+        let source_timeline = timeline(
+            vec![instance("bounded-theme", "theme-alpha", 1, 0, 1, vec![0])],
+            Vec::new(),
+        );
+        let remap = event_remap(
+            &source,
+            &candidate,
+            vec![
+                ScoreEventRemapEntryV1 {
+                    source_index: 0,
+                    disposition: ScoreEventDispositionV1::Split {
+                        candidate_indices: vec![0, 4],
+                        operation_id: "bad-split".into(),
+                    },
+                },
+                retained(1, 1),
+                retained(2, 2),
+                retained(3, 3),
+            ],
+        );
+
+        let error = rebind_material_lineage_through_event_remap(
+            &source, &candidate, &source_timeline, &remap,
+            &digest(), &"b".repeat(64), &"c".repeat(64),
+        ).unwrap_err();
+        assert!(error.issues.iter().any(|issue| {
+            issue.code == MaterialLineageRebindIssueCodeV1::CandidateLineageInvalid
+        }));
+        assert!(error.candidate_lineage_issues.iter().any(|issue| {
+            issue.code == MaterialLineageIssueCodeV1::EventOutsideInstanceWindow
+        }));
+    }
+
+    #[test]
+    fn refuses_stale_or_invalid_event_remaps_before_rebinding() {
+        let source = score();
+        let candidate = source.clone();
+        let source_timeline = timeline(
+            vec![instance("theme-alpha", "theme-alpha", 1, 0, 1, vec![0])],
+            Vec::new(),
+        );
+        let mut remap = event_remap(
+            &source,
+            &candidate,
+            vec![retained(0, 0), retained(1, 1), retained(2, 2), retained(3, 3)],
+        );
+        remap.candidate_score_sha256 = "d".repeat(64);
+
+        let error = rebind_material_lineage_through_event_remap(
+            &source, &candidate, &source_timeline, &remap,
+            &digest(), &"b".repeat(64), &"c".repeat(64),
+        ).unwrap_err();
+        assert!(error.issues.iter().any(|issue| {
+            issue.code == MaterialLineageRebindIssueCodeV1::EventRemapInvalid
+        }));
+        assert!(!error.event_remap_issues.is_empty());
+    }
+
+
 }
