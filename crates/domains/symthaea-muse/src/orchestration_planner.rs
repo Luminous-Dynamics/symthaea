@@ -752,9 +752,7 @@ pub fn plan_orchestration_v1(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instrument_capability_evidence::{
-        CapabilityScopeV1, INSTRUMENT_CAPABILITY_EVIDENCE_SCHEMA_V1,
-    };
+    use crate::instrument_capability_evidence::CapabilityScopeV1;
     use crate::score_demand::{
         DemandIdentityBasis, VoiceDemand, SCORE_DEMAND_INPUT_DIGEST_SCHEMA,
         SCORE_DEMAND_PROFILE_SCHEMA,
