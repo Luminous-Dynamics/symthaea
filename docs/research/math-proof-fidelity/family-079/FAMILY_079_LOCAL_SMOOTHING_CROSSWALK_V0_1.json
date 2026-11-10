@@ -1,0 +1,198 @@
+{
+  "schema_version": "luminous.math-proof-fidelity-crosswalk.v0.1",
+  "audit_id": "openai-math-family-079-local-smoothing-preliminary-2026-11-10",
+  "audit_status": "preliminary_static_source_audit",
+  "claim_ceiling": "This artifact records a source-level correspondence inspection only. It is not an independent Lean rebuild, axiom audit over the full dependency closure, expert proof review, or validation of the mathematical theorem.",
+  "sources": {
+    "external_repository": {
+      "repository": "openai/math",
+      "commit": "4eaee87548250b2682affda7d05d947c05554bae",
+      "commit_url": "https://github.com/openai/math/commit/4eaee87548250b2682affda7d05d947c05554bae",
+      "paper": {
+        "title": "Local smoothing for the Euclidean wave equation",
+        "version_date": "2026-10-25",
+        "introduction_tex": {
+          "path": "preprints/Local-smoothing-for-the-Euclidean-wave-equation-October-25-2026/build/sections/introduction.tex",
+          "blob_sha": "4aa00976d8cf5b4a66617ee3bdcc21e44ec186e4",
+          "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/preprints/Local-smoothing-for-the-Euclidean-wave-equation-October-25-2026/build/sections/introduction.tex"
+        },
+        "readme": {
+          "path": "preprints/Local-smoothing-for-the-Euclidean-wave-equation-October-25-2026/README.md",
+          "blob_sha": "8e3abaf4259d33b98e1da65f852d229e406c20a4",
+          "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/preprints/Local-smoothing-for-the-Euclidean-wave-equation-October-25-2026/README.md"
+        }
+      },
+      "lean_scope_note": {
+        "path": "lean/docs/079.md",
+        "blob_sha": "e6ea535832d6dfef60c539a2e0537b560c1b7108",
+        "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/docs/079.md"
+      },
+      "lean_toolchain": {
+        "path": "lean/lean-toolchain",
+        "blob_sha": "ba8ebf2dbaf6a668cd2a0e086186d6d569b69ff5",
+        "declared_version": "leanprover/lean4:v4.34.1",
+        "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/lean-toolchain"
+      }
+    }
+  },
+  "core_theorem": {
+    "paper_location": "build/sections/introduction.tex, Theorem thm:local-smoothing",
+    "paper_statement": {
+      "propagator": "U(t) = exp(-i t |D|)",
+      "time_interval": "[1,2]",
+      "spatial_dimension": "n >= 2",
+      "p_range": "2 <= p < infinity",
+      "epsilon_range": "epsilon > 0, with epsilon = 0 permitted at p = 2",
+      "sobolev_order": "s_+(p) + epsilon; s_+(p) = max(0, (n-1)/2 - n/p)",
+      "initial_data": "complex Schwartz functions",
+      "estimate": "||U(t)f||_{L^p(R^n x [1,2])} <= C(n,p,epsilon) ||(1-Delta)^((s_+(p)+epsilon)/2) f||_{L^p(R^n)}"
+    },
+    "lean_definition": {
+      "path": "lean/OAI/Analysis/Fourier/LocalSmoothing/Definitions.lean",
+      "declaration": "OAI.Analysis.Fourier.LocalSmoothing.EuclideanLocalSmoothing",
+      "blob_sha": "0357f1691510ac94e787093073c08bee294192fe",
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/Analysis/Fourier/LocalSmoothing/Definitions.lean"
+    },
+    "lean_proof_wiring": {
+      "path": "lean/OAI/Analysis/Fourier/LocalSmoothing/Main.lean",
+      "declaration": "OAI.Analysis.Fourier.LocalSmoothing.euclidean_local_smoothing",
+      "blob_sha": "3b95ea013123b96932afb88cc11e6aa1579c59ed",
+      "proof_path": "euclideanLocalSmoothing_of_logarithmicRefinement logarithmic_refinement; logarithmic_refinement is derived from positive packet solvability",
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/Analysis/Fourier/LocalSmoothing/Main.lean"
+    },
+    "preliminary_correspondence": {
+      "status": "preliminary_match_no_obvious_statement_mismatch_found",
+      "method": "manual comparison of paper introduction TeX, Lean proposition definition, main theorem wiring, and comparator target",
+      "dimensions": "match",
+      "p_range_and_endpoint": "match",
+      "epsilon_loss": "match",
+      "sobolev_bessel_order": "match",
+      "propagator_sign": "match",
+      "time_interval_and_measure": "match",
+      "initial_data_class": "match",
+      "norm_inequality": "match",
+      "reviewer_status": "not independently peer reviewed",
+      "caveat": "This is a statement-to-statement source inspection. It does not validate the analytic proof strategy or prove that the paper's entire mathematical narrative follows from all formal declarations."
+    }
+  },
+  "comparator_suite": {
+    "statement_file": {
+      "path": "lean/ComparatorChallenges/LocalSmoothing.lean",
+      "blob_sha": "9e712197a604ecb440b9dade7469ef44ba5f716a",
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/ComparatorChallenges/LocalSmoothing.lean",
+      "note": "The six `by sorry` endings are intentional comparator challenge placeholders, not failed proof runs."
+    },
+    "solution_file": {
+      "path": "lean/OAI/Analysis/Fourier/LocalSmoothing/Comparator.lean",
+      "blob_sha": "6def181857b8148d9dbaed288876a225ca9ddbfb",
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/Analysis/Fourier/LocalSmoothing/Comparator.lean",
+      "note": "The separate solution module supplies the six corresponding proofs by applying the development's theorem declarations."
+    },
+    "configuration": {
+      "path": "lean/ComparatorChallenges/LocalSmoothing.json",
+      "blob_sha": "88c1e1c3368f66f9d64206a2b166a89bc87b4f9b",
+      "permitted_axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
+      "note": "This is the comparator configuration's allowed-axiom list, not an independently generated full dependency-closure axiom report."
+    },
+    "targets": [
+      "euclidean_local_smoothing",
+      "bochner_riesz",
+      "spherical_restriction",
+      "kakeya_maximal",
+      "kakeya",
+      "stein_square"
+    ],
+    "target_mapping_status": "six_statement_and_solution_pairs_located; complete paper-claim correspondence review remains open"
+  },
+  "wider_formalization_inventory": {
+    "main_theorems": {
+      "path": "lean/OAI/Analysis/Fourier/Main.lean",
+      "blob_sha": "ae4775daaf3dbbbe660dcf3216370f59e6848144",
+      "declarations": [
+        "LocalSmoothing.logarithmic_refinement",
+        "LocalSmoothing.euclidean_local_smoothing",
+        "LocalSmoothing.logarithmic_sobolev",
+        "BochnerRiesz.bochner_riesz",
+        "Restriction.spherical_restriction",
+        "Kakeya.kakeya_maximal",
+        "SquareFunction.stein_square",
+        "SquareFunction.stein_square_fullLp",
+        "Cone.cone_extension",
+        "WaveEquation.wave_data",
+        "Kakeya.kakeya"
+      ],
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/Analysis/Fourier/Main.lean"
+    },
+    "further_results": {
+      "path": "lean/OAI/Analysis/Fourier/LocalSmoothing/FurtherResults.lean",
+      "blob_sha": "f2601bbfa00ddcdddc4b732bc244f16caac15011",
+      "additional_results": [
+        "bounded Kakeya lower and upper Minkowski dimensions",
+        "Nikodym maximal estimate",
+        "Nikodym full Hausdorff-dimension consequence",
+        "wave-data Sobolev estimate",
+        "constant-elliptic local smoothing and logarithmic Sobolev consequences",
+        "massive local smoothing and logarithmic Sobolev consequences",
+        "quadratic-curve dimension consequences"
+      ],
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/Analysis/Fourier/LocalSmoothing/FurtherResults.lean"
+    },
+    "logarithmic_tube_volume": {
+      "path": "lean/OAI/MeasureTheory/Kakeya/Logarithmic.lean",
+      "blob_sha": "c67e99f07f748a7c4d3a2556242ba420cf10157d",
+      "declaration": "tube_union_logarithmic_three_dimensional",
+      "reported_consequence": "at least delta^-2 unit-length tubes with delta-separated directions have union volume >= c/(1+log(1/delta))^66, uniformly over centers and 0<delta<=1",
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/MeasureTheory/Kakeya/Logarithmic.lean"
+    }
+  },
+  "open_crosswalk_items": [
+    {
+      "paper_claim": "compact paraboloid extension estimate",
+      "status": "not_yet_mapped_in_this_audit",
+      "note": "Do not infer absence from the six comparator targets; locate exact declaration and compare its domain/range."
+    },
+    {
+      "paper_claim": "Schrodinger local smoothing consequence",
+      "status": "not_yet_mapped_in_this_audit",
+      "note": "Locate the exact formal declaration and compare dimension, critical exponent and Sobolev order."
+    },
+    {
+      "paper_claim": "truncated-cone extension estimate",
+      "status": "formal_module_located_statement_crosswalk_pending",
+      "declaration": "OAI.Analysis.Fourier.Cone.cone_extension"
+    },
+    {
+      "paper_claim": "Nikodym maximal and dimension consequences",
+      "status": "formal_modules_located_statement_crosswalk_pending",
+      "declarations": [
+        "OAI.Analysis.Fourier.LocalSmoothing.nikodym_maximal",
+        "OAI.Analysis.Fourier.LocalSmoothing.nikodym_dimension"
+      ]
+    },
+    {
+      "paper_claim": "logarithmic tube-union lower bound",
+      "status": "formal_module_located_statement_crosswalk_pending",
+      "declaration": "OAI.MeasureTheory.Kakeya.tube_union_logarithmic_three_dimensional"
+    }
+  ],
+  "validation": {
+    "source_files_inspected_at_exact_commit": true,
+    "paper_pdf_independently_reviewed": false,
+    "clean_lean_rebuild": false,
+    "kernel_replay_independently_run": false,
+    "full_dependency_closure_axiom_report": false,
+    "independent_mathematical_review": false,
+    "proof_correctness_assessed": false
+  },
+  "next_steps": [
+    "Complete one-to-one crosswalk of every material theorem and corollary in the exact paper source to Lean declarations.",
+    "Inspect compact-paraboloid, Schrödinger, cone, Nikodym, and logarithmic tube-volume statements and compare their precise hypotheses.",
+    "Replay the exact Lean project in the pinned toolchain and record Lake manifest, dependency closure, theorem types, axioms, and build digest.",
+    "Run mutation checks for endpoint, epsilon, quantifier, domain, normalization, and operator-definition substitutions.",
+    "Obtain an independent specialist review of the analytic proof and its formalization correspondence."
+  ]
+}
