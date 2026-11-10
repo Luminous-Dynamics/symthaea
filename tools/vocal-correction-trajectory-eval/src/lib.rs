@@ -69,6 +69,7 @@ pub struct TrajectorySpecV1 {
     pub control_id: String,
     pub frozen_context_digest: String,
     pub baseline_output_digest: String,
+    pub initial_control_state_digest: String,
     pub minimum_familywise_coverage: f64,
     pub maximum_corrections: usize,
     /// Names the normalization and coordinate scaling used by action_norm.
@@ -105,6 +106,7 @@ pub struct IterationEvidenceV1 {
     pub iteration_index: usize,
     pub source_case_id: String,
     pub frozen_context_digest: String,
+    pub control_state_digest: String,
     pub parent_output_digest: Option<String>,
     pub output_digest: String,
     pub action_digest: Option<String>,
@@ -192,6 +194,7 @@ pub struct CollateralMetricResultV1 {
 #[derive(Clone, Debug, PartialEq)]
 pub struct IterationResultV1 {
     pub iteration_index: usize,
+    pub control_state_digest: String,
     pub parent_output_digest: Option<String>,
     pub output_digest: String,
     pub action_digest: Option<String>,
@@ -209,6 +212,8 @@ pub struct TrajectoryReportV1 {
     pub control_id: String,
     pub frozen_context_digest: String,
     pub action_norm_profile_id: String,
+    pub initial_control_state_digest: String,
+    pub final_control_state_digest: String,
     pub initial_output_digest: String,
     pub final_output_digest: String,
     pub corrections_used: usize,
@@ -242,6 +247,7 @@ pub fn evaluate_trajectory(
     let mut results: Vec<IterationResultV1> = Vec::with_capacity(evidence.len());
     let mut previous_output_digest: Option<&str> = None;
     let mut seen_output_digests = BTreeSet::new();
+    let mut seen_control_state_digests = BTreeSet::new();
     let mut corrections_used = 0usize;
     let mut final_outcome = TrajectoryOutcome::NeedsCorrection;
 
@@ -265,6 +271,10 @@ pub fn evaluate_trajectory(
 
             if iteration.action_norm > spec.maximum_action_norm {
                 outcome = TrajectoryOutcome::Noncompliant;
+            } else if seen_control_state_digests.contains(&iteration.control_state_digest) {
+                // Detect parameter-state cycles even when stochastic renders
+                // produce different waveform digests for the same control state.
+                outcome = TrajectoryOutcome::Stalled;
             } else if seen_output_digests.contains(&iteration.output_digest) {
                 // A repeated output digest is a render-state cycle (including
                 // the immediate no-op case), even if analyzer noise changes.
@@ -288,6 +298,7 @@ pub fn evaluate_trajectory(
 
         let result = IterationResultV1 {
             iteration_index: iteration.iteration_index,
+            control_state_digest: iteration.control_state_digest.clone(),
             parent_output_digest: iteration.parent_output_digest.clone(),
             output_digest: iteration.output_digest.clone(),
             action_digest: iteration.action_digest.clone(),
@@ -308,6 +319,7 @@ pub fn evaluate_trajectory(
         }
 
         seen_output_digests.insert(iteration.output_digest.clone());
+        seen_control_state_digests.insert(iteration.control_state_digest.clone());
         previous_output_digest = Some(iteration.output_digest.as_str());
     }
 
@@ -329,6 +341,11 @@ pub fn evaluate_trajectory(
         control_id: spec.control_id.clone(),
         frozen_context_digest: spec.frozen_context_digest.clone(),
         action_norm_profile_id: spec.action_norm_profile_id.clone(),
+        initial_control_state_digest: spec.initial_control_state_digest.clone(),
+        final_control_state_digest: evidence
+            .last()
+            .map(|iteration| iteration.control_state_digest.clone())
+            .ok_or_else(|| TrajectoryError::new("trajectory lost its final control-state identity"))?,
         initial_output_digest: spec.baseline_output_digest.clone(),
         final_output_digest,
         corrections_used,
@@ -344,6 +361,10 @@ fn validate_spec(spec: &TrajectorySpecV1) -> Result<(), TrajectoryError> {
     require_non_empty(&spec.action_norm_profile_id, "action_norm_profile_id")?;
     validate_digest(&spec.frozen_context_digest, "frozen_context_digest")?;
     validate_digest(&spec.baseline_output_digest, "baseline_output_digest")?;
+    validate_digest(
+        &spec.initial_control_state_digest,
+        "initial_control_state_digest",
+    )?;
 
     if !spec.minimum_familywise_coverage.is_finite()
         || spec.minimum_familywise_coverage <= 0.0
@@ -448,6 +469,7 @@ fn validate_iteration_identity(
         )));
     }
     validate_digest(&iteration.output_digest, "iteration output_digest")?;
+    validate_digest(&iteration.control_state_digest, "iteration control_state_digest")?;
 
     if expected_index == 0 {
         if iteration.parent_output_digest.is_some() {
@@ -463,6 +485,11 @@ fn validate_iteration_identity(
         if iteration.output_digest != spec.baseline_output_digest {
             return Err(TrajectoryError::new(
                 "baseline output digest does not match the trajectory specification",
+            ));
+        }
+        if iteration.control_state_digest != spec.initial_control_state_digest {
+            return Err(TrajectoryError::new(
+                "baseline control-state digest does not match the trajectory specification",
             ));
         }
     } else {
@@ -863,6 +890,7 @@ mod tests {
             control_id: "vibrato-depth".to_owned(),
             frozen_context_digest: digest('a'),
             baseline_output_digest: digest('b'),
+            initial_control_state_digest: digest('b'),
             minimum_familywise_coverage: 0.95,
             maximum_corrections: 3,
             action_norm_profile_id: "normalized-control-l2-v1".to_owned(),
@@ -937,6 +965,7 @@ mod tests {
             iteration_index: index,
             source_case_id: "case-01".to_owned(),
             frozen_context_digest: digest('a'),
+            control_state_digest: digest(output),
             parent_output_digest: parent,
             output_digest: digest(output),
             action_digest: action.map(digest),
@@ -1199,6 +1228,41 @@ mod tests {
         .unwrap();
         assert_eq!(report.outcome, TrajectoryOutcome::Stalled);
         assert_eq!(report.iterations[2].output_digest, digest('b'));
+    }
+
+    #[test]
+    fn repeated_control_state_is_stalled_even_when_stochastic_output_changes() {
+        let mut second = correction(
+            2,
+            'd',
+            'e',
+            (9.0, 11.0),
+            (-1.0, 1.0),
+            (0.0, 0.0),
+        );
+        second.control_state_digest = digest('b');
+        let report = evaluate_trajectory(
+            &spec(),
+            &[
+                baseline((16.0, 17.0), (5.0, 6.0), (0.0, 0.0)),
+                correction(
+                    1,
+                    'b',
+                    'd',
+                    (13.0, 14.0),
+                    (3.0, 4.0),
+                    (0.0, 0.0),
+                ),
+                second,
+            ],
+        )
+        .unwrap();
+        assert_eq!(report.outcome, TrajectoryOutcome::Stalled);
+        assert_ne!(report.iterations[2].output_digest, report.iterations[0].output_digest);
+        assert_eq!(
+            report.iterations[2].control_state_digest,
+            report.iterations[0].control_state_digest
+        );
     }
 
     #[test]
