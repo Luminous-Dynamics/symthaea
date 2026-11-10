@@ -148,6 +148,7 @@ Use separately approved component, integrated-rig, environmental, structural/fat
 - Volocopter VoloXPro announcement and stated 600 kg MTOM / 154 kg payload figures: https://www.volocopter.com/en/newsroom/volocopter-launches-new-product-voloxpro
 - EHang EH216-S product configuration and manufacturer-stated performance: https://www.ehang.com/ehang216s/
 - EHang EH216-S airworthiness milestones: https://www.ehang.com/ehang216s/airworthiness/
+- EHang EH216-S market/service status (checked 29 October 2026): https://lowaltitudeeconomy.aero/en/directory/electrified-aircraft/all-electric-aircraft/all-electric-evtol/ehang-eh216-s
 - NASA full-scale eVTOL aerodynamic/acoustic flight-test, modeling and simulation project: https://techport.nasa.gov/projects/154389
 - Joby Q3 2026 certification/manufacturing update (published 4 November 2026): https://www.jobyaviation.com/news/joby-reports-third-quarter-2026-financial-results
 - Archer Q3 2026 Market Survey certificate update (published 9 November 2026): https://investors.archer.com/news/news-details/2026/Archer-Announces-Q3-2026-Results-Receives-Market-Survey-Certificate-Unlocking-LA-Operations-and-Boeing-Deal-Close-Imminent/default.aspx
