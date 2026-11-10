@@ -20,42 +20,58 @@
         {
           "agent_instance_id": "AGENT-00",
           "principal_ref": "PRINCIPAL-00",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-01",
           "principal_ref": "PRINCIPAL-01",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-02",
           "principal_ref": "PRINCIPAL-02",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-03",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-04",
           "principal_ref": "PRINCIPAL-04",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-05",
           "principal_ref": "PRINCIPAL-05",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-06",
           "principal_ref": "PRINCIPAL-06",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-07",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         }
       ],
       "edges": [
@@ -316,7 +332,7 @@
         "maximum_selected_agent_instance_id": "AGENT-03",
         "reciprocity": "required"
       },
-      "graph_sha256": "ceae4d221d2efebd93c0d24375ffaa935960ef39c7fcac9576a8a077552b89ad"
+      "graph_sha256": "170965fa98d79f1e53d114a40e4176dabd41e0adb81b39642772ce0c8df293a8"
     },
     {
       "profile_id": "IG-COMM-TOPOLOGY-001/star/v0.1",
@@ -330,42 +346,58 @@
         {
           "agent_instance_id": "AGENT-00",
           "principal_ref": "PRINCIPAL-00",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-01",
           "principal_ref": "PRINCIPAL-01",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-02",
           "principal_ref": "PRINCIPAL-02",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-03",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-04",
           "principal_ref": "PRINCIPAL-04",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-05",
           "principal_ref": "PRINCIPAL-05",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-06",
           "principal_ref": "PRINCIPAL-06",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-07",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         }
       ],
       "edges": [
@@ -630,7 +662,7 @@
         "maximum_selected_agent_instance_id": "AGENT-00",
         "reciprocity": "required"
       },
-      "graph_sha256": "e8028a024c82c789385e47e6cf23d4c5771f486701cd195a23bacf248791a2ea"
+      "graph_sha256": "866c3b37c371d3b9abac32835d55a7963c2adfa9fa5d251f00b819e9d5c03473"
     },
     {
       "profile_id": "IG-COMM-TOPOLOGY-001/balanced_tree/v0.1",
@@ -644,42 +676,58 @@
         {
           "agent_instance_id": "AGENT-00",
           "principal_ref": "PRINCIPAL-00",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-01",
           "principal_ref": "PRINCIPAL-01",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-02",
           "principal_ref": "PRINCIPAL-02",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-03",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-04",
           "principal_ref": "PRINCIPAL-04",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-05",
           "principal_ref": "PRINCIPAL-05",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-06",
           "principal_ref": "PRINCIPAL-06",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-07",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         }
       ],
       "edges": [
@@ -969,7 +1017,7 @@
         "maximum_selected_agent_instance_id": "AGENT-01",
         "reciprocity": "required"
       },
-      "graph_sha256": "4c743ccec547317f633398dd48cd4753e36f6e5c397b12601b016b62c6168df4"
+      "graph_sha256": "6dd4c3c271098239af955a6cba4faabb56655bddcfbe42e8e4f4722aa4aec873"
     },
     {
       "profile_id": "IG-COMM-TOPOLOGY-001/complete/v0.1",
@@ -983,42 +1031,58 @@
         {
           "agent_instance_id": "AGENT-00",
           "principal_ref": "PRINCIPAL-00",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-01",
           "principal_ref": "PRINCIPAL-01",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-02",
           "principal_ref": "PRINCIPAL-02",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-03",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-04",
           "principal_ref": "PRINCIPAL-04",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-05",
           "principal_ref": "PRINCIPAL-05",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-06",
           "principal_ref": "PRINCIPAL-06",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-07",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         }
       ],
       "edges": [
@@ -1879,7 +1943,7 @@
         "maximum_selected_agent_instance_id": "AGENT-00",
         "reciprocity": "not_required_for_unsupported_tie_control"
       },
-      "graph_sha256": "4f6c2b8546e3b03ef6cf81bdae4371a181c66571a667a8f900e19daff8c02187"
+      "graph_sha256": "1db9f1c1cbca85cd4dc5b3b43d131721dc7d5775d4db440fa30368b7829a0cb1"
     },
     {
       "profile_id": "IG-COMM-TOPOLOGY-001/sparse_random/v0.1",
@@ -1893,42 +1957,58 @@
         {
           "agent_instance_id": "AGENT-00",
           "principal_ref": "PRINCIPAL-00",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-01",
           "principal_ref": "PRINCIPAL-01",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-02",
           "principal_ref": "PRINCIPAL-02",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-03",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-04",
           "principal_ref": "PRINCIPAL-04",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-05",
           "principal_ref": "PRINCIPAL-05",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-06",
           "principal_ref": "PRINCIPAL-06",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-07",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         }
       ],
       "edges": [
@@ -2341,7 +2421,7 @@
         "maximum_selected_agent_instance_id": "AGENT-00",
         "reciprocity": "not_required_for_unsupported_tie_control"
       },
-      "graph_sha256": "103f18bb9803992f2a8a3245b69ee97cf7d7f329ef2217191cacc00b0085cb9b"
+      "graph_sha256": "1346df3e2c7dc5f407dd4760f3de2365cebe56e62f4a920f8b1deccf711274bd"
     },
     {
       "profile_id": "IG-COMM-TOPOLOGY-001/stochastic_block/v0.1",
@@ -2355,42 +2435,58 @@
         {
           "agent_instance_id": "AGENT-00",
           "principal_ref": "PRINCIPAL-00",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-01",
           "principal_ref": "PRINCIPAL-01",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-02",
           "principal_ref": "PRINCIPAL-02",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-03",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-04",
           "principal_ref": "PRINCIPAL-04",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-05",
           "principal_ref": "PRINCIPAL-05",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-06",
           "principal_ref": "PRINCIPAL-06",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-07",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         }
       ],
       "edges": [
@@ -2823,7 +2919,7 @@
         "maximum_selected_agent_instance_id": "AGENT-03",
         "reciprocity": "required"
       },
-      "graph_sha256": "83f1e9f13efd057629cb3a32f487bc38692be262cae537929e38842709f1296c"
+      "graph_sha256": "f2bcc718c5fe2c1edebb1dbdefa6a0bfddcfcdcc977a8234ac7c16611ec3c024"
     },
     {
       "profile_id": "IG-COMM-TOPOLOGY-001/core_periphery/v0.1",
@@ -2837,42 +2933,58 @@
         {
           "agent_instance_id": "AGENT-00",
           "principal_ref": "PRINCIPAL-00",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-01",
           "principal_ref": "PRINCIPAL-01",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-02",
           "principal_ref": "PRINCIPAL-02",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-03",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-04",
           "principal_ref": "PRINCIPAL-04",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-05",
           "principal_ref": "PRINCIPAL-05",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-06",
           "principal_ref": "PRINCIPAL-06",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-07",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         }
       ],
       "edges": [
@@ -3303,7 +3415,7 @@
         "maximum_selected_agent_instance_id": "AGENT-02",
         "reciprocity": "required"
       },
-      "graph_sha256": "571c9efe1599fe5891265822329061bb816ba7e806ae587e57d9bbb57b6bea70"
+      "graph_sha256": "ff6cdf3af62899e59a98a8a70e7673f80a9593aef4a0cc3139187f43ef76e12e"
     },
     {
       "profile_id": "IG-COMM-TOPOLOGY-001/temporal_churn/v0.1",
