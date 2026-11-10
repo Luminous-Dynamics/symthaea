@@ -103,6 +103,22 @@ pub struct CausalDiagnosticActionSetReceipt {
     pub descriptor_set_digest: String,
 }
 
+/// Complete digest envelope for a decision-focused diagnostic problem.
+///
+/// Binds the causal action descriptors, hypothesis identities and priors,
+/// action-conditioned likelihood tables, downstream decision-loss table,
+/// and task specification. The source revision and evaluator authority belong
+/// in the outer run/verification receipt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CausalDiagnosticDecisionProblemReceipt {
+    pub action_set_digest: String,
+    pub hypothesis_set_digest: String,
+    pub action_likelihood_table_set_digest: String,
+    pub decision_loss_table_digest: String,
+    pub task_specification_digest: String,
+    pub decision_problem_digest: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum CausalDiagnosticActionError {
     #[error("at least one diagnostic action is required")]
@@ -136,6 +152,8 @@ pub enum CausalDiagnosticActionError {
     InvalidLikelihoodDistribution { hypothesis_id: String },
     #[error("action-likelihood digest does not match the decision-kernel input for action {0}")]
     ActionLikelihoodDigestMismatch(String),
+    #[error("decision-loss table is empty, non-finite, negative, or non-rectangular")]
+    InvalidDecisionLossTable,
 }
 
 /// Compute a canonical digest of one action's complete predictive-likelihood table.
@@ -246,6 +264,172 @@ pub fn validate_causal_diagnostic_action_likelihood_bindings(
         }
     }
     Ok(receipt)
+}
+
+/// Digest hypothesis identities and priors independently of action outcomes.
+pub fn compute_hypothesis_set_digest(
+    hypotheses: &[DecisionHypothesis],
+) -> Result<String, CausalDiagnosticActionError> {
+    if hypotheses.is_empty() {
+        return Err(CausalDiagnosticActionError::InvalidHypothesisSet);
+    }
+    let prior_sum: f64 = hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.prior_probability)
+        .sum();
+    if !prior_sum.is_finite() || (prior_sum - 1.0).abs() > 1e-9 {
+        return Err(CausalDiagnosticActionError::InvalidHypothesisSet);
+    }
+
+    let mut seen_ids = BTreeSet::new();
+    let mut ordered: Vec<&DecisionHypothesis> = hypotheses.iter().collect();
+    for hypothesis in &ordered {
+        if hypothesis.id.trim().is_empty()
+            || !seen_ids.insert(hypothesis.id.as_str())
+            || !hypothesis.prior_probability.is_finite()
+            || !(0.0..=1.0).contains(&hypothesis.prior_probability)
+        {
+            return Err(CausalDiagnosticActionError::InvalidHypothesisSet);
+        }
+    }
+    ordered.sort_by(|left, right| left.id.cmp(&right.id));
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-decision-hypothesis-set-v1\0");
+    hasher.update(&(ordered.len() as u64).to_le_bytes());
+    for hypothesis in ordered {
+        hash_field(&mut hasher, "hypothesis_id", &hypothesis.id);
+        hasher.update(&hypothesis.prior_probability.to_bits().to_le_bytes());
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Digest the downstream loss matrix, preserving decision order and exact
+/// floating-point values. Losses must be finite, non-negative, and rectangular.
+pub fn compute_decision_loss_table_digest(
+    hypotheses: &[DecisionHypothesis],
+) -> Result<String, CausalDiagnosticActionError> {
+    if hypotheses.is_empty() {
+        return Err(CausalDiagnosticActionError::InvalidDecisionLossTable);
+    }
+    let mut seen_ids = BTreeSet::new();
+    let mut ordered: Vec<&DecisionHypothesis> = hypotheses.iter().collect();
+    for hypothesis in &ordered {
+        if hypothesis.id.trim().is_empty()
+            || !seen_ids.insert(hypothesis.id.as_str())
+        {
+            return Err(CausalDiagnosticActionError::InvalidDecisionLossTable);
+        }
+    }
+    ordered.sort_by(|left, right| left.id.cmp(&right.id));
+
+    let decision_count = ordered[0].loss_by_final_decision.len();
+    if decision_count == 0 {
+        return Err(CausalDiagnosticActionError::InvalidDecisionLossTable);
+    }
+    for hypothesis in &ordered {
+        if hypothesis.loss_by_final_decision.len() != decision_count
+            || hypothesis
+                .loss_by_final_decision
+                .iter()
+                .any(|loss| !loss.is_finite() || *loss < 0.0)
+        {
+            return Err(CausalDiagnosticActionError::InvalidDecisionLossTable);
+        }
+    }
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-decision-loss-table-v1\0");
+    hasher.update(&(ordered.len() as u64).to_le_bytes());
+    hasher.update(&(decision_count as u64).to_le_bytes());
+    for hypothesis in ordered {
+        hash_field(&mut hasher, "hypothesis_id", &hypothesis.id);
+        for loss in &hypothesis.loss_by_final_decision {
+            hasher.update(&loss.to_bits().to_le_bytes());
+        }
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Bind one complete decision problem before an EVSI result is admitted.
+///
+/// This verifies the action descriptor set, recomputes the supplied likelihood
+/// tables, validates model priors and losses, and binds the caller's task
+/// specification digest. It does not prove that the likelihoods or losses
+/// accurately represent the world.
+pub fn validate_causal_diagnostic_decision_problem(
+    actions: &[DiagnosticAction],
+    descriptors: &[CausalDiagnosticActionDescriptor],
+    hypotheses: &[DecisionHypothesis],
+    task_specification_digest: &str,
+) -> Result<CausalDiagnosticDecisionProblemReceipt, CausalDiagnosticActionError> {
+    let action_set =
+        validate_causal_diagnostic_action_likelihood_bindings(actions, descriptors, hypotheses)?;
+    let hypothesis_set_digest = compute_hypothesis_set_digest(hypotheses)?;
+    let decision_loss_table_digest = compute_decision_loss_table_digest(hypotheses)?;
+
+    let mut ordered_action_digests: Vec<(String, String)> = actions
+        .iter()
+        .enumerate()
+        .map(|(action_index, action)| {
+            Ok((
+                action.id.clone(),
+                compute_action_likelihood_table_digest(hypotheses, action_index)?,
+            ))
+        })
+        .collect::<Result<_, CausalDiagnosticActionError>>()?;
+    ordered_action_digests.sort_by(|left, right| left.0.cmp(&right.0));
+
+    let mut action_likelihood_hasher = Sha256::new();
+    action_likelihood_hasher.update(b"symthaea-action-likelihood-table-set-v1\0");
+    action_likelihood_hasher.update(&(ordered_action_digests.len() as u64).to_le_bytes());
+    for (action_id, likelihood_digest) in ordered_action_digests {
+        hash_field(&mut action_likelihood_hasher, "action_id", &action_id);
+        hash_field(
+            &mut action_likelihood_hasher,
+            "action_likelihood_table_digest",
+            &likelihood_digest,
+        );
+    }
+    let action_likelihood_table_set_digest =
+        format!("{:x}", action_likelihood_hasher.finalize());
+
+    let mut problem_hasher = Sha256::new();
+    problem_hasher.update(b"symthaea-causal-diagnostic-decision-problem-v1\0");
+    hash_field(
+        &mut problem_hasher,
+        "action_set_digest",
+        &action_set.descriptor_set_digest,
+    );
+    hash_field(
+        &mut problem_hasher,
+        "hypothesis_set_digest",
+        &hypothesis_set_digest,
+    );
+    hash_field(
+        &mut problem_hasher,
+        "action_likelihood_table_set_digest",
+        &action_likelihood_table_set_digest,
+    );
+    hash_field(
+        &mut problem_hasher,
+        "decision_loss_table_digest",
+        &decision_loss_table_digest,
+    );
+    hash_digest(
+        &mut problem_hasher,
+        "task_specification_digest",
+        task_specification_digest,
+    )?;
+
+    Ok(CausalDiagnosticDecisionProblemReceipt {
+        action_set_digest: action_set.descriptor_set_digest,
+        hypothesis_set_digest,
+        action_likelihood_table_set_digest,
+        decision_loss_table_digest,
+        task_specification_digest: task_specification_digest.to_owned(),
+        decision_problem_digest: format!("{:x}", problem_hasher.finalize()),
+    })
 }
 
 /// Validate a one-to-one typed causal descriptor set and produce its digest.
@@ -814,6 +998,82 @@ mod tests {
         assert!(matches!(
             compute_action_likelihood_table_digest(&invalid_likelihood, 0),
             Err(CausalDiagnosticActionError::InvalidLikelihoodDistribution { .. })
+        ));
+    }
+
+    #[test]
+    fn decision_problem_receipt_binds_hypotheses_likelihoods_losses_and_task() {
+        let (actions, mut descriptors) = four_kind_fixture();
+        let hypotheses = hypothesis_fixture();
+        bind_fixture_likelihood_digests(&hypotheses, &mut descriptors);
+        let original = validate_causal_diagnostic_decision_problem(
+            &actions,
+            &descriptors,
+            &hypotheses,
+            &digest('a'),
+        )
+        .expect("complete decision-problem receipt");
+
+        let mut altered_losses = hypotheses.clone();
+        altered_losses[0].loss_by_final_decision[0] = 0.25;
+        let changed_loss = validate_causal_diagnostic_decision_problem(
+            &actions,
+            &descriptors,
+            &altered_losses,
+            &digest('a'),
+        )
+        .expect("changed loss table");
+
+        let changed_task = validate_causal_diagnostic_decision_problem(
+            &actions,
+            &descriptors,
+            &hypotheses,
+            &digest('b'),
+        )
+        .expect("changed task specification");
+
+        assert_ne!(
+            original.decision_loss_table_digest,
+            changed_loss.decision_loss_table_digest
+        );
+        assert_ne!(
+            original.decision_problem_digest,
+            changed_loss.decision_problem_digest
+        );
+        assert_ne!(
+            original.decision_problem_digest,
+            changed_task.decision_problem_digest
+        );
+    }
+
+    #[test]
+    fn decision_problem_receipt_rejects_invalid_loss_table_and_task_digest() {
+        let (actions, mut descriptors) = four_kind_fixture();
+        let hypotheses = hypothesis_fixture();
+        bind_fixture_likelihood_digests(&hypotheses, &mut descriptors);
+
+        let mut invalid_losses = hypotheses.clone();
+        invalid_losses[0].loss_by_final_decision[0] = f64::NAN;
+        assert!(matches!(
+            validate_causal_diagnostic_decision_problem(
+                &actions,
+                &descriptors,
+                &invalid_losses,
+                &digest('a'),
+            ),
+            Err(CausalDiagnosticActionError::InvalidDecisionLossTable)
+        ));
+
+        assert!(matches!(
+            validate_causal_diagnostic_decision_problem(
+                &actions,
+                &descriptors,
+                &hypotheses,
+                "not-a-digest",
+            ),
+            Err(CausalDiagnosticActionError::InvalidDigest(
+                "task_specification_digest"
+            ))
         ));
     }
 
