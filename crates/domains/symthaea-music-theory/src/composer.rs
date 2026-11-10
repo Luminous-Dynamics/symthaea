@@ -1723,7 +1723,7 @@ fn apply_harmonic_stasis(score: &mut Score) {
         onsets.sort_by(f64::total_cmp);
         onsets.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
 
-        let mut active: std::collections::HashMap<u8, usize> = std::collections::HashMap::new();
+        let mut active: std::collections::HashMap<(PartId, u8), usize> = std::collections::HashMap::new();
         let mut removed: Vec<usize> = Vec::new();
 
         for &t in &onsets {
@@ -1734,18 +1734,18 @@ fn apply_harmonic_stasis(score: &mut Score) {
                 .filter(|(_, n)| n.role == role && (n.onset.beats() - t).abs() < 1e-9)
                 .map(|(idx, _)| idx)
                 .collect();
-            let mut still_active: std::collections::HashMap<u8, usize> =
+            let mut still_active: std::collections::HashMap<(PartId, u8), usize> =
                 std::collections::HashMap::new();
             for &idx in &chord {
-                let midi = score.notes[idx].pitch.midi();
-                if let Some(&source) = active.get(&midi) {
+                let key = (score.notes[idx].part, score.notes[idx].pitch.midi());
+                if let Some(&source) = active.get(&key) {
                     let new_end = score.notes[idx].onset + score.notes[idx].duration;
                     let src_onset = score.notes[source].onset;
                     score.notes[source].duration = new_end.saturating_sub(src_onset);
                     removed.push(idx);
-                    still_active.insert(midi, source);
+                    still_active.insert(key, source);
                 } else {
-                    still_active.insert(midi, idx);
+                    still_active.insert(key, idx);
                 }
             }
             active = still_active;
@@ -2495,7 +2495,10 @@ fn apply_joyful_lift(score: &mut Score) {
 
 fn apply_joyful_lift_for_part(score: &mut Score, melody_part_id: PartId) {
     for n in score.notes.iter_mut() {
-        if n.role == VoiceRole::Melody && n.emphasis == Emphasis::Normal && n.duration.beats() < 1.5
+        if n.part == melody_part_id
+            && n.role == VoiceRole::Melody
+            && n.emphasis == Emphasis::Normal
+            && n.duration.beats() < 1.5
         {
             n.duration = n.duration.scale(9, 10);
         }
@@ -2675,7 +2678,7 @@ fn apply_damage(
             let grace = Duration::sixteenth();
             let passing_onset = score.notes[bi].onset.saturating_sub(grace);
             let passing = ScoreNote {
-                part: melody_part_id,
+                part: score.notes[ai].part,
                 pitch: score.notes[ai].pitch.transpose(dir),
                 onset: passing_onset,
                 duration: grace,
