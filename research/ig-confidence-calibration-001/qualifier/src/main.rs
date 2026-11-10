@@ -35,6 +35,16 @@ fn field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key)?.as_str().filter(|value| !value.trim().is_empty())
 }
 
+fn string_set(value: &Value) -> BTreeSet<String> {
+    value
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
 fn is_sha256(value: &str) -> bool {
     value.len() == 64
         && value
