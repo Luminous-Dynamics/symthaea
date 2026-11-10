@@ -716,11 +716,11 @@ mod tests {
     }
 
     #[test]
-    fn frozen_corpus_accepts_five_and_rejects_eight_controls() {
+    fn frozen_corpus_accepts_six_and_rejects_twelve_controls() {
         let report = report();
-        assert_eq!(report.payload.case_count, 13);
-        assert_eq!(report.payload.accepted_count, 5);
-        assert_eq!(report.payload.rejected_count, 8);
+        assert_eq!(report.payload.case_count, 18);
+        assert_eq!(report.payload.accepted_count, 6);
+        assert_eq!(report.payload.rejected_count, 12);
     }
 
     #[test]
@@ -796,8 +796,9 @@ mod tests {
             .find(|case| case.case_id == "partial-adapter-declared-partial")
             .expect("partial adapter case");
         assert!(case.accepted);
-        assert_eq!(case.supported_tasks, 2);
-        assert_eq!(case.partial_tasks, 1);
+        assert_eq!(case.supported_tasks, 0);
+        assert_eq!(case.partial_tasks, 3);
+        assert_eq!(case.not_supported_tasks, 3);
     }
 
     #[test]
