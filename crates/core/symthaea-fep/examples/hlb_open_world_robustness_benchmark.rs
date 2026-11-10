@@ -260,6 +260,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             outcome_probabilities_by_action: hypothesis.outcome_probabilities_by_action.clone(),
         })
         .collect();
+    let nominal_truth_scores = actual_expected_scores(&hypotheses, &actions, &truth, &nominal);
     let alpha_grid = [1.0, 0.9, 0.7, 0.5, 0.3, 0.1];
     let mut sibson_alpha_sweep = Vec::with_capacity(alpha_grid.len());
     let mut alpha_one_consistency_error = 0.0_f64;
@@ -268,12 +269,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         let actual_scores =
             actual_expected_sibson_scores(&hypotheses, &actions, &truth, &evaluation);
         if alpha == 1.0 {
-            for (alpha_score, nominal_score) in actual_scores.iter().zip(&actual_scores) {
+            for (alpha_score, nominal_score) in actual_scores.iter().zip(&nominal_truth_scores) {
                 alpha_one_consistency_error =
                     alpha_one_consistency_error.max((alpha_score - nominal_score).abs());
             }
         }
         let robust_action = evaluation.most_robustly_informative_action;
+        let selected_actual_score = actual_scores[robust_action];
         sibson_alpha_sweep.push(json!({
             "alpha": alpha,
             "robust_information_selected_action_index": robust_action,
@@ -283,7 +285,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "shannon_information_by_action_nats": evaluation.actions.iter()
                 .map(|action| action.shannon_information_nats).collect::<Vec<_>>(),
             "alpha_tilted_actual_expected_score_by_action": actual_scores,
-            "selected_action_actual_expected_score": actual_scores[robust_action],
+            "selected_action_actual_expected_score": selected_actual_score,
             "interpretation": "Information-only selection; score uses alpha-tilted posterior and independent ground-truth outcome probabilities. No cost/risk selection authority."
         }));
     }
