@@ -42,6 +42,25 @@ Primary sources:
 - [IUMI — Nuclear propulsion](https://iumi.com/policy/nuclear-propulsion/)
 - [2026 containership propulsion economics study](https://www.sciencedirect.com/science/article/pii/S0149197026000776)
 
+### 2.1.1 New merchant-shipping TCO reference (5 November 2026)
+
+UCL Energy Institute published *Nuclear Reactors for Merchant Shipping: A Total Cost of Ownership Assessment of a Low-Carbon Pathway* on 5 November 2026. Its public summary reports:
+- without the IMO Net-Zero Framework, none of the nuclear-powered vessel cases is cheaper than conventional vessels, even at the lowest reactor-cost assumptions;
+- under the IMO Net-Zero Framework, nuclear propulsion could become least-cost from 2040 only if reactor costs fall significantly to levels not yet demonstrated;
+- insurance, liability and regulatory frameworks remain material barriers.
+
+Source: [UCL Energy Institute publication](https://www.ucl.ac.uk/bartlett/publications/2026/nov/nuclear-reactors-merchant-shipping-total-cost-ownership-assessment-low-carbon-pathway).
+
+This becomes an obligatory independent **negative/conditional economic benchmark**. Do not hard-code its conclusion into the calculator. Admit its source assumptions, route/service scope, policy scenario, CAPEX, financing, fuel, insurance, port and lifecycle boundaries when available, then reproduce the result. Keep it distinct from the Lloyd's Register 15,000 TEU / 25-knot case. The two studies have different assumptions and comparison boundaries; the benchmark must explain any divergence rather than average their findings.
+
+### 2.1.2 Port-readiness and insurability evidence
+
+- Lloyd's Register / British Ports Association (22 October 2026) recommends that ports prepare before procurement, map stakeholders, assess demand/grid constraints, engage regulators, and strengthen workforce and community readiness. It explicitly recognizes that nuclear will not be appropriate for every port. Source: [LR/BPA port readiness paper announcement](https://www.lr.org/en/knowledge/press-room/press-listing/press-release/2026/ports-encouraged-to-prepare-now-for-advanced-nuclear-in-maritime-and-clean-energy/).
+- WTW (22 October 2026) highlights port exclusion, emergency-response confidence, nuclear-versus-maritime liability allocation, and insurer/reinsurer exposure as commercial viability questions. Source: [WTW — Nuclear shipping's second act](https://www.wtwco.com/en-us/insights/2026/10/nuclear-shippings-second-act).
+- IUMI (7 May 2026) reports that conventional marine insurance excludes nuclear risks and that existing maritime liability and IMO frameworks were not designed for nuclear-powered merchant ships. Source: [IUMI — Nuclear propulsion](https://iumi.com/policy/nuclear-propulsion/).
+
+Consequently, insurability, port admission and liability cannot be represented as small cost premiums or probabilistic penalties. They are explicit feasibility gates until a credible, jurisdiction-specific arrangement exists.
+
 ### 2.2 Industry software baselines
 
 The engineering assurance fabric must be compared against the relevant capabilities of established tools—not against a caricature of them.
