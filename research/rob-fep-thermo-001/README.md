@@ -147,7 +147,9 @@ Compare at equal information, compute, action and physical-resource budgets:
 | G | Corrected action-conditioned FEP + EVSI | Qualified thermal and actuator constraints |
 | H | Thermal-constrained MPC / HQP | Same qualified plant and sensor budget |
 | I | Thermal-aware RL / residual policy | Same qualified plant and sensor budget |
-| J | Evaluator-only clairvoyant oracle | Upper bound only; never deployable |
+| J | GenAIF-style generative trajectory model (diffusion / CVAE / flow matching) with action-conditioned likelihoods | Same plant and inference budget; manipulation-domain comparison first |
+| K | Robust min–max MPC / viability-filtered controller | Same qualified physical plant, disturbance set and action budget |
+| L | Evaluator-only clairvoyant oracle | Upper bound only; never deployable |
 
 Add HDC-only, CfC/LTC-only and combined ablations only where matched compute and data are available.
 
