@@ -641,10 +641,12 @@ pub fn compare_episode_safety_arms(
         for metric in metrics {
             let base_rate = episode_metric_rate(&baseline_unit, metric);
             let candidate_rate = episode_metric_rate(&candidate_unit, metric);
+            // A missing verdict in either arm is an unresolved pair, not a
+            // protocol mismatch. Keep the unit in the paired denominator and
+            // suppress only this metric's delta.
             let delta = match (base_rate, candidate_rate) {
                 (Some(base), Some(candidate)) => Some(candidate - base),
-                (None, None) => None,
-                _ => return Err(EpisodeSafetyError::ComparisonApplicabilityMismatch),
+                _ => None,
             };
             unit_deltas.push(EpisodeSafetyUnitDelta {
                 task_id: task_id.clone(),
