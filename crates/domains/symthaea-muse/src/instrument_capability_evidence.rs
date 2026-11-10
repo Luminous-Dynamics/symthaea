@@ -236,7 +236,8 @@ pub struct QualifiedInstrumentCapabilityV1 {
     pub capability: InstrumentCapabilityV1,
     pub profile_sha256: String,
     pub profile_digest_schema: String,
-    pub scope: CapabilityScopeV1,
+    pub performance_scope: CapabilityScopeV1,
+    pub renderer_scope: Option<CapabilityScopeV1>,
     pub claim_ids: Vec<String>,
     pub evidence_ids: Vec<String>,
     pub qualification_record_ids: Vec<String>,
@@ -549,21 +550,27 @@ fn qualified_values<'a>(
 /// require a positive renderer/patch availability claim.
 pub fn materialize_qualified_instrument_capability_v1(
     profile: &InstrumentCapabilityEvidenceProfileV1,
-    required_scope: &CapabilityScopeV1,
+    required_performance_scope: &CapabilityScopeV1,
+    required_renderer_scope: Option<&CapabilityScopeV1>,
 ) -> Result<QualifiedInstrumentCapabilityV1, CapabilityMaterializationErrorV1> {
     let validation = validate_instrument_capability_evidence_v1(profile);
     if !validation.valid {
         return Err(CapabilityMaterializationErrorV1::InvalidProfile);
     }
 
-    let claims: Vec<&CapabilityClaimV1> =
-        qualified_values(profile, required_scope).collect();
-    let ranges: Vec<&CapabilityClaimV1> = claims
+    if !validate_scope(required_performance_scope)
+        || required_renderer_scope.is_some_and(|scope| !validate_scope(scope))
+    {
+        return Err(CapabilityMaterializationErrorV1::ScopeMismatch);
+    }
+    let performance_claims: Vec<&CapabilityClaimV1> =
+        qualified_values(profile, required_performance_scope).collect();
+    let ranges: Vec<&CapabilityClaimV1> = performance_claims
         .iter()
         .copied()
         .filter(|claim| matches!(&claim.value, CapabilityValueV1::SoundingRange { .. }))
         .collect();
-    let polyphony: Vec<&CapabilityClaimV1> = claims
+    let polyphony: Vec<&CapabilityClaimV1> = performance_claims
         .iter()
         .copied()
         .filter(|claim| matches!(&claim.value, CapabilityValueV1::MaxPolyphony { .. }))
@@ -598,29 +605,44 @@ pub fn materialize_qualified_instrument_capability_v1(
         return Err(CapabilityMaterializationErrorV1::DuplicateQualifiedPolyphony);
     }
 
-    if required_scope.renderer_id.is_some() || required_scope.patch_id.is_some() {
-        let renderer_claims: Vec<&CapabilityClaimV1> = claims
-            .iter()
-            .copied()
+    let renderer_claims: Vec<&CapabilityClaimV1> = if let Some(renderer_scope) =
+        required_renderer_scope
+    {
+        qualified_values(profile, renderer_scope)
             .filter(|claim| {
                 matches!(
                     &claim.value,
                     CapabilityValueV1::RendererPatchAvailability { .. }
                 )
             })
-            .collect();
-        if renderer_claims.is_empty() {
-            return Err(CapabilityMaterializationErrorV1::MissingQualifiedRendererPatch);
-        }
-        if renderer_claims.len() > 1 {
-            return Err(CapabilityMaterializationErrorV1::DuplicateQualifiedCapability);
-        }
-        if !matches!(
-            &renderer_claims[0].value,
+            .collect()
+    } else {
+        Vec::new()
+    };
+    if required_renderer_scope.is_some() && renderer_claims.is_empty() {
+        let exists_at_another_scope = profile.claims.iter().any(|claim| {
+            claim.disposition == QualificationDispositionV1::Qualified
+                && matches!(
+                    &claim.value,
+                    CapabilityValueV1::RendererPatchAvailability { .. }
+                )
+        });
+        return Err(if exists_at_another_scope {
+            CapabilityMaterializationErrorV1::ScopeMismatch
+        } else {
+            CapabilityMaterializationErrorV1::MissingQualifiedRendererPatch
+        });
+    }
+    if renderer_claims.len() > 1 {
+        return Err(CapabilityMaterializationErrorV1::DuplicateQualifiedCapability);
+    }
+    if renderer_claims.first().is_some_and(|claim| {
+        !matches!(
+            &claim.value,
             CapabilityValueV1::RendererPatchAvailability { available: true }
-        ) {
-            return Err(CapabilityMaterializationErrorV1::RendererPatchUnavailable);
-        }
+        )
+    }) {
+        return Err(CapabilityMaterializationErrorV1::RendererPatchUnavailable);
     }
 
     let sounding_range = match &ranges[0].value {
@@ -639,19 +661,8 @@ pub fn materialize_qualified_instrument_capability_v1(
     };
 
     let mut required_claims = vec![ranges[0], polyphony[0]];
-    if required_scope.renderer_id.is_some() || required_scope.patch_id.is_some() {
-        required_claims.push(
-            claims
-                .iter()
-                .copied()
-                .find(|claim| {
-                    matches!(
-                        &claim.value,
-                        CapabilityValueV1::RendererPatchAvailability { available: true }
-                    )
-                })
-                .ok_or(CapabilityMaterializationErrorV1::MissingQualifiedRendererPatch)?,
-        );
+    if let Some(renderer_claim) = renderer_claims.first() {
+        required_claims.push(*renderer_claim);
     }
     required_claims.sort_by(|a, b| a.claim_id.cmp(&b.claim_id));
 
@@ -679,7 +690,8 @@ pub fn materialize_qualified_instrument_capability_v1(
         },
         profile_sha256,
         profile_digest_schema: INSTRUMENT_CAPABILITY_PROFILE_DIGEST_SCHEMA_V1.into(),
-        scope: required_scope.clone(),
+        performance_scope: required_performance_scope.clone(),
+        renderer_scope: required_renderer_scope.cloned(),
         claim_ids,
         evidence_ids,
         qualification_record_ids,
@@ -787,7 +799,12 @@ mod tests {
     fn exact_scope_measured_claims_materialize_existing_capability_contract() {
         let (profile, required_scope) = valid_profile(true);
         let capability =
-            materialize_qualified_instrument_capability_v1(&profile, &required_scope).unwrap();
+            materialize_qualified_instrument_capability_v1(
+                &profile,
+                &required_scope,
+                Some(&renderer_scope),
+            )
+            .unwrap();
         assert_eq!(capability.capability.id, "solo-cello-01");
         assert_eq!(capability.capability.kind, InstrumentKindV1::Cello);
         assert_eq!(capability.capability.sounding_range.lowest_midi, 36);
@@ -797,7 +814,8 @@ mod tests {
         assert_eq!(capability.claim_ids.len(), 3);
         assert_eq!(capability.evidence_ids.len(), 3);
         assert_eq!(capability.qualification_record_ids.len(), 3);
-        assert_eq!(capability.scope, required_scope);
+        assert_eq!(capability.performance_scope, required_scope);
+        assert_eq!(capability.renderer_scope, Some(renderer_scope));
     }
 
     #[test]
@@ -830,7 +848,7 @@ mod tests {
         let (profile, _) = valid_profile(true);
         let wrong_scope = scope(false);
         assert_eq!(
-            materialize_qualified_instrument_capability_v1(&profile, &wrong_scope),
+            materialize_qualified_instrument_capability_v1(&profile, &wrong_scope, None),
             Err(CapabilityMaterializationErrorV1::ScopeMismatch)
         );
     }
@@ -860,7 +878,11 @@ mod tests {
         let (mut profile, required_scope) = valid_profile(true);
         profile.claims.pop();
         assert_eq!(
-            materialize_qualified_instrument_capability_v1(&profile, &required_scope),
+            materialize_qualified_instrument_capability_v1(
+                &profile,
+                &required_scope,
+                Some(&required_scope),
+            ),
             Err(CapabilityMaterializationErrorV1::MissingQualifiedRendererPatch)
         );
     }
