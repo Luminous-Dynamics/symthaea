@@ -64,7 +64,25 @@ The probability must be emitted **before** the task outcome is known. The foreca
 
 Run --calibrate FORECASTS.tsv TRIALS.tsv [BIN_COUNT] [HIGH_CONFIDENCE_THRESHOLD]. It reports Brier score, log loss, fixed-bin expected calibration error (ECE), failure rate among forecasts above the chosen confidence threshold, and area under a confidence-ranked risk/coverage curve. Lower Brier, log loss, ECE, and risk/coverage area are generally better. The high-confidence failure rate is especially relevant to a recovery gate: a system that predicts 90% success should not fail often on the trials it labels that confidently.
 
-Do not tune the confidence threshold on held-out test data. Split calibration and evaluation by scenes/tasks or a preregistered trial set where feasible; report both the ungated base policy and the gated system. These are decision-quality diagnostics, **not** safety certificates or proof of consciousness. The synthetic forecast fixture exists only to test file parsing and metric arithmetic.
+Do not tune the confidence threshold on held-out test data. Split calibration and evaluation by scenes/tasks or a preregistered trial set where feasible; report both the ungated base policy and the gated system. These are decision-quality diagnostics, not safety certificates or proof of consciousness. The synthetic forecast fixture exists only to test file parsing and metric arithmetic.
+
+### Finite-sample selective-risk certificate
+
+The `selective_risk` module adds a separate risk-control layer. Brier/ECE/risk-coverage diagnostics describe forecast quality, but a point probability or a low ECE does not itself bound the error rate among predictions selected for execution.
+
+The certificate freezes one acceptance rule:
+- predicted task-success probability must be at least a pre-registered threshold;
+- predicted unsafe-event probability must be no greater than a pre-registered threshold.
+
+Only held-out calibration episodes satisfying that rule enter the accepted cohort. For that cohort the module computes separate one-sided exact Clopper–Pearson upper bounds for task-failure rate and unsafe-event rate. It uses `delta/2` for each bound, giving a simultaneous confidence claim of at least `1 - delta` by the union bound, **provided** the calibration episodes and deployment episodes are independent/exchangeable within the same declared context.
+
+The context freezes task ID, policy-artifact digest, environment/shift-condition digest and evaluator digest. The certificate also records the calibration-dataset digest. At runtime, a score is accepted by this gate only if the exact context matches, the score lies inside the frozen acceptance region, and both finite-sample risk bounds satisfy their limits.
+
+Invalid/interrupted runs count as task failures. Missing task-success labels or missing unsafe-event labels are recorded as incomplete evidence; the corresponding bound is withheld and the certificate cannot qualify. Certificate fields are private after construction, so callers cannot change the status or bounds in-place.
+
+**Important limitations:** the module does not hash/authenticate the supplied dataset or artifact digests, prove that data were held out, establish independence/exchangeability, detect all distribution shifts, or authorize actuator commands. A certificate for one condition does not transfer to a new shift, robot configuration, evaluator or policy. Multiple task/condition/policy certificates require a pre-registered multiplicity plan or separately allocated error budgets. The result is statistical selective-risk evidence for one declared cohort, not a physical safety guarantee.
+
+See [the selective-risk certificate design note](../../docs/research/ROBODOJO_SELECTIVE_RISK_CERTIFICATE_V0_1.md).
 
 ## Scope boundary
 
