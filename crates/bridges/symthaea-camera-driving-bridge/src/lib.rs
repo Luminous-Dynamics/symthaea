@@ -950,6 +950,49 @@ mod tests {
     }
 
     #[test]
+    fn rejects_tampered_upstream_receipt_before_advancing_temporal_state() {
+        let mut bridge = bridge();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.upstream.receipt_sha256 = "f".repeat(64);
+        assert_eq!(
+            bridge.observe(item).err(),
+            Some(BridgeError::UpstreamReceiptCommitmentMismatch)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_tampered_upstream_observation_identity_before_advancing_state() {
+        let mut bridge = bridge();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.upstream.observation_id = "f".repeat(64);
+        assert_eq!(
+            bridge.observe(item).err(),
+            Some(BridgeError::UpstreamReceiptCommitmentMismatch)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_upstream_frame_byte_length_mismatch_before_advancing_state() {
+        let mut bridge = bridge();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.upstream.frame_byte_len += 1;
+        item.upstream.receipt_sha256 = item.upstream.calculated_receipt_sha256();
+        assert_eq!(
+            bridge.observe(item).err(),
+            Some(BridgeError::UpstreamReceiptMalformed)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
+    }
+
+    #[test]
     fn constructs_frozen_vision_pipeline() {
         let bridge = bridge();
         assert!(bridge.learning_is_frozen());
