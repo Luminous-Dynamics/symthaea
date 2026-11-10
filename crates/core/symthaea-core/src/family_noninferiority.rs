@@ -169,7 +169,7 @@ impl FamilyGuardrailPlan {
             .flat_map(|family| family.episode_ids.iter())
             .collect::<BTreeSet<_>>();
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea-confirmatory-episode-manifest-v1\\0");
+        hasher.update(b"symthaea-confirmatory-episode-manifest-v1\0");
         hasher.update(&1_u32.to_le_bytes());
         hasher.update(&(episode_ids.len() as u64).to_le_bytes());
         for episode_id in episode_ids {
