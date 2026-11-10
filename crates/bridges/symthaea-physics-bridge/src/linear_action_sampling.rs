@@ -11,7 +11,7 @@ use nalgebra::{DMatrix, DVector};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-use symthaea_core::hdc::conjecture_engine::Expr;
+use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 
 use crate::linear_group_action::AdmittedLinearGroupActionV1;
 
@@ -205,37 +205,262 @@ pub enum LinearActionSamplingErrorV1 {
     },
 }
 
-/// Evaluate the scalar expression using the declared variable order.
+/// Append a length-prefixed byte string to a canonical BLAKE3 input.
+fn hash_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
+}
+
+fn hash_str(hasher: &mut blake3::Hasher, value: &str) {
+    hash_bytes(hasher, value.as_bytes());
+}
+
+fn hash_usize(hasher: &mut blake3::Hasher, value: usize) {
+    hasher.update(&(value as u64).to_le_bytes());
+}
+
+fn hash_f64(hasher: &mut blake3::Hasher, value: f64) {
+    hasher.update(&value.to_bits().to_le_bytes());
+}
+
+/// Canonical structural encoding of the expression tree. Constants use their
+/// exact IEEE-754 bit patterns; this is an identity digest, not a semantic hash.
+fn hash_expression_node(hasher: &mut blake3::Hasher, expr: &Expr) {
+    match expr {
+        Expr::Var(name) => {
+            hasher.update(&[0]);
+            hash_str(hasher, name);
+        }
+        Expr::Const(value) => {
+            hasher.update(&[1]);
+            hash_f64(hasher, *value);
+        }
+        Expr::BinOp(operation, left, right) => {
+            hasher.update(&[2]);
+            let tag = match operation {
+                BinOp::Add => 0,
+                BinOp::Sub => 1,
+                BinOp::Mul => 2,
+                BinOp::Div => 3,
+                BinOp::Pow => 4,
+            };
+            hasher.update(&[tag]);
+            hash_expression_node(hasher, left);
+            hash_expression_node(hasher, right);
+        }
+        Expr::Func(function, argument) => {
+            hasher.update(&[3]);
+            let tag = match function {
+                UnaryFn::Sqrt => 0,
+                UnaryFn::Log => 1,
+                UnaryFn::Exp => 2,
+                UnaryFn::Sin => 3,
+                UnaryFn::Cos => 4,
+                UnaryFn::Abs => 5,
+                UnaryFn::Floor => 6,
+            };
+            hasher.update(&[tag]);
+            hash_expression_node(hasher, argument);
+        }
+        Expr::Sum(body, variable) => {
+            hasher.update(&[4]);
+            hash_str(hasher, variable);
+            hash_expression_node(hasher, body);
+        }
+    }
+}
+
+fn expression_blake3(expr: &Expr) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-linear-action-expression-v1");
+    hash_expression_node(&mut hasher, expr);
+    hasher.finalize().to_hex().to_string()
+}
+
+/// Hash the exact caller-supplied action declaration, including ordered IDs,
+/// units, matrix dimensions and raw IEEE-754 entries.
+fn action_declaration_blake3(action: &crate::linear_group_action::LinearGroupActionV1) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-linear-group-action-declaration-v1");
+    hash_str(&mut hasher, &action.action_id);
+    hash_str(&mut hasher, &action.coordinate_basis_id);
+    hash_usize(&mut hasher, action.coordinate_names.len());
+    for name in &action.coordinate_names {
+        hash_str(&mut hasher, name);
+    }
+    hash_usize(&mut hasher, action.coordinate_unit_ids.len());
+    for unit in &action.coordinate_unit_ids {
+        hash_str(&mut hasher, unit);
+    }
+    hash_usize(&mut hasher, action.metric.len());
+    for row in &action.metric {
+        hash_usize(&mut hasher, row.len());
+        for value in row {
+            hash_f64(&mut hasher, *value);
+        }
+    }
+    hash_usize(&mut hasher, action.generators.len());
+    for generator in &action.generators {
+        hash_str(&mut hasher, &generator.id);
+        hash_usize(&mut hasher, generator.matrix.len());
+        for row in &generator.matrix {
+            hash_usize(&mut hasher, row.len());
+            for value in row {
+                hash_f64(&mut hasher, *value);
+            }
+        }
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn sample_batch_blake3(samples: &[LinearActionSampleV1]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-linear-action-sample-batch-v1");
+    hash_usize(&mut hasher, samples.len());
+    for sample in samples {
+        hash_str(&mut hasher, &sample.sample_id);
+        hash_usize(&mut hasher, sample.state.len());
+        for value in &sample.state {
+            hash_f64(&mut hasher, *value);
+        }
+        hash_usize(&mut hasher, sample.direction_basis.len());
+        for direction in &sample.direction_basis {
+            hash_usize(&mut hasher, direction.len());
+            for value in direction {
+                hash_f64(&mut hasher, *value);
+            }
+        }
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn sampling_profile_blake3(profile: LinearActionSamplingProfileV1) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-linear-action-sampling-profile-v1");
+    hash_f64(&mut hasher, profile.finite_difference_step);
+    hash_f64(&mut hasher, profile.squared_cosine_tolerance);
+    hash_usize(&mut hasher, profile.maximum_samples);
+    hash_usize(&mut hasher, profile.maximum_expression_variables);
+    hash_usize(&mut hasher, profile.maximum_expression_evaluation_cost);
+    hash_usize(&mut hasher, profile.minimum_informative_samples);
+    hash_f64(&mut hasher, profile.maximum_direction_basis_condition);
+    hash_f64(
+        &mut hasher,
+        profile.maximum_directional_reconstruction_relative_residual,
+    );
+    hasher.finalize().to_hex().to_string()
+}
+
+/// Upper bound on recursive expression-node visits for one evaluation.
+/// A Sum evaluates its body at most 101 times (the core Expr evaluator caps n at 100).
+fn expression_evaluation_cost(expr: &Expr) -> Option<usize> {
+    match expr {
+        Expr::Var(_) | Expr::Const(_) => Some(1),
+        Expr::BinOp(_, left, right) => 1usize
+            .checked_add(expression_evaluation_cost(left)?)?
+            .checked_add(expression_evaluation_cost(right)?),
+        Expr::Func(_, argument) => 1usize.checked_add(expression_evaluation_cost(argument)?),
+        Expr::Sum(body, _) => 1usize.checked_add(expression_evaluation_cost(body)?.checked_mul(101)?),
+    }
+}
+
+/// Lexically scoped expression evaluation. Unlike the legacy Expr evaluator,
+/// an inner Sum binding shadows an outer binding with the same variable name.
+fn evaluate_expression_node(expr: &Expr, variables: &[(&str, f64)]) -> f64 {
+    match expr {
+        Expr::Var(name) => variables
+            .iter()
+            .rev()
+            .find(|(candidate, _)| *candidate == name.as_str())
+            .map(|(_, value)| *value)
+            .unwrap_or(f64::NAN),
+        Expr::Const(value) => *value,
+        Expr::BinOp(operation, left, right) => {
+            let left = evaluate_expression_node(left, variables);
+            let right = evaluate_expression_node(right, variables);
+            match operation {
+                BinOp::Add => left + right,
+                BinOp::Sub => left - right,
+                BinOp::Mul => left * right,
+                BinOp::Div => {
+                    if right.abs() > 1e-15 {
+                        left / right
+                    } else {
+                        f64::NAN
+                    }
+                }
+                BinOp::Pow => left.powf(right),
+            }
+        }
+        Expr::Func(function, argument) => {
+            let value = evaluate_expression_node(argument, variables);
+            match function {
+                UnaryFn::Sqrt => {
+                    if value >= 0.0 { value.sqrt() } else { f64::NAN }
+                }
+                UnaryFn::Log => {
+                    if value > 0.0 { value.ln() } else { f64::NAN }
+                }
+                UnaryFn::Exp => value.exp(),
+                UnaryFn::Sin => value.sin(),
+                UnaryFn::Cos => value.cos(),
+                UnaryFn::Abs => value.abs(),
+                UnaryFn::Floor => value.floor(),
+            }
+        }
+        Expr::Sum(body, variable) => {
+            let upper = variables
+                .iter()
+                .find(|(name, _)| *name == "n")
+                .map(|(_, value)| *value as usize)
+                .unwrap_or(0)
+                .min(100);
+            let mut sum = 0.0_f64;
+            for index in 0..=upper {
+                let mut inner = variables.to_vec();
+                inner.push((variable.as_str(), index as f64));
+                sum += evaluate_expression_node(body, &inner);
+                if !sum.is_finite() {
+                    return f64::NAN;
+                }
+            }
+            sum
+        }
+    }
+}
+
 fn evaluate_expression(expr: &Expr, variable_names: &[String], state: &[f64]) -> f64 {
     let bindings: Vec<(&str, f64)> = variable_names
         .iter()
         .map(String::as_str)
         .zip(state.iter().copied())
         .collect();
-    expr.eval(&bindings)
+    evaluate_expression_node(expr, &bindings)
 }
 
-/// Collect variables in deterministic first-seen order.
-fn collect_variable_names(expr: &Expr, output: &mut Vec<String>) {
-    use symthaea_core::hdc::conjecture_engine::Expr;
-
+/// Collect free variables in deterministic first-seen order. Sum-bound variables
+/// are excluded from the sample state and are supplied by the lexical evaluator.
+fn collect_variable_names_scoped(
+    expr: &Expr,
+    bound: &mut Vec<String>,
+    output: &mut Vec<String>,
+) {
     match expr {
         Expr::Var(name) => {
-            if !output.contains(name) {
+            if !bound.contains(name) && !output.contains(name) {
                 output.push(name.clone());
             }
         }
         Expr::Const(_) => {}
         Expr::BinOp(_, left, right) => {
-            collect_variable_names(left, output);
-            collect_variable_names(right, output);
+            collect_variable_names_scoped(left, bound, output);
+            collect_variable_names_scoped(right, bound, output);
         }
-        Expr::Func(_, argument) => collect_variable_names(argument, output),
+        Expr::Func(_, argument) => collect_variable_names_scoped(argument, bound, output),
         Expr::Sum(body, variable) => {
-            collect_variable_names(body, output);
-            if !output.contains(variable) {
-                output.push(variable.clone());
-            }
+            bound.push(variable.clone());
+            collect_variable_names_scoped(body, bound, output);
+            bound.pop();
         }
     }
 }
