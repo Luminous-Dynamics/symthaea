@@ -12,6 +12,7 @@ use digest::CanonicalHasher;
 
 pub mod digest;
 pub mod active_sensing;
+pub mod risk_aware_active_sensing;
 pub mod edge_adapter;
 pub mod real_dataset_manifest;
 pub mod dms;
