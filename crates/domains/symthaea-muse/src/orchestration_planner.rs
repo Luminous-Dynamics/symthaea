@@ -74,7 +74,7 @@ pub struct OrchestrationPlannerRequestV1 {
     pub limits: PlannerLimitsV1,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum PlannerDispositionV1 {
     /// Search completed and all feasible candidates were enumerated.
     FeasibleComplete,
@@ -90,7 +90,7 @@ pub enum PlannerDispositionV1 {
     BudgetExhausted,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum PlannerIssueCodeV1 {
     InvalidSchema,
     InvalidExpectedScoreDigest,
@@ -129,7 +129,7 @@ pub struct PlannedPartAssignmentV1 {
     pub part_id: u16,
     pub instrument_instance_id: String,
     pub musical_function: String,
-    pub instrument_kind: String,
+    pub instrument_kind: crate::instruments::Instrument,
     pub sounding_lowest_midi: u8,
     pub sounding_highest_midi: u8,
     pub max_polyphony: u8,
@@ -274,14 +274,15 @@ fn scope_matches_requirement(
         && exact_match(&requirement.technique, &scope.technique)
         && exact_match(&requirement.dynamic, &scope.dynamic)
         && (!requirement.renderer_required
-            || instrument.renderer_scope.as_ref().is_some_and(|renderer| {
-                renderer.renderer_id.as_ref().is_some_and(|value| !value.trim().is_empty())
-                    && renderer.patch_id.as_ref().is_some_and(|value| !value.trim().is_empty())
-                    && renderer
-                        .asset_sha256
-                        .as_ref()
-                        .is_some_and(|digest| valid_sha256_hex_v1(digest))
-            }))
+            || (instrument.claim_ids.len() >= 3
+                && instrument.renderer_scope.as_ref().is_some_and(|renderer| {
+                    renderer.renderer_id.as_ref().is_some_and(|value| !value.trim().is_empty())
+                        && renderer.patch_id.as_ref().is_some_and(|value| !value.trim().is_empty())
+                        && renderer
+                            .asset_sha256
+                            .as_ref()
+                            .is_some_and(|digest| valid_sha256_hex_v1(digest))
+                })))
 }
 
 fn supports_demand(
@@ -312,7 +313,7 @@ fn candidate_from_assignment(
             part_id,
             instrument_instance_id: instrument.capability.id.clone(),
             musical_function: requirement.musical_function.clone(),
-            instrument_kind: format!("{:?}", instrument.capability.kind),
+            instrument_kind: instrument.capability.kind,
             sounding_lowest_midi: instrument.capability.sounding_range.lowest_midi,
             sounding_highest_midi: instrument.capability.sounding_range.highest_midi,
             max_polyphony: instrument.capability.max_polyphony,
@@ -505,7 +506,7 @@ pub fn plan_orchestration_v1(
     }
 
     if !report.issues.is_empty() {
-        report.disposition = if report.issues.iter().any(|issue| {
+        report.disposition = if report.issues.iter().all(|issue| {
             matches!(
                 issue.code,
                 PlannerIssueCodeV1::IncompletePartIdentity
@@ -746,7 +747,7 @@ pub fn plan_orchestration_v1(
 mod tests {
     use super::*;
     use crate::instrument_capability_evidence::{
-        INSTRUMENT_CAPABILITY_EVIDENCE_SCHEMA_V1,
+        CapabilityScopeV1, INSTRUMENT_CAPABILITY_EVIDENCE_SCHEMA_V1,
     };
     use crate::score_demand::{
         DemandIdentityBasis, VoiceDemand, SCORE_DEMAND_INPUT_DIGEST_SCHEMA,
@@ -944,6 +945,24 @@ mod tests {
         assert!(report.issues.iter().any(|issue| {
             issue.code == PlannerIssueCodeV1::NoQualifiedCandidateForPart
         }));
+    }
+
+    #[test]
+    fn renderer_required_part_abstains_from_non_renderer_capabilities() {
+        let mut request = request();
+        request.part_requirements[0].renderer_required = true;
+        let report = plan_orchestration_v1(&request);
+        assert_eq!(report.disposition, PlannerDispositionV1::InfeasibleComplete);
+        assert!(report.candidates.is_empty());
+    }
+
+    #[test]
+    fn invalid_schema_and_incomplete_identity_are_not_misreported_as_abstention() {
+        let mut request = request();
+        request.schema = "unknown-schema".into();
+        request.score_demand.has_complete_part_identity = false;
+        let report = plan_orchestration_v1(&request);
+        assert_eq!(report.disposition, PlannerDispositionV1::InvalidRequest);
     }
 
     #[test]
