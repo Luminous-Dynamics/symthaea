@@ -384,7 +384,12 @@
         "missingness_mapping_digest",
         "sentinel_handling",
         "unlabeled_periods_are_negative",
-        "censoring_supported"
+        "censoring_supported",
+        "topology_descriptor_digest",
+        "topology_qualification_digest",
+        "service_event_completion_available",
+        "post_intervention_followup_available",
+        "matched_comparison_available"
       ],
       "properties": {
         "application_types": {
@@ -491,6 +496,29 @@
           "type": "boolean"
         },
         "censoring_supported": {
+          "type": "boolean"
+        },
+        "topology_descriptor_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "topology_qualification_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "service_event_completion_available": {
+          "type": "boolean"
+        },
+        "post_intervention_followup_available": {
+          "type": "boolean"
+        },
+        "matched_comparison_available": {
           "type": "boolean"
         }
       }
