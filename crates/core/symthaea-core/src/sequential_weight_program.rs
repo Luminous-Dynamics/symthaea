@@ -918,16 +918,18 @@ mod tests {
                     candidate_loss,
                 })
                 .expect("paired confirmatory observation");
-            let family_observation = FamilyGuardrailObservation {
-                episode_id: format!("confirmatory-{index}"),
-                family_id: "all-protected-tasks".to_owned(),
-                baseline_loss,
-                candidate_loss,
-            };
-            family_observations.push(family_observation.clone());
-            family_report = family_gate
-                .observe(family_observation)
-                .expect("paired family guardrail observation");
+            if !family_gate.is_terminal() {
+                let family_observation = FamilyGuardrailObservation {
+                    episode_id: format!("confirmatory-{index}"),
+                    family_id: "all-protected-tasks".to_owned(),
+                    baseline_loss,
+                    candidate_loss,
+                };
+                family_observations.push(family_observation.clone());
+                family_report = family_gate
+                    .observe(family_observation)
+                    .expect("paired family guardrail observation");
+            }
             if report.status == crate::sequential_weight_verification::SequentialWeightVerificationStatus::BenefitEstablished
                 && family_report.status == crate::family_noninferiority::FamilyGuardrailStatus::AllFamiliesNonInferior
             {
