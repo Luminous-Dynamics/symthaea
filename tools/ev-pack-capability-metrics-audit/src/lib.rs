@@ -66,6 +66,16 @@ struct Topology {
     architecture: String,
     topology_ref: String,
     topology_digest: String,
+    qualification: Option<TopologyQualification>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TopologyQualification {
+    qualification_ref: String,
+    authority_ref: String,
+    evidence_digest: String,
+    evidence_class: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -157,6 +167,7 @@ struct SocObservation {
     soc_fraction: f64,
     sample_time_ms: u64,
     evidence_digest: String,
+    evidence_class: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -176,6 +187,7 @@ struct LifetimeUnit {
     efc_to_eol: Option<f64>,
     eol_event_ref: Option<String>,
     evidence_digest: Option<String>,
+    evidence_class: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -185,6 +197,7 @@ pub struct MetricResult {
     pub unit: String,
     pub population_scope: String,
     pub evidence_digests: Vec<String>,
+    pub evidence_classes: Vec<String>,
     pub reason: Option<String>,
 }
 
@@ -341,6 +354,35 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
     if !nonempty(&profile.topology.topology_ref) || !is_digest(&profile.topology.topology_digest) {
         errors.push("topology reference or digest is invalid".to_owned());
     }
+    match (profile.topology.status.as_str(), &profile.topology.qualification) {
+        ("qualified", Some(qualification)) => {
+            if !nonempty(&qualification.qualification_ref)
+                || !nonempty(&qualification.authority_ref)
+                || !is_digest(&qualification.evidence_digest)
+                || !matches!(
+                    qualification.evidence_class.as_str(),
+                    "reference_test_measurement"
+                        | "derived_estimate"
+                        | "model_prediction"
+                        | "simulation_output"
+                        | "synthetic_fixture"
+                        | "vendor_claim"
+                )
+            {
+                errors.push("topology qualification evidence is invalid".to_owned());
+            }
+        }
+        ("qualified", None) => {
+            errors.push(
+                "qualified topology requires authority-backed qualification evidence".to_owned(),
+            );
+        }
+        ("unknown", None) => {}
+        ("unknown", Some(_)) => {
+            errors.push("unknown topology cannot carry a qualification record".to_owned());
+        }
+        _ => errors.push("topology status is invalid".to_owned()),
+    }
 
     let capacity = &profile.reference_conditions.capacity;
     if !nonempty(&capacity.condition_ref)
@@ -461,6 +503,15 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
             if !row.soc_fraction.is_finite()
                 || !(0.0..=1.0).contains(&row.soc_fraction)
                 || !is_digest(&row.evidence_digest)
+                || !matches!(
+                    row.evidence_class.as_str(),
+                    "reference_test_measurement"
+                        | "derived_estimate"
+                        | "model_prediction"
+                        | "simulation_output"
+                        | "synthetic_fixture"
+                        | "vendor_claim"
+                )
             {
                 errors.push(format!("SOC observation for {} is invalid", row.unit_ref));
             }
@@ -488,6 +539,20 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
             if !unit_ids.contains(&row.unit_ref) || !lifetime_ids.insert(row.unit_ref.clone()) {
                 errors.push(format!(
                     "lifetime evidence has unknown or duplicate unit: {}",
+                    row.unit_ref
+                ));
+            }
+            if !matches!(
+                row.evidence_class.as_str(),
+                "reference_test_measurement"
+                    | "derived_estimate"
+                    | "model_prediction"
+                    | "simulation_output"
+                    | "synthetic_fixture"
+                    | "vendor_claim"
+            ) {
+                errors.push(format!(
+                    "lifetime evidence for {} has unknown evidence class",
                     row.unit_ref
                 ));
             }
@@ -580,20 +645,31 @@ fn not_computable(unit: &str, scope: &str, reason: &str) -> MetricResult {
         unit: unit.to_owned(),
         population_scope: scope.to_owned(),
         evidence_digests: Vec::new(),
+        evidence_classes: Vec::new(),
         reason: Some(reason.to_owned()),
     }
 }
 
-fn computed(value: f64, unit: &str, scope: &str, digests: Vec<String>) -> MetricResult {
-    let mut sorted = digests;
-    sorted.sort();
-    sorted.dedup();
+fn computed(
+    value: f64,
+    unit: &str,
+    scope: &str,
+    digests: Vec<String>,
+    evidence_classes: Vec<String>,
+) -> MetricResult {
+    let mut sorted_digests = digests;
+    sorted_digests.sort();
+    sorted_digests.dedup();
+    let mut sorted_classes = evidence_classes;
+    sorted_classes.sort();
+    sorted_classes.dedup();
     MetricResult {
         status: "COMPUTED".to_owned(),
         value: Some(value),
         unit: unit.to_owned(),
         population_scope: scope.to_owned(),
-        evidence_digests: sorted,
+        evidence_digests: sorted_digests,
+        evidence_classes: sorted_classes,
         reason: None,
     }
 }
@@ -626,12 +702,34 @@ fn calculate_metrics(
         .map(|unit| unit.capacity.evidence_digest.clone())
         .chain(std::iter::once(source_digest.clone()))
         .collect();
+    let soh_classes: Vec<String> = profile
+        .units
+        .iter()
+        .map(|unit| unit.capacity.evidence_class.clone())
+        .collect();
     let sigma_soh = computed(
         soh_distribution.population_standard_deviation,
         "SOH_fraction",
         &population_scope,
         soh_digests.clone(),
+        soh_classes.clone(),
     );
+
+    let topology_digests = || {
+        let mut digests = vec![profile.topology.topology_digest.clone()];
+        if let Some(qualification) = &profile.topology.qualification {
+            digests.push(qualification.evidence_digest.clone());
+        }
+        digests
+    };
+    let topology_classes = || {
+        profile
+            .topology
+            .qualification
+            .as_ref()
+            .map(|qualification| vec![qualification.evidence_class.clone()])
+            .unwrap_or_default()
+    };
 
     let beta_soh = match series_cell_gate(profile) {
         Ok(()) => {
@@ -641,7 +739,16 @@ fn calculate_metrics(
                 minimum / mean,
                 "ratio",
                 &population_scope,
-                soh_digests.clone(),
+                soh_digests
+                    .iter()
+                    .cloned()
+                    .chain(topology_digests())
+                    .collect(),
+                soh_classes
+                    .iter()
+                    .cloned()
+                    .chain(topology_classes())
+                    .collect(),
             )
         }
         Err(reason) => not_computable("ratio", &population_scope, reason),
@@ -659,10 +766,7 @@ fn calculate_metrics(
                 )
             }
             Some(lifetime)
-                if lifetime
-                    .units
-                    .iter()
-                    .any(|row| row.status != "observed_eol") =>
+                if lifetime.units.iter().any(|row| row.status != "observed_eol") =>
             {
                 not_computable(
                     "ratio",
@@ -694,8 +798,15 @@ fn calculate_metrics(
                         .filter_map(|row| row.evidence_digest.clone())
                         .chain(std::iter::once(lifetime.evidence_digest.clone()))
                         .chain(std::iter::once(source_digest.clone()))
+                        .chain(topology_digests())
                         .collect();
-                    computed(value, "ratio", &population_scope, digests)
+                    let classes = lifetime
+                        .units
+                        .iter()
+                        .map(|row| row.evidence_class.clone())
+                        .chain(topology_classes())
+                        .collect();
+                    computed(value, "ratio", &population_scope, digests, classes)
                 }
             }
         },
@@ -735,10 +846,7 @@ fn calculate_metrics(
                     .observations
                     .iter()
                     .map(|row| {
-                        let unit_soh = soh_by_unit
-                            .get(row.unit_ref.as_str())
-                            .copied()
-                            .unwrap_or(0.0);
+                        let unit_soh = soh_by_unit.get(row.unit_ref.as_str()).copied().unwrap_or(0.0);
                         (soc_max - row.soc_fraction) * unit_soh
                     })
                     .sum();
@@ -755,12 +863,21 @@ fn calculate_metrics(
                         .map(|row| row.evidence_digest.clone())
                         .chain(std::iter::once(snapshot.snapshot_digest.clone()))
                         .chain(soh_digests.clone())
+                        .chain(topology_digests())
+                        .collect();
+                    let classes = snapshot
+                        .observations
+                        .iter()
+                        .map(|row| row.evidence_class.clone())
+                        .chain(soh_classes.clone())
+                        .chain(topology_classes())
                         .collect();
                     computed(
                         1.0 - weighted_gap / total_soh,
                         "ratio",
                         &population_scope,
                         digests,
+                        classes,
                     )
                 }
             }
@@ -1002,6 +1119,35 @@ mod tests {
         assert_eq!(metrics.beta_energy.status, "NOT_COMPUTABLE");
         assert!((metrics.beta_soh.value.unwrap() - (0.85 / 0.90)).abs() < 1e-12);
         assert!((metrics.beta_life.value.unwrap() - (3.0 * 800.0 / 2700.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn computed_metrics_preserve_input_evidence_classes_and_topology_authority() {
+        let report = report();
+        let complete = report
+            .payload
+            .cases
+            .iter()
+            .find(|case| case.case_id == "complete-qualified-series-pack")
+            .and_then(|case| case.summary.as_ref())
+            .expect("complete pack summary");
+        let metrics = &complete.inconsistency_metrics;
+        assert_eq!(metrics.sigma_soh.evidence_classes, vec!["synthetic_fixture"]);
+        assert_eq!(metrics.beta_soh.evidence_classes, vec!["synthetic_fixture"]);
+        assert_eq!(metrics.beta_life.evidence_classes, vec!["synthetic_fixture"]);
+        assert_eq!(metrics.beta_soc.evidence_classes, vec!["synthetic_fixture"]);
+        assert!(metrics.beta_soh.evidence_digests.iter().any(|digest| digest == "0000000000000000000000000000000000000000000000000000000000001f48"));
+    }
+
+    #[test]
+    fn qualified_topology_without_authority_evidence_is_rejected() {
+        let mut value: Value = serde_json::from_slice(CORPUS).expect("corpus");
+        value["cases"][0]["profile"]["topology"]
+            .as_object_mut()
+            .expect("topology")
+            .remove("qualification");
+        let bytes = serde_json::to_vec(&value).expect("mutated corpus");
+        assert!(audit_corpus(SCHEMA, &bytes).is_err());
     }
 
     #[test]
