@@ -246,6 +246,14 @@ pub fn validate_ensemble_relations(
             "relationship timeline must use the exact score-demand digest schema",
         );
     }
+    if timeline.score_digest_schema != ENSEMBLE_RELATION_SCORE_DIGEST_SCHEMA_V1 {
+        report.push(
+            EnsembleRelationIssueCodeV1::InvalidScoreDigestSchema,
+            None,
+            None,
+            "unsupported score digest schema; use the exact score-demand serialization contract",
+        );
+    }
     if !is_valid_digest(&timeline.score_sha256) {
         report.push(
             EnsembleRelationIssueCodeV1::InvalidScoreDigest,
@@ -569,6 +577,16 @@ mod tests {
         let mut relation_timeline = timeline(vec![relation(EnsembleRelationKindV1::Imitation)]);
         relation_timeline.score_digest_schema = "sha256-json-v0".into();
         let report = validate_ensemble_relations(&score, &relation_timeline, &digest());
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == EnsembleRelationIssueCodeV1::InvalidScoreDigestSchema
+        }));
+    }
+
+    #[test]
+    fn rejects_a_mismatched_score_digest_schema() {
+        let mut timeline = timeline(vec![relation(EnsembleRelationKindV1::Imitation)]);
+        timeline.score_digest_schema = "unknown-score-hash-v0".into();
+        let report = validate_ensemble_relations(&score(), &timeline, &digest());
         assert!(report.issues.iter().any(|issue| {
             issue.code == EnsembleRelationIssueCodeV1::InvalidScoreDigestSchema
         }));
