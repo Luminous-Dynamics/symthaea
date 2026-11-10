@@ -49,7 +49,7 @@ pub enum VssiDisposition {
 }
 
 /// Registered observation or intervention protocol.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum VssiExperimentKind {
     PassiveObservation,
     ThermalImpulse,
