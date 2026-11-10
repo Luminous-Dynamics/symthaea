@@ -321,7 +321,7 @@ mod tests {
 
         assert!(report.nominal.all_up_mass_kg <= input.aircraft.maximum_takeoff_mass_kg);
         assert!(matches!(
-            report.adverse_corner_result,
+            &report.adverse_corner_result,
             Err(ModelError::MaximumTakeoffMassExceeded { .. })
         ));
         assert!(!report.is_feasible_at_adverse_corner());
