@@ -122,6 +122,25 @@ impl fmt::Display for LinearGroupActionAdmissionError {
 
 impl std::error::Error for LinearGroupActionAdmissionError {}
 
+/// Measured metric-skew residual for one admitted generator.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GeneratorMetricSkewDiagnosticV1 {
+    pub generator_id: String,
+    pub relative_defect: f64,
+}
+
+/// Measured diagnostics retained by a successful action admission.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LinearGroupActionAdmissionDiagnosticsV1 {
+    pub metric_symmetry_relative_defect: f64,
+    /// Minimum diagonal entry of the Cholesky factor of G / metric_scale.
+    /// This is a pivot-scale diagnostic, not a condition-number estimate.
+    pub minimum_scaled_cholesky_diagonal: f64,
+    /// Maximum diagonal entry of the Cholesky factor of G / metric_scale.
+    pub maximum_scaled_cholesky_diagonal: f64,
+    pub generator_metric_skew: Vec<GeneratorMetricSkewDiagnosticV1>,
+}
+
 /// An immutable action declaration that passed the local structural / metric checks.
 ///
 /// The Cholesky factor is for the scaled metric G / metric_scale. Keeping the scale
@@ -129,6 +148,8 @@ impl std::error::Error for LinearGroupActionAdmissionError {}
 #[derive(Debug, Clone, PartialEq)]
 pub struct AdmittedLinearGroupActionV1 {
     action: LinearGroupActionV1,
+    profile: LinearGroupActionAdmissionProfileV1,
+    diagnostics: LinearGroupActionAdmissionDiagnosticsV1,
     metric_scale: f64,
     scaled_metric_cholesky_lower: Vec<Vec<f64>>,
 }
@@ -142,6 +163,16 @@ impl AdmittedLinearGroupActionV1 {
     /// Number of coordinates in the declared representation.
     pub fn dimension(&self) -> usize {
         self.action.coordinate_names.len()
+    }
+
+    /// Exact admission profile used to validate this action.
+    pub fn profile(&self) -> &LinearGroupActionAdmissionProfileV1 {
+        &self.profile
+    }
+
+    /// Measured diagnostics that justified admission.
+    pub fn diagnostics(&self) -> &LinearGroupActionAdmissionDiagnosticsV1 {
+        &self.diagnostics
     }
 
     /// Positive scale satisfying G = metric_scale * L * L^T.
@@ -251,8 +282,16 @@ impl LinearGroupActionV1 {
 
         let scaled_metric_cholesky_lower =
             cholesky_lower_scaled_metric(&self.metric, metric_scale)?;
+        let mut minimum_scaled_cholesky_diagonal = f64::INFINITY;
+        let mut maximum_scaled_cholesky_diagonal = 0.0_f64;
+        for (index, row) in scaled_metric_cholesky_lower.iter().enumerate() {
+            let diagonal = row[index];
+            minimum_scaled_cholesky_diagonal = minimum_scaled_cholesky_diagonal.min(diagonal);
+            maximum_scaled_cholesky_diagonal = maximum_scaled_cholesky_diagonal.max(diagonal);
+        }
 
         let mut generator_ids = BTreeSet::new();
+        let mut generator_metric_skew = Vec::with_capacity(self.generators.len());
         for (index, generator) in self.generators.iter().enumerate() {
             if generator.id.trim().is_empty() {
                 return Err(LinearGroupActionAdmissionError::EmptyGeneratorId { index });
@@ -284,10 +323,21 @@ impl LinearGroupActionV1 {
                     relative_defect,
                 });
             }
+            generator_metric_skew.push(GeneratorMetricSkewDiagnosticV1 {
+                generator_id: generator.id.clone(),
+                relative_defect,
+            });
         }
 
         Ok(AdmittedLinearGroupActionV1 {
             action: self.clone(),
+            profile,
+            diagnostics: LinearGroupActionAdmissionDiagnosticsV1 {
+                metric_symmetry_relative_defect: metric_symmetry_defect,
+                minimum_scaled_cholesky_diagonal,
+                maximum_scaled_cholesky_diagonal,
+                generator_metric_skew,
+            },
             metric_scale,
             scaled_metric_cholesky_lower,
         })
@@ -506,6 +556,31 @@ mod tests {
         };
         let admitted = action.try_admit(profile()).unwrap();
         assert_eq!(admitted.dimension(), 2);
+    }
+
+    #[test]
+    fn admission_receipt_preserves_profile_and_measured_defects() {
+        let selected_profile = profile();
+        let admitted = canonical_so2().try_admit(selected_profile).unwrap();
+        assert_eq!(admitted.profile(), &selected_profile);
+        assert_eq!(admitted.diagnostics().metric_symmetry_relative_defect, 0.0);
+        assert_eq!(admitted.diagnostics().generator_metric_skew.len(), 1);
+        assert_eq!(
+            admitted.diagnostics().generator_metric_skew[0].generator_id,
+            "J"
+        );
+        assert_eq!(
+            admitted.diagnostics().generator_metric_skew[0].relative_defect,
+            0.0
+        );
+        assert_eq!(
+            admitted.diagnostics().minimum_scaled_cholesky_diagonal,
+            1.0
+        );
+        assert_eq!(
+            admitted.diagnostics().maximum_scaled_cholesky_diagonal,
+            1.0
+        );
     }
 
     #[test]
