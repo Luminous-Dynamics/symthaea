@@ -1,4 +1,4 @@
-use jsonschema::{draft202012, Validator};
+use jsonschema::{Validator, draft202012};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -171,7 +171,10 @@ fn validate_unit(unit: &UnitRecord, treated: bool) -> Result<(), String> {
         || !is_digest(&unit.pre_configuration_digest)
         || !is_digest(&unit.post_configuration_digest)
     {
-        return Err(format!("unit {} has invalid configuration or matching digest", unit.unit_id));
+        return Err(format!(
+            "unit {} has invalid configuration or matching digest",
+            unit.unit_id
+        ));
     }
     if !unit.pretrend.value.is_finite()
         || !is_digest(&unit.pretrend.observation_digest)
@@ -180,14 +183,20 @@ fn validate_unit(unit: &UnitRecord, treated: bool) -> Result<(), String> {
         || unit.pretrend.protocol_digest != unit.pre.protocol_digest
         || unit.pretrend.condition_digest != unit.pre.condition_digest
     {
-        return Err(format!("unit {} has invalid pre-trend reference measurement", unit.unit_id));
+        return Err(format!(
+            "unit {} has invalid pre-trend reference measurement",
+            unit.unit_id
+        ));
     }
     if !unit.pre.value.is_finite()
         || !is_digest(&unit.pre.observation_digest)
         || !is_digest(&unit.pre.protocol_digest)
         || !is_digest(&unit.pre.condition_digest)
     {
-        return Err(format!("unit {} has invalid pre-intervention measurement", unit.unit_id));
+        return Err(format!(
+            "unit {} has invalid pre-intervention measurement",
+            unit.unit_id
+        ));
     }
     match unit.follow_up_status.as_str() {
         "complete" => {
@@ -196,14 +205,20 @@ fn validate_unit(unit: &UnitRecord, treated: bool) -> Result<(), String> {
                 .as_ref()
                 .ok_or_else(|| format!("unit {} missing post measurement", unit.unit_id))?;
             if unit.censoring_reason.is_some() {
-                return Err(format!("unit {} marks complete follow-up as censored", unit.unit_id));
+                return Err(format!(
+                    "unit {} marks complete follow-up as censored",
+                    unit.unit_id
+                ));
             }
             if !post.value.is_finite()
                 || !is_digest(&post.observation_digest)
                 || !is_digest(&post.protocol_digest)
                 || !is_digest(&post.condition_digest)
             {
-                return Err(format!("unit {} has invalid post measurement", unit.unit_id));
+                return Err(format!(
+                    "unit {} has invalid post measurement",
+                    unit.unit_id
+                ));
             }
             if post.protocol_digest != unit.pre.protocol_digest
                 || post.condition_digest != unit.pre.condition_digest
@@ -216,7 +231,10 @@ fn validate_unit(unit: &UnitRecord, treated: bool) -> Result<(), String> {
         }
         "administrative_censoring" | "lost_to_follow_up" | "retired_due_to_fault" => {
             if unit.post.is_some()
-                || unit.censoring_reason.as_deref().is_none_or(|v| !nonempty(v))
+                || unit
+                    .censoring_reason
+                    .as_deref()
+                    .is_none_or(|v| !nonempty(v))
             {
                 return Err(format!(
                     "unit {} needs a censoring reason and no fabricated post measurement",
@@ -224,7 +242,12 @@ fn validate_unit(unit: &UnitRecord, treated: bool) -> Result<(), String> {
                 ));
             }
         }
-        _ => return Err(format!("unit {} has an unknown follow-up status", unit.unit_id)),
+        _ => {
+            return Err(format!(
+                "unit {} has an unknown follow-up status",
+                unit.unit_id
+            ));
+        }
     }
 
     if treated {
@@ -236,10 +259,22 @@ fn validate_unit(unit: &UnitRecord, treated: bool) -> Result<(), String> {
             ));
         }
         if intervention.family.as_deref().is_none_or(|v| !nonempty(v))
-            || intervention.procedure_ref.as_deref().is_none_or(|v| !nonempty(v))
-            || intervention.service_event_ref.as_deref().is_none_or(|v| !nonempty(v))
-            || intervention.authority_ref.as_deref().is_none_or(|v| !nonempty(v))
-            || intervention.completion_digest.as_deref().is_none_or(|v| !is_digest(v))
+            || intervention
+                .procedure_ref
+                .as_deref()
+                .is_none_or(|v| !nonempty(v))
+            || intervention
+                .service_event_ref
+                .as_deref()
+                .is_none_or(|v| !nonempty(v))
+            || intervention
+                .authority_ref
+                .as_deref()
+                .is_none_or(|v| !nonempty(v))
+            || intervention
+                .completion_digest
+                .as_deref()
+                .is_none_or(|v| !is_digest(v))
         {
             return Err(format!(
                 "unit {} lacks procedure, service, authority or completion evidence",
@@ -309,7 +344,10 @@ fn evaluate(scenario: Scenario) -> Result<Evaluation, String> {
 
         for unit in [&set.treated, &set.comparator] {
             if !unit_ids.insert(unit.unit_id.clone()) {
-                return Err(format!("unit {} is reused across matched sets", unit.unit_id));
+                return Err(format!(
+                    "unit {} is reused across matched sets",
+                    unit.unit_id
+                ));
             }
             let key = (
                 unit.pre.protocol_digest.clone(),
@@ -348,8 +386,7 @@ fn evaluate(scenario: Scenario) -> Result<Evaluation, String> {
 
     let mut pretrend_violation = false;
     for set in &sets {
-        let treated_pretrend =
-            direction * (set.treated.pre.value - set.treated.pretrend.value);
+        let treated_pretrend = direction * (set.treated.pre.value - set.treated.pretrend.value);
         let comparator_pretrend =
             direction * (set.comparator.pre.value - set.comparator.pretrend.value);
         let gap = (treated_pretrend - comparator_pretrend).abs();
@@ -377,8 +414,16 @@ fn evaluate(scenario: Scenario) -> Result<Evaluation, String> {
     let mut comparator_changes = Vec::with_capacity(sets.len());
     let mut effects = Vec::with_capacity(sets.len());
     for set in &sets {
-        let treated_post = set.treated.post.as_ref().expect("validated complete follow-up");
-        let comparator_post = set.comparator.post.as_ref().expect("validated complete follow-up");
+        let treated_post = set
+            .treated
+            .post
+            .as_ref()
+            .expect("validated complete follow-up");
+        let comparator_post = set
+            .comparator
+            .post
+            .as_ref()
+            .expect("validated complete follow-up");
         let treated_change = direction * (treated_post.value - set.treated.pre.value);
         let comparator_change = direction * (comparator_post.value - set.comparator.pre.value);
         let effect = treated_change - comparator_change;
@@ -409,9 +454,15 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
     if corpus.corpus_version != CORPUS_VERSION {
         return Err("unsupported intervention corpus version".to_owned());
     }
-    corpus.cases.sort_by(|left, right| left.case_id.cmp(&right.case_id));
+    corpus
+        .cases
+        .sort_by(|left, right| left.case_id.cmp(&right.case_id));
     for case in &mut corpus.cases {
-        if let Some(sets) = case.scenario.get_mut("matched_sets").and_then(Value::as_array_mut) {
+        if let Some(sets) = case
+            .scenario
+            .get_mut("matched_sets")
+            .and_then(Value::as_array_mut)
+        {
             sets.sort_by(|left, right| {
                 left.get("match_set_id")
                     .and_then(Value::as_str)
@@ -420,8 +471,8 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
         }
     }
 
-    let canonical = serde_json::to_vec(&corpus)
-        .map_err(|error| format!("canonical corpus: {error}"))?;
+    let canonical =
+        serde_json::to_vec(&corpus).map_err(|error| format!("canonical corpus: {error}"))?;
     let report_sha256 = sha256(&canonical);
     let mut reports = Vec::new();
     let mut seen = BTreeSet::new();
@@ -431,10 +482,19 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
 
     for case in corpus.cases {
         if !nonempty(&case.case_id) || !seen.insert(case.case_id.clone()) {
-            return Err(format!("case identity is empty or duplicated: {}", case.case_id));
+            return Err(format!(
+                "case identity is empty or duplicated: {}",
+                case.case_id
+            ));
         }
-        if !matches!(case.expected_disposition.as_str(), "estimated" | "abstain" | "rejected") {
-            return Err(format!("case {} has an unknown expected disposition", case.case_id));
+        if !matches!(
+            case.expected_disposition.as_str(),
+            "estimated" | "abstain" | "rejected"
+        ) {
+            return Err(format!(
+                "case {} has an unknown expected disposition",
+                case.case_id
+            ));
         }
         let schema_errors: Vec<String> = validator
             .iter_errors(&case.scenario)
@@ -480,7 +540,9 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
                     format!("case {} is missing its known-truth effect", case.case_id)
                 })?;
                 let tolerance = case.expected_tolerance.unwrap_or(EPSILON);
-                let actual = result.did_effect.expect("estimated disposition has an effect");
+                let actual = result
+                    .did_effect
+                    .expect("estimated disposition has an effect");
                 let error = (actual - expected).abs();
                 if !error.is_finite() || error > tolerance {
                     return Err(format!(
@@ -551,8 +613,9 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
-    const SCHEMA: &[u8] =
-        include_bytes!("../../../schemas/transport/ev_intervention_causal_scenario_v0_1.schema.json");
+    const SCHEMA: &[u8] = include_bytes!(
+        "../../../schemas/transport/ev_intervention_causal_scenario_v0_1.schema.json"
+    );
     const CORPUS: &[u8] =
         include_bytes!("../../../fixtures/ev_battery/intervention_causal_scenarios_v0_1.json");
 
@@ -572,7 +635,9 @@ mod tests {
     #[test]
     fn regression_to_mean_does_not_become_a_treatment_effect() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "regression-to-mean-negative-control")
             .expect("negative control");
         assert_eq!(case.disposition, "estimated");
@@ -584,7 +649,9 @@ mod tests {
     #[test]
     fn censoring_is_preserved_and_forces_abstention() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "censoring-forces-abstention")
             .expect("censored fixture");
         assert_eq!(case.disposition, "abstain");
@@ -596,7 +663,9 @@ mod tests {
     #[test]
     fn lower_is_better_metric_direction_normalizes_benefit_positive() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "lower-is-better-resistance-effect")
             .expect("lower-is-better fixture");
         assert_eq!(case.disposition, "estimated");
@@ -606,22 +675,36 @@ mod tests {
     #[test]
     fn divergent_preintervention_trends_force_abstention() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "pretrend-violation-abstains")
             .expect("pre-trend negative control");
         assert_eq!(case.disposition, "abstain");
-        assert!(case.reason.as_deref().unwrap().contains("pre-intervention trends"));
+        assert!(
+            case.reason
+                .as_deref()
+                .unwrap()
+                .contains("pre-intervention trends")
+        );
         assert!(case.did_effect.is_none());
     }
 
     #[test]
     fn work_order_without_verified_completion_is_rejected() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "work-order-is-not-completion")
             .expect("work order fixture");
         assert_eq!(case.disposition, "rejected");
-        assert!(case.reason.as_deref().unwrap().contains("verified completed intervention"));
+        assert!(
+            case.reason
+                .as_deref()
+                .unwrap()
+                .contains("verified completed intervention")
+        );
     }
 
     #[test]
@@ -631,7 +714,9 @@ mod tests {
         value["cases"].as_array_mut().expect("cases").reverse();
         for case in value["cases"].as_array_mut().expect("cases") {
             case["scenario"]["matched_sets"]
-                .as_array_mut().expect("matched sets").reverse();
+                .as_array_mut()
+                .expect("matched sets")
+                .reverse();
         }
         let permuted = serde_json::to_vec(&value).expect("permuted corpus");
         let replay = audit_corpus(SCHEMA, &permuted).expect("permuted replay");
