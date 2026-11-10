@@ -1422,9 +1422,9 @@ mod tests {
             &"d".repeat(64),
         )
         .expect("changed action risk bound");
-        assert_eq!(
-            changed_action_risk.policy_receipt.maximum_path_risk_upper_bound,
-            0.65
+        assert!(
+            (changed_action_risk.policy_receipt.maximum_path_risk_upper_bound - 0.65).abs()
+                < 1e-12
         );
         assert_ne!(
             result.policy_receipt.receipt_digest,
