@@ -460,7 +460,7 @@ fn required_field<'a>(value: &'a Value, field: &str, path: &str) -> Result<&'a V
 
 fn projected_quantity(value: &Value) -> Value {
     let mut projected = Map::new();
-    for field in ["value", "unit", "unknown_reason"] {
+    for field in ["value", "unit", "unknown_reason", "not_applicable_reason"] {
         if let Some(member) = value.get(field) {
             projected.insert(field.to_owned(), member.clone());
         }
@@ -1363,6 +1363,48 @@ mod tests {
             serde_json::json!(19);
         let changed = compute_service_fingerprint(&fixture).expect("changed fingerprint");
         assert_ne!(original, changed);
+    }
+
+    #[test]
+    fn canonical_json_fingerprint_ignores_object_key_order() {
+        let left: Value = serde_json::from_str(r#"{"b":2,"a":{"d":4,"c":3}}"#).unwrap();
+        let right: Value = serde_json::from_str(r#"{"a":{"c":3,"d":4},"b":2}"#).unwrap();
+        assert_eq!(canonical_json_sha256(&left), canonical_json_sha256(&right));
+    }
+
+    #[test]
+    fn service_fingerprint_distinguishes_not_applicable_from_unknown_and_zero() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        let baseline = compute_service_fingerprint(&fixture).expect("baseline fingerprint");
+        fixture["service"]["annual_delivered_cargo_mass"] = serde_json::json!({
+            "value": null,
+            "unit": "tonne",
+            "not_applicable_reason": "The contract functional unit is TEU-nautical-mile.",
+            "provenance": {
+                "class":"synthetic",
+                "source_id":"SYNTHETIC-WAPS-FIXTURE-ONLY",
+                "method":"test mutation",
+                "limitations":["Test-only state distinction."],
+                "rights_status":"not_applicable"
+            }
+        });
+        let not_applicable = compute_service_fingerprint(&fixture).expect("not-applicable fingerprint");
+        assert_ne!(baseline, not_applicable);
+        fixture["service"]["annual_delivered_cargo_mass"] = serde_json::json!({
+            "value": null,
+            "unit": "tonne",
+            "unknown_reason": "Cargo mass was not measured.",
+            "provenance": {
+                "class":"synthetic",
+                "source_id":"SYNTHETIC-WAPS-FIXTURE-ONLY",
+                "method":"test mutation",
+                "limitations":["Test-only state distinction."],
+                "rights_status":"not_applicable"
+            }
+        });
+        let unknown = compute_service_fingerprint(&fixture).expect("unknown fingerprint");
+        assert_ne!(not_applicable, unknown);
     }
 
     #[test]
