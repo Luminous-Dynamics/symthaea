@@ -8,6 +8,8 @@ use std::process::ExitCode;
 #[derive(Serialize)]
 struct Receipt {
     receipt_schema: &'static str,
+    tool_version: &'static str,
+    build_commit: String,
     status: &'static str,
     input_path: String,
     input_sha256: String,
@@ -48,19 +50,26 @@ fn main() -> ExitCode {
         }
     };
     let input_sha256 = sha256_hex(&bytes);
+    let build_commit =
+        env::var("GITHUB_SHA").unwrap_or_else(|_| "UNBOUND_LOCAL_BUILD".to_string());
 
     let dataset: PortReferenceDataset = match serde_json::from_slice(&bytes) {
         Ok(dataset) => dataset,
         Err(error) => {
             let receipt = FailureReceipt {
                 receipt_schema: "nuclear-tea-port-reference-receipt-v1",
+                tool_version: env!("CARGO_PKG_VERSION"),
+                build_commit: build_commit.clone(),
                 status: "FAIL",
                 input_path,
                 input_sha256,
                 errors: vec![format!("JSON parse error: {error}")],
                 claim_ceiling: "Source structure and arithmetic only; no engineering or licensing claim.",
             };
-            println!("{}", serde_json::to_string_pretty(&receipt).expect("receipt serializes"));
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&receipt).expect("receipt serializes")
+            );
             return ExitCode::FAILURE;
         }
     };
@@ -69,6 +78,8 @@ fn main() -> ExitCode {
         Ok(report) => {
             let receipt = Receipt {
                 receipt_schema: "nuclear-tea-port-reference-receipt-v1",
+                tool_version: env!("CARGO_PKG_VERSION"),
+                build_commit: build_commit.clone(),
                 status: "PASS_SOURCE_DATA_CONTRACT_ONLY",
                 input_path,
                 input_sha256,
@@ -86,6 +97,8 @@ fn main() -> ExitCode {
         Err(validation_errors) => {
             let receipt = FailureReceipt {
                 receipt_schema: "nuclear-tea-port-reference-receipt-v1",
+                tool_version: env!("CARGO_PKG_VERSION"),
+                build_commit: build_commit.clone(),
                 status: "FAIL",
                 input_path,
                 input_sha256,
