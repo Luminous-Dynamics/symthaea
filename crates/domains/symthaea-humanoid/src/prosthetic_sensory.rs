@@ -302,11 +302,16 @@ pub struct ProstheticFeedbackFrameV1 {
     pub provenance_receipt_ref: Option<String>,
     pub provenance: ProvenanceDisposition,
     pub calibration_ref: Option<String>,
+    pub calibration: CalibrationDisposition,
     pub task_envelope_ref: Option<String>,
+    pub task_envelope_provenance: Option<ProvenanceDisposition>,
     pub slip_estimator_profile_ref: Option<String>,
+    pub slip_estimator_profile_provenance: Option<ProvenanceDisposition>,
     pub source_clock_profile_ref: String,
     pub source_timestamp_ns: u64,
     pub received_monotonic_ns: u64,
+    /// Host monotonic time at which this observation was evaluated.
+    pub evaluated_monotonic_ns: u64,
     pub evidence_class: SensoryEvidenceClass,
     pub cues: Vec<HapticCue>,
     pub disposition: FeedbackFrameDisposition,
@@ -378,6 +383,7 @@ impl ProstheticFeedbackEncoder {
                 observation,
                 Vec::new(),
                 FeedbackFrameDisposition::Disabled,
+                now_monotonic_ns,
             ));
         }
 
@@ -395,7 +401,7 @@ impl ProstheticFeedbackEncoder {
             } else {
                 FeedbackUnavailableReason::ProvenanceNotVerified
             };
-            return Ok(self.unavailable(observation, reason));
+            return Ok(self.unavailable(observation, reason, now_monotonic_ns));
         }
 
         if observation
@@ -406,6 +412,7 @@ impl ProstheticFeedbackEncoder {
             return Ok(self.unavailable(
                 observation,
                 FeedbackUnavailableReason::MissingProvenanceReceipt,
+                now_monotonic_ns,
             ));
         }
 
@@ -418,6 +425,7 @@ impl ProstheticFeedbackEncoder {
             return Ok(self.unavailable(
                 observation,
                 FeedbackUnavailableReason::CalibrationNotCurrent,
+                now_monotonic_ns,
             ));
         }
 
@@ -428,6 +436,7 @@ impl ProstheticFeedbackEncoder {
             return Ok(self.unavailable(
                 observation,
                 FeedbackUnavailableReason::TaskEnvelopeNotVerified,
+                now_monotonic_ns,
             ));
         }
 
@@ -438,6 +447,7 @@ impl ProstheticFeedbackEncoder {
             return Ok(self.unavailable(
                 observation,
                 FeedbackUnavailableReason::SlipEstimatorNotVerified,
+                now_monotonic_ns,
             ));
         }
 
@@ -455,6 +465,7 @@ impl ProstheticFeedbackEncoder {
             return Ok(self.unavailable(
                 observation,
                 FeedbackUnavailableReason::ReplayOrOutOfOrder,
+                now_monotonic_ns,
             ));
         }
 
@@ -467,6 +478,7 @@ impl ProstheticFeedbackEncoder {
             return Ok(self.unavailable(
                 observation,
                 FeedbackUnavailableReason::FutureReceiveTimestamp,
+                now_monotonic_ns,
             ));
         }
 
@@ -476,6 +488,7 @@ impl ProstheticFeedbackEncoder {
             return Ok(self.unavailable(
                 observation,
                 FeedbackUnavailableReason::StaleReceiveTimestamp,
+                now_monotonic_ns,
             ));
         }
 
@@ -528,6 +541,7 @@ impl ProstheticFeedbackEncoder {
                 observation,
                 Vec::new(),
                 FeedbackFrameDisposition::NoCue,
+                now_monotonic_ns,
             ));
         }
 
@@ -535,6 +549,7 @@ impl ProstheticFeedbackEncoder {
             observation,
             cues,
             FeedbackFrameDisposition::CuesEncoded,
+            now_monotonic_ns,
         ))
     }
 
@@ -542,6 +557,7 @@ impl ProstheticFeedbackEncoder {
         &self,
         observation: &ProstheticSensoryObservationV1,
         reason: FeedbackUnavailableReason,
+        evaluated_monotonic_ns: u64,
     ) -> ProstheticFeedbackFrameV1 {
         // Replayed/out-of-order frames are deliberately silent. A repeated
         // replay must not repeatedly buzz the wearer; the disposition remains
@@ -561,6 +577,7 @@ impl ProstheticFeedbackEncoder {
             observation,
             cues,
             FeedbackFrameDisposition::DataUnavailable(reason),
+            evaluated_monotonic_ns,
         )
     }
 
@@ -569,6 +586,7 @@ impl ProstheticFeedbackEncoder {
         observation: &ProstheticSensoryObservationV1,
         cues: Vec<HapticCue>,
         disposition: FeedbackFrameDisposition,
+        evaluated_monotonic_ns: u64,
     ) -> ProstheticFeedbackFrameV1 {
         ProstheticFeedbackFrameV1 {
             mapping_id: self.codebook.mapping_id.clone(),
@@ -577,17 +595,27 @@ impl ProstheticFeedbackEncoder {
             provenance_receipt_ref: observation.provenance_receipt_ref.clone(),
             provenance: observation.provenance,
             calibration_ref: observation.calibration_ref.clone(),
+            calibration: observation.calibration,
             task_envelope_ref: observation
                 .grip
                 .as_ref()
                 .map(|grip| grip.task_envelope_ref.clone()),
+            task_envelope_provenance: observation
+                .grip
+                .as_ref()
+                .map(|grip| grip.task_envelope_provenance),
             slip_estimator_profile_ref: observation
                 .slip
                 .as_ref()
                 .map(|slip| slip.estimator_profile_ref.clone()),
+            slip_estimator_profile_provenance: observation
+                .slip
+                .as_ref()
+                .map(|slip| slip.estimator_profile_provenance),
             source_clock_profile_ref: observation.source_clock_profile_ref.clone(),
             source_timestamp_ns: observation.source_timestamp_ns,
             received_monotonic_ns: observation.received_monotonic_ns,
+            evaluated_monotonic_ns,
             evidence_class: observation.evidence_class,
             cues,
             disposition,
@@ -691,8 +719,15 @@ mod tests {
         assert_eq!(frame.source_sensor_id, sample.sensor_id);
         assert_eq!(frame.provenance_receipt_ref, sample.provenance_receipt_ref);
         assert_eq!(frame.calibration_ref, sample.calibration_ref);
+        assert_eq!(frame.calibration, CalibrationDisposition::VerifiedCurrent);
         assert_eq!(frame.task_envelope_ref.as_deref(), Some("task-envelope:glass-v2"));
+        assert_eq!(frame.task_envelope_provenance, Some(ProvenanceDisposition::Verified));
         assert_eq!(frame.slip_estimator_profile_ref.as_deref(), Some("slip-estimator:v3"));
+        assert_eq!(
+            frame.slip_estimator_profile_provenance,
+            Some(ProvenanceDisposition::Verified)
+        );
+        assert_eq!(frame.evaluated_monotonic_ns, 150);
         assert_eq!(frame.source_clock_profile_ref, sample.source_clock_profile_ref);
         assert_eq!(frame.source_timestamp_ns, sample.source_timestamp_ns);
         assert_eq!(frame.received_monotonic_ns, sample.received_monotonic_ns);
