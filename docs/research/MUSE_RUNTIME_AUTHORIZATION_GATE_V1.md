@@ -30,6 +30,7 @@ The crate tools/muse-runtime-authorization-gate:
 - reserves compute, latency and risk budget once;
 - rechecks exact audio, registry and session head before dispatch and before any outcome resolution;
 - rejects reused/altered grants and wrong state transitions;
+- supports cancellation of a grant that was authorized but never dispatched, retaining the cancellation receipt;
 - blocks new grants during any AUTHORIZED, DISPATCHED or OUTCOME_UNKNOWN attempt;
 - advances current audio only after a direct valid commit or verified reconciliation commit;
 - retains definite failures and unknown outcomes in the attempt history.
