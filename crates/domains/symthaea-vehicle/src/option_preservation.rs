@@ -940,24 +940,30 @@ mod tests {
 
         let report =
             evaluate_option_preservation(&input).expect("canonical fixture must evaluate");
+        let expected_parent_id = fixture["expected"]["parent_action_id"]
+            .as_str()
+            .expect("fixture parent action ID");
+        let expected_class_id = fixture["expected"]["observation_class_id"]
+            .as_str()
+            .expect("fixture observation class ID");
         let parent = report
             .parent_actions
             .iter()
-            .find(|action| action.parent_action_id == fixture["expected"]["parent_action_id"])
+            .find(|action| action.parent_action_id == expected_parent_id)
             .expect("expected parent action report");
         let class = parent
             .observation_classes
             .iter()
-            .find(|class| class.observation_class_id == fixture["expected"]["observation_class_id"])
+            .find(|class| class.observation_class_id == expected_class_id)
             .expect("expected observation class report");
 
         assert_eq!(
-            format!("{:?}", parent.status),
-            "NoContinuationForAtLeastOneObservationClass"
+            parent.status,
+            ParentActionStatus::NoContinuationForAtLeastOneObservationClass
         );
         assert_eq!(
-            format!("{:?}", class.status),
-            "NoPossibleOptions"
+            class.status,
+            ObservationClassStatus::NoPossibleOptions
         );
         assert_eq!(class.robust_option_ids, Some(vec![]));
         assert_eq!(class.possible_option_ids, Some(vec![]));
