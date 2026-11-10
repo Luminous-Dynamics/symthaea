@@ -118,11 +118,16 @@ The updated SOTA crosswalk contains these references and the SVR-MAD adaptive-ro
 - **Demystifying Multi-Agent Debate (Findings ACL 2026):** evaluates diversity-aware initial answer sets and confidence-modulated updates across six reasoning benchmarks. Confidence remains calibrated descriptive metadata, never authority or proof. [Paper](https://aclanthology.org/2026.findings-acl.1694/)
 - **Free-MAD (Findings ACL 2026):** removes consensus as a requirement, scores debate trajectories rather than only the last round, and uses anti-conformity; compare accuracy and token/round cost under matched conditions. [Paper](https://aclanthology.org/2026.findings-acl.1600/)
 - **ACIArena (ACL 2026):** 1,356 test cases over six multi-agent implementations and attack surfaces spanning external inputs, agent profiles and inter-agent messages; its results caution that topology alone is not a complete robustness measure. [Paper](https://aclanthology.org/2026.acl-long.457/)
+- **Beyond Symmetric Agents: Cognitive Diversity and Multi-Agent Debate in Small Language Models (2026 preprint):** 23 models, 11 vendor families, five tasks and 5,500+ runs; its matched-budget controls and context-overflow finding motivate budget fairness and full transcript-integrity checks. [Paper](https://arxiv.org/abs/2609.35875)
+- **Pareto-Optimal Test-Time Scaling (ACL SRW 2026):** compares self-consistency, self-refinement, debate and mixture-of-agents under matched inference budgets; motivates quality/cost/latency Pareto reporting. [Paper](https://arxiv.org/abs/2605.01566)
+- **Alignment by Confident Debate (AbCD, 6 Nov 2026 preprint):** converts debate traces into preference data for post-training. Treat this as a separate trace-to-training arm, not an inference-only baseline, and evaluate on independent verifiers. [Preprint](https://arxiv.org/abs/2611.09568)
+- **When Linguistic and Internal Confidence Diverge (Findings EMNLP 2026):** finds verbal confidence can diverge from internal/logit and semantic-entropy signals; measure association, magnitude agreement and calibration separately. [Paper](https://aclanthology.org/2026.findings-emnlp.1300/)
 - **Beyond Consensus (Findings EMNLP 2026):** on tested subjective scoring tasks, single-judge baselines achieved stronger human alignment than consensus MAD, with asymmetric strict-role prompts introducing downward bias. Add blind-human, single-judge, symmetric-MAD and role-asymmetry comparators. [Paper](https://aclanthology.org/2026.findings-emnlp.243/)
 - **The Value of Variance (ICML 2026):** proposes intra-agent, inter-agent and system-level uncertainty diagnostics for debate collapse. Preserve justified disagreement; do not minimize variance as a proxy for truth. [Paper](https://proceedings.mlr.press/v306/tang26n.html)
 - **Agent Red Teaming (UK AISI 2026):** public competition across 22 agents and 44 deployment scenarios yielded over 60,000 policy violations from 1.8 million submitted attacks; use as motivation for effect-level read/write and exfiltration controls, not as a directly comparable score. [Research summary](https://www.aisi.gov.uk/research/security-challenges-in-ai-agent-deployment-insights-from-a-large-scale-public-competition)
 
 The programme's differentiation target is not more rounds or more consensus. It is a verifiable account of which revisions were evidence-supported, how social topology changed exposure, where persuasion bypassed evidence, and where no single normative answer exists. It must also establish whether evaluator panels align with blind human judgments and whether operational attack attempts ever cross a real capability/effect boundary.
+The comparison must additionally be budget-fair: every inference result is paired with complete prompt/message/tool/token accounting and context-integrity evidence. [IG-BUDGET-FAIR-001 #11415](https://github.com/Luminous-Dynamics/symthaea/issues/11415) owns the end-to-end cost, serving-context and Pareto tournament; a hidden truncation or missing resource measurement invalidates a claimed efficiency win.
 
 ## Industry positioning
 
@@ -132,11 +137,15 @@ Our target differentiation is the assurance layer above those runtimes: evidence
 
 ## Ownership boundaries
 
-- **#11248:** deterministic graph/topology generation.
+- **#11337:** CommunicationGraph generation, directed message-channel semantics, delivery events and centrality profiles.
+- **#11248:** DelegationGraph generation and scoped mandate semantics; delegation edges are not message channels.
 - **#3054 / #3095 / #3115:** institutional-game orchestration, experiment receipts and model/mechanism provenance.
 - **#1872:** hostile-agent execution.
 - **#9431:** evaluator error correlation.
-- **#11320:** stance-measurement protocol, causal contrasts, paired centrality experiments and counterexample analysis.
+- **#11320:** stance-measurement protocol, causal contrasts, paired communication-topology experiments and counterexample analysis.
+- **#11340:** evidence-carrying revision event contract, claim/evidence deltas and causal-pair receipt boundary.
+- **#11367:** confidence calibration provenance and metrics; self-reported confidence is not calibration.
+- **#11415:** matched-budget tournament, request/response transcript integrity, context overflow and quality-cost-latency Pareto frontiers.
 - **Mycelix #5999 / #6011:** future human-group process and participant-conditioned opinion-summary evaluation.
 
 No new graph generator, game-theory engine or adversarial runtime is introduced.
