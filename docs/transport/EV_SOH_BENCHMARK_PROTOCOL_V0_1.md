@@ -43,11 +43,11 @@ A same-cell temporal test is valid when correctly ordered, but it does not estab
 - Every observation references a declared dataset digest and unique observation ID.
 - Group-disjoint relations have zero overlap on their declared physical identity.
 - Same-cell temporal relations have complete train/validation/test trajectories with strictly ordered time boundaries.
-- Fitted preprocessing and feature selection may use train-only data or fixed predeclared transforms; validation/test/all-data fitting is rejected.
+- Fitted preprocessing and feature selection may use train-only data or fixed predeclared transforms; validation/test/all-data fitting is rejected. Fixed transforms must carry a predeclaration date no later than the split-freeze date.
 - Test labels may not influence feature selection, model selection or tuning.
 - SOH requires an explicit nominal or initial-measured-capacity denominator; direct capacity must be reported in Ah without pretending it is SOH.
 - Results require MAE and RMSE plus macro-per-cell and worst-domain aggregation; sample-pooled error alone is insufficient.
-- An uncertainty claim requires nominal and observed coverage plus validation calibration provenance and stated group disjointness.
+- An uncertainty claim requires nominal and observed coverage plus validation calibration provenance and a group-disjointness flag consistent with the physical split (group-disjoint for unseen-asset/domain claims; explicitly non-group-disjoint but temporally ordered for same-cell temporal claims).
 - Dataset/target/split/result/execution digests are retained in the deterministic report.
 
 ## Frozen synthetic corpus
