@@ -153,6 +153,7 @@ pub enum LinearActionSamplingErrorV1 {
         expected: usize,
         actual: usize,
     },
+    ExpressionVariableBudgetExceeded { actual: usize, maximum: usize },
     ActionDimensionLimitExceeded { actual: usize, maximum: usize },
     ExpressionEvaluationBudgetExceeded { estimated: usize, maximum: usize },
     NonFiniteState { sample_id: String, index: usize },
@@ -703,6 +704,17 @@ fn metric_squared_cosine(
     Some((cosine * cosine).clamp(0.0, 1.0))
 }
 
+fn median_and_p95(sorted_values: &[f64]) -> (f64, f64) {
+    let count = sorted_values.len();
+    let median = if count % 2 == 0 {
+        0.5 * (sorted_values[count / 2 - 1] + sorted_values[count / 2])
+    } else {
+        sorted_values[count / 2]
+    };
+    let p95_index = ((95 * count).div_ceil(100)).saturating_sub(1).min(count - 1);
+    (median, sorted_values[p95_index])
+}
+
 /// Evaluate an already admitted linear action on explicit, paired sample states.
 ///
 /// The squared metric cosine is computed from the finite-difference covector and
@@ -723,6 +735,8 @@ pub fn evaluate_linear_action_samples(
         || profile.maximum_samples > HARD_MAX_LINEAR_ACTION_SAMPLES
         || profile.maximum_expression_variables == 0
         || profile.maximum_expression_variables > HARD_MAX_LINEAR_ACTION_EXPRESSION_VARIABLES
+        || profile.maximum_expression_evaluation_cost == 0
+        || profile.maximum_expression_evaluation_cost > HARD_MAX_EXPRESSION_EVALUATION_COST
         || profile.minimum_informative_samples == 0
         || profile.minimum_informative_samples > profile.maximum_samples
         || !profile.maximum_direction_basis_condition.is_finite()
@@ -749,15 +763,41 @@ pub fn evaluate_linear_action_samples(
 
     let declaration = action.action();
     let dimension = declaration.coordinate_names.len();
+    if dimension > HARD_MAX_LINEAR_ACTION_DIMENSION {
+        return Err(LinearActionSamplingErrorV1::ActionDimensionLimitExceeded {
+            actual: dimension,
+            maximum: HARD_MAX_LINEAR_ACTION_DIMENSION,
+        });
+    }
+
     let mut variable_names = Vec::new();
-    collect_variable_names(expr, &mut variable_names);
+    collect_variable_names_scoped(expr, &mut Vec::new(), &mut variable_names);
     for coordinate_name in &declaration.coordinate_names {
         if !variable_names.contains(coordinate_name) {
             variable_names.push(coordinate_name.clone());
         }
     }
     if variable_names.len() > profile.maximum_expression_variables {
-        return Err(LinearActionSamplingErrorV1::InvalidProfile);
+        return Err(LinearActionSamplingErrorV1::ExpressionVariableBudgetExceeded {
+            actual: variable_names.len(),
+            maximum: profile.maximum_expression_variables,
+        });
+    }
+
+    // Each sample requires one plus/minus evaluation for every action
+    // coordinate direction. Sum nodes are conservatively charged for their
+    // maximum 101 body evaluations, so a small AST cannot hide an expensive sum.
+    let per_evaluation_cost = expression_evaluation_cost(expr).unwrap_or(usize::MAX);
+    let estimated_expression_evaluation_cost = per_evaluation_cost
+        .checked_mul(2)
+        .and_then(|cost| cost.checked_mul(dimension))
+        .and_then(|cost| cost.checked_mul(samples.len()))
+        .unwrap_or(usize::MAX);
+    if estimated_expression_evaluation_cost > profile.maximum_expression_evaluation_cost {
+        return Err(LinearActionSamplingErrorV1::ExpressionEvaluationBudgetExceeded {
+            estimated: estimated_expression_evaluation_cost,
+            maximum: profile.maximum_expression_evaluation_cost,
+        });
     }
     let mut action_coordinate_indices = Vec::with_capacity(dimension);
     for coordinate_name in &declaration.coordinate_names {
@@ -846,6 +886,7 @@ pub fn evaluate_linear_action_samples(
         let mut skipped_sample_count = 0usize;
         let mut residual_sum = 0.0_f64;
         let mut maximum_residual = 0.0_f64;
+        let mut residual_values = Vec::with_capacity(samples.len());
         let mut sample_residuals = Vec::with_capacity(samples.len());
 
         for (sample, gradient) in samples.iter().zip(sample_gradients.iter()) {
@@ -890,6 +931,7 @@ pub fn evaluate_linear_action_samples(
             informative_sample_count = informative_sample_count.saturating_add(1);
             residual_sum += residual;
             maximum_residual = maximum_residual.max(residual);
+            residual_values.push(residual);
         }
 
         if informative_sample_count < profile.minimum_informative_samples {
@@ -900,12 +942,26 @@ pub fn evaluate_linear_action_samples(
             });
         }
 
+        residual_values.sort_by(f64::total_cmp);
+        let (median_residual, p95_residual) = median_and_p95(&residual_values);
+        let mean_residual = residual_sum / informative_sample_count as f64;
+        let variance = residual_values
+            .iter()
+            .map(|value| {
+                let difference = *value - mean_residual;
+                difference * difference
+            })
+            .sum::<f64>()
+            / informative_sample_count as f64;
         generator_statistics.push(LinearActionGeneratorSampleStatisticsV1 {
             generator_id: generator.id.clone(),
             checked_sample_count: samples.len(),
             informative_sample_count,
             skipped_sample_count,
-            mean_normalized_squared_residual: residual_sum / informative_sample_count as f64,
+            mean_normalized_squared_residual: mean_residual,
+            median_normalized_squared_residual: median_residual,
+            p95_normalized_squared_residual: p95_residual,
+            standard_deviation_normalized_squared_residual: variance.sqrt(),
             maximum_normalized_squared_residual: maximum_residual,
             within_tolerance: maximum_residual <= profile.squared_cosine_tolerance,
             sample_residuals,
@@ -916,6 +972,11 @@ pub fn evaluate_linear_action_samples(
         action_id: declaration.action_id.clone(),
         coordinate_basis_id: declaration.coordinate_basis_id.clone(),
         profile,
+        expression_blake3: expression_blake3(expr),
+        declared_action_blake3: action_declaration_blake3(action.declared_action()),
+        sample_batch_blake3: sample_batch_blake3(samples),
+        sampling_profile_blake3: sampling_profile_blake3(profile),
+        estimated_expression_evaluation_cost,
         sample_ids: samples.iter().map(|sample| sample.sample_id.clone()).collect(),
         direction_basis_diagnostics,
         generator_statistics,
