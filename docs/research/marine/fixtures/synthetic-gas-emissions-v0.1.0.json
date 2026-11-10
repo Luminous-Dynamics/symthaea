@@ -25,7 +25,9 @@
     "observed_sample_count": 60,
     "missing_sample_count": 0,
     "minimum_observed_fraction": 0.95,
-    "time_alignment_uncertainty_seconds": 0.002
+    "time_alignment_uncertainty_seconds": 0.002,
+    "window_semantics": "start_inclusive_end_exclusive",
+    "rate_count_tolerance_samples": 1
   },
   "expected_gases": [
     "CH4",
@@ -48,7 +50,7 @@
         "calibration_status": "in_tolerance",
         "timebase_id": "SYNTHETIC-UTC-TB-001",
         "trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "rights_status": "not_applicable"
+        "rights_status": "unknown"
       }
     },
     {
@@ -66,7 +68,7 @@
         "calibration_status": "in_tolerance",
         "timebase_id": "SYNTHETIC-UTC-TB-001",
         "trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "rights_status": "not_applicable"
+        "rights_status": "unknown"
       }
     }
   ],
