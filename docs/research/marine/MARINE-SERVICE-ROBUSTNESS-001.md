@@ -288,6 +288,36 @@ Reference the current IMO Guidelines on Maritime Cyber Risk Management (MSC-FAL.
 - IMO MSC 111, 13–22 May 2026. https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-msc-111.aspx
 - IMO SDC 12 safety-framework work plan, 19–23 January 2026. https://www.imo.org/en/mediacentre/meetingsummaries/pages/sdc-12.aspx
 
+## 17. SOTA update: leakage-resistant prediction and uncertainty-qualified hydrodynamics
+
+Two further benchmarks materially sharpen the programme.
+
+### 17.1 Operational fuel prediction
+
+Park and Song's 23 September 2026 study, "Physics-Informed Machine Learning with Monotonic Constraints for Daily Fuel Consumption and CII Prediction of Ships" (JMSE 14(19), 1774; DOI 10.3390/jmse14191774), reports random-split R² 0.975 ± 0.001 versus purged time-block R² 0.943 ± 0.007 for FuelCast Poseidon (+0.032 random-split optimism bias). It reports elimination of non-physical ALE reversals in its three measured-ship cases using monotonic constraints and a CII MAPE of 6.80%.
+
+FuelCast contains daily measured data from two cruise ships and one offshore support vessel—not a mainstream cargo vessel. The fuel target is total onboard daily fuel, not propulsion-only shaft fuel. Its records do not capture cargo loading variation adequately. Its reported license is CC BY-NC-ND 4.0; commercial use, derivative analysis and redistribution require a rights review. EU MRV annual aggregates are useful for fleet/CII diagnostics, but must not be disaggregated into daily training labels.
+
+Our next protocol is therefore: reproduce the purged 20%-contiguous time block with 2% purge on both sides and five rotations; add whole-voyage, route/season and leave-one-ship-out holdouts; audit arithmetic target leakage; compare physics baselines and constrained/unconstrained RF/XGBoost; and report uncertainty calibration, worst-slice error and out-of-domain abstention.
+
+Crucially, monotonic constraints must be conditional. A global "more wind speed means more fuel" rule is physically inappropriate for WAPS: relative direction and wind-device state can make favourable wind reduce engine demand. Current direction, SOG/STW, load/draft/trim and device state must remain explicit.
+
+Specification: [MARINE-OPERATIONAL-PREDICTION-BENCHMARK-001](./MARINE-OPERATIONAL-PREDICTION-BENCHMARK-001.md).
+
+### 17.2 Hydrodynamic verification/validation
+
+ITTC procedure 7.5-03-02-01 Rev.02 (2024) gives a Series 60 cargo/container RANS example at Fr=0.316 and Re=4.3e6 with separate grid and uncertainty analysis. The example reports total-resistance comparison error of 7.2% against combined validation uncertainty of 3.1%, so total resistance is not validated in that case. Its wave-profile result is a separate near-validated observable. This is an important standard for claim discipline: no generic "CFD validated" badge is allowed when an observable has failed its uncertainty comparison.
+
+Specification: [MARINE-HYDRODYNAMIC-VALIDATION-001](./MARINE-HYDRODYNAMIC-VALIDATION-001.md).
+
+### 17.3 New execution workstreams
+
+- [#11441 — operational prediction benchmark](https://github.com/Luminous-Dynamics/symthaea/issues/11441)
+- [#11442 — ITTC uncertainty-qualified hydrodynamic validation](https://github.com/Luminous-Dynamics/symthaea/issues/11442)
+- [#11443 — canonical service fingerprint and comparison boundary](https://github.com/Luminous-Dynamics/symthaea/issues/11443)
+
+The current supplied service fingerprint is compared for equality but not yet recomputed from a formally versioned canonical payload. #11443 tracks this integrity gap. A digest must bind a declared payload, not merely be a 64-character string repeated across two cases.
+
 ## 16. Claim ceiling
 
 A route-policy experiment is not proof of safe autonomous navigation. A model reproduction is not a vessel trial. A schema or validator pass is not sensor authentication or physical qualification. A one-ship result does not establish fleet transfer. Every conclusion must identify vessel, configuration, service contract, route, season, operating envelope, dataset, models, source rights, uncertainty, trial stage and excluded conditions.
