@@ -515,16 +515,20 @@ mod tests {
     #[test]
     fn characterized_robust_path_rejects_duplicate_scalar_map_uncertainty() {
         let input = baseline();
-        let mut budget = MissionUncertaintyBudget::default();
-        budget.propulsion_efficiency_fraction = 0.01;
+        let propulsion_budget = MissionUncertaintyBudget {
+            propulsion_efficiency_fraction: 0.01,
+            ..MissionUncertaintyBudget::default()
+        };
         assert!(matches!(
-            budget.apply_adverse_corner_for_characterized_maps(&input),
+            propulsion_budget.apply_adverse_corner_for_characterized_maps(&input),
             Err(RobustEvaluationError::InvalidBudget(_))
         ));
-        budget.propulsion_efficiency_fraction = 0.0;
-        budget.battery_voltage_fraction = 0.01;
+        let battery_budget = MissionUncertaintyBudget {
+            battery_voltage_fraction: 0.01,
+            ..MissionUncertaintyBudget::default()
+        };
         assert!(matches!(
-            budget.apply_adverse_corner_for_characterized_maps(&input),
+            battery_budget.apply_adverse_corner_for_characterized_maps(&input),
             Err(RobustEvaluationError::InvalidBudget(_))
         ));
     }
@@ -532,16 +536,21 @@ mod tests {
     #[test]
     fn uncertainty_budget_rejects_non_finite_and_unit_fractions() {
         let input = baseline();
-        let mut invalid = MissionUncertaintyBudget::default();
-        invalid.mass_fraction = 1.0;
+        let unit_fraction = MissionUncertaintyBudget {
+            mass_fraction: 1.0,
+            ..MissionUncertaintyBudget::default()
+        };
         assert!(matches!(
-            evaluate_mission_robust(&input, &invalid),
+            evaluate_mission_robust(&input, &unit_fraction),
             Err(RobustEvaluationError::InvalidBudget(_))
         ));
 
-        invalid.mass_fraction = f64::NAN;
+        let non_finite_fraction = MissionUncertaintyBudget {
+            mass_fraction: f64::NAN,
+            ..MissionUncertaintyBudget::default()
+        };
         assert!(matches!(
-            evaluate_mission_robust(&input, &invalid),
+            evaluate_mission_robust(&input, &non_finite_fraction),
             Err(RobustEvaluationError::InvalidBudget(_))
         ));
     }
