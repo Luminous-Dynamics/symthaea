@@ -336,7 +336,7 @@ mod tests {
     }
 
     #[test]
-    fn 95_95_single_metric_requires_59_independent_units() {
+    fn one_metric_95_95_requires_59_independent_units() {
         assert_eq!(minimum_sample_count(0.95, 0.95).unwrap(), 59);
     }
 
@@ -356,7 +356,7 @@ mod tests {
             .into_iter()
             .map(|mut row| {
                 if row.metric_id == "pitch" {
-                    row.absolute_delta /= 100.0;
+                    row.absolute_delta /= 10.0;
                 } else {
                     row.absolute_delta = 0.0001;
                 }
