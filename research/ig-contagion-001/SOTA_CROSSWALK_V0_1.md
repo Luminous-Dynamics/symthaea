@@ -16,6 +16,10 @@ This document is a research design crosswalk. Published values below are reporte
 | MADBench, arXiv 2026 | Six security-attack families over 356 source tasks / 3,958 test cases; includes prompt/resource attacks, compromised agents and orchestrator compromise | Compose its attack taxonomy as a separate security layer; compare answer correctness and unauthorized read/write outcomes | The current 50-case stance/topology matrix is not a reproduction of MADBench; exact artifacts/harness require separate qualification |
 | *Demystifying Multi-Agent Debate*, Findings ACL 2026 | Diversity-aware initial answers and confidence-modulated updates across six reasoning benchmarks | Add initial-diversity and calibrated-confidence treatment arms | Confidence is not evidence; QA improvements do not establish civic legitimacy |
 | *Free-MAD*, Findings ACL 2026 | Consensus-free debate, full-trajectory scoring and anti-conformity; reports lower round/token cost | Add a trajectory-scoring and consensus-free baseline under equal model/token budgets | Majority resistance can still erase minorities if trajectory scoring is opaque or miscalibrated |
+| SVR-MAD, Findings EMNLP 2026 | Posterior-guided communication-graph construction; reports up to 61% token-cost reduction on its tested setup | Add adaptive communication routing under matched end-to-end budgets | Self-reported confidence and peer-survival signals can be miscalibrated; measure minority-evidence exclusion and equal-budget quality |
+| Debate-aware Learning Makes LLMs Genuine Debaters, EMNLP 2026 | Structured debate, imitation and debate-aware learning; introduces RES and BGS | Reproduce rebuttal engagement and belief-governance diagnostics as separate argument-quality measures | RES/BGS are not factual ground-truth or security-effect oracles; exact definitions and annotation must be verified |
+| When Linguistic and Internal Confidence Diverge, Findings EMNLP 2026 | Verbal confidence often diverges from logits and semantic entropy; evaluates association, magnitude agreement and calibration | Separate confidence channels and test prompt-induced confidence inflation | Verbal confidence is a lossy channel, not a calibrated prior by default |
+| Epistemic Gain, Aleatoric Cost, ICML 2026 | Distinguishes epistemic gain from aleatoric uncertainty cost in debate | Add declared uncertainty-decomposition diagnostics and evidence-reducible uncertainty | Do not penalize legitimate value disagreement or minimize variance as a proxy for truth |
 
 | ACIArena, ACL 2026 | 1,356 cases over six MAS implementations; external-input, agent-profile and inter-agent-message attacks; topology alone insufficient | Add role/profile/message attack layers and transfer tests; do not reduce security to topology | Not a like-for-like accuracy benchmark for our synthetic stance protocol |
 | *Beyond Consensus*, Findings EMNLP 2026 | On tested subjective scoring tasks, single-judge baselines had stronger human alignment than consensus MAD; asymmetric strict roles induced downward bias | Include blind-human reference, single-judge baseline, symmetric-MAD control and role-asymmetry ablation | Does not imply single judges always outperform multi-judge systems or justify removing human adjudication |
@@ -65,6 +69,10 @@ Use the same task instances, model family/revision, agent count, token/tool budg
 | A7 — confidence/diversity | Diverse initial answer sets and calibrated confidence reporting | Does this improve evidence-selective revision without turning confidence into authority? |
 | A8 — Free-MAD trajectory scoring | Preserve initial/intermediate/final answers; use a consensus-free trajectory scorer and anti-conformity condition | Does full-trajectory selection reduce conformity and token cost without losing minority information? |
 | A9 — MADBench security taxonomy | Matched attacks at prompt, resource, coordination and orchestrator layers | Does the protocol fail safely across the wider debate-security lifecycle? |
+| A10 — SVR-MAD adaptive routing | Posterior-guided message graph growth under equal total inference budgets | Does routing save tokens without suppressing minority evidence under miscalibrated confidence? |
+| A11 — argumentation / rebuttal quality | Structured argument, explicit rebuttal and correction; RES/BGS-style measures | Do agents engage with counterarguments and revise according to argument/evidence strength rather than status or majority? |
+| A12 — confidence-channel separation | Verbal confidence, logits-derived confidence and semantic entropy logged separately | Which channel predicts correctness/revision, and how do prompt cues distort each? |
+| A13 — hierarchical uncertainty | Decompose within-agent epistemic/aleatoric uncertainty, between-agent disagreement and system uncertainty | Can collapse be detected without suppressing legitimate pluralism? |
 | A10 — role-symmetry / human alignment | Single-judge baseline, symmetric-MAD and asymmetric strict/lenient roles against blind human ratings | Does consensus improve alignment with human judgments, or merely enforce role-induced bias? |
 | A11 — hierarchical uncertainty | Measure intra-agent, inter-agent and system-output uncertainty separately | Can collapse be detected without treating justified disagreement as failure? |
 | A12 — cascading injection / effect security | Attack external inputs, agent profiles and inter-agent messages; test read/write/exfiltration outcomes in a contained environment | Does topology-aware debate also resist cross-agent instruction propagation and unauthorized effects? |
@@ -351,3 +359,18 @@ A run with unknown server-side context/truncation state cannot count as a clean 
 **A14 — trace-to-preference post-training.** AbCD-style preference extraction is evaluated separately from inference-only debate. Its metric is independent held-out task performance and transfer, with label-corruption, correlated-judge and consensus-capture controls. It must not be scored as an inference improvement.
 
 The new comparison criteria are therefore two-stage: first qualify transcript/budget integrity; only then compare method quality on the resulting clean run set.
+
+
+## Further 10 November 2026 comparison extensions
+
+### SVR-MAD adaptive routing
+Treat the reported up-to-61% token savings as a matched replication target, not a forecast. Report end-to-end tokens, judge/tool costs, latency, final and intermediate correctness, warranted revision, unsupported influence, minority-evidence exposure, and invalid context/routing. A cheaper graph is not better if it systematically drops dissent or valid minority evidence.
+
+### Argumentation and rebuttal quality
+Reproduce RES/BGS only after verifying exact equations, annotation protocol, judge independence and dataset splits from the EMNLP 2026 paper. Add a blind-human or independent argument-structure oracle. Keep these metrics separate from factual accuracy, civic legitimacy and operational security.
+
+### Confidence-channel integrity
+For each sample record verbal confidence, logits-derived score and semantic-entropy estimate only where the model API exposes the required information. Measure (i) rank association, (ii) magnitude agreement, and (iii) probabilistic calibration separately. Prompt-induced inflation is a test factor. If an internal channel is unavailable, record Unsupported; do not infer it from the verbal answer.
+
+### Uncertainty decomposition
+Distinguish within-agent epistemic uncertainty, within-agent aleatoric uncertainty, between-agent disagreement and system-level predictive uncertainty. Keep the estimator identity, assumptions, task class and decomposition residual in the run receipt. Normative pluralism must not be coerced into low variance.
