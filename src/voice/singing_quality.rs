@@ -399,6 +399,20 @@ fn estimate_f0_near(x: &[f32], rate: u32, expected: f32) -> Option<f32> {
     (best.0 > 0 && best.1 >= 0.12).then(|| rate as f32 / best.0 as f32)
 }
 
+/// Three-tap binomial low-pass followed by 2:1 decimation. This is used
+/// before broad pitch searches to reduce lag work while keeping 1200 Hz well
+/// below the decimated Nyquist limit at normal audio sample rates.
+fn lowpass_decimate_by_two(x: &[f32]) -> Vec<f32> {
+    let mut output = Vec::with_capacity(x.len().div_ceil(2));
+    for center in (0..x.len()).step_by(2) {
+        let left = if center == 0 { x[0] } else { x[center - 1] };
+        let middle = x[center];
+        let right = x.get(center + 1).copied().unwrap_or(middle);
+        output.push((left + 2.0 * middle + right) * 0.25);
+    }
+    output
+}
+
 /// Broad-range autocorrelation cross-check that deliberately does not use
 /// the expected note. The 40-1200 Hz range covers common low/high singing
 /// fundamentals and permits an octave-error detector to observe a true pitch
@@ -407,12 +421,19 @@ fn estimate_f0_near(x: &[f32], rate: u32, expected: f32) -> Option<f32> {
 /// This shares the autocorrelation algorithm family with the score-conditioned
 /// estimator. It addresses prior-window bias, not correlated estimator error.
 fn estimate_f0_broad(x: &[f32], rate: u32) -> Option<f32> {
-    let rms = (x.iter().map(|value| value * value).sum::<f32>() / x.len().max(1) as f32).sqrt();
-    if x.len() < 4 || rate == 0 || rms < 0.003 {
+    if x.len() < 8 || rate < 80 {
         return None;
     }
-    let min_lag = (rate as f32 / 1200.0).floor().max(1.0) as usize;
-    let max_lag = ((rate as f32 / 40.0).ceil() as usize).min(x.len() / 2);
+    let downsampled = lowpass_decimate_by_two(x);
+    let effective_rate = rate as f64 / 2.0;
+    let rms = (downsampled.iter().map(|value| value * value).sum::<f32>()
+        / downsampled.len().max(1) as f32)
+        .sqrt();
+    if rms < 0.003 {
+        return None;
+    }
+    let min_lag = (effective_rate / 1200.0).floor().max(1.0) as usize;
+    let max_lag = ((effective_rate / 40.0).ceil() as usize).min(downsampled.len() / 2);
     if min_lag > max_lag {
         return None;
     }
@@ -420,16 +441,16 @@ fn estimate_f0_broad(x: &[f32], rate: u32) -> Option<f32> {
     let mut scores = Vec::with_capacity(max_lag - min_lag + 1);
     let mut best_score = f64::NEG_INFINITY;
     for lag in min_lag..=max_lag {
-        let (dot, energy_a, energy_b) = x[..x.len() - lag].iter().zip(&x[lag..]).fold(
-            (0.0f64, 0.0f64, 0.0f64),
-            |(dot, a2, b2), (&a, &b)| {
+        let (dot, energy_a, energy_b) = downsampled[..downsampled.len() - lag]
+            .iter()
+            .zip(&downsampled[lag..])
+            .fold((0.0f64, 0.0f64, 0.0f64), |(dot, a2, b2), (&a, &b)| {
                 (
                     dot + (a * b) as f64,
                     a2 + (a * a) as f64,
                     b2 + (b * b) as f64,
                 )
-            },
-        );
+            });
         let score = dot / (energy_a * energy_b).sqrt().max(1e-12);
         best_score = best_score.max(score);
         scores.push((lag, score));
@@ -438,7 +459,6 @@ fn estimate_f0_broad(x: &[f32], rate: u32) -> Option<f32> {
         return None;
     }
 
-    // Retain the legacy earliest-credible-peak policy, but over a wider range.
     let threshold = (best_score * 0.85).max(0.25);
     let selected = scores
         .windows(3)
@@ -454,28 +474,26 @@ fn estimate_f0_broad(x: &[f32], rate: u32) -> Option<f32> {
                 .find(|(_, score)| *score >= threshold)
                 .map(|(lag, _)| *lag)
         })?;
-    Some(rate as f32 / selected as f32)
+    Some((effective_rate / selected as f64) as f32)
 }
 
 /// YIN-style F0 estimate using the difference function and cumulative
 /// mean normalized difference (CMNDF). Returns (frequency_hz, confidence).
 ///
-/// A small 3-tap smoothing filter precedes 2:1 decimation to bound evaluation
-/// cost while retaining the 40-1200 Hz fundamental range. Confidence is
+/// Two cascaded 3-tap smoothing/2:1 stages bound evaluation cost while
+/// retaining the 40-1200 Hz fundamental range. Confidence is
 /// 1-CMNDF at the selected trough. This is a second estimator family relative
 /// to the autocorrelation peak search, not an independent reference signal.
 fn estimate_f0_yin(x: &[f32], rate: u32) -> Option<(f32, f32)> {
     if x.len() < 8 || rate < 80 {
         return None;
     }
-    let mut downsampled = Vec::with_capacity(x.len().div_ceil(2));
-    for center in (0..x.len()).step_by(2) {
-        let left = if center == 0 { x[0] } else { x[center - 1] };
-        let middle = x[center];
-        let right = x.get(center + 1).copied().unwrap_or(middle);
-        downsampled.push((left + 2.0 * middle + right) * 0.25);
-    }
-    let effective_rate = rate as f64 / 2.0;
+    // Cascaded anti-aliased 2:1 stages yield a 4:1 reduction overall.
+    // Two stages preserve the target range while keeping this O(N * lag)
+    // estimator cheap enough for the offline comparison gate.
+    let first_stage = lowpass_decimate_by_two(x);
+    let downsampled = lowpass_decimate_by_two(&first_stage);
+    let effective_rate = rate as f64 / 4.0;
     let rms = (downsampled.iter().map(|value| value * value).sum::<f32>()
         / downsampled.len().max(1) as f32)
         .sqrt();
@@ -522,9 +540,8 @@ fn estimate_f0_yin(x: &[f32], rate: u32) -> Option<(f32, f32)> {
         lag += 1;
     }
     let selected = selected.or_else(|| {
-        let candidate = (min_lag..=max_lag).min_by(|&left, &right| {
-            cmndf[left].total_cmp(&cmndf[right])
-        })?;
+        let candidate =
+            (min_lag..=max_lag).min_by(|&left, &right| cmndf[left].total_cmp(&cmndf[right]))?;
         (cmndf[candidate] <= 0.25).then_some(candidate)
     })?;
 
