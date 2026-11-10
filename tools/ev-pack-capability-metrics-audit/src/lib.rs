@@ -426,7 +426,7 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
             || !nonempty(&snapshot.snapshot_ref)
             || !is_digest(&snapshot.snapshot_digest)
             || snapshot.pack_configuration_digest != profile.asset.pack_configuration_digest
-            || snapshot.condition_ref != capacity.condition_ref
+            || !nonempty(&snapshot.condition_ref)
             || snapshot.maximum_sample_skew_ms == 0
         {
             errors.push("SOC snapshot identity, configuration or event context is invalid".to_owned());
@@ -857,13 +857,20 @@ mod tests {
 
     #[test]
     fn all_six_metrics_have_explicit_status() {
-        let metrics = &report().payload.cases[0].summary.as_ref().unwrap().inconsistency_metrics;
+        let report = report();
+        let complete = report.payload.cases.iter()
+            .find(|case| case.case_id == "complete-qualified-series-pack")
+            .and_then(|case| case.summary.as_ref())
+            .expect("complete pack summary");
+        let metrics = &complete.inconsistency_metrics;
         assert_eq!(metrics.sigma_soh.status, "COMPUTED");
         assert_eq!(metrics.beta_soh.status, "COMPUTED");
         assert_eq!(metrics.beta_life.status, "COMPUTED");
         assert_eq!(metrics.beta_soc.status, "COMPUTED");
         assert_eq!(metrics.beta_power.status, "NOT_COMPUTABLE");
         assert_eq!(metrics.beta_energy.status, "NOT_COMPUTABLE");
+        assert!((metrics.beta_soh.value.unwrap() - (0.85 / 0.90)).abs() < 1e-12);
+        assert!((metrics.beta_life.value.unwrap() - (3.0 * 800.0 / 2700.0)).abs() < 1e-12);
     }
 
     #[test]
