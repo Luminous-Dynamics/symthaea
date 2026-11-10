@@ -707,18 +707,54 @@ fn compose_with_spec_and_form_and_grammar_impl(
             meter_beats,
         );
     }
-    apply_appoggiaturas(&mut score, key, &spec.melody, intent.seed);
+    apply_appoggiaturas(
+        &mut score,
+        GENERAL_MELODY_PART_V1,
+        key,
+        &spec.melody,
+        intent.seed,
+    );
     if tx.roll_ornaments {
-        apply_roll_ornaments(&mut score, key, &spec.melody, intent.seed);
+        apply_roll_ornaments(
+            &mut score,
+            GENERAL_MELODY_PART_V1,
+            key,
+            &spec.melody,
+            intent.seed,
+        );
     } else {
-        apply_grace_ornaments(&mut score, key, &spec.melody, intent.seed);
+        apply_grace_ornaments(
+            &mut score,
+            GENERAL_MELODY_PART_V1,
+            key,
+            &spec.melody,
+            intent.seed,
+        );
     }
-    apply_blue_notes(&mut score, key, spec.melody.blue_note_rate, intent.seed);
-    apply_suspensions(&mut score, key, tx.suspension_rate, intent.seed);
+    apply_blue_notes(
+        &mut score,
+        GENERAL_MELODY_PART_V1,
+        key,
+        spec.melody.blue_note_rate,
+        intent.seed,
+    );
+    apply_suspensions(
+        &mut score,
+        GENERAL_HARMONY_PART_V1,
+        key,
+        tx.suspension_rate,
+        intent.seed,
+    );
     if tx.planing {
         // After every melody-altering pass, so the chord shape rides the
         // FINAL melodic contour, not a pre-ornament draft of it.
-        apply_parallel_planing(&mut score, &form, bars as i64, meter_beats);
+        apply_parallel_planing(
+            &mut score,
+            GENERAL_HARMONY_PART_V1,
+            &form,
+            bars as i64,
+            meter_beats,
+        );
     }
     if tx.staged_entrances {
         apply_staged_entrances(&mut score, &form, meter_beats);
@@ -824,7 +860,13 @@ fn compose_with_spec_and_form_and_grammar_impl(
 /// rides the tune's contour. "Color over function": nothing here
 /// resolves; the harmony is entirely defined by where the melody happens
 /// to be standing right now.
-fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats: f64) {
+fn apply_parallel_planing(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    bars: i64,
+    meter_beats: f64,
+) {
     for (si, section) in form.sections.iter().enumerate() {
         if !matches!(
             section.role,
@@ -877,7 +919,7 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
             .notes
             .iter()
             .filter(|n| {
-                n.role == VoiceRole::Harmony && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
+                n.role == VoiceRole::Harmony && n.part == part_id && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
             })
             .map(|n| n.onset)
             .min_by(|a, b| {
@@ -901,7 +943,7 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
             continue;
         }
         score.notes.retain(|n| {
-            !(n.role == VoiceRole::Harmony && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi)
+            !(n.role == VoiceRole::Harmony && n.part == part_id && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi)
         });
         for (onset, duration, midi, si_intensity) in melody {
             let shift = midi - base_melody_midi;
@@ -1237,7 +1279,13 @@ fn apply_evaded_return_close(
 /// [`crate::spec::MelodicDna::appoggiatura_rate`] (0 = the pass is
 /// inert); which cadences lean is a scrambled per-note seed choice, so
 /// two pieces at the same rate lean in different places.
-fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDna, seed: u64) {
+fn apply_appoggiaturas(
+    score: &mut Score,
+    part_id: PartId,
+    key: Key,
+    dna: &crate::spec::MelodicDna,
+    seed: u64,
+) {
     if dna.appoggiatura_rate <= 0.0 {
         return;
     }
@@ -1246,7 +1294,7 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
     let mut counter = 0u64;
     for i in 0..score.notes.len() {
         let n = &score.notes[i];
-        if n.role != VoiceRole::Melody
+        if n.role != VoiceRole::Melody || n.part != part_id
             || n.emphasis != Emphasis::Cadential
             || n.duration.beats() < 1.0
         {
@@ -1313,7 +1361,13 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
 /// being just another appoggiatura wearing a different name. Rate comes
 /// from [`crate::spec::MelodicDna::ornament_rate`] (0 = the pass is
 /// inert).
-fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicDna, seed: u64) {
+fn apply_grace_ornaments(
+    score: &mut Score,
+    part_id: PartId,
+    key: Key,
+    dna: &crate::spec::MelodicDna,
+    seed: u64,
+) {
     if dna.ornament_rate <= 0.0 {
         return;
     }
@@ -1322,7 +1376,7 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
     let mut counter = 0u64;
     for i in 0..score.notes.len() {
         let n = &score.notes[i];
-        if n.role != VoiceRole::Melody || n.duration.beats() < 0.4 {
+        if n.role != VoiceRole::Melody || n.part != part_id || n.duration.beats() < 0.4 {
             continue;
         }
         counter += 1;
@@ -1388,7 +1442,13 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
 /// identity as THE arrival matters more than decoration). Mutually
 /// exclusive with `apply_grace_ornaments`; reuses `MelodicDna::
 /// ornament_rate` as its gate/probability, same as the cut.
-fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicDna, seed: u64) {
+fn apply_roll_ornaments(
+    score: &mut Score,
+    part_id: PartId,
+    key: Key,
+    dna: &crate::spec::MelodicDna,
+    seed: u64,
+) {
     if dna.ornament_rate <= 0.0 {
         return;
     }
@@ -1398,7 +1458,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
     let mut counter = 0u64;
     for i in 0..score.notes.len() {
         let n = &score.notes[i];
-        if n.role != VoiceRole::Melody || n.duration.beats() < 0.9 || n.emphasis == Emphasis::Climax
+        if n.role != VoiceRole::Melody || n.part != part_id || n.duration.beats() < 0.9 || n.emphasis == Emphasis::Climax
         {
             continue;
         }
@@ -1502,7 +1562,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
 /// one that's already there — a deliberate melody/harmony scale mismatch,
 /// not a new pitch event. Rate comes from
 /// [`crate::spec::MelodicDna::blue_note_rate`] (0 = the pass is inert).
-fn apply_blue_notes(score: &mut Score, key: Key, rate: f32, seed: u64) {
+fn apply_blue_notes(score: &mut Score, part_id: PartId, key: Key, rate: f32, seed: u64) {
     if rate <= 0.0 {
         return;
     }
@@ -1511,7 +1571,7 @@ fn apply_blue_notes(score: &mut Score, key: Key, rate: f32, seed: u64) {
     let seventh_pc = scale.degree_pitch_class(7);
     let mut counter = 0u64;
     for n in score.notes.iter_mut() {
-        if n.role != VoiceRole::Melody {
+        if n.role != VoiceRole::Melody || n.part != part_id {
             continue;
         }
         let pc = n.pitch.pitch_class();
@@ -1542,7 +1602,7 @@ fn apply_blue_notes(score: &mut Score, key: Key, rate: f32, seed: u64) {
 /// mechanism: real chorale harmony, not appoggiatura's melodic upper
 /// neighbor wearing a different name. Rate comes from
 /// [`crate::spec::TextureSpec::suspension_rate`] (0 = the pass is inert).
-fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
+fn apply_suspensions(score: &mut Score, part_id: PartId, key: Key, rate: f32, seed: u64) {
     if rate <= 0.0 {
         return;
     }
@@ -1550,7 +1610,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
     let mut onsets: Vec<f64> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Harmony)
+        .filter(|n| n.role == VoiceRole::Harmony && n.part == part_id)
         .map(|n| n.onset.beats())
         .collect();
     onsets.sort_by(f64::total_cmp);
@@ -1561,7 +1621,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             .notes
             .iter()
             .enumerate()
-            .filter(|(_, n)| n.role == VoiceRole::Harmony && (n.onset.beats() - t).abs() < 1e-9)
+            .filter(|(_, n)| n.role == VoiceRole::Harmony && n.part == part_id && (n.onset.beats() - t).abs() < 1e-9)
             .map(|(idx, n)| (idx, n.pitch, n.duration, n.velocity, n.section_intensity, n.part))
             .collect()
     };
@@ -7308,7 +7368,7 @@ mod tests {
                 section_intensity: 1.0,
             });
         }
-        apply_suspensions(&mut score, key, 1.0, 3);
+        apply_suspensions(&mut score, PartId::UNASSIGNED, key, 1.0, 3);
         let mut harmony: Vec<&ScoreNote> = score
             .notes
             .iter()
@@ -7360,6 +7420,35 @@ mod tests {
             resolution.velocity < suspended.velocity,
             "the resolution releases — quieter than the suspension"
         );
+    }
+
+    #[test]
+    fn harmonic_stasis_never_merges_equal_pitch_events_from_distinct_parts() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        let pitch = Pitch::from_midi(60);
+        for part in [PartId(11), PartId(22)] {
+            for onset in [0i64, 4] {
+                score.push(ScoreNote {
+                    part,
+                    pitch,
+                    onset: Duration::new(onset, 1),
+                    duration: Duration::new(4, 1),
+                    velocity: 0.5,
+                    role: VoiceRole::Harmony,
+                    emphasis: Emphasis::Normal,
+                    section_intensity: 1.0,
+                });
+            }
+        }
+        apply_harmonic_stasis(&mut score);
+        assert_eq!(score.notes.len(), 2);
+        assert!(score.notes.iter().all(|note| note.pitch == pitch));
+        assert_eq!(
+            score.notes.iter().map(|note| note.part).collect::<std::collections::BTreeSet<_>>(),
+            [PartId(11), PartId(22)].into_iter().collect()
+        );
+        assert!(score.notes.iter().all(|note| (note.duration.beats() - 8.0).abs() < 1e-9));
     }
 
     #[test]
@@ -7610,7 +7699,7 @@ mod tests {
             emphasis: Emphasis::Normal,
             section_intensity: 1.0,
         });
-        apply_blue_notes(&mut score, key, 1.0, 7);
+        apply_blue_notes(&mut score, PartId::UNASSIGNED, key, 1.0, 7);
         let melody: Vec<&ScoreNote> = score
             .notes
             .iter()
@@ -8662,7 +8751,7 @@ mod tests {
             ornament_rate: 1.0,
             ..Default::default()
         };
-        apply_roll_ornaments(&mut score, key, &dna, 1);
+        apply_roll_ornaments(&mut score, PartId::UNASSIGNED, key, &dna, 1);
         let mut mel: Vec<ScoreNote> = score
             .notes
             .iter()
