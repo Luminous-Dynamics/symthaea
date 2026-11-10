@@ -23,6 +23,12 @@ const CASES: &[(&str, &str)] = &[
     ("multisyllabic", "colonel anemone phenomenon"),
     ("punctuation", "\"Hello, world!\""),
     ("unknown_candidate", "xqzpl flurble"),
+    ("ugt_abbreviations", "ppl r here imo"),
+    ("ugt_initialisms", "brb idk tbh"),
+    ("ugt_noncanonical", "u r gonna be ok"),
+    ("ugt_elongation", "soooo this is reallly good"),
+    ("ugt_slang", "tho cuz wanna hafta"),
+    ("ugt_digit_homophone", "gr8 2 c u"),
 ];
 
 fn main() {
