@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/communication-graph-core/COMMUNICATION_GRAPH_PROFILE_V0_1.schema.json",
+  "title": "CommunicationGraph profile v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "profile_version",
+    "nodes",
+    "channels"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "communication-graph-profile-v0.1"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "agent_instance_id",
+          "principal_ref"
+        ],
+        "properties": {
+          "agent_instance_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "principal_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "channels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "channel_id",
+          "sender",
+          "recipient",
+          "allowed_message_classes",
+          "active_from_round",
+          "active_until_round",
+          "per_round_capacity",
+          "max_payload_bytes"
+        ],
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sender": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recipient": {
+            "type": "string",
+            "minLength": 1
+          },
+          "allowed_message_classes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "claim",
+                "challenge",
+                "control",
+                "correction",
+                "coordination",
+                "evidence"
+              ]
+            }
+          },
+          "active_from_round": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active_until_round": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "per_round_capacity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_payload_bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}
