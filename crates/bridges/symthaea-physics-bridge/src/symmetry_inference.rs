@@ -1893,6 +1893,229 @@ mod tests {
         Expr::Var(name.to_string())
     }
 
+    fn metric_aware_so2_action() -> crate::linear_group_action::AdmittedLinearGroupActionV1 {
+        crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "sample-so2".to_string(),
+            coordinate_basis_id: "xy".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "J".to_string(),
+                matrix: vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap()
+    }
+
+    fn metric_sample_states() -> Vec<Vec<f64>> {
+        vec![
+            vec![1.0, 2.0],
+            vec![2.0, -1.0],
+            vec![-0.5, 1.5],
+            vec![3.0, 0.25],
+        ]
+    }
+
+    #[test]
+    fn metric_aware_sampler_accepts_exact_radial_invariant_and_retains_receipt() {
+        let report = evaluate_metric_aware_linear_action_samples(
+            &add(pow2("x"), pow2("y")),
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.invariant_under_every_generator());
+        assert_eq!(report.sample_states, metric_sample_states());
+        assert_eq!(report.coordinate_unit_ids, vec!["1".to_string(), "1".to_string()]);
+        assert!(report.expression_canonical.starts_with("BADD("));
+        assert_eq!(report.action_declaration.action_id, "sample-so2");
+        assert_eq!(report.original_action_declaration.action_id, "sample-so2");
+        assert_eq!(report.total_invalid_evaluations(), 0);
+        assert_eq!(report.total_informative_evaluations(), 4);
+        assert!(report.generator_results[0].maximum_squared_residual < 1e-28);
+    }
+
+    #[test]
+    fn metric_aware_sampler_rejects_anisotropic_expression() {
+        let expression = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
+        let report = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(!report.invariant_under_every_generator());
+        assert!(report.generator_results[0].maximum_squared_residual > 1e-3);
+    }
+
+    #[test]
+    fn metric_aware_sampler_is_covariant_under_nonorthogonal_coordinate_change() {
+        // D = [[1,1],[0,1]], A' = D A D^-1, G' = D^-T D^-1.
+        // The transformed scalar is f'(X,Y) = X² - 2XY + 2Y².
+        let transformed_action = crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "sample-so2-sheared".to_string(),
+            coordinate_basis_id: "XY".to_string(),
+            coordinate_names: vec!["X".to_string(), "Y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, -1.0], vec![-1.0, 2.0]],
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "conjugated-J".to_string(),
+                matrix: vec![vec![1.0, -2.0], vec![1.0, -1.0]],
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+        let base_samples = metric_sample_states();
+        let transformed_samples: Vec<Vec<f64>> = base_samples
+            .iter()
+            .map(|state| vec![state[0] + state[1], state[1]])
+            .collect();
+        let base_report = evaluate_metric_aware_linear_action_samples(
+            &add(pow2("x"), pow2("y")),
+            &metric_aware_so2_action(),
+            &base_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        let transformed_expression = sub(
+            add(pow2("X"), mul(Expr::Const(2.0), pow2("Y"))),
+            mul(Expr::Const(2.0), mul(var("X"), var("Y"))),
+        );
+        let transformed_report = evaluate_metric_aware_linear_action_samples(
+            &transformed_expression,
+            &transformed_action,
+            &transformed_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(base_report.invariant_under_every_generator());
+        assert!(transformed_report.invariant_under_every_generator());
+        let base_residual = base_report.generator_results[0].maximum_squared_residual;
+        let transformed_residual =
+            transformed_report.generator_results[0].maximum_squared_residual;
+        assert!(
+            (base_residual - transformed_residual).abs() < 1e-24,
+            "metric-aware residual changed under basis transform: {base_residual} vs {transformed_residual}"
+        );
+    }
+
+    #[test]
+    fn metric_aware_sampler_supports_fixed_parameters_and_requires_them() {
+        let expression = mul(var("z"), add(pow2("x"), pow2("y")));
+        let action = metric_aware_so2_action();
+        let missing = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &action,
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        );
+        assert_eq!(
+            missing,
+            Err(MetricAwareLinearActionSampleErrorV1::MissingFixedBinding {
+                name: "z".to_string()
+            })
+        );
+
+        let report = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &action,
+            &metric_sample_states(),
+            &[("z", 3.0)],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert!(report.invariant_under_every_generator());
+        assert_eq!(report.fixed_bindings, vec![("z".to_string(), 3.0)]);
+    }
+
+    #[test]
+    fn metric_aware_sampler_abstains_on_invalid_and_uninformative_samples() {
+        let expression = Expr::Func(UnaryFn::Sqrt, Box::new(var("x")));
+        let report = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &metric_aware_so2_action(),
+            &[vec![-1.0, 1.0], vec![1.0, 0.0]],
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert!(!report.invariant_under_every_generator());
+        assert_eq!(report.generator_results[0].invalid_sample_count, 1);
+
+        let radial = add(pow2("x"), pow2("y"));
+        let report = evaluate_metric_aware_linear_action_samples(
+            &radial,
+            &metric_aware_so2_action(),
+            &[vec![0.0, 0.0], vec![1.0, 0.0]],
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert_eq!(report.generator_results[0].uninformative_sample_count, 1);
+        assert_eq!(report.generator_results[0].informative_sample_count, 1);
+    }
+
+    #[test]
+    fn metric_aware_sampler_rejects_unsupported_nondifferentiable_ast() {
+        let expression = Expr::Func(UnaryFn::Abs, Box::new(var("x")));
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &metric_sample_states(),
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::UnsupportedExpression)
+        );
+    }
+
+    #[test]
+    fn metric_aware_sampler_enforces_sample_and_work_budgets() {
+        let expression = add(pow2("x"), pow2("y"));
+        let states = metric_sample_states();
+        let mut too_few = MetricAwareLinearActionSampleProfileV1::default();
+        too_few.maximum_samples = 2;
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                too_few
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::TooManySamples {
+                actual: 4,
+                maximum: 2
+            })
+        );
+
+        let mut low_work = MetricAwareLinearActionSampleProfileV1::default();
+        low_work.maximum_total_gradient_work = 1;
+        assert!(matches!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                low_work
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::TotalGradientWorkExceeded { .. })
+        ));
+    }
+
     #[test]
     fn structural_symmetry_report_preserves_pattern_provenance() {
         let expr = add(pow2("x"), pow2("y"));
