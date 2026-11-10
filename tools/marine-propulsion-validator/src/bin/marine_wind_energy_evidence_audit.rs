@@ -419,8 +419,7 @@ mod tests {
         value["record_status"] = serde_json::json!("certified");
         let mut findings = Findings::default();
         check_record(&value, &mut findings);
-        assert!(findings.invalid || findings.incomplete);
-        assert!(!findings.disposition().contains("READY"));
+        assert!(findings.invalid, "{:?}", findings.diagnostics);
     }
 
     #[test]
