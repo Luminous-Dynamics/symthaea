@@ -578,6 +578,25 @@ mod tests {
     }
 
     #[test]
+    fn near_isotropic_quadratic_candidate_remains_sampled_evidence() {
+        // The 1e-5 anisotropy is below the declared sampled residual threshold.
+        // It must not be represented as an exact structural pattern or formal proof.
+        let expr = add(
+            pow2("x"),
+            mul(Expr::Const(1.00001), pow2("y")),
+        );
+        assert!(detect_sum_of_squares(&expr).is_none());
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(
+            report.candidate.as_ref().unwrap().lie_groups,
+            vec![LieGroup::SO(2)]
+        );
+        assert!(matches!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::SampledLieDerivative { .. })
+        ));
+    }
+    #[test]
     fn no_candidate_report_does_not_claim_absence_of_symmetry() {
         let report = infer_symmetry_with_evidence(&mul(var("x"), var("y")));
         assert!(report.candidate.is_none());
