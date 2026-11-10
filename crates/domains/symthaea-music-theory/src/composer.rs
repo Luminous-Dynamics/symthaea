@@ -7265,6 +7265,52 @@ mod tests {
     }
 
     #[test]
+    fn suspension_chain_inherits_the_target_harmony_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        let outgoing = key.diatonic_triad(1);
+        let incoming = key.diatonic_triad(4);
+
+        // The outgoing fifth is the prepared suspension; the incoming
+        // chord's F is the target voice whose identity continues through
+        // suspension and downward resolution.
+        for pitch in outgoing.voice(4) {
+            score.push(ScoreNote {
+                part: PartId(19),
+                pitch,
+                onset: Duration::zero(),
+                duration: Duration::new(4, 1),
+                velocity: 0.5,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        for pitch in incoming.voice(4) {
+            score.push(ScoreNote {
+                part: PartId(73),
+                pitch,
+                onset: Duration::new(4, 1),
+                duration: Duration::new(4, 1),
+                velocity: 0.5,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+
+        apply_suspensions(&mut score, key, 1.0, 1);
+        let generated: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.onset.beats() >= 4.0 && note.onset.beats() < 8.0)
+            .collect();
+        assert!(!generated.is_empty());
+        assert!(
+            generated.iter().all(|note| note.part == PartId(73)),
+            "suspension and resolution must preserve the incoming harmony voice's identity"
+        );
+    }
+
+    #[test]
     fn harmonic_stasis_ties_a_repeated_chord_into_one_long_sustain() {
         // Isolated: three consecutive bars, the SAME triad struck fresh
         // each bar (what `realize_harmony_measures` produces on its own
