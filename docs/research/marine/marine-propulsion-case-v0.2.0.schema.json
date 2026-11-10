@@ -831,24 +831,6 @@
         }
       },
       "description": "Timebase/clock record with source, method, reference, offset, drift, uncertainty and validity window. A timebase record does not prove the clock was correctly configured or independently authenticated."
-    }
-  },
-  "properties": {
-    "schema_version": {
-      "const": "0.2.0"
-    },
-    "case_id": {
-      "type": "string",
-      "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"
-    },
-    "record_status": {
-      "type": "string",
-      "enum": [
-        "synthetic",
-        "published_reference_reconstruction",
-        "design_study",
-        "physical_trial"
-      ]
     },
     "comparison": {
       "type": "object",
@@ -857,7 +839,8 @@
         "comparison_group_id",
         "candidate_id",
         "role",
-        "service_fingerprint"
+        "service_fingerprint",
+        "service_fingerprint_profile"
       ],
       "properties": {
         "comparison_group_id": {
@@ -889,6 +872,75 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "service_fingerprint_profile": {
+          "const": "marine-service-payload-v1+symthaea-canonical-json-sha256-v1",
+          "description": "Versioned service/route/load payload projection and canonical JSON digest algorithm."
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "0.2.0"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"
+    },
+    "record_status": {
+      "type": "string",
+      "enum": [
+        "synthetic",
+        "published_reference_reconstruction",
+        "design_study",
+        "physical_trial"
+      ]
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_group_id",
+        "candidate_id",
+        "role",
+        "service_fingerprint",
+        "service_fingerprint_profile"
+      ],
+      "properties": {
+        "comparison_group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "baseline",
+            "candidate",
+            "reference_only"
+          ]
+        },
+        "service_fingerprint": {
+          "$ref": "#/$defs/sha256"
+        },
+        "paired_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "matching_deviations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "service_fingerprint_profile": {
+          "const": "marine-service-payload-v1+symthaea-canonical-json-sha256-v1",
+          "description": "Versioned service/route/load payload projection and canonical JSON digest algorithm."
         }
       }
     },
