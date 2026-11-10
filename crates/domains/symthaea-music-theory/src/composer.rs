@@ -8814,7 +8814,7 @@ mod tests {
             ornament_rate: 1.0,
             ..Default::default()
         };
-        apply_roll_ornaments(&mut score, key, &dna, 1);
+        apply_roll_ornaments(&mut score, PartId::UNASSIGNED, key, &dna, 1);
         let mel_count = score
             .notes
             .iter()
