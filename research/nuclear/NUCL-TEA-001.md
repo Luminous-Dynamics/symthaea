@@ -160,6 +160,8 @@ The factor 0.9 is the study's assumed power-factor conversion. The resulting ran
 - The two studies have different boundaries and must not be subtracted from each other as though they were a single matched load-flow study. The shore-power demand is a time-varying vessel-load estimate; the spare-capacity result is a pre-feasibility port-intake estimate.
 - The reference model should preserve each source's financial-year coverage, method, caveats, units and exact version. It should then acquire interval-meter data, current single-line diagrams and a utility/municipality connection assessment before any project-specific conclusion.
 
+Machine-readable dataset: [`port-reference-evidence-sa-2025.json`](port-reference-evidence-sa-2025.json). It preserves source methods, caveats, the eight-port values, reference-case roles and prohibited inferences.
+
 Sources:
 - CSIR / PtX Hub, *Shore Power Demand for South African Ports* (September 2025), especially executive summary p. 6 and demand results. [Publication page](https://ptx-hub.org/publication/shore-power-demand-for-south-african-ports/) · [PDF](https://ptx-hub.org/wp-content/uploads/2025/10/PtX-Hub-Shore-Power-Demand-for-South-African-Ports-2.pdf)
 - CSIR / PtX Hub, *Load Connection Capacity Assessment of South African National Ports* (September 2025), especially discussion and Table 10, p. 34. [Publication page](https://ptx-hub.org/publication/load-connection-capactiy-assessment-of-south-african-national-ports/) · [PDF](https://ptx-hub.org/wp-content/uploads/2025/11/PtX-Hub-Load-Connection-Capacity-Assessment-of-South-African-National-Ports_final-1.pdf)
