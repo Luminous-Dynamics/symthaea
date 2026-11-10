@@ -27,6 +27,17 @@ pub struct VocalQualityMetrics {
     /// None means the score-independent estimate did not have enough voiced
     /// support to qualify this diagnostic.
     pub score_independent_pitch_audit_pass: Option<bool>,
+    /// Separate YIN difference-function estimator; not a score-conditioned
+    /// search and not yet calibrated as a production F0 tracker.
+    pub yin_pitch_median_error_cents: f32,
+    pub yin_pitch_p95_error_cents: f32,
+    pub yin_pitch_valid_fraction: f32,
+    pub yin_pitch_prior_mismatch_frames: usize,
+    pub yin_pitch_prior_mismatch_fraction: f32,
+    pub yin_pitch_audit_pass: Option<bool>,
+    /// Fraction of frames with both broad autocorrelation and YIN estimates
+    /// differing by more than 150 cents. Undefined without both estimates.
+    pub yin_autocorrelation_disagreement_fraction: Option<f32>,
     pub median_onset_error_ms: f32,
     pub duration_error_ms: f32,
     pub rest_interval_count: usize,
@@ -116,6 +127,11 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     let mut score_independent_errors = Vec::new();
     let mut pitch_prior_mismatch_frames = 0usize;
     let mut score_independent_attempted = 0usize;
+    let mut yin_errors = Vec::new();
+    let mut yin_pitch_attempted = 0usize;
+    let mut yin_pitch_prior_mismatch_frames = 0usize;
+    let mut yin_autocorrelation_disagreements = 0usize;
+    let mut yin_autocorrelation_compared = 0usize;
     let mut attempted = 0usize;
     let mut vuv_errors = 0usize;
     let mut all_frames = 0usize;
@@ -144,6 +160,27 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
             }
             if expected_voiced {
                 attempted += 1;
+                if let Some(expected) = expected_pitch {
+                    yin_pitch_attempted += 1;
+                    if let Some(yin_hz) = estimate_f0_yin(window, rate) {
+                        let yin_error = (1200.0 * (yin_hz / expected).log2()).abs();
+                        yin_errors.push(yin_error);
+                        if let Some(constrained) = actual {
+                            if yin_error > 400.0
+                                && constrained.is_finite()
+                                && (1200.0 * (constrained / expected).log2()).abs() < 350.0
+                            {
+                                yin_pitch_prior_mismatch_frames += 1;
+                            }
+                        }
+                        if let Some(independent) = estimate_f0_global(window, rate) {
+                            yin_autocorrelation_compared += 1;
+                            if (1200.0 * (yin_hz / independent).log2()).abs() > 150.0 {
+                                yin_autocorrelation_disagreements += 1;
+                            }
+                        }
+                    }
+                }
                 if let (Some(expected), Some(constrained)) = (expected_pitch, actual) {
                     score_independent_attempted += 1;
                     if let Some(independent) = estimate_f0_global(window, rate) {
@@ -190,6 +227,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     stable_errors.sort_by(f32::total_cmp);
     transition_errors.sort_by(f32::total_cmp);
     score_independent_errors.sort_by(f32::total_cmp);
+    yin_errors.sort_by(f32::total_cmp);
     let stable_pitch_p95_cents = percentile(&stable_errors, 0.95);
     let transition_pitch_p95_cents = percentile(&transition_errors, 0.95);
     let score_independent_pitch_median_error_cents =
@@ -206,6 +244,21 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     let score_independent_pitch_audit_pass =
         (score_independent_pitch_valid_fraction >= 0.8)
             .then_some(pitch_prior_mismatch_fraction <= 0.10);
+    let yin_pitch_median_error_cents = percentile(&yin_errors, 0.5);
+    let yin_pitch_p95_error_cents = percentile(&yin_errors, 0.95);
+    let yin_pitch_valid_fraction =
+        yin_errors.len() as f32 / yin_pitch_attempted.max(1) as f32;
+    let yin_pitch_prior_mismatch_fraction =
+        yin_pitch_prior_mismatch_frames as f32 / yin_errors.len().max(1) as f32;
+    // The YIN check is an additional research guard. It can block on a
+    // high-coverage false-reassurance finding, but undefined support does not
+    // become a pass and is not yet a mandatory gate until calibrated.
+    let yin_pitch_audit_pass = (yin_pitch_valid_fraction >= 0.8)
+        .then_some(yin_pitch_prior_mismatch_fraction <= 0.10);
+    let yin_autocorrelation_disagreement_fraction =
+        (yin_autocorrelation_compared > 0).then(|| {
+            yin_autocorrelation_disagreements as f32 / yin_autocorrelation_compared as f32
+        });
     // An onset-from-silence metric is meaningful for the first note and after
     // an actual gap, not at a connected legato boundary where audio continues.
     let mut previous_end = None;
@@ -258,6 +311,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     // even when the constrained tracker itself reports a reassuring pitch.
     let objective_pass = pitch_tracking_pass
         && score_independent_pitch_audit_pass == Some(true)
+        && yin_pitch_audit_pass != Some(false)
         && transition_pitch_pass
         && timing_pass
         && physical_stability_pass
@@ -282,6 +336,13 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         pitch_prior_mismatch_frames,
         pitch_prior_mismatch_fraction,
         score_independent_pitch_audit_pass,
+        yin_pitch_median_error_cents,
+        yin_pitch_p95_error_cents,
+        yin_pitch_valid_fraction,
+        yin_pitch_prior_mismatch_frames,
+        yin_pitch_prior_mismatch_fraction,
+        yin_pitch_audit_pass,
+        yin_autocorrelation_disagreement_fraction,
         median_onset_error_ms,
         duration_error_ms,
         rest_interval_count,
