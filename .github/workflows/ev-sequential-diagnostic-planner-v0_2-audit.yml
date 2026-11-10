@@ -1,0 +1,37 @@
+name: EV sequential diagnostic planner v0.2 correlated-likelihood audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_SEQUENTIAL_DIAGNOSTIC_PLANNER_V0_2.md"
+      - "schemas/transport/ev_sequential_diagnostic_scenario_v0_2.schema.json"
+      - "fixtures/ev_battery/sequential_diagnostic_scenarios_v0_2.json"
+      - "tools/ev-sequential-diagnostic-planner/**"
+      - ".github/workflows/ev-sequential-diagnostic-planner-v0_2-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-sequential-diagnostic-planner/Cargo.toml -- --check
+      - name: Run joint-likelihood and mutation tests
+        run: cargo test --manifest-path tools/ev-sequential-diagnostic-planner/Cargo.toml
+      - name: Audit frozen synthetic scenarios
+        run: |
+          cargo run --manifest-path tools/ev-sequential-diagnostic-planner/Cargo.toml -- --schema schemas/transport/ev_sequential_diagnostic_scenario_v0_2.schema.json --corpus fixtures/ev_battery/sequential_diagnostic_scenarios_v0_2.json > "$RUNNER_TEMP/ev-sequential-diagnostic-v0-2-report.json"
+          jq -e '
+            .case_count == 15 and
+            .planned_count == 10 and
+            .rejected_count == 5 and
+            (.report_sha256 | test("^[a-f0-9]{64}$"))
+          ' "$RUNNER_TEMP/ev-sequential-diagnostic-v0-2-report.json"
