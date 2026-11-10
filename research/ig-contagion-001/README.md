@@ -170,9 +170,16 @@ The qualifier checks the bounded manifest/matrix contract, 50-fixture/family cou
 
 ## Validation and claim ceiling
 
-The earlier v0.1 protocol-only hosted run [#42758447839](https://github.com/Luminous-Dynamics/symthaea/actions/runs/42758447839) passed 18 Rust tests on exact commit `81f349954a67c23ea1fa59f4091854246cafdc9a`, qualifying the then-current 45-descriptor structural contract. That run predates the new 50-case matrix, content bundle, digest checks and pluralism controls. It does **not** qualify the current revision.
+The current dedicated hosted run [#42836286467](https://github.com/Luminous-Dynamics/symthaea/actions/runs/42836286467) passed on exact PR head `413972336de51ad62a4c4e9ae8d5198e3fefa17f`:
 
-The current scenario design is still unexecuted. A future structural PASS cannot demonstrate that an agent changed stance, that a defense works, or that human groups behave similarly. Human-subject work requires a separate protocol, applicable ethics review, consent, privacy safeguards, preregistration and independent human evaluation.
+- **23 Rust tests passed, zero failed.**
+- The CLI qualified 50 fixtures, nine families and eight topology families.
+- It reported 34 red-team, six evidence-positive, five measurement and five pluralism controls, plus five paired centrality blocks.
+- Matched message, agent-profile and evidence-packet digest checks passed as part of the dedicated qualifier.
+
+The generic repository CI, benchmark, showroom, governance and workflow-syntax jobs were skipped and are not counted as passes.
+
+This qualifies the checked-in protocol/matrix/content structural contract only. It does not demonstrate actual agent stance change, intervention efficacy, human deliberation effects, alignment, legitimacy or production governance suitability. Human-subject work requires a separate protocol, applicable ethics review, consent, privacy safeguards, preregistration and independent human evaluation.
 
 No production Mycelix voting, delegation, eligibility, authority or moderation policy is changed by this research.
 
