@@ -653,15 +653,136 @@ pub fn validate_family_guardrail_report(
         || !is_lowercase_hex_digest(&report.binding.precondition_gate_digest)
         || !is_lowercase_hex_digest(&report.observation_stream_digest)
         || report.binding.maximum_total_observations == 0
+        || report.total_observation_count > report.binding.maximum_total_observations
     {
         return Err(FamilyGuardrailError::ReportDigestMismatch);
     }
-    let expected_alpha =
-        report.campaign_alpha
-            / (report.candidate_index as f64 * (report.candidate_index as f64 + 1.0));
-    if (expected_alpha - report.candidate_alpha_all_families).abs() > LOSS_TOLERANCE {
+
+    let candidate = report.candidate_index as f64;
+    let expected_candidate_alpha = report.campaign_alpha / (candidate * (candidate + 1.0));
+    if (expected_candidate_alpha - report.candidate_alpha_all_families).abs() > LOSS_TOLERANCE {
         return Err(FamilyGuardrailError::ReportDigestMismatch);
     }
+
+    let expected_total_budget = report
+        .families
+        .iter()
+        .try_fold(0_u64, |total, family| total.checked_add(family.maximum_observations))
+        .ok_or(FamilyGuardrailError::ReportDigestMismatch)?;
+    if expected_total_budget != report.binding.maximum_total_observations {
+        return Err(FamilyGuardrailError::ReportDigestMismatch);
+    }
+
+    let mut previous_family_id: Option<&str> = None;
+    let mut observed_total = 0_u64;
+    let mut any_regression = false;
+    let mut all_noninferior = true;
+    let mut all_at_budget = true;
+    let family_alpha = report.candidate_alpha_all_families / report.family_count as f64;
+
+    for family in &report.families {
+        if family.family_id.trim().is_empty()
+            || previous_family_id.is_some_and(|previous| previous >= family.family_id.as_str())
+            || !family.non_inferiority_margin.is_finite()
+            || !(0.0..=1.0).contains(&family.non_inferiority_margin)
+            || family.minimum_observations == 0
+            || family.minimum_observations > family.maximum_observations
+            || family.observation_count > family.maximum_observations
+        {
+            return Err(FamilyGuardrailError::ReportDigestMismatch);
+        }
+        previous_family_id = Some(&family.family_id);
+        observed_total = observed_total
+            .checked_add(family.observation_count)
+            .ok_or(FamilyGuardrailError::ReportDigestMismatch)?;
+
+        let threshold = -family.non_inferiority_margin;
+        if family.observation_count == 0 {
+            if family.mean_improvement.is_some()
+                || family.lower_confidence_bound.is_some()
+                || family.upper_confidence_bound.is_some()
+                || family.alpha_spent_at_current_look.is_some()
+                || family.status != FamilyNonInferiorityStatus::InsufficientEvidence
+            {
+                return Err(FamilyGuardrailError::ReportDigestMismatch);
+            }
+            all_noninferior = false;
+            all_at_budget = false;
+            continue;
+        }
+
+        let mean = family
+            .mean_improvement
+            .ok_or(FamilyGuardrailError::ReportDigestMismatch)?;
+        let lower = family
+            .lower_confidence_bound
+            .ok_or(FamilyGuardrailError::ReportDigestMismatch)?;
+        let upper = family
+            .upper_confidence_bound
+            .ok_or(FamilyGuardrailError::ReportDigestMismatch)?;
+        let alpha_at_look = family
+            .alpha_spent_at_current_look
+            .ok_or(FamilyGuardrailError::ReportDigestMismatch)?;
+        let n = family.observation_count as f64;
+        let expected_alpha_at_look = family_alpha / (n * (n + 1.0));
+        if !mean.is_finite()
+            || !lower.is_finite()
+            || !upper.is_finite()
+            || !alpha_at_look.is_finite()
+            || !(-1.0..=1.0).contains(&mean)
+            || !(-1.0..=1.0).contains(&lower)
+            || !(-1.0..=1.0).contains(&upper)
+            || lower > mean
+            || mean > upper
+            || alpha_at_look <= 0.0
+            || alpha_at_look >= 1.0
+            || (alpha_at_look - expected_alpha_at_look).abs() > LOSS_TOLERANCE
+        {
+            return Err(FamilyGuardrailError::ReportDigestMismatch);
+        }
+
+        let expected_family_status = if family.observation_count < family.minimum_observations {
+            FamilyNonInferiorityStatus::InsufficientEvidence
+        } else if lower > threshold {
+            FamilyNonInferiorityStatus::NonInferior
+        } else if upper < threshold {
+            FamilyNonInferiorityStatus::RegressionEstablished
+        } else if family.observation_count >= family.maximum_observations {
+            FamilyNonInferiorityStatus::UnresolvedAtBudget
+        } else {
+            FamilyNonInferiorityStatus::Collecting
+        };
+        if family.status != expected_family_status {
+            return Err(FamilyGuardrailError::ReportDigestMismatch);
+        }
+
+        if family.status == FamilyNonInferiorityStatus::RegressionEstablished {
+            any_regression = true;
+        }
+        if family.status != FamilyNonInferiorityStatus::NonInferior {
+            all_noninferior = false;
+        }
+        if family.observation_count < family.maximum_observations {
+            all_at_budget = false;
+        }
+    }
+
+    if observed_total != report.total_observation_count {
+        return Err(FamilyGuardrailError::ReportDigestMismatch);
+    }
+    let expected_status = if any_regression {
+        FamilyGuardrailStatus::RegressionDetected
+    } else if all_noninferior {
+        FamilyGuardrailStatus::AllFamiliesNonInferior
+    } else if all_at_budget {
+        FamilyGuardrailStatus::InconclusiveAtBudget
+    } else {
+        FamilyGuardrailStatus::Collecting
+    };
+    if report.status != expected_status {
+        return Err(FamilyGuardrailError::ReportDigestMismatch);
+    }
+
     let expected_digest = family_guardrail_report_digest(report)?;
     if expected_digest != report.report_digest {
         return Err(FamilyGuardrailError::ReportDigestMismatch);
