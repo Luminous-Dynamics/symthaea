@@ -1,0 +1,1227 @@
+{
+  "schema_version": "ig-revision-ledger-fixtures-v0.1",
+  "ledger_id": "IG-REVISION-LEDGER-001",
+  "status": "synthetic_fixture_design_unexecuted",
+  "owning_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11340",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
+  "communication_graph_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
+  "delegation_graph_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+  "fixture_count": 16,
+  "fixtures": [
+    {
+      "fixture_id": "REV-001",
+      "description": "No-discussion repeat control with identical state digests.",
+      "record": {
+        "revision_event_id": "REV-001",
+        "run_id": "RUN-REV-001",
+        "scenario_id": "SCENARIO-REV-001",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateContextReset",
+        "transition": "NoChange",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "MeasurementOnly",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "REV-002",
+      "description": "New verified evidence precedes a revision on a synthetic known-answer task.",
+      "record": {
+        "revision_event_id": "REV-002",
+        "run_id": "RUN-REV-002",
+        "scenario_id": "SCENARIO-REV-002",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [
+            "CLAIM-A"
+          ],
+          "evidence_ids": [
+            "EVID-OLD"
+          ]
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [
+            "CLAIM-B"
+          ],
+          "evidence_ids": [
+            "EVID-NEW"
+          ]
+        },
+        "claim_delta": {
+          "added": [
+            "CLAIM-B"
+          ],
+          "removed": [
+            "CLAIM-A"
+          ],
+          "retained": [],
+          "contradicted": [
+            "CLAIM-A"
+          ],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [
+            "EVID-OLD"
+          ],
+          "newly_available": [
+            "EVID-NEW"
+          ],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [
+          {
+            "claim_id": "CLAIM-B",
+            "evidence_id": "EVID-NEW",
+            "relationship": "supports"
+          }
+        ],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "Supported",
+          "answer_space_sha256": "000000000000000000000000000000000000000000000000000000000000005a",
+          "oracle_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000005b"
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": true
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "REV-003",
+      "description": "Change after social exposure without new evidence; self-reported reason is not causal proof.",
+      "record": {
+        "revision_event_id": "REV-003",
+        "run_id": "RUN-REV-003",
+        "scenario_id": "SCENARIO-REV-003",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [
+          {
+            "message_id": "MSG-1",
+            "channel_event_id": "CHANNEL-EVENT-1",
+            "payload_sha256": "000000000000000000000000000000000000000000000000000000000000000a"
+          }
+        ],
+        "agent_report": {
+          "provided": true,
+          "kind": "self_report",
+          "reason_code": "StatusCue",
+          "explanation_sha256": "000000000000000000000000000000000000000000000000000000000000000b"
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": true,
+          "status_cue_exposure": true,
+          "repetition_cue_exposure": true,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "REV-004",
+      "description": "Conflicting new evidence leaves an open-world task indeterminate; agent abstains.",
+      "record": {
+        "revision_event_id": "REV-004",
+        "run_id": "RUN-REV-004",
+        "scenario_id": "SCENARIO-REV-004",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Abstained",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+          "stance": "A",
+          "uncertainty_state": "Uncertain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+          "stance": "Abstain",
+          "uncertainty_state": "Abstained",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [
+            "EVID-1"
+          ],
+          "newly_available": [
+            "EVID-2"
+          ],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "OpenWorld",
+          "outcome": "Indeterminate",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000c"
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": true
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "REV-005",
+      "description": "Negative control: event says Changed but before/after state digests are identical.",
+      "record": {
+        "revision_event_id": "REV-005",
+        "run_id": "RUN-REV-005",
+        "scenario_id": "SCENARIO-REV-005",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "changed_state_digest_unchanged"
+      ]
+    },
+    {
+      "fixture_id": "REV-006",
+      "description": "Negative control: missing measurement is incorrectly accompanied by a post-state.",
+      "record": {
+        "revision_event_id": "REV-006",
+        "run_id": "RUN-REV-006",
+        "scenario_id": "SCENARIO-REV-006",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Missing",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "NotRun",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "missing_measurement_post_state_present"
+      ]
+    },
+    {
+      "fixture_id": "REV-007",
+      "description": "Negative control: causal estimate has no matched-pair identities.",
+      "record": {
+        "revision_event_id": "REV-007",
+        "run_id": "RUN-REV-007",
+        "scenario_id": "SCENARIO-REV-007",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "MatchedPairEstimate",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "causal_estimate_missing_matched_pair"
+      ]
+    },
+    {
+      "fixture_id": "REV-008",
+      "description": "Negative control: claim appears in both added and removed sets.",
+      "record": {
+        "revision_event_id": "REV-008",
+        "run_id": "RUN-REV-008",
+        "scenario_id": "SCENARIO-REV-008",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "000000000000000000000000000000000000000000000000000000000000000f",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000010",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [
+            "CLAIM-X"
+          ],
+          "removed": [
+            "CLAIM-X"
+          ],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "claim_delta_sets_overlap"
+      ]
+    },
+    {
+      "fixture_id": "REV-009",
+      "description": "Negative control: delivered message lacks its CommunicationGraph channel event.",
+      "record": {
+        "revision_event_id": "REV-009",
+        "run_id": "RUN-REV-009",
+        "scenario_id": "SCENARIO-REV-009",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000012",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [
+          {
+            "message_id": "MSG-9",
+            "channel_event_id": "",
+            "payload_sha256": "0000000000000000000000000000000000000000000000000000000000000011"
+          }
+        ],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "delivered_message_missing_channel_event"
+      ]
+    },
+    {
+      "fixture_id": "REV-010",
+      "description": "Matched treatment/control estimate with a separate agent self-report.",
+      "record": {
+        "revision_event_id": "REV-010",
+        "run_id": "RUN-REV-010",
+        "scenario_id": "SCENARIO-REV-010",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000013",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000014",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": true,
+          "kind": "self_report",
+          "reason_code": "Evidence",
+          "explanation_sha256": "0000000000000000000000000000000000000000000000000000000000000017"
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "MatchedPairEstimate",
+          "matched_pair_id": "PAIR-10",
+          "treatment_run_id": "RUN-TREAT-10",
+          "control_run_id": "RUN-CONTROL-10",
+          "analysis_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
+          "effect_estimate_sha256": "0000000000000000000000000000000000000000000000000000000000000016"
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "REV-011",
+      "description": "Normative-pluralism task: differing values have no canonical correct answer.",
+      "record": {
+        "revision_event_id": "REV-011",
+        "run_id": "RUN-REV-011",
+        "scenario_id": "SCENARIO-REV-011",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
+          "stance": "ValuePosition-A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000019",
+          "stance": "ValuePosition-B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [
+            "VALUE-B"
+          ],
+          "removed": [
+            "VALUE-A"
+          ],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "NormativePluralism",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "REV-012",
+      "description": "Missing delayed measurement is explicit NotRun, never treated as no change.",
+      "record": {
+        "revision_event_id": "REV-012",
+        "run_id": "RUN-REV-012",
+        "scenario_id": "SCENARIO-REV-012",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "DelayedPrivate",
+        "transition": "Missing",
+        "previous_state": {
+          "state_sha256": "000000000000000000000000000000000000000000000000000000000000001a",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": null,
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "MeasurementOnly",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "NotRun",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "REV-013",
+      "description": "Negative control: synthetic known-answer result omits answer-space identity.",
+      "record": {
+        "revision_event_id": "REV-013",
+        "run_id": "RUN-REV-013",
+        "scenario_id": "SCENARIO-REV-013",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "000000000000000000000000000000000000000000000000000000000000001b",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "000000000000000000000000000000000000000000000000000000000000001c",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "Supported",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000001d"
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "synthetic_oracle_missing_answer_space"
+      ]
+    },
+    {
+      "fixture_id": "REV-014",
+      "description": "Negative control: open-world task is assigned a correctness outcome.",
+      "record": {
+        "revision_event_id": "REV-014",
+        "run_id": "RUN-REV-014",
+        "scenario_id": "SCENARIO-REV-014",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "000000000000000000000000000000000000000000000000000000000000001e",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "OpenWorld",
+          "outcome": "Supported",
+          "answer_space_sha256": "0000000000000000000000000000000000000000000000000000000000000020",
+          "oracle_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000021"
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "open_world_or_pluralism_cannot_have_correctness_outcome"
+      ]
+    },
+    {
+      "fixture_id": "REV-015",
+      "description": "Negative control: matched causal pair reuses the same run as treatment and control.",
+      "record": {
+        "revision_event_id": "REV-015",
+        "run_id": "RUN-REV-015",
+        "scenario_id": "SCENARIO-REV-015",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000022",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000023",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "MatchedPairEstimate",
+          "matched_pair_id": "PAIR-15",
+          "treatment_run_id": "RUN-15",
+          "control_run_id": "RUN-15",
+          "analysis_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000024",
+          "effect_estimate_sha256": "0000000000000000000000000000000000000000000000000000000000000025"
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "causal_pair_runs_must_be_distinct"
+      ]
+    },
+    {
+      "fixture_id": "REV-016",
+      "description": "Evidence correction invalidates a relied-upon source and records claim retraction.",
+      "record": {
+        "revision_event_id": "REV-016",
+        "run_id": "RUN-REV-016",
+        "scenario_id": "SCENARIO-REV-016",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000026",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [
+            "CLAIM-A"
+          ],
+          "evidence_ids": [
+            "EVID-X"
+          ]
+        },
+        "next_state": {
+          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000027",
+          "stance": "B",
+          "uncertainty_state": "Uncertain",
+          "claim_ids": [],
+          "evidence_ids": []
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [
+            "CLAIM-A"
+          ],
+          "retracted": [
+            "CLAIM-A"
+          ]
+        },
+        "evidence_delta": {
+          "available_before": [
+            "EVID-X"
+          ],
+          "newly_available": [
+            "EVID-CORRECTION"
+          ],
+          "newly_unavailable": [],
+          "invalidated": [
+            "EVID-X"
+          ]
+        },
+        "claim_evidence_links": [
+          {
+            "claim_id": "CLAIM-A",
+            "evidence_id": "EVID-CORRECTION",
+            "relationship": "contradicts"
+          }
+        ],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "Contradicted",
+          "answer_space_sha256": "0000000000000000000000000000000000000000000000000000000000000028",
+          "oracle_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000029"
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": []
+    }
+  ],
+  "claim_ceiling": "The fixtures test observable transition, evidence, self-report and causal-layer separation. They do not inspect hidden model states, establish human psychology, or prove causal effects outside matched experiments."
+}
