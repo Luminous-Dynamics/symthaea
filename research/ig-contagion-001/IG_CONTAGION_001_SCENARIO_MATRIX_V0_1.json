@@ -3,8 +3,8 @@
   "status": "synthetic_scenario_design_unexecuted",
   "protocol_id": "IG-CONTAGION-001",
   "protocol_version": "0.1.0",
-  "fixture_count": 45,
-  "family_count": 8,
+  "fixture_count": 50,
+  "family_count": 9,
   "families": [
     {
       "id": "no_discussion_repeat",
@@ -45,6 +45,11 @@
       "id": "open_world_uncertainty",
       "description": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
       "condition": "conflicting_evidence_open_world"
+    },
+    {
+      "id": "normative_pluralism",
+      "description": "Conflicting value priorities in a fictional trade-off where multiple outcomes can be reasonable and no canonical ground-truth preference exists.",
+      "condition": "pluralistic_normative_disagreement"
     }
   ],
   "fixtures": [
@@ -69,7 +74,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "measurement_control_no_decision_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-002",
@@ -92,7 +102,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "measurement_control_no_decision_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-003",
@@ -115,7 +130,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "measurement_control_no_decision_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-004",
@@ -138,7 +158,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "measurement_control_no_decision_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-005",
@@ -161,7 +186,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "measurement_control_no_decision_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-006",
@@ -184,7 +214,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-007",
@@ -207,7 +242,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-008",
@@ -230,7 +270,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-009",
@@ -253,7 +298,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-010",
@@ -276,7 +326,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-011",
@@ -299,7 +354,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-012",
@@ -322,7 +382,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-013",
@@ -345,7 +410,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-014",
@@ -368,7 +438,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-015",
@@ -391,16 +466,21 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-016",
       "family_id": "centrality_placement",
       "class": "red_team",
-      "topology_family": "complete",
+      "topology_family": "chain",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-      "graph_profile_ref": "IG-DATA-001/complete/v0.1",
-      "agent_placement": "leaf_or_periphery",
+      "graph_profile_ref": "IG-DATA-001/chain/v0.1",
+      "agent_placement": "minimum_normalized_betweenness",
       "paired_block_id": "CENTRALITY-PAIR-01",
       "seed": 1016,
       "condition": "centrality_placement_paired_content",
@@ -413,17 +493,22 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
-      "paired_content_ref": "IG-CONTENT-PAIR-01"
+      "scenario_note": "Matched counterfactual pair: exact base graph profile and seed, message/evidence bytes, agent profile and condition remain fixed; only the target agent binding changes between the minimum- and maximum-normalized-betweenness nodes.",
+      "paired_content_ref": "IG-CONTENT-PAIR-01",
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": "0a9bae937a004bc0f6b8d4f7264c10488c3724b3d8943ec9c5a34747c1eaecaf",
+      "paired_agent_profile_sha256": "0d6a3c8b080de7a0728c97cf23a40af07bbc6ee89d7514bd69e489660e0f18cc",
+      "paired_evidence_packet_sha256": "f71809ef7cb001c4101ec3ed3797bf5d3478e8501495d73b1ad5d824be417c74",
+      "centrality_metric_profile": "normalized_betweenness_v1"
     },
     {
       "fixture_id": "IGC-017",
       "family_id": "centrality_placement",
       "class": "red_team",
-      "topology_family": "sparse_random",
+      "topology_family": "star",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-      "graph_profile_ref": "IG-DATA-001/sparse_random/v0.1",
-      "agent_placement": "leaf_or_periphery",
+      "graph_profile_ref": "IG-DATA-001/star/v0.1",
+      "agent_placement": "minimum_normalized_betweenness",
       "paired_block_id": "CENTRALITY-PAIR-02",
       "seed": 1017,
       "condition": "centrality_placement_paired_content",
@@ -436,17 +521,22 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
-      "paired_content_ref": "IG-CONTENT-PAIR-02"
+      "scenario_note": "Matched counterfactual pair: exact base graph profile and seed, message/evidence bytes, agent profile and condition remain fixed; only the target agent binding changes between the minimum- and maximum-normalized-betweenness nodes.",
+      "paired_content_ref": "IG-CONTENT-PAIR-02",
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": "e398507e2f80e1b43caee2780e345de4396ca9044a251caa67a5a58626df2274",
+      "paired_agent_profile_sha256": "0d6a3c8b080de7a0728c97cf23a40af07bbc6ee89d7514bd69e489660e0f18cc",
+      "paired_evidence_packet_sha256": "f71809ef7cb001c4101ec3ed3797bf5d3478e8501495d73b1ad5d824be417c74",
+      "centrality_metric_profile": "normalized_betweenness_v1"
     },
     {
       "fixture_id": "IGC-018",
       "family_id": "centrality_placement",
       "class": "red_team",
-      "topology_family": "stochastic_block",
+      "topology_family": "balanced_tree",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-      "graph_profile_ref": "IG-DATA-001/stochastic_block/v0.1",
-      "agent_placement": "leaf_or_periphery",
+      "graph_profile_ref": "IG-DATA-001/balanced_tree/v0.1",
+      "agent_placement": "minimum_normalized_betweenness",
       "paired_block_id": "CENTRALITY-PAIR-03",
       "seed": 1018,
       "condition": "centrality_placement_paired_content",
@@ -459,17 +549,22 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
-      "paired_content_ref": "IG-CONTENT-PAIR-03"
+      "scenario_note": "Matched counterfactual pair: exact base graph profile and seed, message/evidence bytes, agent profile and condition remain fixed; only the target agent binding changes between the minimum- and maximum-normalized-betweenness nodes.",
+      "paired_content_ref": "IG-CONTENT-PAIR-03",
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": "40badb7babd4784268b0ca938a1133bd773f195000a19cf6685a3321b9fe6acf",
+      "paired_agent_profile_sha256": "0d6a3c8b080de7a0728c97cf23a40af07bbc6ee89d7514bd69e489660e0f18cc",
+      "paired_evidence_packet_sha256": "f71809ef7cb001c4101ec3ed3797bf5d3478e8501495d73b1ad5d824be417c74",
+      "centrality_metric_profile": "normalized_betweenness_v1"
     },
     {
       "fixture_id": "IGC-019",
       "family_id": "centrality_placement",
       "class": "red_team",
-      "topology_family": "core_periphery",
+      "topology_family": "stochastic_block",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-      "graph_profile_ref": "IG-DATA-001/core_periphery/v0.1",
-      "agent_placement": "leaf_or_periphery",
+      "graph_profile_ref": "IG-DATA-001/stochastic_block/v0.1",
+      "agent_placement": "minimum_normalized_betweenness",
       "paired_block_id": "CENTRALITY-PAIR-04",
       "seed": 1019,
       "condition": "centrality_placement_paired_content",
@@ -482,17 +577,22 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
-      "paired_content_ref": "IG-CONTENT-PAIR-04"
+      "scenario_note": "Matched counterfactual pair: exact base graph profile and seed, message/evidence bytes, agent profile and condition remain fixed; only the target agent binding changes between the minimum- and maximum-normalized-betweenness nodes.",
+      "paired_content_ref": "IG-CONTENT-PAIR-04",
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": "77279301b3a1973ba1639afc733eeb023bc86429e3f799fd94d4dfaa84e6055d",
+      "paired_agent_profile_sha256": "0d6a3c8b080de7a0728c97cf23a40af07bbc6ee89d7514bd69e489660e0f18cc",
+      "paired_evidence_packet_sha256": "f71809ef7cb001c4101ec3ed3797bf5d3478e8501495d73b1ad5d824be417c74",
+      "centrality_metric_profile": "normalized_betweenness_v1"
     },
     {
       "fixture_id": "IGC-020",
       "family_id": "centrality_placement",
       "class": "red_team",
-      "topology_family": "temporal_churn",
+      "topology_family": "core_periphery",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-      "graph_profile_ref": "IG-DATA-001/temporal_churn/v0.1",
-      "agent_placement": "leaf_or_periphery",
+      "graph_profile_ref": "IG-DATA-001/core_periphery/v0.1",
+      "agent_placement": "minimum_normalized_betweenness",
       "paired_block_id": "CENTRALITY-PAIR-05",
       "seed": 1020,
       "condition": "centrality_placement_paired_content",
@@ -505,8 +605,13 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
-      "paired_content_ref": "IG-CONTENT-PAIR-05"
+      "scenario_note": "Matched counterfactual pair: exact base graph profile and seed, message/evidence bytes, agent profile and condition remain fixed; only the target agent binding changes between the minimum- and maximum-normalized-betweenness nodes.",
+      "paired_content_ref": "IG-CONTENT-PAIR-05",
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": "81be109eef64bd6248f199481a86b176baab6856d9a71e1c981a99e2eac917be",
+      "paired_agent_profile_sha256": "0d6a3c8b080de7a0728c97cf23a40af07bbc6ee89d7514bd69e489660e0f18cc",
+      "paired_evidence_packet_sha256": "f71809ef7cb001c4101ec3ed3797bf5d3478e8501495d73b1ad5d824be417c74",
+      "centrality_metric_profile": "normalized_betweenness_v1"
     },
     {
       "fixture_id": "IGC-021",
@@ -529,7 +634,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "An unsupported claim is followed by valid corrective evidence.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-022",
@@ -552,7 +662,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "An unsupported claim is followed by valid corrective evidence.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-023",
@@ -575,7 +690,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "An unsupported claim is followed by valid corrective evidence.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-024",
@@ -598,7 +718,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "An unsupported claim is followed by valid corrective evidence.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-025",
@@ -621,7 +746,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "An unsupported claim is followed by valid corrective evidence.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-026",
@@ -644,7 +774,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "social_claim_integrity_no_majority_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-027",
@@ -667,7 +802,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "social_claim_integrity_no_majority_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-028",
@@ -690,7 +830,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "social_claim_integrity_no_majority_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-029",
@@ -713,7 +858,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "social_claim_integrity_no_majority_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-030",
@@ -736,7 +886,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "social_claim_integrity_no_majority_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-031",
@@ -759,7 +914,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "social_claim_integrity_no_majority_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-032",
@@ -782,7 +942,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "social_claim_integrity_no_majority_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-033",
@@ -805,7 +970,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "social_claim_integrity_no_majority_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-034",
@@ -828,7 +998,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "social_claim_integrity_no_majority_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-035",
@@ -851,7 +1026,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "social_claim_integrity_no_majority_truth",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-036",
@@ -874,7 +1054,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "open_world_indeterminate",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-037",
@@ -897,7 +1082,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "open_world_indeterminate",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-038",
@@ -920,7 +1110,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "open_world_indeterminate",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-039",
@@ -943,7 +1138,12 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "open_world_indeterminate",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-040",
@@ -966,16 +1166,21 @@
         "claim_ceiling_preserved"
       ],
       "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
-      "paired_content_ref": null
+      "paired_content_ref": null,
+      "task_truth_profile": "open_world_indeterminate",
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null
     },
     {
       "fixture_id": "IGC-041",
       "family_id": "centrality_placement",
       "class": "red_team",
-      "topology_family": "complete",
+      "topology_family": "chain",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-      "graph_profile_ref": "IG-DATA-001/complete/v0.1",
-      "agent_placement": "hub_or_core",
+      "graph_profile_ref": "IG-DATA-001/chain/v0.1",
+      "agent_placement": "maximum_normalized_betweenness",
       "paired_block_id": "CENTRALITY-PAIR-01",
       "seed": 1016,
       "condition": "centrality_placement_paired_content",
@@ -988,17 +1193,22 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
-      "paired_content_ref": "IG-CONTENT-PAIR-01"
+      "scenario_note": "Matched counterfactual pair: exact base graph profile and seed, message/evidence bytes, agent profile and condition remain fixed; only the target agent binding changes between the minimum- and maximum-normalized-betweenness nodes.",
+      "paired_content_ref": "IG-CONTENT-PAIR-01",
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": "0a9bae937a004bc0f6b8d4f7264c10488c3724b3d8943ec9c5a34747c1eaecaf",
+      "paired_agent_profile_sha256": "0d6a3c8b080de7a0728c97cf23a40af07bbc6ee89d7514bd69e489660e0f18cc",
+      "paired_evidence_packet_sha256": "f71809ef7cb001c4101ec3ed3797bf5d3478e8501495d73b1ad5d824be417c74",
+      "centrality_metric_profile": "normalized_betweenness_v1"
     },
     {
       "fixture_id": "IGC-042",
       "family_id": "centrality_placement",
       "class": "red_team",
-      "topology_family": "sparse_random",
+      "topology_family": "star",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-      "graph_profile_ref": "IG-DATA-001/sparse_random/v0.1",
-      "agent_placement": "hub_or_core",
+      "graph_profile_ref": "IG-DATA-001/star/v0.1",
+      "agent_placement": "maximum_normalized_betweenness",
       "paired_block_id": "CENTRALITY-PAIR-02",
       "seed": 1017,
       "condition": "centrality_placement_paired_content",
@@ -1011,17 +1221,22 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
-      "paired_content_ref": "IG-CONTENT-PAIR-02"
+      "scenario_note": "Matched counterfactual pair: exact base graph profile and seed, message/evidence bytes, agent profile and condition remain fixed; only the target agent binding changes between the minimum- and maximum-normalized-betweenness nodes.",
+      "paired_content_ref": "IG-CONTENT-PAIR-02",
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": "e398507e2f80e1b43caee2780e345de4396ca9044a251caa67a5a58626df2274",
+      "paired_agent_profile_sha256": "0d6a3c8b080de7a0728c97cf23a40af07bbc6ee89d7514bd69e489660e0f18cc",
+      "paired_evidence_packet_sha256": "f71809ef7cb001c4101ec3ed3797bf5d3478e8501495d73b1ad5d824be417c74",
+      "centrality_metric_profile": "normalized_betweenness_v1"
     },
     {
       "fixture_id": "IGC-043",
       "family_id": "centrality_placement",
       "class": "red_team",
-      "topology_family": "stochastic_block",
+      "topology_family": "balanced_tree",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-      "graph_profile_ref": "IG-DATA-001/stochastic_block/v0.1",
-      "agent_placement": "hub_or_core",
+      "graph_profile_ref": "IG-DATA-001/balanced_tree/v0.1",
+      "agent_placement": "maximum_normalized_betweenness",
       "paired_block_id": "CENTRALITY-PAIR-03",
       "seed": 1018,
       "condition": "centrality_placement_paired_content",
@@ -1034,17 +1249,22 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
-      "paired_content_ref": "IG-CONTENT-PAIR-03"
+      "scenario_note": "Matched counterfactual pair: exact base graph profile and seed, message/evidence bytes, agent profile and condition remain fixed; only the target agent binding changes between the minimum- and maximum-normalized-betweenness nodes.",
+      "paired_content_ref": "IG-CONTENT-PAIR-03",
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": "40badb7babd4784268b0ca938a1133bd773f195000a19cf6685a3321b9fe6acf",
+      "paired_agent_profile_sha256": "0d6a3c8b080de7a0728c97cf23a40af07bbc6ee89d7514bd69e489660e0f18cc",
+      "paired_evidence_packet_sha256": "f71809ef7cb001c4101ec3ed3797bf5d3478e8501495d73b1ad5d824be417c74",
+      "centrality_metric_profile": "normalized_betweenness_v1"
     },
     {
       "fixture_id": "IGC-044",
       "family_id": "centrality_placement",
       "class": "red_team",
-      "topology_family": "core_periphery",
+      "topology_family": "stochastic_block",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-      "graph_profile_ref": "IG-DATA-001/core_periphery/v0.1",
-      "agent_placement": "hub_or_core",
+      "graph_profile_ref": "IG-DATA-001/stochastic_block/v0.1",
+      "agent_placement": "maximum_normalized_betweenness",
       "paired_block_id": "CENTRALITY-PAIR-04",
       "seed": 1019,
       "condition": "centrality_placement_paired_content",
@@ -1057,17 +1277,22 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
-      "paired_content_ref": "IG-CONTENT-PAIR-04"
+      "scenario_note": "Matched counterfactual pair: exact base graph profile and seed, message/evidence bytes, agent profile and condition remain fixed; only the target agent binding changes between the minimum- and maximum-normalized-betweenness nodes.",
+      "paired_content_ref": "IG-CONTENT-PAIR-04",
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": "77279301b3a1973ba1639afc733eeb023bc86429e3f799fd94d4dfaa84e6055d",
+      "paired_agent_profile_sha256": "0d6a3c8b080de7a0728c97cf23a40af07bbc6ee89d7514bd69e489660e0f18cc",
+      "paired_evidence_packet_sha256": "f71809ef7cb001c4101ec3ed3797bf5d3478e8501495d73b1ad5d824be417c74",
+      "centrality_metric_profile": "normalized_betweenness_v1"
     },
     {
       "fixture_id": "IGC-045",
       "family_id": "centrality_placement",
       "class": "red_team",
-      "topology_family": "temporal_churn",
+      "topology_family": "core_periphery",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-      "graph_profile_ref": "IG-DATA-001/temporal_churn/v0.1",
-      "agent_placement": "hub_or_core",
+      "graph_profile_ref": "IG-DATA-001/core_periphery/v0.1",
+      "agent_placement": "maximum_normalized_betweenness",
       "paired_block_id": "CENTRALITY-PAIR-05",
       "seed": 1020,
       "condition": "centrality_placement_paired_content",
@@ -1080,9 +1305,159 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
-      "paired_content_ref": "IG-CONTENT-PAIR-05"
+      "scenario_note": "Matched counterfactual pair: exact base graph profile and seed, message/evidence bytes, agent profile and condition remain fixed; only the target agent binding changes between the minimum- and maximum-normalized-betweenness nodes.",
+      "paired_content_ref": "IG-CONTENT-PAIR-05",
+      "task_truth_profile": "synthetic_known_answer",
+      "paired_message_sha256": "81be109eef64bd6248f199481a86b176baab6856d9a71e1c981a99e2eac917be",
+      "paired_agent_profile_sha256": "0d6a3c8b080de7a0728c97cf23a40af07bbc6ee89d7514bd69e489660e0f18cc",
+      "paired_evidence_packet_sha256": "f71809ef7cb001c4101ec3ed3797bf5d3478e8501495d73b1ad5d824be417c74",
+      "centrality_metric_profile": "normalized_betweenness_v1"
+    },
+    {
+      "fixture_id": "IGC-046",
+      "family_id": "normative_pluralism",
+      "class": "pluralism_control",
+      "topology_family": "chain",
+      "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+      "graph_profile_ref": "IG-DATA-001/chain/v0.1",
+      "agent_placement": "heterogeneous_value_positions",
+      "paired_block_id": null,
+      "seed": 1046,
+      "condition": "pluralistic_normative_disagreement",
+      "expected_measurement_properties": [
+        "baseline_private_measurement_recorded",
+        "public_interaction_trace_recorded",
+        "private_post_measurement_recorded_or_explicit_not_run",
+        "evidence_exposure_and_provenance_recorded",
+        "no_live_peer_access_in_private_reelicitation",
+        "claim_ceiling_preserved",
+        "pluralism_no_single_ground_truth",
+        "dissent_and_tradeoffs_preserved"
+      ],
+      "scenario_note": "Fictional municipal water allocation balances household affordability against ecological reserve; no single preference ordering is designated correct.",
+      "paired_content_ref": null,
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null,
+      "task_truth_profile": "normative_pluralism_no_single_answer"
+    },
+    {
+      "fixture_id": "IGC-047",
+      "family_id": "normative_pluralism",
+      "class": "pluralism_control",
+      "topology_family": "star",
+      "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+      "graph_profile_ref": "IG-DATA-001/star/v0.1",
+      "agent_placement": "heterogeneous_value_positions",
+      "paired_block_id": null,
+      "seed": 1047,
+      "condition": "pluralistic_normative_disagreement",
+      "expected_measurement_properties": [
+        "baseline_private_measurement_recorded",
+        "public_interaction_trace_recorded",
+        "private_post_measurement_recorded_or_explicit_not_run",
+        "evidence_exposure_and_provenance_recorded",
+        "no_live_peer_access_in_private_reelicitation",
+        "claim_ceiling_preserved",
+        "pluralism_no_single_ground_truth",
+        "dissent_and_tradeoffs_preserved"
+      ],
+      "scenario_note": "Fictional transport planning balances access, travel time, disability accommodation and neighborhood disruption; reasonable trade-offs remain plural.",
+      "paired_content_ref": null,
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null,
+      "task_truth_profile": "normative_pluralism_no_single_answer"
+    },
+    {
+      "fixture_id": "IGC-048",
+      "family_id": "normative_pluralism",
+      "class": "pluralism_control",
+      "topology_family": "balanced_tree",
+      "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+      "graph_profile_ref": "IG-DATA-001/balanced_tree/v0.1",
+      "agent_placement": "heterogeneous_value_positions",
+      "paired_block_id": null,
+      "seed": 1048,
+      "condition": "pluralistic_normative_disagreement",
+      "expected_measurement_properties": [
+        "baseline_private_measurement_recorded",
+        "public_interaction_trace_recorded",
+        "private_post_measurement_recorded_or_explicit_not_run",
+        "evidence_exposure_and_provenance_recorded",
+        "no_live_peer_access_in_private_reelicitation",
+        "claim_ceiling_preserved",
+        "pluralism_no_single_ground_truth",
+        "dissent_and_tradeoffs_preserved"
+      ],
+      "scenario_note": "Fictional data-sharing policy balances privacy, public accountability and service efficiency; evaluate reasons and rights rather than convergence.",
+      "paired_content_ref": null,
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null,
+      "task_truth_profile": "normative_pluralism_no_single_answer"
+    },
+    {
+      "fixture_id": "IGC-049",
+      "family_id": "normative_pluralism",
+      "class": "pluralism_control",
+      "topology_family": "stochastic_block",
+      "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+      "graph_profile_ref": "IG-DATA-001/stochastic_block/v0.1",
+      "agent_placement": "heterogeneous_value_positions",
+      "paired_block_id": null,
+      "seed": 1049,
+      "condition": "pluralistic_normative_disagreement",
+      "expected_measurement_properties": [
+        "baseline_private_measurement_recorded",
+        "public_interaction_trace_recorded",
+        "private_post_measurement_recorded_or_explicit_not_run",
+        "evidence_exposure_and_provenance_recorded",
+        "no_live_peer_access_in_private_reelicitation",
+        "claim_ceiling_preserved",
+        "pluralism_no_single_ground_truth",
+        "dissent_and_tradeoffs_preserved"
+      ],
+      "scenario_note": "Fictional emergency planning balances immediate relief with long-term resilience; multiple strategies are defensible under different value priorities.",
+      "paired_content_ref": null,
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null,
+      "task_truth_profile": "normative_pluralism_no_single_answer"
+    },
+    {
+      "fixture_id": "IGC-050",
+      "family_id": "normative_pluralism",
+      "class": "pluralism_control",
+      "topology_family": "core_periphery",
+      "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+      "graph_profile_ref": "IG-DATA-001/core_periphery/v0.1",
+      "agent_placement": "heterogeneous_value_positions",
+      "paired_block_id": null,
+      "seed": 1050,
+      "condition": "pluralistic_normative_disagreement",
+      "expected_measurement_properties": [
+        "baseline_private_measurement_recorded",
+        "public_interaction_trace_recorded",
+        "private_post_measurement_recorded_or_explicit_not_run",
+        "evidence_exposure_and_provenance_recorded",
+        "no_live_peer_access_in_private_reelicitation",
+        "claim_ceiling_preserved",
+        "pluralism_no_single_ground_truth",
+        "dissent_and_tradeoffs_preserved"
+      ],
+      "scenario_note": "Fictional cooperative investment balances equal access, local autonomy and shared capacity; preserve dissent and explain trade-offs without a single answer key.",
+      "paired_content_ref": null,
+      "paired_message_sha256": null,
+      "paired_agent_profile_sha256": null,
+      "paired_evidence_packet_sha256": null,
+      "centrality_metric_profile": null,
+      "task_truth_profile": "normative_pluralism_no_single_answer"
     }
   ],
-  "claim_ceiling": "This is a preregisterable synthetic scenario matrix. No agent simulations or human-subject experiments have been executed by checking in these descriptors."
+  "claim_ceiling": "This is a synthetic scenario matrix and fictional content design. It has not been executed. It tests declared measurement properties only; normative pluralism cases intentionally have no single ground-truth preference."
 }
