@@ -346,7 +346,7 @@ pub enum FamilyGuardrailError {
     InvalidBindingDigest(&'static str),
     #[error("family episode union does not match the parent candidate confirmatory manifest")]
     ConfirmatoryManifestMismatch,
-    #[error("candidate observation budget must equal the sum of family maximums: expected {expected}, received {actual}")]
+    #[error("candidate observation budget mismatch: expected {expected}, received {actual}")]
     CandidateObservationBudgetMismatch { expected: u64, actual: u64 },
     #[error("unknown family identifier: {0}")]
     UnknownFamily(String),
@@ -417,7 +417,9 @@ impl FamilyNonInferiorityGate {
                 return Err(FamilyGuardrailError::InvalidBindingDigest(field));
             }
         }
-        if binding.confirmatory_episode_manifest_digest != plan.confirmatory_episode_manifest_digest() {
+        if binding.confirmatory_episode_manifest_digest
+            != plan.confirmatory_episode_manifest_digest()
+        {
             return Err(FamilyGuardrailError::ConfirmatoryManifestMismatch);
         }
         let expected_budget = plan.maximum_total_observations();
@@ -624,7 +626,12 @@ impl FamilyNonInferiorityGate {
             simultaneous_family_bounds: true,
             status,
             families: family_results,
-            observation_stream_digest: self.observation_hasher.clone().finalize().to_hex().to_string(),
+            observation_stream_digest: self
+                .observation_hasher
+                .clone()
+                .finalize()
+                .to_hex()
+                .to_string(),
             report_digest: String::new(),
         };
         report.report_digest = family_guardrail_report_digest(&report)?;
