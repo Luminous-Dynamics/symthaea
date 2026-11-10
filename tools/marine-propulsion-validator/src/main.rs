@@ -1838,7 +1838,7 @@ mod tests {
         fixture["trial_evidence"]["timebases"][0]["reference_epoch"] =
             serde_json::json!("2026-11-10T11:00:00Z");
         fixture["trial_evidence"]["timebases"][0]["drift_uncertainty_ppm"]["value"] =
-            serde_json::json!(100);
+            serde_json::json!(1);
         let mut findings = Findings::default();
         check_trial(&fixture, &mut findings);
         assert!(findings.invalid, "{:?}", findings.diagnostics);
@@ -1851,9 +1851,9 @@ mod tests {
         fixture["trial_evidence"]["timebases"][0]["reference_epoch"] =
             serde_json::json!("2026-11-10T11:00:00Z");
         fixture["trial_evidence"]["timebases"][0]["drift_uncertainty_ppm"]["value"] =
-            serde_json::json!(100);
+            serde_json::json!(1);
         fixture["trial_evidence"]["channels"][0]["time_alignment_uncertainty"]["value"] =
-            serde_json::json!(0.008);
+            serde_json::json!(0.006);
         let mut findings = Findings::default();
         check_trial(&fixture, &mut findings);
         assert!(!findings.invalid, "{:?}", findings.diagnostics);
