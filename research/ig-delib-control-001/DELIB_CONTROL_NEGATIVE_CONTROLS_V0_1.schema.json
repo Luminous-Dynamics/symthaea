@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-delib-control-001/DELIB_CONTROL_NEGATIVE_CONTROLS_V0_1.schema.json",
+  "title": "IG-DELIB-CONTROL-001 negative controls v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "fixture_count",
+    "fixtures",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-delib-control-negative-v0.1"
+    },
+    "status": {
+      "enum": [
+        "synthetic_negative_controls_unexecuted",
+        "synthetic_negative_controls_frozen"
+      ]
+    },
+    "fixture_count": {
+      "const": 24
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "description",
+          "target_fixture_id",
+          "mutation",
+          "expected_violations"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20
+          },
+          "target_fixture_id": {
+            "type": "string"
+          },
+          "mutation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "path",
+              "value"
+            ],
+            "properties": {
+              "operation": {
+                "enum": [
+                  "set",
+                  "remove"
+                ]
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {}
+            }
+          },
+          "expected_violations": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 60
+    }
+  }
+}
