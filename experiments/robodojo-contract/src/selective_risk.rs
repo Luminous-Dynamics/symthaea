@@ -158,11 +158,11 @@ pub struct SelectiveRiskCertificate {
     empirical_unsafe_event_rate: Option<f64>,
     /// Exact one-sided Clopper-Pearson upper bounds. Each uses delta/2 so the
     /// pair of claims has at least 1-delta simultaneous confidence.
-    pub failure_rate_upper_bound: Option<f64>,
-    pub unsafe_event_rate_upper_bound: Option<f64>,
-    pub failure_bound_delta: f64,
-    pub unsafe_bound_delta: f64,
-    pub status: RiskQualificationStatus,
+    failure_rate_upper_bound: Option<f64>,
+    unsafe_event_rate_upper_bound: Option<f64>,
+    failure_bound_delta: f64,
+    unsafe_bound_delta: f64,
+    status: RiskQualificationStatus,
 }
 
 impl SelectiveRiskCertificate {
@@ -182,6 +182,8 @@ impl SelectiveRiskCertificate {
     pub fn empirical_unsafe_event_rate(&self) -> Option<f64> { self.empirical_unsafe_event_rate }
     pub fn failure_rate_upper_bound(&self) -> Option<f64> { self.failure_rate_upper_bound }
     pub fn unsafe_event_rate_upper_bound(&self) -> Option<f64> { self.unsafe_event_rate_upper_bound }
+    pub fn failure_bound_delta(&self) -> f64 { self.failure_bound_delta }
+    pub fn unsafe_bound_delta(&self) -> f64 { self.unsafe_bound_delta }
 
     /// This checks whether a new score belongs to the certified selective
     /// region. It does not authorize an actuator command or establish safety.
@@ -561,8 +563,8 @@ mod tests {
     fn observed_risk_above_the_pre_registered_limit_blocks_qualification() {
         let mut samples = safe_samples(100);
         for index in 0..20 {
-            samples[index].observed_success = false;
-            samples[index].observed_unsafe_event = true;
+            samples[index].observed_success = Some(false);
+            samples[index].observed_unsafe_event = Some(true);
         }
         let certificate =
             certify_selective_risk(&samples, policy(), "4".repeat(64)).unwrap();
