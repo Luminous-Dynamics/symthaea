@@ -1,0 +1,115 @@
+{
+  "schema_version": "communication-graph-profile-v0.1",
+  "profile_id": "GOLDEN-RECIPROCAL-STAR",
+  "profile_version": "0.1.0",
+  "nodes": [
+    {
+      "agent_instance_id": "AGENT-A",
+      "principal_ref": "PRINCIPAL-SHARED"
+    },
+    {
+      "agent_instance_id": "AGENT-B",
+      "principal_ref": "PRINCIPAL-SHARED"
+    },
+    {
+      "agent_instance_id": "AGENT-C",
+      "principal_ref": "PRINCIPAL-C"
+    },
+    {
+      "agent_instance_id": "AGENT-D",
+      "principal_ref": "PRINCIPAL-D"
+    }
+  ],
+  "channels": [
+    {
+      "channel_id": "A-B",
+      "sender": "AGENT-A",
+      "recipient": "AGENT-B",
+      "allowed_message_classes": [
+        "claim",
+        "challenge",
+        "correction",
+        "evidence"
+      ],
+      "active_from_round": 1,
+      "active_until_round": null,
+      "per_round_capacity": 2,
+      "max_payload_bytes": 1024
+    },
+    {
+      "channel_id": "B-A",
+      "sender": "AGENT-B",
+      "recipient": "AGENT-A",
+      "allowed_message_classes": [
+        "claim",
+        "challenge",
+        "correction",
+        "evidence"
+      ],
+      "active_from_round": 1,
+      "active_until_round": null,
+      "per_round_capacity": 2,
+      "max_payload_bytes": 1024
+    },
+    {
+      "channel_id": "A-C",
+      "sender": "AGENT-A",
+      "recipient": "AGENT-C",
+      "allowed_message_classes": [
+        "claim",
+        "challenge",
+        "correction",
+        "evidence"
+      ],
+      "active_from_round": 1,
+      "active_until_round": null,
+      "per_round_capacity": 2,
+      "max_payload_bytes": 1024
+    },
+    {
+      "channel_id": "C-A",
+      "sender": "AGENT-C",
+      "recipient": "AGENT-A",
+      "allowed_message_classes": [
+        "claim",
+        "challenge",
+        "correction",
+        "evidence"
+      ],
+      "active_from_round": 1,
+      "active_until_round": null,
+      "per_round_capacity": 2,
+      "max_payload_bytes": 1024
+    },
+    {
+      "channel_id": "A-D",
+      "sender": "AGENT-A",
+      "recipient": "AGENT-D",
+      "allowed_message_classes": [
+        "claim",
+        "challenge",
+        "correction",
+        "evidence"
+      ],
+      "active_from_round": 1,
+      "active_until_round": null,
+      "per_round_capacity": 2,
+      "max_payload_bytes": 1024
+    },
+    {
+      "channel_id": "D-A",
+      "sender": "AGENT-D",
+      "recipient": "AGENT-A",
+      "allowed_message_classes": [
+        "claim",
+        "challenge",
+        "correction",
+        "evidence"
+      ],
+      "active_from_round": 1,
+      "active_until_round": null,
+      "per_round_capacity": 2,
+      "max_payload_bytes": 1024
+    }
+  ]
+}
