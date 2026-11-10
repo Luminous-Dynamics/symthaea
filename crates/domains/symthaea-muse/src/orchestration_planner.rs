@@ -216,6 +216,7 @@ fn valid_capability_receipt(
         && capability.sounding_range.lowest_midi <= capability.sounding_range.highest_midi
         && capability.sounding_range.highest_midi <= 127
         && capability.max_polyphony > 0
+        && capability.max_polyphony <= 64
         && performance_scope
             .instrument_model
             .as_ref()
@@ -906,6 +907,25 @@ mod tests {
         }
     }
 
+    fn with_renderer(
+        mut instrument: QualifiedInstrumentCapabilityV1,
+    ) -> QualifiedInstrumentCapabilityV1 {
+        instrument.renderer_scope = Some(CapabilityScopeV1 {
+            instrument_model: Some(format!("{}-model", instrument.capability.id)),
+            performer_level: None,
+            technique: None,
+            dynamic: None,
+            renderer_id: Some("fluidsynth-pinned-build".into()),
+            patch_id: Some(format!("{}-sustain", instrument.capability.id)),
+            asset_sha256: Some(sha('f')),
+        });
+        instrument.claim_ids.push("renderer-patch".into());
+        instrument.evidence_ids.push("renderer-evidence".into());
+        instrument.qualification_record_ids.push("renderer-review".into());
+        instrument.qualification_record_sha256s.push(sha('g'));
+        instrument
+    }
+
     fn request() -> OrchestrationPlannerRequestV1 {
         OrchestrationPlannerRequestV1 {
             schema: ORCHESTRATION_PLANNER_SCHEMA_V1.into(),
@@ -949,6 +969,35 @@ mod tests {
             .candidates
             .iter()
             .all(|candidate| candidate.assignments.len() == 2));
+    }
+
+    #[test]
+    fn exact_renderer_qualified_capability_can_satisfy_a_renderer_required_part() {
+        let mut request = request();
+        request.part_requirements[0].renderer_required = true;
+        request.instruments[0] = with_renderer(request.instruments[0].clone());
+
+        let report = plan_orchestration_v1(&request);
+        assert_eq!(report.disposition, PlannerDispositionV1::FeasibleComplete);
+        assert_eq!(report.candidates.len(), 1);
+        let primary = report.candidates[0]
+            .assignments
+            .iter()
+            .find(|assignment| assignment.part_id == 1)
+            .unwrap();
+        assert_eq!(primary.instrument_instance_id, "cello-1");
+        assert!(primary.renderer_scope.is_some());
+    }
+
+    #[test]
+    fn malformed_capability_receipt_is_rejected_before_search() {
+        let mut request = request();
+        request.instruments[0].capability.max_polyphony = 65;
+        let report = plan_orchestration_v1(&request);
+        assert_eq!(report.disposition, PlannerDispositionV1::InvalidRequest);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == PlannerIssueCodeV1::InvalidCapabilityReceipt
+        }));
     }
 
     #[test]
