@@ -357,7 +357,41 @@
               "ess_lifetime_years": 12
             }
           ]
-        }
+        },
+        "hybrid_power_sizing": {
+          "table_5_statement": {
+            "field": "Installed DG power (HYB)",
+            "reported_configuration": "2 × 2250 kW diesel generator sets",
+            "computed_total_kw": 4500,
+            "source_location": "Table 5",
+            "interpretation": "Published hybrid-concept machinery entry; relation to the optimized Table 8 result is not explained."
+          },
+          "table_8_statement": {
+            "configurations": [
+              {
+                "configuration": "MECH",
+                "installed_engine_power_kw": 6000,
+                "ess_kwh": 0
+              },
+              {
+                "configuration": "HYB-RB",
+                "installed_engine_power_kw": 2600,
+                "ess_kwh": 1000
+              },
+              {
+                "configuration": "HYB-OPT",
+                "installed_engine_power_kw": 2300,
+                "ess_kwh": 1600
+              }
+            ],
+            "source_location": "Table 8",
+            "interpretation": "The paper describes HYB-OPT as about 23% downsizing relative to the 6 MW mechanical baseline."
+          },
+          "consistency_status": "UNRESOLVED_INTERNAL_SOURCE_CONFLICT",
+          "discrepancy": "Table 5's hybrid DG entry implies 4.5 MW installed generation, while Table 8 reports 2.3 MW as optimized total engine rating. These quantities cannot be treated as the same boundary without author clarification.",
+          "policy": "Preserve both values. Do not choose one, average them, or infer generator count, redundancy or shaft/electrical boundary. Reproduction work must obtain source clarification or independently map the two terms to distinct equipment boundaries."
+        },
+        "design_life_years": 20
       },
       "methodological_details": [
         "The lower-level dynamic-programming energy-management policy assumes perfect knowledge of each voyage's future power profile; this is an offline design upper bound, not a deployable online controller.",
@@ -365,7 +399,8 @@
         "The article identifies incomplete representation of hull fouling, extreme weather and detailed manoeuvring.",
         "Battery ageing uses laboratory-derived cycle-life data represented as a stationary cycle-life surface with pack-level scaling assumptions; thermal gradients and cell-to-cell variation are not fully represented.",
         "Long AIS data gaps are repaired by interpolation or speed extrapolation; the effects of that repair policy should be stress-tested.",
-        "Five statistically representative typical operating profiles are used for the optimization, rather than scoring every voyage as a held-out observation."
+        "Five statistically representative typical operating profiles are used for the optimization, rather than scoring every voyage as a held-out observation.",
+        "Internal sizing discrepancy: Table 5 states hybrid installed DG power of 2 × 2250 kW (4.5 MW total), while Table 8 reports HYB-OPT P_eng,max = 2300 kW total engine rating. Preserve both statements as an unresolved source conflict and obtain author clarification before treating either as a reproduced installed-power boundary."
       ]
     },
     {
