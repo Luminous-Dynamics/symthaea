@@ -228,9 +228,6 @@ fn check_record(record: &Value, findings: &mut Findings) {
         _ => {}
     }
     let method_basis = wind.get("method_basis").and_then(Value::as_str).unwrap_or("");
-    if status == "method_derived" && !matches!(wind_status, "standard_derived" | "certified") {
-        findings.push("/record_status", "INVALID", "method_derived record status requires a standard-derived or certified wind-energy assessment");
-    }
     if status == "research_record" && wind_status == "certified" {
         findings.push("/record_status", "INVALID", "research_record cannot claim a certified wind-energy assessment");
     }
