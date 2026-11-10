@@ -1,6 +1,6 @@
 # Vocal phoneme coverage and South African singing research
 
-**Date:** 7 November 2026  
+**Date:** 10 November 2026  
 **Status:** implementation and benchmark plan; no new singing-quality or multilingual-capability result is claimed.
 
 ## Findings addressed by this patch
@@ -127,6 +127,14 @@ A new `FormantSingingEngine` adapter now:
 - explicitly marks melisma and fixed vibrato as approximations and voice identity, local edits, breathiness, phrase-expression controls, and custom portamento as unsupported.
 
 This is a **conventional formant/source-filter baseline**. It is not the missing waveguide/gesture physical renderer tracked in issue #10860, and it does not establish human-level naturalness. It is useful because it adds a third integrated renderer to the identical-case release gate without pretending that an uncompiled prototype is functional.
+
+## New G2P frontier: user-generated text
+
+A recent benchmark directly changes how we should approach lyric normalization. UGTPHON, published in Findings of EMNLP 2026, studies noncanonical user-generated text in English, Vietnamese and Korean. It reports canonical/noncanonical G2P gaps reaching 66.8 PER points in its studied settings, and a retrieval-augmented staged approach that reduces this gap by up to 83% with a model below 0.5B parameters. The key lesson is architectural: lexical normalization and pronunciation should be explicit stages, with retrieval and compositional inference, rather than asking a single phonemizer to infer every intent from surface spelling.
+
+Source: https://aclanthology.org/2026.findings-emnlp.1020/
+
+The isolated G2P spike now contains an additional UGT suite for abbreviations, initialisms, noncanonical spellings, repeated-letter elongation, slang and digit/letter mixtures. Its review rows are intentionally pending. This lets us compare raw candidate behavior while requiring independent, contextual adjudication before scoring canonical pronunciation. No global rewrite such as `u -> you` is permitted without context and an explicit selected hypothesis.
 
 ## Research framing: benchmark different tasks separately
 
