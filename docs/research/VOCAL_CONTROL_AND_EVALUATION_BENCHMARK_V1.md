@@ -1,6 +1,6 @@
 # VCEB-001 — Vocal Control, Fidelity and Evaluation Benchmark
 
-**Date:** 8 November 2026  
+**Date:** 10 November 2026  
 **Status:** benchmark specification; targets below are proposed qualification gates, not achieved results.
 
 ## Purpose
@@ -14,6 +14,29 @@ The performance authoring API now exposes `VocalPhraseSpec` with per-phrase `bre
 The central research question is:
 
 **Can a vocal system realize an explicit linguistic and musical performance plan, preserve a chosen voice identity, produce a perceptually convincing performance, and revise it predictably?**
+
+## Track 0 — Text normalization and pronunciation uncertainty
+
+Before score-conditioned singing, the system must interpret the written lyric without silently changing it. Benchmark surface normalization separately from G2P:
+
+- preserve the exact input lyric and word offsets;
+- generate one or more context-conditioned canonical text hypotheses;
+- record normalization provenance, alternatives, and calibrated uncertainty where available;
+- distinguish a proper name, heteronym, contraction, dialect form, abbreviation, elongation, code-switch, emoji, and OOV token;
+- only then generate pronunciation candidates against a versioned language/dialect profile;
+- require explicit user/community selection when the top candidates are ambiguous or unsupported.
+
+The October 2026 UGTPHON benchmark (Findings of EMNLP 2026) studies user-generated text in English, Vietnamese, and Korean. It reports a canonical/non-canonical pronunciation gap reaching 66.8 PER points in its studied settings and proposes retrieval-augmented canonical-form inference with staged decoding; its sub-0.5B approach reduces that gap by up to 83%. This is a promising research pattern, not direct evidence for singing G2P or South African languages. Source: https://aclanthology.org/2026.findings-emnlp.1020/
+
+Muse's isolated G2P spike now has a UGT diagnostic track for abbreviations, initialisms, noncanonical spellings, elongation, slang and alphanumeric text. Those reference rows remain pending until independent context-aware adjudication. The raw Piper character stream is preserved; no universal spelling rewrite is applied.
+
+Proposed UGT metrics:
+- canonical-form exact accuracy and top-k recall against adjudicated context-dependent variants;
+- word error / phone error after canonicalization, reported separately;
+- ambiguity detection precision/recall and selective risk versus coverage;
+- OOV abstention precision/recall and false-confidence rate;
+- surface-form preservation and provenance completeness;
+- code-switch boundary and dialect-variant accuracy.
 
 ## Benchmark tracks
 
@@ -175,6 +198,7 @@ A public task aggregator also lists heterogeneous SVS metrics across distinct da
 | SingMOS-Pro | Singing-quality predictors and annotated MOS corpus | Auxiliary quality screen and metric calibration |
 | MusicJudge | Joint lyric correctness and pitch/rhythm fidelity at music-block level | Independent evaluator design reference |
 | DiffSinger | Phoneme/duration/F0-conditioned SVS baseline | Explicit control baseline |
+| UGTPHON (Findings EMNLP 2026) | Contextual canonicalization for English, Vietnamese and Korean user-generated text | G2P/text-normalization benchmark design; not a singing system |
 | Kokoro singing adaptation | Speech-to-singing adapted baseline | Measure degradation from speech-domain transformation |
 | Symthaea FormantSingingEngine | Existing Muse G2P + formant-frame renderer + source-filter FormantVocoder | Third integrated renderer; declared capabilities make fixed vibrato, English G2P, and unavailable expression controls explicit |
 | Symthaea physical vocal tract (planned; not currently integrated) | Intended interpretable articulatory and physical acoustic realization | Keep as a research track until issue #10860 is closed and exact-head examples compile |
