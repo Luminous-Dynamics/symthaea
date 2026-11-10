@@ -608,7 +608,9 @@ fn compute_evaluation_digest(
     actions: &[MultivariateGaussianDiagnosticActionEvaluation],
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea-multivariate-gaussian-binary-evaluation-v1\\0");
+    hasher.update(b"symthaea-multivariate-gaussian-binary-evaluation-v1\0");
+    hasher.update(NORMAL_CDF_APPROXIMATION_ERROR_ENVELOPE.to_bits().to_le_bytes());
+    hash_string(&mut hasher, "normal_cdf_method", "A&S-7.1.26");
     hash_string(&mut hasher, "problem_digest", problem_digest);
     hasher.update(prior_bayes_risk.to_bits().to_le_bytes());
     hasher.update(no_probe_score.to_bits().to_le_bytes());
@@ -957,6 +959,7 @@ mod tests {
         changed[0].covariance[1][0] = 0.4;
         let changed = evaluate(&hypotheses, &changed);
         assert_ne!(original.problem_digest, changed.problem_digest);
+        assert_ne!(original.evaluation_digest, changed.evaluation_digest);
         let changed_task = evaluate_multivariate_gaussian_decision_diagnostics(
             &hypotheses,
             &actions,
