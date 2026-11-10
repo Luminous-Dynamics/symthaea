@@ -1460,6 +1460,149 @@ mod tests {
         Expr::Var(name.to_string())
     }
 
+    fn admitted_so2_action() -> AdmittedLinearGroupActionV1 {
+        crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "exact-so2".to_string(),
+            coordinate_basis_id: "xy".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "J".to_string(),
+                matrix: vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap()
+    }
+
+    #[test]
+    fn exact_linear_action_checker_proves_radial_polynomial_invariance() {
+        let expression = add(pow2("x"), pow2("y"));
+        let report = check_exact_linear_action_invariance(
+            &expression,
+            &admitted_so2_action(),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.invariant_under_every_generator());
+        assert!(!report.constant_expression);
+        assert_eq!(report.generator_results.len(), 1);
+        assert_eq!(report.generator_results[0].generator_id, "J");
+        assert_eq!(report.generator_results[0].residual_term_count, 0);
+        assert_eq!(report.expression_variables, vec!["x".to_string(), "y".to_string()]);
+    }
+
+    #[test]
+    fn exact_linear_action_checker_rejects_anisotropic_polynomial() {
+        let expression = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
+        let report = check_exact_linear_action_invariance(
+            &expression,
+            &admitted_so2_action(),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(!report.invariant_under_every_generator());
+        assert_eq!(report.generator_results[0].residual_term_count, 1);
+    }
+
+    #[test]
+    fn exact_linear_action_checker_handles_conjugated_generator_and_metric() {
+        // D = [[1, 1], [0, 1]], A' = D J D^-1, and G' = D^-T D^-1.
+        // f(X,Y) = [X,Y] G' [X,Y]^T is exactly invariant under A'.
+        let action = crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "exact-so2-sheared".to_string(),
+            coordinate_basis_id: "XY".to_string(),
+            coordinate_names: vec!["X".to_string(), "Y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, -1.0], vec![-1.0, 2.0]],
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "conjugated-J".to_string(),
+                matrix: vec![vec![1.0, -2.0], vec![1.0, -1.0]],
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+
+        let expression = sub(
+            add(pow2("X"), mul(Expr::Const(2.0), pow2("Y"))),
+            mul(Expr::Const(2.0), mul(var("X"), var("Y"))),
+        );
+        let report = check_exact_linear_action_invariance(
+            &expression,
+            &action,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.invariant_under_every_generator());
+        assert_eq!(report.generator_results[0].residual_term_count, 0);
+    }
+
+    #[test]
+    fn exact_linear_action_checker_keeps_unacted_variables_as_parameters() {
+        let expression = mul(var("z"), add(pow2("x"), pow2("y")));
+        let report = check_exact_linear_action_invariance(
+            &expression,
+            &admitted_so2_action(),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.invariant_under_every_generator());
+        assert_eq!(
+            report.expression_variables,
+            vec!["z".to_string(), "x".to_string(), "y".to_string()]
+        );
+    }
+
+    #[test]
+    fn exact_linear_action_checker_distinguishes_constant_expressions() {
+        let report = check_exact_linear_action_invariance(
+            &Expr::Const(3.0),
+            &admitted_so2_action(),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.constant_expression);
+        assert!(report.invariant_under_every_generator());
+    }
+
+    #[test]
+    fn exact_linear_action_checker_reports_unsupported_and_resource_limited_inputs() {
+        let unsupported = sqrt_of(add(pow2("x"), pow2("y")));
+        assert_eq!(
+            check_exact_linear_action_invariance(
+                &unsupported,
+                &admitted_so2_action(),
+                ExactPolynomialLieProfileV1::default(),
+            ),
+            Err(LinearActionPolynomialErrorV1::UnsupportedExpression)
+        );
+
+        let expression = add(pow2("x"), pow2("y"));
+        let mut bounded = ExactPolynomialLieProfileV1::default();
+        bounded.maximum_variables = 1;
+        assert_eq!(
+            check_exact_linear_action_invariance(&expression, &admitted_so2_action(), bounded),
+            Err(LinearActionPolynomialErrorV1::ResourceLimitExceeded)
+        );
+
+        let mut invalid = ExactPolynomialLieProfileV1::default();
+        invalid.maximum_terms = 0;
+        assert_eq!(
+            check_exact_linear_action_invariance(
+                &expression,
+                &admitted_so2_action(),
+                invalid
+            ),
+            Err(LinearActionPolynomialErrorV1::InvalidProfile)
+        );
+    }
+
     #[test]
     fn structural_symmetry_report_preserves_pattern_provenance() {
         let expr = add(pow2("x"), pow2("y"));
