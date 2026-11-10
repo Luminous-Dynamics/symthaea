@@ -395,6 +395,7 @@ pub fn mark_dispatched(
     receipt: &DispatchReceiptV1,
 ) -> Result<RuntimeStateV1, GateErrorV1> {
     validate_state(state)?;
+    ensure_grant_current_head(state, grant)?;
     validate_digest(&receipt.receipt_sha256, "dispatch receipt")?;
     validate_receipt_binding(
         &grant.grant_id_sha256,
@@ -425,6 +426,7 @@ pub fn commit_execution(
     receipt: &CommitReceiptV1,
 ) -> Result<RuntimeStateV1, GateErrorV1> {
     validate_state(state)?;
+    ensure_grant_current_head(state, grant)?;
     validate_digest(&receipt.output_audio_sha256, "output audio digest")?;
     validate_digest(&receipt.execution_receipt_sha256, "execution receipt")?;
     validate_receipt_binding(
@@ -481,6 +483,7 @@ pub fn record_definite_failure(
     receipt: &DefiniteFailureReceiptV1,
 ) -> Result<RuntimeStateV1, GateErrorV1> {
     validate_state(state)?;
+    ensure_grant_current_head(state, grant)?;
     validate_digest(&receipt.failure_receipt_sha256, "failure receipt")?;
     if !receipt.proves_no_mutation {
         return Err(GateErrorV1::new(
@@ -512,6 +515,7 @@ pub fn mark_outcome_unknown(
     grant: &ExecutionGrantV1,
 ) -> Result<RuntimeStateV1, GateErrorV1> {
     validate_state(state)?;
+    ensure_grant_current_head(state, grant)?;
     let mut next = state.clone();
     let attempt = find_attempt_mut(&mut next, &grant.grant_id_sha256)?;
     ensure_same_grant(&attempt.grant, grant)?;
@@ -538,9 +542,7 @@ pub fn reconcile_unknown_outcome(
         &receipt.original_parent_audio_sha256,
         &receipt.action_sha256,
     )?;
-    if state.head.current_audio_sha256 != grant.parent_audio_sha256 {
-        return Err(GateErrorV1::stale("runtime head changed while outcome was unknown"));
-    }
+    ensure_grant_current_head(state, grant)?;
     let mut next = state.clone();
     let attempt = find_attempt_mut(&mut next, &grant.grant_id_sha256)?;
     ensure_same_grant(&attempt.grant, grant)?;
@@ -568,6 +570,21 @@ pub fn reconcile_unknown_outcome(
         }
     }
     Ok(next)
+}
+
+fn ensure_grant_current_head(
+    state: &RuntimeStateV1,
+    grant: &ExecutionGrantV1,
+) -> Result<(), GateErrorV1> {
+    if state.head.current_audio_sha256 != grant.parent_audio_sha256
+        || state.head.registry_snapshot_sha256 != grant.registry_snapshot_sha256
+        || state.head.session_ledger_sha256 != grant.session_ledger_sha256
+    {
+        return Err(GateErrorV1::stale(
+            "grant no longer matches the exact current audio, registry and session ledger",
+        ));
+    }
+    Ok(())
 }
 
 fn validate_state(state: &RuntimeStateV1) -> Result<(), GateErrorV1> {
