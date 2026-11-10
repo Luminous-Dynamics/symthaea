@@ -693,17 +693,13 @@ fn validate_request(request: &MutationRequestV1) -> Result<(), GateErrorV1> {
     require_text(&request.operator_version, "operator version")?;
     validate_digest(&request.operator_artifact_sha256, "operator artifact digest")?;
     validate_unique_texts(&request.required_capabilities, "required capabilities")?;
-    validate_unique_texts(&request.required_precondition_ids, "required preconditions")?;
-    validate_unique_texts(&request.required_observer_metric_ids, "required observer metrics")?;
+    validate_unique_texts(&request.required_precondition_ids, "required precondition IDs")?;
+    validate_unique_texts(&request.required_observer_metric_ids, "required observer metric IDs")?;
     if request.required_capabilities.is_empty() || request.required_observer_metric_ids.is_empty() {
         return Err(GateErrorV1::invalid("capabilities and observer obligations must be nonempty"));
     }
     validate_nonnegative(request.estimated_cost.compute_units, "estimated compute cost")?;
     validate_nonnegative(request.estimated_cost.risk_units, "estimated risk cost")?;
-
-    validate_unique_texts(&request.required_capabilities, "required capabilities")?;
-    validate_unique_texts(&request.required_precondition_ids, "required precondition IDs")?;
-    validate_unique_texts(&request.required_observer_metric_ids, "required observer metric IDs")?;
     let auth = &request.user_authorization;
     validate_digest(&auth.receipt_sha256, "user authorization receipt")?;
     validate_digest(&auth.plan_sha256, "authorized plan digest")?;
@@ -1074,6 +1070,30 @@ mod tests {
         let mut changed = request();
         changed.user_authorization.action_sha256 = digest('0');
         assert!(authorize_mutation(&state(), &policy(), &changed).is_err());
+    }
+
+    #[test]
+    fn user_authorization_receipt_must_bind_plan_node_parent_action_and_scope() {
+        let mut wrong_plan = request();
+        wrong_plan.user_authorization.plan_sha256 = digest('0');
+        assert_eq!(
+            authorize_mutation(&state(), &policy(), &wrong_plan).unwrap_err().kind,
+            GateErrorKindV1::Unauthorized
+        );
+
+        let mut wrong_parent = request();
+        wrong_parent.user_authorization.parent_audio_sha256 = digest('0');
+        assert_eq!(
+            authorize_mutation(&state(), &policy(), &wrong_parent).unwrap_err().kind,
+            GateErrorKindV1::Unauthorized
+        );
+
+        let mut wrong_scope = request();
+        wrong_scope.user_authorization.maximum_scope = MutationScopeV1::Global;
+        assert_eq!(
+            authorize_mutation(&state(), &policy(), &wrong_scope).unwrap_err().kind,
+            GateErrorKindV1::Unauthorized
+        );
     }
 
     #[test]
