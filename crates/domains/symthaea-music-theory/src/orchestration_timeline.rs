@@ -26,6 +26,8 @@ use crate::rhythm::Duration;
 use crate::score::Score;
 
 pub const ORCHESTRATION_TIMELINE_SCHEMA_V1: &str = "orchestration-timeline-v1";
+/// Exact domain-separated digest recipe emitted by #9461 ScoreDemandProfile.
+pub const ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1: &str = "muse-score-serde-json-sha256-v1";
 pub const MAX_ORCHESTRATION_SEGMENTS_V1: usize = 4_096;
 const MAX_BEAT_NUMERATOR: i128 = 1_000_000_000;
 const MAX_BEAT_DENOMINATOR: i128 = 1_000_000;
@@ -77,6 +79,8 @@ pub struct OrchestrationSegmentV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrchestrationTimelineV1 {
     pub schema: String,
+    /// Digest recipe/version used for score_sha256.
+    pub score_digest_schema: String,
     /// SHA-256 digest of the exact symbolic score, supplied by the score
     /// demand/provenance layer. This module validates its shape, not its origin.
     pub score_sha256: String,
@@ -87,6 +91,7 @@ pub struct OrchestrationTimelineV1 {
 #[serde(rename_all = "snake_case")]
 pub enum OrchestrationTimelineIssueCodeV1 {
     InvalidSchema,
+    InvalidScoreDigestSchema,
     InvalidScoreDigest,
     InvalidExpectedScoreDigest,
     ScoreDigestMismatch,
@@ -283,6 +288,15 @@ pub fn validate_orchestration_timeline(
             None,
             None,
             "timeline schema identifier is not supported",
+        );
+    }
+    if plan.score_digest_schema != ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1 {
+        report.push(
+            OrchestrationTimelineIssueCodeV1::InvalidScoreDigestSchema,
+            None,
+            None,
+            None,
+            "timeline must use the exact score-demand digest schema",
         );
     }
     let plan_digest_valid = valid_sha256_hex(&plan.score_sha256);
@@ -767,6 +781,7 @@ mod tests {
     fn base_plan() -> OrchestrationTimelineV1 {
         OrchestrationTimelineV1 {
             schema: ORCHESTRATION_TIMELINE_SCHEMA_V1.into(),
+            score_digest_schema: ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
             score_sha256: "a".repeat(64),
             segments: vec![
                 OrchestrationSegmentV1 {
@@ -964,6 +979,17 @@ mod tests {
         );
         assert!(report.issues.iter().any(|issue| {
             issue.code == OrchestrationTimelineIssueCodeV1::UnknownScorePart
+        }));
+    }
+
+    #[test]
+    fn rejects_an_unknown_score_digest_schema() {
+        let score = base_score();
+        let mut plan = base_plan();
+        plan.score_digest_schema = "sha256-json-v0".into();
+        let report = validate_fixture(&score, &plan, &base_instruments());
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == OrchestrationTimelineIssueCodeV1::InvalidScoreDigestSchema
         }));
     }
 
