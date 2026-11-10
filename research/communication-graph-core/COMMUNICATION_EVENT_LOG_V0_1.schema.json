@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/communication-graph-core/COMMUNICATION_EVENT_LOG_V0_1.schema.json",
+  "title": "CommunicationGraph event log v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "graph_sha256",
+    "completeness",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "communication-event-log-v0.1"
+    },
+    "graph_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "completeness": {
+      "enum": [
+        "complete",
+        "incomplete"
+      ]
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "event_id",
+          "round",
+          "message_id",
+          "channel_id",
+          "sender",
+          "recipient",
+          "message_class",
+          "payload_sha256",
+          "payload_len_bytes",
+          "outcome"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "message_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "channel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sender": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recipient": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message_class": {
+            "enum": [
+              "claim",
+              "challenge",
+              "control",
+              "correction",
+              "coordination",
+              "evidence"
+            ]
+          },
+          "payload_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "payload_len_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outcome": {
+            "enum": [
+              "delivered",
+              "rejected_inactive",
+              "rejected_message_class",
+              "rejected_payload_limit",
+              "rejected_capacity"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
