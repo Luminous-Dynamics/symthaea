@@ -8,6 +8,7 @@
 //! The matched cases deliberately reduce the production network to one node
 //! and freeze OCV so both implementations solve the same mathematical plant.
 
+#[allow(dead_code)] // The complete oracle source is imported so tests use its canonical implementation.
 #[path = "../../../../tools/electric-aircraft-coupled-oracle/src/lib.rs"]
 mod reference_oracle;
 
