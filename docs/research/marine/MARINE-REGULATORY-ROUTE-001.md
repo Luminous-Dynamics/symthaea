@@ -73,6 +73,13 @@ As of 10 November 2026, the IMO Net-Zero Framework had not yet completed formal 
 
 ## 3. Core architecture: a versioned regulatory evidence graph
 
+## New ship manoeuvrability standards under development
+
+SDC 12 (19–23 January 2026) continued development of goal-based SOLAS Chapter II-1 (Part C) and Chapter V steering/propulsion provisions intended to cover traditional and non-traditional systems. It also discussed draft International Ship Manoeuvrability Standards (ISSM) for new ships subject to the future goal-based requirements. SDC 12 agreed the principles in principle, but technical content remains under development.
+
+The current roadmap anticipates further work at SDC 13 in 2027, expected adoption around 2029 and target entry into force on 1 January 2032. These are planning milestones, not adopted rules. The existing MSC.137(76) standards remain the reference for existing ships under the current roadmap. The machine-readable rule register marks the new ISSM/SOLAS work as `under_review` without assigning a made-up future meeting date.
+
+
 A first machine-readable snapshot is retained at [`marine-regulatory-rule-register-2026-11-10.json`](./marine-regulatory-rule-register-2026-11-10.json), with its v0.1.0 Draft 2020-12 contract. The corrected current snapshot is [`marine-regulatory-rule-register-2026-11-10-v0.2.0.json`](./marine-regulatory-rule-register-2026-11-10-v0.2.0.json), with schema [`marine-regulatory-rule-register-v0.2.0.schema.json`](./marine-regulatory-rule-register-v0.2.0.schema.json). The standalone `marine-regulatory-rule-audit` checks date/status consistency and source references. This is a register integrity check, not a legal applicability engine.
 
 Each rule record should bind:
