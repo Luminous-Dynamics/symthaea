@@ -214,6 +214,19 @@ fn check_record(record: &Value, findings: &mut Findings) {
 
     let wind = record.get("wind_energy_assessment").unwrap_or(&Value::Null);
     let wind_status = wind.get("status").and_then(Value::as_str).unwrap_or("");
+    match status {
+        "certified" if wind_status != "certified" => findings.push(
+            "/record_status",
+            "INVALID",
+            "record_status certified requires a certified wind-energy assessment",
+        ),
+        "method_derived" if wind_status != "standard_derived" && wind_status != "certified" => findings.push(
+            "/record_status",
+            "INVALID",
+            "record_status method_derived requires a standard-derived or certified wind-energy assessment",
+        ),
+        _ => {}
+    }
     let method_basis = wind.get("method_basis").and_then(Value::as_str).unwrap_or("");
     let regulatory_quantity = wind.get("regulatory_energy_gj").unwrap_or(&Value::Null);
     check_energy_quantity(regulatory_quantity, "/wind_energy_assessment/regulatory_energy_gj", &sources, findings);
@@ -308,6 +321,8 @@ fn check_record(record: &Value, findings: &mut Findings) {
         check_energy_quantity(&counterfactual["avoided_propulsion_energy_gj"], "/counterfactual_avoided_propulsion_energy/avoided_propulsion_energy_gj", &sources, findings);
         if counterfactual.get("identifiability_status").and_then(Value::as_str) != Some("identified_for_declared_population") {
             findings.push("/counterfactual_avoided_propulsion_energy", "INCOMPLETE", "avoided propulsion energy is not causally identified for a declared population; it must not be represented as regulatory wind energy");
+        } else {
+            findings.push("/counterfactual_avoided_propulsion_energy", "RESEARCH_ONLY", "even an identified avoided-propulsion-energy counterfactual is not the regulatory wind-energy-used quantity");
         }
     }
 
@@ -406,6 +421,17 @@ mod tests {
         check_record(&value, &mut findings);
         assert!(findings.invalid || findings.incomplete);
         assert!(!findings.disposition().contains("READY"));
+    }
+
+    #[test]
+    fn record_cannot_claim_certified_when_wind_assessment_is_research_only() {
+        let mut value = fixture();
+        value["record_status"] = serde_json::json!("certified");
+        value["wind_energy_assessment"]["status"] = serde_json::json!("research_estimate");
+        value["wind_energy_assessment"]["method_basis"] = serde_json::json!("research_method");
+        let mut findings = Findings::default();
+        check_record(&value, &mut findings);
+        assert!(findings.invalid);
     }
 
     #[test]
