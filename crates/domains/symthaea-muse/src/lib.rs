@@ -128,6 +128,10 @@ pub mod musical_policy;
 pub mod neural_melody;
 pub mod notation;
 #[cfg(feature = "theory")]
+pub mod score_demand;
+#[cfg(feature = "theory")]
+pub mod score_edit_service;
+#[cfg(feature = "theory")]
 pub mod participant_evidence;
 #[cfg(feature = "theory")]
 pub mod participant_schedule;
