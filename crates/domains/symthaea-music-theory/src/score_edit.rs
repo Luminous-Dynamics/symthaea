@@ -17,6 +17,9 @@ use crate::rhythm::Duration;
 use crate::score::{PartId, Score};
 
 pub const SCORE_EDIT_SCHEMA_V1: &str = "score-edit-plan-v1";
+/// Must match the exact domain-separated digest emitted by Muse's
+/// ScoreDemandProfile; changing the digest recipe requires a new version.
+pub const SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1: &str = "muse-score-serde-json-sha256-v1";
 pub const MAX_SCORE_EDIT_OPERATIONS_V1: usize = 128;
 pub const MAX_PROTECTED_WINDOWS_V1: usize = 512;
 const MAX_EDIT_BEAT_NUMERATOR: i128 = 1_000_000_000;
@@ -56,6 +59,8 @@ pub struct ProtectedPartWindowV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScoreEditPlanV1 {
     pub schema: String,
+    /// Digest recipe/version from the trusted score-demand profile.
+    pub input_digest_schema: String,
     /// SHA-256 of the exact input Score, supplied by trusted provenance.
     pub input_score_sha256: String,
     pub operations: Vec<ScalePartVelocityV1>,
@@ -66,6 +71,7 @@ pub struct ScoreEditPlanV1 {
 #[serde(rename_all = "snake_case")]
 pub enum ScoreEditIssueCodeV1 {
     InvalidSchema,
+    InvalidInputDigestSchema,
     InvalidInputDigest,
     InvalidExpectedInputDigest,
     InputDigestMismatch,
@@ -103,6 +109,7 @@ pub struct ScoreEditIssueV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScoreEditReceiptV1 {
     pub schema: String,
+    pub input_digest_schema: String,
     pub input_score_sha256: String,
     pub operation_ids: Vec<String>,
     /// Event ordinals scoped exclusively to input_score_sha256.
@@ -249,6 +256,16 @@ pub fn apply_score_edit_plan(
             None,
             None,
             "unsupported score-edit schema",
+        );
+    }
+    if plan.input_digest_schema != SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1 {
+        push_issue(
+            &mut issues,
+            ScoreEditIssueCodeV1::InvalidInputDigestSchema,
+            None,
+            None,
+            None,
+            "edit plan must use the exact score-demand digest schema",
         );
     }
     if !valid_digest(&plan.input_score_sha256) {
@@ -601,6 +618,7 @@ pub fn apply_score_edit_plan(
 
     let receipt = ScoreEditReceiptV1 {
         schema: SCORE_EDIT_SCHEMA_V1.into(),
+        input_digest_schema: plan.input_digest_schema.clone(),
         input_score_sha256: plan.input_score_sha256.clone(),
         operation_ids: plan.operations.iter().map(|operation| operation.id.clone()).collect(),
         changed_note_indices,
@@ -658,6 +676,7 @@ mod tests {
     fn plan(operations: Vec<ScalePartVelocityV1>) -> ScoreEditPlanV1 {
         ScoreEditPlanV1 {
             schema: SCORE_EDIT_SCHEMA_V1.into(),
+            input_digest_schema: SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1.into(),
             input_score_sha256: digest(),
             operations,
             protected_windows: Vec::new(),
@@ -763,6 +782,16 @@ mod tests {
         let result = apply_score_edit_plan(&source_score(), &plan(vec![edit_op]), &digest());
         assert!(result.unwrap_err().iter().any(|issue| {
             issue.code == ScoreEditIssueCodeV1::VelocityOutOfRange
+        }));
+    }
+
+    #[test]
+    fn rejects_an_unknown_input_digest_schema() {
+        let mut edit = plan(vec![operation("edit", 0, 1)]);
+        edit.input_digest_schema = "unrecognized-score-hash-v2".into();
+        let result = apply_score_edit_plan(&source_score(), &edit, &digest());
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEditIssueCodeV1::InvalidInputDigestSchema
         }));
     }
 
