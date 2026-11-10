@@ -3196,6 +3196,18 @@ fn apply_hidden_bass_quote(
     };
     let quote_start = (start_bar + bars / 2) as f64 * meter_beats;
     let span = 2.0 * hook.beats();
+    // The quote replaces the existing bass line inside this window; retain
+    // the exact source part identity rather than inventing a new performer.
+    let bass_part = score
+        .notes
+        .iter()
+        .find(|note| {
+            note.role == VoiceRole::Bass
+                && note.onset.beats() < quote_start + span
+                && (note.onset + note.duration).beats() > quote_start
+        })
+        .map(|note| note.part)
+        .unwrap_or(PartId::UNASSIGNED);
     // Clear the window (overlap-aware, per the exposed-climax lesson).
     score.notes.retain(|n| {
         !(n.role == VoiceRole::Bass
@@ -3215,7 +3227,7 @@ fn apply_hidden_bass_quote(
     for &(deg, dur) in &hook.notes {
         let augmented = dur.scale(2, 1);
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part,
             pitch: key.scale().degree_pitch(deg, 2),
             onset: Duration::new((t * 2.0).round() as i64, 2),
             duration: augmented,
@@ -4772,6 +4784,52 @@ mod tests {
     use super::*;
     use crate::harmony::{Progression, Tonality};
     use crate::score::VoiceRole;
+
+    #[test]
+    fn hidden_bass_quote_inherits_the_replaced_bass_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ScoreNote {
+            part: PartId(80),
+            pitch: Pitch::from_midi(36),
+            onset: Duration::new(16, 1),
+            duration: Duration::new(8, 1),
+            velocity: 0.5,
+            role: VoiceRole::Bass,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        let phrase = crate::phrase::Phrase {
+            line: Motif::new(Vec::new()),
+            progression: vec![1, 4, 5, 1],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![crate::form::Section {
+                role: SectionRole::B,
+                key,
+                period: crate::phrase::Period {
+                    antecedent: phrase.clone(),
+                    consequent: phrase,
+                },
+            }],
+        };
+        let hook = crate::hook::HookCell {
+            notes: vec![(1, Duration::quarter()), (3, Duration::quarter())],
+        };
+        apply_hidden_bass_quote(
+            &mut score,
+            &form,
+            4.0,
+            &MusicalIntent::default(),
+            &hook,
+        );
+        let quote: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Bass && note.onset.beats() >= 16.0)
+            .collect();
+        assert_eq!(quote.len(), 2);
+        assert!(quote.iter().all(|note| note.part == PartId(80)));
+    }
 
     #[test]
     fn generated_counterline_uses_the_composer_authored_part_id() {
