@@ -255,12 +255,12 @@ fn walk_semantics(value: &Value, path: &str, f: &mut Findings) {
                     if map
                         .get("value")
                         .and_then(Value::as_f64)
-                        .is_none_or(|v| v <= 0.0)
+                        .is_some_and(|v| v <= 0.0)
                     {
                         f.push(
                             pointer_child(path, "value"),
                             "INVALID",
-                            "sample rate must be finite and strictly positive",
+                            "sample rate must be strictly positive",
                         );
                     }
                 }
@@ -327,6 +327,29 @@ fn collect_string_refs(value: &Value, key: &str, out: &mut BTreeSet<String>) {
     }
 }
 
+fn collect_provenance_source_refs(value: &Value, out: &mut BTreeSet<String>) {
+    match value {
+        Value::Object(map) => {
+            if let Some(source_id) = map
+                .get("provenance")
+                .and_then(|provenance| provenance.get("source_id"))
+                .and_then(Value::as_str)
+            {
+                out.insert(source_id.to_owned());
+            }
+            for child in map.values() {
+                collect_provenance_source_refs(child, out);
+            }
+        }
+        Value::Array(items) => {
+            for child in items {
+                collect_provenance_source_refs(child, out);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn check_lineage(case: &Value, f: &mut Findings) {
     let source_ids: BTreeSet<String> = case
         .pointer("/evidence/sources")
@@ -336,7 +359,7 @@ fn check_lineage(case: &Value, f: &mut Findings) {
         .filter_map(|v| v.get("source_id").and_then(Value::as_str).map(str::to_owned))
         .collect();
     let mut provenance_refs = BTreeSet::new();
-    collect_string_refs(case, "source_id", &mut provenance_refs);
+    collect_provenance_source_refs(case, &mut provenance_refs);
     for source in provenance_refs.difference(&source_ids) {
         f.push(
             "/evidence/sources",
@@ -381,6 +404,32 @@ fn check_trial(case: &Value, f: &mut Findings) {
             "INCOMPARABLE",
             "trial service fingerprint does not equal the case comparison fingerprint",
         );
+    }
+
+    if let Some(excluded) = trial.get("excluded_intervals").and_then(Value::as_array) {
+        for (index, interval) in excluded.iter().enumerate() {
+            let path = format!("/trial_evidence/excluded_intervals/{index}");
+            let start = interval.get("start").and_then(Value::as_str);
+            let end = interval.get("end").and_then(Value::as_str);
+            if let (Some(start), Some(end)) = (start, end) {
+                match (
+                    DateTime::parse_from_rfc3339(start),
+                    DateTime::parse_from_rfc3339(end),
+                ) {
+                    (Ok(start), Ok(end)) if start < end => {}
+                    (Ok(_), Ok(_)) => f.push(
+                        &path,
+                        "INVALID",
+                        "excluded interval must have start strictly earlier than end",
+                    ),
+                    _ => f.push(
+                        &path,
+                        "INVALID",
+                        "excluded interval timestamps must be valid RFC3339 date-times",
+                    ),
+                }
+            }
+        }
     }
 
     let channels = trial.get("channels").and_then(Value::as_array);
@@ -623,6 +672,9 @@ fn check_pair(left: &Value, right: &Value, f: &mut Findings) {
         "/service/functional_unit",
         "/service/service_contract_id",
         "/service/annual_delivered_work",
+        "/service/annual_delivered_cargo_mass",
+        "/service/annual_delivered_teu",
+        "/service/service_availability_target",
         "/service/arrival_policy",
         "/service/required_arrival_window_hours",
         "/vessel/loading_condition",
@@ -635,11 +687,13 @@ fn check_pair(left: &Value, right: &Value, f: &mut Findings) {
         "/environment/wind_series_sha256",
         "/environment/wave_series_sha256",
         "/environment/current_series_sha256",
+        "/environment/water_depth_series_sha256",
         "/architecture/powertrain/shaft_boundary_id",
         "/architecture/powertrain/electrical_boundary_id",
         "/economics/currency",
         "/economics/base_year",
         "/economics/lifecycle_years",
+        "/economics/discount_rate",
         "/evidence/data_class",
     ] {
         compare_pointer(left, right, pointer, pointer, f);
