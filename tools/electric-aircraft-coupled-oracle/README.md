@@ -74,13 +74,15 @@ The oracle is useful precisely because it has a small, inspectable boundary. It 
 
 ## Frozen synthetic tests
 
-The current reference crate contains 12 deterministic Rust tests:
+The current reference crate contains 14 deterministic Rust tests:
 
 | Test | Purpose |
 |---|---|
 | Constant-resistance closed form | Check the independent bisection result against a separately derived algebraic temperature/current solution |
 | Temperature-resistance feedback | Confirm higher resistance-temperature coupling changes current, heat and final temperature in the expected direction |
 | No real current root | Reject terminal demand above the battery's quadratic power limit |
+| Electrical-domain tail | Retain a valid lower-temperature thermal equilibrium when the configured hot end is outside the battery's current-solution domain |
+| Electro-thermal no-equilibrium | Reject when the electrical power domain closes before a coupled thermal equilibrium exists |
 | Thermal ceiling | Reject a substep whose implicit thermal equilibrium lies above the declared domain |
 | Reserve infringement | Keep energy-reserve failure distinct from current/thermal failure |
 | Iteration limit | Return bracket width and residual instead of a partial result |
@@ -90,6 +92,8 @@ The current reference crate contains 12 deterministic Rust tests:
 | TMS energy attribution | Keep a 20% synthetic thermal-management electrical load visible in the mission energy report |
 | Time-step refinement | Compare 10 s and 1 s mission integrations |
 | Failed substep rollback | Return the segment/substep failure and no partial mission PASS |
+
+The constant-resistance closed-form fixture has a frozen reference point at 40 kW, 400 V OCV, 0.04 ohm pack resistance and a 60 s step: current 101.0205144336 A, resistive heat 408.2057734575 W, and end temperature 298.7836319351 K from a 298.15 K start with the declared one-node thermal boundary. The test derives these values independently from the quadratic and backward-Euler closed form.
 
 Synthetic tests prove only the reference implementation's bounded arithmetic and disposition contract. They are not physical data.
 
