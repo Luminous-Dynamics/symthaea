@@ -58,15 +58,15 @@
 //! generator instead) at several sampled points rather than proven
 //! symbolically. This is deliberately bounded, not a full search:
 //!
-//! - joint SO(n) acting on all of the expression's variables at once (n ≤ 6,
-//!   for generator-count cost), and
-//! - SO(2) acting on each pair of variables independently,
+//! - SO(k) actions on deterministic variable subsets of the first n variables
+//!   (n ≤ 6), searched from largest k to smallest; and
+//! - optionally, SO(2) actions involving variables beyond that bounded prefix.
 //!
-//! which strictly covers the two structural heuristics' cases (any function of
-//! `x²+y²+...`, not just the sum itself) while staying tractable. It does not
-//! search arbitrary variable subsets/groupings, and it is a numerical check
-//! (some sampled points, fixed tolerance) rather than a symbolic proof — treat
-//! a positive result as strong evidence, not a certificate.
+//! The subset budget and ordering are explicit in the profile. This can discover
+//! a maximal SO(3) subgroup embedded in a larger expression with unacted
+//! parameters, rather than reporting only the first SO(2) pair. It is still a
+//! bounded search over standard coordinate-rotation representations, not an
+//! exhaustive search over arbitrary Lie groups or nonlinear group actions.
 //!
 //! ## Why the structural heuristics still run first
 //!
