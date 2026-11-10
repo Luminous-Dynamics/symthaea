@@ -1431,6 +1431,26 @@ mod tests {
             ))
         ));
 
+        let mut wrong_alpha_budget = correctly_bound.clone();
+        wrong_alpha_budget.claims.combined_campaign_alpha_budget_bits = 0.1_f64.to_bits();
+        let message = sequential_verifier_attestation_message(&wrong_alpha_budget.claims)
+            .expect("message for re-signed mismatched combined alpha budget");
+        wrong_alpha_budget.signature = signing_key.sign(&message).to_bytes().to_vec();
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &evidence_binding,
+                &wrong_alpha_budget,
+                &pinned_key,
+            ),
+            Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                "combined_campaign_alpha_budget_bits"
+            ))
+        ));
+
         let mut wrong_precondition = correctly_bound.clone();
         wrong_precondition.claims.precondition_gate_digest = digest('3');
         let message = sequential_verifier_attestation_message(&wrong_precondition.claims)
