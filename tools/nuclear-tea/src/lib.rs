@@ -297,6 +297,274 @@ pub fn validate_port_reference(
     }
 }
 
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MarineRegistryReport {
+    pub registry_id: String,
+    pub anchor_count: usize,
+    pub reconciliation_dimension_count: usize,
+    pub ucl_model_details_present: bool,
+    pub lr_public_summary_details_present: bool,
+    pub validation_status: String,
+}
+
+/// Validates the structure and required evidence dimensions of the frozen
+/// UCL/LR maritime economics registry. It does not validate the truth of claims
+/// or reproduce the external studies' full numerical models.
+pub fn validate_marine_economic_registry(
+    input: &str,
+) -> Result<MarineRegistryReport, Vec<ValidationError>> {
+    use serde_json::Value;
+
+    let value: Value = match serde_json::from_str(input) {
+        Ok(value) => value,
+        Err(error) => {
+            return Err(vec![ValidationError::new(
+                "registry",
+                format!("invalid JSON: {error}"),
+            )]);
+        }
+    };
+    let mut errors = Vec::new();
+
+    if value.get("registry_id").and_then(Value::as_str)
+        != Some("NUCL-MAR-ECONOMIC-REFERENCE-CASES")
+    {
+        errors.push(ValidationError::new(
+            "registry_id",
+            "must identify the frozen marine economics reference registry",
+        ));
+    }
+    if value.get("schema_version").and_then(Value::as_str) != Some("1.0.0") {
+        errors.push(ValidationError::new(
+            "schema_version",
+            "must match the frozen 1.0.0 registry contract",
+        ));
+    }
+
+    let anchors = match value.get("anchors").and_then(Value::as_array) {
+        Some(anchors) => anchors,
+        None => {
+            errors.push(ValidationError::new(
+                "anchors",
+                "must be an array of source-bounded evidence anchors",
+            ));
+            return Err(errors);
+        }
+    };
+    if anchors.len() != 8 {
+        errors.push(ValidationError::new(
+            "anchors",
+            "expected the eight frozen literature, policy and readiness anchors",
+        ));
+    }
+
+    let mut anchor_ids = BTreeSet::new();
+    for (index, anchor) in anchors.iter().enumerate() {
+        let field = format!("anchors[{index}]");
+        let anchor_id = anchor
+            .get("anchor_id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        if anchor_id.is_empty() {
+            errors.push(ValidationError::new(
+                format!("{field}.anchor_id"),
+                "must not be empty",
+            ));
+        } else if !anchor_ids.insert(anchor_id.to_ascii_lowercase()) {
+            errors.push(ValidationError::new(
+                format!("{field}.anchor_id"),
+                "duplicate anchor identity",
+            ));
+        }
+        for key in ["source_class", "published_at", "title", "publisher"] {
+            if anchor
+                .get(key)
+                .and_then(Value::as_str)
+                .is_none_or(|item| item.trim().is_empty())
+            {
+                errors.push(ValidationError::new(
+                    format!("{field}.{key}"),
+                    "must be a non-empty source descriptor",
+                ));
+            }
+        }
+        let source_url = anchor
+            .get("source_url")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if !(source_url.starts_with("https://") || source_url.starts_with("http://")) {
+            errors.push(ValidationError::new(
+                format!("{field}.source_url"),
+                "must be an explicit HTTP(S) source locator",
+            ));
+        }
+        if anchor
+            .get("public_summary_findings")
+            .and_then(Value::as_array)
+            .is_none_or(|items| items.is_empty() || items.iter().any(|item| {
+                item.as_str().is_none_or(|text| text.trim().is_empty())
+            }))
+        {
+            errors.push(ValidationError::new(
+                format!("{field}.public_summary_findings"),
+                "must contain non-empty source-bounded findings",
+            ));
+        }
+        if anchor
+            .get("inference_limits")
+            .and_then(Value::as_array)
+            .is_none_or(|items| items.is_empty() || items.iter().any(|item| {
+                item.as_str().is_none_or(|text| text.trim().is_empty())
+            }))
+        {
+            errors.push(ValidationError::new(
+                format!("{field}.inference_limits"),
+                "must preserve non-empty inference limits",
+            ));
+        }
+    }
+
+    let required_anchor = |id: &str| {
+        anchors.iter().find(|anchor| {
+            anchor.get("anchor_id").and_then(Value::as_str) == Some(id)
+        })
+    };
+    let ucl = required_anchor("UCL-MERCHANT-TCO-2026");
+    let lr = required_anchor("LR-LUCID-CONTAINERSHIP-2026");
+    if ucl.is_none() {
+        errors.push(ValidationError::new(
+            "anchors",
+            "missing UCL merchant-shipping TCO anchor",
+        ));
+    }
+    if lr.is_none() {
+        errors.push(ValidationError::new(
+            "anchors",
+            "missing Lloyd's Register containership anchor",
+        ));
+    }
+
+    let has_number_path = |root: Option<&Value>, path: &[&str]| {
+        let mut current = match root {
+            Some(root) => root,
+            None => return false,
+        };
+        for segment in path {
+            current = match current.get(*segment) {
+                Some(next) => next,
+                None => return false,
+            };
+        }
+        current.as_f64().is_some()
+    };
+    let ucl_details_present = ucl.is_some_and(|anchor| {
+        has_number_path(Some(anchor), &["published_model_details", "vessel_class", "teu_min"])
+            && has_number_path(Some(anchor), &["published_model_details", "reference_operation", "speed_knots"])
+            && has_number_path(Some(anchor), &["published_model_details", "nuclear_installed_electrical_power_kwe", "low_speed_14_85_knots"])
+            && has_number_path(Some(anchor), &["published_model_details", "nuclear_installed_electrical_power_kwe", "high_speed_25_knots"])
+            && has_number_path(Some(anchor), &["published_model_details", "reactor_capex_usd_per_kwe", "low_noak"])
+            && has_number_path(Some(anchor), &["published_model_details", "reactor_capex_usd_per_kwe", "high_foak"])
+    });
+    if !ucl_details_present {
+        errors.push(ValidationError::new(
+            "UCL-MERCHANT-TCO-2026.published_model_details",
+            "must preserve vessel, operating, installed-power and low/high reactor-CAPEX inputs",
+        ));
+    }
+
+    let lr_details_present = lr.is_some_and(|anchor| {
+        has_number_path(Some(anchor), &["public_summary_details", "vessel_teu"])
+            && has_number_path(Some(anchor), &["public_summary_details", "nuclear_speed_knots"])
+            && has_number_path(Some(anchor), &["public_summary_details", "modeled_max_annual_cargo_capacity_increase_percent"])
+            && has_number_path(Some(anchor), &["public_summary_details", "modeled_max_additional_container_space_percent"])
+    });
+    if !lr_details_present {
+        errors.push(ValidationError::new(
+            "LR-LUCID-CONTAINERSHIP-2026.public_summary_details",
+            "must preserve the public vessel, speed, capacity and cargo-space assumptions",
+        ));
+    }
+
+    let dimensions = match value.get("reconciliation_matrix").and_then(Value::as_array) {
+        Some(dimensions) => dimensions,
+        None => {
+            errors.push(ValidationError::new(
+                "reconciliation_matrix",
+                "must be an array of explicit UCL/LR comparison dimensions",
+            ));
+            return Err(errors);
+        }
+    };
+    if dimensions.len() < 7 {
+        errors.push(ValidationError::new(
+            "reconciliation_matrix",
+            "must retain at least seven distinct comparison dimensions",
+        ));
+    }
+    let mut dimension_ids = BTreeSet::new();
+    for (index, dimension) in dimensions.iter().enumerate() {
+        let field = format!("reconciliation_matrix[{index}]");
+        let id = dimension
+            .get("dimension")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        if id.is_empty() || !dimension_ids.insert(id) {
+            errors.push(ValidationError::new(
+                format!("{field}.dimension"),
+                "must be non-empty and unique",
+            ));
+        }
+        for key in ["ucl", "lr", "status"] {
+            if dimension
+                .get(key)
+                .and_then(Value::as_str)
+                .is_none_or(|item| item.trim().is_empty())
+            {
+                errors.push(ValidationError::new(
+                    format!("{field}.{key}"),
+                    "must declare both study scope and the reconciliation status",
+                ));
+            }
+        }
+    }
+
+    for key in ["comparison_rules", "prohibited_inferences"] {
+        if value
+            .get(key)
+            .and_then(Value::as_array)
+            .is_none_or(|items| items.is_empty() || items.iter().any(|item| {
+                item.as_str().is_none_or(|text| text.trim().is_empty())
+            }))
+        {
+            errors.push(ValidationError::new(
+                key,
+                "must contain non-empty reconciliation/inference constraints",
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(MarineRegistryReport {
+            registry_id: value
+                .get("registry_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            anchor_count: anchors.len(),
+            reconciliation_dimension_count: dimensions.len(),
+            ucl_model_details_present: ucl_details_present,
+            lr_public_summary_details_present: lr_details_present,
+            validation_status: "STRUCTURALLY_VALIDATED_LITERATURE_REGISTRY_ONLY".to_string(),
+        })
+    } else {
+        Err(errors)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PriceBasis {
@@ -698,6 +966,51 @@ mod tests {
             serde_json::from_str(input).expect("valid frozen JSON");
         dataset.estimated_spare_port_intake_capacity[0].spare_mw += 0.1;
         assert!(validate_port_reference(&dataset).is_err());
+    }
+
+
+    #[test]
+    fn marine_economic_registry_parses_and_validates() {
+        let input = include_str!("../../../research/nuclear/marine-economic-reference-cases-2026.json");
+        let report = validate_marine_economic_registry(input).expect("valid marine reference registry");
+        assert_eq!(report.anchor_count, 8);
+        assert_eq!(report.reconciliation_dimension_count, 7);
+        assert!(report.ucl_model_details_present);
+        assert!(report.lr_public_summary_details_present);
+    }
+
+    #[test]
+    fn marine_registry_rejects_duplicate_anchor_identity() {
+        let input = include_str!("../../../research/nuclear/marine-economic-reference-cases-2026.json");
+        let mut registry: serde_json::Value =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        let first = registry["anchors"][0]["anchor_id"].clone();
+        registry["anchors"][1]["anchor_id"] = first;
+        let altered = serde_json::to_string(&registry).expect("serializes");
+        assert!(validate_marine_economic_registry(&altered).is_err());
+    }
+
+    #[test]
+    fn marine_registry_requires_detailed_ucl_and_lr_inputs() {
+        let input = include_str!("../../../research/nuclear/marine-economic-reference-cases-2026.json");
+        let mut registry: serde_json::Value =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        registry["anchors"][0]
+            .as_object_mut()
+            .expect("anchor object")
+            .remove("published_model_details");
+        let altered = serde_json::to_string(&registry).expect("serializes");
+        assert!(validate_marine_economic_registry(&altered).is_err());
+    }
+
+    #[test]
+    fn marine_registry_requires_reconciliation_dimensions() {
+        let input = include_str!("../../../research/nuclear/marine-economic-reference-cases-2026.json");
+        let mut registry: serde_json::Value =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        registry["reconciliation_matrix"] = serde_json::Value::Array(Vec::new());
+        let altered = serde_json::to_string(&registry).expect("serializes");
+        assert!(validate_marine_economic_registry(&altered).is_err());
     }
 
     #[test]
