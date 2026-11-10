@@ -19,7 +19,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some(path) => fs::read_to_string(path)?,
         None => include_str!("../fixtures/albiach2010great_pseudonymous.csv").to_owned(),
     };
-    let report = audit_csv(&input).map_err(std::io::Error::other)?;
+    let report = audit_csv(&input).map_err(|error| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, error)
+    })?;
     println!("{}", serde_json::to_string_pretty(&report)?);
     Ok(())
 }
