@@ -70,6 +70,7 @@ The source currently contains twelve focused regression tests covering:
 | Stale expected score digest | Reject a changed score paired with an old digest |
 | Source overlap hidden by tick quantization | Reject using exact rational source-time overlap |
 | Quantized handoff collision | Reject different instrument instances collapsing to one MIDI tick |
+| Parsed MIDI-to-receipt correspondence | Independently parsed SMF note-on/off and program-change events exactly match the receipt |
 | Frozen input replay | Byte-identical MIDI and receipt hashes |
 
 **Verification status:** tests are authored but have not been compiled or executed in this environment. The focused CI workflow is included in this branch. A queued, skipped, or absent workflow is not a pass.
