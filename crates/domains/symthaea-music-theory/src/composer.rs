@@ -597,6 +597,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.hook_cell {
         apply_hook_memory(
             &mut score,
+            GENERAL_MELODY_PART_V1,
             &form,
             meter_beats,
             crate::hook::HookCell::generate_with(&spec.melody, intent.seed, meter_beats)
@@ -758,6 +759,8 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.intro_bars > 0 {
         prepend_intro(
             &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
             key,
             meter_beats,
             intent,
@@ -768,6 +771,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.coda_bars > 0 {
         append_coda(
             &mut score,
+            GENERAL_MELODY_PART_V1,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
             key,
             meter_beats,
             intent,
@@ -3133,6 +3139,7 @@ fn apply_counter_hook_echoes_for_part(
 /// return stays a verbatim memory — the engine's native temperament.
 fn apply_hook_memory(
     score: &mut Score,
+    melody_part: PartId,
     form: &Form,
     meter_beats: f64,
     hook_len: usize,
@@ -3159,11 +3166,11 @@ fn apply_hook_memory(
     for (i, (key, start_bar)) in returns.iter().enumerate() {
         let w0 = *start_bar as f64 * meter_beats;
         if i + 1 == n && n >= 2 {
-            for idx in statement_indices(score, w0, hook_len) {
+            for idx in statement_indices(score, melody_part, w0, hook_len) {
                 score.notes[idx].velocity = (score.notes[idx].velocity + 0.05).clamp(0.1, 1.0);
             }
         } else {
-            alter_statement(score, *key, w0, hook_len, att);
+            alter_statement(score, melody_part, *key, w0, hook_len, att);
         }
     }
 }
@@ -3171,12 +3178,12 @@ fn apply_hook_memory(
 /// The first `hook_len` melody notes at or after `w0` — a return's opening
 /// hook statement, re-derived from the live note list (earlier alterations
 /// may have shifted indices).
-fn statement_indices(score: &Score, w0: f64, hook_len: usize) -> Vec<usize> {
+fn statement_indices(score: &Score, melody_part: PartId, w0: f64, hook_len: usize) -> Vec<usize> {
     let mut v: Vec<(usize, f64)> = score
         .notes
         .iter()
         .enumerate()
-        .filter(|(_, n)| n.role == VoiceRole::Melody && n.onset.beats() >= w0 - 1e-9)
+        .filter(|(_, n)| n.part == melody_part && n.role == VoiceRole::Melody && n.onset.beats() >= w0 - 1e-9)
         .map(|(i, n)| (i, n.onset.beats()))
         .collect();
     v.sort_by(|a, b| a.1.total_cmp(&b.1));
@@ -3187,13 +3194,14 @@ fn statement_indices(score: &Score, w0: f64, hook_len: usize) -> Vec<usize> {
 /// [`apply_hook_memory`] for what each attitude does to what it remembers.
 fn alter_statement(
     score: &mut Score,
+    melody_part: PartId,
     key: Key,
     w0: f64,
     hook_len: usize,
     att: crate::spec::Attitude,
 ) {
     use crate::spec::Attitude as A;
-    let idxs = statement_indices(score, w0, hook_len);
+    let idxs = statement_indices(score, melody_part, w0, hook_len);
     if idxs.len() < 3 {
         return;
     }
@@ -3251,7 +3259,8 @@ fn alter_statement(
             // sounds, and it keeps the giggle from depending on the hook's
             // rhythm shape.
             let prev = score.notes.iter().position(|n| {
-                n.role == VoiceRole::Melody
+                n.part == melody_part
+                    && n.role == VoiceRole::Melody
                     && n.onset + n.duration == peak_onset
                     && n.duration.beats() >= 0.75
             });
@@ -3266,7 +3275,7 @@ fn alter_statement(
                 let vel = (score.notes[peak].velocity * 0.8).clamp(0.1, 1.0);
                 let intensity = score.notes[peak].section_intensity;
                 score.notes.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: melody_part,
                     pitch: above,
                     onset: peak_onset.saturating_sub(grace),
                     duration: grace,
@@ -3552,6 +3561,8 @@ fn apply_held_arrivals(score: &mut Score, meter_beats: f64) {
 /// phrase entry is an EVENT.
 fn prepend_intro(
     score: &mut Score,
+    bass_part: PartId,
+    harmony_part: PartId,
     home: Key,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -3583,8 +3594,9 @@ fn prepend_intro(
         let onset = bar.scale(m, 1);
         match variant {
             1 => {
-                pattern.realize_measure(
+                pattern.realize_measure_for_part(
                     score,
+                    harmony_part,
                     &voiced,
                     onset,
                     meter_beats,
@@ -3592,7 +3604,7 @@ fn prepend_intro(
                     SectionRole::A.intensity(),
                 );
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: bass_part,
                     pitch: Pitch::new(home.tonic, 2),
                     onset,
                     duration: bar,
@@ -3608,7 +3620,7 @@ fn prepend_intro(
                 let swell = vel * (0.8 + 0.2 * (m as f32 + 1.0) / intro_bars.max(1) as f32);
                 for pitch in &voiced {
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: harmony_part,
                         pitch: *pitch,
                         onset,
                         duration: bar,
@@ -3620,8 +3632,9 @@ fn prepend_intro(
                 }
             }
             _ => {
-                pattern.realize_measure(
+                pattern.realize_measure_for_part(
                     score,
+                    harmony_part,
                     &voiced,
                     onset,
                     meter_beats,
@@ -3660,13 +3673,16 @@ pub const CODA_BARS: i64 = 2;
 /// original cadence now gets the smaller mid-piece relaxation.
 fn append_coda(
     score: &mut Score,
+    melody_part: PartId,
+    bass_part: PartId,
+    harmony_part: PartId,
     home: Key,
     meter_beats: f64,
     intent: &MusicalIntent,
     coda_bars: i64,
     transformed: bool,
 ) {
-    if transformed && append_transformed_coda(score, home, meter_beats, intent, coda_bars) {
+    if transformed && append_transformed_coda(score, melody_part, bass_part, harmony_part, home, meter_beats, intent, coda_bars) {
         return;
     }
     let bar = Duration::new(meter_beats as i64, 1);
@@ -3685,7 +3701,7 @@ fn append_coda(
         let onset = start + bar.scale(m, 1);
         let chord = home.diatonic_triad(deg);
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: melody_part,
             pitch: tonic_melody,
             onset,
             duration: bar,
@@ -3700,7 +3716,7 @@ fn append_coda(
         });
         for pitch in chord.voice(3) {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part,
                 pitch,
                 onset,
                 duration: bar,
@@ -3711,7 +3727,7 @@ fn append_coda(
             });
         }
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part,
             pitch: chord.voice(2)[0],
             onset,
             duration: bar,
@@ -3741,6 +3757,9 @@ fn append_coda(
 /// no melody to quote.
 fn append_transformed_coda(
     score: &mut Score,
+    melody_part: PartId,
+    bass_part: PartId,
+    harmony_part: PartId,
     home: Key,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -3749,7 +3768,7 @@ fn append_transformed_coda(
     let mut fragment: Vec<Pitch> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.part == melody_part && n.role == VoiceRole::Melody)
         .take(4)
         .map(|n| n.pitch)
         .collect();
@@ -3811,7 +3830,7 @@ fn append_transformed_coda(
         };
         let fade = 0.9 - 0.25 * (onset_beats / total_beats) as f32;
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: melody_part,
             pitch,
             onset: start + Duration::new((onset_beats * 2.0) as i64, 2),
             duration: Duration::new((dur_beats * 2.0) as i64, 2),
@@ -3838,7 +3857,7 @@ fn append_transformed_coda(
         let onset = start + bar.scale(m, 1);
         for pitch in chord.voice(3) {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part,
                 pitch,
                 onset,
                 duration: bar,
@@ -3852,7 +3871,7 @@ fn append_transformed_coda(
             });
         }
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part,
             pitch: chord.voice(2)[0],
             onset,
             duration: bar,
