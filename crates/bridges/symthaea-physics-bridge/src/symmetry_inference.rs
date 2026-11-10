@@ -85,12 +85,13 @@ use crate::types::{LieGroup, SymmetryDescriptor};
 /// The profile is returned with every numerical candidate so a consumer can
 /// distinguish a sampled heuristic from a symbolic identity or formal proof.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct NumericLieDerivativeProfileV1 {
+pub struct NumericLieDerivativeProfileV2 {
     pub seed: u64,
     pub samples_per_generator: usize,
     pub finite_difference_step: f64,
-    pub normalized_squared_residual_tolerance: f64,
-    pub minimum_gradient_squared: f64,
+    /// Maximum squared cosine between the expression gradient and group-orbit tangent.
+    /// Dimensionless and invariant to nonzero expression and uniform coordinate rescaling.
+    pub squared_cosine_tolerance: f64,
     pub sample_min_inclusive: f64,
     pub sample_max_exclusive: f64,
     pub maximum_joint_dimension: usize,
@@ -99,14 +100,13 @@ pub struct NumericLieDerivativeProfileV1 {
     pub pairwise_so2_search: bool,
 }
 
-impl Default for NumericLieDerivativeProfileV1 {
+impl Default for NumericLieDerivativeProfileV2 {
     fn default() -> Self {
         Self {
             seed: 0x9E3779B97F4A7C15,
             samples_per_generator: 8,
             finite_difference_step: 1e-5,
-            normalized_squared_residual_tolerance: 1e-6,
-            minimum_gradient_squared: 1e-8,
+            squared_cosine_tolerance: 1e-6,
             sample_min_inclusive: 0.5,
             sample_max_exclusive: 3.0,
             maximum_joint_dimension: 6,
@@ -181,7 +181,8 @@ pub enum StructuralSymmetryPattern {
 /// Observed diagnostics for an accepted sampled Lie-derivative candidate.
 ///
 /// The maximum is taken over every informative generator/sample pair evaluated
-/// by the declared profile. It is not a confidence interval or a proof.
+/// by the declared profile. Each value is the squared cosine between the expression
+/// gradient and the group-orbit tangent. It is not a confidence interval or a proof.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LieDerivativeSampleStatisticsV1 {
     pub sample_count_per_generator: usize,
@@ -206,7 +207,7 @@ pub enum SymmetryInferenceEvidence {
         checked_generator_count: usize,
     },
     SampledLieDerivative {
-        profile: NumericLieDerivativeProfileV1,
+        profile: NumericLieDerivativeProfileV2,
         acted_on_variables: Vec<String>,
         group: LieGroup,
         statistics: LieDerivativeSampleStatisticsV1,
@@ -254,7 +255,7 @@ pub struct SymmetryInferenceReport {
     pub candidate: Option<SymmetryDescriptor>,
     pub evidence: Option<SymmetryInferenceEvidence>,
     pub search_status: SymmetryInferenceSearchStatus,
-    pub numeric_profile: NumericLieDerivativeProfileV1,
+    pub numeric_profile: NumericLieDerivativeProfileV2,
     pub exact_polynomial_profile: ExactPolynomialLieProfileV1,
     pub exact_polynomial_status: ExactPolynomialSearchStatus,
 }
@@ -275,7 +276,7 @@ pub fn infer_symmetry(expr: &Expr) -> SymmetryDescriptor {
 
 /// Infer a symmetry candidate while preserving the evidence source and search limits.
 pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
-    let numeric_profile = NumericLieDerivativeProfileV1::default();
+    let numeric_profile = NumericLieDerivativeProfileV2::default();
     let exact_polynomial_profile = ExactPolynomialLieProfileV1::default();
 
     if let Some((variables, shared_coefficient)) = detect_sum_of_squares(expr)
@@ -374,7 +375,7 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
 pub fn infer_symmetry_numeric_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
     infer_symmetry_numeric_with_profile(
         expr,
-        NumericLieDerivativeProfileV1::default(),
+        NumericLieDerivativeProfileV2::default(),
         ExactPolynomialLieProfileV1::default(),
         ExactPolynomialSearchStatus::NotRequested,
     )
@@ -387,7 +388,7 @@ pub fn infer_symmetry_numeric(expr: &Expr) -> SymmetryDescriptor {
 
 fn infer_symmetry_numeric_with_profile(
     expr: &Expr,
-    profile: NumericLieDerivativeProfileV1,
+    profile: NumericLieDerivativeProfileV2,
     exact_polynomial_profile: ExactPolynomialLieProfileV1,
     exact_polynomial_status: ExactPolynomialSearchStatus,
 ) -> SymmetryInferenceReport {
@@ -1012,7 +1013,7 @@ fn fd_gradient(
     expr: &Expr,
     state: &[f64],
     var_names: &[String],
-    profile: NumericLieDerivativeProfileV1,
+    profile: NumericLieDerivativeProfileV2,
 ) -> Vec<f64> {
     let eps = profile.finite_difference_step;
     let mut grad = Vec::with_capacity(var_names.len());
@@ -1038,7 +1039,7 @@ fn fd_gradient(
 
 /// Deterministic xorshift64 sampler — no external RNG dependency, reproducible
 /// across runs (important for test stability).
-fn sample_states(dim: usize, profile: NumericLieDerivativeProfileV1) -> Vec<Vec<f64>> {
+fn sample_states(dim: usize, profile: NumericLieDerivativeProfileV2) -> Vec<Vec<f64>> {
     let mut state = profile.seed | 1;
     (0..profile.samples_per_generator)
         .map(|_| {
@@ -1061,16 +1062,17 @@ fn sample_states(dim: usize, profile: NumericLieDerivativeProfileV1) -> Vec<Vec<
 /// Numerically test whether `expr` is invariant under the group generated by
 /// `algebra`, acting on the variables at `active_indices` (all other
 /// variables held fixed). Requires the normalized squared Lie derivative to
-/// be below tolerance at every sampled point, for every generator — and
-/// requires at least one sample to be "informative" (non-vanishing gradient
-/// on the active subspace), so an expression that's merely locally flat at
-/// every sampled point doesn't get misread as globally invariant.
+/// be below tolerance at every sampled point, for every generator. The residual
+/// is the squared cosine between the expression gradient and group-orbit tangent.
+/// Unlike |L_A f|² / ||grad f||², it is dimensionless and does not depend on the
+/// magnitude/units of the orbit vector. Samples with a zero gradient or zero
+/// orbit tangent are uninformative and are skipped.
 fn is_lie_invariant(
     expr: &Expr,
     var_names: &[String],
     active_indices: &[usize],
     algebra: &LieAlgebra,
-    profile: NumericLieDerivativeProfileV1,
+    profile: NumericLieDerivativeProfileV2,
 ) -> Option<LieDerivativeSampleStatisticsV1> {
     let samples = sample_states(var_names.len(), profile);
 
@@ -1093,18 +1095,35 @@ fn is_lie_invariant(
                 flow[vi] = acc;
             }
 
-            let lie: f64 = grad.iter().zip(flow.iter()).map(|(g, f)| g * f).sum();
-            let grad_sq: f64 = active_indices.iter().map(|&vi| grad[vi] * grad[vi]).sum();
-            if !lie.is_finite() || !grad_sq.is_finite() {
+            // Normalize both vectors before taking their dot product. The prior
+            // |L_A f|² / ||grad f||² metric equals ||A x||² cos²(theta), so its
+            // threshold depends on coordinate magnitude/units. hypot keeps norm
+            // accumulation stable; the normalized dot product avoids forming an
+            // unscaled Lie derivative or multiplying the two norms.
+            let gradient_norm = active_indices
+                .iter()
+                .fold(0.0_f64, |norm, &vi| norm.hypot(grad[vi]));
+            let flow_norm = active_indices
+                .iter()
+                .fold(0.0_f64, |norm, &vi| norm.hypot(flow[vi]));
+            if !gradient_norm.is_finite() || !flow_norm.is_finite() {
                 return None;
             }
-            if grad_sq < profile.minimum_gradient_squared {
+            if gradient_norm == 0.0 || flow_norm == 0.0 {
                 continue;
             }
 
-            let normalized_squared_residual = (lie * lie) / grad_sq;
+            let normalized_directional_derivative: f64 = active_indices
+                .iter()
+                .map(|&vi| (grad[vi] / gradient_norm) * (flow[vi] / flow_norm))
+                .sum();
+            if !normalized_directional_derivative.is_finite() {
+                return None;
+            }
+            let normalized_squared_residual =
+                normalized_directional_derivative * normalized_directional_derivative;
             if !normalized_squared_residual.is_finite()
-                || normalized_squared_residual > profile.normalized_squared_residual_tolerance
+                || normalized_squared_residual > profile.squared_cosine_tolerance
             {
                 return None;
             }
@@ -1313,9 +1332,63 @@ mod tests {
         assert_eq!(statistics.sample_count_per_generator, 8);
         assert_eq!(statistics.checked_generator_count, 1);
         assert_eq!(statistics.informative_evaluation_count, 8);
-        assert!(statistics.maximum_normalized_squared_residual <= profile.normalized_squared_residual_tolerance);
+        assert!(statistics.maximum_normalized_squared_residual <= profile.squared_cosine_tolerance);
         assert_eq!(
             report.search_status,
+            SymmetryInferenceSearchStatus::NumericSearchCompleted
+        );
+    }
+
+    fn numeric_profile_with_coordinate_scale(scale: f64) -> NumericLieDerivativeProfileV2 {
+        let mut profile = NumericLieDerivativeProfileV2::default();
+        profile.sample_min_inclusive *= scale;
+        profile.sample_max_exclusive *= scale;
+        profile.finite_difference_step *= scale;
+        profile
+    }
+
+    #[test]
+    fn sampled_symmetry_is_robust_to_expression_and_coordinate_scales() {
+        // The numeric lane must not abstain merely because a valid expression
+        // is represented at a very small or large amplitude. The old absolute
+        // minimum-gradient cutoff rejected both extremes.
+        let radial = sqrt_of(add(pow2("x"), pow2("y")));
+        for amplitude in [5e-200, 5e200] {
+            let scaled = mul(Expr::Const(amplitude), radial.clone());
+            let report = infer_symmetry_numeric_with_evidence(&scaled);
+            assert_eq!(
+                report.candidate.as_ref().map(|candidate| candidate.lie_groups.clone()),
+                Some(vec![LieGroup::SO(2)]),
+                "radial symmetry should survive expression amplitude {amplitude}"
+            );
+        }
+
+        // Coordinate units also matter. Let X = c*x, Y = c*y and express the
+        // same anisotropic function as sqrt((X² + 2Y²) / c²). With c=1e-4,
+        // the old residual ||A X||² cos²(theta) falls below 1e-6 on the frozen
+        // sample box and can falsely accept SO(2), despite unchanged geometry.
+        // The dimensionless squared-cosine residual remains above threshold.
+        let anisotropic = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
+        let baseline = infer_symmetry_numeric_with_evidence(&sqrt_of(anisotropic.clone()));
+        assert!(baseline.candidate.is_none());
+
+        let coordinate_scale = 1e-4;
+        let inverse_scale_squared = 1.0 / (coordinate_scale * coordinate_scale);
+        let scaled_coordinates_expr = sqrt_of(mul(
+            Expr::Const(inverse_scale_squared),
+            anisotropic,
+        ));
+        let scaled_profile = numeric_profile_with_coordinate_scale(coordinate_scale);
+        let scaled_report = infer_symmetry_numeric_with_profile(
+            &scaled_coordinates_expr,
+            scaled_profile,
+            ExactPolynomialLieProfileV1::default(),
+            ExactPolynomialSearchStatus::NotRequested,
+        );
+        assert!(scaled_report.candidate.is_none());
+        assert!(scaled_report.evidence.is_none());
+        assert_eq!(
+            scaled_report.search_status,
             SymmetryInferenceSearchStatus::NumericSearchCompleted
         );
     }
@@ -1338,7 +1411,7 @@ mod tests {
             panic!("near-isotropic candidate must remain sampled evidence");
         };
         assert!(statistics.maximum_normalized_squared_residual > 0.0);
-        assert!(statistics.maximum_normalized_squared_residual <= profile.normalized_squared_residual_tolerance);
+        assert!(statistics.maximum_normalized_squared_residual <= profile.squared_cosine_tolerance);
         assert_eq!(statistics.sample_count_per_generator, profile.samples_per_generator);
         assert_eq!(
             report.exact_polynomial_status,
@@ -1710,7 +1783,7 @@ mod tests {
     #[test]
     fn numeric_search_skips_pairwise_combinations_when_profile_disables_them() {
         let expr = sqrt_of(add(pow2("x"), pow2("y")));
-        let mut profile = NumericLieDerivativeProfileV1::default();
+        let mut profile = NumericLieDerivativeProfileV2::default();
         profile.pairwise_so2_search = false;
         let report = infer_symmetry_numeric_with_profile(
             &expr,
