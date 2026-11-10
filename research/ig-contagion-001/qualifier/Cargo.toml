@@ -7,3 +7,7 @@ description = "Structural and scenario-matrix qualifier for IG-CONTAGION-001"
 
 [dependencies]
 serde_json = "1"
+
+[workspace]
+members = ["."]
+resolver = "2"
