@@ -106,8 +106,11 @@ fn check_operating_context(record: &Value, findings: &mut Findings) {
     }
 
     let installation = context.get("wind_assist_installation").and_then(Value::as_str);
-    let states = context.get("wind_device_states").and_then(Value::as_array);
-    let states = states.map(Vec::as_slice).unwrap_or(&[]);
+    let states: &[Value] = context
+        .get("wind_device_states")
+        .and_then(Value::as_array)
+        .map(|values| values.as_slice())
+        .unwrap_or(&[]);
     match installation {
         Some("installed") if states.is_empty() => findings.push(
             "/measurement_context/wind_device_states",
