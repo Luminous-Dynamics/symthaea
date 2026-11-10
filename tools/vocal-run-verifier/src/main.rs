@@ -19,7 +19,7 @@ use std::path::{Component, Path, PathBuf};
 const RUN_SCHEMA: &str = "muse-vocal-run/v1";
 const PRIVATE_KEY_VERSION: u64 = 2;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct BlindClip {
     clip_id: String,
@@ -32,7 +32,7 @@ struct BlindClip {
     challenge: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RunManifest {
     schema: String,
@@ -44,7 +44,7 @@ struct RunManifest {
     cases: Vec<CaseReceipt>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CaseReceipt {
     case_id: usize,
@@ -74,7 +74,7 @@ struct NoteReceipt {
     velocity: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PrivateBackendKey {
     format_version: u64,
@@ -82,7 +82,7 @@ struct PrivateBackendKey {
     entries: Vec<KeyEntry>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct KeyEntry {
     clip_id: String,
@@ -93,7 +93,7 @@ struct KeyEntry {
     capability_manifest_blake3: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct HumanReferenceReceipt {
     case_id: usize,
