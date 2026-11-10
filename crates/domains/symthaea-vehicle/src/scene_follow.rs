@@ -220,6 +220,8 @@ pub struct AdmittedLocalFollowTarget {
     scene_digest: [u8; 32],
     provenance_receipt_digest: [u8; 32],
     scene_sequence: u64,
+    scene_receive_tick_ns: u64,
+    scene_processing_tick_ns: u64,
     track_hypothesis_id: String,
     track_lineage_id: String,
     source_ids: Vec<String>,
@@ -276,6 +278,14 @@ impl AdmittedLocalFollowTarget {
 
     pub fn scene_sequence(&self) -> u64 {
         self.scene_sequence
+    }
+
+    pub fn scene_receive_tick_ns(&self) -> u64 {
+        self.scene_receive_tick_ns
+    }
+
+    pub fn scene_processing_tick_ns(&self) -> u64 {
+        self.scene_processing_tick_ns
     }
 
     pub fn track_hypothesis_id(&self) -> &str {
@@ -493,6 +503,8 @@ pub(crate) fn admit_local_follow_target(
         scene_digest: receipt.snapshot_digest,
         provenance_receipt_digest: receipt.provenance_receipt_digest,
         scene_sequence: receipt.sequence,
+        scene_receive_tick_ns: receipt.receive_tick_ns,
+        scene_processing_tick_ns: receipt.processing_tick_ns,
         track_hypothesis_id: target.hypothesis_id.clone(),
         track_lineage_id: target.track_lineage_id.clone(),
         source_ids: target.source_ids.clone(),
@@ -626,6 +638,8 @@ mod tests {
         assert!((admitted.gap_lower_bound_m() - 13.0).abs() < 1e-12);
         assert!((admitted.relative_speed_mps() + 1.0).abs() < 1e-12);
         assert_eq!(admitted.scene_sequence(), 12);
+        assert_eq!(admitted.scene_receive_tick_ns(), 12_001_000_000);
+        assert_eq!(admitted.scene_processing_tick_ns(), 12_002_000_000);
         assert_eq!(admitted.track_hypothesis_id(), "hyp-1");
         assert_eq!(admitted.track_lineage_id(), "track-1");
         assert_eq!(admitted.scene_digest(), [0x11; 32]);
@@ -789,6 +803,32 @@ mod tests {
         assert_eq!(
             pd_cruise_with_admitted_local_target(&state, 10.0, 0.0, 20.0, &admitted),
             Err(FollowEvidenceError::StaleOrFutureObservation)
+        );
+    }
+
+    #[test]
+    fn rejects_stale_or_future_source_evidence() {
+        let mut receipt = valid_receipt();
+        receipt.sources[0].acquisition_tick_ns = 11_000_000_000;
+        assert_eq!(
+            admit_local_follow_target(&receipt, &deployment_profile()),
+            Err(FollowEvidenceError::SceneAdmissionRejected)
+        );
+        let mut receipt = valid_receipt();
+        receipt.sources[0].receive_tick_ns = 12_030_000_000;
+        assert_eq!(
+            admit_local_follow_target(&receipt, &deployment_profile()),
+            Err(FollowEvidenceError::SceneAdmissionRejected)
+        );
+    }
+
+    #[test]
+    fn rejects_scene_hypotheses_with_unknown_uncertainty_semantics() {
+        let mut receipt = valid_receipt();
+        receipt.tracks[0].uncertainty_semantics_id.clear();
+        assert_eq!(
+            admit_local_follow_target(&receipt, &deployment_profile()),
+            Err(FollowEvidenceError::SceneAdmissionRejected)
         );
     }
 
