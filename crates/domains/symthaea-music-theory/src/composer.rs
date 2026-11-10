@@ -7143,7 +7143,12 @@ mod tests {
         spec.rhetoric = crate::spec::PhraseRhetoric::Classic;
         let score = compose_with_spec(&MusicalIntent::default(), &spec);
         let mut twin = score.clone();
-        apply_phrase_rhetoric(&mut twin, crate::spec::PhraseRhetoric::Classic, 4.0);
+        apply_phrase_rhetoric(
+            &mut twin,
+            PartId::UNASSIGNED,
+            crate::spec::PhraseRhetoric::Classic,
+            4.0,
+        );
         assert_eq!(score, twin);
     }
 
