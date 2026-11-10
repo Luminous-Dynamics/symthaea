@@ -439,6 +439,39 @@
       "limitations": [
         "This snapshot becomes stale after subsequent IMO sessions or decisions; refresh before future use."
       ]
+    },
+    {
+      "rule_id": "EU-ETS-TARGETED-REVISION-PROPOSAL-2026",
+      "title": "European Commission targeted revision proposal for EU ETS, including maritime provisions",
+      "authority": "European Commission",
+      "instrument": "Commission proposal for a targeted revision of the EU ETS and related maritime monitoring/reporting provisions",
+      "revision_or_resolution": "Proposal published 17 July 2026; legislative adoption status not established by this snapshot",
+      "rule_status": "proposed",
+      "legal_character": "negotiation_proposal",
+      "dates": {},
+      "applicability": {
+        "ship_scope": "Potential changes to EU ETS and maritime MRV scope and rules; exact ship scope depends on final legislative text.",
+        "geographic_scope": "EU/EEA regulatory framework as defined in the eventual adopted instrument.",
+        "voyage_scope": "Scenario analysis only; no current voyage is reclassified by this proposal.",
+        "conditions": [
+          "The Commission announced a targeted revision proposal on 17 July 2026, including maritime transport provisions and linked MRV/ETS materials."
+        ],
+        "exclusions_or_unknowns": [
+          "This is a proposal, not an adopted or applicable rule as of 10 November 2026.",
+          "Exact article-level amendments and effective dates must be taken from the legislative proposal and eventual adopted text."
+        ]
+      },
+      "output_scope": [
+        "future_policy_scenario",
+        "regulatory_change_delta",
+        "investment_sensitivity"
+      ],
+      "source_ids": [
+        "EU-ETS-TARGETED-REVISION-PROPOSAL-2026"
+      ],
+      "limitations": [
+        "Do not promote this proposal to an effective rule or apply it to current liability until formally adopted and applicable."
+      ]
     }
   ],
   "sources": [
@@ -517,6 +550,18 @@
       "limitations": [
         "Use the current consolidated version and implementing acts for reporting determinations.",
         "The legal MRV scope and gas reporting years differ from EU ETS surrender scope."
+      ]
+    },
+    {
+      "source_id": "EU-ETS-TARGETED-REVISION-PROPOSAL-2026",
+      "title": "European Commission proposal for a targeted revision of the EU Emissions Trading System, 17 July 2026",
+      "publisher": "European Commission",
+      "uri": "https://climate.ec.europa.eu/areas-action/transport-decarbonisation/reducing-emissions-shipping-sector_en",
+      "publication_date": "2026-07-17",
+      "evidence_class": "official_legislative_proposal",
+      "limitations": [
+        "Proposal status only; do not treat proposed maritime revisions as effective law.",
+        "The page signals proposal scope but detailed effects must be read from the linked proposal texts and final adopted legal act."
       ]
     }
   ]
