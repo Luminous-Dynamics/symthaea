@@ -135,9 +135,7 @@ mod tests {
     use symthaea_music_theory::score_edit::{
         EditBeatV1, ScalePartVelocityV1, ScoreEditIssueCodeV1,
     };
-    use symthaea_music_theory::score_event_remap::{
-        ScoreEventRemapIssueCodeV1, validate_score_event_remap,
-    };
+    use symthaea_music_theory::score_event_remap::validate_score_event_remap;
 
     fn source_score() -> Score {
         let mut score = Score::new(Key::major(PitchClass::C), 100.0, 4);
@@ -259,11 +257,24 @@ mod tests {
     }
 
     #[test]
-    fn invalid_candidate_demand_prevents_partial_preview() {
-        // The low-level velocity edit rejects out-of-range output. This test
-        // exercises the public service's explicit error boundary for a source
-        // that passes an initial profile but a candidate-side analyzer failure
-        // is never silently converted into a partial successful preview.
+    fn preview_rejects_a_target_velocity_that_rounds_to_no_change() {
+        let mut source = source_score();
+        source.notes[0].velocity = 0.0;
+        let error = preview_score_edit(&source, &plan(&source)).unwrap_err();
+        assert!(matches!(
+            error,
+            ScoreEditServiceErrorV1::EditRejected(ref issues)
+                if issues.iter().any(|issue| {
+                    issue.code == ScoreEditIssueCodeV1::NoOpVelocityScale
+                        && issue.note_index == Some(0)
+                })
+        ));
+    }
+
+    #[test]
+    fn out_of_range_candidate_velocity_is_rejected_before_preview_is_returned() {
+        // The low-level transaction rejects out-of-range candidate values
+        // before the service can expose a partially successful preview.
         let source = source_score();
         let mut edit = plan(&source);
         edit.operations[0].numerator = 2;
