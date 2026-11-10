@@ -13,6 +13,9 @@ This document is a research design crosswalk. Published values below are reporte
 | Ha & Mitchell, *Beyond Correctness*, ICML 2026 / PMLR | Measures the direction and distance of answer revisions relative to an explicit ground truth | Add task-specific revision-distance and direction metrics on synthetic known-answer tasks | Does not license a truth-distance score for normative opinions |
 | Myakala et al., *BeliefShift*, 2026 preprint | Longitudinal temporal consistency, contradiction resolution and evidence-driven revision across multi-session trajectories | Add delayed re-elicitation and contradiction/revision analysis where exact artifacts and rights permit | Preprint claims and dataset are not independently reproduced here |
 | *When collaboration fails: persuasion driven adversarial influence in multi agent large language model debate*, Scientific Reports 2026 | Persuasion attacks beyond prompt injection; reports substantial accuracy loss and incorrect-consensus increases in the tested setup | Add confident, status-bearing, social-proof, citation-laundering and emotional-urgency attacks | Does not imply the same effect sizes across models or tasks |
+| MADBench, arXiv 2026 | Six security-attack families over 356 source tasks / 3,958 test cases; includes prompt/resource attacks, compromised agents and orchestrator compromise | Compose its attack taxonomy as a separate security layer; compare answer correctness and unauthorized read/write outcomes | The current 50-case stance/topology matrix is not a reproduction of MADBench; exact artifacts/harness require separate qualification |
+| *Demystifying Multi-Agent Debate*, Findings ACL 2026 | Diversity-aware initial answers and confidence-modulated updates across six reasoning benchmarks | Add initial-diversity and calibrated-confidence treatment arms | Confidence is not evidence; QA improvements do not establish civic legitimacy |
+| *Free-MAD*, Findings ACL 2026 | Consensus-free debate, full-trajectory scoring and anti-conformity; reports lower round/token cost | Add a trajectory-scoring and consensus-free baseline under equal model/token budgets | Majority resistance can still erase minorities if trajectory scoring is opaque or miscalibrated |
 
 Links:
 - https://proceedings.colm.cc/paper_files/paper/2026/hash/871ed095b734818cfba48db6aeb25a62-Abstract-Conference.html
@@ -54,8 +57,11 @@ Use the same task instances, model family/revision, agent count, token/tool budg
 | A4 — evidence protocol | Claims require source/evidence references; independent challenge and correction stage | Does evidence accountability reduce persuasion without blocking valid updates? |
 | A5 — source verification | Independent source/claim verification before post-discussion answer | Does verification change unsupported and warranted revision differently? |
 | A6 — topology counterfactual | Same exact message, agent profile, evidence packet and graph; only speaker placement changes | Does exposure centrality itself change persistent influence? |
+| A7 — confidence/diversity | Diverse initial answer sets and calibrated confidence reporting | Does this improve evidence-selective revision without turning confidence into authority? |
+| A8 — Free-MAD trajectory scoring | Preserve initial/intermediate/final answers; use a consensus-free trajectory scorer and anti-conformity condition | Does full-trajectory selection reduce conformity and token cost without losing minority information? |
+| A9 — MADBench security taxonomy | Matched attacks at prompt, resource, coordination and orchestrator layers | Does the protocol fail safely across the wider debate-security lifecycle? |
 
-A2 and A3 separate the two DReaMAD design levers. A4/A5 are candidate Symthaea interventions, not assumed wins. A6 uses the five frozen content/topology pairs in the scenario matrix.
+A2 and A3 separate the two DReaMAD design levers. A7 mirrors the confidence/diversity factors studied in Findings ACL 2026. A8 tests Free-MAD's trajectory-level, consensus-free alternative. A9 composes MADBench's threat taxonomy but requires a separate resource/tool/orchestrator harness; it is not represented by the current five persuasive-message bundles. A4/A5 remain candidate Symthaea interventions, not assumed wins. A6 uses the five frozen message/evidence/agent/topology pairs in the scenario matrix.
 
 ## Required outcome vector
 
@@ -135,11 +141,12 @@ A numerical target should be set only after a reproduced baseline, variance esti
 
 ## Ownership
 
-- #11248 owns deterministic graph generation.
+- #11337 owns CommunicationGraph generation, message-channel semantics and centrality fixtures; #11248 owns the separate delegation graph taxonomy.
 - #3054 / #3095 / #3115 own institutional experiment orchestration and provenance.
 - #1872 owns hostile-agent execution.
 - #9431 owns evaluator correlation/ensemble qualification.
 - #11320 owns the stance-shift measurement protocol and counterfactual analysis.
+- MADBench security-layer replication/adaptation is separate from the 50-case persuasion/topology matrix; no dataset ingestion or reproduction is implied by citation alone.
 - Mycelix #5999/#6011 own human-group process and participant-conditioned summary evaluation.
 
 No existing engine or production governance authority is duplicated by this crosswalk.
