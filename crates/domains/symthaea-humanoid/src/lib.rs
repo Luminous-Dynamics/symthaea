@@ -40,6 +40,7 @@ pub mod oracle_generator_certification;
 pub mod osqp_backend;
 pub mod plugin;
 pub mod prosthetic_sensory;
+pub mod prosthetic_feedback_benchmark;
 pub mod qp_certification;
 pub mod recovery;
 pub mod recovery_benchmark;
