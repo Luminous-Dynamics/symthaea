@@ -902,6 +902,109 @@ mod tests {
     }
 
     #[test]
+    fn rejects_selected_source_without_admitted_clock_or_frame_transform() {
+        let mut receipt = valid_receipt();
+        receipt.sources[0].clock_transform_admitted = false;
+        assert_eq!(
+            admit_local_follow_target(&receipt, &deployment_profile()),
+            Err(FollowEvidenceError::SceneAdmissionRejected)
+        );
+
+        let mut receipt = valid_receipt();
+        receipt.sources[0].frame_transform_admitted = false;
+        assert_eq!(
+            admit_local_follow_target(&receipt, &deployment_profile()),
+            Err(FollowEvidenceError::SceneAdmissionRejected)
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_or_unregistered_scene_track_hypotheses_at_receipt_boundary() {
+        let mut receipt = valid_receipt();
+        let mut duplicate = receipt.tracks[0].clone();
+        duplicate.position_x_m = 20.0;
+        receipt.tracks.push(duplicate);
+        assert_eq!(
+            SceneAdmissionReceipt::from_validated_scene_admission(
+                receipt.snapshot_id,
+                receipt.schema_version,
+                receipt.snapshot_digest,
+                receipt.provenance_receipt_digest,
+                receipt.sequence,
+                receipt.frame_id,
+                receipt.frame_transform_id,
+                receipt.clock_domain_id,
+                receipt.clock_transform_id,
+                receipt.event_tick_ns,
+                receipt.receive_tick_ns,
+                receipt.processing_tick_ns,
+                receipt.evaluated_at_tick_ns,
+                receipt.clock_alignment_admitted,
+                receipt.frame_transform_admitted,
+                receipt.calibration_currentness_admitted,
+                receipt.numeric_validity_admitted,
+                receipt.x_axis_is_forward,
+                receipt.ego_position_x_m,
+                receipt.ego_velocity_x_mps,
+                receipt.lane_min_y_m,
+                receipt.lane_max_y_m,
+                receipt.sources,
+                receipt.tracks,
+            ),
+            Err(FollowEvidenceError::SceneAdmissionRejected)
+        );
+    }
+
+    #[test]
+    fn rejects_non_finite_scene_track_before_nearest_actor_selection() {
+        let mut receipt = valid_receipt();
+        let mut malformed_far_track = receipt.tracks[0].clone();
+        malformed_far_track.hypothesis_id = "hyp-bad".into();
+        malformed_far_track.track_lineage_id = "track-bad".into();
+        malformed_far_track.position_x_m = f64::NAN;
+        receipt.tracks.push(malformed_far_track);
+        assert_eq!(
+            SceneAdmissionReceipt::from_validated_scene_admission(
+                receipt.snapshot_id,
+                receipt.schema_version,
+                receipt.snapshot_digest,
+                receipt.provenance_receipt_digest,
+                receipt.sequence,
+                receipt.frame_id,
+                receipt.frame_transform_id,
+                receipt.clock_domain_id,
+                receipt.clock_transform_id,
+                receipt.event_tick_ns,
+                receipt.receive_tick_ns,
+                receipt.processing_tick_ns,
+                receipt.evaluated_at_tick_ns,
+                receipt.clock_alignment_admitted,
+                receipt.frame_transform_admitted,
+                receipt.calibration_currentness_admitted,
+                receipt.numeric_validity_admitted,
+                receipt.x_axis_is_forward,
+                receipt.ego_position_x_m,
+                receipt.ego_velocity_x_mps,
+                receipt.lane_min_y_m,
+                receipt.lane_max_y_m,
+                receipt.sources,
+                receipt.tracks,
+            ),
+            Err(FollowEvidenceError::SceneAdmissionRejected)
+        );
+    }
+
+    #[test]
+    fn rejects_target_with_unqualified_synthetic_source_role() {
+        let mut receipt = valid_receipt();
+        receipt.sources[0].role = SceneSourceRole::SyntheticSensorObservation;
+        assert_eq!(
+            admit_local_follow_target(&receipt, &deployment_profile()),
+            Err(FollowEvidenceError::SceneAdmissionRejected)
+        );
+    }
+
+    #[test]
     fn rejects_non_forward_road_frame() {
         let mut receipt = valid_receipt();
         receipt.x_axis_is_forward = false;
