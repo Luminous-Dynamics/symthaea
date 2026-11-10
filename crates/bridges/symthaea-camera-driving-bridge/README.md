@@ -68,6 +68,31 @@ cargo clippy --locked --all-targets --all-features -- -D warnings
 
 The bridge introduces no third-party dependency; it uses workspace-locked `serde` and `sha2`.
 
+## Episode integration CLI
+
+The crate also exposes `camera-driving-bridge`, which processes a complete episode in one process so the Vision Manifold and vehicle encoder retain their temporal state across observations.
+
+Build and run from the repository root:
+
+```sh
+cargo run --locked \
+  --manifest-path crates/bridges/symthaea-camera-driving-bridge/Cargo.toml \
+  --bin camera-driving-bridge -- \
+  episode-request.json receipts-output.json policy-inputs/
+```
+
+The request schema is `schemas/episode-request-v1.schema.json`. Each observation references an RGB pixel artifact by a path relative to the request file. The CLI rejects absolute paths, parent-directory traversal and symlinks that resolve outside the request directory. It checks the source pixel digest against the upstream Symtropy policy receipt before advancing the Vision Manifold.
+
+The CLI writes:
+- one serialized `DrivingObservationReceipt` per delivered observation;
+- a sequential predecessor-receipt chain;
+- one binary HDC policy-input artifact per sequence under the requested output directory;
+- artifact metadata with sequence, dimension, byte length and SHA-256.
+
+The HDC artifact format is an 8-byte unsigned little-endian dimension followed by 16,384 little-endian IEEE-754 f32 components. The binary file hash uses the same dimension-prefixed representation as the bridge receipt's `fused_policy_input_sha256`. The CLI checks the two digests match before writing a successful result.
+
+Only delivered frames are passed through this bridge. Missing/dropped/stale observation events must remain in the episode stream and denominator; they are not replaced or synthesized by the CLI. A successful bridge receipt does not authorize a controller or actuator.
+
 ## Claim ceiling
 
 Passing tests establish deterministic fusion and receipt construction over finite supplied frames and vehicle states. They do not establish visual semantic accuracy, depth estimation, a trained camera-conditioned policy, closed-loop driving performance, causality, operational timing, world-model validity or physical safety.
