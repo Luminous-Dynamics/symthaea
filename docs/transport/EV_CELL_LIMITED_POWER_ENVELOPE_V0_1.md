@@ -31,7 +31,7 @@ All cell identities, the hashed pack cell-inventory manifest, asset/configuratio
 
 ## Frozen corpus
 
-Nine synthetic cases include equal-cell reference, weak-cell voltage limit, thermal limit, current-rating limit, an exhausted thermal-margin no-discharge result, and four fail-closed controls (SOC out of domain, temperature out of domain, unsupported topology and invalid calibration). These are arithmetic and gate tests only.
+Eleven synthetic cases include equal-cell reference, weak-cell voltage limit, thermal limit, current-rating limit, an exhausted thermal-margin no-discharge result, and six fail-closed controls (SOC out of domain, temperature out of domain, unsupported topology, invalid calibration, OCV/SOC context mismatch and OCV/temperature context mismatch). OCV evidence is bound to the cell operating SOC and temperature within declared uncertainty; maximum-temperature limits have a separate evidence digest and class. These are arithmetic and gate tests only.
 
 ## Deliberate limits
 
