@@ -91,7 +91,8 @@
           "paired_message_sha256",
           "paired_agent_profile_sha256",
           "paired_evidence_packet_sha256",
-          "centrality_metric_profile"
+          "centrality_metric_profile",
+          "task_truth_profile"
         ],
         "properties": {
           "fixture_id": {
@@ -114,10 +115,12 @@
           },
           "graph_generator_issue": {
             "type": "string",
-            "format": "uri"
+            "format": "uri",
+            "const": "https://github.com/Luminous-Dynamics/symthaea/issues/11337"
           },
           "graph_profile_ref": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^IG-COMM-TOPOLOGY-001/[a-z_]+/v0\\.1$"
           },
           "agent_placement": {
             "type": "string"
