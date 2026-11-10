@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-sequential-diagnostic-scenario/0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "decision_unit",
+    "horizon",
+    "abstain_loss",
+    "hypotheses",
+    "actions",
+    "tests",
+    "prior_evidence_digest",
+    "prior_evidence_class",
+    "decision_loss_digest",
+    "decision_loss_evidence_class",
+    "likelihood_mode",
+    "joint_likelihoods"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ev-sequential-diagnostic/0.1"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "horizon": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8
+    },
+    "abstain_loss": {
+      "type": "number",
+      "minimum": 0
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "prior"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prior": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "maxItems": 32
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "admissible",
+          "loss_by_hypothesis"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "admissible": {
+            "type": "boolean"
+          },
+          "loss_by_hypothesis": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0
+            },
+            "propertyNames": {
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "maxItems": 32
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "test_cost",
+          "test_cost_digest",
+          "downtime_cost",
+          "downtime_cost_digest",
+          "prerequisites",
+          "requires",
+          "outcomes",
+          "likelihood_model_digest",
+          "calibration_evidence_digest",
+          "calibration_cohort_digest",
+          "likelihood_evidence_class"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "test_cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "test_cost_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "downtime_cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "downtime_cost_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "prerequisites": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "safety_approved",
+              "calibration_valid",
+              "domain_supported",
+              "equipment_available",
+              "protocol_digest",
+              "equipment_digest",
+              "safety_approval_digest",
+              "safety_authority_ref",
+              "calibration_record_digest",
+              "domain_scope_digest"
+            ],
+            "properties": {
+              "safety_approved": {
+                "type": "boolean"
+              },
+              "calibration_valid": {
+                "type": "boolean"
+              },
+              "domain_supported": {
+                "type": "boolean"
+              },
+              "equipment_available": {
+                "type": "boolean"
+              },
+              "protocol_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "equipment_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "safety_approval_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "safety_authority_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "calibration_record_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "domain_scope_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "requires": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "test_id",
+              "outcome"
+            ],
+            "properties": {
+              "test_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "outcome": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "outcomes": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "likelihood_by_hypothesis"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "likelihood_by_hypothesis": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "propertyNames": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          "likelihood_model_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "calibration_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "calibration_cohort_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "likelihood_evidence_class": {
+            "enum": [
+              "reference_test_measurement",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          }
+        }
+      }
+    },
+    "prior_evidence_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "prior_evidence_class": {
+      "enum": [
+        "reference_test_measurement",
+        "derived_estimate",
+        "model_prediction",
+        "simulation_output",
+        "synthetic_fixture",
+        "vendor_claim"
+      ]
+    },
+    "decision_loss_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "decision_loss_evidence_class": {
+      "enum": [
+        "reference_test_measurement",
+        "derived_estimate",
+        "model_prediction",
+        "simulation_output",
+        "synthetic_fixture",
+        "vendor_claim"
+      ]
+    },
+    "likelihood_mode": {
+      "enum": [
+        "conditional_independent",
+        "joint_assignment"
+      ]
+    },
+    "joint_likelihoods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "outcome_assignment",
+          "probability"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outcome_assignment": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "maxItems": 4096
+    }
+  },
+  "title": "EV sequential diagnostic planning scenario v0.2"
+}
