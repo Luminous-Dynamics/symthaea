@@ -74,7 +74,8 @@ pub use recognize::{
 pub use symmetry::SymmetryEncoder;
 pub use symmetry_inference::{
     ExactPolynomialLieProfileV1, ExactPolynomialSearchStatus, NumericLieDerivativeProfileV1,
-    StructuralSymmetryPattern, SymmetryInferenceEvidence, SymmetryInferenceReport,
+    LieDerivativeSampleStatisticsV1, StructuralSymmetryPattern, SymmetryInferenceEvidence,
+    SymmetryInferenceReport,
     SymmetryInferenceSearchStatus, infer_symmetry, infer_symmetry_numeric,
     infer_symmetry_numeric_with_evidence, infer_symmetry_with_evidence,
 };
