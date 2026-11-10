@@ -66,6 +66,8 @@ pub enum ProceedReason {
     ExpectedBenefitBelowThreshold,
     OptionalSensorUnavailable,
     OptionalSensorOverBudget,
+    OptionalObservationViolatesRiskGate,
+    OptionalObservationViolatesConfidenceGate,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -78,6 +80,7 @@ pub enum SensingDecision {
         sensor_id: String,
         estimated_net_benefit: f64,
         required_for_risk_gate: bool,
+        required_for_confidence_gate: bool,
     },
     StopAndEscalate {
         reason: SensingStopReason,
@@ -213,13 +216,21 @@ pub fn choose_active_sensing(
         });
     };
 
-    if must_sense_for_risk && after_unsafe > policy.maximum_unsafe_event_probability {
+    // A required observation must resolve both declared continuation gates.
+    // A merely optional observation that predicts a worse gate outcome must be
+    // declined; its hypothetical posterior must not veto the current admissible state.
+    let after_risk_acceptable =
+        after_unsafe <= policy.maximum_unsafe_event_probability;
+    let after_confidence_acceptable = after_success >= policy.minimum_continue_probability;
+    let sensing_required = must_sense_for_risk || must_improve_confidence;
+
+    if sensing_required && !after_risk_acceptable {
         return Ok(SensingDecision::StopAndEscalate {
             reason: SensingStopReason::RiskRemainsAboveLimit,
             estimated_net_benefit: None,
         });
     }
-    if must_improve_confidence && after_success < policy.minimum_continue_probability {
+    if sensing_required && !after_confidence_acceptable {
         return Ok(SensingDecision::StopAndEscalate {
             reason: SensingStopReason::ConfidenceRemainsBelowThreshold,
             estimated_net_benefit: None,
@@ -239,8 +250,21 @@ pub fn choose_active_sensing(
         return Err(SensingError::InvalidCost);
     }
 
+    if !sensing_required && !after_risk_acceptable {
+        return Ok(SensingDecision::ProceedWithoutSensing {
+            reason: ProceedReason::OptionalObservationViolatesRiskGate,
+            estimated_net_benefit: Some(net_benefit),
+        });
+    }
+    if !sensing_required && !after_confidence_acceptable {
+        return Ok(SensingDecision::ProceedWithoutSensing {
+            reason: ProceedReason::OptionalObservationViolatesConfidenceGate,
+            estimated_net_benefit: Some(net_benefit),
+        });
+    }
+
     if !within_budget {
-        if must_sense_for_risk || must_improve_confidence {
+        if sensing_required {
             return Ok(SensingDecision::StopAndEscalate {
                 reason: SensingStopReason::RequiredSensorOverBudget,
                 estimated_net_benefit: Some(net_benefit),
@@ -252,38 +276,15 @@ pub fn choose_active_sensing(
         });
     }
 
-    if must_sense_for_risk {
+    if sensing_required {
+        // A hard continuation gate is not an optional ROI calculation. Once the
+        // proposed observation is within both gates and within budget, acquire it
+        // even when the optional net-benefit threshold is not met.
         return Ok(SensingDecision::AcquireObservation {
             sensor_id: option.sensor_id.clone(),
             estimated_net_benefit: net_benefit,
-            required_for_risk_gate: true,
-        });
-    }
-
-    if must_improve_confidence {
-        if net_benefit >= policy.minimum_net_benefit
-            && after_unsafe <= policy.maximum_unsafe_event_probability
-        {
-            return Ok(SensingDecision::AcquireObservation {
-                sensor_id: option.sensor_id.clone(),
-                estimated_net_benefit: net_benefit,
-                required_for_risk_gate: false,
-            });
-        }
-        return Ok(SensingDecision::StopAndEscalate {
-            reason: if after_unsafe > policy.maximum_unsafe_event_probability {
-                SensingStopReason::RiskRemainsAboveLimit
-            } else {
-                SensingStopReason::NetBenefitBelowThreshold
-            },
-            estimated_net_benefit: Some(net_benefit),
-        });
-    }
-
-    if after_unsafe > policy.maximum_unsafe_event_probability {
-        return Ok(SensingDecision::StopAndEscalate {
-            reason: SensingStopReason::RiskRemainsAboveLimit,
-            estimated_net_benefit: Some(net_benefit),
+            required_for_risk_gate: must_sense_for_risk,
+            required_for_confidence_gate: must_improve_confidence,
         });
     }
 
@@ -292,6 +293,7 @@ pub fn choose_active_sensing(
             sensor_id: option.sensor_id.clone(),
             estimated_net_benefit: net_benefit,
             required_for_risk_gate: false,
+            required_for_confidence_gate: false,
         })
     } else {
         Ok(SensingDecision::ProceedWithoutSensing {
@@ -487,6 +489,96 @@ mod tests {
             choose_active_sensing(state(), &candidate, policy()),
             Err(SensingError::InvalidCost)
         );
+    }
+
+    #[test]
+    fn optional_observation_that_worsens_risk_is_declined_not_escalated() {
+        let mut current = state();
+        current.predicted_success_without_sensing = 0.9;
+        current.unsafe_event_probability_without_sensing = 0.02;
+        let mut candidate = option();
+        candidate.predicted_success_after_sensing = Some(0.92);
+        candidate.unsafe_event_probability_after_sensing = Some(0.2);
+
+        assert!(matches!(
+            choose_active_sensing(current, &candidate, policy()).unwrap(),
+            SensingDecision::ProceedWithoutSensing {
+                reason: ProceedReason::OptionalObservationViolatesRiskGate,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn optional_observation_that_drops_confidence_is_declined_not_escalated() {
+        let mut current = state();
+        current.predicted_success_without_sensing = 0.9;
+        let mut candidate = option();
+        candidate.predicted_success_after_sensing = Some(0.7);
+
+        assert!(matches!(
+            choose_active_sensing(current, &candidate, policy()).unwrap(),
+            SensingDecision::ProceedWithoutSensing {
+                reason: ProceedReason::OptionalObservationViolatesConfidenceGate,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn confidence_required_observation_is_not_blocked_by_optional_roi_threshold() {
+        let mut current = state();
+        current.predicted_success_without_sensing = 0.3;
+        let mut candidate = option();
+        candidate.predicted_success_after_sensing = Some(0.85);
+        candidate.energy_cost_j = 900.0;
+        let mut current_policy = policy();
+        current_policy.minimum_net_benefit = 1_000.0;
+
+        assert!(matches!(
+            choose_active_sensing(current, &candidate, current_policy).unwrap(),
+            SensingDecision::AcquireObservation {
+                required_for_risk_gate: false,
+                required_for_confidence_gate: true,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn risk_required_observation_must_also_preserve_confidence_gate() {
+        let mut current = state();
+        current.predicted_success_without_sensing = 0.9;
+        current.unsafe_event_probability_without_sensing = 0.2;
+        let mut candidate = option();
+        candidate.predicted_success_after_sensing = Some(0.4);
+        candidate.unsafe_event_probability_after_sensing = Some(0.01);
+
+        assert!(matches!(
+            choose_active_sensing(current, &candidate, policy()).unwrap(),
+            SensingDecision::StopAndEscalate {
+                reason: SensingStopReason::ConfidenceRemainsBelowThreshold,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn confidence_required_observation_must_also_restore_risk_gate() {
+        let mut current = state();
+        current.predicted_success_without_sensing = 0.3;
+        current.unsafe_event_probability_without_sensing = 0.02;
+        let mut candidate = option();
+        candidate.predicted_success_after_sensing = Some(0.9);
+        candidate.unsafe_event_probability_after_sensing = Some(0.2);
+
+        assert!(matches!(
+            choose_active_sensing(current, &candidate, policy()).unwrap(),
+            SensingDecision::StopAndEscalate {
+                reason: SensingStopReason::RiskRemainsAboveLimit,
+                ..
+            }
+        ));
     }
 
     #[test]
