@@ -97,6 +97,10 @@ pub struct MidiPerformanceManifestV1 {
     pub capability_sha256: String,
     pub midi_sha256: String,
     pub ticks_per_quarter: u16,
+    /// MIDI tempo resolution is integer microseconds per quarter note.
+    pub tempo_microseconds_per_quarter: u32,
+    pub meter_numerator: u8,
+    pub meter_denominator: u8,
     pub tracks: Vec<MidiPerformanceTrackReceiptV1>,
     pub notes: Vec<MidiPerformanceNoteReceiptV1>,
 }
@@ -714,6 +718,9 @@ pub fn export_score_midi_performance_v1(
         capability_sha256,
         midi_sha256,
         ticks_per_quarter: MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1,
+        tempo_microseconds_per_quarter: tempo_micros,
+        meter_numerator: score.meter,
+        meter_denominator: 4,
         tracks: track_receipts,
         notes: note_receipts,
     };
@@ -869,6 +876,9 @@ mod tests {
         assert_eq!(&artifact.midi_bytes[8..10], &1u16.to_be_bytes());
         assert_eq!(artifact.manifest.tracks.len(), 2);
         assert_eq!(artifact.manifest.notes.len(), 2);
+        assert_eq!(artifact.manifest.tempo_microseconds_per_quarter, 500_000);
+        assert_eq!(artifact.manifest.meter_numerator, 4);
+        assert_eq!(artifact.manifest.meter_denominator, 4);
         assert_eq!(artifact.manifest.notes[0].source_note_ordinal, 0);
         assert_eq!(artifact.manifest.notes[0].part_id, 10);
         assert_eq!(artifact.manifest.notes[1].part_id, 20);
