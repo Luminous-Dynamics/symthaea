@@ -30,3 +30,23 @@ This file is a research crosswalk, not an evidence receipt, theorem prover, or s
 See `FAMILY_079_RIEMANNIAN_GEODESIC_NIKODYM_APPENDIX_V0_1.json` for a second pinned source crosswalk covering the Euclidean Nikodym definitions and the local Riemannian geodesic-tube formalization.
 
 Important boundary: the formalization uses smooth **Riemannian** manifolds, local Beltrami charts and (for its literal chart/tube existence theorem) a constant-sectional-curvature hypothesis. It is not a Lorentzian Kerr theorem and says nothing directly about null geodesic Jacobi maps or black-hole caustics. The new Symtropy #4519 work is a numerical/geometric experiment, not a theorem transfer.
+
+## Declaration-level inventory update — 2026-11-10
+
+The preliminary static audit now records exact-commit Lean source identities and top-level proof wiring for ten claim families:
+
+- main logarithmic refinement and logarithmic Sobolev;
+- Bochner–Riesz;
+- Stein square function and its full-Lp extension;
+- spherical restriction and truncated-cone extension;
+- Kakeya maximal, Hausdorff-dimension and Minkowski-dimension consequences;
+- Nikodym maximal and dimension consequences;
+- the logarithmic Kakeya tube-union volume theorem;
+- wave-data, constant-elliptic, massive and quadratic-curve further results.
+
+The source-level inventory also pins the paper's `cor:parabolic` statement for compact-paraboloid extension and free Schrödinger local smoothing, including its mixed-norm and exact Besov/Sobolev formulations. A dedicated Lean declaration or exact derivation has not yet been located for that corollary. This is an unresolved crosswalk item, **not** evidence that the result is unformalized.
+
+The three-dimensional tube-volume declaration inspected in the pinned tree states a lower bound proportional to `(1 + log(1/delta))^-66` for a `delta`-separated family of unit tubes when `m * delta^2 >= 1`, with arbitrary centers. This is recorded as a repository formal result; correspondence to a specific manuscript claim has not been asserted.
+
+**Validation ceiling remains unchanged:** source files were inspected at the pinned commit and the JSON parsed. No clean Lean rebuild, full dependency-closure axiom report, paper-PDF audit, proof-correctness assessment or independent specialist review is claimed.
+
