@@ -10,5 +10,5 @@ description = "Evidence-bound visual and proprioceptive HDC input for driving ex
 serde = { workspace = true }
 sha2 = { workspace = true }
 symthaea-core = { path = "../../core/symthaea-core" }
-symthaea-vehicle = { path = "../domains/symthaea-vehicle" }
-symthaea-vision-manifold = { path = "../domains/symthaea-vision-manifold" }
+symthaea-vehicle = { path = "../../domains/symthaea-vehicle" }
+symthaea-vision-manifold = { path = "../../domains/symthaea-vision-manifold" }
