@@ -47,11 +47,11 @@
     },
     "fixture_count": {
       "type": "integer",
-      "minimum": 17
+      "minimum": 21
     },
     "fixtures": {
       "type": "array",
-      "minItems": 17,
+      "minItems": 21,
       "uniqueItems": true,
       "items": {
         "type": "object",
