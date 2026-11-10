@@ -1,0 +1,320 @@
+{
+  "schema_version": "ig-delib-control-negative-v0.1",
+  "status": "synthetic_negative_controls_unexecuted",
+  "fixture_count": 24,
+  "fixtures": [
+    {
+      "fixture_id": "NEG-001",
+      "description": "unknown truth profile",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/task_truth_profile",
+        "value": "Unknown"
+      },
+      "expected_violations": [
+        "task_truth_profile_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-002",
+      "description": "negative budget",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/budget_remaining",
+        "value": -1
+      },
+      "expected_violations": [
+        "budget_remaining_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-003",
+      "description": "agreement below zero",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/agent_agreement",
+        "value": -0.1
+      },
+      "expected_violations": [
+        "agent_agreement_out_of_range"
+      ]
+    },
+    {
+      "fixture_id": "NEG-004",
+      "description": "agreement above one",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/agent_agreement",
+        "value": 1.1
+      },
+      "expected_violations": [
+        "agent_agreement_out_of_range"
+      ]
+    },
+    {
+      "fixture_id": "NEG-005",
+      "description": "zero round limit",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/round_limit",
+        "value": 0
+      },
+      "expected_violations": [
+        "round_limit_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-006",
+      "description": "negative rounds used",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/rounds_used",
+        "value": -1
+      },
+      "expected_violations": [
+        "rounds_used_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-007",
+      "description": "non-boolean evidence completeness",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/evidence_complete",
+        "value": "yes"
+      },
+      "expected_violations": [
+        "evidence_complete_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-008",
+      "description": "negative unresolved-claim count",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/high_impact_unresolved_count",
+        "value": -1
+      },
+      "expected_violations": [
+        "unresolved_claim_count_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-009",
+      "description": "negative contradiction count",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/contradictory_source_count",
+        "value": -1
+      },
+      "expected_violations": [
+        "contradiction_count_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-010",
+      "description": "negative hypothesis count",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/hypothesis_diversity_count",
+        "value": -1
+      },
+      "expected_violations": [
+        "hypothesis_diversity_count_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-011",
+      "description": "unknown minority state",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/minority_candidate_state",
+        "value": "Maybe"
+      },
+      "expected_violations": [
+        "minority_state_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-012",
+      "description": "non-boolean minority preservation",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/minority_preserved",
+        "value": "yes"
+      },
+      "expected_violations": [
+        "minority_preserved_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-013",
+      "description": "non-boolean common-mode signal",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/common_mode_signal",
+        "value": "yes"
+      },
+      "expected_violations": [
+        "common_mode_signal_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-014",
+      "description": "missing orchestrator integrity field",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "remove",
+        "path": "/state/orchestrator_compromise",
+        "value": null
+      },
+      "expected_violations": [
+        "orchestrator_compromise_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-015",
+      "description": "missing source lineage field",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "remove",
+        "path": "/state/source_lineage_compromised",
+        "value": null
+      },
+      "expected_violations": [
+        "source_lineage_flag_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-016",
+      "description": "missing input integrity field",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "remove",
+        "path": "/state/input_integrity_valid",
+        "value": null
+      },
+      "expected_violations": [
+        "input_integrity_flag_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-017",
+      "description": "unknown confidence status",
+      "target_fixture_id": "DC-002-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/confidence_signal/status",
+        "value": "Guessing"
+      },
+      "expected_violations": [
+        "confidence_status_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-018",
+      "description": "self-reported probability outside [0,1]",
+      "target_fixture_id": "DC-002-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/confidence_signal/probability_correct",
+        "value": 1.5
+      },
+      "expected_violations": [
+        "confidence_probability_out_of_range"
+      ]
+    },
+    {
+      "fixture_id": "NEG-019",
+      "description": "calibrated confidence without a profile identity",
+      "target_fixture_id": "DC-002-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/confidence_signal/status",
+        "value": "CalibratedInScope"
+      },
+      "expected_violations": [
+        "confidence_profile_missing"
+      ]
+    },
+    {
+      "fixture_id": "NEG-020",
+      "description": "unknown expected action",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/expected_action",
+        "value": "ConsensusWin"
+      },
+      "expected_violations": [
+        "expected_action_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-021",
+      "description": "agreement baseline is not recomputed",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/expected_agreement_baseline_stop",
+        "value": true
+      },
+      "expected_violations": [
+        "agreement_baseline_mismatch"
+      ]
+    },
+    {
+      "fixture_id": "NEG-022",
+      "description": "fixed-round baseline is not recomputed",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/expected_fixed_round_baseline_stop",
+        "value": true
+      },
+      "expected_violations": [
+        "fixed_round_baseline_mismatch"
+      ]
+    },
+    {
+      "fixture_id": "NEG-023",
+      "description": "missing agent agreement",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "remove",
+        "path": "/state/agent_agreement",
+        "value": null
+      },
+      "expected_violations": [
+        "agent_agreement_out_of_range"
+      ]
+    },
+    {
+      "fixture_id": "NEG-024",
+      "description": "missing expected action",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "remove",
+        "path": "/expected_action",
+        "value": null
+      },
+      "expected_violations": [
+        "expected_action_invalid"
+      ]
+    }
+  ],
+  "claim_ceiling": "These controls validate the bounded state schema and deterministic reference policy only. They do not show real debate behaviour or moderator efficacy."
+}
