@@ -37,7 +37,7 @@ The estimated resource cost is reserved once at authorization. The same state is
 - Grant IDs are unique in the retained attempt ledger.
 - Only AUTHORIZED can dispatch.
 - Only DISPATCHED can commit, prove a definite no-mutation failure or become OUTCOME_UNKNOWN.
-- An undispatched authorization may be cancelled with a durable cancellation receipt.
+- An undispatched authorization may be cancelled with a durable cancellation receipt; it is retained as FAILED_NO_MUTATION and its reserved budget is not refunded in v1.
 - A failure is retry-safe only when an external receipt proves no mutation occurred.
 - Any ambiguous dispatch becomes OUTCOME_UNKNOWN.
 - OUTCOME_UNKNOWN blocks new mutation grants.
