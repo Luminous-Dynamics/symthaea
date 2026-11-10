@@ -4139,7 +4139,7 @@ pub(crate) fn realize_melody_for_part(
                     *dur
                 };
                 score.push(ScoreNote {
-                    part,
+                    part: part_id,
                     pitch: *p,
                     onset,
                     duration: sounded,
@@ -4202,7 +4202,7 @@ pub(crate) fn realize_melody_for_part(
                 score.notes.insert(
                     ci,
                     ScoreNote {
-                        part,
+                        part: part_id,
                         pitch: below,
                         onset: climax_onset.saturating_sub(grace),
                         duration: grace,
