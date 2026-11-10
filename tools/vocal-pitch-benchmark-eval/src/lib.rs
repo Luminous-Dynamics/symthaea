@@ -52,7 +52,13 @@ pub struct PitchBenchmarkSpecV1 {
     pub reference_suite_id: String,
     pub reference_suite_version: String,
     pub reference_manifest_sha256: String,
+    pub calibration_split_id: String,
     pub evaluation_split_id: String,
+    pub voicing_calibration_receipt_sha256: String,
+    /// Some trackers expose a confidence value with a frozen numeric cutoff;
+    /// trackers with an intrinsic voiced/unvoiced decision use None and must
+    /// identify that policy in voicing_policy_id.
+    pub voicing_confidence_threshold: Option<f64>,
     pub preprocessing_manifest_sha256: String,
     pub frame_alignment_policy_id: String,
     pub voicing_policy_id: String,
@@ -320,7 +326,24 @@ fn validate_spec(spec: &PitchBenchmarkSpecV1) -> Result<(), PitchBenchmarkError>
     require_non_empty(&spec.reference_suite_id, "reference_suite_id")?;
     require_non_empty(&spec.reference_suite_version, "reference_suite_version")?;
     require_digest(&spec.reference_manifest_sha256, "reference_manifest_sha256")?;
+    require_non_empty(&spec.calibration_split_id, "calibration_split_id")?;
     require_non_empty(&spec.evaluation_split_id, "evaluation_split_id")?;
+    if spec.calibration_split_id == spec.evaluation_split_id {
+        return Err(PitchBenchmarkError::new(
+            "voicing calibration split must be disjoint from the evaluation split",
+        ));
+    }
+    require_digest(
+        &spec.voicing_calibration_receipt_sha256,
+        "voicing_calibration_receipt_sha256",
+    )?;
+    if let Some(threshold) = spec.voicing_confidence_threshold
+        && (!threshold.is_finite() || !(0.0..=1.0).contains(&threshold))
+    {
+        return Err(PitchBenchmarkError::new(
+            "voicing_confidence_threshold must be finite and in [0, 1]",
+        ));
+    }
     require_digest(
         &spec.preprocessing_manifest_sha256,
         "preprocessing_manifest_sha256",
@@ -607,7 +630,10 @@ mod tests {
             reference_suite_id: "licensed-vocal-pilot".to_owned(),
             reference_suite_version: "v1".to_owned(),
             reference_manifest_sha256: digest('b'),
+            calibration_split_id: "singer-song-session-calibration".to_owned(),
             evaluation_split_id: "singer-song-session-heldout".to_owned(),
+            voicing_calibration_receipt_sha256: digest('7'),
+            voicing_confidence_threshold: Some(0.5),
             preprocessing_manifest_sha256: digest('c'),
             frame_alignment_policy_id: "16ms-center-aligned-v1".to_owned(),
             voicing_policy_id: "confidence>=0.5-calibrated-v1".to_owned(),
@@ -784,6 +810,40 @@ mod tests {
             }]
         )
         .is_err());
+    }
+
+    #[test]
+    fn voicing_calibration_and_evaluation_splits_must_be_disjoint() {
+        let mut spec = spec();
+        spec.calibration_split_id = spec.evaluation_split_id.clone();
+        let segment = PitchSegmentInputV1 {
+            metadata: metadata("clip-01", "corpus-a", "clean"),
+            frames: vec![frame(0, Some(220.0), Some(220.0))],
+        };
+        assert!(evaluate_pitch_benchmark(&spec, &[segment]).is_err());
+    }
+
+    #[test]
+    fn numeric_voicing_threshold_must_be_finite_and_in_unit_interval() {
+        let mut spec = spec();
+        spec.voicing_confidence_threshold = Some(1.1);
+        let segment = PitchSegmentInputV1 {
+            metadata: metadata("clip-01", "corpus-a", "clean"),
+            frames: vec![frame(0, Some(220.0), Some(220.0))],
+        };
+        assert!(evaluate_pitch_benchmark(&spec, &[segment]).is_err());
+    }
+
+    #[test]
+    fn intrinsic_voicing_policy_can_use_no_numeric_threshold() {
+        let mut spec = spec();
+        spec.voicing_policy_id = "tracker-intrinsic-voicing-v1".to_owned();
+        spec.voicing_confidence_threshold = None;
+        let segment = PitchSegmentInputV1 {
+            metadata: metadata("clip-01", "corpus-a", "clean"),
+            frames: vec![frame(0, Some(220.0), Some(220.0))],
+        };
+        assert!(evaluate_pitch_benchmark(&spec, &[segment]).is_ok());
     }
 
     #[test]
