@@ -640,8 +640,11 @@ struct Timeline {
 }
 
 impl Timeline {
-    fn seconds(&self, beat: f64) -> f32 {
-        self.rubato.seconds(swing_beat(beat, self.swing))
+    /// Convert a score-beat position through the shared clock: first swing
+    /// into warped-beat coordinates, then structural Rubato into seconds.
+    /// Every pitched voice and percussion event uses this same map.
+    fn seconds(&self, score_beat: f64) -> f32 {
+        self.rubato.seconds(swing_beat(score_beat, self.swing))
     }
 }
 
