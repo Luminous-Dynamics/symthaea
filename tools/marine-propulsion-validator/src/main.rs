@@ -1186,7 +1186,8 @@ fn check_trial(case: &Value, f: &mut Findings) {
                                 "INVALID",
                                 "channel alignment uncertainty understates the timebase reference uncertainty plus accumulated residual drift bound",
                             ),
-                            _ => f.push(
+                            (Some(_), None) => {} // An earlier diagnostic already marked unknown timing inputs INCOMPLETE.
+                            (None, _) => f.push(
                                 pointer_child(path.clone(), "time_alignment_uncertainty"),
                                 "INVALID",
                                 "time alignment uncertainty units must be convertible using the reviewed time vocabulary",
