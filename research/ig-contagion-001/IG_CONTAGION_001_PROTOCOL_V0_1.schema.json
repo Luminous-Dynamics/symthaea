@@ -72,7 +72,10 @@
         "adversarial_execution",
         "evaluator_error_correlation",
         "human_group_deliberation",
-        "participant_conditioned_summary"
+        "participant_conditioned_summary",
+        "revision_ledger",
+        "confidence_calibration",
+        "debate_security"
       ],
       "properties": {
         "topology_generator": {
@@ -104,6 +107,18 @@
           "format": "uri"
         },
         "delegation_topology_taxonomy": {
+          "type": "string",
+          "format": "uri"
+        },
+        "revision_ledger": {
+          "type": "string",
+          "format": "uri"
+        },
+        "confidence_calibration": {
+          "type": "string",
+          "format": "uri"
+        },
+        "debate_security": {
           "type": "string",
           "format": "uri"
         }
