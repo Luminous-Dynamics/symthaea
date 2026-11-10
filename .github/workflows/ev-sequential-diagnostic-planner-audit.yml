@@ -34,8 +34,8 @@ jobs:
         run: |
           cargo run --manifest-path tools/ev-sequential-diagnostic-planner/Cargo.toml -- --schema schemas/transport/ev_sequential_diagnostic_scenario_v0_1.schema.json --corpus fixtures/ev_battery/sequential_diagnostic_scenarios_v0_1.json > "$RUNNER_TEMP/ev-sequential-diagnostic-report.json"
           jq -e '
-            .case_count == 7 and
-            .planned_count == 6 and
-            .rejected_count == 1 and
+            .case_count == 11 and
+            .planned_count == 9 and
+            .rejected_count == 2 and
             (.report_sha256 | test("^[a-f0-9]{64}$"))
           ' "$RUNNER_TEMP/ev-sequential-diagnostic-report.json"
