@@ -31,6 +31,7 @@ pub const PERFORMANCE_ALLOCATION_SCHEMA_V2: &str = "performance-allocation-v2";
 pub const MAX_PERFORMANCE_UNITS_V2: usize = 4_096;
 pub const MAX_PERFORMER_PROFILES_V2: usize = 1_024;
 pub const MAX_PERFORMERS_PER_UNIT_V2: usize = 64;
+pub const MAX_USED_PERFORMERS_V2: usize = 1_024;
 const MAX_BEAT_NUMERATOR: i128 = 1_000_000_000;
 const MAX_BEAT_DENOMINATOR: i128 = 1_000_000;
 
@@ -117,6 +118,7 @@ pub enum PerformanceAllocationIssueCodeV2 {
     InvalidPerformerId,
     DuplicatePerformerInUnit,
     InvalidPerformerRoster,
+    PerformerResourceLimitExceeded,
     InvalidSetupId,
     InvalidAllocationGroupId,
     InvalidModeShape,
@@ -500,6 +502,16 @@ pub fn validate_performance_allocation_v2(
             _ => {}
         }
     }
+    if used_performers.len() > MAX_USED_PERFORMERS_V2 {
+        report.push(
+            PerformanceAllocationIssueCodeV2::PerformerResourceLimitExceeded,
+            None,
+            None,
+            None,
+            None,
+            "distinct performer count exceeds the v2 resource limit",
+        );
+    }
     report.performer_count = used_performers.len();
 
     for segment in &timeline.segments {
@@ -619,14 +631,21 @@ pub fn validate_performance_allocation_v2(
                 }
                 let performers_are_distinct = left.performer_ids.first()
                     != right.performer_ids.first();
-                let explicitly_shared =
-                    left.mode == PerformanceAllocationModeV2::SharedInstrumentMultiPerformer
-                    && right.mode == PerformanceAllocationModeV2::SharedInstrumentMultiPerformer
-                    && left.allocation_group_id.is_some()
+                let same_group = left.allocation_group_id.is_some()
                     && left.allocation_group_id == right.allocation_group_id
                     && left.setup_id == right.setup_id
-                    && performers_are_distinct
                     && left_segment.part_id != right_segment.part_id;
+                let shared_performer =
+                    left.mode == PerformanceAllocationModeV2::SharedPerformerMultiPart
+                    && right.mode == PerformanceAllocationModeV2::SharedPerformerMultiPart
+                    && !performers_are_distinct
+                    && same_group;
+                let shared_instrument =
+                    left.mode == PerformanceAllocationModeV2::SharedInstrumentMultiPerformer
+                    && right.mode == PerformanceAllocationModeV2::SharedInstrumentMultiPerformer
+                    && performers_are_distinct
+                    && same_group;
+                let explicitly_shared = shared_performer || shared_instrument;
                 if !explicitly_shared {
                     report.push(
                         PerformanceAllocationIssueCodeV2::SharedInstrumentWithoutDeclaredGroup,
@@ -667,7 +686,7 @@ pub fn validate_performance_allocation_v2(
                     && left.setup_id == right.setup_id;
                 if !explicitly_shared {
                     report.push(PerformanceAllocationIssueCodeV2::PerformerDoubleBooked,
-                        Some(&right.id), Some(performer), Some(right_segment.part_id), None,
+                        Some(&right.id), Some(*performer), Some(right_segment.part_id), None,
                         "overlapping performer assignments require one explicit shared-performer group on the same instrument/setup");
                 }
             }
