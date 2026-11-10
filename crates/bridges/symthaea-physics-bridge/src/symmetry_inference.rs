@@ -1186,9 +1186,7 @@ fn exact_polynomial_vector_field_generator_residual(
 ) -> Result<Vec<ExactPolynomial>, ExactPolynomialError> {
     let mut component_residuals = Vec::with_capacity(coordinate_names.len());
 
-    for ((output_index, output_component), generator_row) in
-        components.iter().enumerate().zip(generator.matrix.iter())
-    {
+    for (output_component, generator_row) in components.iter().zip(generator.matrix.iter()) {
         let mut residual = ExactPolynomial::new();
 
         // First term: D F(x) * (A x).
