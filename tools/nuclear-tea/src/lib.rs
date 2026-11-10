@@ -654,6 +654,13 @@ mod tests {
     }
 
     #[test]
+    fn missing_scenario_provenance_is_rejected() {
+        let mut series = exact_series("missing_provenance");
+        series.input_evidence_refs.clear();
+        assert!(series.validate().is_err());
+    }
+
+    #[test]
     fn nominal_and_real_basis_mismatch_is_rejected() {
         let mut series = exact_series("basis_mismatch");
         series.discount_basis = PriceBasis::Nominal {
