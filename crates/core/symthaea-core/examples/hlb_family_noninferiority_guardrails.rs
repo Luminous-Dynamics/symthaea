@@ -46,7 +46,7 @@ fn run_case(
     for (family_index, family_id) in family_ids.iter().enumerate() {
         for episode_index in 0..200 {
             let improvement = improvements[family_index];
-            let baseline_loss = 0.5;
+            let baseline_loss = if improvement < 0.0 { 0.1 } else { 0.9 };
             let candidate_loss = baseline_loss - improvement;
             if !(0.0..=1.0).contains(&candidate_loss) {
                 return Err(format!("invalid fixture candidate loss {candidate_loss}").into());
