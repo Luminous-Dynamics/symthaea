@@ -124,7 +124,9 @@
             "precision_same_across_actions",
             "mode_probabilities_same_across_actions",
             "entropy_based_epistemic_term_action_invariant",
-            "expected_information_gain_status"
+            "expected_information_gain_status",
+            "entropy_uses_precision_and_dimension_only",
+            "mode_entropy_is_separate_and_not_used_by_efe_epistemic_term"
           ],
           "properties": {
             "next_precision": {
@@ -148,6 +150,12 @@
             },
             "expected_information_gain_status": {
               "const": "not_established_by_this_entropy_delta"
+            },
+            "entropy_uses_precision_and_dimension_only": {
+              "type": "boolean"
+            },
+            "mode_entropy_is_separate_and_not_used_by_efe_epistemic_term": {
+              "type": "boolean"
             }
           }
         }
