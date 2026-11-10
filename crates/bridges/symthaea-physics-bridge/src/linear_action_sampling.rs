@@ -701,8 +701,31 @@ fn metric_squared_cosine(
     tangent: &[f64],
     lower: &[Vec<f64>],
 ) -> Option<f64> {
-    let whitened_gradient = solve_lower_triangular(lower, gradient)?;
-    let whitened_tangent = multiply_lower_transpose(lower, tangent);
+    // Both vector magnitudes cancel from the cosine. Normalize before
+    // whitening to avoid overflowing products for large finite gradients or
+    // orbit tangents while preserving their direction.
+    let gradient_scale = gradient
+        .iter()
+        .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+    let tangent_scale = tangent
+        .iter()
+        .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+    if !gradient_scale.is_finite() || !tangent_scale.is_finite() {
+        return None;
+    }
+    if gradient_scale == 0.0 || tangent_scale == 0.0 {
+        return Some(f64::NAN);
+    }
+    let normalized_gradient: Vec<f64> = gradient
+        .iter()
+        .map(|value| *value / gradient_scale)
+        .collect();
+    let normalized_tangent: Vec<f64> = tangent
+        .iter()
+        .map(|value| *value / tangent_scale)
+        .collect();
+    let whitened_gradient = solve_lower_triangular(lower, &normalized_gradient)?;
+    let whitened_tangent = multiply_lower_transpose(lower, &normalized_tangent);
     if whitened_tangent.iter().any(|value| !value.is_finite()) {
         return None;
     }
