@@ -280,6 +280,13 @@ fn walk_semantics(value: &Value, path: &str, f: &mut Findings) {
                             "sample rate must be strictly positive",
                         );
                     }
+                    if map.get("not_applicable_reason").is_some() {
+                        f.push(
+                            pointer_child(path, "not_applicable_reason"),
+                            "INVALID",
+                            "a required measurement channel sample rate cannot be not applicable",
+                        );
+                    }
                 }
                 if path.ends_with("/time_alignment_uncertainty")
                     && map
@@ -1513,6 +1520,27 @@ mod tests {
         check_unique_scopes(&fixture, &mut findings);
         check_trial(&fixture, &mut findings);
         assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn required_channel_sample_rate_cannot_be_not_applicable() {
+        let mut findings = Findings::default();
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        fixture["trial_evidence"]["channels"][0]["sample_rate_hz"] = serde_json::json!({
+            "value":null,
+            "unit":"Hz",
+            "not_applicable_reason":"not supplied",
+            "provenance":{
+                "class":"synthetic",
+                "source_id":"SYNTHETIC-WAPS-FIXTURE-ONLY",
+                "method":"test",
+                "limitations":["test-only"],
+                "rights_status":"not_applicable"
+            }
+        });
+        walk_semantics(&fixture, "", &mut findings);
+        assert!(findings.invalid);
     }
 
     #[test]
