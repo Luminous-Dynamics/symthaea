@@ -50,3 +50,10 @@ The three-dimensional tube-volume declaration inspected in the pinned tree state
 
 **Validation ceiling remains unchanged:** source files were inspected at the pinned commit and the JSON parsed. No clean Lean rebuild, full dependency-closure axiom report, paper-PDF audit, proof-correctness assessment or independent specialist review is claimed.
 
+### Additional distinction: constant-elliptic half-wave is not Schrödinger
+
+A deeper source search located the formal `ConstantEllipticLocalSmoothing` and `ConstantEllipticLogarithmicSobolev` propositions and their derivation from `logarithmic_refinement`. Their propagator is `quadraticHalfWave`, with phase
+`exp(-i t sqrt(m^2 + xi^T Q xi))` for positive-definite (Q) and (m\ge0). This is a positive quadratic Klein–Gordon / wave half-wave dispersion. It is **not** the free Schrödinger phase `exp(-i t |xi|^2)`, so it must not be used as a correspondence for the compact-paraboloid / Schrödinger `cor:parabolic` estimate.
+
+The source files are pinned in the JSON inventory (`Statements.lean`, `Quadratic.lean`, `Propagator.lean`, and `FurtherResults.lean`). The Lean comments refer to source label `cor:constant-dispersion`, but the corresponding TeX statement was not located in the inspected pinned manuscript tree. Its exact paper correspondence therefore remains unresolved.
+
