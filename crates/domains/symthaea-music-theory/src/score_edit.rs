@@ -71,6 +71,7 @@ pub enum ScoreEditIssueCodeV1 {
     InputDigestMismatch,
     EmptyScore,
     MissingPartIdentity,
+    EmptyOperations,
     ResourceLimitExceeded,
     InvalidOperationId,
     DuplicateOperationId,
@@ -279,6 +280,16 @@ pub fn apply_score_edit_plan(
             None,
             None,
             "edit plan is bound to a different source Score",
+        );
+    }
+    if plan.operations.is_empty() {
+        push_issue(
+            &mut issues,
+            ScoreEditIssueCodeV1::EmptyOperations,
+            None,
+            None,
+            None,
+            "an edit plan must contain at least one explicit operation",
         );
     }
     if source.notes.is_empty() {
@@ -704,6 +715,14 @@ mod tests {
         let result = apply_score_edit_plan(&source, &plan(vec![op]), &digest());
         assert!(result.unwrap_err().iter().any(|issue| {
             issue.code == ScoreEditIssueCodeV1::EmptyTargetSelection
+        }));
+    }
+
+    #[test]
+    fn rejects_an_empty_edit_plan() {
+        let result = apply_score_edit_plan(&source_score(), &plan(Vec::new()), &digest());
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEditIssueCodeV1::EmptyOperations
         }));
     }
 
