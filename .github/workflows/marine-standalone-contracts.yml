@@ -1,0 +1,102 @@
+name: Marine Standalone Contracts
+
+on:
+  pull_request:
+    paths:
+      - "tools/marine-propulsion-validator/**"
+      - "docs/research/marine/**"
+      - ".github/workflows/marine-standalone-contracts.yml"
+  push:
+    branches:
+      - research/marine-waps-co-design-20261110
+    paths:
+      - "tools/marine-propulsion-validator/**"
+      - "docs/research/marine/**"
+      - ".github/workflows/marine-standalone-contracts.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marine-standalone-contracts-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Pinned Rust build, tests and contract smoke checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Generate standalone lockfile
+        run: cargo generate-lockfile --manifest-path tools/marine-propulsion-validator/Cargo.toml
+
+      - name: Format check
+        run: cargo fmt --manifest-path tools/marine-propulsion-validator/Cargo.toml -- --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/marine-propulsion-validator/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Unit and schema integration tests
+        run: cargo test --manifest-path tools/marine-propulsion-validator/Cargo.toml --locked --all-targets
+
+      - name: Marine case validator synthetic fixture returns explicit INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-propulsion-validator -- \
+            docs/research/marine/marine-propulsion-case-v0.3.0.schema.json \
+            docs/research/marine/fixtures/synthetic-waps-case-v0.3.0.json \
+            > "$RUNNER_TEMP/marine-case-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-case-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE"' "$RUNNER_TEMP/marine-case-report.json"
+
+      - name: Regulatory rule register returns REGISTER_CONTRACT_VALID
+        run: |
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-regulatory-rule-audit -- \
+            docs/research/marine/marine-regulatory-rule-register-v0.2.0.schema.json \
+            docs/research/marine/marine-regulatory-rule-register-2026-11-10-v0.2.0.json \
+            > "$RUNNER_TEMP/marine-regulatory-report.json"
+          cat "$RUNNER_TEMP/marine-regulatory-report.json"
+          jq -e '.disposition == "REGISTER_CONTRACT_VALID"' "$RUNNER_TEMP/marine-regulatory-report.json"
+
+      - name: Synthetic causal protocol remains explicitly NOT_READY
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-causal-protocol-audit -- \
+            docs/research/marine/marine-causal-study-protocol-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-causal-study-protocol-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-causal-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-causal-report.json"
+          test "$status" -eq 2
+          jq -e '.readiness_disposition == "NOT_READY"' "$RUNNER_TEMP/marine-causal-report.json"
+
+      - name: Preserve generated lockfile and audit receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marine-standalone-validation-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            tools/marine-propulsion-validator/Cargo.lock
+            ${{ runner.temp }}/marine-case-report.json
+            ${{ runner.temp }}/marine-regulatory-report.json
+            ${{ runner.temp }}/marine-causal-report.json
