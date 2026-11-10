@@ -14,7 +14,7 @@ use crate::rhythm::Duration;
 use crate::score::{PartId, Score};
 use crate::score_event_remap::{
     ScoreEventDispositionV1, ScoreEventRemapIssueV1, ScoreEventRemapV1,
-    ScoreEventRemapReportV1, validate_score_event_remap,
+    validate_score_event_remap,
 };
 
 pub const MATERIAL_LINEAGE_SCHEMA_V1: &str = "material-lineage-v1";
