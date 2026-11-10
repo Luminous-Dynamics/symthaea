@@ -207,6 +207,7 @@ pub enum MissionThermalError {
     DuplicateComponentId(String),
     DuplicatePowerBasis(ComponentPowerBasis),
     UnknownThermalNode(String),
+    MissionInput(crate::ModelError),
     MissionReportShapeMismatch(&'static str),
     MissionReportInputMismatch {
         segment_id: String,
@@ -537,20 +538,38 @@ fn validate_mission_report_pair(
     mission: &MissionInput,
     report: &MissionReport,
 ) -> Result<(), MissionThermalError> {
+    crate::validate_input(mission).map_err(MissionThermalError::MissionInput)?;
     if mission.segments.len() != report.segments.len() {
         return Err(MissionThermalError::MissionReportShapeMismatch(
             "mission and energy report segment counts differ",
         ));
     }
+
+    let battery = &mission.battery;
+    let capacity_wh = battery.nominal_energy_wh * battery.state_of_health;
     let expected_mass = mission.aircraft.empty_mass_kg
         + mission.aircraft.payload_mass_kg
-        + mission.battery.pack_mass_kg;
-    if !close_enough(expected_mass, report.all_up_mass_kg) {
+        + battery.pack_mass_kg;
+    let expected_specific_energy = battery.nominal_energy_wh / battery.pack_mass_kg;
+    let expected_available_energy_wh =
+        (battery.initial_state_of_charge - battery.reserve_state_of_charge) * capacity_wh;
+    if !close_enough(expected_mass, report.all_up_mass_kg)
+        || !close_enough(expected_specific_energy, report.battery_specific_energy_wh_per_kg)
+        || !close_enough(expected_available_energy_wh, report.available_energy_to_reserve_wh)
+    {
         return Err(MissionThermalError::MissionReportInputMismatch {
             segment_id: "<mission>".into(),
-            field: "all-up mass",
+            field: "all-up mass, pack specific energy, or available reserve energy",
         });
     }
+
+    let mut previous_soc = battery.initial_state_of_charge;
+    let mut total_terminal_wh = 0.0;
+    let mut total_chemical_wh = 0.0;
+    let mut peak_power_w: f64 = 0.0;
+    let mut peak_current_a: f64 = 0.0;
+    let mut minimum_voltage_v = f64::INFINITY;
+    let mut maximum_pack_temperature_k = battery.initial_temperature_k;
 
     for (segment, result) in mission.segments.iter().zip(&report.segments) {
         if segment.id != result.id || segment.phase != result.phase {
@@ -559,71 +578,168 @@ fn validate_mission_report_pair(
                 field: "segment ID or flight phase",
             });
         }
-        if !segment.duration_s.is_finite() || segment.duration_s <= 0.0 {
-            return Err(MissionThermalError::InvalidMissionProfile {
-                segment_id: segment.id.clone(),
-                reason: "mission segment duration must be finite and positive",
-            });
-        }
+
+        let dt = segment.duration_s;
         let expected_drag_n = report.all_up_mass_kg * GRAVITY_MPS2
             / segment.lift_to_drag_ratio;
         let climb_power_w = report.all_up_mass_kg
             * GRAVITY_MPS2
             * segment.climb_rate_mps.max(0.0);
         let useful_power_w = expected_drag_n * segment.true_airspeed_mps + climb_power_w;
-        let expected_shaft_w = useful_power_w / result.propeller_efficiency_used;
-        let expected_motor_input_w =
-            expected_shaft_w / result.motor_efficiency_used;
-        let expected_inverter_input_w =
-            expected_motor_input_w / result.inverter_efficiency_used;
-        let expected_battery_power_w = expected_inverter_input_w
-            + segment.auxiliary_power_w;
-        let expected_terminal_wh =
-            expected_battery_power_w * segment.duration_s / SECONDS_PER_HOUR;
-        let expected_resistive_heat_wh = result.battery_current_a.powi(2)
-            * result.battery_internal_resistance_used_ohm
-            * segment.duration_s / SECONDS_PER_HOUR;
 
-        let calculated = [
-            expected_drag_n,
-            expected_shaft_w,
-            expected_motor_input_w,
-            expected_inverter_input_w,
-            expected_battery_power_w,
-            expected_terminal_wh,
-            expected_resistive_heat_wh,
+        let efficiencies = [
+            result.motor_efficiency_used,
+            result.inverter_efficiency_used,
+            result.propeller_efficiency_used,
         ];
-        let reported = [
-            result.aerodynamic_drag_n,
-            result.propulsive_shaft_power_w,
-            result.propulsive_shaft_power_w / result.motor_efficiency_used,
-            result.propulsive_shaft_power_w
-                / (result.motor_efficiency_used * result.inverter_efficiency_used),
-            result.battery_power_w,
-            result.terminal_energy_wh,
-            result.resistive_heat_wh,
-        ];
-        if calculated
-            .iter()
-            .zip(reported)
-            .any(|(expected, actual)| !expected.is_finite() || !close_enough(*expected, actual))
-        {
-            return Err(MissionThermalError::MissionReportInputMismatch {
-                segment_id: segment.id.clone(),
-                field: "recomputed drag, power, terminal energy, or I²R heat",
-            });
-        }
-        if ![result.motor_efficiency_used, result.inverter_efficiency_used,
-            result.propeller_efficiency_used]
-            .iter()
-            .all(|efficiency| efficiency.is_finite() && *efficiency > 0.0 && *efficiency <= 1.0)
-        {
+        if !efficiencies.iter().all(|efficiency| {
+            efficiency.is_finite() && *efficiency > 0.0 && *efficiency <= 1.0
+        }) {
             return Err(MissionThermalError::MissionReportInputMismatch {
                 segment_id: segment.id.clone(),
                 field: "resolved propulsion efficiency",
             });
         }
+
+        let expected_shaft_w = useful_power_w / result.propeller_efficiency_used;
+        let expected_motor_input_w = expected_shaft_w / result.motor_efficiency_used;
+        let expected_inverter_input_w = expected_motor_input_w / result.inverter_efficiency_used;
+        let expected_battery_power_w = expected_inverter_input_w + segment.auxiliary_power_w;
+
+        // Verify the battery equivalent-circuit identity independently of the
+        // mission evaluator: P_terminal = I * (OCV - I*R).
+        let current_a = result.battery_current_a;
+        let ocv_v = result.battery_open_circuit_voltage_used_v;
+        let resistance_ohm = result.battery_internal_resistance_used_ohm;
+        let terminal_voltage_v = ocv_v - current_a * resistance_ohm;
+        let electrical_terminal_power_w = current_a * terminal_voltage_v;
+        let terminal_wh = electrical_terminal_power_w * dt / SECONDS_PER_HOUR;
+        let chemical_wh = current_a * ocv_v * dt / SECONDS_PER_HOUR;
+        let resistive_heat_wh =
+            current_a * current_a * resistance_ohm * dt / SECONDS_PER_HOUR;
+        let expected_soc = previous_soc - chemical_wh / capacity_wh;
+
+        let numeric_values = [
+            expected_drag_n,
+            expected_shaft_w,
+            expected_motor_input_w,
+            expected_inverter_input_w,
+            expected_battery_power_w,
+            current_a,
+            ocv_v,
+            resistance_ohm,
+            terminal_voltage_v,
+            electrical_terminal_power_w,
+            terminal_wh,
+            chemical_wh,
+            resistive_heat_wh,
+            expected_soc,
+            result.aerodynamic_drag_n,
+            result.propulsive_shaft_power_w,
+            result.battery_power_w,
+            result.terminal_voltage_v,
+            result.terminal_energy_wh,
+            result.chemical_energy_wh,
+            result.resistive_heat_wh,
+            result.pack_temperature_end_k,
+            result.state_of_charge_end,
+        ];
+        if numeric_values.iter().any(|value| !value.is_finite())
+            || current_a < 0.0
+            || ocv_v <= 0.0
+            || resistance_ohm < 0.0
+            || terminal_voltage_v <= 0.0
+            || electrical_terminal_power_w < 0.0
+            || result.pack_temperature_end_k <= 0.0
+        {
+            return Err(MissionThermalError::MissionReportInputMismatch {
+                segment_id: segment.id.clone(),
+                field: "non-finite or physically invalid segment electrical / thermal state",
+            });
+        }
+
+        let calculated = [
+            expected_drag_n,
+            expected_shaft_w,
+            expected_battery_power_w,
+            electrical_terminal_power_w,
+            terminal_voltage_v,
+            terminal_wh,
+            chemical_wh,
+            resistive_heat_wh,
+            expected_soc,
+        ];
+        let reported = [
+            result.aerodynamic_drag_n,
+            result.propulsive_shaft_power_w,
+            result.battery_power_w,
+            result.battery_current_a * result.terminal_voltage_v,
+            result.terminal_voltage_v,
+            result.terminal_energy_wh,
+            result.chemical_energy_wh,
+            result.resistive_heat_wh,
+            result.state_of_charge_end,
+        ];
+        if calculated
+            .iter()
+            .zip(reported)
+            .any(|(expected, actual)| !close_enough(*expected, actual))
+        {
+            return Err(MissionThermalError::MissionReportInputMismatch {
+                segment_id: segment.id.clone(),
+                field: "drag, propulsion/battery power, voltage, energy, I²R heat, or SOC transition",
+            });
+        }
+
+        // Also assert the physical identity that chemical draw equals terminal
+        // delivery plus equivalent internal ohmic loss.
+        if !close_enough(chemical_wh, terminal_wh + resistive_heat_wh) {
+            return Err(MissionThermalError::MissionReportInputMismatch {
+                segment_id: segment.id.clone(),
+                field: "battery chemical / terminal / resistive energy balance",
+            });
+        }
+
+        previous_soc = result.state_of_charge_end;
+        total_terminal_wh += terminal_wh;
+        total_chemical_wh += chemical_wh;
+        peak_power_w = peak_power_w.max(electrical_terminal_power_w);
+        peak_current_a = peak_current_a.max(current_a);
+        minimum_voltage_v = minimum_voltage_v.min(terminal_voltage_v);
+        maximum_pack_temperature_k =
+            maximum_pack_temperature_k.max(result.pack_temperature_end_k);
     }
+
+    let expected_energy_with_uncertainty =
+        total_chemical_wh * (1.0 + mission.mission_uncertainty_fraction);
+    let expected_energy_margin_wh =
+        expected_available_energy_wh - expected_energy_with_uncertainty;
+    let expected_final_soc = report
+        .segments
+        .last()
+        .map_or(battery.initial_state_of_charge, |segment| segment.state_of_charge_end);
+
+    let aggregate_pairs = [
+        (total_terminal_wh, report.mission_terminal_energy_wh),
+        (total_chemical_wh, report.mission_chemical_energy_wh),
+        (expected_energy_with_uncertainty, report.energy_required_with_uncertainty_wh),
+        (expected_energy_margin_wh, report.energy_margin_wh),
+        (peak_power_w, report.peak_battery_power_w),
+        (peak_current_a, report.peak_battery_current_a),
+        (minimum_voltage_v, report.minimum_terminal_voltage_v),
+        (maximum_pack_temperature_k, report.maximum_pack_temperature_k),
+        (expected_final_soc, report.final_state_of_charge),
+    ];
+    if aggregate_pairs
+        .iter()
+        .any(|(expected, actual)| !close_enough(*expected, *actual))
+    {
+        return Err(MissionThermalError::MissionReportInputMismatch {
+            segment_id: "<mission>".into(),
+            field: "aggregate energy, SOC, peak power/current, minimum voltage, or maximum pack temperature",
+        });
+    }
+
     Ok(())
 }
 
