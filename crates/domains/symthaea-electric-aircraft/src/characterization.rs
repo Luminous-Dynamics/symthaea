@@ -301,7 +301,7 @@ mod tests {
             id: id.into(),
             uri: format!("artifact://characterization/{id}"),
             sha256: "a".repeat(64),
-            class: EvidenceClass::PhysicalMeasurement,
+            class: EvidenceClass::Simulation,
             description: "Synthetic fixture for unit tests; not physical test evidence".into(),
         }
     }
