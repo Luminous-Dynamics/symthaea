@@ -615,7 +615,7 @@ mod tests {
         EfficiencyCurve {
             id: id.into(),
             x_axis: axis.into(),
-            x_unit: "dimensionless".into(),
+            x_unit: "1".into(),
             evidence: evidence(&format!("{id}-dataset")),
             points,
         }
