@@ -24,13 +24,21 @@ pub enum ScoreEventDispositionV1 {
     Modified {
         candidate_index: usize,
         changed_fields: Vec<ScoreEventFieldV1>,
+        operation_id: String,
     },
-    Split { candidate_indices: Vec<usize> },
+    Split {
+        candidate_indices: Vec<usize>,
+        operation_id: String,
+    },
     Merged {
         candidate_index: usize,
         merge_group_id: String,
+        operation_id: String,
     },
-    Deleted { reason: String },
+    Deleted {
+        reason: String,
+        operation_id: String,
+    },
 }
 
 /// Fields that can change while the persistent PartId remains unchanged.
@@ -104,6 +112,7 @@ pub enum ScoreEventRemapIssueCodeV1 {
     MissingCandidateDisposition,
     DuplicateInsertion,
     InvalidInsertionOperationId,
+    InvalidDispositionOperationId,
     InvalidInsertionPartId,
     InsertionPartMismatch,
     InvalidDeletionReason,
@@ -368,8 +377,15 @@ pub fn validate_score_event_remap(
                     );
                 }
             }
-            ScoreEventDispositionV1::Modified { candidate_index, changed_fields } => {
+            ScoreEventDispositionV1::Modified { candidate_index, changed_fields, operation_id } => {
                 report.modified_count += 1;
+                if operation_id.trim().is_empty() {
+                    report.push(
+                        ScoreEventRemapIssueCodeV1::InvalidDispositionOperationId,
+                        Some(entry.source_index), Some(*candidate_index), None,
+                        "modified event requires a non-empty operation ID",
+                    );
+                }
                 if changed_fields.is_empty() {
                     report.push(
                         ScoreEventRemapIssueCodeV1::ModifiedEventHasNoChanges,
@@ -409,8 +425,15 @@ pub fn validate_score_event_remap(
                     );
                 }
             }
-            ScoreEventDispositionV1::Split { candidate_indices } => {
+            ScoreEventDispositionV1::Split { candidate_indices, operation_id } => {
                 report.split_source_count += 1;
+                if operation_id.trim().is_empty() {
+                    report.push(
+                        ScoreEventRemapIssueCodeV1::InvalidDispositionOperationId,
+                        Some(entry.source_index), None, None,
+                        "split event requires a non-empty operation ID",
+                    );
+                }
                 if candidate_indices.len() < 2 {
                     report.push(
                         ScoreEventRemapIssueCodeV1::SplitMustHaveMultipleTargets,
@@ -446,8 +469,15 @@ pub fn validate_score_event_remap(
                     }
                 }
             }
-            ScoreEventDispositionV1::Merged { candidate_index, merge_group_id } => {
+            ScoreEventDispositionV1::Merged { candidate_index, merge_group_id, operation_id } => {
                 report.merged_source_count += 1;
+                if operation_id.trim().is_empty() {
+                    report.push(
+                        ScoreEventRemapIssueCodeV1::InvalidDispositionOperationId,
+                        Some(entry.source_index), Some(*candidate_index), Some(merge_group_id),
+                        "merged event requires a non-empty operation ID",
+                    );
+                }
                 if merge_group_id.trim().is_empty() {
                     report.push(
                         ScoreEventRemapIssueCodeV1::InvalidMergeGroupId,
@@ -490,8 +520,15 @@ pub fn validate_score_event_remap(
                     );
                 }
             }
-            ScoreEventDispositionV1::Deleted { reason } => {
+            ScoreEventDispositionV1::Deleted { reason, operation_id } => {
                 report.deleted_count += 1;
+                if operation_id.trim().is_empty() {
+                    report.push(
+                        ScoreEventRemapIssueCodeV1::InvalidDispositionOperationId,
+                        Some(entry.source_index), None, None,
+                        "deleted event requires a non-empty operation ID",
+                    );
+                }
                 if reason.trim().is_empty() {
                     report.push(
                         ScoreEventRemapIssueCodeV1::InvalidDeletionReason,
@@ -682,6 +719,7 @@ mod tests {
             disposition: ScoreEventDispositionV1::Modified {
                 candidate_index: 0,
                 changed_fields: vec![ScoreEventFieldV1::Velocity],
+                operation_id: "scale-velocity".into(),
             },
         }];
         let report = validate(&source, &candidate, &remap);
@@ -729,12 +767,14 @@ mod tests {
                 source_index: 0,
                 disposition: ScoreEventDispositionV1::Merged {
                     candidate_index: 0, merge_group_id: "tie-1".into(),
+                    operation_id: "merge-tie".into(),
                 },
             },
             ScoreEventRemapEntryV1 {
                 source_index: 1,
                 disposition: ScoreEventDispositionV1::Merged {
                     candidate_index: 0, merge_group_id: "tie-1".into(),
+                    operation_id: "merge-tie".into(),
                 },
             },
         ];
@@ -752,6 +792,7 @@ mod tests {
             source_index: 0,
             disposition: ScoreEventDispositionV1::Deleted {
                 reason: "explicit motif removal".into(),
+                operation_id: "remove-motif".into(),
             },
         }];
         remap.insertions = vec![ScoreEventInsertionV1 {
