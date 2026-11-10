@@ -292,6 +292,40 @@
             "FurtherResults.lean:f2601bbfa00ddcdddc4b732bc244f16caac15011"
           ],
           "status": "formal_declarations_and_proof_wiring_located; not_yet_classified_as_main_paper_claims"
+        },
+        {
+          "paper_claim": "constant-elliptic positive quadratic half-wave local smoothing and logarithmic Sobolev (Lean source labels cor:constant-dispersion; corresponding TeX claim not located in the inspected pinned manuscript tree)",
+          "declarations": [
+            "OAI.Analysis.Fourier.Dispersion.quadraticHalfWave",
+            "OAI.Analysis.Fourier.Dispersion.ConstantEllipticLocalSmoothing",
+            "OAI.Analysis.Fourier.Dispersion.ConstantEllipticLogarithmicSobolev",
+            "OAI.Analysis.Fourier.Dispersion.constantEllipticLocalSmoothing_of_logarithmicRefinement",
+            "OAI.Analysis.Fourier.Dispersion.constantEllipticLogarithmicSobolev_of_logarithmicRefinement",
+            "OAI.Analysis.Fourier.LocalSmoothing.constant_elliptic_local_smoothing",
+            "OAI.Analysis.Fourier.LocalSmoothing.constant_elliptic_logarithmic_sobolev"
+          ],
+          "operator": "quadraticHalfWave uses phase exp(-i*t*sqrt(m^2 + xi^T Q xi)), with Q positive definite and m>=0. This is a positive quadratic Klein-Gordon / wave half-wave dispersion, not the free Schrödinger phase exp(-i*t*|xi|^2).",
+          "proof_wiring": "Statements.lean defines the constant-elliptic propositions. The corresponding theorem names in FurtherResults.lean derive both statements from logarithmic_refinement through quadraticDispersion_eq_radial_comp and frequency-bound transfer lemmas.",
+          "source_file_blobs": [
+            {
+              "path": "lean/OAI/Analysis/Fourier/Dispersion/Statements.lean",
+              "blob_sha": "62e529c54ef4cf25f027b708e56032d437829944"
+            },
+            {
+              "path": "lean/OAI/Analysis/Fourier/Dispersion/Quadratic.lean",
+              "blob_sha": "b89c3889908dc439869a2db654204ae980189a99"
+            },
+            {
+              "path": "lean/OAI/Analysis/Fourier/Dispersion/Propagator.lean",
+              "blob_sha": "34d7487c88a6d78bc43480a3408b71b6c199eb1e"
+            },
+            {
+              "path": "lean/OAI/Analysis/Fourier/LocalSmoothing/FurtherResults.lean",
+              "blob_sha": "f2601bbfa00ddcdddc4b732bc244f16caac15011"
+            }
+          ],
+          "correspondence_status": "formal_proposition_and_proof_wiring_located; precise paper source label/statement not recovered; not_equivalent_to_the_parabolic_schrodinger_corollary",
+          "note": "Keep this as a distinct related theorem family. It must not be cited as formalization of the compact-paraboloid or free Schrödinger estimates in cor:parabolic."
         }
       ]
     }
@@ -341,7 +375,8 @@
     "proof_correctness_assessed": false,
     "expanded_declaration_inventory": true,
     "exact_parabolic_lean_declaration_located": false,
-    "paper_claim_correspondence_for_all_consequences": false
+    "paper_claim_correspondence_for_all_consequences": false,
+    "constant_elliptic_half_wave_distinguished_from_schrodinger": true
   },
   "next_steps": [
     "Trace the compact-paraboloid and Schrödinger corollary through the exact Lean tree, including cap-rescaling and transfer lemmas.",
@@ -349,6 +384,7 @@
     "Complete line-by-line proof wiring and transitive dependency inventory for every paper claim.",
     "Replay the pinned Lean project and record Lake manifest, dependency closure, axiom set, build output and theorem identities.",
     "Run adversarial statement mutations for endpoint, epsilon, quantifier, domain, Fourier sign, function-space and normalization substitutions.",
-    "Obtain independent specialist review of analytic proof strategy and formalization correspondence."
+    "Obtain independent specialist review of analytic proof strategy and formalization correspondence.",
+    "Keep the formally derived constant-elliptic Klein–Gordon half-wave estimate separate from the parabolic Schrödinger corollary; recover its cited manuscript statement before making any paper correspondence claim."
   ]
 }
