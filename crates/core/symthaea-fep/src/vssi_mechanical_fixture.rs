@@ -603,6 +603,51 @@ mod tests {
     }
 
     #[test]
+    fn distinct_hidden_cases_are_observably_distinguishable_by_at_least_one_protocol() {
+        let cases = [
+            VssiFixtureCase::HealthyControl,
+            VssiFixtureCase::InitialStateFault,
+            VssiFixtureCase::ParameterFault,
+            VssiFixtureCase::StructuralFault,
+            VssiFixtureCase::ObservationModelFault,
+            VssiFixtureCase::OpenWorldFault,
+        ];
+        let protocols = [
+            VssiExperimentKind::PassiveObservation,
+            VssiExperimentKind::ThermalImpulse,
+            VssiExperimentKind::AlternatingLoad,
+        ];
+
+        for left_index in 0..cases.len() {
+            for right_index in (left_index + 1)..cases.len() {
+                let mut distinguishable = false;
+                for protocol in protocols {
+                    let mut left = VssiMechanicalEnvironment::new(
+                        format!("vssi-separability-left-{left_index}-{right_index}"),
+                        cases[left_index],
+                    )
+                    .unwrap();
+                    let mut right = VssiMechanicalEnvironment::new(
+                        format!("vssi-separability-right-{left_index}-{right_index}"),
+                        cases[right_index],
+                    )
+                    .unwrap();
+                    let left_trace = left.observe_experiment(protocol).unwrap();
+                    let right_trace = right.observe_experiment(protocol).unwrap();
+                    if left_trace != right_trace {
+                        distinguishable = true;
+                        break;
+                    }
+                }
+                assert!(
+                    distinguishable,
+                    "hidden cases {left_index} and {right_index} have identical registered traces"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn empty_scenario_identifier_is_rejected() {
         assert_eq!(
             VssiMechanicalEnvironment::new("  ", VssiFixtureCase::HealthyControl).unwrap_err(),
