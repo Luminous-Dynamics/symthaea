@@ -14,7 +14,15 @@ LyricEditBench (arXiv:2603.24589) has 7,200 test examples covering Partial Subst
 
 YingMusic-Singer uses an optional timbre reference, a melody-providing singing clip and modified lyrics without manual alignment. The paper reports better lyric PER, F0-CORR and Vocal Score than Vevo2 across the six task types in its experiments, while Vevo2 has advantages on speaker similarity in some settings. These are task-specific published comparisons, not a universal industry ranking.
 
-The ICASSP 2027 Audio Editing Challenge adds a broad audio-editing comparison. Its MMAE public development set has 2,000 examples and 17,741 rubrics. The challenge reports existing Exact Match Rate below 5%, and its November 10 release includes two separate 500-example hidden-rubric test tracks (single-model and agent). The official score separates Instruction Following Rate, Consistency Rate and Exact Match Rate. Challenge registration closed October 8; public development evaluation is available separately from official leaderboard participation.
+The ICASSP 2027 Audio Editing Challenge adds a broad audio-editing comparison. Its MMAE public development set has 2,000 examples and 17,741 atomic rubrics. On November 10, the organizers released two separate 500-example hidden-rubric test tracks; only input audio and instructions are public, while evaluation rubrics remain private until official results are finalized.
+
+The newly released official test-set cards report:
+- Track 1 (Single Model): AuK baseline IFR 40.33%, CR 74.70%, EMR 7.60%.
+- Track 2 (Agent): router + DSP + SAM-Audio + AuK baseline IFR 44.13%, CR 76.09%, EMR 8.00%.
+
+These are different tracks and must not be compared as if they were a matched model ablation. The organizer page also describes earlier MMAE systems as below 5% EMR; the newly released track-specific baselines are the appropriate comparison points for this challenge test release. The official score separates Instruction Following Rate, Consistency Rate and Exact Match Rate. Challenge registration closed October 8; public development evaluation and access to the released test inputs are separate from official leaderboard eligibility.
+
+The official SDK repository specifies Python 3.11+, exactly 500 sample IDs for the selected track, one nonempty 16 kHz mono 16-bit PCM WAV per ID, at most 300 seconds per file and a 2 GiB total upload package. It requires organizer-issued evaluation URL and track-specific secret key; uploading does not itself start evaluation. Any local validator must prepare/validate output artifacts but cannot bypass the official SDK or credentials.
 
 ## Paradigm: two-sided edit contracts
 
