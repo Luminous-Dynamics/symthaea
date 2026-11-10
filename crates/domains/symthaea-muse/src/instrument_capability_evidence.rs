@@ -706,15 +706,27 @@ mod tests {
         std::iter::repeat(ch).take(64).collect()
     }
 
-    fn scope(renderer: bool) -> CapabilityScopeV1 {
+    fn performance_scope() -> CapabilityScopeV1 {
         CapabilityScopeV1 {
             instrument_model: Some("cello-model-a".into()),
             performer_level: Some("professional".into()),
             technique: Some("arco".into()),
             dynamic: Some("mf".into()),
-            renderer_id: renderer.then(|| "fluidsynth-2.4".into()),
-            patch_id: renderer.then(|| "orchestral-cello-sustain".into()),
-            asset_sha256: renderer.then(|| sha('a')),
+            renderer_id: None,
+            patch_id: None,
+            asset_sha256: None,
+        }
+    }
+
+    fn renderer_scope() -> CapabilityScopeV1 {
+        CapabilityScopeV1 {
+            instrument_model: Some("cello-model-a".into()),
+            performer_level: None,
+            technique: None,
+            dynamic: None,
+            renderer_id: Some("fluidsynth-2.4".into()),
+            patch_id: Some("orchestral-cello-sustain".into()),
+            asset_sha256: Some(sha('a')),
         }
     }
 
@@ -757,8 +769,15 @@ mod tests {
         }
     }
 
-    fn valid_profile(renderer: bool) -> (InstrumentCapabilityEvidenceProfileV1, CapabilityScopeV1) {
-        let required_scope = scope(renderer);
+    fn valid_profile(
+        include_renderer: bool,
+    ) -> (
+        InstrumentCapabilityEvidenceProfileV1,
+        CapabilityScopeV1,
+        Option<CapabilityScopeV1>,
+    ) {
+        let required_performance_scope = performance_scope();
+        let required_renderer_scope = include_renderer.then(renderer_scope);
         let mut claims = vec![
             claim(
                 "range",
@@ -766,21 +785,21 @@ mod tests {
                     lowest_midi: 36,
                     highest_midi: 84,
                 },
-                required_scope.clone(),
+                required_performance_scope.clone(),
                 "range-measurement",
             ),
             claim(
                 "polyphony",
                 CapabilityValueV1::MaxPolyphony { notes: 1 },
-                required_scope.clone(),
+                required_performance_scope.clone(),
                 "polyphony-measurement",
             ),
         ];
-        if renderer {
+        if let Some(renderer_scope) = &required_renderer_scope {
             claims.push(claim(
                 "renderer-patch",
                 CapabilityValueV1::RendererPatchAvailability { available: true },
-                required_scope.clone(),
+                renderer_scope.clone(),
                 "renderer-probe",
             ));
         }
@@ -791,20 +810,21 @@ mod tests {
                 instrument_kind: InstrumentKindV1::Cello,
                 claims,
             },
-            required_scope,
+            required_performance_scope,
+            required_renderer_scope,
         )
     }
 
     #[test]
     fn exact_scope_measured_claims_materialize_existing_capability_contract() {
-        let (profile, required_scope) = valid_profile(true);
-        let capability =
-            materialize_qualified_instrument_capability_v1(
-                &profile,
-                &required_scope,
-                Some(&renderer_scope),
-            )
-            .unwrap();
+        let (profile, required_performance_scope, required_renderer_scope) = valid_profile(true);
+        let renderer_scope = required_renderer_scope.as_ref().unwrap();
+        let capability = materialize_qualified_instrument_capability_v1(
+            &profile,
+            &required_performance_scope,
+            Some(renderer_scope),
+        )
+        .unwrap();
         assert_eq!(capability.capability.id, "solo-cello-01");
         assert_eq!(capability.capability.kind, InstrumentKindV1::Cello);
         assert_eq!(capability.capability.sounding_range.lowest_midi, 36);
@@ -820,7 +840,7 @@ mod tests {
 
     #[test]
     fn estimated_evidence_cannot_be_promoted_to_qualified_hard_capability() {
-        let (mut profile, _) = valid_profile(false);
+        let (mut profile, _, _) = valid_profile(false);
         profile.claims[0].evidence.evidence_class = EvidenceClassV1::Estimated;
         let report = validate_instrument_capability_evidence_v1(&profile);
         assert!(report.issues.iter().any(|issue| {
@@ -831,7 +851,7 @@ mod tests {
 
     #[test]
     fn qualified_claim_requires_permitted_reuse_and_a_review_record() {
-        let (mut profile, _) = valid_profile(false);
+        let (mut profile, _, _) = valid_profile(false);
         profile.claims[0].evidence.license = ReusePermissionV1::Unknown;
         profile.claims[0].qualification_record_id = None;
         let report = validate_instrument_capability_evidence_v1(&profile);
@@ -845,8 +865,9 @@ mod tests {
 
     #[test]
     fn renderer_scoped_capability_abstains_on_scope_mismatch() {
-        let (profile, _) = valid_profile(true);
-        let wrong_scope = scope(false);
+        let (profile, performance_scope, _) = valid_profile(true);
+        let mut wrong_scope = performance_scope;
+        wrong_scope.instrument_model = Some("cello-model-b".into());
         assert_eq!(
             materialize_qualified_instrument_capability_v1(&profile, &wrong_scope, None),
             Err(CapabilityMaterializationErrorV1::ScopeMismatch)
@@ -855,8 +876,8 @@ mod tests {
 
     #[test]
     fn asset_scoped_claim_rejects_a_different_asset_digest() {
-        let (mut profile, _) = valid_profile(true);
-        profile.claims[0].evidence.bound_asset_sha256 = Some(sha('c'));
+        let (mut profile, _, _) = valid_profile(true);
+        profile.claims[2].evidence.bound_asset_sha256 = Some(sha('c'));
         let report = validate_instrument_capability_evidence_v1(&profile);
         assert!(report.issues.iter().any(|issue| {
             issue.code == CapabilityEvidenceIssueCodeV1::AssetDigestMismatch
@@ -865,8 +886,8 @@ mod tests {
 
     #[test]
     fn asset_scoped_qualified_claim_requires_explicit_license_permission() {
-        let (mut profile, _) = valid_profile(true);
-        profile.claims[0].evidence.license = ReusePermissionV1::Unknown;
+        let (mut profile, _, _) = valid_profile(true);
+        profile.claims[2].evidence.license = ReusePermissionV1::Unknown;
         let report = validate_instrument_capability_evidence_v1(&profile);
         assert!(report.issues.iter().any(|issue| {
             issue.code == CapabilityEvidenceIssueCodeV1::QualifiedAssetWithoutLicense
@@ -875,13 +896,14 @@ mod tests {
 
     #[test]
     fn renderer_scoped_capability_requires_a_positive_exact_patch_probe() {
-        let (mut profile, required_scope) = valid_profile(true);
+        let (mut profile, performance_scope, renderer_scope) = valid_profile(true);
         profile.claims.pop();
+        let renderer_scope = renderer_scope.as_ref().unwrap();
         assert_eq!(
             materialize_qualified_instrument_capability_v1(
                 &profile,
-                &required_scope,
-                Some(&required_scope),
+                &performance_scope,
+                Some(renderer_scope),
             ),
             Err(CapabilityMaterializationErrorV1::MissingQualifiedRendererPatch)
         );
@@ -889,7 +911,7 @@ mod tests {
 
     #[test]
     fn malformed_evidence_digest_is_rejected() {
-        let (mut profile, _) = valid_profile(false);
+        let (mut profile, _, _) = valid_profile(false);
         profile.claims[0].evidence.content_sha256 = Some("not-a-digest".into());
         let report = validate_instrument_capability_evidence_v1(&profile);
         assert!(report.issues.iter().any(|issue| {
@@ -899,7 +921,7 @@ mod tests {
 
     #[test]
     fn derived_claim_requires_parent_evidence_and_transform_identity() {
-        let (mut profile, _) = valid_profile(false);
+        let (mut profile, _, _) = valid_profile(false);
         profile.claims[0].evidence.evidence_class = EvidenceClassV1::Derived;
         profile.claims[0].evidence.parent_evidence_ids.clear();
         profile.claims[0].evidence.transformation_id = None;
