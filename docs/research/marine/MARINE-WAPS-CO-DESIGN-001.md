@@ -370,9 +370,15 @@ Every public result must state the exact vessel/configuration, mission, environm
 
 ## 13. Artifacts and current execution state
 
-- [Machine-readable case schema](./marine-propulsion-case.schema.json)
+- [Machine-readable case schema v0.1.0](./marine-propulsion-case.schema.json) — retained unchanged for compatibility.
+- [Machine-readable case schema v0.2.0](./marine-propulsion-case-v0.2.0.schema.json) — adds calibration/timebase registries, observed/expected sample counts and sample-completeness policy.
+- [Synthetic v0.1.0 fixture](./fixtures/synthetic-waps-case-0001.json)
+- [Synthetic v0.2.0 fixture](./fixtures/synthetic-waps-case-v0.2.0.json)
 - [Source-attributed reference baseline registry](./marine-propulsion-reference-baselines-2026-11-10.json)
-- [Synthetic schema smoke fixture](./fixtures/synthetic-waps-case-0001.json)
+- [Rust semantic validator](../../tools/marine-propulsion-validator/README.md)
+- [Route/service robustness specification](./MARINE-SERVICE-ROBUSTNESS-001.md)
+- [Operational prediction benchmark](./MARINE-OPERATIONAL-PREDICTION-BENCHMARK-001.md)
+- [Hydrodynamic validation specification](./MARINE-HYDRODYNAMIC-VALIDATION-001.md)
 
-The schema and registry parse as JSON. The synthetic fixture passes the hand-authored structural smoke checks recorded in the work session. Full JSON Schema meta-schema validation, a dedicated semantic validator, Rust tests, source-study reproduction, specialist solver validation and physical trials remain pending. The fixture contains invented illustrative numbers and placeholder hashes; it is not a proposed vessel configuration or source of engineering values.
+The registry now has 23 source records. The v0.1.0 schema remains unchanged; v0.2.0 introduces resolvable calibration/timebase registries and explicit sample completeness. A standalone Rust validator and integration/adversarial tests are committed. JSON artifacts have been retrieved and structurally inspected, but full JSON Schema meta-schema validation and Rust compilation/test execution have not been run in this environment. The isolated Rust crate still needs a generated Cargo.lock. The v0.2.0 fixture contains synthetic data and intentionally unknown uncertainty/gate states; it is not a proposed vessel configuration or source of engineering values.
 
