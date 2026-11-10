@@ -1,0 +1,1250 @@
+{
+  "schema_version": "ig-delib-control-scenarios-v0.1",
+  "status": "synthetic_scenarios_unexecuted",
+  "benchmark_id": "IG-DELIB-CONTROL-001",
+  "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11383",
+  "runner_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/3095",
+  "revision_ledger": "https://github.com/Luminous-Dynamics/symthaea/issues/11340",
+  "comm_graph_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
+  "confidence_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11367",
+  "fixture_count": 40,
+  "family_count": 8,
+  "families": [
+    {
+      "id": "factual_evidence_closure",
+      "description": "factual evidence closure"
+    },
+    {
+      "id": "false_consensus",
+      "description": "false consensus"
+    },
+    {
+      "id": "minority_preservation",
+      "description": "minority preservation"
+    },
+    {
+      "id": "open_world",
+      "description": "open world"
+    },
+    {
+      "id": "normative_pluralism",
+      "description": "normative pluralism"
+    },
+    {
+      "id": "controller_adversary",
+      "description": "controller adversary"
+    },
+    {
+      "id": "budget_and_cost",
+      "description": "budget and cost"
+    },
+    {
+      "id": "trajectory_value",
+      "description": "trajectory value"
+    }
+  ],
+  "agreement_threshold": 0.8,
+  "scenarios": [
+    {
+      "fixture_id": "DC-001-1",
+      "family_id": "factual_evidence_closure",
+      "scenario_note": "fully verified evidence permits an early supported stop",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.35,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "FinalizeSupported",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-001-2",
+      "family_id": "factual_evidence_closure",
+      "scenario_note": "missing evidence triggers evidence acquisition",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": false,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "RequestEvidence",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-001-3",
+      "family_id": "factual_evidence_closure",
+      "scenario_note": "conflicting sources trigger independent verification",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 1,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "VerifyClaim",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-001-4",
+      "family_id": "factual_evidence_closure",
+      "scenario_note": "a consequential unresolved claim triggers verification",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 1,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "VerifyClaim",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-001-5",
+      "family_id": "factual_evidence_closure",
+      "scenario_note": "a verified minority is preserved despite a near-unanimous last round",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.95,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "Verified",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "PreserveMinority",
+      "expected_agreement_baseline_stop": true,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-002-1",
+      "family_id": "false_consensus",
+      "scenario_note": "near-unanimity cannot close missing evidence",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.99,
+        "evidence_complete": false,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "SelfReported",
+          "probability_correct": 0.64,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "RequestEvidence",
+      "expected_agreement_baseline_stop": true,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-002-2",
+      "family_id": "false_consensus",
+      "scenario_note": "common-mode signal triggers adversarial challenge",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.98,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": true,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "AdversarialChallenge",
+      "expected_agreement_baseline_stop": true,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-002-3",
+      "family_id": "false_consensus",
+      "scenario_note": "high agreement does not resolve conflicting sources",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.99,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 2,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "VerifyClaim",
+      "expected_agreement_baseline_stop": true,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-002-4",
+      "family_id": "false_consensus",
+      "scenario_note": "high agreement does not resolve a consequential unknown",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.99,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 1,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "VerifyClaim",
+      "expected_agreement_baseline_stop": true,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-002-5",
+      "family_id": "false_consensus",
+      "scenario_note": "high agreement cannot substitute for a missing source",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.88,
+        "evidence_complete": false,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "RequestEvidence",
+      "expected_agreement_baseline_stop": true,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-003-1",
+      "family_id": "minority_preservation",
+      "scenario_note": "low agreement does not erase a verified minority",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.2,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "Verified",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "PreserveMinority",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-003-2",
+      "family_id": "minority_preservation",
+      "scenario_note": "an early verified answer survives a later incorrect majority",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.1,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "Verified",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "PreserveMinority",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-003-3",
+      "family_id": "minority_preservation",
+      "scenario_note": "finalize only after minority evidence has been preserved",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.3,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "Verified",
+        "minority_preserved": true,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "FinalizeSupported",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-003-4",
+      "family_id": "minority_preservation",
+      "scenario_note": "low-centrality verified evidence is retained",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.15,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "Verified",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "PreserveMinority",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-003-5",
+      "family_id": "minority_preservation",
+      "scenario_note": "evidence closure does not require consensus",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "FinalizeSupported",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-004-1",
+      "family_id": "open_world",
+      "scenario_note": "conflicting open-world sources justify verification",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 1,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "OpenWorldIndeterminate"
+      },
+      "expected_action": "VerifyClaim",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-004-2",
+      "family_id": "open_world",
+      "scenario_note": "missing evidence triggers a bounded evidence request",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": false,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "OpenWorldIndeterminate"
+      },
+      "expected_action": "RequestEvidence",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-004-3",
+      "family_id": "open_world",
+      "scenario_note": "resolved search without authoritative ground truth remains indeterminate",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.95,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "OpenWorldIndeterminate"
+      },
+      "expected_action": "FinalizeIndeterminate",
+      "expected_agreement_baseline_stop": true,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-004-4",
+      "family_id": "open_world",
+      "scenario_note": "no remaining budget returns an explicit incomplete state",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 0,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 2,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "OpenWorldIndeterminate"
+      },
+      "expected_action": "StopBudgetExhausted",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-004-5",
+      "family_id": "open_world",
+      "scenario_note": "disagreement alone is not a correctness failure",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.1,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "OpenWorldIndeterminate"
+      },
+      "expected_action": "FinalizeIndeterminate",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-005-1",
+      "family_id": "normative_pluralism",
+      "scenario_note": "preserve a value position not represented in the majority",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "Unverified",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "NormativePluralism"
+      },
+      "expected_action": "PreserveMinority",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-005-2",
+      "family_id": "normative_pluralism",
+      "scenario_note": "publish multiple defensible positions after dissent is preserved",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "Verified",
+        "minority_preserved": true,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "NormativePluralism"
+      },
+      "expected_action": "PluralisticMultiplePositions",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-005-3",
+      "family_id": "normative_pluralism",
+      "scenario_note": "request evidence for an unresolved factual subclaim",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": false,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "NormativePluralism"
+      },
+      "expected_action": "RequestEvidence",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-005-4",
+      "family_id": "normative_pluralism",
+      "scenario_note": "verify empirical disagreement without scoring value preferences",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 1,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "NormativePluralism"
+      },
+      "expected_action": "VerifyClaim",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-005-5",
+      "family_id": "normative_pluralism",
+      "scenario_note": "no canonical answer exists even with high agreement",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.99,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "NormativePluralism"
+      },
+      "expected_action": "PluralisticMultiplePositions",
+      "expected_agreement_baseline_stop": true,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-006-1",
+      "family_id": "controller_adversary",
+      "scenario_note": "orchestrator compromise invokes independent adjudication",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": true,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "IndependentAdjudication",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-006-2",
+      "family_id": "controller_adversary",
+      "scenario_note": "compromised source lineage invokes independent adjudication",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": true,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "IndependentAdjudication",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-006-3",
+      "family_id": "controller_adversary",
+      "scenario_note": "common-mode signal triggers a counterexample search",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": true,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "AdversarialChallenge",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-006-4",
+      "family_id": "controller_adversary",
+      "scenario_note": "corrupted controller input blocks action",
+      "state": {
+        "input_integrity_valid": false,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "StopInvalid",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-006-5",
+      "family_id": "controller_adversary",
+      "scenario_note": "integrity failure blocks finalization even when budget remains",
+      "state": {
+        "input_integrity_valid": false,
+        "budget_remaining": 5,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "StopInvalid",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-007-1",
+      "family_id": "budget_and_cost",
+      "scenario_note": "zero budget is incomplete, never success",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 0,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "StopBudgetExhausted",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-007-2",
+      "family_id": "budget_and_cost",
+      "scenario_note": "one remaining unit still requests required evidence",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 1,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": false,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "RequestEvidence",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-007-3",
+      "family_id": "budget_and_cost",
+      "scenario_note": "evidence closure permits stopping before round limit",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 8,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "FinalizeSupported",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-007-4",
+      "family_id": "budget_and_cost",
+      "scenario_note": "one initial hypothesis plus missing evidence triggers diversification",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": false,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 1,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "DiversifyHypotheses",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-007-5",
+      "family_id": "budget_and_cost",
+      "scenario_note": "remaining budget can fund verification of a contradiction",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 1,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 1,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "VerifyClaim",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-008-1",
+      "family_id": "trajectory_value",
+      "scenario_note": "retain a verified trajectory minority despite final agreement",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.9,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "Verified",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "PreserveMinority",
+      "expected_agreement_baseline_stop": true,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-008-2",
+      "family_id": "trajectory_value",
+      "scenario_note": "trajectory conflict triggers verification",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.2,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 1,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "VerifyClaim",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-008-3",
+      "family_id": "trajectory_value",
+      "scenario_note": "single initial hypothesis and incomplete evidence request diversification",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.45,
+        "evidence_complete": false,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 0,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "DiversifyHypotheses",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-008-4",
+      "family_id": "trajectory_value",
+      "scenario_note": "open-world trajectory ends indeterminate despite apparent agreement",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0.95,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "None",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "OpenWorldIndeterminate"
+      },
+      "expected_action": "FinalizeIndeterminate",
+      "expected_agreement_baseline_stop": true,
+      "expected_fixed_round_baseline_stop": false
+    },
+    {
+      "fixture_id": "DC-008-5",
+      "family_id": "trajectory_value",
+      "scenario_note": "supported minority is recorded before final selection",
+      "state": {
+        "input_integrity_valid": true,
+        "budget_remaining": 4,
+        "rounds_used": 1,
+        "round_limit": 4,
+        "agent_agreement": 0,
+        "evidence_complete": true,
+        "high_impact_unresolved_count": 0,
+        "contradictory_source_count": 0,
+        "hypothesis_diversity_count": 3,
+        "minority_candidate_state": "Verified",
+        "minority_preserved": false,
+        "common_mode_signal": false,
+        "orchestrator_compromise": false,
+        "source_lineage_compromised": false,
+        "confidence_signal": {
+          "status": "NotProvided",
+          "probability_correct": null,
+          "calibration_profile_sha256": null
+        },
+        "task_truth_profile": "SyntheticKnownAnswer"
+      },
+      "expected_action": "PreserveMinority",
+      "expected_agreement_baseline_stop": false,
+      "expected_fixed_round_baseline_stop": false
+    }
+  ],
+  "claim_ceiling": "These are deterministic synthetic control-policy test inputs. They do not establish model or human outcomes, controller superiority, or any causal effect."
+}
