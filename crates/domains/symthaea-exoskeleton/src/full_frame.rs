@@ -109,8 +109,9 @@ pub struct HumanLoadModel {
 }
 
 impl HumanLoadModel {
-    /// Standard 75kg adult male load model.
-    pub fn standard_adult() -> Self {
+    /// Synthetic reference profile with a nominal 75 kg total mass.
+    /// This is not a population norm or a clinically representative body model.
+    pub fn reference_75kg_profile() -> Self {
         Self {
             total_mass_kg: 75.0,
             human_torques: [0.0; NUM_FULL_FRAME_JOINTS],
@@ -137,8 +138,9 @@ impl HumanLoadModel {
         }
     }
 
-    /// Total human-generated power.
-    pub fn human_power(&self) -> f64 {
+    /// Sum of absolute synthetic joint torques, in N·m.
+    /// This is not mechanical power; power requires torque multiplied by angular velocity.
+    pub fn sum_abs_joint_torque_nm(&self) -> f64 {
         self.human_torques.iter().map(|t| t.abs()).sum()
     }
 }
@@ -344,7 +346,7 @@ impl FullFrameSimulator {
             right_arm,
             left_leg,
             right_leg,
-            human: HumanLoadModel::standard_adult(),
+            human: HumanLoadModel::reference_75kg_profile(),
             callback: FullFrameCallback,
         }
     }
@@ -388,14 +390,14 @@ mod tests {
 
     #[test]
     fn test_human_load_model() {
-        let mut model = HumanLoadModel::standard_adult();
+        let mut model = HumanLoadModel::reference_75kg_profile();
         assert_eq!(model.total_mass_kg, 75.0);
-        assert_eq!(model.human_power(), 0.0); // No torques yet
+        assert_eq!(model.sum_abs_joint_torque_nm(), 0.0); // No torques yet
 
         // Update gait and verify torques are generated
         model.update(0.1);
         assert!(
-            model.human_power() > 0.0,
+            model.sum_abs_joint_torque_nm() > 0.0,
             "Gait should generate human torques"
         );
     }
@@ -453,16 +455,16 @@ mod tests {
     }
 
     #[test]
-    fn test_fatigue_reduces_human_power() {
-        let mut fresh = HumanLoadModel::standard_adult();
-        let mut tired = HumanLoadModel::standard_adult();
+    fn test_fatigue_reduces_sum_abs_joint_torque_nm() {
+        let mut fresh = HumanLoadModel::reference_75kg_profile();
+        let mut tired = HumanLoadModel::reference_75kg_profile();
         tired.fatigue = 0.8; // 80% fatigued
 
         fresh.update(0.25);
         tired.update(0.25);
 
         assert!(
-            fresh.human_power() > tired.human_power(),
+            fresh.sum_abs_joint_torque_nm() > tired.sum_abs_joint_torque_nm(),
             "Fresh human should generate more power than fatigued"
         );
     }
