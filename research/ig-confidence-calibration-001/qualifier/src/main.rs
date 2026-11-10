@@ -1,0 +1,474 @@
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::{
+    collections::{BTreeSet, HashSet},
+    env, fs,
+    process::ExitCode,
+};
+
+const EXPECTED_FIXTURES: usize = 24;
+const MINIMUM_SAMPLE_COUNT: usize = 20;
+const ECE_BINS: usize = 10;
+const LOG_EPSILON: f64 = 1e-15;
+
+#[derive(Debug, Clone, PartialEq)]
+struct ReliabilityBin {
+    lower: f64,
+    upper: f64,
+    count: usize,
+    mean_probability: f64,
+    observed_frequency: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct CalibrationMetrics {
+    sample_count: usize,
+    brier_score: f64,
+    log_loss: f64,
+    ece_equal_width: f64,
+    aurc: f64,
+    reliability_bins: Vec<ReliabilityBin>,
+    risk_at_coverage: Vec<(f64, f64)>,
+}
+
+fn field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+    value.get(key)?.as_str().filter(|value| !value.trim().is_empty())
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn add(errors: &mut Vec<String>, code: &str) {
+    errors.push(code.to_string());
+}
+
+fn set_at_path(root: &mut Value, path: &str, replacement: Value) -> bool {
+    let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    if parts.is_empty() || parts.iter().any(|part| part.is_empty()) {
+        return false;
+    }
+    let mut current = root;
+    for part in &parts[..parts.len() - 1] {
+        current = match current {
+            Value::Object(map) => match map.get_mut(*part) {
+                Some(value) => value,
+                None => return false,
+            },
+            Value::Array(items) => match part.parse::<usize>().ok().and_then(|i| items.get_mut(i)) {
+                Some(value) => value,
+                None => return false,
+            },
+            _ => return false,
+        };
+    }
+    let last = parts[parts.len() - 1];
+    match current {
+        Value::Object(map) => {
+            if !map.contains_key(last) {
+                return false;
+            }
+            map.insert(last.to_string(), replacement);
+            true
+        }
+        Value::Array(items) => match last.parse::<usize>() {
+            Ok(index) if index < items.len() => {
+                items[index] = replacement;
+                true
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn remove_at_path(root: &mut Value, path: &str) -> bool {
+    let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    if parts.is_empty() || parts.iter().any(|part| part.is_empty()) {
+        return false;
+    }
+    let mut current = root;
+    for part in &parts[..parts.len() - 1] {
+        current = match current {
+            Value::Object(map) => match map.get_mut(*part) {
+                Some(value) => value,
+                None => return false,
+            },
+            Value::Array(items) => match part.parse::<usize>().ok().and_then(|i| items.get_mut(i)) {
+                Some(value) => value,
+                None => return false,
+            },
+            _ => return false,
+        };
+    }
+    let last = parts[parts.len() - 1];
+    match current {
+        Value::Object(map) => map.remove(last).is_some(),
+        Value::Array(items) => match last.parse::<usize>() {
+            Ok(index) if index < items.len() => {
+                items.remove(index);
+                true
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn digest_json(value: &Value) -> Option<String> {
+    let bytes = serde_json::to_vec(value).ok()?;
+    let hash = Sha256::digest(bytes);
+    Some(format!("{hash:x}"))
+}
+
+fn validate_bundle(bundle: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    if field(bundle, "schema_version") != Some("ig-confidence-evaluation-v0.1")
+        || field(bundle, "benchmark_id") != Some("IG-CONFIDENCE-CALIBRATION-001")
+    {
+        add(&mut errors, "evaluation_identity_invalid");
+    }
+    if field(bundle, "status") != Some("synthetic_known_answer_unexecuted") {
+        add(&mut errors, "evaluation_status_invalid");
+    }
+
+    let profile = &bundle["calibration_profile"];
+    if field(profile, "status") != Some("Calibrated") {
+        add(&mut errors, "profile_not_calibrated");
+    }
+    if !is_sha256(field(profile, "calibration_profile_sha256").unwrap_or_default()) {
+        add(&mut errors, "profile_digest_invalid");
+    }
+    if !is_sha256(field(profile, "calibration_report_sha256").unwrap_or_default()) {
+        add(&mut errors, "report_digest_invalid");
+    }
+    if !matches!(
+        field(profile, "method"),
+        Some("PlattScaling" | "IsotonicRegression" | "BetaCalibration" | "TemperatureScaling")
+    ) {
+        add(&mut errors, "calibration_method_unsupported");
+    }
+    if field(profile, "scale_id") != Some("probability_of_correctness_v1") {
+        add(&mut errors, "confidence_scale_unsupported");
+    }
+
+    let evaluation = &bundle["evaluation_identity"];
+    let model = &profile["model_identity"];
+    if field(model, "provider") != field(evaluation, "provider")
+        || field(model, "model") != field(evaluation, "model")
+        || field(model, "revision") != field(evaluation, "revision")
+        || field(model, "provider").is_none()
+    {
+        add(&mut errors, "model_identity_mismatch");
+    }
+    if field(profile, "prompt_family_sha256")
+        != field(evaluation, "prompt_family_sha256")
+        || !is_sha256(field(profile, "prompt_family_sha256").unwrap_or_default())
+    {
+        add(&mut errors, "prompt_family_mismatch");
+    }
+    if field(profile, "task_scope") != field(evaluation, "task_scope")
+        || field(evaluation, "task_scope") != Some("factual_qa_binary_correctness")
+    {
+        add(&mut errors, "task_scope_mismatch");
+    }
+    if field(evaluation, "task_truth_profile") != Some("SyntheticKnownAnswer") {
+        add(&mut errors, "evaluation_truth_profile_unsupported");
+    }
+
+    let calibration_data = &profile["calibration_data"];
+    let fit_digest = field(calibration_data, "fit_dataset_sha256").unwrap_or_default();
+    let validation_digest = field(calibration_data, "validation_dataset_sha256").unwrap_or_default();
+    let evaluation_digest = field(bundle, "evaluation_dataset_sha256").unwrap_or_default();
+    if !is_sha256(fit_digest) || !is_sha256(validation_digest) || !is_sha256(evaluation_digest) {
+        add(&mut errors, "calibration_dataset_digest_invalid");
+    } else if fit_digest == validation_digest
+        || fit_digest == evaluation_digest
+        || validation_digest == evaluation_digest
+    {
+        add(&mut errors, "calibration_dataset_digest_reuse");
+    }
+
+    let fit_groups: BTreeSet<String> = calibration_data["fit_group_ids"]
+        .as_array().into_iter().flatten().filter_map(Value::as_str)
+        .map(ToOwned::to_owned).collect();
+    let validation_groups: BTreeSet<String> = calibration_data["validation_group_ids"]
+        .as_array().into_iter().flatten().filter_map(Value::as_str)
+        .map(ToOwned::to_owned).collect();
+    let evaluation_groups: BTreeSet<String> = calibration_data["evaluation_group_ids"]
+        .as_array().into_iter().flatten().filter_map(Value::as_str)
+        .map(ToOwned::to_owned).collect();
+    if !fit_groups.is_disjoint(&validation_groups) {
+        add(&mut errors, "fit_validation_group_overlap");
+    }
+    if !fit_groups.is_disjoint(&evaluation_groups) {
+        add(&mut errors, "fit_evaluation_group_overlap");
+    }
+    if !validation_groups.is_disjoint(&evaluation_groups) {
+        add(&mut errors, "validation_evaluation_group_overlap");
+    }
+
+    if calibration_data["sample_count"].as_u64().unwrap_or(0) < MINIMUM_SAMPLE_COUNT as u64 {
+        add(&mut errors, "calibration_sample_count_insufficient");
+    }
+    if field(&profile["validator"], "identity").is_none() {
+        add(&mut errors, "validator_identity_missing");
+    }
+    if field(&profile["validator"], "version").is_none() {
+        add(&mut errors, "validator_version_missing");
+    }
+
+    let Some(observations) = bundle["observations"].as_array() else {
+        add(&mut errors, "evaluation_observations_missing");
+        errors.sort();
+        errors.dedup();
+        return errors;
+    };
+    let minimum = bundle["minimum_observations"].as_u64().unwrap_or(MINIMUM_SAMPLE_COUNT as u64);
+    if observations.len() < minimum as usize || observations.len() < MINIMUM_SAMPLE_COUNT {
+        add(&mut errors, "evaluation_observation_count_insufficient");
+    }
+    let mut sample_ids = HashSet::new();
+    let mut seen_true = false;
+    let mut seen_false = false;
+    for row in observations {
+        let sample_id = field(row, "sample_id");
+        if sample_id.is_none() || !sample_ids.insert(sample_id.unwrap().to_string()) {
+            add(&mut errors, "duplicate_sample_id");
+        }
+        let probability = row["probability_correct"].as_f64();
+        if probability.is_none_or(|p| !p.is_finite() || !(0.0..=1.0).contains(&p)) {
+            add(&mut errors, "probability_out_of_range");
+        }
+        match row["outcome_correct"].as_bool() {
+            Some(true) => seen_true = true,
+            Some(false) => seen_false = true,
+            None => add(&mut errors, "binary_outcome_missing"),
+        }
+        if field(row, "task_group_id").is_none()
+            || !evaluation_groups.contains(field(row, "task_group_id").unwrap_or_default())
+        {
+            add(&mut errors, "evaluation_group_unbound");
+        }
+    }
+    if !seen_true || !seen_false {
+        add(&mut errors, "single_outcome_class");
+    }
+
+    if let Some(actual_digest) = digest_json(&bundle["observations"]) {
+        if actual_digest != evaluation_digest {
+            add(&mut errors, "evaluation_dataset_digest_mismatch");
+        }
+    } else {
+        add(&mut errors, "evaluation_dataset_digest_unavailable");
+    }
+
+    errors.sort();
+    errors.dedup();
+    errors
+}
+
+fn calculate_metrics(bundle: &Value) -> Option<CalibrationMetrics> {
+    let rows = bundle["observations"].as_array()?;
+    if rows.is_empty() {
+        return None;
+    }
+    let mut pairs = Vec::with_capacity(rows.len());
+    let mut brier = 0.0;
+    let mut log_loss = 0.0;
+    for row in rows {
+        let p = row["probability_correct"].as_f64()?;
+        let y = row["outcome_correct"].as_bool()? as u8 as f64;
+        let error = p - y;
+        brier += error * error;
+        let clipped = p.clamp(LOG_EPSILON, 1.0 - LOG_EPSILON);
+        log_loss -= y * clipped.ln() + (1.0 - y) * (1.0 - clipped).ln();
+        pairs.push((p, y));
+    }
+    let n = pairs.len() as f64;
+    brier /= n;
+    log_loss /= n;
+
+    let mut bins = Vec::new();
+    let mut ece = 0.0;
+    for index in 0..ECE_BINS {
+        let lower = index as f64 / ECE_BINS as f64;
+        let upper = (index + 1) as f64 / ECE_BINS as f64;
+        let members: Vec<(f64, f64)> = pairs.iter().copied()
+            .filter(|(p, _)| {
+                let bucket = ((*p * ECE_BINS as f64).floor() as usize).min(ECE_BINS - 1);
+                bucket == index
+            }).collect();
+        if members.is_empty() { continue; }
+        let count = members.len();
+        let mean_probability = members.iter().map(|(p, _)| p).sum::<f64>() / count as f64;
+        let observed_frequency = members.iter().map(|(_, y)| y).sum::<f64>() / count as f64;
+        ece += (count as f64 / n) * (mean_probability - observed_frequency).abs();
+        bins.push(ReliabilityBin { lower, upper, count, mean_probability, observed_frequency });
+    }
+
+    let mut ranked = pairs.clone();
+    ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let mut errors = 0.0;
+    let mut cumulative_risk_sum = 0.0;
+    for (index, (_, y)) in ranked.iter().enumerate() {
+        errors += 1.0 - y;
+        cumulative_risk_sum += errors / (index + 1) as f64;
+    }
+    let aurc = cumulative_risk_sum / n;
+
+    let mut risk_at_coverage = Vec::new();
+    for coverage in [0.25, 0.50, 0.75, 1.00] {
+        let count = ((coverage * n).ceil() as usize).clamp(1, ranked.len());
+        let risk = ranked[..count].iter().map(|(_, y)| 1.0 - y).sum::<f64>() / count as f64;
+        risk_at_coverage.push((coverage, risk));
+    }
+
+    Some(CalibrationMetrics {
+        sample_count: rows.len(),
+        brier_score: brier,
+        log_loss,
+        ece_equal_width: ece,
+        aurc,
+        reliability_bins: bins,
+        risk_at_coverage,
+    })
+}
+
+fn read_json(path: &str) -> Result<Value, String> {
+    let contents = fs::read_to_string(path).map_err(|error| format!("{path}: {error}"))?;
+    serde_json::from_str(&contents).map_err(|error| format!("{path}: invalid JSON: {error}"))
+}
+
+fn apply_fixture(bundle: &mut Value, fixture: &Value) -> bool {
+    let Some(mutation) = fixture.get("mutation") else { return true; };
+    if mutation.is_null() { return true; }
+    let path = field(mutation, "path").unwrap_or_default();
+    match field(mutation, "operation") {
+        Some("set") => set_at_path(bundle, path, mutation["value"].clone()),
+        Some("remove") => remove_at_path(bundle, path),
+        _ => false,
+    }
+}
+
+fn main() -> ExitCode {
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 3 {
+        eprintln!("usage: ig-confidence-calibration-qualifier <evaluation.json> <negative-controls.json>");
+        return ExitCode::from(2);
+    }
+    let bundle = match read_json(&args[1]) {
+        Ok(value) => value,
+        Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
+    };
+    let controls = match read_json(&args[2]) {
+        Ok(value) => value,
+        Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
+    };
+    let mut findings = validate_bundle(&bundle);
+    let fixtures = controls["fixtures"].as_array().cloned().unwrap_or_default();
+    if fixtures.len() != EXPECTED_FIXTURES
+        || controls["fixture_count"].as_u64() != Some(EXPECTED_FIXTURES as u64)
+    {
+        findings.push("negative_control_fixture_count_invalid".to_string());
+    }
+    for (index, fixture) in fixtures.iter().enumerate() {
+        let mut changed = bundle.clone();
+        if !apply_fixture(&mut changed, fixture) {
+            findings.push(format!("negative_control_fixture_{index}_mutation_invalid"));
+            continue;
+        }
+        let actual = validate_bundle(&changed);
+        let expected = string_set(&fixture["expected_violations"]);
+        let actual: BTreeSet<String> = actual.into_iter().collect();
+        if expected != actual {
+            findings.push(format!("negative_control_fixture_{}_oracle_mismatch", fixture["fixture_id"].as_str().unwrap_or("unknown")));
+        }
+    }
+    if !findings.is_empty() {
+        findings.sort();
+        findings.dedup();
+        eprintln!("CONFIDENCE CALIBRATION QUALIFICATION FAILED:");
+        for finding in findings { eprintln!(" - {finding}"); }
+        return ExitCode::FAILURE;
+    }
+    let Some(metrics) = calculate_metrics(&bundle) else {
+        eprintln!("metrics are unavailable");
+        return ExitCode::FAILURE;
+    };
+    println!("QUALIFIED STRUCTURAL CONFIDENCE EVALUATOR: n={}", metrics.sample_count);
+    println!("Brier={:.8} log_loss={:.8} ECE10={:.8} AURC={:.8}", metrics.brier_score, metrics.log_loss, metrics.ece_equal_width, metrics.aurc);
+    for (coverage, risk) in metrics.risk_at_coverage {
+        println!("risk@coverage[{:.0}%]={:.8}", coverage * 100.0, risk);
+    }
+    println!("NOT A CALIBRATOR: no calibration map was fitted by this evaluator.");
+    println!("NOT AUTHORITY: confidence values do not create civic rights, voice, vote weight, or action authority.");
+    println!("SYNTHETIC ONLY: the checked-in outcomes are fictional known-answer controls.");
+    ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const BUNDLE: &str = include_str!("../../CONFIDENCE_EVALUATION_V0_1.json");
+    const CONTROLS: &str = include_str!("../../CONFIDENCE_NEGATIVE_CONTROLS_V0_1.json");
+
+    fn parsed(source: &str) -> Value {
+        serde_json::from_str(source).expect("checked-in JSON must parse")
+    }
+
+    #[test]
+    fn checked_in_synthetic_evaluation_is_structurally_valid() {
+        assert!(validate_bundle(&parsed(BUNDLE)).is_empty());
+    }
+
+    #[test]
+    fn proper_scores_match_known_answer_fixture() {
+        let metrics = calculate_metrics(&parsed(BUNDLE)).unwrap();
+        assert_eq!(metrics.sample_count, 50);
+        assert!((metrics.brier_score - 0.16).abs() < 1e-12);
+        assert!(metrics.ece_equal_width.abs() < 1e-12);
+        assert!((metrics.log_loss - 0.5004024235381879).abs() < 1e-12);
+        assert_eq!(metrics.reliability_bins.len(), 2);
+    }
+
+    #[test]
+    fn high_confidence_subset_has_lower_selective_risk() {
+        let metrics = calculate_metrics(&parsed(BUNDLE)).unwrap();
+        assert!(metrics.risk_at_coverage[0].1 < metrics.risk_at_coverage[3].1);
+    }
+
+    #[test]
+    fn all_twenty_four_negative_controls_match_expected_violation_codes() {
+        let bundle = parsed(BUNDLE);
+        let controls = parsed(CONTROLS);
+        let fixtures = controls["fixtures"].as_array().unwrap();
+        assert_eq!(fixtures.len(), EXPECTED_FIXTURES);
+        for fixture in fixtures {
+            let mut changed = bundle.clone();
+            assert!(apply_fixture(&mut changed, fixture));
+            let actual: BTreeSet<String> = validate_bundle(&changed).into_iter().collect();
+            let expected = string_set(&fixture["expected_violations"]);
+            assert_eq!(actual, expected, "fixture {}", field(fixture, "fixture_id").unwrap());
+        }
+    }
+
+    #[test]
+    fn normative_values_cannot_be_scored_as_binary_correctness() {
+        let mut bundle = parsed(BUNDLE);
+        bundle["evaluation_identity"]["task_truth_profile"] = Value::String("NormativePluralism".into());
+        assert!(validate_bundle(&bundle).contains(&"evaluation_truth_profile_unsupported".to_string()));
+    }
+
+    #[test]
+    fn confidence_is_not_a_civic_authority_field() {
+        let profile = &parsed(BUNDLE)["calibration_profile"];
+        assert!(profile.get("vote_weight").is_none());
+        assert!(profile.get("eligibility").is_none());
+        assert!(profile.get("authority").is_none());
+    }
+}
