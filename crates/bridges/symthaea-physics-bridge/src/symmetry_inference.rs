@@ -78,6 +78,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use symthaea_core::hdc::lie_theory::{self, LieAlgebra};
 
+use crate::linear_group_action::AdmittedLinearGroupActionV1;
 use crate::types::{LieGroup, SymmetryDescriptor};
 
 /// Fully specified numerical policy used by the bounded Lie-derivative fallback.
@@ -1421,7 +1422,7 @@ pub fn evaluate_metric_aware_linear_action_samples(
         if name.trim().is_empty() {
             return Err(MetricAwareLinearActionSampleErrorV1::EmptyFixedBindingName { index });
         }
-        if declaration.coordinate_names.iter().any(|coordinate| coordinate == name) {
+        if declaration.coordinate_names.iter().any(|coordinate| coordinate.as_str() == name) {
             return Err(
                 MetricAwareLinearActionSampleErrorV1::FixedBindingConflictsWithActionCoordinate {
                     name: name.to_string(),
