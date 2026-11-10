@@ -21,6 +21,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use thiserror::Error;
 
 /// Fault family selected by the benchmark generator, never included in the
@@ -123,6 +124,7 @@ pub struct VssiPublicTask {
 
 /// One completed experiment with provenance, budget accounting and a chained digest.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VssiExperimentReceipt {
     /// Investigator-visible scenario identity.
     pub scenario_id: String,
@@ -132,6 +134,8 @@ pub struct VssiExperimentReceipt {
     pub experiment_index: u64,
     /// Experiment protocol that produced the observation batch.
     pub kind: VssiExperimentKind,
+    /// Digest of the exact registered protocol specification in the public task.
+    pub experiment_spec_digest: String,
     /// Abstract fixture cost charged for this protocol.
     pub observation_cost: f64,
     /// Remaining abstract cost budget immediately before the experiment.
@@ -148,6 +152,7 @@ pub struct VssiExperimentReceipt {
 
 /// Observations released to the investigator together with their receipt.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VssiExperimentResult {
     pub observations: Vec<VssiObservation>,
     pub receipt: VssiExperimentReceipt,
@@ -171,6 +176,7 @@ impl VssiExperimentReceipt {
             return Err(VssiFixtureError::InvalidReceiptClaims);
         }
         if !is_sha256_hex(&self.public_task_digest)
+            || !is_sha256_hex(&self.experiment_spec_digest)
             || !is_sha256_hex(&self.observations_digest)
             || !is_sha256_hex(&self.receipt_digest)
             || self
@@ -186,6 +192,7 @@ impl VssiExperimentReceipt {
             public_task_digest: &self.public_task_digest,
             experiment_index: self.experiment_index,
             kind: self.kind,
+            experiment_spec_digest: &self.experiment_spec_digest,
             observation_cost: self.observation_cost,
             budget_before: self.budget_before,
             budget_after: self.budget_after,
@@ -251,6 +258,101 @@ pub fn validate_vssi_experiment_receipt_chain(
     Ok(())
 }
 
+/// Independently validate released experiment batches against the public task.
+/// This checks the complete task digest, exact registered protocol specification,
+/// one-use protocol identity, observation payload digest and cumulative budget.
+/// It does not authenticate an actor or provide an OS process boundary.
+pub fn validate_vssi_experiment_results(
+    task: &VssiPublicTask,
+    results: &[VssiExperimentResult],
+) -> Result<(), VssiFixtureError> {
+    if task.scenario_id.trim().is_empty()
+        || !task.observation_budget.is_finite()
+        || task.observation_budget < 0.0
+    {
+        return Err(VssiFixtureError::InvalidReceiptClaims);
+    }
+    let mut registered = BTreeSet::new();
+    for spec in &task.available_experiments {
+        if !registered.insert(spec.kind)
+            || !spec.observation_cost.is_finite()
+            || spec.observation_cost < 0.0
+            || !spec.minimum_load.is_finite()
+            || !spec.maximum_load.is_finite()
+            || spec.minimum_load > spec.maximum_load
+            || spec.duration_ticks == 0
+        {
+            return Err(VssiFixtureError::ReceiptSpecMismatch);
+        }
+    }
+
+    let task_digest =
+        sha256_serializable(b"symthaea-vssi-public-task-v1\0", task)?;
+    let mut previous_receipt_digest: Option<&str> = None;
+    let mut remaining_budget = task.observation_budget;
+    let mut used_protocols = BTreeSet::new();
+    for (index, result) in results.iter().enumerate() {
+        result.validate()?;
+        let receipt = &result.receipt;
+        if receipt.scenario_id != task.scenario_id || receipt.public_task_digest != task_digest {
+            return Err(VssiFixtureError::ReceiptTaskMismatch);
+        }
+        if receipt.experiment_index != index as u64 + 1
+            || receipt.previous_receipt_digest.as_deref() != previous_receipt_digest
+            || (receipt.budget_before - remaining_budget).abs() > 1e-12
+        {
+            return Err(VssiFixtureError::ReceiptChainMismatch {
+                index: receipt.experiment_index,
+            });
+        }
+        if !used_protocols.insert(receipt.kind) {
+            return Err(VssiFixtureError::DuplicateReceiptExperiment);
+        }
+        let spec = task
+            .available_experiments
+            .iter()
+            .find(|candidate| candidate.kind == receipt.kind)
+            .ok_or(VssiFixtureError::ReceiptSpecMismatch)?;
+        let expected_spec_digest =
+            sha256_serializable(b"symthaea-vssi-experiment-spec-v1\0", spec)?;
+        if receipt.experiment_spec_digest != expected_spec_digest
+            || (receipt.observation_cost - spec.observation_cost).abs() > 1e-12
+            || receipt.observation_cost > remaining_budget + 1e-12
+        {
+            return Err(VssiFixtureError::ReceiptSpecMismatch);
+        }
+
+        for observation in &result.observations {
+            if !observation.event_time.is_finite()
+                || observation.event_time <= 3.0
+                || (observation.temperature.is_none() && observation.vibration.is_none())
+            {
+                return Err(VssiFixtureError::ReceiptObservationOutOfRange);
+            }
+            for reading in [observation.temperature, observation.vibration]
+                .into_iter()
+                .flatten()
+            {
+                if !reading.value.is_finite()
+                    || !reading.acquired_at.is_finite()
+                    || reading.acquired_at <= observation.event_time
+                {
+                    return Err(VssiFixtureError::ReceiptObservationOutOfRange);
+                }
+            }
+        }
+
+        remaining_budget = (remaining_budget - spec.observation_cost).max(0.0);
+        if (receipt.budget_after - remaining_budget).abs() > 1e-12 {
+            return Err(VssiFixtureError::ReceiptChainMismatch {
+                index: receipt.experiment_index,
+            });
+        }
+        previous_receipt_digest = Some(receipt.receipt_digest.as_str());
+    }
+    Ok(())
+}
+
 #[derive(Serialize)]
 struct VssiExperimentReceiptClaims<'a> {
     schema_version: &'static str,
@@ -258,6 +360,7 @@ struct VssiExperimentReceiptClaims<'a> {
     public_task_digest: &'a str,
     experiment_index: u64,
     kind: VssiExperimentKind,
+    experiment_spec_digest: &'a str,
     observation_cost: f64,
     budget_before: f64,
     budget_after: f64,
@@ -321,6 +424,14 @@ pub enum VssiFixtureError {
     ReceiptDigestMismatch,
     #[error("released observations do not match the experiment receipt digest")]
     ObservationDigestMismatch,
+    #[error("experiment receipt is not bound to the supplied public task")]
+    ReceiptTaskMismatch,
+    #[error("experiment receipt does not match its registered experiment specification")]
+    ReceiptSpecMismatch,
+    #[error("experiment protocol appears more than once in a receipt sequence")]
+    DuplicateReceiptExperiment,
+    #[error("released observation is outside the allowed post-intervention time/quality contract")]
+    ReceiptObservationOutOfRange,
 }
 
 impl VssiMechanicalEnvironment {
@@ -441,6 +552,8 @@ impl VssiMechanicalEnvironment {
             sha256_serializable(b"symthaea-vssi-public-task-v1\0", &self.task)?;
         let observations_digest =
             sha256_serializable(b"symthaea-vssi-observation-batch-v1\0", &observations)?;
+        let experiment_spec_digest =
+            sha256_serializable(b"symthaea-vssi-experiment-spec-v1\0", &spec)?;
         let experiment_index = self.experiment_receipts.len() as u64 + 1;
         let previous_receipt_digest = self
             .experiment_receipts
@@ -452,6 +565,7 @@ impl VssiMechanicalEnvironment {
             public_task_digest: &public_task_digest,
             experiment_index,
             kind,
+            experiment_spec_digest: &experiment_spec_digest,
             observation_cost: spec.observation_cost,
             budget_before,
             budget_after,
@@ -465,6 +579,7 @@ impl VssiMechanicalEnvironment {
             public_task_digest,
             experiment_index,
             kind,
+            experiment_spec_digest,
             observation_cost: spec.observation_cost,
             budget_before,
             budget_after,
