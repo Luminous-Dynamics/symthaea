@@ -1,7 +1,9 @@
 use chrono::DateTime;
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 use std::env;
 use std::fs;
 
@@ -396,6 +398,191 @@ fn check_lineage(case: &Value, f: &mut Findings) {
             "INCOMPLETE",
             format!("model reference '{model}' has no model identity/revision/applicability record"),
         );
+    }
+}
+
+const SERVICE_FINGERPRINT_PROFILE: &str =
+    "marine-service-payload-v1+symthaea-canonical-json-sha256-v1";
+
+fn write_canonical_json(value: &Value, output: &mut String) {
+    match value {
+        Value::Null => output.push_str("null"),
+        Value::Bool(value) => output.push_str(if *value { "true" } else { "false" }),
+        Value::Number(value) => output.push_str(&value.to_string()),
+        Value::String(value) => {
+            output.push_str(
+                &serde_json::to_string(value).expect("serializing a JSON string cannot fail"),
+            );
+        }
+        Value::Array(values) => {
+            output.push('[');
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    output.push(',');
+                }
+                write_canonical_json(value, output);
+            }
+            output.push(']');
+        }
+        Value::Object(values) => {
+            output.push('{');
+            let mut entries: Vec<_> = values.iter().collect();
+            entries.sort_by(|left, right| left.0.cmp(right.0));
+            for (index, (key, value)) in entries.into_iter().enumerate() {
+                if index > 0 {
+                    output.push(',');
+                }
+                output.push_str(
+                    &serde_json::to_string(key).expect("serializing a JSON key cannot fail"),
+                );
+                output.push(':');
+                write_canonical_json(value, output);
+            }
+            output.push('}');
+        }
+    }
+}
+
+fn canonical_json_sha256(value: &Value) -> String {
+    let mut canonical = String::new();
+    write_canonical_json(value, &mut canonical);
+    let digest = Sha256::digest(canonical.as_bytes());
+    let mut result = String::with_capacity(64);
+    for byte in digest {
+        write!(&mut result, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    result
+}
+
+fn required_field<'a>(value: &'a Value, field: &str, path: &str) -> Result<&'a Value, String> {
+    value.get(field).ok_or_else(|| format!("missing required service fingerprint field {path}/{field}"))
+}
+
+fn projected_quantity(value: &Value) -> Value {
+    let mut projected = Map::new();
+    for field in ["value", "unit", "unknown_reason"] {
+        if let Some(member) = value.get(field) {
+            projected.insert(field.to_owned(), member.clone());
+        }
+    }
+    Value::Object(projected)
+}
+
+fn insert_optional_quantity(target: &mut Map<String, Value>, source: &Value, field: &str) {
+    if let Some(quantity) = source.get(field) {
+        target.insert(field.to_owned(), projected_quantity(quantity));
+    }
+}
+
+fn service_fingerprint_payload(case: &Value) -> Result<Value, String> {
+    let comparison = required_field(case, "comparison", "")?;
+    let profile = comparison
+        .get("service_fingerprint_profile")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "missing service_fingerprint_profile".to_owned())?;
+    if profile != SERVICE_FINGERPRINT_PROFILE {
+        return Err(format!("unsupported service fingerprint profile '{profile}'"));
+    }
+
+    let service = required_field(case, "service", "")?;
+    let route = required_field(case, "route", "")?;
+    let vessel = required_field(case, "vessel", "")?;
+    let mut payload = Map::new();
+    payload.insert(
+        "fingerprint_profile".to_owned(),
+        Value::String(SERVICE_FINGERPRINT_PROFILE.to_owned()),
+    );
+
+    for field in ["cargo_class", "functional_unit", "service_contract_id", "arrival_policy"] {
+        payload.insert(field.to_owned(), required_field(service, field, "/service")?.clone());
+    }
+    if let Some(other_unit) = service.get("declared_other_unit") {
+        payload.insert("declared_other_unit".to_owned(), other_unit.clone());
+    }
+    for field in [
+        "annual_delivered_work",
+        "annual_delivered_cargo_mass",
+        "annual_delivered_teu",
+        "required_arrival_window_hours",
+        "service_availability_target",
+    ] {
+        insert_optional_quantity(&mut payload, service, field);
+    }
+
+    payload.insert(
+        "loading_condition".to_owned(),
+        required_field(vessel, "loading_condition", "/vessel")?.clone(),
+    );
+    payload.insert("route_id".to_owned(), required_field(route, "route_id", "/route")?.clone());
+    payload.insert(
+        "route_revision".to_owned(),
+        required_field(route, "route_revision", "/route")?.clone(),
+    );
+
+    let segments = route
+        .get("segments")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "missing route segments for service fingerprint".to_owned())?;
+    let mut projected_segments = Vec::with_capacity(segments.len());
+    for (index, segment) in segments.iter().enumerate() {
+        let path = format!("/route/segments/{index}");
+        let mut projected = Map::new();
+        for field in ["segment_id", "speed_policy"] {
+            projected.insert(
+                field.to_owned(),
+                required_field(segment, field, &path)?.clone(),
+            );
+        }
+        let distance = required_field(segment, "distance", &path)?;
+        projected.insert("distance".to_owned(), projected_quantity(distance));
+        for field in ["target_speed", "arrival_time_window"] {
+            insert_optional_quantity(&mut projected, segment, field);
+        }
+        if let Some(port) = segment.get("port_or_waypoint_id") {
+            projected.insert("port_or_waypoint_id".to_owned(), port.clone());
+        }
+        projected_segments.push(Value::Object(projected));
+    }
+    payload.insert("segments".to_owned(), Value::Array(projected_segments));
+    Ok(Value::Object(payload))
+}
+
+fn compute_service_fingerprint(case: &Value) -> Result<String, String> {
+    let payload = service_fingerprint_payload(case)?;
+    Ok(canonical_json_sha256(&payload))
+}
+
+fn check_service_fingerprint(case: &Value, f: &mut Findings) {
+    let expected = case
+        .pointer("/comparison/service_fingerprint")
+        .and_then(Value::as_str);
+    let profile = case
+        .pointer("/comparison/service_fingerprint_profile")
+        .and_then(Value::as_str);
+    match profile {
+        None => f.push(
+            "/comparison/service_fingerprint_profile",
+            "INCOMPLETE",
+            "legacy case has no versioned canonical service fingerprint profile; digest equality alone is not independently recomputed",
+        ),
+        Some(profile) if profile != SERVICE_FINGERPRINT_PROFILE => f.push(
+            "/comparison/service_fingerprint_profile",
+            "INVALID",
+            format!("unsupported service fingerprint profile '{profile}'"),
+        ),
+        Some(_) => match compute_service_fingerprint(case) {
+            Ok(actual) if Some(actual.as_str()) == expected => {}
+            Ok(_) => f.push(
+                "/comparison/service_fingerprint",
+                "INVALID",
+                "service fingerprint does not match the canonical service/route/loading payload",
+            ),
+            Err(error) => f.push(
+                "/comparison/service_fingerprint",
+                "INVALID",
+                error,
+            ),
+        },
     }
 }
 
@@ -1040,6 +1227,7 @@ fn validate_semantics(case: &Value, f: &mut Findings, pair_supplied: bool) {
     }
 
     walk_semantics(case, "", f);
+    check_service_fingerprint(case, f);
     check_unique_scopes(case, f);
     check_lineage(case, f);
     check_trial(case, f);
@@ -1155,6 +1343,27 @@ mod tests {
         include_str!("../../../docs/research/marine/marine-propulsion-case-v0.2.0.schema.json");
     const SYNTHETIC_CASE_V2: &str =
         include_str!("../../../docs/research/marine/fixtures/synthetic-waps-case-v0.2.0.json");
+
+    #[test]
+    fn service_fingerprint_matches_known_canonical_vector() {
+        let fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        assert_eq!(
+            compute_service_fingerprint(&fixture).expect("canonical fingerprint"),
+            "38e8d556612ac380d71ca6786146bfa47f78cec97ce00a32698ae8cf82a3eda2"
+        );
+    }
+
+    #[test]
+    fn service_fingerprint_changes_when_declared_service_changes() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        let original = compute_service_fingerprint(&fixture).expect("original fingerprint");
+        fixture["route"]["segments"][0]["target_speed"]["value"] =
+            serde_json::json!(19);
+        let changed = compute_service_fingerprint(&fixture).expect("changed fingerprint");
+        assert_ne!(original, changed);
+    }
 
     #[test]
     fn v0_2_schema_and_fixture_resolve_calibration_and_timebase_contracts() {
