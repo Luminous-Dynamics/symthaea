@@ -936,7 +936,7 @@ mod tests {
     const SCHEMA: &[u8] =
         include_bytes!("../../../schemas/transport/ev_cell_limited_power_envelope_v0_1.schema.json");
     const CORPUS: &[u8] =
-        include_bytes!("../../../fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_1.json");
+        include_bytes!("../../../fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_2.json");
 
     fn report() -> CorpusReport {
         audit_corpus(SCHEMA, CORPUS).expect("frozen power-envelope corpus")
