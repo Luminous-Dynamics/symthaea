@@ -77,6 +77,7 @@ pub struct NumericLieDerivativeProfileV1 {
     pub sample_min_inclusive: f64,
     pub sample_max_exclusive: f64,
     pub maximum_joint_dimension: usize,
+    pub pairwise_so2_search: bool,
 }
 
 impl Default for NumericLieDerivativeProfileV1 {
@@ -90,6 +91,7 @@ impl Default for NumericLieDerivativeProfileV1 {
             sample_min_inclusive: 0.5,
             sample_max_exclusive: 3.0,
             maximum_joint_dimension: 6,
+            pairwise_so2_search: true,
         }
     }
 }
@@ -98,7 +100,10 @@ impl Default for NumericLieDerivativeProfileV1 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StructuralSymmetryPattern {
     /// A sum of distinct squared variables with one shared finite nonzero coefficient.
-    EqualCoefficientSumOfSquares,
+    EqualCoefficientSumOfSquares {
+        variable_count: u8,
+        shared_coefficient: f64,
+    },
     /// A two-dimensional antisymmetric bilinear determinant with four distinct variables.
     TwoDimensionalAntisymmetricBilinear,
 }
@@ -166,7 +171,12 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
         return SymmetryInferenceReport {
             candidate: Some(SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(n)], false)),
             evidence: Some(SymmetryInferenceEvidence::StructuralPatternMatch {
-                pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares,
+                pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares {
+                    variable_count: n,
+                    shared_coefficient: detect_sum_of_squares_with_coefficient(expr)
+                        .map(|(_, coefficient)| coefficient)
+                        .unwrap_or(1.0),
+                },
             }),
             search_status: SymmetryInferenceSearchStatus::StructuralMatchShortCircuit,
             numeric_profile,
@@ -405,6 +415,10 @@ fn flatten_add_only<'a>(expr: &'a Expr, out: &mut Vec<&'a Expr>) {
 /// shared finite, nonzero coefficient c, return k. Unequal weights define an
 /// ellipsoid rather than an SO(k)-invariant quadratic form and are rejected.
 fn detect_sum_of_squares(expr: &Expr) -> Option<u8> {
+    detect_sum_of_squares_with_coefficient(expr).map(|(count, _)| count)
+}
+
+fn detect_sum_of_squares_with_coefficient(expr: &Expr) -> Option<(u8, f64)> {
     let mut terms = Vec::new();
     flatten_add_only(expr, &mut terms);
     if terms.len() < 2 {
@@ -434,7 +448,7 @@ fn detect_sum_of_squares(expr: &Expr) -> Option<u8> {
         }
         seen.push(var);
     }
-    Some(seen.len() as u8)
+    Some((seen.len() as u8, common_coefficient?))
 }
 
 /// Return (variable name, total scalar coefficient) for a squared variable.
@@ -543,7 +557,10 @@ mod tests {
         assert_eq!(
             report.evidence,
             Some(SymmetryInferenceEvidence::StructuralPatternMatch {
-                pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares,
+                pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares {
+                    variable_count: 2,
+                    shared_coefficient: 1.0,
+                },
             })
         );
         assert_eq!(
