@@ -102,9 +102,19 @@ pub struct RegisteredOperatorV1 {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RegisteredObserverV1 {
+    pub metric_id: String,
+    pub observer_profile_sha256: String,
+    pub evaluator_artifact_sha256: String,
+    pub calibration_receipt_sha256: String,
+    pub independently_qualified: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AuthorityPolicyV1 {
     pub registry_snapshot_sha256: String,
     pub operators: Vec<RegisteredOperatorV1>,
+    pub observers: Vec<RegisteredObserverV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -325,6 +335,7 @@ pub fn authorize_mutation(
         &request.required_observer_metric_ids,
         &request.observers,
         &request.operator_artifact_sha256,
+        &policy.observers,
     )?;
 
     validate_nonnegative(request.estimated_cost.compute_units, "estimated compute")?;
@@ -442,6 +453,28 @@ pub fn commit_execution(
 
 /// A definite failure is retry-safe only when an independent receipt proves
 /// that no output was committed. Otherwise the state must remain unresolved.
+/// Cancel an unused AUTHORIZED grant before dispatch. This is a definite
+/// no-mutation transition; the reservation is not refunded in v1.
+pub fn cancel_undispatched_authorization(
+    state: &RuntimeStateV1,
+    grant: &ExecutionGrantV1,
+    cancellation_receipt_sha256: &str,
+) -> Result<RuntimeStateV1, GateErrorV1> {
+    validate_state(state)?;
+    validate_digest(cancellation_receipt_sha256, "cancellation receipt")?;
+    let mut next = state.clone();
+    let attempt = find_attempt_mut(&mut next, &grant.grant_id_sha256)?;
+    ensure_same_grant(&attempt.grant, grant)?;
+    if attempt.status != AttemptStatusV1::Authorized {
+        return Err(GateErrorV1::transition(
+            "only an undispatched AUTHORIZED grant can be cancelled",
+        ));
+    }
+    attempt.status = AttemptStatusV1::FailedNoMutation;
+    attempt.failure_receipt_sha256 = Some(cancellation_receipt_sha256.to_owned());
+    Ok(next)
+}
+
 pub fn record_definite_failure(
     state: &RuntimeStateV1,
     grant: &ExecutionGrantV1,
@@ -618,6 +651,16 @@ fn validate_policy(policy: &AuthorityPolicyV1) -> Result<(), GateErrorV1> {
             return Err(GateErrorV1::invalid("duplicate operator profile in authority policy"));
         }
     }
+    let mut observer_keys = BTreeSet::new();
+    for observer in &policy.observers {
+        require_text(&observer.metric_id, "registered observer metric ID")?;
+        validate_digest(&observer.observer_profile_sha256, "registered observer profile digest")?;
+        validate_digest(&observer.evaluator_artifact_sha256, "registered evaluator artifact digest")?;
+        validate_digest(&observer.calibration_receipt_sha256, "registered observer calibration receipt")?;
+        if !observer_keys.insert((observer.metric_id.as_str(), observer.observer_profile_sha256.as_str())) {
+            return Err(GateErrorV1::invalid("duplicate observer profile in authority policy"));
+        }
+    }
     Ok(())
 }
 
@@ -641,16 +684,25 @@ fn validate_request(request: &MutationRequestV1) -> Result<(), GateErrorV1> {
     validate_nonnegative(request.estimated_cost.compute_units, "estimated compute cost")?;
     validate_nonnegative(request.estimated_cost.risk_units, "estimated risk cost")?;
 
+    validate_unique_texts(&request.required_capabilities, "required capabilities")?;
+    validate_unique_texts(&request.required_precondition_ids, "required precondition IDs")?;
+    validate_unique_texts(&request.required_observer_metric_ids, "required observer metric IDs")?;
     let auth = &request.user_authorization;
     validate_digest(&auth.receipt_sha256, "user authorization receipt")?;
     validate_digest(&auth.plan_sha256, "authorized plan digest")?;
     require_text(&auth.plan_node_id, "authorized plan node ID")?;
     validate_digest(&auth.parent_audio_sha256, "authorized parent audio digest")?;
     validate_digest(&auth.action_sha256, "authorized action digest")?;
-    if auth.maximum_scope != request.requested_scope {
+    if !auth.explicit_authorization
+        || auth.plan_sha256 != request.plan_sha256
+        || auth.plan_node_id != request.plan_node_id
+        || auth.parent_audio_sha256 != request.parent_audio_sha256
+        || auth.action_sha256 != request.action_sha256
+        || auth.maximum_scope != request.requested_scope
+    {
         return Err(GateErrorV1::new(
             GateErrorKindV1::Unauthorized,
-            "user authorization must grant exactly the requested scope (least privilege)",
+            "user authorization receipt must explicitly bind this exact plan node, parent, action and least-privilege scope",
         ));
     }
     Ok(())
@@ -697,6 +749,7 @@ fn validate_observers(
     required: &[String],
     observers: &[ObserverEvidenceV1],
     operator_digest: &str,
+    registered: &[RegisteredObserverV1],
 ) -> Result<(), GateErrorV1> {
     let mut seen = BTreeSet::new();
     for observer in observers {
@@ -704,10 +757,19 @@ fn validate_observers(
         validate_digest(&observer.observer_profile_sha256, "observer profile digest")?;
         validate_digest(&observer.evaluator_artifact_sha256, "evaluator artifact digest")?;
         validate_digest(&observer.calibration_receipt_sha256, "observer calibration receipt")?;
-        if !observer.independently_qualified || observer.evaluator_artifact_sha256 == operator_digest {
+        let profile = registered.iter().find(|profile| {
+            profile.metric_id == observer.metric_id
+                && profile.observer_profile_sha256 == observer.observer_profile_sha256
+                && profile.evaluator_artifact_sha256 == observer.evaluator_artifact_sha256
+                && profile.calibration_receipt_sha256 == observer.calibration_receipt_sha256
+        });
+        if !observer.independently_qualified
+            || observer.evaluator_artifact_sha256 == operator_digest
+            || profile.is_none_or(|profile| !profile.independently_qualified)
+        {
             return Err(GateErrorV1::new(
                 GateErrorKindV1::Unauthorized,
-                "observer is not qualified or reuses the operator artifact",
+                "observer is not present in the frozen authority registry, is not qualified or reuses the operator artifact",
             ));
         }
         if !seen.insert(observer.metric_id.as_str()) {
@@ -826,6 +888,13 @@ mod tests {
                 capabilities: vec!["vocal.local-edit".into(), "vocal.phoneme-edit".into()],
                 maximum_scope: MutationScopeV1::Phrase,
             }],
+            observers: vec![RegisteredObserverV1 {
+                metric_id: "phoneme-error-rate".into(),
+                observer_profile_sha256: digest('3'),
+                evaluator_artifact_sha256: digest('4'),
+                calibration_receipt_sha256: digest('5'),
+                independently_qualified: true,
+            }],
         }
     }
 
@@ -940,6 +1009,44 @@ mod tests {
         global.requested_scope = MutationScopeV1::Global;
         global.user_authorization.maximum_scope = MutationScopeV1::Global;
         assert_eq!(authorize_mutation(&state(), &policy(), &global).unwrap_err().kind, GateErrorKindV1::Unauthorized);
+    }
+
+    #[test]
+    fn rejects_authorization_receipt_bound_to_different_plan_or_parent() {
+        let mut wrong_plan = request();
+        wrong_plan.user_authorization.plan_sha256 = digest('0');
+        assert_eq!(
+            authorize_mutation(&state(), &policy(), &wrong_plan).unwrap_err().kind,
+            GateErrorKindV1::Unauthorized
+        );
+        let mut wrong_parent = request();
+        wrong_parent.user_authorization.parent_audio_sha256 = digest('0');
+        assert_eq!(
+            authorize_mutation(&state(), &policy(), &wrong_parent).unwrap_err().kind,
+            GateErrorKindV1::Unauthorized
+        );
+    }
+
+    #[test]
+    fn observer_must_match_frozen_authority_registry_profile() {
+        let mut wrong_profile = request();
+        wrong_profile.observers[0].observer_profile_sha256 = digest('0');
+        assert_eq!(
+            authorize_mutation(&state(), &policy(), &wrong_profile).unwrap_err().kind,
+            GateErrorKindV1::Unauthorized
+        );
+    }
+
+    #[test]
+    fn cancel_before_dispatch_closes_grant_and_allows_a_new_one() {
+        let (authorized, grant) = authorized();
+        let cancelled = cancel_undispatched_authorization(
+            &authorized, &grant, &digest('a')
+        ).unwrap();
+        assert_eq!(cancelled.attempts[0].status, AttemptStatusV1::FailedNoMutation);
+        let mut retry = request();
+        retry.grant_id_sha256 = digest('c');
+        assert!(authorize_mutation(&cancelled, &policy(), &retry).is_ok());
     }
 
     #[test]
