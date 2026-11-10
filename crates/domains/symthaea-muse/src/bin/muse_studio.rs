@@ -3387,6 +3387,7 @@ fn score_note_event(
     let pitch = note.pitch;
     SymbolicNoteEvent {
         id: symbolic_note_id(role, role_index),
+        part_id: note.part.is_assigned().then_some(note.part.0),
         midi: pitch.midi(),
         pitch_name: format!("{}{}", pitch.pitch_class().name(), pitch.octave()),
         onset: musical_time(beats, tempo),
@@ -4052,6 +4053,23 @@ fn composition_bundle(
     )
 }
 
+fn source_part_id_for_role(score: &Score, role: VoiceRole) -> Option<u16> {
+    let mut source_part = None;
+    let mut found_note = false;
+    for note in score.notes.iter().filter(|note| note.role == role) {
+        found_note = true;
+        if !note.part.is_assigned() {
+            return None;
+        }
+        match source_part {
+            Some(existing) if existing != note.part.0 => return None,
+            Some(_) => {}
+            None => source_part = Some(note.part.0),
+        }
+    }
+    found_note.then_some(source_part).flatten()
+}
+
 fn performance_bundle_payload(
     score: &Score,
     spec: &CompositionSpec,
@@ -4074,13 +4092,7 @@ fn performance_bundle_payload(
     let mut summaries = Vec::new();
     let mut duration = 0.0_f64;
     for (voice_index, voice) in voices.into_iter().enumerate() {
-        let voice_id = voice.name.to_ascii_lowercase().replace(' ', "-");
-        summaries.push(PerformanceVoiceSummary {
-            id: voice_id.clone(),
-            name: voice.name.clone(),
-            instrument: voice.instrument.clone(),
-            note_count: voice.notes.len(),
-        });
+        let voice_id = voice.name.to_ascii_lowercase().replace(' ', "-');
         let source_role = match voice.name.as_str() {
             "Bass" => Some(VoiceRole::Bass),
             "Harmony" => Some(VoiceRole::Harmony),
@@ -4088,24 +4100,49 @@ fn performance_bundle_payload(
             "Melody" => Some(VoiceRole::Melody),
             _ => None,
         };
+        let expected_count = source_role.map(|role| score.voice(role).len());
+        let source_part_id = source_role.and_then(|role| source_part_id_for_role(score, role));
+        let exact_source_mapping = source_part_id.is_some()
+            && expected_count == Some(voice.notes.len());
+
         if let Some(role) = source_role {
-            let expected = score.voice(role).len();
+            let expected = expected_count.unwrap_or(0);
             if expected != voice.notes.len() {
                 warnings.push(BundleWarning {
                     code: "performance-source-count-mismatch".to_string(),
                     message: format!(
-                        "{} emitted {} performed events for {expected} symbolic events; source IDs after the shared prefix were withheld.",
+                        "{} emitted {} performed events for {expected} symbolic events; source IDs and PartIds were withheld.",
                         voice.name,
                         voice.notes.len()
                     ),
                 });
+            } else if source_part_id.is_none() {
+                warnings.push(BundleWarning {
+                    code: "performance-source-part-identity-ambiguous".to_string(),
+                    message: format!(
+                        "{} maps to a role containing multiple or unassigned PartIds; source IDs and PartIds were withheld rather than inferred.",
+                        voice.name
+                    ),
+                });
             }
+            let _ = role;
         }
+
+        summaries.push(PerformanceVoiceSummary {
+            id: voice_id.clone(),
+            name: voice.name.clone(),
+            instrument: voice.instrument.clone(),
+            part_id: exact_source_mapping.then_some(source_part_id).flatten(),
+            voice_role: source_role.map(|role| role_label(role).to_string()),
+            note_count: voice.notes.len(),
+        });
+
         for (note_index, note) in voice.notes.into_iter().enumerate() {
-            let source_note_id = source_role.and_then(|role| {
-                (score.voice(role).len() == summaries.last().map_or(0, |v| v.note_count))
-                    .then(|| symbolic_note_id(role, note_index))
-            });
+            let source_note_id = if exact_source_mapping {
+                source_role.map(|role| symbolic_note_id(role, note_index))
+            } else {
+                None
+            };
             let nominal = source_note_id
                 .as_deref()
                 .and_then(|id| symbolic_times.get(id).copied());
@@ -4114,6 +4151,7 @@ fn performance_bundle_payload(
                 id: format!("performance-{voice_index}-{note_index}"),
                 voice_id: voice_id.clone(),
                 source_note_id,
+                part_id: if exact_source_mapping { source_part_id } else { None },
                 start_seconds: note.start_time as f64,
                 duration_seconds: note.duration as f64,
                 frequency_hz: note.frequency as f64,
@@ -4128,7 +4166,7 @@ fn performance_bundle_payload(
     (
         ListenPerformanceBundle {
             duration_seconds: duration,
-            mapping_method: "ordered-primary-score-voice-v1; renderer-added-voices-unmapped"
+            mapping_method: "ordered-primary-score-voice-single-part-v2; role-aggregated-or-unassigned-parts-unmapped; renderer-added-voices-unmapped"
                 .to_string(),
             voices: summaries,
             notes: events,
@@ -4242,6 +4280,70 @@ mod piece_bundle_tests {
         assert_eq!(regions[0].active_voices.len(), 2);
         assert_eq!(regions[0].register_min_midi, Some(48));
         assert_eq!(regions[0].register_max_midi, Some(60));
+    }
+
+    #[test]
+    fn symbolic_note_events_retain_generator_authored_part_ids() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for (part, midi, onset) in [(PartId(10), 60, 0), (PartId(11), 64, 1)] {
+            score.push(ScoreNote {
+                part,
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::quarter(),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        let notes = symbolic_notes(&score);
+        assert_eq!(notes.len(), 2);
+        assert_eq!(notes[0].part_id, Some(10));
+        assert_eq!(notes[1].part_id, Some(11));
+    }
+
+    #[test]
+    fn role_to_part_mapping_abstains_when_a_role_contains_multiple_parts() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for (part, onset) in [(PartId(10), 0), (PartId(11), 1)] {
+            score.push(ScoreNote {
+                part,
+                pitch: Pitch::from_midi(60),
+                onset: Duration::new(onset, 1),
+                duration: Duration::quarter(),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        assert_eq!(source_part_id_for_role(&score, VoiceRole::Melody), None);
+    }
+
+    #[test]
+    fn role_to_part_mapping_abstains_when_any_note_is_unassigned() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.push(note(0, 0.8, Emphasis::Normal));
+        assert_eq!(source_part_id_for_role(&score, VoiceRole::Melody), None);
+    }
+
+    #[test]
+    fn role_to_part_mapping_accepts_one_complete_persistent_part() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for onset in [0, 1, 2] {
+            score.push(ScoreNote {
+                part: PartId(42),
+                pitch: Pitch::from_midi(60 + onset as u8),
+                onset: Duration::new(onset, 1),
+                duration: Duration::quarter(),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        assert_eq!(source_part_id_for_role(&score, VoiceRole::Melody), Some(42));
     }
 
     #[test]
