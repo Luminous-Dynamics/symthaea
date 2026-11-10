@@ -949,6 +949,7 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
 /// consequent is left intact (it owns the section's cadence).
 fn apply_development_style(
     score: &mut Score,
+    part_id: PartId,
     form: &Form,
     dna: crate::spec::DevelopmentDna,
     motif: &crate::motif::Motif,
@@ -1130,7 +1131,7 @@ fn apply_development_style(
                         pitch = pitch.transpose(-12);
                     }
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part,
                         pitch,
                         onset: t,
                         duration: note.duration,
@@ -1775,7 +1776,14 @@ fn apply_harmonic_stasis(score: &mut Score) {
 /// this is the first that wholesale REPLACES one within its window
 /// (mirroring how [`apply_drone_pedal`] replaces the whole bass, but
 /// scoped to specific sections rather than the whole piece).
-fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats: f64, seed: u64) {
+fn apply_additive_process(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    bars: i64,
+    meter_beats: f64,
+    seed: u64,
+) {
     let cell = crate::hook::HookCell::generate_with(
         &crate::spec::MelodicDna::default(),
         seed,
@@ -1822,7 +1830,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part,
                     pitch,
                     onset: Duration::new((t * 480.0).round() as i64, 480),
                     duration: Duration::new((this_dur * 480.0).round().max(1.0) as i64, 480),
@@ -1857,7 +1865,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
 /// point of a drone: it's the fixed ground a modal melody floats over, the
 /// harmony moving freely against it. Runs LAST, after every other bass
 /// note is in place, and simply replaces them all.
-fn apply_drone_pedal(score: &mut Score, key: Key) {
+fn apply_drone_pedal(score: &mut Score, part_id: PartId, key: Key) {
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -1887,7 +1895,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
         let onset = bar.scale(m, 1);
         let si = intensity_near(onset.beats());
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: tonic,
             onset,
             duration: half,
@@ -1897,7 +1905,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
             section_intensity: si,
         });
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: fifth,
             onset: onset + half,
             duration: half,
@@ -1922,8 +1930,13 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
 /// the whole piece — reusing the Ambient style's own device (repetition
 /// becoming duration) rather than re-deriving tying logic, since the
 /// effect wanted is identical.
-fn apply_full_drone(score: &mut Score, key: Key) {
-    apply_drone_pedal(score, key);
+fn apply_full_drone(
+    score: &mut Score,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
+    key: Key,
+) {
+    apply_drone_pedal(score, bass_part_id, key);
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -1952,7 +1965,7 @@ fn apply_full_drone(score: &mut Score, key: Key) {
         let si = intensity_near(onset.beats());
         for pitch in [tonic, fifth, octave] {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part_id,
                 pitch,
                 onset,
                 duration: bar,
@@ -1982,7 +1995,14 @@ fn apply_full_drone(score: &mut Score, key: Key) {
 /// Returns keep the staged-entrance treatment (the thinned bar, the
 /// arrival) — you leave home by modulation, you come home by arrival.
 /// The fugue keeps its documented no-modulation limit (its own pipeline).
-fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beats: f64) {
+fn apply_pivot_modulations(
+    score: &mut Score,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
+    form: &Form,
+    bars: i64,
+    meter_beats: f64,
+) {
     let section_bars = 2 * bars; // antecedent + consequent
     let meter_i = meter_beats as i64;
     for i in 1..form.sections.len() {
@@ -2096,7 +2116,7 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
         if !window_touched {
             for &pitch in &dom_voiced {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: harmony_part_id,
                     pitch,
                     onset: win_onset,
                     duration: half,
@@ -2107,7 +2127,7 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
                 });
             }
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: bass_part_id,
                 pitch: dom_root_bass,
                 onset: win_onset,
                 duration: half,
@@ -2374,6 +2394,7 @@ fn apply_phrase_rhetoric(
 /// semitones below it.
 fn apply_grief_suspensions(
     score: &mut Score,
+    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -2405,7 +2426,7 @@ fn apply_grief_suspensions(
             };
             let onset = bar.scale(measure + i as i64, 1);
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part,
                 pitch: sus,
                 onset,
                 duration: Duration::new(1, 1),
@@ -2415,7 +2436,7 @@ fn apply_grief_suspensions(
                 section_intensity: section.role.intensity(),
             });
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part,
                 pitch: resolution,
                 onset: onset + Duration::new(1, 1),
                 duration: Duration::new((meter_beats as i64 - 1).max(1), 1),
@@ -2928,6 +2949,7 @@ fn plan_damage(
 /// the hook there; two quotations at once would smear both).
 fn apply_counter_hook_echoes(
     score: &mut Score,
+    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -2987,11 +3009,13 @@ fn apply_counter_hook_echoes(
             // notes: exact-duplicate onsets/pitches or straight overlap.
             score.notes.retain(|n| {
                 !(n.role == VoiceRole::CounterMelody
+                    && n.part == part_id
                     && n.onset.beats() >= echo_start - 1e-9
                     && n.onset.beats() < echo_end - 1e-9)
             });
             for n in score.notes.iter_mut() {
                 if n.role == VoiceRole::CounterMelody
+                    && n.part == part_id
                     && n.onset.beats() < echo_start - 1e-9
                     && (n.onset + n.duration).beats() > echo_start + 1e-9
                 {
@@ -3008,7 +3032,7 @@ fn apply_counter_hook_echoes(
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch,
                     onset: Duration::new((t * 4.0).round() as i64, 4),
                     duration: halved,
@@ -3204,6 +3228,7 @@ fn alter_statement(
 /// instrumental works become deeply satisfying.
 fn apply_hidden_bass_quote(
     score: &mut Score,
+    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -3239,7 +3264,7 @@ fn apply_hidden_bass_quote(
     for &(deg, dur) in &hook.notes {
         let augmented = dur.scale(2, 1);
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: key.scale().degree_pitch(deg, 2),
             onset: Duration::new((t * 2.0).round() as i64, 2),
             duration: augmented,
@@ -3441,6 +3466,8 @@ fn apply_held_arrivals(score: &mut Score, meter_beats: f64) {
 /// phrase entry is an EVENT.
 fn prepend_intro(
     score: &mut Score,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
     home: Key,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -3472,8 +3499,9 @@ fn prepend_intro(
         let onset = bar.scale(m, 1);
         match variant {
             1 => {
-                pattern.realize_measure(
+                pattern.realize_measure_for_part(
                     score,
+                    harmony_part_id,
                     &voiced,
                     onset,
                     meter_beats,
@@ -3481,7 +3509,7 @@ fn prepend_intro(
                     SectionRole::A.intensity(),
                 );
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: bass_part_id,
                     pitch: Pitch::new(home.tonic, 2),
                     onset,
                     duration: bar,
@@ -3497,7 +3525,7 @@ fn prepend_intro(
                 let swell = vel * (0.8 + 0.2 * (m as f32 + 1.0) / intro_bars.max(1) as f32);
                 for pitch in &voiced {
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: harmony_part_id,
                         pitch: *pitch,
                         onset,
                         duration: bar,
@@ -3509,8 +3537,9 @@ fn prepend_intro(
                 }
             }
             _ => {
-                pattern.realize_measure(
+                pattern.realize_measure_for_part(
                     score,
+                    harmony_part_id,
                     &voiced,
                     onset,
                     meter_beats,
@@ -3549,13 +3578,27 @@ pub const CODA_BARS: i64 = 2;
 /// original cadence now gets the smaller mid-piece relaxation.
 fn append_coda(
     score: &mut Score,
+    melody_part_id: PartId,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
     home: Key,
     meter_beats: f64,
     intent: &MusicalIntent,
     coda_bars: i64,
     transformed: bool,
 ) {
-    if transformed && append_transformed_coda(score, home, meter_beats, intent, coda_bars) {
+    if transformed
+        && append_transformed_coda(
+            score,
+            melody_part_id,
+            bass_part_id,
+            harmony_part_id,
+            home,
+            meter_beats,
+            intent,
+            coda_bars,
+        )
+    {
         return;
     }
     let bar = Duration::new(meter_beats as i64, 1);
@@ -3574,7 +3617,7 @@ fn append_coda(
         let onset = start + bar.scale(m, 1);
         let chord = home.diatonic_triad(deg);
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: melody_part_id,
             pitch: tonic_melody,
             onset,
             duration: bar,
@@ -3589,7 +3632,7 @@ fn append_coda(
         });
         for pitch in chord.voice(3) {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part_id,
                 pitch,
                 onset,
                 duration: bar,
@@ -3600,7 +3643,7 @@ fn append_coda(
             });
         }
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part_id,
             pitch: chord.voice(2)[0],
             onset,
             duration: bar,
@@ -3630,6 +3673,9 @@ fn append_coda(
 /// no melody to quote.
 fn append_transformed_coda(
     score: &mut Score,
+    melody_part_id: PartId,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
     home: Key,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -3700,7 +3746,7 @@ fn append_transformed_coda(
         };
         let fade = 0.9 - 0.25 * (onset_beats / total_beats) as f32;
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: melody_part_id,
             pitch,
             onset: start + Duration::new((onset_beats * 2.0) as i64, 2),
             duration: Duration::new((dur_beats * 2.0) as i64, 2),
@@ -3727,7 +3773,7 @@ fn append_transformed_coda(
         let onset = start + bar.scale(m, 1);
         for pitch in chord.voice(3) {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part_id,
                 pitch,
                 onset,
                 duration: bar,
@@ -3741,7 +3787,7 @@ fn append_transformed_coda(
             });
         }
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part_id,
             pitch: chord.voice(2)[0],
             onset,
             duration: bar,
