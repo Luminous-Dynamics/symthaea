@@ -639,12 +639,16 @@ fn check_trial(case: &Value, f: &mut Findings) {
                             .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
                         let calibration_date = record.get("calibration_date").and_then(Value::as_str)
                             .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
-                        if matches!((calibration_date, valid_from), (Some(calibrated), Some(from)) if calibrated > from) {
-                            f.push(
-                                record_path.clone(),
-                                "INVALID",
-                                "calibration_date must not be later than valid_from",
-                            );
+                        if let (Some(calibrated), Some(from)) =
+                            (calibration_date.as_ref(), valid_from.as_ref())
+                        {
+                            if calibrated > from {
+                                f.push(
+                                    record_path.clone(),
+                                    "INVALID",
+                                    "calibration_date must not be later than valid_from",
+                                );
+                            }
                         }
                         match (valid_from, valid_until) {
                             (Some(from), Some(until)) if from <= sample_start && until >= sample_end => {}
