@@ -99,6 +99,14 @@ This creates known-answer adversarial controls, not simulations or empirical cla
 
 There is no aggregate contagion, alignment, influence or governance score.
 
+## Human-reference boundary
+
+Human deliberative update fidelity is a distinct evidence class and is not part of this synthetic agent benchmark. The October 2026 EMNLP paper *Before You Poll with LLMs* compares LLM and human expressed-position changes after matched information interventions and reports reversal, overshoot and rigidity patterns in its tested models/questions. The corresponding human-reference track is separately owned by [Mycelix #6023](https://github.com/Luminous-Dynamics/mycelix/issues/6023). No America in One Room participant-level data is ingested or used by this synthetic scenario matrix.
+
+Confidence is also a separate signal from evidence. The October 2026 EMNLP work *When Linguistic and Internal Confidence Diverge* finds that verbal and internal/logit or semantic-entropy confidence measures can diverge across the paper's tested models/tasks. The current revision ledger distinguishes NotProvided, SelfReported and Calibrated confidence; actual calibration reports and held-out transfer are owned by [Symthaea #11367](https://github.com/Luminous-Dynamics/symthaea/issues/11367).
+
+The updated SOTA crosswalk contains these references and the SVR-MAD adaptive-routing comparison. Published reported gains are not attributed to Symthaea, and no superiority claim is made.
+
 ## 2026 research comparators
 
 - **Misalignment Contagion (COLM 2026):** 35,290 trials across five datasets and four topologies; distinguishes public discussion from private re-elicitation and reports topology/centrality-dependent persistence. Use as a replication target under exact task/model/protocol boundaries. [Paper](https://proceedings.colm.cc/paper_files/paper/2026/hash/871ed095b734818cfba48db6aeb25a62-Abstract-Conference.html)
