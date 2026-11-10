@@ -599,7 +599,7 @@ fn evaluate<M: ConfidenceModel>(model: &M, candidate: &[u8]) -> Result<f64, Atta
 fn mutate_one_site(candidate: &mut [u8], alphabet_size: u16, rng: &mut XorShift64) {
     let position = rng.next_usize(candidate.len());
     let current = u16::from(candidate[position]);
-    let offset = (rng.next_u64() % u64::from(alphabet_size - 1)) as u16;
+    let offset = rng.next_usize(usize::from(alphabet_size - 1)) as u16;
     let replacement = if offset >= current { offset + 1 } else { offset };
     candidate[position] = replacement as u8;
 }
@@ -632,11 +632,21 @@ impl XorShift64 {
     }
 
     fn next_unit(&mut self) -> f64 {
-        self.next_u64() as f64 / u64::MAX as f64
+        // Use the top 53 bits so the result is always in [0, 1), including for u64::MAX.
+        ((self.next_u64() >> 11) as f64) / ((1u64 << 53) as f64)
     }
 
     fn next_usize(&mut self, upper_exclusive: usize) -> usize {
-        (self.next_u64() % upper_exclusive as u64) as usize
+        assert!(upper_exclusive > 0, "upper_exclusive must be non-zero");
+        let upper = upper_exclusive as u64;
+        // Rejection sampling removes modulo bias while preserving deterministic replay.
+        let zone = u64::MAX - (u64::MAX % upper);
+        loop {
+            let value = self.next_u64();
+            if value < zone {
+                return (value % upper) as usize;
+            }
+        }
     }
 }
 
