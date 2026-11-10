@@ -89,7 +89,11 @@
               }
             ],
             "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011170",
-            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011171"
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011171",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002afa",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002afc",
+            "likelihood_evidence_class": "synthetic_fixture"
           },
           {
             "id": "test-b",
@@ -125,9 +129,17 @@
               }
             ],
             "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011172",
-            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011173"
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011173",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002afd",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002afe",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002aff",
+            "likelihood_evidence_class": "synthetic_fixture"
           }
-        ]
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002af8",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002af9",
+        "decision_loss_evidence_class": "synthetic_fixture"
       }
     },
     {
@@ -217,7 +229,11 @@
               }
             ],
             "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011174",
-            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011175"
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011175",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b02",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b03",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b04",
+            "likelihood_evidence_class": "synthetic_fixture"
           },
           {
             "id": "test-b",
@@ -256,9 +272,17 @@
               }
             ],
             "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011176",
-            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011177"
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011177",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b05",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b06",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b07",
+            "likelihood_evidence_class": "synthetic_fixture"
           }
-        ]
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b00",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b01",
+        "decision_loss_evidence_class": "synthetic_fixture"
       }
     },
     {
@@ -332,9 +356,17 @@
               }
             ],
             "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011178",
-            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011179"
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011179",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b0a",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b0b",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b0c",
+            "likelihood_evidence_class": "synthetic_fixture"
           }
-        ]
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b08",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b09",
+        "decision_loss_evidence_class": "synthetic_fixture"
       }
     },
     {
@@ -408,9 +440,17 @@
               }
             ],
             "test_cost_digest": "000000000000000000000000000000000000000000000000000000000001117a",
-            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000001117b"
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000001117b",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b0f",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b10",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b11",
+            "likelihood_evidence_class": "synthetic_fixture"
           }
-        ]
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b0d",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b0e",
+        "decision_loss_evidence_class": "synthetic_fixture"
       }
     },
     {
@@ -484,9 +524,17 @@
               }
             ],
             "test_cost_digest": "000000000000000000000000000000000000000000000000000000000001117c",
-            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000001117d"
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000001117d",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b14",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b15",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b16",
+            "likelihood_evidence_class": "synthetic_fixture"
           }
-        ]
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b12",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b13",
+        "decision_loss_evidence_class": "synthetic_fixture"
       }
     },
     {
@@ -560,9 +608,17 @@
               }
             ],
             "test_cost_digest": "000000000000000000000000000000000000000000000000000000000001117e",
-            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000001117f"
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000001117f",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b19",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b1a",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b1b",
+            "likelihood_evidence_class": "synthetic_fixture"
           }
-        ]
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b17",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b18",
+        "decision_loss_evidence_class": "synthetic_fixture"
       }
     },
     {
@@ -592,7 +648,11 @@
             }
           }
         ],
-        "tests": []
+        "tests": [],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b1c",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b1d",
+        "decision_loss_evidence_class": "synthetic_fixture"
       }
     }
   ]
