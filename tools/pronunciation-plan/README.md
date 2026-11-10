@@ -30,6 +30,21 @@ The crate now also includes an additive `BeatDomainScore` source representation:
 This removes the current constructor's "surplus notes become final-syllable melisma" assumption from the target architecture. The current production constructor remains a compatibility adapter until a separately reviewed integration is made.
 
 
+## Deterministic score-alignment planner
+
+The contract now includes `VocalScoreAlignment::from_duration_weights` and `from_beat_domain_score`. These construct a validated mapping from:
+- a fully selected pronunciation plan;
+- ordered note/rest events (or a beat-domain score with a tempo map);
+- explicit rest-to-syllable boundary receipts;
+- one positive duration weight per selected syllable;
+- phrase ranges and breath metadata.
+
+The planner allocates each uninterrupted sung-note run among its explicitly assigned syllables in proportion to those caller-supplied weights. A syllable may split a long note with other syllables, or cross consecutive note events and become an explicitly designated final-vowel melisma. Rest events terminate runs and require a boundary receipt. The returned alignment is passed through the existing full-coverage validator before it can be consumed.
+
+The planner intentionally does not infer rest boundaries from audio, invent phrase boundaries, or claim that simple weights are learned natural-duration estimates. The caller owns those priors and boundaries; they should eventually be emitted with source/provenance in the run receipt. This is a deterministic proposal mechanism, not a replacement for musical interpretation or human review.
+
+Synthetic tests cover shared-note subdivisions, multi-note melisma, explicit rests, unassigned note runs, missing rest receipts, invalid weights and beat-domain conversion across a tempo change.
+
 ## Versioned language-profile contract
 
 The library now defines a separate `LanguageProfileManifest` and a `ProfiledPronunciationPlan` wrapper. This binds an exact pronunciation plan to a specific profile ID, profile digest, BCP-47 tag, dialect, orthography, phone-inventory version, source revision, per-resource license/attribution receipts, and explicit task qualifications.
