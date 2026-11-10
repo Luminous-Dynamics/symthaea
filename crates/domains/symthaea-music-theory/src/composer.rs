@@ -22,6 +22,9 @@ use serde::{Deserialize, Serialize};
 /// return-section counterline. Other general-composer parts remain explicitly
 /// unassigned until their source generators are migrated under #11304.
 const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
+/// The grief suspension chain is an independently performed, expressive
+/// harmony line, not a continuation of the block-chord accompaniment.
+const GENERAL_GRIEF_SUSPENSION_PART_V1: PartId = PartId(4);
 
 /// A muse-independent expressive intent. muse maps its cognitive state onto
 /// this; the composer maps this onto structure.
@@ -720,7 +723,13 @@ fn compose_with_spec_and_form_and_grammar_impl(
     }
     match attitude {
         Some(crate::spec::Attitude::Grief) => {
-            apply_grief_suspensions(&mut score, &form, meter_beats, intent);
+            apply_grief_suspensions(
+                &mut score,
+                &form,
+                meter_beats,
+                intent,
+                GENERAL_GRIEF_SUSPENSION_PART_V1,
+            );
         }
         Some(crate::spec::Attitude::Defiance) => {
             apply_defiant_syncopation(&mut score, meter_beats);
@@ -2350,6 +2359,7 @@ fn apply_grief_suspensions(
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
+    part_id: PartId,
 ) {
     let vel = ((0.28 + intent.energy.clamp(0.0, 1.0) * 0.25) * 0.95).clamp(0.18, 0.5);
     let bar = Duration::new(meter_beats as i64, 1);
@@ -2378,7 +2388,7 @@ fn apply_grief_suspensions(
             };
             let onset = bar.scale(measure + i as i64, 1);
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: sus,
                 onset,
                 duration: Duration::new(1, 1),
@@ -2388,7 +2398,7 @@ fn apply_grief_suspensions(
                 section_intensity: section.role.intensity(),
             });
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: resolution,
                 onset: onset + Duration::new(1, 1),
                 duration: Duration::new((meter_beats as i64 - 1).max(1), 1),
@@ -3123,6 +3133,7 @@ fn alter_statement(
             let grace = Duration::new(1, 4);
             let peak_onset = score.notes[peak].onset;
             let peak_pitch = score.notes[peak].pitch;
+            let peak_part = score.notes[peak].part;
             // Steal the grace's time from a long-enough predecessor when
             // one exists; otherwise let it CRUSH (overlap the tail of
             // whatever came before) — that's how an acciaccatura actually
@@ -3144,7 +3155,7 @@ fn alter_statement(
                 let vel = (score.notes[peak].velocity * 0.8).clamp(0.1, 1.0);
                 let intensity = score.notes[peak].section_intensity;
                 score.notes.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: peak_part,
                     pitch: above,
                     onset: peak_onset.saturating_sub(grace),
                     duration: grace,
@@ -4784,6 +4795,70 @@ mod tests {
     use super::*;
     use crate::harmony::{Progression, Tonality};
     use crate::score::VoiceRole;
+
+    #[test]
+    fn grief_suspension_chain_uses_its_own_source_authored_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let empty_phrase = crate::phrase::Phrase {
+            line: Motif::new(Vec::new()),
+            progression: vec![1, 5],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let empty_consequent = crate::phrase::Phrase {
+            line: Motif::new(Vec::new()),
+            progression: Vec::new(),
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![crate::form::Section {
+                role: SectionRole::A,
+                key,
+                period: crate::phrase::Period {
+                    antecedent: empty_phrase,
+                    consequent: empty_consequent,
+                },
+            }],
+        };
+        let mut score = Score::new(key, 100.0, 4);
+        let part = PartId(44);
+        apply_grief_suspensions(
+            &mut score,
+            &form,
+            4.0,
+            &MusicalIntent::default(),
+            part,
+        );
+        assert_eq!(score.notes.len(), 2);
+        assert!(score.notes.iter().all(|note| note.part == part));
+        assert!(score.notes.iter().all(|note| note.role == VoiceRole::Harmony));
+    }
+
+    #[test]
+    fn joy_grace_note_inherits_the_decorated_melody_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for (midi, onset) in [(60u8, 0i64), (64, 1), (67, 2)] {
+            score.push(ScoreNote {
+                part: PartId(45),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::new(1, 1),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        alter_statement(
+            &mut score,
+            key,
+            0.0,
+            3,
+            crate::spec::Attitude::Joy,
+        );
+        assert!(score.notes.len() > 3);
+        assert!(score.notes.iter().all(|note| note.part == PartId(45)));
+    }
 
     #[test]
     fn hidden_bass_quote_inherits_the_replaced_bass_part_identity() {
