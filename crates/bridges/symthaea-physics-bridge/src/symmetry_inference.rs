@@ -1182,6 +1182,7 @@ mod tests {
             profile,
             group,
             acted_on_variables,
+            statistics,
         }) = report.evidence
         else {
             panic!("numeric fallback must preserve sampled evidence provenance");
@@ -1192,9 +1193,6 @@ mod tests {
         assert_eq!(profile.finite_difference_step, 1e-5);
         assert_eq!(profile.sample_min_inclusive, 0.5);
         assert_eq!(profile.sample_max_exclusive, 3.0);
-        let Some(SymmetryInferenceEvidence::SampledLieDerivative { statistics, .. }) = report.evidence else {
-            panic!("sampled candidate must retain its measured diagnostics");
-        };
         assert_eq!(statistics.sample_count_per_generator, 8);
         assert_eq!(statistics.checked_generator_count, 1);
         assert_eq!(statistics.informative_evaluation_count, 8);
