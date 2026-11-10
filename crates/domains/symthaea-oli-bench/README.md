@@ -18,11 +18,11 @@ Exact source tag: v1.0.4.
 
 ## Run
 
-\`\`\`bash
+```bash
 cargo test -p symthaea-oli-bench --locked
 cargo run -p symthaea-oli-bench --locked
 cargo run -p symthaea-oli-bench --locked -- path/to/minimized.csv
-\`\`\`
+```
 
 The audit validates task rows and computes condition-level descriptive statistics, deterministic subject-cluster bootstrap intervals, and three leave-one-subject-out baselines.
 
