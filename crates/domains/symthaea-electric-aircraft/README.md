@@ -50,4 +50,4 @@ The pack maps are still reduced-order: they do not model cell-level electrochemi
 
 This is a research/mission-planning model, not an aircraft performance prediction, flight simulator, battery qualification tool, flight-control system, or certification artefact. It assumes steady segments and a supplied L/D ratio. It does not model takeoff transients, stall, compressibility, detailed propeller maps, voltage/SOC/temperature-dependent cell electrochemistry, thermal runaway, cell imbalance, battery fault propagation, aeroelasticity, structural loads, control laws, or regulatory reserve rules. A successful software test is not evidence of airworthiness.
 
-See docs/MODEL_LIMITATIONS.md and docs/BENCHMARK_PLAN.md.
+See docs/ARCHITECTURE_TRADE_STUDY.md for the mission-first architecture decision framework, docs/MODEL_LIMITATIONS.md for promotion gates, and docs/BENCHMARK_PLAN.md plus docs/METRIC_BOUNDARIES.md for industry comparisons.
