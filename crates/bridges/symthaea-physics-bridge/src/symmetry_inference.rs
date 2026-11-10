@@ -1972,6 +1972,102 @@ mod tests {
     }
 
     #[test]
+    fn analytic_and_directional_derivative_witnesses_agree_on_frozen_smooth_samples() {
+        use crate::linear_action_sampling::{
+            LinearActionSampleV1, LinearActionSamplingProfileV1, evaluate_linear_action_samples,
+        };
+
+        let samples = metric_sample_states();
+        let directional_samples: Vec<LinearActionSampleV1> = samples
+            .iter()
+            .enumerate()
+            .map(|(index, state)| LinearActionSampleV1 {
+                sample_id: format!("dual-witness-{index}"),
+                state: state.clone(),
+                direction_basis: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            })
+            .collect();
+        let mut directional_profile = LinearActionSamplingProfileV1::default();
+        directional_profile.minimum_informative_samples = samples.len();
+        directional_profile.maximum_samples = 16;
+        directional_profile.squared_cosine_tolerance = 1e-8;
+
+        let controls = [
+            (
+                Expr::Func(UnaryFn::Sqrt, Box::new(add(pow2("x"), pow2("y")))),
+                true,
+            ),
+            (
+                Expr::Func(
+                    UnaryFn::Sqrt,
+                    Box::new(add(pow2("x"), mul(Expr::Const(2.0), pow2("y")))),
+                ),
+                false,
+            ),
+            (
+                Expr::Func(UnaryFn::Sin, Box::new(add(pow2("x"), pow2("y")))),
+                true,
+            ),
+        ];
+
+        for (expression, expected_invariant) in controls {
+            let action = metric_aware_so2_action();
+            let analytic = evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &action,
+                &samples,
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            )
+            .unwrap();
+            let directional = evaluate_linear_action_samples(
+                &expression,
+                &action,
+                &directional_samples,
+                directional_profile,
+            )
+            .unwrap();
+
+            assert_eq!(analytic.invariant_under_every_generator(), expected_invariant);
+            assert_eq!(directional.invariant_within_tolerance(), expected_invariant);
+            assert_eq!(
+                analytic.generator_results[0].informative_sample_count,
+                directional.generator_statistics[0].informative_sample_count
+            );
+            for (analytic_index, directional_residual) in directional.generator_statistics[0]
+                .sample_residuals
+                .iter()
+                .enumerate()
+            {
+                let analytic_per_sample = if analytic_index < samples.len() {
+                    // The analytic report contains aggregate per-generator
+                    // statistics; the finite-difference path retains per-sample
+                    // residuals. Re-run AD on this singleton to pair the witnesses.
+                    let one_sample = vec![samples[analytic_index].clone()];
+                    let one = evaluate_metric_aware_linear_action_samples(
+                        &expression,
+                        &action,
+                        &one_sample,
+                        &[],
+                        MetricAwareLinearActionSampleProfileV1::default(),
+                    )
+                    .unwrap();
+                    one.generator_results[0].maximum_squared_residual
+                } else {
+                    unreachable!("paired sample index is in range")
+                };
+                assert!(
+                    (analytic_per_sample
+                        - directional_residual.normalized_squared_residual.unwrap())
+                        .abs()
+                        < 2.0e-7,
+                    "analytic and directional residuals disagree at sample {analytic_index}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn metric_aware_sampler_supports_composed_smooth_unary_functions() {
         let radius = sqrt_of(add(pow2("x"), pow2("y")));
         let expression = Expr::Func(UnaryFn::Sin, Box::new(radius));
