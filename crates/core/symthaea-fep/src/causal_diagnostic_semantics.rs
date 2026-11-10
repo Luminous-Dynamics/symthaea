@@ -22,7 +22,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use super::decision_relevant_information::{DecisionHypothesis, DiagnosticAction};
+use super::decision_relevant_information::{
+    DecisionDiagnosticConfig, DecisionHypothesis, DiagnosticAction,
+};
 
 /// How a measurement's possible perturbation of the measured system is handled.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -115,6 +117,7 @@ pub struct CausalDiagnosticDecisionProblemReceipt {
     pub hypothesis_set_digest: String,
     pub action_likelihood_table_set_digest: String,
     pub decision_loss_table_digest: String,
+    pub decision_policy_config_digest: String,
     pub task_specification_digest: String,
     pub decision_problem_digest: String,
 }
@@ -154,6 +157,8 @@ pub enum CausalDiagnosticActionError {
     ActionLikelihoodDigestMismatch(String),
     #[error("decision-loss table is empty, non-finite, negative, or non-rectangular")]
     InvalidDecisionLossTable,
+    #[error("decision policy weights or safety threshold are invalid")]
+    InvalidDecisionPolicyConfig,
 }
 
 /// Compute a canonical digest of one action's complete predictive-likelihood table.
@@ -351,6 +356,30 @@ pub fn compute_decision_loss_table_digest(
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+/// Digest the cost/risk weights and hard safety threshold used by the
+/// decision-focused policy. A change in any of these values changes the
+/// decision-problem identity even when observations and task losses stay fixed.
+pub fn compute_decision_policy_config_digest(
+    config: DecisionDiagnosticConfig,
+) -> Result<String, CausalDiagnosticActionError> {
+    if !config.observation_cost_weight.is_finite()
+        || config.observation_cost_weight < 0.0
+        || !config.safety_risk_weight.is_finite()
+        || config.safety_risk_weight < 0.0
+        || !config.maximum_safety_risk.is_finite()
+        || !(0.0..=1.0).contains(&config.maximum_safety_risk)
+    {
+        return Err(CausalDiagnosticActionError::InvalidDecisionPolicyConfig);
+    }
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-decision-policy-config-v1\0");
+    hasher.update(&config.observation_cost_weight.to_bits().to_le_bytes());
+    hasher.update(&config.safety_risk_weight.to_bits().to_le_bytes());
+    hasher.update(&config.maximum_safety_risk.to_bits().to_le_bytes());
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
 /// Bind one complete decision problem before an EVSI result is admitted.
 ///
 /// This verifies the action descriptor set, recomputes the supplied likelihood
@@ -361,12 +390,15 @@ pub fn validate_causal_diagnostic_decision_problem(
     actions: &[DiagnosticAction],
     descriptors: &[CausalDiagnosticActionDescriptor],
     hypotheses: &[DecisionHypothesis],
+    decision_config: DecisionDiagnosticConfig,
     task_specification_digest: &str,
 ) -> Result<CausalDiagnosticDecisionProblemReceipt, CausalDiagnosticActionError> {
     let action_set =
         validate_causal_diagnostic_action_likelihood_bindings(actions, descriptors, hypotheses)?;
     let hypothesis_set_digest = compute_hypothesis_set_digest(hypotheses)?;
     let decision_loss_table_digest = compute_decision_loss_table_digest(hypotheses)?;
+    let decision_policy_config_digest =
+        compute_decision_policy_config_digest(decision_config)?;
 
     let mut ordered_action_digests: Vec<(String, String)> = actions
         .iter()
@@ -416,6 +448,11 @@ pub fn validate_causal_diagnostic_decision_problem(
         "decision_loss_table_digest",
         &decision_loss_table_digest,
     );
+    hash_field(
+        &mut problem_hasher,
+        "decision_policy_config_digest",
+        &decision_policy_config_digest,
+    );
     hash_digest(
         &mut problem_hasher,
         "task_specification_digest",
@@ -427,6 +464,7 @@ pub fn validate_causal_diagnostic_decision_problem(
         hypothesis_set_digest,
         action_likelihood_table_set_digest,
         decision_loss_table_digest,
+        decision_policy_config_digest,
         task_specification_digest: task_specification_digest.to_owned(),
         decision_problem_digest: format!("{:x}", problem_hasher.finalize()),
     })
@@ -1010,6 +1048,7 @@ mod tests {
             &actions,
             &descriptors,
             &hypotheses,
+            decision_config(),
             &digest('a'),
         )
         .expect("complete decision-problem receipt");
@@ -1020,6 +1059,7 @@ mod tests {
             &actions,
             &descriptors,
             &altered_losses,
+            decision_config(),
             &digest('a'),
         )
         .expect("changed loss table");
@@ -1028,6 +1068,7 @@ mod tests {
             &actions,
             &descriptors,
             &hypotheses,
+            decision_config(),
             &digest('b'),
         )
         .expect("changed task specification");
@@ -1047,6 +1088,43 @@ mod tests {
     }
 
     #[test]
+    fn policy_config_changes_decision_problem_identity() {
+        let (actions, mut descriptors) = four_kind_fixture();
+        let hypotheses = hypothesis_fixture();
+        bind_fixture_likelihood_digests(&hypotheses, &mut descriptors);
+        let config = decision_config();
+        let original = validate_causal_diagnostic_decision_problem(
+            &actions,
+            &descriptors,
+            &hypotheses,
+            config,
+            &digest('a'),
+        )
+        .expect("default config receipt");
+
+        let changed = validate_causal_diagnostic_decision_problem(
+            &actions,
+            &descriptors,
+            &hypotheses,
+            DecisionDiagnosticConfig {
+                observation_cost_weight: 2.0,
+                ..config
+            },
+            &digest('a'),
+        )
+        .expect("changed policy config receipt");
+
+        assert_ne!(
+            original.decision_policy_config_digest,
+            changed.decision_policy_config_digest
+        );
+        assert_ne!(
+            original.decision_problem_digest,
+            changed.decision_problem_digest
+        );
+    }
+
+    #[test]
     fn decision_problem_receipt_rejects_invalid_loss_table_and_task_digest() {
         let (actions, mut descriptors) = four_kind_fixture();
         let hypotheses = hypothesis_fixture();
@@ -1059,6 +1137,7 @@ mod tests {
                 &actions,
                 &descriptors,
                 &invalid_losses,
+                decision_config(),
                 &digest('a'),
             ),
             Err(CausalDiagnosticActionError::InvalidDecisionLossTable)
@@ -1069,11 +1148,23 @@ mod tests {
                 &actions,
                 &descriptors,
                 &hypotheses,
+                decision_config(),
                 "not-a-digest",
             ),
             Err(CausalDiagnosticActionError::InvalidDigest(
                 "task_specification_digest"
             ))
+        ));
+    }
+
+    #[test]
+    fn invalid_decision_policy_config_fails_closed() {
+        assert!(matches!(
+            compute_decision_policy_config_digest(DecisionDiagnosticConfig {
+                observation_cost_weight: f64::NAN,
+                ..decision_config()
+            }),
+            Err(CausalDiagnosticActionError::InvalidDecisionPolicyConfig)
         ));
     }
 
