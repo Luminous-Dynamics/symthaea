@@ -437,13 +437,16 @@ mod tests {
     }
 
     #[test]
-    fn downstream_conversion_unknown_does_not_change_input_total_but_keeps_record_incomplete() {
+    fn downstream_conversion_unknown_does_not_change_complete_source_input_total() {
         let mut value = fixture();
+        value["energy_sources"][2]["energy"]["value_micro_gj"] = serde_json::json!(10_000_000);
+        value["energy_sources"][2]["energy"].as_object_mut().unwrap().remove("unknown_reason");
         value["energy_sources"][3]["energy"]["value_micro_gj"] = Value::Null;
-        value["energy_sources"][3]["energy"]["unknown_reason"] = serde_json::json!("synthetic missing downstream meter");
+        value["energy_sources"][3]["energy"]["unknown_reason"] =
+            serde_json::json!("synthetic missing downstream generator meter");
         let result = calculate(&value);
-        assert_eq!(result.known_subtotal_micro_gj, 102_000_000);
-        assert_eq!(result.total_source_input_micro_gj, None); // unknown wind input still blocks the total
-        assert!(result.findings.incomplete);
+        assert_eq!(result.known_subtotal_micro_gj, 112_000_000);
+        assert_eq!(result.total_source_input_micro_gj, Some(112_000_000));
+        assert!(result.findings.incomplete); // downstream flow evidence incomplete, source-input total still closed
     }
 }
