@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-comm-topology-001/COMMUNICATION_GRAPH_FIXTURES_V0_1.schema.json",
+  "title": "CommunicationGraph fixture manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "status",
+    "owner_issue",
+    "delegation_graph_issue",
+    "topology_count",
+    "profile_count",
+    "fixture_count",
+    "profiles",
+    "fixtures",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "communication-graph-fixtures-v0.1"
+    },
+    "contract_id": {
+      "const": "IG-COMM-TOPOLOGY-001"
+    },
+    "status": {
+      "enum": [
+        "synthetic_graph_profiles_unexecuted",
+        "synthetic_graph_profiles_frozen"
+      ]
+    },
+    "owner_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "delegation_graph_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "topology_count": {
+      "type": "integer",
+      "minimum": 8
+    },
+    "profile_count": {
+      "type": "integer",
+      "minimum": 8
+    },
+    "fixture_count": {
+      "type": "integer",
+      "minimum": 30
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile_id",
+          "profile_version",
+          "topology_family",
+          "node_identity",
+          "edge_semantics",
+          "rng_algorithm",
+          "seed",
+          "nodes",
+          "edges",
+          "graph_state",
+          "snapshot_round",
+          "temporal_events",
+          "self_loops",
+          "centrality_reference",
+          "graph_sha256"
+        ],
+        "properties": {
+          "profile_id": {
+            "type": "string"
+          },
+          "profile_version": {
+            "const": "0.1"
+          },
+          "topology_family": {
+            "enum": [
+              "chain",
+              "star",
+              "balanced_tree",
+              "complete",
+              "sparse_random",
+              "stochastic_block",
+              "core_periphery",
+              "temporal_churn"
+            ]
+          },
+          "node_identity": {
+            "const": "AgentInstanceId"
+          },
+          "edge_semantics": {
+            "const": "directed_message_channel"
+          },
+          "rng_algorithm": {
+            "type": "string"
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "nodes": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "agent_instance_id",
+                "principal_ref",
+                "role"
+              ],
+              "properties": {
+                "agent_instance_id": {
+                  "type": "string"
+                },
+                "principal_ref": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "channel_id",
+                "sender",
+                "recipient",
+                "message_classes",
+                "active_from_round",
+                "active_until_round",
+                "capacity_per_round",
+                "latency_ticks"
+              ],
+              "properties": {
+                "channel_id": {
+                  "type": "string"
+                },
+                "sender": {
+                  "type": "string"
+                },
+                "recipient": {
+                  "type": "string"
+                },
+                "message_classes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "active_from_round": {
+                  "type": "integer"
+                },
+                "active_until_round": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "capacity_per_round": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "latency_ticks": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "graph_state": {
+            "enum": [
+              "static_snapshot",
+              "event_sourced"
+            ]
+          },
+          "snapshot_round": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "temporal_events": {
+            "type": "array"
+          },
+          "self_loops": {
+            "const": false
+          },
+          "centrality_reference": {
+            "type": "object"
+          },
+          "graph_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 30,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "profile_ref",
+          "kind",
+          "expected_status",
+          "assertions",
+          "expected_violations"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string"
+          },
+          "profile_ref": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "expected_status": {
+            "enum": [
+              "Pass",
+              "Fail",
+              "Unsupported",
+              "Indeterminate"
+            ]
+          },
+          "assertions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected_violations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 80
+    }
+  }
+}
