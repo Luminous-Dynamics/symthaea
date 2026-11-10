@@ -1,0 +1,46 @@
+name: Vocal score-prior-independent pitch audit
+
+on:
+  pull_request:
+    paths:
+      - "src/voice/singing_quality.rs"
+      - "docs/research/VOCAL_PITCH_PRIOR_AUDIT_V1.md"
+      - ".github/workflows/vocal-pitch-prior-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  score-independent-pitch-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_PITCH_AUDIT_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust formatter and toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check singing quality metrics and audit tests
+        run: rustfmt +1.96.0 --edition 2024 --check src/voice/singing_quality.rs
+
+      - name: Run objective vocal pitch audit tests on exact head
+        run: cargo +1.96.0 test --locked -p symthaea --lib --features singing voice::singing_quality::tests -- --test-threads=1
+
+      - name: Confirm the frozen lockfile remained unchanged
+        run: git diff --exit-code -- Cargo.lock
