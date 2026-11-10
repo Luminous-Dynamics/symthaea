@@ -18,6 +18,14 @@ use crate::rhythm::Duration;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
+// Persistent identities owned by the general composer. VoiceRole remains a
+// local function; these IDs identify the continuing source-authored lines.
+const GENERAL_MELODY_PART_V1: PartId = PartId(0);
+const GENERAL_BASS_PART_V1: PartId = PartId(1);
+const GENERAL_HARMONY_PART_V1: PartId = PartId(2);
+const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
+const GENERAL_GRIEF_SUSPENSION_PART_V1: PartId = PartId(4);
+
 /// A muse-independent expressive intent. muse maps its cognitive state onto
 /// this; the composer maps this onto structure.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -576,8 +584,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
         spec.accompaniment(intent.seed)
     };
     let tx = &spec.texture;
-    realize_melody(
+    realize_melody_for_part(
         &mut score,
+        GENERAL_MELODY_PART_V1,
         &form,
         intent,
         Duration::zero(),
@@ -585,11 +594,12 @@ fn compose_with_spec_and_form_and_grammar_impl(
         tx.climax_grace,
     );
     if tx.held_arrivals {
-        apply_held_arrivals(&mut score, meter_beats);
+        apply_held_arrivals(&mut score, GENERAL_MELODY_PART_V1, meter_beats);
     }
     if tx.hook_cell {
         apply_hook_memory(
             &mut score,
+            GENERAL_MELODY_PART_V1,
             &form,
             meter_beats,
             crate::hook::HookCell::generate_with(&spec.melody, intent.seed, meter_beats)
@@ -603,8 +613,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
     // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
     // and never read each other's state, so the emitted NOTES are unchanged.
-    realize_bass(
+    realize_bass_for_part(
         &mut score,
+        GENERAL_BASS_PART_V1,
         &form,
         meter_beats,
         intent,
@@ -613,8 +624,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
         tx.cadential_harmonic_rhythm,
         spec.development != crate::spec::DevelopmentDna::Classic,
     );
-    realize_harmony(
+    realize_harmony_for_part(
         &mut score,
+        GENERAL_HARMONY_PART_V1,
         &form,
         meter_beats,
         intent,
@@ -627,6 +639,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.hook_cell {
         apply_hidden_bass_quote(
             &mut score,
+            GENERAL_BASS_PART_V1,
             &form,
             meter_beats,
             intent,
@@ -634,10 +647,18 @@ fn compose_with_spec_and_form_and_grammar_impl(
         );
     }
     if tx.counter_melody {
-        realize_counter_melody(&mut score, &form, meter_beats, intent);
+        realize_counter_melody_for_part(
+            &mut score,
+            GENERAL_COUNTERMELODY_PART_V1,
+            &form,
+            meter_beats,
+            intent,
+        );
         if tx.held_arrivals && tx.hook_cell {
             apply_counter_hook_echoes(
                 &mut score,
+                GENERAL_COUNTERMELODY_PART_V1,
+                GENERAL_MELODY_PART_V1,
                 &form,
                 meter_beats,
                 intent,
@@ -647,6 +668,8 @@ fn compose_with_spec_and_form_and_grammar_impl(
     }
     apply_development_style(
         &mut score,
+        GENERAL_MELODY_PART_V1,
+        GENERAL_BASS_PART_V1,
         &form,
         spec.development,
         &motif,
@@ -657,6 +680,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.additive_process {
         apply_additive_process(
             &mut score,
+            GENERAL_MELODY_PART_V1,
             &form,
             intent.bars.max(1) as i64,
             meter_beats,
@@ -664,40 +688,105 @@ fn compose_with_spec_and_form_and_grammar_impl(
         );
     }
     if tx.deceptive_close {
-        apply_deceptive_first_close(&mut score, key, intent.bars.max(1) as i64, meter_beats);
+        apply_deceptive_first_close(
+            &mut score,
+            GENERAL_MELODY_PART_V1,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            key,
+            intent.bars.max(1) as i64,
+            meter_beats,
+        );
     }
-    apply_pivot_modulations(&mut score, &form, intent.bars.max(1) as i64, meter_beats);
+    apply_pivot_modulations(
+        &mut score,
+        GENERAL_MELODY_PART_V1,
+        GENERAL_BASS_PART_V1,
+        GENERAL_HARMONY_PART_V1,
+        &form,
+        intent.bars.max(1) as i64,
+        meter_beats,
+    );
     if tx.deceptive_close {
         // The evasion travels with the deception: styles that deny their
         // first close also let their LAST mid-piece close slip past, so
         // the coda becomes the true arrival.
         apply_evaded_return_close(
             &mut score,
+            GENERAL_MELODY_PART_V1,
+            GENERAL_BASS_PART_V1,
             key,
             &form,
             intent.bars.max(1) as i64,
             meter_beats,
         );
     }
-    apply_appoggiaturas(&mut score, key, &spec.melody, intent.seed);
+    apply_appoggiaturas(
+        &mut score,
+        GENERAL_MELODY_PART_V1,
+        key,
+        &spec.melody,
+        intent.seed,
+    );
     if tx.roll_ornaments {
-        apply_roll_ornaments(&mut score, key, &spec.melody, intent.seed);
+        apply_roll_ornaments(
+            &mut score,
+            GENERAL_MELODY_PART_V1,
+            key,
+            &spec.melody,
+            intent.seed,
+        );
     } else {
-        apply_grace_ornaments(&mut score, key, &spec.melody, intent.seed);
+        apply_grace_ornaments(
+            &mut score,
+            GENERAL_MELODY_PART_V1,
+            key,
+            &spec.melody,
+            intent.seed,
+        );
     }
-    apply_blue_notes(&mut score, key, spec.melody.blue_note_rate, intent.seed);
-    apply_suspensions(&mut score, key, tx.suspension_rate, intent.seed);
+    apply_blue_notes(
+        &mut score,
+        GENERAL_MELODY_PART_V1,
+        key,
+        spec.melody.blue_note_rate,
+        intent.seed,
+    );
+    apply_suspensions(
+        &mut score,
+        GENERAL_HARMONY_PART_V1,
+        key,
+        tx.suspension_rate,
+        intent.seed,
+    );
     if tx.planing {
         // After every melody-altering pass, so the chord shape rides the
         // FINAL melodic contour, not a pre-ornament draft of it.
-        apply_parallel_planing(&mut score, &form, bars as i64, meter_beats);
+        apply_parallel_planing(
+            &mut score,
+            GENERAL_MELODY_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            &form,
+            bars as i64,
+            meter_beats,
+        );
     }
     if tx.staged_entrances {
-        apply_staged_entrances(&mut score, &form, meter_beats);
+        apply_staged_entrances(
+            &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            &form,
+            meter_beats,
+        );
     }
     if tx.damage > 0.0 {
         apply_damage(
             &mut score,
+            GENERAL_MELODY_PART_V1,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            GENERAL_COUNTERMELODY_PART_V1,
             &form,
             key,
             meter_beats,
@@ -708,10 +797,16 @@ fn compose_with_spec_and_form_and_grammar_impl(
     }
     match attitude {
         Some(crate::spec::Attitude::Grief) => {
-            apply_grief_suspensions(&mut score, &form, meter_beats, intent);
+            apply_grief_suspensions(
+                &mut score,
+                GENERAL_GRIEF_SUSPENSION_PART_V1,
+                &form,
+                meter_beats,
+                intent,
+            );
         }
         Some(crate::spec::Attitude::Defiance) => {
-            apply_defiant_syncopation(&mut score, meter_beats);
+            apply_defiant_syncopation(&mut score, GENERAL_MELODY_PART_V1, meter_beats);
             for n in score.notes.iter_mut() {
                 if n.role == VoiceRole::Bass {
                     n.velocity = (n.velocity + 0.08).clamp(0.1, 1.0);
@@ -719,13 +814,15 @@ fn compose_with_spec_and_form_and_grammar_impl(
             }
         }
         Some(crate::spec::Attitude::Joy) => {
-            apply_joyful_lift(&mut score);
+            apply_joyful_lift(&mut score, GENERAL_MELODY_PART_V1);
         }
         _ => {}
     }
     if tx.intro_bars > 0 {
         prepend_intro(
             &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
             key,
             meter_beats,
             intent,
@@ -736,6 +833,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.coda_bars > 0 {
         append_coda(
             &mut score,
+            GENERAL_MELODY_PART_V1,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
             key,
             meter_beats,
             intent,
@@ -744,7 +844,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
         );
     }
     if attitude == Some(crate::spec::Attitude::Curiosity) {
-        apply_curious_question(&mut score, key);
+        apply_curious_question(&mut score, GENERAL_MELODY_PART_V1, key);
     }
     if tx.harmonic_stasis {
         // After intro/coda, same reasoning as the drone pedal below — a
@@ -756,18 +856,34 @@ fn compose_with_spec_and_form_and_grammar_impl(
         // Supersedes the plain drone below (it calls `apply_drone_pedal`
         // itself internally, then replaces Harmony too) — after intro/coda
         // so the pad covers the FULL span they extend.
-        apply_full_drone(&mut score, key);
+        apply_full_drone(
+            &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            GENERAL_MELODY_PART_V1,
+            key,
+        );
     } else if tx.drone {
         // After intro/coda so the pedal covers the FULL span they extend
         // — a drone that dropped out for the intro or coda would stop
         // being a drone.
-        apply_drone_pedal(&mut score, key);
+        apply_drone_pedal(
+            &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_MELODY_PART_V1,
+            key,
+        );
     }
     // LAST, so intro shifts and the coda's own cadence are included: the
     // style's phrase rhetoric — the conversational layer the second
     // melodic-DNA review localized ("the opening sentence differs; the
     // conversation afterward still sounds recognizably Muse").
-    apply_phrase_rhetoric(&mut score, spec.rhetoric, meter_beats);
+    apply_phrase_rhetoric(
+        &mut score,
+        GENERAL_MELODY_PART_V1,
+        spec.rhetoric,
+        meter_beats,
+    );
     (score, Some(form))
 }
 
@@ -780,7 +896,14 @@ fn compose_with_spec_and_form_and_grammar_impl(
 /// rides the tune's contour. "Color over function": nothing here
 /// resolves; the harmony is entirely defined by where the melody happens
 /// to be standing right now.
-fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats: f64) {
+fn apply_parallel_planing(
+    score: &mut Score,
+    melody_part_id: PartId,
+    harmony_part_id: PartId,
+    form: &Form,
+    bars: i64,
+    meter_beats: f64,
+) {
     for (si, section) in form.sections.iter().enumerate() {
         if !matches!(
             section.role,
@@ -807,7 +930,10 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
             .notes
             .iter()
             .filter(|n| {
-                n.role == VoiceRole::Melody && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
+                n.role == VoiceRole::Melody
+                    && n.part == melody_part_id
+                    && n.onset.beats() >= lo - 1e-9
+                    && n.onset.beats() < hi
             })
             .map(|n| {
                 (
@@ -833,7 +959,10 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
             .notes
             .iter()
             .filter(|n| {
-                n.role == VoiceRole::Harmony && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
+                n.role == VoiceRole::Harmony
+                && n.part == harmony_part_id
+                && n.onset.beats() >= lo - 1e-9
+                && n.onset.beats() < hi
             })
             .map(|n| n.onset)
             .min_by(|a, b| {
@@ -844,26 +973,30 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
         let Some(base_harmony_onset) = base_harmony_onset else {
             continue;
         };
-        let base_shape: Vec<(i32, f32)> = score
+        let base_shape: Vec<(i32, f32, PartId)> = score
             .notes
             .iter()
             .filter(|n| {
                 n.role == VoiceRole::Harmony
+                    && n.part == harmony_part_id
                     && (n.onset.beats() - base_harmony_onset.beats()).abs() < 1e-6
             })
-            .map(|n| (n.pitch.midi() as i32, n.velocity))
+            .map(|n| (n.pitch.midi() as i32, n.velocity, n.part))
             .collect();
         if base_shape.is_empty() {
             continue;
         }
         score.notes.retain(|n| {
-            !(n.role == VoiceRole::Harmony && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi)
+            !(n.role == VoiceRole::Harmony
+                && n.part == harmony_part_id
+                && n.onset.beats() >= lo - 1e-9
+                && n.onset.beats() < hi)
         });
         for (onset, duration, midi, si_intensity) in melody {
             let shift = midi - base_melody_midi;
-            for &(base_midi, vel) in &base_shape {
+            for &(base_midi, vel, part) in &base_shape {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part,
                     pitch: Pitch::from_midi((base_midi + shift).clamp(0, 127) as u8),
                     onset,
                     duration,
@@ -905,6 +1038,8 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
 /// consequent is left intact (it owns the section's cadence).
 fn apply_development_style(
     score: &mut Score,
+    part_id: PartId,
+    bass_part_id: PartId,
     form: &Form,
     dna: crate::spec::DevelopmentDna,
     motif: &crate::motif::Motif,
@@ -927,7 +1062,9 @@ fn apply_development_style(
     let climax_span = score
         .notes
         .iter()
-        .find(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
+        .find(|n| n.role == VoiceRole::Melody
+            && n.part == part_id
+            && n.emphasis == Emphasis::Climax)
         .map(|n| (n.onset.beats(), (n.onset + n.duration).beats()));
     for (si, section) in form.sections.iter().enumerate() {
         if !matches!(
@@ -946,7 +1083,10 @@ fn apply_development_style(
             .notes
             .iter()
             .filter(|n| {
-                n.role == VoiceRole::Bass && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
+                n.role == VoiceRole::Bass
+                    && n.part == bass_part_id
+                    && n.onset.beats() >= lo - 1e-9
+                    && n.onset.beats() < hi
             })
             .map(|n| crate::counterpoint::CantusEvent {
                 onset: n.onset.beats(),
@@ -972,7 +1112,11 @@ fn apply_development_style(
         // Clear the antecedent melody EXCEPT the climax's own bar(s); the
         // device line replaces the rest.
         score.notes.retain(|n| {
-            if n.role != VoiceRole::Melody || n.onset.beats() < lo - 1e-9 || n.onset.beats() >= hi {
+            if n.role != VoiceRole::Melody
+                || n.part != part_id
+                || n.onset.beats() < lo - 1e-9
+                || n.onset.beats() >= hi
+            {
                 return true;
             }
             let this_bar = ((n.onset.beats() - lo) / meter_beats) as i64;
@@ -999,6 +1143,7 @@ fn apply_development_style(
                     );
                     for n in score.notes.iter_mut() {
                         if n.role == VoiceRole::Melody
+                            && n.part == part_id
                             && n.onset.beats() >= bar_lo - 1e-9
                             && n.onset.beats() < bar_hi
                         {
@@ -1086,7 +1231,7 @@ fn apply_development_style(
                         pitch = pitch.transpose(-12);
                     }
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: part_id,
                         pitch,
                         onset: t,
                         duration: note.duration,
@@ -1119,12 +1264,14 @@ fn apply_development_style(
     if !score
         .notes
         .iter()
-        .any(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
+        .any(|n| n.role == VoiceRole::Melody
+                && n.part == part_id
+                && n.emphasis == Emphasis::Climax)
         && let Some(peak_idx) = score
             .notes
             .iter()
             .enumerate()
-            .filter(|(_, n)| n.role == VoiceRole::Melody)
+            .filter(|(_, n)| n.role == VoiceRole::Melody && n.part == part_id)
             .max_by_key(|(_, n)| n.pitch.midi())
             .map(|(i, _)| i)
     {
@@ -1144,6 +1291,8 @@ fn apply_development_style(
 /// coda's) is never touched.
 fn apply_evaded_return_close(
     score: &mut Score,
+    melody_part_id: PartId,
+    bass_part_id: PartId,
     key: Key,
     form: &Form,
     bars: i64,
@@ -1168,12 +1317,12 @@ fn apply_evaded_return_close(
             continue;
         }
         match n.role {
-            VoiceRole::Bass => {
+            VoiceRole::Bass if n.part == bass_part_id => {
                 // First inversion: the ground under the cadence is the
                 // mediant, not the root — the weight never lands.
                 score.notes[i].pitch = mediant_bass;
             }
-            VoiceRole::Melody => {
+            VoiceRole::Melody if n.part == melody_part_id => {
                 if n.pitch.pitch_class() == tonic_pc {
                     // The tune gestures at home and steps to 3̂ instead.
                     score.notes[i].pitch = scale.degree_pitch(3, 5);
@@ -1192,7 +1341,13 @@ fn apply_evaded_return_close(
 /// [`crate::spec::MelodicDna::appoggiatura_rate`] (0 = the pass is
 /// inert); which cadences lean is a scrambled per-note seed choice, so
 /// two pieces at the same rate lean in different places.
-fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDna, seed: u64) {
+fn apply_appoggiaturas(
+    score: &mut Score,
+    part_id: PartId,
+    key: Key,
+    dna: &crate::spec::MelodicDna,
+    seed: u64,
+) {
     if dna.appoggiatura_rate <= 0.0 {
         return;
     }
@@ -1201,7 +1356,7 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
     let mut counter = 0u64;
     for i in 0..score.notes.len() {
         let n = &score.notes[i];
-        if n.role != VoiceRole::Melody
+        if n.role != VoiceRole::Melody || n.part != part_id
             || n.emphasis != Emphasis::Cadential
             || n.duration.beats() < 1.0
         {
@@ -1239,13 +1394,13 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
         let total = n.duration.beats();
         let lean_beats = (total / 2.0).min(1.0);
         let lean_480 = (lean_beats * 480.0).round() as i64;
-        let (onset, velocity, si) = (n.onset, n.velocity, n.section_intensity);
+        let (onset, velocity, si, part) = (n.onset, n.velocity, n.section_intensity, n.part);
         let note = &mut score.notes[i];
         note.onset = onset + Duration::new(lean_480, 480);
         note.duration = note.duration.saturating_sub(Duration::new(lean_480, 480));
         note.velocity *= 0.92; // the resolution releases
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: lean_pitch,
             onset,
             duration: Duration::new(lean_480, 480),
@@ -1268,7 +1423,13 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
 /// being just another appoggiatura wearing a different name. Rate comes
 /// from [`crate::spec::MelodicDna::ornament_rate`] (0 = the pass is
 /// inert).
-fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicDna, seed: u64) {
+fn apply_grace_ornaments(
+    score: &mut Score,
+    part_id: PartId,
+    key: Key,
+    dna: &crate::spec::MelodicDna,
+    seed: u64,
+) {
     if dna.ornament_rate <= 0.0 {
         return;
     }
@@ -1277,7 +1438,7 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
     let mut counter = 0u64;
     for i in 0..score.notes.len() {
         let n = &score.notes[i];
-        if n.role != VoiceRole::Melody || n.duration.beats() < 0.4 {
+        if n.role != VoiceRole::Melody || n.part != part_id || n.duration.beats() < 0.4 {
             continue;
         }
         counter += 1;
@@ -1307,6 +1468,7 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
         };
         // The cut borrows a sixteenth, capped so it never eats more than a
         // fifth of the main note — a flick, not a lean.
+        let part = n.part;
         let total = n.duration.beats();
         let cut_beats: f64 = 0.25_f64.min(total * 0.2);
         let cut_480 = ((cut_beats * 480.0).round() as i64).max(1);
@@ -1315,7 +1477,7 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
         note.onset = onset + Duration::new(cut_480, 480);
         note.duration = note.duration.saturating_sub(Duration::new(cut_480, 480));
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: cut_pitch,
             onset,
             duration: Duration::new(cut_480, 480),
@@ -1342,7 +1504,13 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
 /// identity as THE arrival matters more than decoration). Mutually
 /// exclusive with `apply_grace_ornaments`; reuses `MelodicDna::
 /// ornament_rate` as its gate/probability, same as the cut.
-fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicDna, seed: u64) {
+fn apply_roll_ornaments(
+    score: &mut Score,
+    part_id: PartId,
+    key: Key,
+    dna: &crate::spec::MelodicDna,
+    seed: u64,
+) {
     if dna.ornament_rate <= 0.0 {
         return;
     }
@@ -1352,7 +1520,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
     let mut counter = 0u64;
     for i in 0..score.notes.len() {
         let n = &score.notes[i];
-        if n.role != VoiceRole::Melody || n.duration.beats() < 0.9 || n.emphasis == Emphasis::Climax
+        if n.role != VoiceRole::Melody || n.part != part_id || n.duration.beats() < 0.9 || n.emphasis == Emphasis::Climax
         {
             continue;
         }
@@ -1413,7 +1581,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
                 dur
             };
             chain.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: n.part,
                 pitch,
                 onset: t,
                 duration: this_dur,
@@ -1456,7 +1624,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
 /// one that's already there — a deliberate melody/harmony scale mismatch,
 /// not a new pitch event. Rate comes from
 /// [`crate::spec::MelodicDna::blue_note_rate`] (0 = the pass is inert).
-fn apply_blue_notes(score: &mut Score, key: Key, rate: f32, seed: u64) {
+fn apply_blue_notes(score: &mut Score, part_id: PartId, key: Key, rate: f32, seed: u64) {
     if rate <= 0.0 {
         return;
     }
@@ -1465,7 +1633,7 @@ fn apply_blue_notes(score: &mut Score, key: Key, rate: f32, seed: u64) {
     let seventh_pc = scale.degree_pitch_class(7);
     let mut counter = 0u64;
     for n in score.notes.iter_mut() {
-        if n.role != VoiceRole::Melody {
+        if n.role != VoiceRole::Melody || n.part != part_id {
             continue;
         }
         let pc = n.pitch.pitch_class();
@@ -1496,7 +1664,7 @@ fn apply_blue_notes(score: &mut Score, key: Key, rate: f32, seed: u64) {
 /// mechanism: real chorale harmony, not appoggiatura's melodic upper
 /// neighbor wearing a different name. Rate comes from
 /// [`crate::spec::TextureSpec::suspension_rate`] (0 = the pass is inert).
-fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
+fn apply_suspensions(score: &mut Score, part_id: PartId, key: Key, rate: f32, seed: u64) {
     if rate <= 0.0 {
         return;
     }
@@ -1504,19 +1672,19 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
     let mut onsets: Vec<f64> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Harmony)
+        .filter(|n| n.role == VoiceRole::Harmony && n.part == part_id)
         .map(|n| n.onset.beats())
         .collect();
     onsets.sort_by(f64::total_cmp);
     onsets.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
 
-    let chord_at = |t: f64, score: &Score| -> Vec<(usize, Pitch, Duration, f32, f32)> {
+    let chord_at = |t: f64, score: &Score| -> Vec<(usize, Pitch, Duration, f32, f32, PartId)> {
         score
             .notes
             .iter()
             .enumerate()
-            .filter(|(_, n)| n.role == VoiceRole::Harmony && (n.onset.beats() - t).abs() < 1e-9)
-            .map(|(idx, n)| (idx, n.pitch, n.duration, n.velocity, n.section_intensity))
+            .filter(|(_, n)| n.role == VoiceRole::Harmony && n.part == part_id && (n.onset.beats() - t).abs() < 1e-9)
+            .map(|(idx, n)| (idx, n.pitch, n.duration, n.velocity, n.section_intensity, n.part))
             .collect()
     };
 
@@ -1531,8 +1699,8 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
         if chord1.is_empty() || chord2.is_empty() {
             continue;
         }
-        let mut found: Option<(Pitch, usize, Pitch, Duration, f32, f32)> = None;
-        for &(j_idx, p2, dur2, vel2, si2) in &chord2 {
+        let mut found: Option<(Pitch, usize, Pitch, Duration, f32, f32, PartId)> = None;
+        for &(j_idx, p2, dur2, vel2, si2, part) in &chord2 {
             let degree = (1..=15)
                 .min_by_key(|&d| (scale.degree_pitch(d, 4).midi() as i32 - p2.midi() as i32).abs())
                 .unwrap();
@@ -1540,11 +1708,11 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             if let Some(&(_, p1, ..)) = chord1.iter().find(|&&(_, p1, ..)| {
                 p1.pitch_class() == target_pc && (p1.midi() as i32 - p2.midi() as i32).abs() <= 3
             }) {
-                found = Some((p1, j_idx, p2, dur2, vel2, si2));
+                found = Some((p1, j_idx, p2, dur2, vel2, si2, part));
                 break;
             }
         }
-        let Some((suspended_pitch, j_idx, resolved_pitch, dur2, vel2, si2)) = found else {
+        let Some((suspended_pitch, j_idx, resolved_pitch, dur2, vel2, si2, part)) = found else {
             continue;
         };
         counter += 1;
@@ -1561,7 +1729,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
         let hold = Duration::new((hold_beats * 480.0).round() as i64, 480);
         resolved_indices.push(j_idx);
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: suspended_pitch,
             onset: onset2,
             duration: hold,
@@ -1571,7 +1739,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             section_intensity: si2,
         });
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: resolved_pitch,
             onset: onset2 + hold,
             duration: dur2.saturating_sub(hold),
@@ -1683,7 +1851,8 @@ fn apply_harmonic_stasis(score: &mut Score) {
         onsets.sort_by(f64::total_cmp);
         onsets.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
 
-        let mut active: std::collections::HashMap<u8, usize> = std::collections::HashMap::new();
+        let mut active: std::collections::HashMap<(PartId, u8), usize> =
+            std::collections::HashMap::new();
         let mut removed: Vec<usize> = Vec::new();
 
         for &t in &onsets {
@@ -1694,18 +1863,18 @@ fn apply_harmonic_stasis(score: &mut Score) {
                 .filter(|(_, n)| n.role == role && (n.onset.beats() - t).abs() < 1e-9)
                 .map(|(idx, _)| idx)
                 .collect();
-            let mut still_active: std::collections::HashMap<u8, usize> =
+            let mut still_active: std::collections::HashMap<(PartId, u8), usize> =
                 std::collections::HashMap::new();
             for &idx in &chord {
-                let midi = score.notes[idx].pitch.midi();
-                if let Some(&source) = active.get(&midi) {
+                let key = (score.notes[idx].part, score.notes[idx].pitch.midi());
+                if let Some(&source) = active.get(&key) {
                     let new_end = score.notes[idx].onset + score.notes[idx].duration;
                     let src_onset = score.notes[source].onset;
                     score.notes[source].duration = new_end.saturating_sub(src_onset);
                     removed.push(idx);
-                    still_active.insert(midi, source);
+                    still_active.insert(key, source);
                 } else {
-                    still_active.insert(midi, idx);
+                    still_active.insert(key, idx);
                 }
             }
             active = still_active;
@@ -1731,7 +1900,14 @@ fn apply_harmonic_stasis(score: &mut Score) {
 /// this is the first that wholesale REPLACES one within its window
 /// (mirroring how [`apply_drone_pedal`] replaces the whole bass, but
 /// scoped to specific sections rather than the whole piece).
-fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats: f64, seed: u64) {
+fn apply_additive_process(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    bars: i64,
+    meter_beats: f64,
+    seed: u64,
+) {
     let cell = crate::hook::HookCell::generate_with(
         &crate::spec::MelodicDna::default(),
         seed,
@@ -1755,7 +1931,10 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
         let scale = section.key.scale();
         let intensity = section.role.intensity();
         score.notes.retain(|n| {
-            !(n.role == VoiceRole::Melody && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi)
+            !(n.role == VoiceRole::Melody
+                && n.part == part_id
+                && n.onset.beats() >= lo - 1e-9
+                && n.onset.beats() < hi)
         });
         let mut t = lo;
         let mut k: usize = 1;
@@ -1778,7 +1957,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch,
                     onset: Duration::new((t * 480.0).round() as i64, 480),
                     duration: Duration::new((this_dur * 480.0).round().max(1.0) as i64, 480),
@@ -1813,7 +1992,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
 /// point of a drone: it's the fixed ground a modal melody floats over, the
 /// harmony moving freely against it. Runs LAST, after every other bass
 /// note is in place, and simply replaces them all.
-fn apply_drone_pedal(score: &mut Score, key: Key) {
+fn apply_drone_pedal(score: &mut Score, part_id: PartId, melody_part_id: PartId, key: Key) {
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -1828,7 +2007,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
     let melody_track: Vec<(f64, f32)> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.role == VoiceRole::Melody && n.part == melody_part_id)
         .map(|n| (n.onset.beats(), n.section_intensity))
         .collect();
     let intensity_near = |t: f64| -> f32 {
@@ -1838,12 +2017,12 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
             .map(|&(_, si)| si)
             .unwrap_or(1.0)
     };
-    score.notes.retain(|n| n.role != VoiceRole::Bass);
+    score.notes.retain(|n| !(n.role == VoiceRole::Bass && n.part == part_id));
     for m in 0..total_bars {
         let onset = bar.scale(m, 1);
         let si = intensity_near(onset.beats());
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: part_id,
             pitch: tonic,
             onset,
             duration: half,
@@ -1853,7 +2032,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
             section_intensity: si,
         });
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: part_id,
             pitch: fifth,
             onset: onset + half,
             duration: half,
@@ -1878,8 +2057,14 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
 /// the whole piece — reusing the Ambient style's own device (repetition
 /// becoming duration) rather than re-deriving tying logic, since the
 /// effect wanted is identical.
-fn apply_full_drone(score: &mut Score, key: Key) {
-    apply_drone_pedal(score, key);
+fn apply_full_drone(
+    score: &mut Score,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
+    melody_part_id: PartId,
+    key: Key,
+) {
+    apply_drone_pedal(score, bass_part_id, melody_part_id, key);
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -1892,7 +2077,7 @@ fn apply_full_drone(score: &mut Score, key: Key) {
     let melody_track: Vec<(f64, f32)> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.role == VoiceRole::Melody && n.part == melody_part_id)
         .map(|n| (n.onset.beats(), n.section_intensity))
         .collect();
     let intensity_near = |t: f64| -> f32 {
@@ -1902,13 +2087,15 @@ fn apply_full_drone(score: &mut Score, key: Key) {
             .map(|&(_, si)| si)
             .unwrap_or(1.0)
     };
-    score.notes.retain(|n| n.role != VoiceRole::Harmony);
+    score.notes.retain(|n| {
+        !(n.role == VoiceRole::Harmony && n.part == harmony_part_id)
+    });
     for m in 0..total_bars {
         let onset = bar.scale(m, 1);
         let si = intensity_near(onset.beats());
         for pitch in [tonic, fifth, octave] {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part_id,
                 pitch,
                 onset,
                 duration: bar,
@@ -1938,7 +2125,15 @@ fn apply_full_drone(score: &mut Score, key: Key) {
 /// Returns keep the staged-entrance treatment (the thinned bar, the
 /// arrival) — you leave home by modulation, you come home by arrival.
 /// The fugue keeps its documented no-modulation limit (its own pipeline).
-fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beats: f64) {
+fn apply_pivot_modulations(
+    score: &mut Score,
+    melody_part_id: PartId,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
+    form: &Form,
+    bars: i64,
+    meter_beats: f64,
+) {
     let section_bars = 2 * bars; // antecedent + consequent
     let meter_i = meter_beats as i64;
     for i in 1..form.sections.len() {
@@ -1987,7 +2182,13 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
         for j in 0..score.notes.len() {
             let n = &score.notes[j];
             let (on, off) = (n.onset.beats(), (n.onset + n.duration).beats());
-            if !(on < win_hi - 1e-9 && off > win_lo + 1e-9) {
+            let belongs_to_target_line = match n.role {
+                VoiceRole::Melody => n.part == melody_part_id,
+                VoiceRole::Bass => n.part == bass_part_id,
+                VoiceRole::Harmony => n.part == harmony_part_id,
+                _ => false,
+            };
+            if !belongs_to_target_line || !(on < win_hi - 1e-9 && off > win_lo + 1e-9) {
                 continue;
             }
             match n.role {
@@ -2052,7 +2253,7 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
         if !window_touched {
             for &pitch in &dom_voiced {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: harmony_part_id,
                     pitch,
                     onset: win_onset,
                     duration: half,
@@ -2063,7 +2264,7 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
                 });
             }
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: bass_part_id,
                 pitch: dom_root_bass,
                 onset: win_onset,
                 duration: half,
@@ -2103,7 +2304,15 @@ fn nearest_leading(
 /// close honestly — the deception works because the promise is
 /// eventually kept), and the pass runs before intro-shift so bar
 /// arithmetic is section-relative.
-fn apply_deceptive_first_close(score: &mut Score, key: Key, bars: i64, meter_beats: f64) {
+fn apply_deceptive_first_close(
+    score: &mut Score,
+    melody_part_id: PartId,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
+    key: Key,
+    bars: i64,
+    meter_beats: f64,
+) {
     // The opening period spans bars 0..2*bars; its consequent's final bar:
     let target_bar = 2 * bars - 1;
     let (lo, hi) = (
@@ -2121,7 +2330,7 @@ fn apply_deceptive_first_close(score: &mut Score, key: Key, bars: i64, meter_bea
     let mut harmony_idx: Vec<usize> = (0..score.notes.len())
         .filter(|&i| {
             let n = &score.notes[i];
-            n.role == VoiceRole::Harmony && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
+            n.role == VoiceRole::Harmony && n.part == harmony_part_id && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
         })
         .collect();
     harmony_idx.sort_by(|&a, &b| {
@@ -2139,7 +2348,7 @@ fn apply_deceptive_first_close(score: &mut Score, key: Key, bars: i64, meter_bea
     // Bass: the deceptive step — up to the submediant root.
     for i in 0..score.notes.len() {
         let n = &score.notes[i];
-        if n.role == VoiceRole::Bass && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi {
+        if n.role == VoiceRole::Bass && n.part == bass_part_id && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi {
             score.notes[i].pitch = scale.degree_pitch(6, 2);
         }
     }
@@ -2149,6 +2358,7 @@ fn apply_deceptive_first_close(score: &mut Score, key: Key, bars: i64, meter_bea
     for i in 0..score.notes.len() {
         let n = &score.notes[i];
         if n.role == VoiceRole::Melody
+            && n.part == melody_part_id
             && n.onset.beats() >= lo - 1e-9
             && n.onset.beats() < hi
             && !vi_pcs.contains(&n.pitch.pitch_class())
@@ -2187,6 +2397,7 @@ fn apply_deceptive_first_close(score: &mut Score, key: Key, bars: i64, meter_bea
 ///   drum-major would give even with no kit playing.
 fn apply_phrase_rhetoric(
     score: &mut Score,
+    part_id: PartId,
     rhetoric: crate::spec::PhraseRhetoric,
     meter_beats: f64,
 ) {
@@ -2197,7 +2408,7 @@ fn apply_phrase_rhetoric(
     let cadentials: Vec<usize> = {
         let mut idx: Vec<usize> = (0..score.notes.len())
             .filter(|&i| {
-                score.notes[i].role == VoiceRole::Melody
+                score.notes[i].role == VoiceRole::Melody && score.notes[i].part == part_id
                     && score.notes[i].emphasis == Emphasis::Cadential
             })
             .collect();
@@ -2222,7 +2433,7 @@ fn apply_phrase_rhetoric(
                     let target = (0..score.notes.len())
                         .filter(|&j| {
                             let n = &score.notes[j];
-                            n.role == VoiceRole::Melody
+                            n.role == VoiceRole::Melody && n.part == part_id
                                 && n.emphasis != Emphasis::Climax
                                 && n.onset.beats() < stop - 0.25
                                 && (n.onset + n.duration).beats() > stop
@@ -2255,7 +2466,7 @@ fn apply_phrase_rhetoric(
                 let prev = (0..score.notes.len())
                     .filter(|&j| {
                         let n = &score.notes[j];
-                        n.role == VoiceRole::Melody
+                        n.role == VoiceRole::Melody && n.part == part_id
                             && ((n.onset + n.duration).beats() - cad_onset.beats()).abs() < 1e-6
                     })
                     .max_by(|&a, &b| {
@@ -2284,7 +2495,7 @@ fn apply_phrase_rhetoric(
                 if let Some(j) = (0..score.notes.len())
                     .filter(|&j| {
                         let n = &score.notes[j];
-                        n.role == VoiceRole::Melody
+                        n.role == VoiceRole::Melody && n.part == part_id
                             && ((n.onset + n.duration).beats() - cad_onset.beats()).abs() < 1e-6
                     })
                     .max_by(|&a, &b| {
@@ -2330,6 +2541,7 @@ fn apply_phrase_rhetoric(
 /// semitones below it.
 fn apply_grief_suspensions(
     score: &mut Score,
+    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -2361,7 +2573,7 @@ fn apply_grief_suspensions(
             };
             let onset = bar.scale(measure + i as i64, 1);
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: sus,
                 onset,
                 duration: Duration::new(1, 1),
@@ -2371,7 +2583,7 @@ fn apply_grief_suspensions(
                 section_intensity: section.role.intensity(),
             });
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: resolution,
                 onset: onset + Duration::new(1, 1),
                 duration: Duration::new((meter_beats as i64 - 1).max(1), 1),
@@ -2394,10 +2606,10 @@ fn apply_grief_suspensions(
 /// score itself (so the MIDI carries it, not just the render). Phrase
 /// starts, cadences, and the climax keep their placement: defiance
 /// disturbs the middle of the sentence, not its punctuation.
-fn apply_defiant_syncopation(score: &mut Score, meter_beats: f64) {
+fn apply_defiant_syncopation(score: &mut Score, part_id: PartId, meter_beats: f64) {
     let eighth = Duration::new(1, 2);
     for n in score.notes.iter_mut() {
-        if n.role != VoiceRole::Melody || n.emphasis != Emphasis::Normal {
+        if n.role != VoiceRole::Melody || n.part != part_id || n.emphasis != Emphasis::Normal {
             continue;
         }
         let beats = n.onset.beats();
@@ -2417,9 +2629,9 @@ fn apply_defiant_syncopation(score: &mut Score, meter_beats: f64) {
 /// Joy's signature: LIFT. Interior melody notes sound lighter — a tenth
 /// shorter — so the line dances instead of singing legato. Long tones
 /// (holds, cadences) keep their length; joy is airborne, not clipped.
-fn apply_joyful_lift(score: &mut Score) {
+fn apply_joyful_lift(score: &mut Score, part_id: PartId) {
     for n in score.notes.iter_mut() {
-        if n.role == VoiceRole::Melody && n.emphasis == Emphasis::Normal && n.duration.beats() < 1.5
+        if n.role == VoiceRole::Melody && n.part == part_id && n.emphasis == Emphasis::Normal && n.duration.beats() < 1.5
         {
             n.duration = n.duration.scale(9, 10);
         }
@@ -2429,11 +2641,11 @@ fn apply_joyful_lift(score: &mut Score) {
 /// Curiosity's signature: the QUESTION. The piece's very last melody tone
 /// resolves UP to scale degree 2 instead of settling on the tonic —
 /// question intonation, the ending that leaves without answering.
-fn apply_curious_question(score: &mut Score, key: Key) {
+fn apply_curious_question(score: &mut Score, part_id: PartId, key: Key) {
     let Some(last) = score
         .notes
         .iter_mut()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.role == VoiceRole::Melody && n.part == part_id)
         .max_by(|a, b| a.onset.beats().total_cmp(&b.onset.beats()))
     else {
         return;
@@ -2482,6 +2694,10 @@ fn apply_curious_question(score: &mut Score, key: Key) {
 #[allow(clippy::too_many_arguments)]
 fn apply_damage(
     score: &mut Score,
+    melody_part_id: PartId,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
+    counter_part_id: PartId,
     form: &Form,
     key: Key,
     meter_beats: f64,
@@ -2505,17 +2721,23 @@ fn apply_damage(
         && let Some(climax) = score
             .notes
             .iter()
-            .find(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
+            .find(|n| {
+                n.role == VoiceRole::Melody
+                    && n.part == melody_part_id
+                    && n.emphasis == Emphasis::Climax
+            })
     {
         let win_start = (climax.onset.beats() / meter_beats).floor() * meter_beats;
         let win_end = ((climax.onset + climax.duration).beats() / meter_beats).ceil() * meter_beats;
         score.notes.retain(|n| {
-            !(matches!(n.role, VoiceRole::Harmony | VoiceRole::Bass)
+            !((n.role == VoiceRole::Harmony && n.part == harmony_part_id
+                || n.role == VoiceRole::Bass && n.part == bass_part_id)
                 && n.onset.beats() >= win_start - 1e-9
                 && n.onset.beats() < win_end - 1e-9)
         });
         for n in score.notes.iter_mut() {
-            if matches!(n.role, VoiceRole::Harmony | VoiceRole::Bass)
+            if (n.role == VoiceRole::Harmony && n.part == harmony_part_id
+                || n.role == VoiceRole::Bass && n.part == bass_part_id)
                 && n.onset.beats() < win_start
                 && (n.onset + n.duration).beats() > win_start + 1e-9
             {
@@ -2529,7 +2751,7 @@ fn apply_damage(
         && let Some(first_bass) = score
             .notes
             .iter_mut()
-            .filter(|n| n.role == VoiceRole::Bass)
+            .filter(|n| n.role == VoiceRole::Bass && n.part == bass_part_id)
             .min_by(|a, b| a.onset.beats().total_cmp(&b.onset.beats()))
         && first_bass.pitch.midi() >= 36
     {
@@ -2543,6 +2765,7 @@ fn apply_damage(
         let target = (ret.start_bar + 1) as f64 * meter_beats;
         if let Some(idx) = score.notes.iter().position(|n| {
             n.role == VoiceRole::Melody
+                && n.part == melody_part_id
                 && (n.onset.beats() - target).abs() < 1e-6
                 && n.emphasis == Emphasis::Normal
         }) {
@@ -2563,6 +2786,7 @@ fn apply_damage(
             .enumerate()
             .filter(|(_, n)| {
                 n.role == VoiceRole::Melody
+                    && n.part == melody_part_id
                     && n.onset.beats() >= b0
                     && n.onset.beats() < b1
                     && n.emphasis == Emphasis::Normal
@@ -2585,6 +2809,7 @@ fn apply_damage(
                 idx != w[0]
                     && idx != w[1]
                     && n.role == VoiceRole::Melody
+                    && n.part == melody_part_id
                     && n.onset.beats() < gap_end - 1e-9
                     && (n.onset + n.duration).beats() > gap_start + 1e-9
             });
@@ -2592,14 +2817,15 @@ fn apply_damage(
             (step.abs() == 2
                 && gap_end - gap_start >= -1e-6
                 && a.duration.beats() >= 0.5
-                && gap_is_clear)
+                && gap_is_clear
+                && a.part == b.part)
                 .then_some((w[0], w[1], step.signum()))
         });
         if let Some((ai, bi, dir)) = pair {
             let grace = Duration::sixteenth();
             let passing_onset = score.notes[bi].onset.saturating_sub(grace);
             let passing = ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: score.notes[ai].part,
                 pitch: score.notes[ai].pitch.transpose(dir),
                 onset: passing_onset,
                 duration: grace,
@@ -2625,7 +2851,7 @@ fn apply_damage(
             .notes
             .iter()
             .enumerate()
-            .filter(|(_, n)| n.role == VoiceRole::CounterMelody)
+            .filter(|(_, n)| n.role == VoiceRole::CounterMelody && n.part == counter_part_id)
             .map(|(i, _)| i)
             .collect();
         if counter.len() >= 6 {
@@ -2647,7 +2873,7 @@ fn apply_damage(
     // note past where the next counter-melody note (shifted or not) begins.
     // De-overlap defensively rather than trying to reason about every
     // shift/floor interaction inline.
-    deoverlap_voice(score, VoiceRole::CounterMelody);
+    deoverlap_part(score, VoiceRole::CounterMelody, counter_part_id);
 
     // Keep the melody line onset-ordered for downstream consumers.
     let _ = key; // key reserved for future harmonic damage devices
@@ -2698,6 +2924,43 @@ pub(crate) fn deoverlap_voice(score: &mut Score, role: VoiceRole) {
     to_remove.dedup();
     for i in to_remove.into_iter().rev() {
         score.notes.remove(i);
+    }
+}
+
+/// De-overlap one source-authored part without touching other parts that
+/// happen to share its local VoiceRole.
+fn deoverlap_part(score: &mut Score, role: VoiceRole, part_id: PartId) {
+    let mut indices: Vec<usize> = score
+        .notes
+        .iter()
+        .enumerate()
+        .filter(|(_, note)| note.part == part_id && note.role == role)
+        .map(|(index, _)| index)
+        .collect();
+    indices.sort_by(|&left, &right| {
+        score.notes[left]
+            .onset
+            .beats()
+            .total_cmp(&score.notes[right].onset.beats())
+    });
+    let mut remove = Vec::new();
+    for pair in indices.windows(2) {
+        let (left, right) = (pair[0], pair[1]);
+        let left_end = (score.notes[left].onset + score.notes[left].duration).beats();
+        let right_onset = score.notes[right].onset.beats();
+        if left_end > right_onset + 1e-9 {
+            let gap = score.notes[right].onset.saturating_sub(score.notes[left].onset);
+            if gap.beats() <= 1e-9 {
+                remove.push(left);
+            } else {
+                score.notes[left].duration = gap;
+            }
+        }
+    }
+    remove.sort_unstable();
+    remove.dedup();
+    for index in remove.into_iter().rev() {
+        score.notes.remove(index);
     }
 }
 
@@ -2884,6 +3147,8 @@ fn plan_damage(
 /// the hook there; two quotations at once would smear both).
 fn apply_counter_hook_echoes(
     score: &mut Score,
+    counter_part_id: PartId,
+    melody_part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -2901,7 +3166,9 @@ fn apply_counter_hook_echoes(
     let final_onset = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Cadential)
+        .filter(|n| n.role == VoiceRole::Melody
+                && n.part == melody_part_id
+                && n.emphasis == Emphasis::Cadential)
         .map(|n| n.onset.beats())
         .fold(f64::MIN, f64::max);
     // Held cadence tones inside each ReturnA window.
@@ -2923,6 +3190,7 @@ fn apply_counter_hook_echoes(
             .iter()
             .filter(|n| {
                 n.role == VoiceRole::Melody
+                    && n.part == melody_part_id
                     && n.emphasis == Emphasis::Cadential
                     && n.duration.beats() >= 1.5
                     && n.onset.beats() >= w0 - 1e-9
@@ -2943,11 +3211,13 @@ fn apply_counter_hook_echoes(
             // notes: exact-duplicate onsets/pitches or straight overlap.
             score.notes.retain(|n| {
                 !(n.role == VoiceRole::CounterMelody
+                    && n.part == counter_part_id
                     && n.onset.beats() >= echo_start - 1e-9
                     && n.onset.beats() < echo_end - 1e-9)
             });
             for n in score.notes.iter_mut() {
                 if n.role == VoiceRole::CounterMelody
+                    && n.part == counter_part_id
                     && n.onset.beats() < echo_start - 1e-9
                     && (n.onset + n.duration).beats() > echo_start + 1e-9
                 {
@@ -2964,7 +3234,7 @@ fn apply_counter_hook_echoes(
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: counter_part_id,
                     pitch,
                     onset: Duration::new((t * 4.0).round() as i64, 4),
                     duration: halved,
@@ -2991,6 +3261,7 @@ fn apply_counter_hook_echoes(
 /// return stays a verbatim memory — the engine's native temperament.
 fn apply_hook_memory(
     score: &mut Score,
+    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     hook_len: usize,
@@ -3017,11 +3288,11 @@ fn apply_hook_memory(
     for (i, (key, start_bar)) in returns.iter().enumerate() {
         let w0 = *start_bar as f64 * meter_beats;
         if i + 1 == n && n >= 2 {
-            for idx in statement_indices(score, w0, hook_len) {
+            for idx in statement_indices(score, part_id, w0, hook_len) {
                 score.notes[idx].velocity = (score.notes[idx].velocity + 0.05).clamp(0.1, 1.0);
             }
         } else {
-            alter_statement(score, *key, w0, hook_len, att);
+            alter_statement(score, part_id, *key, w0, hook_len, att);
         }
     }
 }
@@ -3029,12 +3300,12 @@ fn apply_hook_memory(
 /// The first `hook_len` melody notes at or after `w0` — a return's opening
 /// hook statement, re-derived from the live note list (earlier alterations
 /// may have shifted indices).
-fn statement_indices(score: &Score, w0: f64, hook_len: usize) -> Vec<usize> {
+fn statement_indices(score: &Score, part_id: PartId, w0: f64, hook_len: usize) -> Vec<usize> {
     let mut v: Vec<(usize, f64)> = score
         .notes
         .iter()
         .enumerate()
-        .filter(|(_, n)| n.role == VoiceRole::Melody && n.onset.beats() >= w0 - 1e-9)
+        .filter(|(_, n)| n.role == VoiceRole::Melody && n.part == part_id && n.onset.beats() >= w0 - 1e-9)
         .map(|(i, n)| (i, n.onset.beats()))
         .collect();
     v.sort_by(|a, b| a.1.total_cmp(&b.1));
@@ -3045,13 +3316,14 @@ fn statement_indices(score: &Score, w0: f64, hook_len: usize) -> Vec<usize> {
 /// [`apply_hook_memory`] for what each attitude does to what it remembers.
 fn alter_statement(
     score: &mut Score,
+    part_id: PartId,
     key: Key,
     w0: f64,
     hook_len: usize,
     att: crate::spec::Attitude,
 ) {
     use crate::spec::Attitude as A;
-    let idxs = statement_indices(score, w0, hook_len);
+    let idxs = statement_indices(score, part_id, w0, hook_len);
     if idxs.len() < 3 {
         return;
     }
@@ -3110,6 +3382,7 @@ fn alter_statement(
             // rhythm shape.
             let prev = score.notes.iter().position(|n| {
                 n.role == VoiceRole::Melody
+                    && n.part == part_id
                     && n.onset + n.duration == peak_onset
                     && n.duration.beats() >= 0.75
             });
@@ -3123,8 +3396,9 @@ fn alter_statement(
                 }
                 let vel = (score.notes[peak].velocity * 0.8).clamp(0.1, 1.0);
                 let intensity = score.notes[peak].section_intensity;
+                let part = score.notes[peak].part;
                 score.notes.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part,
                     pitch: above,
                     onset: peak_onset.saturating_sub(grace),
                     duration: grace,
@@ -3160,6 +3434,7 @@ fn alter_statement(
 /// instrumental works become deeply satisfying.
 fn apply_hidden_bass_quote(
     score: &mut Score,
+    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -3179,11 +3454,13 @@ fn apply_hidden_bass_quote(
     // Clear the window (overlap-aware, per the exposed-climax lesson).
     score.notes.retain(|n| {
         !(n.role == VoiceRole::Bass
+            && n.part == part_id
             && n.onset.beats() >= quote_start - 1e-9
             && n.onset.beats() < quote_start + span - 1e-9)
     });
     for n in score.notes.iter_mut() {
         if n.role == VoiceRole::Bass
+            && n.part == part_id
             && n.onset.beats() < quote_start
             && (n.onset + n.duration).beats() > quote_start + 1e-9
         {
@@ -3195,7 +3472,7 @@ fn apply_hidden_bass_quote(
     for &(deg, dur) in &hook.notes {
         let augmented = dur.scale(2, 1);
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: part_id,
             pitch: key.scale().degree_pitch(deg, 2),
             onset: Duration::new((t * 2.0).round() as i64, 2),
             duration: augmented,
@@ -3259,7 +3536,13 @@ pub fn section_bar_map(form: &Form) -> Vec<SectionBars> {
 /// - **Pre-return thinning**: in the bar before every `ReturnA`, the bass
 ///   drops out entirely and the harmony drops out of the second half — a
 ///   held breath, so the reprise lands as an arrival, not another bar.
-fn apply_staged_entrances(score: &mut Score, form: &Form, meter_beats: f64) {
+fn apply_staged_entrances(
+    score: &mut Score,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
+    form: &Form,
+    meter_beats: f64,
+) {
     let sections = section_bar_map(form);
     let Some(first) = sections.first() else {
         return;
@@ -3277,10 +3560,10 @@ fn apply_staged_entrances(score: &mut Score, form: &Form, meter_beats: f64) {
     score.notes.retain(|n| {
         let t = n.onset.beats();
         match n.role {
-            VoiceRole::Bass => {
+            VoiceRole::Bass if n.part == bass_part_id => {
                 t >= bass_entry_beat && !thin_windows.iter().any(|&(b0, _, b1)| t >= b0 && t < b1)
             }
-            VoiceRole::Harmony => !thin_windows.iter().any(|&(_, h0, h1)| t >= h0 && t < h1),
+            VoiceRole::Harmony if n.part == harmony_part_id => !thin_windows.iter().any(|&(_, h0, h1)| t >= h0 && t < h1),
             _ => true,
         }
     });
@@ -3300,13 +3583,13 @@ fn apply_staged_entrances(score: &mut Score, form: &Form, meter_beats: f64) {
 ///   (its duration extends to cover both), so the peak is a long note,
 ///   not a passing one. The existing agogic rubato pause then dwells even
 ///   longer, and muse's climax doubling doubles the HELD note.
-fn apply_held_arrivals(score: &mut Score, meter_beats: f64) {
+fn apply_held_arrivals(score: &mut Score, part_id: PartId, meter_beats: f64) {
     // --- Cadence holds ---
     let cadential: Vec<usize> = score
         .notes
         .iter()
         .enumerate()
-        .filter(|(_, n)| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Cadential)
+        .filter(|(_, n)| n.role == VoiceRole::Melody && n.part == part_id && n.emphasis == Emphasis::Cadential)
         .map(|(i, _)| i)
         .collect();
     // The final cadence (largest onset) is exempt.
@@ -3329,7 +3612,7 @@ fn apply_held_arrivals(score: &mut Score, meter_beats: f64) {
             .iter()
             .enumerate()
             .filter(|(_, n)| {
-                n.role == VoiceRole::Melody
+                n.role == VoiceRole::Melody && n.part == part_id
                     && n.onset.beats() >= bar_start - 1e-9
                     && n.onset.beats() < bar_end - 1e-9
             })
@@ -3373,13 +3656,13 @@ fn apply_held_arrivals(score: &mut Score, meter_beats: f64) {
     let Some(ci) = score
         .notes
         .iter()
-        .position(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
+        .position(|n| n.role == VoiceRole::Melody && n.part == part_id && n.emphasis == Emphasis::Climax)
     else {
         return;
     };
     let climax_end = score.notes[ci].onset + score.notes[ci].duration;
     let next = score.notes.iter().position(|n| {
-        n.role == VoiceRole::Melody
+        n.role == VoiceRole::Melody && n.part == part_id
             && n.emphasis == Emphasis::Normal
             && (n.onset.beats() - climax_end.beats()).abs() < 1e-6
     });
@@ -3397,6 +3680,8 @@ fn apply_held_arrivals(score: &mut Score, meter_beats: f64) {
 /// phrase entry is an EVENT.
 fn prepend_intro(
     score: &mut Score,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
     home: Key,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -3428,8 +3713,9 @@ fn prepend_intro(
         let onset = bar.scale(m, 1);
         match variant {
             1 => {
-                pattern.realize_measure(
+                pattern.realize_measure_for_part(
                     score,
+                    harmony_part_id,
                     &voiced,
                     onset,
                     meter_beats,
@@ -3437,7 +3723,7 @@ fn prepend_intro(
                     SectionRole::A.intensity(),
                 );
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: bass_part_id,
                     pitch: Pitch::new(home.tonic, 2),
                     onset,
                     duration: bar,
@@ -3453,7 +3739,7 @@ fn prepend_intro(
                 let swell = vel * (0.8 + 0.2 * (m as f32 + 1.0) / intro_bars.max(1) as f32);
                 for pitch in &voiced {
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: harmony_part_id,
                         pitch: *pitch,
                         onset,
                         duration: bar,
@@ -3465,8 +3751,9 @@ fn prepend_intro(
                 }
             }
             _ => {
-                pattern.realize_measure(
+                pattern.realize_measure_for_part(
                     score,
+                    harmony_part_id,
                     &voiced,
                     onset,
                     meter_beats,
@@ -3505,13 +3792,27 @@ pub const CODA_BARS: i64 = 2;
 /// original cadence now gets the smaller mid-piece relaxation.
 fn append_coda(
     score: &mut Score,
+    melody_part_id: PartId,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
     home: Key,
     meter_beats: f64,
     intent: &MusicalIntent,
     coda_bars: i64,
     transformed: bool,
 ) {
-    if transformed && append_transformed_coda(score, home, meter_beats, intent, coda_bars) {
+    if transformed
+        && append_transformed_coda(
+            score,
+            melody_part_id,
+            bass_part_id,
+            harmony_part_id,
+            home,
+            meter_beats,
+            intent,
+            coda_bars,
+        )
+    {
         return;
     }
     let bar = Duration::new(meter_beats as i64, 1);
@@ -3530,7 +3831,7 @@ fn append_coda(
         let onset = start + bar.scale(m, 1);
         let chord = home.diatonic_triad(deg);
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: melody_part_id,
             pitch: tonic_melody,
             onset,
             duration: bar,
@@ -3545,7 +3846,7 @@ fn append_coda(
         });
         for pitch in chord.voice(3) {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part_id,
                 pitch,
                 onset,
                 duration: bar,
@@ -3556,7 +3857,7 @@ fn append_coda(
             });
         }
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part_id,
             pitch: chord.voice(2)[0],
             onset,
             duration: bar,
@@ -3586,6 +3887,9 @@ fn append_coda(
 /// no melody to quote.
 fn append_transformed_coda(
     score: &mut Score,
+    melody_part_id: PartId,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
     home: Key,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -3594,7 +3898,7 @@ fn append_transformed_coda(
     let mut fragment: Vec<Pitch> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.role == VoiceRole::Melody && n.part == melody_part_id)
         .take(4)
         .map(|n| n.pitch)
         .collect();
@@ -3656,7 +3960,7 @@ fn append_transformed_coda(
         };
         let fade = 0.9 - 0.25 * (onset_beats / total_beats) as f32;
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: melody_part_id,
             pitch,
             onset: start + Duration::new((onset_beats * 2.0) as i64, 2),
             duration: Duration::new((dur_beats * 2.0) as i64, 2),
@@ -3683,7 +3987,7 @@ fn append_transformed_coda(
         let onset = start + bar.scale(m, 1);
         for pitch in chord.voice(3) {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part_id,
                 pitch,
                 onset,
                 duration: bar,
@@ -3697,7 +4001,7 @@ fn append_transformed_coda(
             });
         }
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part_id,
             pitch: chord.voice(2)[0],
             onset,
             duration: bar,
@@ -3830,6 +4134,28 @@ fn applied_dominant_raised_pc(key: Key, c: i32) -> Option<crate::pitch::PitchCla
 /// decided yet), not a bug.
 pub(crate) fn realize_melody(
     score: &mut Score,
+    form: &Form,
+    intent: &MusicalIntent,
+    start_beat: Duration,
+    meter_beats: f64,
+    climax_grace: bool,
+) {
+    realize_melody_for_part(
+        score,
+        PartId::UNASSIGNED,
+        form,
+        intent,
+        start_beat,
+        meter_beats,
+        climax_grace,
+    );
+}
+
+/// Source-authored variant. All notes and the optional climax grace belong
+/// to the continuing melody part supplied by the composition owner.
+pub(crate) fn realize_melody_for_part(
+    score: &mut Score,
+    part_id: PartId,
     form: &Form,
     intent: &MusicalIntent,
     start_beat: Duration,
@@ -4024,7 +4350,7 @@ pub(crate) fn realize_melody(
                     *dur
                 };
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch: *p,
                     onset,
                     duration: sounded,
@@ -4058,7 +4384,7 @@ pub(crate) fn realize_melody(
         let climax_idx = score
             .notes
             .iter()
-            .position(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax);
+            .position(|n| n.role == VoiceRole::Melody && n.part == part_id && n.emphasis == Emphasis::Climax);
         if let Some(ci) = climax_idx {
             let climax_onset = score.notes[ci].onset;
             let climax_pitch = score.notes[ci].pitch;
@@ -4075,6 +4401,7 @@ pub(crate) fn realize_melody(
                 .find(|p| key.scale().contains(p.pitch_class()));
             let prev = score.notes.iter().position(|n| {
                 n.role == VoiceRole::Melody
+                    && n.part == part_id
                     && n.onset + n.duration == climax_onset
                     && n.duration.beats() >= 0.75
             });
@@ -4087,7 +4414,7 @@ pub(crate) fn realize_melody(
                 score.notes.insert(
                     ci,
                     ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: part_id,
                         pitch: below,
                         onset: climax_onset.saturating_sub(grace),
                         duration: grace,
@@ -4367,6 +4694,17 @@ pub(crate) fn realize_counter_melody(
     meter_beats: f64,
     intent: &MusicalIntent,
 ) {
+    realize_counter_melody_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent);
+}
+
+/// Source-authored variant for the general composer's independent counterline.
+pub(crate) fn realize_counter_melody_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+) {
     let counter_octave = 4;
     let base_vel = (0.28 + intent.energy.clamp(0.0, 1.0) * 0.28).clamp(0.12, 0.58);
     let bar = Duration::new(meter_beats as i64, 1);
@@ -4439,7 +4777,7 @@ pub(crate) fn realize_counter_melody(
                         1.1 - 0.3 * ((pos - 0.65) / 0.35)
                     };
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: part_id,
                         pitch: p,
                         onset,
                         duration: tone_dur,
@@ -4870,6 +5208,700 @@ mod tests {
     use super::*;
     use crate::harmony::{Progression, Tonality};
     use crate::score::VoiceRole;
+
+    #[test]
+    fn general_composer_preserves_identity_through_grief_development_and_arrangement() {
+        let mut spec = crate::style::Style::Classical.spec();
+        spec.form_pool = vec![crate::spec::FormKind::Ternary];
+        spec.attitude = Some(crate::spec::Attitude::Grief);
+        spec.development = crate::spec::DevelopmentDna::Sequential;
+        spec.texture.counter_melody = true;
+        spec.texture.hook_cell = true;
+        spec.texture.intro_bars = 1;
+        spec.texture.coda_bars = 2;
+        spec.texture.damage = 0.6;
+        spec.texture.suspension_rate = 1.0;
+        spec.texture.planing = true;
+        spec.validate().expect("the configured period-form score must be valid");
+
+        let score = compose_with_spec(
+            &MusicalIntent {
+                seed: 17,
+                ..MusicalIntent::default()
+            },
+            &spec,
+        );
+        assert!(
+            score.has_part_identity(),
+            "every generated event must retain a source-authored PartId"
+        );
+
+        for (part, role) in [
+            (GENERAL_MELODY_PART_V1, VoiceRole::Melody),
+            (GENERAL_BASS_PART_V1, VoiceRole::Bass),
+            (GENERAL_HARMONY_PART_V1, VoiceRole::Harmony),
+            (GENERAL_COUNTERMELODY_PART_V1, VoiceRole::CounterMelody),
+        ] {
+            assert!(score.notes.iter().any(|note| note.part == part));
+            assert!(score.notes.iter().filter(|note| note.part == part).all(|note| {
+                note.role == role
+            }));
+        }
+        assert!(
+            score.notes.iter()
+                .filter(|note| note.part == GENERAL_GRIEF_SUSPENSION_PART_V1)
+                .all(|note| note.role == VoiceRole::Harmony)
+        );
+    }
+
+    #[test]
+    fn additive_melody_and_full_drone_preserve_their_source_parts() {
+        let mut spec = crate::style::Style::Classical.spec();
+        spec.form_pool = vec![crate::spec::FormKind::Ternary];
+        spec.development = crate::spec::DevelopmentDna::Classic;
+        spec.texture.additive_process = true;
+        spec.texture.full_drone = true;
+        spec.texture.harmonic_stasis = true;
+        spec.texture.intro_bars = 1;
+        spec.texture.coda_bars = 1;
+        spec.texture.damage = 0.0;
+        spec.texture.counter_melody = false;
+        spec.validate().expect("the additive/full-drone configuration must be valid");
+
+        let score = compose_with_spec(
+            &MusicalIntent {
+                seed: 29,
+                ..MusicalIntent::default()
+            },
+            &spec,
+        );
+        assert!(score.has_part_identity());
+        assert!(score.notes.iter().any(|note| {
+            note.part == GENERAL_MELODY_PART_V1 && note.role == VoiceRole::Melody
+        }));
+        assert!(score.notes.iter().any(|note| {
+            note.part == GENERAL_BASS_PART_V1 && note.role == VoiceRole::Bass
+        }));
+        assert!(score.notes.iter().any(|note| {
+            note.part == GENERAL_HARMONY_PART_V1 && note.role == VoiceRole::Harmony
+        }));
+        assert!(
+            score.notes.iter().all(|note| note.part != PartId::UNASSIGNED),
+            "additive replacement and full-drone replacement must not create unassigned notes"
+        );
+    }
+
+    fn part_identity_ornament_source_note(
+        part: PartId,
+        duration: Duration,
+        emphasis: Emphasis,
+    ) -> ScoreNote {
+        ScoreNote {
+            part,
+            pitch: Pitch::new(crate::pitch::PitchClass::C, 4),
+            onset: Duration::zero(),
+            duration,
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis,
+            section_intensity: 1.0,
+        }
+    }
+
+    #[test]
+    fn appoggiatura_inherits_the_exact_source_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(part_identity_ornament_source_note(
+            PartId(42),
+            Duration::new(2, 1),
+            Emphasis::Cadential,
+        ));
+        let dna = crate::spec::MelodicDna {
+            appoggiatura_rate: 1.0,
+            ..Default::default()
+        };
+        apply_appoggiaturas(&mut score, PartId(42), key, &dna, 7);
+        assert!(score.notes.len() >= 2);
+        assert!(score.notes.iter().all(|note| note.part == PartId(42)));
+    }
+
+    #[test]
+    fn grace_cut_inherits_the_exact_source_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(part_identity_ornament_source_note(
+            PartId(43),
+            Duration::new(1, 1),
+            Emphasis::Normal,
+        ));
+        let dna = crate::spec::MelodicDna {
+            ornament_rate: 1.0,
+            ..Default::default()
+        };
+        apply_grace_ornaments(&mut score, PartId(43), key, &dna, 11);
+        assert!(score.notes.len() >= 2);
+        assert!(score.notes.iter().all(|note| note.part == PartId(43)));
+    }
+
+    #[test]
+    fn roll_chain_inherits_the_exact_source_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(part_identity_ornament_source_note(
+            PartId(44),
+            Duration::new(2, 1),
+            Emphasis::Normal,
+        ));
+        let dna = crate::spec::MelodicDna {
+            ornament_rate: 1.0,
+            ..Default::default()
+        };
+        apply_roll_ornaments(&mut score, PartId(44), key, &dna, 13);
+        assert_eq!(score.notes.len(), 5);
+        assert!(score.notes.iter().all(|note| note.part == PartId(44)));
+    }
+
+    #[test]
+    fn melody_climax_grace_ignores_an_unrelated_melody_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let motif = Motif::from_degrees(&[
+            (1, Duration::quarter()),
+            (3, Duration::quarter()),
+            (5, Duration::half()),
+        ]);
+        let antecedent = crate::phrase::Phrase::build(
+            &motif,
+            &[1, 4],
+            crate::cadence::Cadence::Half,
+            4.0,
+        );
+        let consequent = crate::phrase::Phrase::build(
+            &motif,
+            &[5, 1],
+            crate::cadence::Cadence::Authentic,
+            4.0,
+        );
+        let form = Form {
+            sections: vec![Section {
+                role: SectionRole::A,
+                key,
+                period: crate::phrase::Period {
+                    antecedent,
+                    consequent,
+                },
+            }],
+        };
+        let intent = MusicalIntent {
+            seed: 11,
+            ..MusicalIntent::default()
+        };
+
+        let mut baseline = Score::new(key, 100.0, 4);
+        realize_melody_for_part(&mut baseline, PartId(1), &form, &intent, Duration::zero(), 4.0, true);
+        let mut with_unrelated_climax = Score::new(key, 100.0, 4);
+        let unrelated = ScoreNote {
+            part: PartId(99),
+            pitch: Pitch::from_midi(100),
+            onset: Duration::new(2, 1),
+            duration: Duration::new(1, 1),
+            velocity: 0.9,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Climax,
+            section_intensity: 0.7,
+        };
+        with_unrelated_climax.push(unrelated);
+        realize_melody_for_part(
+            &mut with_unrelated_climax,
+            PartId(1),
+            &form,
+            &intent,
+            Duration::zero(),
+            4.0,
+            true,
+        );
+
+        let baseline_part: Vec<ScoreNote> = baseline.notes.iter()
+            .copied()
+            .filter(|note| note.part == PartId(1))
+            .collect();
+        let scoped_part: Vec<ScoreNote> = with_unrelated_climax.notes.iter()
+            .copied()
+            .filter(|note| note.part == PartId(1))
+            .collect();
+        assert_eq!(
+            scoped_part,
+            baseline_part,
+            "an unrelated Melody/Climax event must not change the source melody's grace placement"
+        );
+        assert_eq!(
+            with_unrelated_climax.notes.iter().find(|note| note.part == PartId(99)),
+            Some(&unrelated),
+            "the pre-existing unrelated climax event must remain unchanged"
+        );
+    }
+
+    #[test]
+    fn transformed_coda_quotes_only_its_source_melody_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ScoreNote {
+            part: PartId(99),
+            pitch: Pitch::from_midi(86),
+            onset: Duration::zero(),
+            duration: Duration::quarter(),
+            velocity: 0.8,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        for (midi, onset) in [(79u8, 0i64), (76, 1), (74, 2), (71, 3)] {
+            score.push(ScoreNote {
+                part: PartId(1),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::quarter(),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        assert!(append_transformed_coda(
+            &mut score,
+            PartId(1),
+            PartId(2),
+            PartId(3),
+            key,
+            4.0,
+            &MusicalIntent::default(),
+            2,
+        ));
+        let first_coda_note = score.notes.iter()
+            .find(|note| note.role == VoiceRole::Melody && note.onset.beats() >= 4.0)
+            .expect("transformed coda melody must be appended");
+        assert_eq!(first_coda_note.part, PartId(1));
+        assert_eq!(first_coda_note.pitch.midi(), 67, "G5 must be quoted down an octave as G4");
+    }
+
+    #[test]
+    fn drone_dynamic_envelope_reads_only_its_own_melody_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ScoreNote {
+            part: PartId(1),
+            pitch: Pitch::from_midi(72),
+            onset: Duration::zero(),
+            duration: Duration::new(4, 1),
+            velocity: 0.4,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 0.3,
+        });
+        score.push(ScoreNote {
+            part: PartId(99),
+            pitch: Pitch::from_midi(84),
+            onset: Duration::zero(),
+            duration: Duration::new(4, 1),
+            velocity: 0.9,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 0.9,
+        });
+        apply_drone_pedal(&mut score, PartId(2), PartId(1), key);
+        let bass: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Bass && note.part == PartId(2))
+            .collect();
+        assert_eq!(bass.len(), 2);
+        assert!(bass.iter().all(|note| (note.section_intensity - 0.3).abs() < 1e-6));
+    }
+
+    #[test]
+    fn counter_hook_echoes_only_the_authored_melody_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        let note = |part, midi, onset| ScoreNote {
+            part: PartId(part),
+            pitch: Pitch::from_midi(midi),
+            onset: Duration::new(onset, 1),
+            duration: Duration::new(2, 1),
+            velocity: 0.6,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Cadential,
+            section_intensity: 1.0,
+        };
+        score.push(note(1, 72, 0));
+        score.push(note(99, 84, 1));
+        score.push(note(1, 74, 6));
+
+        let phrase = crate::phrase::Phrase {
+            line: crate::motif::Motif::from_degrees(&[(1, Duration::quarter())]),
+            progression: vec![1],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![Section {
+                role: SectionRole::ReturnA,
+                key,
+                period: crate::phrase::Period {
+                    antecedent: phrase.clone(),
+                    consequent: phrase,
+                },
+            }],
+        };
+        let hook = crate::hook::HookCell {
+            notes: vec![
+                (1, Duration::quarter()),
+                (3, Duration::quarter()),
+                (2, Duration::quarter()),
+            ],
+        };
+        apply_counter_hook_echoes(
+            &mut score,
+            PartId(3),
+            PartId(1),
+            &form,
+            4.0,
+            &MusicalIntent::default(),
+            &hook,
+        );
+        let echoes: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.part == PartId(3) && note.role == VoiceRole::CounterMelody)
+            .collect();
+        assert_eq!(echoes.len(), 3, "only the authored main-melody hold should trigger an echo");
+        assert!(echoes.iter().all(|note| note.part == PartId(3)));
+    }
+
+    #[test]
+    fn parallel_planing_preserves_the_source_harmony_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for (midi, onset) in [(62u8, 8i64), (64, 9)] {
+            score.push(ScoreNote {
+                part: PartId(1),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::new(1, 1),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        // A second melody entity must not drive planing.
+        score.push(ScoreNote {
+            part: PartId(31),
+            pitch: Pitch::from_midi(79),
+            onset: Duration::new(8, 1),
+            duration: Duration::new(1, 1),
+            velocity: 0.5,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 0.8,
+        });
+        for midi in [48u8, 55, 60] {
+            score.push(ScoreNote {
+                part: PartId(27),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(8, 1),
+                duration: Duration::new(4, 1),
+                velocity: 0.45,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 0.8,
+            });
+        }
+        // An independently authored harmony overlay at the anchor onset
+        // must neither contaminate the captured chord shape nor be removed.
+        score.push(ScoreNote {
+            part: PartId(28),
+            pitch: Pitch::from_midi(67),
+            onset: Duration::new(8, 1),
+            duration: Duration::new(4, 1),
+            velocity: 0.25,
+            role: VoiceRole::Harmony,
+            emphasis: Emphasis::Normal,
+            section_intensity: 0.8,
+        });
+        let empty_phrase = crate::phrase::Phrase {
+            line: crate::motif::Motif::from_degrees(&[(1, Duration::quarter())]),
+            progression: vec![1],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![
+                Section {
+                    role: SectionRole::A,
+                    key,
+                    period: crate::phrase::Period {
+                        antecedent: empty_phrase.clone(),
+                        consequent: empty_phrase.clone(),
+                    },
+                },
+                Section {
+                    role: SectionRole::B,
+                    key,
+                    period: crate::phrase::Period {
+                        antecedent: empty_phrase.clone(),
+                        consequent: empty_phrase,
+                    },
+                },
+            ],
+        };
+        apply_parallel_planing(&mut score, PartId(1), PartId(27), &form, 1, 4.0);
+        let planed: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Harmony
+                && note.part == PartId(27)
+                && note.onset.beats() >= 8.0)
+            .collect();
+        assert_eq!(planed.len(), 6);
+        assert!(planed.iter().all(|note| note.part == PartId(27)));
+
+        let protected_overlay: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Harmony
+                && note.part == PartId(28)
+                && note.onset.beats() >= 8.0)
+            .collect();
+        assert_eq!(protected_overlay.len(), 1);
+        assert_eq!(protected_overlay[0].pitch.midi(), 67);
+        assert_eq!(protected_overlay[0].duration, Duration::new(4, 1));
+
+        let other_melody: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Melody && note.part == PartId(31))
+            .collect();
+        assert_eq!(other_melody.len(), 1);
+        assert_eq!(other_melody[0].pitch.midi(), 79);
+        assert!(score.has_part_identity());
+    }
+
+    #[test]
+    fn suspension_and_resolution_preserve_the_incoming_harmony_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for pitch in key.diatonic_triad(1).voice(4) {
+            score.push(ScoreNote {
+                part: PartId(27),
+                pitch,
+                onset: Duration::zero(),
+                duration: Duration::new(4, 1),
+                velocity: 0.5,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        for pitch in key.diatonic_triad(4).voice(4) {
+            score.push(ScoreNote {
+                part: PartId(27),
+                pitch,
+                onset: Duration::new(4, 1),
+                duration: Duration::new(4, 1),
+                velocity: 0.5,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        apply_suspensions(&mut score, PartId(27), key, 1.0, 17);
+        assert!(
+            score.notes.iter().any(|note| {
+                note.part == PartId(27)
+                    && note.role == VoiceRole::Harmony
+                    && note.onset == Duration::new(6, 1)
+                    && note.pitch == Pitch::from_midi(65)
+            }),
+            "the prepared G-to-F suspension must resolve in the source harmony part"
+        );
+        assert!(score.has_part_identity());
+    }
+
+    #[test]
+    fn generated_counterline_uses_its_composer_authored_part_id() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for (midi, onset) in [(72u8, 0i64), (74, 2), (76, 4), (72, 6)] {
+            score.push(ScoreNote {
+                part: PartId(0),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::new(1, 1),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        let phrase = crate::phrase::Phrase {
+            line: Motif::new(Vec::new()),
+            progression: vec![1, 4, 5, 1],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![crate::form::Section {
+                role: SectionRole::ReturnA,
+                key,
+                period: crate::phrase::Period {
+                    antecedent: phrase.clone(),
+                    consequent: phrase,
+                },
+            }],
+        };
+        let part = PartId(37);
+        realize_counter_melody_for_part(
+            &mut score,
+            part,
+            &form,
+            4.0,
+            &MusicalIntent::default(),
+        );
+        let counter: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::CounterMelody)
+            .collect();
+        assert!(!counter.is_empty());
+        assert!(counter.iter().all(|note| note.part == part));
+    }
+
+    #[test]
+    fn joy_grace_note_inherits_the_exact_decorated_melody_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for (midi, onset) in [(60u8, 0i64), (64, 1), (67, 2)] {
+            score.push(ScoreNote {
+                part: PartId(45),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::new(1, 1),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        alter_statement(
+            &mut score,
+            PartId(45),
+            key,
+            0.0,
+            3,
+            crate::spec::Attitude::Joy,
+        );
+        assert!(score.notes.len() > 3);
+        assert!(score.notes.iter().all(|note| note.part == PartId(45)));
+    }
+
+    #[test]
+    fn hidden_bass_quote_preserves_the_existing_bass_part_id() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ScoreNote {
+            part: PartId(80),
+            pitch: Pitch::from_midi(36),
+            onset: Duration::new(16, 1),
+            duration: Duration::new(8, 1),
+            velocity: 0.5,
+            role: VoiceRole::Bass,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        let phrase = crate::phrase::Phrase {
+            line: Motif::new(Vec::new()),
+            progression: vec![1, 4, 5, 1],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![crate::form::Section {
+                role: SectionRole::B,
+                key,
+                period: crate::phrase::Period {
+                    antecedent: phrase.clone(),
+                    consequent: phrase,
+                },
+            }],
+        };
+        let hook = crate::hook::HookCell {
+            notes: vec![(1, Duration::quarter()), (3, Duration::quarter())],
+        };
+        apply_hidden_bass_quote(
+            &mut score,
+            PartId(80),
+            &form,
+            4.0,
+            &MusicalIntent::default(),
+            &hook,
+        );
+        let quote: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Bass && note.onset.beats() >= 16.0)
+            .collect();
+        assert_eq!(quote.len(), 2);
+        assert!(quote.iter().all(|note| note.part == PartId(80)));
+    }
+
+    #[test]
+    fn general_composer_default_route_assigns_identity_to_every_generated_note() {
+        let intent = MusicalIntent {
+            seed: 41,
+            ..MusicalIntent::default()
+        };
+        let score = compose(&intent);
+        assert!(
+            score.has_part_identity(),
+            "the default general-composer route must not discard source-authored PartIds"
+        );
+        let parts: std::collections::BTreeSet<u16> =
+            score.parts().into_iter().map(|part| part.0).collect();
+        assert!(parts.contains(&GENERAL_MELODY_PART_V1.0));
+        assert!(parts.contains(&GENERAL_BASS_PART_V1.0));
+        assert!(parts.contains(&GENERAL_HARMONY_PART_V1.0));
+        assert!(
+            score.notes.iter().all(|note| match note.role {
+                VoiceRole::Melody => note.part == GENERAL_MELODY_PART_V1,
+                VoiceRole::Bass => note.part == GENERAL_BASS_PART_V1,
+                VoiceRole::Harmony => note.part == GENERAL_HARMONY_PART_V1
+                    || note.part == GENERAL_GRIEF_SUSPENSION_PART_V1,
+                VoiceRole::CounterMelody => note.part == GENERAL_COUNTERMELODY_PART_V1,
+            }),
+            "all generated events must map to the correct source-authored part"
+        );
+    }
+
+    #[test]
+    fn period_form_part_identity_is_complete_across_all_builtin_style_specs() {
+        // Hold the form family constant so every style is exercised through
+        // the same general period-form composer. This isolates style-DNA
+        // transformations from dedicated grammar engines, which qualify
+        // their own source-part identity in separate work.
+        for style in crate::style::Style::ALL {
+            let mut spec = style.spec();
+            spec.form_pool = vec![crate::spec::FormKind::Ternary];
+            spec.validate().expect("each built-in style spec must accept a ternary period form");
+
+            for seed in [0u64, 41u64] {
+                let intent = MusicalIntent {
+                    seed,
+                    ..MusicalIntent::default()
+                };
+                let score = compose_with_spec(&intent, &spec);
+                assert!(
+                    score.has_part_identity(),
+                    "{style:?} seed {seed} emitted a note without source identity"
+                );
+                assert!(
+                    score.notes.iter().all(|note| match note.role {
+                        VoiceRole::Melody => note.part == GENERAL_MELODY_PART_V1,
+                        VoiceRole::Bass => note.part == GENERAL_BASS_PART_V1,
+                        VoiceRole::Harmony => {
+                            note.part == GENERAL_HARMONY_PART_V1
+                                || note.part == GENERAL_GRIEF_SUSPENSION_PART_V1
+                        }
+                        VoiceRole::CounterMelody => {
+                            note.part == GENERAL_COUNTERMELODY_PART_V1
+                        }
+                    }),
+                    "{style:?} seed {seed} changed the declared PartId-to-VoiceRole mapping"
+                );
+            }
+        }
+    }
 
     /// Regression test for the counter-melody overlap bugs fixed in
     /// `apply_counter_hook_echoes` and `DamageDevice::CounterShift`: a
@@ -6802,7 +7834,12 @@ mod tests {
         spec.rhetoric = crate::spec::PhraseRhetoric::Classic;
         let score = compose_with_spec(&MusicalIntent::default(), &spec);
         let mut twin = score.clone();
-        apply_phrase_rhetoric(&mut twin, crate::spec::PhraseRhetoric::Classic, 4.0);
+        apply_phrase_rhetoric(
+            &mut twin,
+            GENERAL_MELODY_PART_V1,
+            crate::spec::PhraseRhetoric::Classic,
+            4.0,
+        );
         assert_eq!(score, twin);
     }
 
@@ -7005,7 +8042,7 @@ mod tests {
         // A real cadence-free canvas: no existing melody to interfere with
         // (the pass removes whatever's there in its own window anyway).
         score.total_beats = Duration::new(24, 1); // 3 sections * 2*4 bars * 4 beats
-        apply_additive_process(&mut score, &form, 4, 4.0, seed);
+        apply_additive_process(&mut score, GENERAL_MELODY_PART_V1, &form, 4, 4.0, seed);
 
         let cell =
             crate::hook::HookCell::generate_with(&crate::spec::MelodicDna::default(), seed, 4.0);
@@ -7149,7 +8186,7 @@ mod tests {
                 section_intensity: 1.0,
             });
         }
-        apply_suspensions(&mut score, key, 1.0, 3);
+        apply_suspensions(&mut score, PartId::UNASSIGNED, key, 1.0, 3);
         let mut harmony: Vec<&ScoreNote> = score
             .notes
             .iter()
@@ -7201,6 +8238,35 @@ mod tests {
             resolution.velocity < suspended.velocity,
             "the resolution releases — quieter than the suspension"
         );
+    }
+
+    #[test]
+    fn harmonic_stasis_never_merges_equal_pitch_events_from_distinct_parts() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        let pitch = Pitch::from_midi(60);
+        for part in [PartId(11), PartId(22)] {
+            for onset in [0i64, 4] {
+                score.push(ScoreNote {
+                    part,
+                    pitch,
+                    onset: Duration::new(onset, 1),
+                    duration: Duration::new(4, 1),
+                    velocity: 0.5,
+                    role: VoiceRole::Harmony,
+                    emphasis: Emphasis::Normal,
+                    section_intensity: 1.0,
+                });
+            }
+        }
+        apply_harmonic_stasis(&mut score);
+        assert_eq!(score.notes.len(), 2);
+        assert!(score.notes.iter().all(|note| note.pitch == pitch));
+        assert_eq!(
+            score.notes.iter().map(|note| note.part).collect::<std::collections::BTreeSet<_>>(),
+            [PartId(11), PartId(22)].into_iter().collect()
+        );
+        assert!(score.notes.iter().all(|note| (note.duration.beats() - 8.0).abs() < 1e-9));
     }
 
     #[test]
@@ -7451,7 +8517,7 @@ mod tests {
             emphasis: Emphasis::Normal,
             section_intensity: 1.0,
         });
-        apply_blue_notes(&mut score, key, 1.0, 7);
+        apply_blue_notes(&mut score, PartId::UNASSIGNED, key, 1.0, 7);
         let melody: Vec<&ScoreNote> = score
             .notes
             .iter()
@@ -8503,7 +9569,7 @@ mod tests {
             ornament_rate: 1.0,
             ..Default::default()
         };
-        apply_roll_ornaments(&mut score, key, &dna, 1);
+        apply_roll_ornaments(&mut score, PartId::UNASSIGNED, key, &dna, 1);
         let mut mel: Vec<ScoreNote> = score
             .notes
             .iter()
@@ -8566,7 +9632,7 @@ mod tests {
             ornament_rate: 1.0,
             ..Default::default()
         };
-        apply_roll_ornaments(&mut score, key, &dna, 1);
+        apply_roll_ornaments(&mut score, PartId::UNASSIGNED, key, &dna, 1);
         let mel_count = score
             .notes
             .iter()
@@ -8628,7 +9694,7 @@ mod tests {
         for (m, &deg) in [1, 4, 5, 6, 2, 1].iter().enumerate() {
             for pitch in key.diatonic_triad(deg).voice(3) {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: GENERAL_HARMONY_PART_V1,
                     pitch,
                     onset: bar.scale(m as i64, 1),
                     duration: bar,
@@ -8639,7 +9705,7 @@ mod tests {
                 });
             }
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: GENERAL_BASS_PART_V1,
                 pitch: key.diatonic_triad(deg).voice(2)[0],
                 onset: bar.scale(m as i64, 1),
                 duration: bar,
@@ -8649,7 +9715,13 @@ mod tests {
                 section_intensity: 1.0,
             });
         }
-        apply_full_drone(&mut score, key);
+        apply_full_drone(
+            &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            GENERAL_MELODY_PART_V1,
+            key,
+        );
         let tonic_pc = key.tonic;
         let fifth_pc = key.scale().degree_pitch_class(5);
         let harmony = score.voice(VoiceRole::Harmony);
