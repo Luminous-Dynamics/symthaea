@@ -20,9 +20,9 @@ The v0.3 crate estimates, for a supplied sequence of steady-flight mission segme
 
 The dedicated uncertainty module adds a deterministic adverse-corner screening evaluator. It applies declared one-sided bounds to mass, speed, L/D, climb, auxiliary demand, battery capacity/voltage/resistance/power/current/thermal limits and scalar propulsion efficiencies. It preserves both the nominal result and the exact adjusted input and adverse-corner outcome. It is not Monte Carlo, a confidence interval, a probabilistic worst-case proof or a certification method; it currently wraps the scalar mission evaluator rather than the characterized-map paths.
 
-Battery OCV and internal-resistance maps are two-dimensional over SOC and pack temperature. Both map families reject extrapolation and record the dataset IDs used. Evidence SHA-256 fields are syntax-checked only; artifact bytes still need external resolution, hash verification and authority/configuration checks. See docs/ROBUST_UNCERTAINTY.md.
+Battery OCV and internal-resistance maps are two-dimensional over SOC and pack temperature. Both map families reject extrapolation and record the dataset IDs used. Evidence SHA-256 fields are syntax-checked at construction. The verified-map API can hash caller-supplied bytes and reject missing or mismatched payloads; URI resolution, signatures, source authority and configuration approval remain external. See docs/ROBUST_UNCERTAINTY.md.
 
-It is dependency-free Rust and uses fail-closed errors for invalid inputs, MTOW violations, battery power/current/voltage/temperature limits, and reserve infringement.
+It is Rust and uses fail-closed errors for invalid inputs, MTOW violations, battery power/current/voltage/temperature limits, and reserve infringement.
 
 ## Build and test
 
@@ -34,11 +34,11 @@ cargo test --locked -p symthaea-electric-aircraft
 cargo clippy --locked -p symthaea-electric-aircraft --all-targets -- -D warnings
 ```
 
-The crate is included automatically by the Symthaea workspace's crates/domains/* member glob. It intentionally has no third-party dependencies in this first increment.
+The crate is included automatically by the Symthaea workspace's crates/domains/* member glob. Its only direct dependency is the workspace-provided sha2 crate for SHA-256 evidence-payload verification.
 
 ## Evidence-bound characterization (v0.2/v0.3)
 
-`evaluate_mission_characterized` accepts three `EfficiencyCurve` datasets: motor efficiency versus shaft-load fraction, inverter efficiency versus input-load fraction, and propeller efficiency versus advance ratio. Each curve identifies its independent-axis units, source URI, evidence class, dataset ID and SHA-256 digest. The evaluator interpolates only within the supplied data domain, subtracts the declared absolute uncertainty bound, and records the dataset IDs used. It rejects unsupported operating points. The digest is format-checked but the current crate does not fetch artifacts or recompute their hashes; consumers must verify artifact bytes in the surrounding evidence pipeline.
+`evaluate_mission_characterized` accepts three `EfficiencyCurve` datasets: motor efficiency versus shaft-load fraction, inverter efficiency versus input-load fraction, and propeller efficiency versus advance ratio. Each curve identifies its independent-axis units, source URI, evidence class, dataset ID and SHA-256 digest. The evaluator interpolates only within the supplied data domain, subtracts the declared absolute uncertainty bound, and records the dataset IDs used. It rejects unsupported operating points. The digest is format-checked by ordinary characterization calls. Use evaluate_mission_fully_verified with a map of immutable caller-supplied artifact bytes to require all propulsion and battery evidence payloads and recompute every SHA-256 digest before evaluation. This still does not fetch URIs or authenticate signatures, publisher authority or configuration approval.
 
 The scalar `evaluate_mission` path remains available for screening and regression continuity. `evaluate_mission_battery_characterized` uses the SOC/temperature pack maps with scalar propulsion efficiencies; `evaluate_mission_fully_characterized` uses both map families. OCV uncertainty is subtracted and resistance uncertainty is added before solving the equivalent pack circuit.
  
