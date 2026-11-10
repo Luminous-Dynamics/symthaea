@@ -136,7 +136,8 @@ impl Default for NumericLieDerivativeProfileV2 {
 pub struct ExactPolynomialLieProfileV1 {
     pub maximum_variables: usize,
     pub maximum_terms: usize,
-    /// Maximum monomial-pair multiplications per polynomial product operation.
+    /// Maximum exact polynomial term operations. The declared-linear-action
+    /// checker consumes this budget cumulatively across all generators.
     pub maximum_term_products: usize,
     pub maximum_total_degree: usize,
     pub maximum_power: u32,
@@ -1638,6 +1639,36 @@ mod tests {
                 &expression,
                 &admitted_so2_action(),
                 operation_limited
+            ),
+            Err(LinearActionPolynomialErrorV1::ResourceLimitExceeded)
+        );
+
+        let action_with_two_generators = crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "exact-so2-two-generator-budget".to_string(),
+            coordinate_basis_id: "xy".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: vec![
+                crate::linear_group_action::LinearGeneratorV1 {
+                    id: "J".to_string(),
+                    matrix: vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+                },
+                crate::linear_group_action::LinearGeneratorV1 {
+                    id: "2J".to_string(),
+                    matrix: vec![vec![0.0, -2.0], vec![2.0, 0.0]],
+                },
+            ],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+        let mut cumulative_limited = ExactPolynomialLieProfileV1::default();
+        cumulative_limited.maximum_term_products = 15;
+        assert_eq!(
+            check_exact_linear_action_invariance(
+                &expression,
+                &action_with_two_generators,
+                cumulative_limited
             ),
             Err(LinearActionPolynomialErrorV1::ResourceLimitExceeded)
         );
