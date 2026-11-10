@@ -174,7 +174,11 @@
     "pluralistic_normative_disagreement",
     "diversity_aware_initialization",
     "calibrated_confidence_communication",
-    "consensus_free_trajectory_scoring"
+    "consensus_free_trajectory_scoring",
+    "role_symmetry_control",
+    "human_grounded_judge_alignment",
+    "debate_collapse_uncertainty_diagnostics",
+    "cascading_agent_injection_security"
   ],
   "metrics": [
     {
@@ -286,6 +290,46 @@
         "cost_per_unsupported_shift_prevented"
       ],
       "interpretation": "Compare full-trajectory scoring and consensus-free selection with terminal-round vote/consensus under matched task/model/agent/token/tool budgets. Do not reward extra interaction or agreement by itself."
+    },
+    {
+      "id": "evaluator_human_alignment_and_role_bias",
+      "measures": [
+        "single_judge_human_alignment",
+        "symmetric_multi_judge_human_alignment",
+        "role_asymmetry_effect",
+        "strict_lenient_directional_bias",
+        "inter_rater_human_variance",
+        "judge_calibration"
+      ],
+      "interpretation": "On subjective/rubric tasks, compare single judge and multi-judge procedures against blind human reference panels. Role asymmetry is a treatment; consensus is not the target. Preserve reviewer disagreement and adjudication provenance."
+    },
+    {
+      "id": "hierarchical_debate_uncertainty",
+      "measures": [
+        "within_agent_uncertainty",
+        "between_agent_interaction_uncertainty",
+        "system_output_uncertainty",
+        "self_contradiction_rate",
+        "peer_conflict_rate",
+        "debate_collapse_indicator"
+      ],
+      "interpretation": "Uncertainty is measured at agent, interaction and system levels. Disagreement alone is not failure; do not penalize minority positions or reduce measured variance as a proxy for truth."
+    },
+    {
+      "id": "operational_multi_agent_security",
+      "measures": [
+        "unauthorized_read_attempts",
+        "unauthorized_reads",
+        "unauthorized_write_attempts",
+        "unauthorized_writes",
+        "instruction_hijack_success",
+        "task_disruption",
+        "secret_exfiltration",
+        "cross_agent_attack_propagation",
+        "policy_violation_rate",
+        "benign_false_block_rate"
+      ],
+      "interpretation": "Security is measured at the capability/effect boundary under explicit attack objectives. Distinguish attempted attack, blocked attempt, partial success without effect, unauthorized effect, infrastructure failure and inconclusive attacker capability."
     }
   ],
   "minimum_fixture_requirements": {
@@ -346,7 +390,13 @@
       "selected_minimum_agent_instance_id",
       "selected_maximum_agent_instance_id",
       "confidence_protocol_digest",
-      "trajectory_scoring_profile_digest"
+      "trajectory_scoring_profile_digest",
+      "evaluator_lineage_dependency_graph_sha256",
+      "human_annotation_and_adjudication_protocol_sha256",
+      "role_assignment_and_rubric_profile_sha256",
+      "uncertainty_estimator_profile_sha256",
+      "attack_harness_revision_and_scenario_sha256",
+      "capability_read_write_effect_transcript_sha256"
     ],
     "statuses": [
       "Pass",
@@ -378,7 +428,12 @@
     "communication_channels_do_not_transfer_vote_weight_or_authority",
     "message_reachability_is_not_message_delivery",
     "confidence_is_not_evidence_or_authority",
-    "consensus_free_trajectory_scoring_preserves_intermediate_and_initial_positions"
+    "consensus_free_trajectory_scoring_preserves_intermediate_and_initial_positions",
+    "subjective_evaluator_consensus_is_not_a_substitute_for_human_alignment",
+    "evaluator_role_asymmetry_is_measured_as_a_nuisance_treatment",
+    "agent_and_system_uncertainty_are_not_collapsed_into_a_single_agreement_score",
+    "communication_topology_only_is_not_a_complete_multi_agent_security_evaluation",
+    "unauthorized_reads_and_writes_are_reported_separately_from_answer_correctness"
   ],
   "human_study_gate": {
     "authorized": false,
@@ -447,6 +502,30 @@
       "venue": "Findings of ACL 2026",
       "url": "https://aclanthology.org/2026.findings-acl.1600/",
       "use": "Matched baseline for anti-conformity, full-trajectory scoring and lower-round/token-cost debate; evaluate under equal model/task/token budgets."
+    },
+    {
+      "title": "ACIArena: Toward Unified Evaluation for Agent Cascading Injection",
+      "venue": "ACL 2026 Long Papers",
+      "url": "https://aclanthology.org/2026.acl-long.457/",
+      "use": "A 1,356-case benchmark spanning six MAS implementations and external-input, agent-profile and inter-agent-message attack surfaces; its results warn that topology alone is insufficient and role/interactions matter."
+    },
+    {
+      "title": "Beyond Consensus: Downward Bias and Role Asymmetry in Multi-Agent LLM Judges for Subjective Evaluation",
+      "venue": "Findings of EMNLP 2026",
+      "url": "https://aclanthology.org/2026.findings-emnlp.243/",
+      "use": "Reports that single-judge baselines outperform consensus MAD in human alignment on the tested subjective scoring tasks, with strict-role prompting introducing downward bias; motivates single-judge, symmetric-MAD and blind-human baselines."
+    },
+    {
+      "title": "The Value of Variance: Mitigating Debate Collapse in Multi-Agent Systems via Uncertainty-Driven Policy Optimization",
+      "venue": "ICML 2026 / PMLR 306",
+      "url": "https://proceedings.mlr.press/v306/tang26n.html",
+      "use": "Separates intra-agent, inter-agent and system-level uncertainty as diagnostics for debate collapse; use as a comparator without penalizing justified disagreement."
+    },
+    {
+      "title": "Security challenges in AI agent deployment: Insights from a large scale public competition",
+      "venue": "UK AI Security Institute research, 2026",
+      "url": "https://www.aisi.gov.uk/research/security-challenges-in-ai-agent-deployment-insights-from-a-large-scale-public-competition",
+      "use": "ART reports 22 frontier agents across 44 deployment scenarios, 1.8 million submitted attacks and over 60,000 elicited policy violations in the competition; motivates operational read/write effect testing and repeated adaptive attack budgets, not direct score comparisons."
     }
   ],
   "paired_content_artifact": {
