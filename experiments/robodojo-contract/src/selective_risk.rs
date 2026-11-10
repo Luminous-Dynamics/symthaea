@@ -638,6 +638,41 @@ mod tests {
     }
 
     #[test]
+    fn nonzero_event_bounds_match_exact_binomial_quantiles() {
+        assert!(
+            (clopper_pearson_upper(1, 100, 0.025) - 0.054459385392080645).abs() < 1e-12
+        );
+        assert!(
+            (clopper_pearson_upper(5, 100, 0.025) - 0.11283491110546275).abs() < 1e-12
+        );
+    }
+
+    #[test]
+    fn failure_and_unsafe_event_limits_fail_independently() {
+        let mut failures_only = safe_samples(100);
+        for sample in failures_only.iter_mut().take(20) {
+            sample.observed_success = Some(false);
+        }
+        let failure_certificate =
+            certify_selective_risk(&failures_only, policy(), "4".repeat(64)).unwrap();
+        assert_eq!(
+            failure_certificate.status(),
+            RiskQualificationStatus::FailureRiskExceedsLimit
+        );
+
+        let mut unsafe_only = safe_samples(100);
+        for sample in unsafe_only.iter_mut().take(20) {
+            sample.observed_unsafe_event = Some(true);
+        }
+        let unsafe_certificate =
+            certify_selective_risk(&unsafe_only, policy(), "4".repeat(64)).unwrap();
+        assert_eq!(
+            unsafe_certificate.status(),
+            RiskQualificationStatus::UnsafeRiskExceedsLimit
+        );
+    }
+
+    #[test]
     fn empty_and_underpowered_calibration_samples_are_not_a_certificate() {
         assert_eq!(
             certify_selective_risk(&[], policy(), "4".repeat(64)),
