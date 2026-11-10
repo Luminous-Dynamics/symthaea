@@ -41,6 +41,11 @@ Do not apply a global rewrite such as `u -> you` or `2 -> to` without context. T
 
 The committed UGT reference rows are all `pending`. They are positional placeholders, not labels. They must be adjudicated independently before any UGT score is reported.
 
+The fixture is designed to span the nine UGTPHON categories, without pre-assigning a class to any token: A1 vowel-drop shortening (`ppl`, `pls`); A2 other shortening (`bc`, `k`); A3 unpronounceable phrase abbreviation (`smh`, `imo`); B1 lengthening (`soooo`); B2 iteration (`waitwait`); C1 eye-dialect respelling (`luv`); C2 regular productive variation (`droppin`); C3 lexicalized slang (`tho`, `cuz`, `wanna`, `hafta`); and C4 pronounceable initialism/acronym (`rofl`). Real-world usage can differ by community and context, so these are challenge prompts, not adjudicated labels.
+
+UGTPHON contains 18,373 sentence examples across English, Vietnamese and Korean; its layers align raw surface text, gold canonical normalization, sentence IPA, and per-token taxonomy. Its language subsets inherit licenses from different source corpora, and the authors warn that the text may contain profanity or harmful content. We use its *taxonomy and evaluation design* here, not its data files. Any later benchmark reproduction must inspect each language/source license and apply suitable content handling before importing samples. Source: https://github.com/naver-ai/UGTPHON
+
+
 UGTPHON reports that canonical/non-canonical input can cause large G2P degradation (up to 66.8 PER points in its studied settings) and explores retrieval-augmented canonicalization with staged decoding. This is an external research result, not a claim about this Piper spike. Source: https://aclanthology.org/2026.findings-emnlp.1020/
 
 ## Why this candidate
