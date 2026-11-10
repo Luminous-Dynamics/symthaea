@@ -8,7 +8,7 @@ use std::{
 const PROTOCOL_ID: &str = "IG-CONTAGION-001";
 const PROTOCOL_VERSION: &str = "0.1.0";
 const MATRIX_SCHEMA_VERSION: &str = "ig-contagion-scenario-matrix-v0.1";
-const EXPECTED_FIXTURES: usize = 40;
+const EXPECTED_FIXTURES: usize = 45;
 const EXPECTED_FAMILIES: usize = 8;
 const PER_FAMILY: usize = 5;
 const MIN_TOPOLOGIES: usize = 6;
@@ -344,13 +344,13 @@ fn validate_matrix(
     }
 
     let mut ids = BTreeSet::new();
-    let mut seeds = BTreeSet::new();
+    let mut seed_members = BTreeMap::<u64, Vec<&Value>>::new();
     let mut family_counts = BTreeMap::<String, usize>::new();
     let mut topologies = BTreeSet::new();
     let mut red_team = 0usize;
     let mut positive = 0usize;
     let mut measurement = 0usize;
-    let mut paired_blocks = BTreeSet::new();
+    let mut paired_members = BTreeMap::<String, Vec<&Value>>::new();
 
     for (index, fixture) in fixtures.iter().enumerate() {
         let context = format!("matrix.fixtures[{index}]");
@@ -414,12 +414,29 @@ fn validate_matrix(
         }
 
         match fixture["seed"].as_u64() {
-            Some(seed) if seed > 0 => {
-                if !seeds.insert(seed) {
-                    add(errors, &context, format!("duplicate seed '{seed}'"));
-                }
-            }
+            Some(seed) if seed > 0 => seed_members.entry(seed).or_default().push(fixture),
             _ => add(errors, &context, "seed must be a positive integer"),
+        }
+
+        let pair_id = field(fixture, "paired_block_id");
+        let content_ref = field(fixture, "paired_content_ref");
+        if family == "centrality_placement" {
+            match (pair_id, content_ref) {
+                (Some(pair), Some(_)) => {
+                    paired_members.entry(pair.to_string()).or_default().push(fixture);
+                }
+                _ => add(
+                    errors,
+                    &context,
+                    "centrality placement fixture requires paired_block_id and paired_content_ref",
+                ),
+            }
+        } else if pair_id.is_some() || content_ref.is_some() {
+            add(
+                errors,
+                &context,
+                "paired identifiers are reserved for centrality_placement fixtures",
+            );
         }
 
         let expected = string_set(&fixture["expected_measurement_properties"]);
@@ -440,33 +457,86 @@ fn validate_matrix(
                 );
             }
         }
+    }
 
-        if family == "centrality_placement" {
-            if let Some(pair) = field(fixture, "paired_block_id") {
-                paired_blocks.insert(pair.to_string());
-            } else {
+    for family in &family_ids {
+        let count = family_counts.get(family).copied().unwrap_or_default();
+        let expected = if family == "centrality_placement" { 10 } else { PER_FAMILY };
+        if count != expected {
+            add(
+                errors,
+                "matrix.families",
+                format!("family '{family}' must contain {expected} fixtures; found {count}"),
+            );
+        }
+    }
+
+    for (seed, members) in &seed_members {
+        if members.len() > 1 {
+            let pair_id = field(members[0], "paired_block_id");
+            let valid_pair_seed = members.len() == 2
+                && pair_id.is_some()
+                && members.iter().all(|member| {
+                    field(member, "family_id") == Some("centrality_placement")
+                        && field(member, "paired_block_id") == pair_id
+                });
+            if !valid_pair_seed {
                 add(
                     errors,
-                    &context,
-                    "centrality placement fixture needs paired_block_id",
+                    "matrix.fixtures",
+                    format!("seed {seed} may be reused only by the two members of one centrality pair"),
                 );
             }
         }
     }
 
-    for family in &family_ids {
-        let count = family_counts.get(family).copied().unwrap_or_default();
-        if count != PER_FAMILY {
+    for (pair_id, members) in &paired_members {
+        if members.len() != 2 {
             add(
                 errors,
-                "matrix.families",
-                format!("family '{family}' must contain {PER_FAMILY} fixtures; found {count}"),
+                "matrix.paired_blocks",
+                format!("paired block '{pair_id}' must contain exactly two members; found {}", members.len()),
+            );
+            continue;
+        }
+
+        let left = members[0];
+        let right = members[1];
+        for field_name in [
+            "topology_family",
+            "graph_profile_ref",
+            "seed",
+            "paired_content_ref",
+            "condition",
+            "scenario_note",
+        ] {
+            if left[field_name] != right[field_name] {
+                add(
+                    errors,
+                    "matrix.paired_blocks",
+                    format!("paired block '{pair_id}' must match {field_name}"),
+                );
+            }
+        }
+
+        let left_placement = field(left, "agent_placement");
+        let right_placement = field(right, "agent_placement");
+        let placements = [left_placement, right_placement];
+        if placements[0] == placements[1]
+            || !placements.contains(&Some("leaf_or_periphery"))
+            || !placements.contains(&Some("hub_or_core"))
+        {
+            add(
+                errors,
+                "matrix.paired_blocks",
+                format!("paired block '{pair_id}' must contrast leaf/periphery with hub/core placement"),
             );
         }
     }
 
     if !fixtures.iter().any(|fixture| {
-        fixture["family_id"] == "no_discussion_repeat" && fixture["class"] == "measurement_control"
+        fixture["family_id"] == "no_discussion_repeat"
+            && fixture["class"] == "measurement_control"
     }) {
         add(
             errors,
@@ -485,7 +555,8 @@ fn validate_matrix(
         );
     }
     if !fixtures.iter().any(|fixture| {
-        fixture["family_id"] == "unsupported_social_influence" && fixture["class"] == "red_team"
+        fixture["family_id"] == "unsupported_social_influence"
+            && fixture["class"] == "red_team"
     }) {
         add(
             errors,
@@ -493,11 +564,11 @@ fn validate_matrix(
             "unsupported social influence red-team fixtures are required",
         );
     }
-    if paired_blocks.len() < 2 {
+    if paired_members.len() != 5 {
         add(
             errors,
             "matrix.fixtures",
-            "at least two paired centrality-placement blocks are required",
+            format!("expected five matched centrality blocks, found {}", paired_members.len()),
         );
     }
     if topologies.len() < MIN_TOPOLOGIES {
@@ -515,7 +586,7 @@ fn validate_matrix(
         red_team,
         positive_controls: positive,
         measurement_controls: measurement,
-        paired_centrality_blocks: paired_blocks.len(),
+        paired_centrality_blocks: paired_members.len(),
     }
 }
 
@@ -647,7 +718,7 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_protocol_and_forty_scenarios_validate() {
+    fn checked_in_protocol_and_forty_five_scenarios_validate() {
         let report = validate(
             &parsed(PROTOCOL),
             &parsed(PROTOCOL_SCHEMA),
@@ -655,7 +726,7 @@ mod tests {
             &parsed(MATRIX_SCHEMA),
         )
         .expect("protocol and matrix should validate");
-        assert_eq!(report.fixtures, 40);
+        assert_eq!(report.fixtures, 45);
         assert_eq!(report.families, 8);
         assert!(report.topology_families >= 6);
         assert_eq!(report.measurement_controls, 5);
@@ -756,18 +827,14 @@ mod tests {
     }
 
     #[test]
-    fn thirty_nine_scenarios_are_rejected() {
+    fn forty_four_scenarios_are_rejected() {
         let mut matrix = parsed(MATRIX);
         matrix["fixtures"].as_array_mut().unwrap().pop();
-        matrix["fixture_count"] = Value::from(39);
+        matrix["fixture_count"] = Value::from(44);
         let mut errors = Vec::new();
         let report = validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
-        assert_eq!(report.fixtures, 39);
-        assert!(
-            errors
-                .iter()
-                .any(|error| error.contains("expected 40 fixtures"))
-        );
+        assert_eq!(report.fixtures, 44);
+        assert!(errors.iter().any(|error| error.contains("expected 45 fixtures")));
     }
 
     #[test]
@@ -785,13 +852,13 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_seeds_are_rejected() {
+    fn seed_reuse_outside_a_matched_centrality_pair_is_rejected() {
         let mut matrix = parsed(MATRIX);
         let first = matrix["fixtures"][0]["seed"].clone();
         matrix["fixtures"][1]["seed"] = first;
         let mut errors = Vec::new();
         validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
-        assert!(errors.iter().any(|error| error.contains("duplicate seed")));
+        assert!(errors.iter().any(|error| error.contains("may be reused only by the two members")));
     }
 
     #[test]
@@ -852,8 +919,38 @@ mod tests {
         assert!(
             errors
                 .iter()
-                .any(|error| error.contains("requires paired_block_id"))
+                .any(|error| error.contains("requires paired_block_id and paired_content_ref"))
         );
+    }
+
+    #[test]
+    fn paired_centrality_members_must_share_graph_and_content_identity() {
+        let mut matrix = parsed(MATRIX);
+        let second = matrix["fixtures"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|fixture| fixture["fixture_id"] == "IGC-041")
+            .unwrap();
+        second["graph_profile_ref"] = Value::String("IG-DATA-001/star/v0.1".into());
+        let mut errors = Vec::new();
+        validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
+        assert!(errors.iter().any(|error| error.contains("must match graph_profile_ref")));
+    }
+
+    #[test]
+    fn paired_centrality_members_must_change_only_placement() {
+        let mut matrix = parsed(MATRIX);
+        let second = matrix["fixtures"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|fixture| fixture["fixture_id"] == "IGC-041")
+            .unwrap();
+        second["agent_placement"] = Value::String("leaf_or_periphery".into());
+        let mut errors = Vec::new();
+        validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
+        assert!(errors.iter().any(|error| error.contains("must contrast leaf/periphery with hub/core")));
     }
 
     #[test]
