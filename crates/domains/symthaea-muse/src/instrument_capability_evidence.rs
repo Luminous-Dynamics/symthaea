@@ -242,9 +242,35 @@ pub enum CapabilityMaterializationErrorV1 {
 /// trust registry. The registry loader must verify authority/signature or other
 /// governance proof before constructing this set; this module checks only
 /// exact authority + record ID + content-digest membership.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct QualificationTrustPolicyV1 {
-    pub approved_records: BTreeSet<(String, String, String)>,
+    // Private and intentionally non-deserializable: untrusted profile JSON
+    // must never be able to declare its own qualification authorities trusted.
+    approved_records: BTreeSet<(String, String, String)>,
+}
+
+impl QualificationTrustPolicyV1 {
+    /// Construct a policy only after the caller has authenticated the registry
+    /// that supplied these exact authority/record/digest triples (for example,
+    /// by verifying its detached signature against release-pinned trust roots).
+    ///
+    /// This is crate-private by design. External API callers cannot manufacture
+    /// approved records or deserialize a claimed-trusted policy from JSON.
+    /// Until the authenticated registry loader calls this constructor, the
+    /// safe external policy is the default empty policy.
+    pub(crate) fn from_authenticated_registry(
+        approved_records: BTreeSet<(String, String, String)>,
+    ) -> Self {
+        Self { approved_records }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.approved_records.is_empty()
+    }
+
+    pub fn approved_record_count(&self) -> usize {
+        self.approved_records.len()
+    }
 }
 
 /// Opaque, materializer-issued capability receipt. Fields are crate-visible
@@ -868,15 +894,18 @@ mod tests {
     }
 
     fn trust_policy(profile: &InstrumentCapabilityEvidenceProfileV1) -> QualificationTrustPolicyV1 {
-        QualificationTrustPolicyV1 {
-            approved_records: profile.claims.iter().filter_map(|claim| {
+        // Synthetic test fixture: this helper stands in for the authenticated
+        // registry loader. Production callers must verify registry signatures
+        // and pinned authority keys before invoking the crate-private path.
+        QualificationTrustPolicyV1::from_authenticated_registry(
+            profile.claims.iter().filter_map(|claim| {
                 Some((
                     claim.qualification_authority_id.clone()?,
                     claim.qualification_record_id.clone()?,
                     claim.qualification_record_sha256.clone()?,
                 ))
             }).collect(),
-        }
+        )
     }
 
     fn valid_profile(
@@ -1050,6 +1079,23 @@ mod tests {
         assert!(report.issues.iter().any(|issue| {
             issue.code == CapabilityEvidenceIssueCodeV1::MalformedQualificationRecordDigest
         }));
+    }
+
+    #[test]
+    fn default_external_trust_policy_has_no_approved_records() {
+        let policy = QualificationTrustPolicyV1::default();
+        assert!(policy.is_empty());
+        assert_eq!(policy.approved_record_count(), 0);
+        let (profile, performance_scope, _) = valid_profile(false);
+        assert_eq!(
+            materialize_qualified_instrument_capability_v1(
+                &profile,
+                &performance_scope,
+                None,
+                &policy,
+            ),
+            Err(CapabilityMaterializationErrorV1::QualificationNotTrusted)
+        );
     }
 
     #[test]
