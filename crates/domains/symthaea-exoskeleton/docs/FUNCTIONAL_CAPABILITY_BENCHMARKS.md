@@ -33,7 +33,7 @@ These are audit findings, not claims that the newer candidate gates have been in
 
 ## 3. Target system architecture
 
-Separate fast physical safety from adaptive cognition. The cognitive system may request a bounded assistance intent; it must not be the final authority over a motor.
+Separate fast physical safety from adaptive cognition. The cognitive system may request a bounded assistance intent; it must not be the final authority over a motor. The subsystem roles below are proposed contracts, not claims that the four repositories are already integrated or that every interface is implemented.
 
 ### Layer 0 — actuator-local protection
 
@@ -45,21 +45,21 @@ A bounded-latency controller performs the validated low-level impedance/admittan
 
 ### Layer 2 — Symthaea intent and task assistance
 
-Symthaea fuses non-invasive measurements and user commands to estimate movement intent and task context. It proposes a task-level assistance request, confidence and expiry—not unconstrained motor torques. Adaptation is shadow-only until an independently reviewed candidate passes the complete validation path.
+Symthaea would fuse non-invasive measurements and user commands to estimate movement intent and task context. It should propose a task-level assistance request, confidence and expiry—not unconstrained motor torques. Adaptation is shadow-only until an independently reviewed candidate passes the complete validation path.
 
 Candidate sensing modalities: joint encoders, IMUs, foot-pressure/contact sensing, load cells, EMG and mechanomyography. Ultrasound is a research option. Invasive neural interfaces are explicitly not a prerequisite for useful first products.
 
 ### Layer 3 — Symtropy physical twin
 
-Symtropy supplies the deterministic plant, contact and articulated-body simulation, sensitivity analysis, actuator/thermal/energy models, adversarial disturbance campaigns and hardware-in-the-loop test fixtures. Model discrepancy must be measured against benchtop observations; simulation outputs are not human-subject evidence.
+Symtropy would provide the deterministic plant, contact and articulated-body simulation, sensitivity analysis, actuator/thermal/energy models, adversarial disturbance campaigns and hardware-in-the-loop test fixtures. Model discrepancy must be measured against benchtop observations; simulation outputs are not human-subject evidence. Its generic metric-to-physics coupling is a research capability, not a safe default for a human-coupled plant: only calibrated physical parameters may drive gravity, contact, friction or actuator dynamics.
 
 ### Layer 4 — Sol-Atlas geometry and configuration
 
-Sol-Atlas owns the spatial representation: wearer/device geometry, joint-axis alignment, link dimensions, range-of-motion envelopes, collision clearance, environment geometry and fit/configuration revisions. A geometric model is not a clinical fit approval.
+Sol-Atlas is intended to own the spatial representation: wearer/device geometry, joint-axis alignment, link dimensions, range-of-motion envelopes, collision clearance, environment geometry and fit/configuration revisions. A geometric model is not a clinical fit approval.
 
 ### Layer 5 — Mycelix provenance and consent
 
-Mycelix can anchor device identity, component and material provenance, calibration revision, signed test receipts, maintenance, software/model versions, consent and authorized roles. It must not become a remote actuation authority. Wearer stop remains local and immediate; a network partition must not prevent a stop.
+Mycelix could anchor device identity, component and material provenance, calibration revision, signed test receipts, maintenance, software/model versions, consent and authorized roles. This is a proposed integration, not a current deployment claim. It must not become a remote actuation authority. Wearer stop remains local and immediate; a network partition must not prevent a stop.
 
 ## 4. Functional benchmark suite
 
