@@ -1131,7 +1131,7 @@ fn apply_development_style(
                         pitch = pitch.transpose(-12);
                     }
                     score.push(ScoreNote {
-                        part,
+                        part: part_id,
                         pitch,
                         onset: t,
                         duration: note.duration,
@@ -1290,7 +1290,7 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
         note.duration = note.duration.saturating_sub(Duration::new(lean_480, 480));
         note.velocity *= 0.92; // the resolution releases
         additions.push(ScoreNote {
-            part,
+            part: part_id,
             pitch: lean_pitch,
             onset,
             duration: Duration::new(lean_480, 480),
@@ -1361,7 +1361,7 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
         note.onset = onset + Duration::new(cut_480, 480);
         note.duration = note.duration.saturating_sub(Duration::new(cut_480, 480));
         additions.push(ScoreNote {
-            part,
+            part: part_id,
             pitch: cut_pitch,
             onset,
             duration: Duration::new(cut_480, 480),
@@ -1459,7 +1459,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
                 dur
             };
             chain.push(ScoreNote {
-                part: n.part,
+                part: n.part: part_id,
                 pitch,
                 onset: t,
                 duration: this_dur,
@@ -1607,7 +1607,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
         let hold = Duration::new((hold_beats * 480.0).round() as i64, 480);
         resolved_indices.push(j_idx);
         additions.push(ScoreNote {
-            part,
+            part: part_id,
             pitch: suspended_pitch,
             onset: onset2,
             duration: hold,
@@ -1617,7 +1617,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             section_intensity: si2,
         });
         additions.push(ScoreNote {
-            part,
+            part: part_id,
             pitch: resolved_pitch,
             onset: onset2 + hold,
             duration: dur2.saturating_sub(hold),
@@ -1831,7 +1831,7 @@ fn apply_additive_process(
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part,
+                    part: part_id,
                     pitch,
                     onset: Duration::new((t * 480.0).round() as i64, 480),
                     duration: Duration::new((this_dur * 480.0).round().max(1.0) as i64, 480),
@@ -1896,7 +1896,7 @@ fn apply_drone_pedal(score: &mut Score, part_id: PartId, key: Key) {
         let onset = bar.scale(m, 1);
         let si = intensity_near(onset.beats());
         score.push(ScoreNote {
-            part,
+            part: part_id,
             pitch: tonic,
             onset,
             duration: half,
@@ -1906,7 +1906,7 @@ fn apply_drone_pedal(score: &mut Score, part_id: PartId, key: Key) {
             section_intensity: si,
         });
         score.push(ScoreNote {
-            part,
+            part: part_id,
             pitch: fifth,
             onset: onset + half,
             duration: half,
@@ -2427,7 +2427,7 @@ fn apply_grief_suspensions(
             };
             let onset = bar.scale(measure + i as i64, 1);
             score.push(ScoreNote {
-                part,
+                part: part_id,
                 pitch: sus,
                 onset,
                 duration: Duration::new(1, 1),
@@ -2437,7 +2437,7 @@ fn apply_grief_suspensions(
                 section_intensity: section.role.intensity(),
             });
             score.push(ScoreNote {
-                part,
+                part: part_id,
                 pitch: resolution,
                 onset: onset + Duration::new(1, 1),
                 duration: Duration::new((meter_beats as i64 - 1).max(1), 1),
@@ -3267,7 +3267,7 @@ fn apply_hidden_bass_quote(
     for &(deg, dur) in &hook.notes {
         let augmented = dur.scale(2, 1);
         score.push(ScoreNote {
-            part,
+            part: part_id,
             pitch: key.scale().degree_pitch(deg, 2),
             onset: Duration::new((t * 2.0).round() as i64, 2),
             duration: augmented,
