@@ -73,6 +73,7 @@ pub struct LinearActionGeneratorSampleStatisticsV1 {
     pub mean_normalized_squared_residual: f64,
     pub maximum_normalized_squared_residual: f64,
     pub within_tolerance: bool,
+    pub sample_residuals: Vec<LinearActionSampleResidualV1>,
 }
 
 /// Evidence report for a sampled scalar-expression invariance check.
@@ -80,6 +81,15 @@ pub struct LinearActionGeneratorSampleStatisticsV1 {
 pub struct LinearActionSampleConditionDiagnosticV1 {
     pub sample_id: String,
     pub direction_basis_condition_number: f64,
+    pub relative_directional_reconstruction_residual: f64,
+}
+
+/// Per-sample residual retained in the evidence receipt. None means the
+/// sample was uninformative because its gradient or orbit tangent was zero.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LinearActionSampleResidualV1 {
+    pub sample_id: String,
+    pub normalized_squared_residual: Option<f64>,
 }
 
 /// Evidence report for a sampled scalar-expression invariance check.
@@ -219,7 +229,7 @@ fn finite_difference_gradient(
         sample.direction_basis[column][row] / direction_scale
     });
     let transpose = direction_matrix.transpose();
-    let decomposition = transpose.svd(true, true);
+    let decomposition = transpose.clone().svd(true, true);
     let maximum_singular_value = decomposition
         .singular_values
         .iter()
@@ -267,8 +277,9 @@ fn finite_difference_gradient(
         observed.push(directional_derivative / direction_scale);
     }
 
+    let observed_vector = DVector::from_vec(observed);
     let solution = decomposition
-        .solve(&DVector::from_vec(observed), f64::EPSILON * (dimension as f64))
+        .solve(&observed_vector, f64::EPSILON * (dimension as f64))
         .map_err(|_| LinearActionSamplingErrorV1::GradientReconstructionFailed {
             sample_id: sample.sample_id.clone(),
         })?;
@@ -278,13 +289,28 @@ fn finite_difference_gradient(
             sample_id: sample.sample_id.clone(),
         });
     }
-    Ok((gradient, condition_number))
+    let reconstructed = &transpose * &solution;
+    let residual_norm = reconstructed
+        .iter()
+        .zip(observed_vector.iter())
+        .fold(0.0_f64, |norm, (left, right)| norm.hypot(left - right));
+    let observed_norm = stable_norm(observed_vector.as_slice());
+    let relative_reconstruction_residual = if observed_norm == 0.0 {
+        residual_norm
+    } else {
+        residual_norm / observed_norm
+    };
+    if !relative_reconstruction_residual.is_finite() {
+        return Err(LinearActionSamplingErrorV1::GradientReconstructionFailed {
+            sample_id: sample.sample_id.clone(),
+        });
+    }
+    Ok((gradient, condition_number, relative_reconstruction_residual))
 }
 
 /// Forward solve L y = p for lower-triangular L.
 fn solve_lower_triangular(lower: &[Vec<f64>], rhs: &[f64]) -> Option<Vec<f64>> {
-    let dimension = rhs.len();
-    let mut solution = Vec::with_capacity(dimension);
+    let mut solution = Vec::with_capacity(rhs.len());
     for (row_index, rhs_value) in rhs.iter().enumerate() {
         let correction = solution
             .iter()
@@ -466,7 +492,7 @@ pub fn evaluate_linear_action_samples(
     let mut sample_gradients = Vec::with_capacity(samples.len());
     let mut direction_basis_diagnostics = Vec::with_capacity(samples.len());
     for sample in samples {
-        let (gradient, condition_number) = finite_difference_gradient(
+        let (gradient, condition_number, reconstruction_residual) = finite_difference_gradient(
             expr,
             &variable_names,
             &action_coordinate_indices,
@@ -477,6 +503,7 @@ pub fn evaluate_linear_action_samples(
         direction_basis_diagnostics.push(LinearActionSampleConditionDiagnosticV1 {
             sample_id: sample.sample_id.clone(),
             direction_basis_condition_number: condition_number,
+            relative_directional_reconstruction_residual: reconstruction_residual,
         });
     }
 
@@ -486,6 +513,7 @@ pub fn evaluate_linear_action_samples(
         let mut skipped_sample_count = 0usize;
         let mut residual_sum = 0.0_f64;
         let mut maximum_residual = 0.0_f64;
+        let mut sample_residuals = Vec::with_capacity(samples.len());
 
         for (sample, gradient) in samples.iter().zip(sample_gradients.iter()) {
             let mut tangent = vec![0.0_f64; dimension];
@@ -516,8 +544,16 @@ pub fn evaluate_linear_action_samples(
             })?;
             if residual.is_nan() {
                 skipped_sample_count = skipped_sample_count.saturating_add(1);
+                sample_residuals.push(LinearActionSampleResidualV1 {
+                    sample_id: sample.sample_id.clone(),
+                    normalized_squared_residual: None,
+                });
                 continue;
             }
+            sample_residuals.push(LinearActionSampleResidualV1 {
+                sample_id: sample.sample_id.clone(),
+                normalized_squared_residual: Some(residual),
+            });
             informative_sample_count = informative_sample_count.saturating_add(1);
             residual_sum += residual;
             maximum_residual = maximum_residual.max(residual);
@@ -539,6 +575,7 @@ pub fn evaluate_linear_action_samples(
             mean_normalized_squared_residual: residual_sum / informative_sample_count as f64,
             maximum_normalized_squared_residual: maximum_residual,
             within_tolerance: maximum_residual <= profile.squared_cosine_tolerance,
+            sample_residuals,
         });
     }
 
