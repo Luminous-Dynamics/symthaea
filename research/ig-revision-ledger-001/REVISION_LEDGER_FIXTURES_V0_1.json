@@ -651,7 +651,8 @@
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
       },
       "expected_violations": [
-        "claim_delta_sets_overlap"
+        "claim_delta_sets_overlap",
+        "claim_delta_state_mismatch"
       ]
     },
     {
@@ -872,14 +873,18 @@
           "state_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
           "stance": "ValuePosition-A",
           "uncertainty_state": "Certain",
-          "claim_ids": [],
+          "claim_ids": [
+            "VALUE-A"
+          ],
           "evidence_ids": []
         },
         "next_state": {
           "state_sha256": "0000000000000000000000000000000000000000000000000000000000000019",
           "stance": "ValuePosition-B",
           "uncertainty_state": "Certain",
-          "claim_ids": [],
+          "claim_ids": [
+            "VALUE-B"
+          ],
           "evidence_ids": []
         },
         "claim_delta": {
