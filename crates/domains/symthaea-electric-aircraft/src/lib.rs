@@ -13,6 +13,7 @@
 //! lift-to-drag ratio and component efficiencies must come from separately
 //! qualified sources.
 
+use std::collections::BTreeMap;
 use std::fmt;
 
 pub mod characterization;
@@ -258,6 +259,25 @@ pub fn evaluate_mission_fully_characterized(
         propulsion_evidence_ids,
         battery_evidence_ids,
     )
+}
+
+/// Evaluate a fully characterized mission only after verifying the exact
+/// caller-supplied bytes for every propulsion and battery evidence record.
+/// This verifies SHA-256 content integrity, but it does not fetch URIs or
+/// authenticate publishers, signatures, authority, or configuration approval.
+pub fn evaluate_mission_fully_verified(
+    input: &MissionInput,
+    propulsion: &PropulsionCharacterization,
+    battery: &BatteryCharacterization,
+    evidence_payloads: &BTreeMap<String, Vec<u8>>,
+) -> Result<MissionReport, ModelError> {
+    propulsion
+        .verify_evidence_payloads(evidence_payloads)
+        .map_err(ModelError::Characterization)?;
+    battery
+        .verify_evidence_payloads(evidence_payloads)
+        .map_err(ModelError::Characterization)?;
+    evaluate_mission_fully_characterized(input, propulsion, battery)
 }
 
 fn scalar_propulsion_point(config: &PropulsionConfig) -> PropulsionOperatingPoint {
@@ -947,6 +967,52 @@ mod tests {
         // Independent numerical oracle for this synthetic SOC/temperature map fixture.
         assert!((fully_mapped.mission_chemical_energy_wh - 15_089.329_326_948_14).abs() < 1e-5);
         assert!((fully_mapped.energy_margin_wh - 10_392.804_807_662_233).abs() < 1e-5);
+    }
+
+    #[test]
+    fn fully_verified_mission_checks_exact_dataset_bytes_before_evaluation() {
+        use std::collections::BTreeMap;
+
+        let input = baseline();
+        let mut propulsion = propulsion_characterization();
+        let mut battery = battery_characterization();
+        let expected_sha256 =
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        for record in [
+            &mut propulsion.motor_efficiency_by_load.evidence,
+            &mut propulsion.inverter_efficiency_by_load.evidence,
+            &mut propulsion.propeller_efficiency_by_advance_ratio.evidence,
+            &mut battery.open_circuit_voltage.evidence,
+            &mut battery.internal_resistance.evidence,
+        ] {
+            record.sha256 = expected_sha256.into();
+        }
+        let evidence_ids = [
+            "motor-evidence",
+            "inverter-evidence",
+            "propeller-evidence",
+            "pack-ocv-data",
+            "pack-resistance-data",
+        ];
+        let payloads = evidence_ids
+            .into_iter()
+            .map(|id| (id.to_string(), b"abc".to_vec()))
+            .collect::<BTreeMap<_, _>>();
+
+        let report =
+            evaluate_mission_fully_verified(&input, &propulsion, &battery, &payloads).unwrap();
+        assert_eq!(report.model_version, "electric-fixed-wing-energy-v0.3.0");
+        assert_eq!(report.characterization_evidence_ids.len(), 3);
+        assert_eq!(report.battery_characterization_evidence_ids.len(), 2);
+
+        let mut corrupt = payloads;
+        corrupt.insert("motor-evidence".into(), b"changed bytes".to_vec());
+        assert!(matches!(
+            evaluate_mission_fully_verified(&input, &propulsion, &battery, &corrupt),
+            Err(ModelError::Characterization(
+                CharacterizationError::EvidenceDigestMismatch { .. }
+            ))
+        ));
     }
 
     #[test]
