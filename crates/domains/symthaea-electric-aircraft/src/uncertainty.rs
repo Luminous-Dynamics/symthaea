@@ -15,7 +15,10 @@
 
 use std::fmt;
 
-use crate::{evaluate_mission, MissionInput, MissionReport, ModelError};
+use crate::{
+    evaluate_mission, evaluate_mission_fully_characterized, BatteryCharacterization,
+    MissionInput, MissionReport, ModelError, PropulsionCharacterization,
+};
 
 pub const ROBUST_UNCERTAINTY_MODEL_VERSION: &str =
     "electric-fixed-wing-adverse-corner-v0.1.0";
@@ -94,6 +97,27 @@ impl MissionUncertaintyBudget {
     /// Materialize the simultaneous adverse corner so the exact adjusted
     /// assumptions can be inspected, persisted, compared, or independently
     /// replayed. This does not claim the corner is statistically likely.
+    /// Apply only the uncertainty dimensions that are independent of the
+    /// characterized maps. Efficiency, OCV, and resistance uncertainty are
+    /// already represented by the supplied evidence-bound maps; requesting
+    /// scalar perturbations for those fields is rejected rather than silently
+    /// ignored or double-counted.
+    pub fn apply_adverse_corner_for_characterized_maps(
+        &self,
+        input: &MissionInput,
+    ) -> Result<MissionInput, RobustEvaluationError> {
+        self.validate()?;
+        if self.battery_voltage_fraction != 0.0
+            || self.battery_resistance_fraction != 0.0
+            || self.propulsion_efficiency_fraction != 0.0
+        {
+            return Err(RobustEvaluationError::InvalidBudget(
+                "characterized maps own propulsion efficiency and battery OCV/resistance uncertainty",
+            ));
+        }
+        self.apply_adverse_corner(input)
+    }
+
     pub fn apply_adverse_corner(
         &self,
         input: &MissionInput,
@@ -210,6 +234,37 @@ pub fn evaluate_mission_robust(
     })
 }
 
+/// Evaluate a fully characterized nominal mission and its adverse corner.
+///
+/// Propulsion efficiency and battery OCV/resistance uncertainties come from
+/// their evidence-bound maps. The separate budget may vary aircraft mass,
+/// mission conditions, SOH/capacity, pack limits and lumped thermal parameters.
+/// Scalar perturbations to mapped quantities are rejected to avoid double
+/// counting. This remains deterministic screening, not a probabilistic or
+/// certified worst-case proof.
+pub fn evaluate_mission_fully_characterized_robust(
+    input: &MissionInput,
+    propulsion: &PropulsionCharacterization,
+    battery: &BatteryCharacterization,
+    budget: &MissionUncertaintyBudget,
+) -> Result<RobustMissionReport, RobustEvaluationError> {
+    budget.validate()?;
+    let nominal = evaluate_mission_fully_characterized(input, propulsion, battery)
+        .map_err(RobustEvaluationError::NominalMission)?;
+    let adverse_corner_input =
+        budget.apply_adverse_corner_for_characterized_maps(input)?;
+    let adverse_corner_result =
+        evaluate_mission_fully_characterized(&adverse_corner_input, propulsion, battery);
+
+    Ok(RobustMissionReport {
+        uncertainty_model_version: ROBUST_UNCERTAINTY_MODEL_VERSION,
+        budget: *budget,
+        nominal,
+        adverse_corner_input,
+        adverse_corner_result,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273,6 +328,77 @@ mod tests {
                     auxiliary_power_w: 700.0,
                 },
             ],
+        }
+    }
+
+    fn evidence(id: &str) -> crate::characterization::EvidenceRecord {
+        use crate::characterization::EvidenceClass;
+        crate::characterization::EvidenceRecord {
+            id: id.into(),
+            uri: format!("artifact://robust-test/{id}"),
+            sha256: "d".repeat(64),
+            class: EvidenceClass::Simulation,
+            description: "Synthetic fixture only; not physical evidence".into(),
+        }
+    }
+
+    fn characterized_propulsion() -> PropulsionCharacterization {
+        use crate::characterization::{EfficiencyCurve, EfficiencyPoint};
+        let curve = |id: &str, axis: &str, values: (f64, f64)| EfficiencyCurve {
+            id: id.into(),
+            x_axis: axis.into(),
+            x_unit: "1".into(),
+            evidence: evidence(&format!("{id}-data")),
+            points: vec![
+                EfficiencyPoint { x: values.0, efficiency: 0.90, absolute_uncertainty: 0.01 },
+                EfficiencyPoint { x: values.1, efficiency: 0.96, absolute_uncertainty: 0.01 },
+            ],
+        };
+        PropulsionCharacterization {
+            motor_efficiency_by_load: curve("motor", "shaft_load_fraction", (0.01, 1.5)),
+            inverter_efficiency_by_load: curve("inverter", "input_load_fraction", (0.01, 1.5)),
+            propeller_efficiency_by_advance_ratio: curve("propeller", "advance_ratio", (0.2, 2.0)),
+            motor_rated_shaft_power_w: 100_000.0,
+            inverter_rated_input_power_w: 120_000.0,
+            propeller_diameter_m: 1.8,
+            propeller_rpm: 1_300.0,
+        }
+    }
+
+    fn characterized_battery() -> BatteryCharacterization {
+        use crate::characterization::{ScalarGrid2D, ScalarGridPoint};
+        let grid = |id: &str, values: Vec<Vec<f64>>, uncertainty: f64| ScalarGrid2D {
+            id: id.into(),
+            x_axis: "state_of_charge".into(),
+            x_unit: "1".into(),
+            x_values: vec![0.1, 0.6, 1.0],
+            y_axis: "temperature".into(),
+            y_unit: "K".into(),
+            y_values: vec![273.0, 298.0, 333.0],
+            evidence: evidence(&format!("{id}-data")),
+            values: values.into_iter().map(|row| row.into_iter().map(|value| {
+                ScalarGridPoint { value, absolute_uncertainty: uncertainty }
+            }).collect()).collect(),
+        };
+        BatteryCharacterization {
+            open_circuit_voltage: grid(
+                "ocv",
+                vec![
+                    vec![340.0, 350.0, 345.0],
+                    vec![365.0, 375.0, 370.0],
+                    vec![385.0, 395.0, 390.0],
+                ],
+                1.0,
+            ),
+            internal_resistance: grid(
+                "resistance",
+                vec![
+                    vec![0.070, 0.065, 0.070],
+                    vec![0.055, 0.050, 0.060],
+                    vec![0.050, 0.045, 0.055],
+                ],
+                0.001,
+            ),
         }
     }
 
@@ -354,6 +480,53 @@ mod tests {
             Err(ModelError::ReserveInfringed { .. })
         ));
         assert!(!report.is_feasible_at_adverse_corner());
+    }
+
+    #[test]
+    fn characterized_maps_are_used_at_both_nominal_and_adverse_corners() {
+        let input = baseline();
+        let propulsion = characterized_propulsion();
+        let battery = characterized_battery();
+        let budget = MissionUncertaintyBudget {
+            mass_fraction: 0.01,
+            airspeed_fraction: 0.01,
+            lift_to_drag_fraction: 0.01,
+            positive_climb_rate_fraction: 0.01,
+            auxiliary_power_fraction: 0.01,
+            battery_capacity_fraction: 0.01,
+            battery_power_limit_fraction: 0.01,
+            battery_current_limit_fraction: 0.01,
+            battery_thermal_capacity_fraction: 0.01,
+            battery_thermal_conductance_fraction: 0.01,
+            battery_temperature_headroom_fraction: 0.01,
+            ..MissionUncertaintyBudget::default()
+        };
+        let report = evaluate_mission_fully_characterized_robust(
+            &input, &propulsion, &battery, &budget
+        ).unwrap();
+        let adverse = report.adverse_corner_result.unwrap();
+
+        assert_eq!(report.nominal.characterization_evidence_records.len(), 3);
+        assert_eq!(report.nominal.battery_characterization_evidence_records.len(), 2);
+        assert!(adverse.mission_terminal_energy_wh > report.nominal.mission_terminal_energy_wh);
+        assert!(adverse.energy_margin_wh < report.nominal.energy_margin_wh);
+    }
+
+    #[test]
+    fn characterized_robust_path_rejects_duplicate_scalar_map_uncertainty() {
+        let input = baseline();
+        let mut budget = MissionUncertaintyBudget::default();
+        budget.propulsion_efficiency_fraction = 0.01;
+        assert!(matches!(
+            budget.apply_adverse_corner_for_characterized_maps(&input),
+            Err(RobustEvaluationError::InvalidBudget(_))
+        ));
+        budget.propulsion_efficiency_fraction = 0.0;
+        budget.battery_voltage_fraction = 0.01;
+        assert!(matches!(
+            budget.apply_adverse_corner_for_characterized_maps(&input),
+            Err(RobustEvaluationError::InvalidBudget(_))
+        ));
     }
 
     #[test]
