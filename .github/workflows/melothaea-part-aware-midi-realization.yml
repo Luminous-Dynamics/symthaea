@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "crates/domains/symthaea-muse/src/midi_export.rs"
+      - "crates/domains/symthaea-muse/src/midi_export/part_aware_v1.rs"
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-music-theory/src/orchestration.rs"
       - "crates/domains/symthaea-music-theory/src/orchestration_timeline.rs"
@@ -29,7 +30,7 @@ jobs:
           components: rustfmt
 
       - name: Check MIDI exporter formatting
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/midi_export.rs
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/midi_export.rs crates/domains/symthaea-muse/src/midi_export/part_aware_v1.rs
 
       - name: Run part-aware MIDI regression tests
         run: cargo test -p symthaea-muse --features theory --lib part_aware_v1::tests::
