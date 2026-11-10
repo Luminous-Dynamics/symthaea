@@ -2,7 +2,7 @@ name: HLB FEP-WSP Factorial Contract
 
 on:
   pull_request:
-    branches: [main, research/swi-001-weight-space-introspection, research/hlb-fep-wsp-factorial-v2, research/hlb-composite-family-acceptance-v0]
+    branches: [main, research/swi-001-weight-space-introspection, research/hlb-fep-wsp-factorial-v2, research/hlb-family-guardrail-v0]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
