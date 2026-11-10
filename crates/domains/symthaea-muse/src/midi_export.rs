@@ -2109,15 +2109,15 @@ pub mod part_aware_v1 {
             let source = score(vec![note(
                 7,
                 60,
-                Duration::zero(),
+                Duration::new(1, 10_000),
                 Duration::new(1, 2),
             )]);
             let digest = score_digest(&source);
-            // These rational boundaries differ but both quantize to tick 0.
+            // These adjacent rational boundaries differ but both quantize to tick 0.
             let timeline = plan(
                 &digest,
                 vec![
-                    segment("opening", 7, "cello-1", 0, 1, 1, 1, None),
+                    segment("opening", 7, "cello-1", 0, 1, 1, 10_000, None),
                     segment(
                         "response",
                         7,
