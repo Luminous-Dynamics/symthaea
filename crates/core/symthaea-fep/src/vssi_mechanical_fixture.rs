@@ -126,6 +126,8 @@ pub struct VssiPublicTask {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VssiExperimentReceipt {
+    /// Self-describing receipt schema version.
+    pub schema_version: String,
     /// Investigator-visible scenario identity.
     pub scenario_id: String,
     /// Digest of the complete investigator-visible task envelope.
@@ -162,7 +164,8 @@ impl VssiExperimentReceipt {
     /// Recompute the receipt's claim digest without trusting its stored digest.
     pub fn validate(&self) -> Result<(), VssiFixtureError> {
         let expected_budget_after = (self.budget_before - self.observation_cost).max(0.0);
-        if self.scenario_id.trim().is_empty()
+        if self.schema_version != "vssi-experiment-receipt-v1"
+            || self.scenario_id.trim().is_empty()
             || self.experiment_index == 0
             || !self.observation_cost.is_finite()
             || self.observation_cost < 0.0
@@ -187,7 +190,7 @@ impl VssiExperimentReceipt {
             return Err(VssiFixtureError::InvalidReceiptDigest);
         }
         let claims = VssiExperimentReceiptClaims {
-            schema_version: "vssi-experiment-receipt-v1",
+            schema_version: &self.schema_version,
             scenario_id: &self.scenario_id,
             public_task_digest: &self.public_task_digest,
             experiment_index: self.experiment_index,
@@ -355,7 +358,7 @@ pub fn validate_vssi_experiment_results(
 
 #[derive(Serialize)]
 struct VssiExperimentReceiptClaims<'a> {
-    schema_version: &'static str,
+    schema_version: &'a str,
     scenario_id: &'a str,
     public_task_digest: &'a str,
     experiment_index: u64,
@@ -559,8 +562,9 @@ impl VssiMechanicalEnvironment {
             .experiment_receipts
             .last()
             .map(|receipt| receipt.receipt_digest.clone());
+        let schema_version = "vssi-experiment-receipt-v1".to_owned();
         let claims = VssiExperimentReceiptClaims {
-            schema_version: "vssi-experiment-receipt-v1",
+            schema_version: &schema_version,
             scenario_id: &self.task.scenario_id,
             public_task_digest: &public_task_digest,
             experiment_index,
@@ -575,6 +579,7 @@ impl VssiMechanicalEnvironment {
         let receipt_digest =
             sha256_serializable(b"symthaea-vssi-experiment-receipt-v1\0", &claims)?;
         let receipt = VssiExperimentReceipt {
+            schema_version,
             scenario_id: self.task.scenario_id.clone(),
             public_task_digest,
             experiment_index,
@@ -1004,7 +1009,7 @@ mod tests {
         wrong_spec_cost[0].receipt.observation_cost += 0.01;
         wrong_spec_cost[0].receipt.budget_after -= 0.01;
         let claims = VssiExperimentReceiptClaims {
-            schema_version: "vssi-experiment-receipt-v1",
+            schema_version: &wrong_spec_cost[0].receipt.schema_version,
             scenario_id: &wrong_spec_cost[0].receipt.scenario_id,
             public_task_digest: &wrong_spec_cost[0].receipt.public_task_digest,
             experiment_index: wrong_spec_cost[0].receipt.experiment_index,
