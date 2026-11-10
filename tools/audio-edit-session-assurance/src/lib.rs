@@ -342,7 +342,9 @@ pub fn evaluate_session_ledger(
             } => {
                 require_started(started)?;
                 validate_digest(instruction_batch_sha256, "instruction_batch_sha256")?;
-                let expected_turn = current_turn + 1;
+                let expected_turn = current_turn
+                    .checked_add(1)
+                    .ok_or_else(|| LedgerError::new("user turn index overflow"))?;
                 if *turn_index != expected_turn {
                     return Err(LedgerError::new(format!(
                         "expected user turn {}, received {}",
@@ -427,10 +429,10 @@ pub fn evaluate_session_ledger(
                         "supersession would create a cycle or target a superseded constraint",
                     ));
                 }
-                constraints
+                let old_mut = constraints
                     .get_mut(old_constraint_id)
-                    .expect("old constraint was checked")
-                    .superseded_by = Some(replacement_constraint_id.clone());
+                    .ok_or_else(|| LedgerError::new("supersession target disappeared"))?;
+                old_mut.superseded_by = Some(replacement_constraint_id.clone());
                 superseded.insert(old_constraint_id.clone());
             }
             SessionEventKindV1::EditExecuted {
