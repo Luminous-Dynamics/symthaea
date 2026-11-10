@@ -25,6 +25,8 @@ struct Receipt {
 #[derive(Serialize)]
 struct FailureReceipt {
     receipt_schema: &'static str,
+    tool_version: &'static str,
+    build_commit: String,
     status: &'static str,
     input_path: String,
     input_sha256: String,
