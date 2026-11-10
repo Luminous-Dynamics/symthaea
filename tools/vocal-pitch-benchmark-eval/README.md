@@ -25,12 +25,16 @@ A gross pitch error uses the predeclared cents threshold (50 cents by default in
 
 The report preserves:
 - every per-segment result;
+- exact source-audio, reference-F0-track and estimated-F0-track digests;
 - singer, song and recording-session identities;
+- language, register, vocal-technique and SNR strata;
 - corpus and recording-condition labels;
 - micro metrics pooled over all frames;
 - per-corpus × recording-condition groups;
 - equal-weight macro metrics across those groups;
 - median per-segment FFE and VDE.
+
+The specification declares the complete expected corpus × condition group set. Missing or unexpected groups reject the run; a partial run cannot silently change the macro denominator. For the external mixed pitch benchmark's headline methodology, declare the eight non-clean conditions for each expected corpus and report clean audio separately. For Muse's singing-only study, define a separate group set appropriate to the licensed corpus.
 
 Use group-level outputs for corpus/condition macro reporting. Do not use raw frames as independent bootstrap samples. Comparative confidence intervals should resample singer/song/session clusters and preserve matched source cases across trackers. The library intentionally does not emit confidence intervals because it does not own the sampling design or resampling policy.
 
