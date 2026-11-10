@@ -51,7 +51,7 @@ The run binds:
 - complete predeclared operation × language × timbre-mode group matrix.
 
 Each case binds:
-- source audio, melody reference and optional timbre reference;
+- source audio, melody reference and optional timbre reference; same-timbre requires the timbre-reference digest to equal the melody-reference digest, while cross-timbre requires a distinct digest;
 - original and requested lyric payload digests for lyric tasks;
 - source singer/song/session and technique strata;
 - task manifest digest;
