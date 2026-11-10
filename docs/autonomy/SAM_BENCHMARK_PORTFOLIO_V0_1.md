@@ -58,6 +58,18 @@ Source: [A Survey of World Model Benchmarks — 8 November 2026 snapshot](https:
 - **Claim boundary:** entries are upstream-published, not independently reproduced by SAM. Match route XML, simulator/ScenarioRunner, sensor privilege, checkpoint, compute and scoring before claiming comparability.
 - **Source:** [upstream v0.0.4](https://github.com/Thinklab-SJTU/Bench2Drive/tree/0.0.4).
 
+
+### Bench2Drive-Robust — deployment-side closed-loop perturbations (2026)
+
+- **Role:** model-agnostic closed-loop robustness extension for Bench2Drive under device/deployment-side faults.
+- **Environment/compatibility:** upstream project states CARLA 0.9.15 and Bench2Drive route/scenario compatibility; exact route files and benchmark revisions must still be pinned for reproduction.
+- **Fixed-policy comparison:** authors evaluate SimLingo-base, TCP-traj, UniAD and VAD without robustness fine-tuning.
+- **Perturbation matrix:** GPS localization noise 5 m / 15 m; inference/control latency 100 ms / 200 ms / 500 ms via FIFO action buffering; cached burst camera-frame drops 20 / 60 ticks; partial camera observation 50% / 80% random rectangular occlusion; multiplicative ego-speed noise with two published Gaussian parameter settings (\(\eta\sim\mathcal{N}(0.5,0.2^2)\) and \(\eta\sim\mathcal{N}(0.2,0.2^2)\)).
+- **Metrics:** closed-loop route outcomes / degradation by perturbation type and severity; retain route success, driving score, efficiency and comfort separately wherever source evaluators expose them.
+- **Claim boundary:** upstream benchmark / author-reported; no SAM reproduction. This measures robustness to its declared perturbations, not physical sensor reliability, real-world safety or general sensor-health qualification.
+- **SAM use:** reproduce this track unchanged, then overlay observation-delivery integrity, option-set changes, capability retention, abstention/fallback, false restriction, recovery latency and p50/p95/p99 runtime as separate metrics. Do not modify upstream scoring or combine these evidence measures into a new composite.
+- **Sources:** [arXiv:2605.18059](https://arxiv.org/abs/2605.18059), [official implementation](https://github.com/Thinklab-SJTU/Bench2Drive-Robust).
+
 ### HiDrive
 
 - **Role:** high-level, long-tail closed-loop driving and rule/norm-sensitive decisions.
