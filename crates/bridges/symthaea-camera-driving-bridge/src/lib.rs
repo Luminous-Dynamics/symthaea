@@ -23,6 +23,7 @@ pub struct DrivingRunIdentity {
     pub run_id: String,
     pub episode_id: String,
     pub scenario_id: String,
+    pub agent_id: String,
     pub camera_id: String,
     pub simulator_revision: String,
     pub policy_revision: String,
@@ -34,6 +35,7 @@ impl DrivingRunIdentity {
             ("run_id", &self.run_id),
             ("episode_id", &self.episode_id),
             ("scenario_id", &self.scenario_id),
+            ("agent_id", &self.agent_id),
             ("camera_id", &self.camera_id),
             ("simulator_revision", &self.simulator_revision),
             ("policy_revision", &self.policy_revision),
@@ -92,7 +94,34 @@ impl BridgeConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+/// Policy-visible metadata copied from the upstream Symtropy camera receipt.
+/// Digest fields are integrity pointers; this type does not authenticate the issuer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpstreamCameraObservation {
+    pub observation_id: String,
+    pub receipt_sha256: String,
+    pub frame_sha256: String,
+    pub episode_id: String,
+    pub agent_id: String,
+    pub clock_id: String,
+    pub tick: u64,
+    pub sequence: u64,
+    pub camera_id: String,
+    pub camera_calibration_sha256: String,
+    pub renderer_revision: String,
+    pub capture_timestamp_us: u64,
+    pub render_completed_timestamp_us: u64,
+    pub delivered_timestamp_us: u64,
+    pub width: u32,
+    pub height: u32,
+    pub channels: usize,
+    pub applied_action_receipt_id: Option<String>,
+    pub applied_action_receipt_sha256: Option<String>,
+    pub applied_action_command_id: Option<String>,
+    pub applied_action_tick: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
 pub struct CapturedDrivingObservation<'a> {
     pub sequence: u64,
     pub timestamp_us: u64,
@@ -102,6 +131,7 @@ pub struct CapturedDrivingObservation<'a> {
     pub height: u32,
     pub channels: usize,
     pub vehicle_state: &'a VehicleState,
+    pub upstream: UpstreamCameraObservation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,6 +156,14 @@ pub enum BridgeError {
     ManifoldRejected,
     NonFinitePerceptionOutput,
     LearningNotFrozen,
+    UpstreamReceiptMalformed,
+    UpstreamIdentityMismatch,
+    UpstreamFrameMismatch,
+    UpstreamSequenceMismatch,
+    UpstreamTimestampMismatch,
+    UpstreamGeometryMismatch,
+    UpstreamClockOrderInvalid,
+    UpstreamActionReferenceInvalid,
     BridgeFaulted,
 }
 
@@ -189,6 +227,22 @@ pub struct DrivingObservationReceipt {
     pub vehicle_encoder_seed_sha256: String,
     pub hdc_dimension: usize,
     pub vehicle_encoder_levels: usize,
+    pub upstream_observation_id: String,
+    pub upstream_receipt_sha256: String,
+    pub upstream_frame_sha256: String,
+    pub upstream_clock_id: String,
+    pub upstream_tick: u64,
+    pub upstream_agent_id: String,
+    pub upstream_camera_calibration_sha256: String,
+    pub upstream_renderer_revision: String,
+    pub upstream_capture_timestamp_us: u64,
+    pub upstream_render_completed_timestamp_us: u64,
+    pub upstream_delivered_timestamp_us: u64,
+    pub upstream_applied_action_receipt_id: Option<String>,
+    pub upstream_applied_action_receipt_sha256: Option<String>,
+    pub upstream_applied_action_command_id: Option<String>,
+    pub upstream_applied_action_tick: Option<u64>,
+    pub previous_receipt_sha256: Option<String>,
     pub raw_frame_sha256: String,
     pub visual_state_sha256: String,
     pub vehicle_state_sha256: String,
@@ -221,6 +275,9 @@ pub struct CameraDrivingBridge {
     last_vehicle_timestamp_us: Option<u64>,
     last_vehicle_state_sha256: Option<String>,
     last_visual_state_sha256: Option<String>,
+    last_receipt_sha256: Option<String>,
+    last_upstream_clock_id: Option<String>,
+    last_upstream_tick: Option<u64>,
     faulted: bool,
 }
 
@@ -258,6 +315,9 @@ impl CameraDrivingBridge {
             last_vehicle_timestamp_us: None,
             last_vehicle_state_sha256: None,
             last_visual_state_sha256: None,
+            last_receipt_sha256: None,
+            last_upstream_clock_id: None,
+            last_upstream_tick: None,
             faulted: false,
         })
     }
@@ -280,6 +340,7 @@ impl CameraDrivingBridge {
 
         let previous_vehicle_state_sha256 = self.last_vehicle_state_sha256.clone();
         let previous_visual_state_sha256 = self.last_visual_state_sha256.clone();
+        let previous_receipt_sha256 = self.last_receipt_sha256.clone();
         let vehicle_state_sha256 = digest_vehicle_state(observation.vehicle_state, &state_channels);
         let training_steps_before = self.vision.training_steps();
         let dt = (dt_us as f64 / 1_000_000.0) as f32;
@@ -355,6 +416,22 @@ impl CameraDrivingBridge {
             vehicle_encoder_seed_sha256: self.vehicle_encoder_seed_sha256.clone(),
             hdc_dimension: HDC_DIMENSION,
             vehicle_encoder_levels: MAX_VEHICLE_ENCODER_LEVELS,
+            upstream_observation_id: observation.upstream.observation_id.clone(),
+            upstream_receipt_sha256: observation.upstream.receipt_sha256.clone(),
+            upstream_frame_sha256: observation.upstream.frame_sha256.clone(),
+            upstream_clock_id: observation.upstream.clock_id.clone(),
+            upstream_tick: observation.upstream.tick,
+            upstream_agent_id: observation.upstream.agent_id.clone(),
+            upstream_camera_calibration_sha256: observation.upstream.camera_calibration_sha256.clone(),
+            upstream_renderer_revision: observation.upstream.renderer_revision.clone(),
+            upstream_capture_timestamp_us: observation.upstream.capture_timestamp_us,
+            upstream_render_completed_timestamp_us: observation.upstream.render_completed_timestamp_us,
+            upstream_delivered_timestamp_us: observation.upstream.delivered_timestamp_us,
+            upstream_applied_action_receipt_id: observation.upstream.applied_action_receipt_id.clone(),
+            upstream_applied_action_receipt_sha256: observation.upstream.applied_action_receipt_sha256.clone(),
+            upstream_applied_action_command_id: observation.upstream.applied_action_command_id.clone(),
+            upstream_applied_action_tick: observation.upstream.applied_action_tick,
+            previous_receipt_sha256,
             raw_frame_sha256,
             visual_state_sha256: visual_state_sha256.clone(),
             vehicle_state_sha256: vehicle_state_sha256.clone(),
@@ -375,6 +452,9 @@ impl CameraDrivingBridge {
         self.last_vehicle_timestamp_us = Some(observation.vehicle_state_timestamp_us);
         self.last_vehicle_state_sha256 = Some(vehicle_state_sha256);
         self.last_visual_state_sha256 = Some(visual_state_sha256);
+        self.last_receipt_sha256 = Some(receipt.receipt_sha256.clone());
+        self.last_upstream_clock_id = Some(observation.upstream.clock_id.clone());
+        self.last_upstream_tick = Some(observation.upstream.tick);
 
         Ok(FusedDrivingInput {
             policy_input,
@@ -386,6 +466,7 @@ impl CameraDrivingBridge {
         &self,
         observation: &CapturedDrivingObservation<'_>,
     ) -> Result<u64, BridgeError> {
+        self.validate_upstream_observation(observation)?;
         if observation.width == 0 || observation.height == 0 {
             return Err(BridgeError::InvalidGeometry);
         }
@@ -436,6 +517,94 @@ impl CameraDrivingBridge {
         Ok(dt_us)
     }
 
+    fn validate_upstream_observation(
+        &self,
+        observation: &CapturedDrivingObservation<'_>,
+    ) -> Result<(), BridgeError> {
+        let upstream = &observation.upstream;
+        for value in [
+            upstream.observation_id.as_str(),
+            upstream.episode_id.as_str(),
+            upstream.agent_id.as_str(),
+            upstream.clock_id.as_str(),
+            upstream.camera_id.as_str(),
+            upstream.renderer_revision.as_str(),
+        ] {
+            if value.trim().is_empty() || value.len() > MAX_ID_BYTES {
+                return Err(BridgeError::UpstreamReceiptMalformed);
+            }
+        }
+        if !is_sha256_hex(&upstream.observation_id)
+            || !is_sha256_hex(&upstream.receipt_sha256)
+            || !is_sha256_hex(&upstream.frame_sha256)
+            || !is_sha256_hex(&upstream.camera_calibration_sha256)
+        {
+            return Err(BridgeError::UpstreamReceiptMalformed);
+        }
+        if upstream.renderer_revision.len() > 128 {
+            return Err(BridgeError::UpstreamReceiptMalformed);
+        }
+        if upstream.episode_id != self.config.identity.episode_id
+            || upstream.agent_id != self.config.identity.agent_id
+            || upstream.camera_id != self.config.identity.camera_id
+        {
+            return Err(BridgeError::UpstreamIdentityMismatch);
+        }
+        if self
+            .last_upstream_clock_id
+            .as_deref()
+            .is_some_and(|last| last != upstream.clock_id)
+            || self
+                .last_upstream_tick
+                .is_some_and(|last| upstream.tick < last)
+        {
+            return Err(BridgeError::UpstreamIdentityMismatch);
+        }
+        if upstream.sequence != observation.sequence {
+            return Err(BridgeError::UpstreamSequenceMismatch);
+        }
+        if upstream.capture_timestamp_us != observation.timestamp_us {
+            return Err(BridgeError::UpstreamTimestampMismatch);
+        }
+        if upstream.width != observation.width
+            || upstream.height != observation.height
+            || upstream.channels != observation.channels
+        {
+            return Err(BridgeError::UpstreamGeometryMismatch);
+        }
+        if upstream.render_completed_timestamp_us < upstream.capture_timestamp_us
+            || upstream.delivered_timestamp_us < upstream.render_completed_timestamp_us
+        {
+            return Err(BridgeError::UpstreamClockOrderInvalid);
+        }
+        if upstream.tick == 0 {
+            if upstream.applied_action_receipt_id.is_some()
+                || upstream.applied_action_receipt_sha256.is_some()
+                || upstream.applied_action_command_id.is_some()
+                || upstream.applied_action_tick.is_some()
+            {
+                return Err(BridgeError::UpstreamActionReferenceInvalid);
+            }
+        } else if upstream
+            .applied_action_receipt_id
+            .as_deref()
+            .is_none_or(str::is_empty)
+            || upstream
+                .applied_action_receipt_command_id_is_empty()
+            || upstream
+                .applied_action_receipt_sha256
+                .as_deref()
+                .is_none_or(|value| !is_sha256_hex(value))
+            || upstream.applied_action_tick != Some(upstream.tick)
+        {
+            return Err(BridgeError::UpstreamActionReferenceInvalid);
+        }
+        if digest_bytes(observation.pixels) != upstream.frame_sha256 {
+            return Err(BridgeError::UpstreamFrameMismatch);
+        }
+        Ok(())
+    }
+
     pub fn frames_processed(&self) -> u64 {
         self.vision.frame_count()
     }
@@ -481,8 +650,10 @@ fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
     hasher.update(receipt.schema_version.to_le_bytes());
     hasher.update([u8::from(receipt.previous_vehicle_state_sha256.is_some())]);
     hasher.update([u8::from(receipt.previous_visual_state_sha256.is_some())]);
+    hasher.update([u8::from(receipt.previous_receipt_sha256.is_some())]);
     let previous_vehicle_state = receipt.previous_vehicle_state_sha256.as_deref().unwrap_or("");
     let previous_visual_state = receipt.previous_visual_state_sha256.as_deref().unwrap_or("");
+    let previous_receipt = receipt.previous_receipt_sha256.as_deref().unwrap_or("");
     for value in [
         receipt.identity.run_id.as_str(),
         receipt.identity.episode_id.as_str(),
@@ -492,6 +663,17 @@ fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
         receipt.identity.policy_revision.as_str(),
         receipt.vision_config_sha256.as_str(),
         receipt.vehicle_encoder_seed_sha256.as_str(),
+        receipt.upstream_observation_id.as_str(),
+        receipt.upstream_receipt_sha256.as_str(),
+        receipt.upstream_frame_sha256.as_str(),
+        receipt.upstream_clock_id.as_str(),
+        receipt.upstream_agent_id.as_str(),
+        receipt.upstream_camera_calibration_sha256.as_str(),
+        receipt.upstream_renderer_revision.as_str(),
+        receipt.upstream_applied_action_receipt_id.as_deref().unwrap_or(""),
+        receipt.upstream_applied_action_receipt_sha256.as_deref().unwrap_or(""),
+        receipt.upstream_applied_action_command_id.as_deref().unwrap_or(""),
+        previous_receipt,
         receipt.raw_frame_sha256.as_str(),
         receipt.visual_state_sha256.as_str(),
         receipt.vehicle_state_sha256.as_str(),
@@ -513,6 +695,12 @@ fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
         receipt.channels as u64,
         u64::from(receipt.visual_weight_ppm),
         receipt.hdc_dimension as u64,
+        receipt.upstream_tick,
+        receipt.capture_sequence,
+        receipt.upstream_capture_timestamp_us,
+        receipt.upstream_render_completed_timestamp_us,
+        receipt.upstream_delivered_timestamp_us,
+        u64::from(receipt.upstream_applied_action_tick.unwrap_or(0)),
         receipt.vehicle_encoder_levels as u64,
     ] {
         hasher.update(value.to_le_bytes());
@@ -534,6 +722,13 @@ fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
     digest_to_hex(&hasher.finalize())
 }
 
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn digest_to_hex(bytes: &[u8]) -> String {
     let mut output = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
@@ -551,6 +746,7 @@ mod tests {
             run_id: "run-001".to_string(),
             episode_id: "episode-001".to_string(),
             scenario_id: "scenario-001".to_string(),
+            agent_id: "ego-001".to_string(),
             camera_id: "front-camera".to_string(),
             simulator_revision: "sim-rev-001".to_string(),
             policy_revision: "policy-rev-001".to_string(),
@@ -577,6 +773,7 @@ mod tests {
         timestamp_us: u64,
         vehicle_state: &'a VehicleState,
     ) -> CapturedDrivingObservation<'a> {
+        let tick = sequence;
         CapturedDrivingObservation {
             sequence,
             timestamp_us,
@@ -586,6 +783,29 @@ mod tests {
             height: 16,
             channels: 3,
             vehicle_state,
+            upstream: UpstreamCameraObservation {
+                observation_id: digest_bytes(format!("observation-{sequence}").as_bytes()),
+                receipt_sha256: "c".repeat(64),
+                frame_sha256: digest_bytes(pixels),
+                episode_id: "episode-001".to_string(),
+                agent_id: "ego-001".to_string(),
+                clock_id: "test-sim-clock".to_string(),
+                tick,
+                sequence,
+                camera_id: "front-camera".to_string(),
+                camera_calibration_sha256: "d".repeat(64),
+                renderer_revision: "software-camera-q16-rgb-v1".to_string(),
+                capture_timestamp_us: timestamp_us,
+                render_completed_timestamp_us: timestamp_us + 200,
+                delivered_timestamp_us: timestamp_us + 400,
+                width: 16,
+                height: 16,
+                channels: 3,
+                applied_action_receipt_id: Some(format!("action-receipt-{sequence}")),
+                applied_action_receipt_sha256: Some("e".repeat(64)),
+                applied_action_command_id: Some(format!("action-command-{sequence}")),
+                applied_action_tick: Some(tick),
+            },
         }
     }
 
@@ -707,7 +927,128 @@ mod tests {
             second.receipt.previous_visual_state_sha256.as_deref(),
             Some(first.receipt.visual_state_sha256.as_str())
         );
+        assert_eq!(
+            second.receipt.previous_receipt_sha256.as_deref(),
+            Some(first.receipt.receipt_sha256.as_str())
+        );
+        assert_eq!(
+            second.receipt.upstream_observation_id,
+            digest_bytes(b"observation-2")
+        );
+        assert_eq!(second.receipt.upstream_receipt_sha256, "c".repeat(64));
         assert_eq!(second.receipt.receipt_sha256, digest_receipt(&second.receipt));
+    }
+
+    #[test]
+    fn rejects_upstream_frame_digest_mismatch_before_advancing_vision() {
+        let mut bridge = bridge();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.upstream.frame_sha256 = "f".repeat(64);
+        assert_eq!(
+            bridge.observe(item).err(),
+            Some(BridgeError::UpstreamFrameMismatch)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_upstream_receipt_digest_malformed_before_advancing_vision() {
+        let mut bridge = bridge();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.upstream.receipt_sha256 = "A".repeat(64);
+        assert_eq!(
+            bridge.observe(item).err(),
+            Some(BridgeError::UpstreamReceiptMalformed)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_upstream_camera_or_agent_identity_mismatch() {
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut camera_bridge = bridge();
+        let mut wrong_camera = observation(&pixels, 1, 10_000, &state);
+        wrong_camera.upstream.camera_id = "rear-camera".to_string();
+        assert_eq!(
+            camera_bridge.observe(wrong_camera).err(),
+            Some(BridgeError::UpstreamIdentityMismatch)
+        );
+        assert_eq!(camera_bridge.frames_processed(), 0);
+
+        let mut agent_bridge = bridge();
+        let mut wrong_agent = observation(&pixels, 1, 10_000, &state);
+        wrong_agent.upstream.agent_id = "other-ego".to_string();
+        assert_eq!(
+            agent_bridge.observe(wrong_agent).err(),
+            Some(BridgeError::UpstreamIdentityMismatch)
+        );
+        assert_eq!(agent_bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_upstream_sequence_timestamp_and_geometry_mismatch() {
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+
+        let mut sequence_bridge = bridge();
+        let mut wrong_sequence = observation(&pixels, 1, 10_000, &state);
+        wrong_sequence.upstream.sequence = 2;
+        assert_eq!(
+            sequence_bridge.observe(wrong_sequence).err(),
+            Some(BridgeError::UpstreamSequenceMismatch)
+        );
+        assert_eq!(sequence_bridge.frames_processed(), 0);
+
+        let mut timestamp_bridge = bridge();
+        let mut wrong_timestamp = observation(&pixels, 1, 10_000, &state);
+        wrong_timestamp.upstream.capture_timestamp_us += 1;
+        assert_eq!(
+            timestamp_bridge.observe(wrong_timestamp).err(),
+            Some(BridgeError::UpstreamTimestampMismatch)
+        );
+        assert_eq!(timestamp_bridge.frames_processed(), 0);
+
+        let mut geometry_bridge = bridge();
+        let mut wrong_geometry = observation(&pixels, 1, 10_000, &state);
+        wrong_geometry.upstream.width = 8;
+        assert_eq!(
+            geometry_bridge.observe(wrong_geometry).err(),
+            Some(BridgeError::UpstreamGeometryMismatch)
+        );
+        assert_eq!(geometry_bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_upstream_action_reference_tick_mismatch() {
+        let mut bridge = bridge();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.upstream.applied_action_tick = Some(0);
+        assert_eq!(
+            bridge.observe(item).err(),
+            Some(BridgeError::UpstreamActionReferenceInvalid)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_upstream_clock_order_regression() {
+        let mut bridge = bridge();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.upstream.render_completed_timestamp_us = 9_999;
+        assert_eq!(
+            bridge.observe(item).err(),
+            Some(BridgeError::UpstreamClockOrderInvalid)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
     }
 
     #[test]
