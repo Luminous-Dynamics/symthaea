@@ -788,6 +788,19 @@ mod tests {
     }
 
     #[test]
+    fn v0_2_nox_construction_threshold_cannot_be_mutated() {
+        let mut register: Value = serde_json::from_str(RULE_REGISTER_V2).expect("v0.2 rule register JSON");
+        let nox = register["rules"].as_array_mut().unwrap().iter_mut().find(|rule|
+            rule.get("rule_id").and_then(Value::as_str) == Some("NE-ATLANTIC-NOX-ECA-2026")
+        ).unwrap();
+        nox["applicability"]["ship_construction_triggers"][0]["threshold_date"] =
+            serde_json::json!("2027-02-01");
+        let mut findings = Findings::default();
+        check_north_east_atlantic_eca(&register, &mut findings, true);
+        assert!(findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
     fn v0_2_sox_application_cannot_be_moved_to_general_eca_entry_date() {
         let mut register: Value = serde_json::from_str(RULE_REGISTER_V2).expect("v0.2 rule register JSON");
         let sox = register["rules"].as_array_mut().unwrap().iter_mut().find(|rule|
