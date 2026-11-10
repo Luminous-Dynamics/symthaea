@@ -664,6 +664,8 @@ fn compose_with_spec_and_form_and_grammar_impl(
     }
     apply_development_style(
         &mut score,
+        GENERAL_MELODY_PART_V1,
+        GENERAL_BASS_PART_V1,
         &form,
         spec.development,
         &motif,
@@ -674,6 +676,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.additive_process {
         apply_additive_process(
             &mut score,
+            GENERAL_MELODY_PART_V1,
             &form,
             intent.bars.max(1) as i64,
             meter_beats,
@@ -773,12 +776,23 @@ fn compose_with_spec_and_form_and_grammar_impl(
         // Supersedes the plain drone below (it calls `apply_drone_pedal`
         // itself internally, then replaces Harmony too) — after intro/coda
         // so the pad covers the FULL span they extend.
-        apply_full_drone(&mut score, key);
+        apply_full_drone(
+            &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            GENERAL_MELODY_PART_V1,
+            key,
+        );
     } else if tx.drone {
         // After intro/coda so the pedal covers the FULL span they extend
         // — a drone that dropped out for the intro or coda would stop
         // being a drone.
-        apply_drone_pedal(&mut score, key);
+        apply_drone_pedal(
+            &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_MELODY_PART_V1,
+            key,
+        );
     }
     // LAST, so intro shifts and the coda's own cadence are included: the
     // style's phrase rhetoric — the conversational layer the second
@@ -922,6 +936,8 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
 /// consequent is left intact (it owns the section's cadence).
 fn apply_development_style(
     score: &mut Score,
+    melody_part: PartId,
+    bass_part: PartId,
     form: &Form,
     dna: crate::spec::DevelopmentDna,
     motif: &crate::motif::Motif,
@@ -944,7 +960,7 @@ fn apply_development_style(
     let climax_span = score
         .notes
         .iter()
-        .find(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
+        .find(|n| n.part == melody_part && n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
         .map(|n| (n.onset.beats(), (n.onset + n.duration).beats()));
     for (si, section) in form.sections.iter().enumerate() {
         if !matches!(
@@ -963,7 +979,7 @@ fn apply_development_style(
             .notes
             .iter()
             .filter(|n| {
-                n.role == VoiceRole::Bass && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
+                n.part == bass_part && n.role == VoiceRole::Bass && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
             })
             .map(|n| crate::counterpoint::CantusEvent {
                 onset: n.onset.beats(),
@@ -989,7 +1005,7 @@ fn apply_development_style(
         // Clear the antecedent melody EXCEPT the climax's own bar(s); the
         // device line replaces the rest.
         score.notes.retain(|n| {
-            if n.role != VoiceRole::Melody || n.onset.beats() < lo - 1e-9 || n.onset.beats() >= hi {
+            if n.part != melody_part || n.role != VoiceRole::Melody || n.onset.beats() < lo - 1e-9 || n.onset.beats() >= hi {
                 return true;
             }
             let this_bar = ((n.onset.beats() - lo) / meter_beats) as i64;
@@ -1015,7 +1031,8 @@ fn apply_development_style(
                         lo + (b + 1) as f64 * meter_beats,
                     );
                     for n in score.notes.iter_mut() {
-                        if n.role == VoiceRole::Melody
+                        if n.part == melody_part
+                            && n.role == VoiceRole::Melody
                             && n.onset.beats() >= bar_lo - 1e-9
                             && n.onset.beats() < bar_hi
                         {
@@ -1103,7 +1120,7 @@ fn apply_development_style(
                         pitch = pitch.transpose(-12);
                     }
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: melody_part,
                         pitch,
                         onset: t,
                         duration: note.duration,
@@ -1748,7 +1765,14 @@ fn apply_harmonic_stasis(score: &mut Score) {
 /// this is the first that wholesale REPLACES one within its window
 /// (mirroring how [`apply_drone_pedal`] replaces the whole bass, but
 /// scoped to specific sections rather than the whole piece).
-fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats: f64, seed: u64) {
+fn apply_additive_process(
+    score: &mut Score,
+    melody_part: PartId,
+    form: &Form,
+    bars: i64,
+    meter_beats: f64,
+    seed: u64,
+) {
     let cell = crate::hook::HookCell::generate_with(
         &crate::spec::MelodicDna::default(),
         seed,
@@ -1772,7 +1796,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
         let scale = section.key.scale();
         let intensity = section.role.intensity();
         score.notes.retain(|n| {
-            !(n.role == VoiceRole::Melody && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi)
+            !(n.part == melody_part && n.role == VoiceRole::Melody && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi)
         });
         let mut t = lo;
         let mut k: usize = 1;
@@ -1795,7 +1819,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: melody_part,
                     pitch,
                     onset: Duration::new((t * 480.0).round() as i64, 480),
                     duration: Duration::new((this_dur * 480.0).round().max(1.0) as i64, 480),
@@ -1830,7 +1854,12 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
 /// point of a drone: it's the fixed ground a modal melody floats over, the
 /// harmony moving freely against it. Runs LAST, after every other bass
 /// note is in place, and simply replaces them all.
-fn apply_drone_pedal(score: &mut Score, key: Key) {
+fn apply_drone_pedal(
+    score: &mut Score,
+    bass_part: PartId,
+    melody_part: PartId,
+    key: Key,
+) {
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -1845,7 +1874,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
     let melody_track: Vec<(f64, f32)> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.part == melody_part && n.role == VoiceRole::Melody)
         .map(|n| (n.onset.beats(), n.section_intensity))
         .collect();
     let intensity_near = |t: f64| -> f32 {
@@ -1855,12 +1884,12 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
             .map(|&(_, si)| si)
             .unwrap_or(1.0)
     };
-    score.notes.retain(|n| n.role != VoiceRole::Bass);
+    score.notes.retain(|n| n.part != bass_part || n.role != VoiceRole::Bass);
     for m in 0..total_bars {
         let onset = bar.scale(m, 1);
         let si = intensity_near(onset.beats());
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part,
             pitch: tonic,
             onset,
             duration: half,
@@ -1870,7 +1899,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
             section_intensity: si,
         });
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part,
             pitch: fifth,
             onset: onset + half,
             duration: half,
@@ -1895,8 +1924,14 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
 /// the whole piece — reusing the Ambient style's own device (repetition
 /// becoming duration) rather than re-deriving tying logic, since the
 /// effect wanted is identical.
-fn apply_full_drone(score: &mut Score, key: Key) {
-    apply_drone_pedal(score, key);
+fn apply_full_drone(
+    score: &mut Score,
+    bass_part: PartId,
+    harmony_part: PartId,
+    melody_part: PartId,
+    key: Key,
+) {
+    apply_drone_pedal(score, bass_part, melody_part, key);
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -1909,7 +1944,7 @@ fn apply_full_drone(score: &mut Score, key: Key) {
     let melody_track: Vec<(f64, f32)> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.part == melody_part && n.role == VoiceRole::Melody)
         .map(|n| (n.onset.beats(), n.section_intensity))
         .collect();
     let intensity_near = |t: f64| -> f32 {
@@ -1919,13 +1954,13 @@ fn apply_full_drone(score: &mut Score, key: Key) {
             .map(|&(_, si)| si)
             .unwrap_or(1.0)
     };
-    score.notes.retain(|n| n.role != VoiceRole::Harmony);
+    score.notes.retain(|n| n.part != harmony_part || n.role != VoiceRole::Harmony);
     for m in 0..total_bars {
         let onset = bar.scale(m, 1);
         let si = intensity_near(onset.beats());
         for pitch in [tonic, fifth, octave] {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part,
                 pitch,
                 onset,
                 duration: bar,
