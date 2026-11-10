@@ -24,11 +24,6 @@ const GENERAL_HARMONY_PART_V1: PartId = PartId(2);
 const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
 const GENERAL_GRIEF_SUSPENSION_PART_V1: PartId = PartId(4);
 
-const GENERAL_MELODY_PART_V1: PartId = PartId(0);
-const GENERAL_BASS_PART_V1: PartId = PartId(1);
-const GENERAL_HARMONY_PART_V1: PartId = PartId(2);
-const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
-
 /// A muse-independent expressive intent. muse maps its cognitive state onto
 /// this; the composer maps this onto structure.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -2922,17 +2917,6 @@ fn apply_counter_hook_echoes_for_part(
     intent: &MusicalIntent,
     hook: &crate::hook::HookCell,
 ) {
-    apply_counter_hook_echoes_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent, hook);
-}
-
-fn apply_counter_hook_echoes_for_part(
-    score: &mut Score,
-    part_id: PartId,
-    form: &Form,
-    meter_beats: f64,
-    intent: &MusicalIntent,
-    hook: &crate::hook::HookCell,
-) {
     let vel = (0.30 + intent.energy.clamp(0.0, 1.0) * 0.25).clamp(0.15, 0.55);
     // The echo's total span (constant across every hold — it's the same
     // hook cell every time), needed to clear its own window in the
@@ -3208,17 +3192,6 @@ fn alter_statement(
 /// instrumental works become deeply satisfying.
 fn apply_hidden_bass_quote(
     score: &mut Score,
-    form: &Form,
-    meter_beats: f64,
-    intent: &MusicalIntent,
-    hook: &crate::hook::HookCell,
-) {
-    apply_hidden_bass_quote_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent, hook);
-}
-
-fn apply_hidden_bass_quote_for_part(
-    score: &mut Score,
-    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -3920,28 +3893,6 @@ pub(crate) fn realize_melody(
 }
 
 /// Source-authored variant used by complete piece composition. The same
-/// PartId is applied to every phrase note and the inserted climax grace.
-pub(crate) fn realize_melody_for_part(
-    score: &mut Score,
-    part_id: PartId,
-    form: &Form,
-    intent: &MusicalIntent,
-    start_beat: Duration,
-    meter_beats: f64,
-    climax_grace: bool,
-) {
-    realize_melody_for_part(
-        score,
-        PartId::UNASSIGNED,
-        form,
-        intent,
-        start_beat,
-        meter_beats,
-        climax_grace,
-    );
-}
-
-/// Source-authored variant used by complete piece composition. The same
 /// PartId is applied to every phrase note and to the inserted climax grace.
 pub(crate) fn realize_melody_for_part(
     score: &mut Score,
@@ -4479,17 +4430,6 @@ pub(crate) fn realize_harmony_for_part(
 /// instead). Classical practice: the reprise earns new interest.
 pub(crate) fn realize_counter_melody(
     score: &mut Score,
-    form: &Form,
-    meter_beats: f64,
-    intent: &MusicalIntent,
-) {
-    realize_counter_melody_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent);
-}
-
-/// Source-authored variant for the genuinely independent return-section line.
-pub(crate) fn realize_counter_melody_for_part(
-    score: &mut Score,
-    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
