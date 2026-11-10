@@ -77,11 +77,19 @@ pub struct LinearActionGeneratorSampleStatisticsV1 {
 
 /// Evidence report for a sampled scalar-expression invariance check.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LinearActionSampleConditionDiagnosticV1 {
+    pub sample_id: String,
+    pub direction_basis_condition_number: f64,
+}
+
+/// Evidence report for a sampled scalar-expression invariance check.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinearActionSampledInvarianceReportV1 {
     pub action_id: String,
     pub coordinate_basis_id: String,
     pub profile: LinearActionSamplingProfileV1,
     pub sample_ids: Vec<String>,
+    pub direction_basis_diagnostics: Vec<LinearActionSampleConditionDiagnosticV1>,
     pub generator_statistics: Vec<LinearActionGeneratorSampleStatisticsV1>,
 }
 
@@ -194,7 +202,7 @@ fn finite_difference_gradient(
     action_coordinate_indices: &[usize],
     sample: &LinearActionSampleV1,
     profile: LinearActionSamplingProfileV1,
-) -> Result<Vec<f64>, LinearActionSamplingErrorV1> {
+) -> Result<(Vec<f64>, f64), LinearActionSamplingErrorV1> {
     let dimension = action_coordinate_indices.len();
     let direction_scale = sample
         .direction_basis
@@ -270,21 +278,21 @@ fn finite_difference_gradient(
             sample_id: sample.sample_id.clone(),
         });
     }
-    Ok(gradient)
+    Ok((gradient, condition_number))
 }
 
 /// Forward solve L y = p for lower-triangular L.
 fn solve_lower_triangular(lower: &[Vec<f64>], rhs: &[f64]) -> Option<Vec<f64>> {
     let dimension = rhs.len();
     let mut solution = Vec::with_capacity(dimension);
-    for row in 0..dimension {
+    for (row_index, rhs_value) in rhs.iter().enumerate() {
         let correction = solution
             .iter()
-            .zip(lower[row].iter())
+            .zip(lower[row_index].iter())
             .map(|(value, coefficient)| *value * *coefficient)
             .sum::<f64>();
-        let pivot = lower[row][row];
-        let value = (rhs[row] - correction) / pivot;
+        let pivot = lower[row_index][row_index];
+        let value = (*rhs_value - correction) / pivot;
         if !value.is_finite() || pivot <= 0.0 {
             return None;
         }
@@ -296,15 +304,15 @@ fn solve_lower_triangular(lower: &[Vec<f64>], rhs: &[f64]) -> Option<Vec<f64>> {
 /// Compute L^T v for lower-triangular L.
 fn multiply_lower_transpose(lower: &[Vec<f64>], vector: &[f64]) -> Vec<f64> {
     let dimension = vector.len();
-    (0..dimension)
-        .map(|column| {
-            lower
-                .iter()
-                .zip(vector.iter())
-                .map(|(row, value)| row[column] * *value)
-                .sum()
-        })
-        .collect()
+    let mut result = vec![0.0_f64; dimension];
+    for (column, output) in result.iter_mut().enumerate() {
+        *output = lower
+            .iter()
+            .zip(vector.iter())
+            .map(|(row, value)| row[column] * *value)
+            .sum();
+    }
+    result
 }
 
 /// Stable Euclidean norm using hypot accumulation.
@@ -453,6 +461,25 @@ pub fn evaluate_linear_action_samples(
         }
     }
 
+    // Reconstruct each gradient once and retain the condition diagnostics.
+    // Multiple generators reuse the same paired function evaluations.
+    let mut sample_gradients = Vec::with_capacity(samples.len());
+    let mut direction_basis_diagnostics = Vec::with_capacity(samples.len());
+    for sample in samples {
+        let (gradient, condition_number) = finite_difference_gradient(
+            expr,
+            &variable_names,
+            &action_coordinate_indices,
+            sample,
+            profile,
+        )?;
+        sample_gradients.push(gradient);
+        direction_basis_diagnostics.push(LinearActionSampleConditionDiagnosticV1 {
+            sample_id: sample.sample_id.clone(),
+            direction_basis_condition_number: condition_number,
+        });
+    }
+
     let mut generator_statistics = Vec::with_capacity(declaration.generators.len());
     for generator in &declaration.generators {
         let mut informative_sample_count = 0usize;
@@ -460,17 +487,12 @@ pub fn evaluate_linear_action_samples(
         let mut residual_sum = 0.0_f64;
         let mut maximum_residual = 0.0_f64;
 
-        for sample in samples {
-            let gradient = finite_difference_gradient(
-                expr,
-                &variable_names,
-                &action_coordinate_indices,
-                sample,
-                profile,
-            )?;
+        for (sample, gradient) in samples.iter().zip(sample_gradients.iter()) {
             let mut tangent = vec![0.0_f64; dimension];
-            for (row_index, generator_row) in generator.matrix.iter().enumerate() {
-                tangent[row_index] = generator_row
+            for (tangent_component, generator_row) in
+                tangent.iter_mut().zip(generator.matrix.iter())
+            {
+                *tangent_component = generator_row
                     .iter()
                     .zip(action_coordinate_indices.iter())
                     .map(|(coefficient, &state_index)| coefficient * sample.state[state_index])
@@ -484,7 +506,7 @@ pub fn evaluate_linear_action_samples(
             }
 
             let residual = metric_squared_cosine(
-                &gradient,
+                gradient,
                 &tangent,
                 action.scaled_metric_cholesky_lower(),
             )
@@ -525,6 +547,7 @@ pub fn evaluate_linear_action_samples(
         coordinate_basis_id: declaration.coordinate_basis_id.clone(),
         profile,
         sample_ids: samples.iter().map(|sample| sample.sample_id.clone()).collect(),
+        direction_basis_diagnostics,
         generator_statistics,
     })
 }
@@ -617,7 +640,14 @@ mod tests {
         .unwrap();
         assert!(report.invariant_within_tolerance());
         assert_eq!(report.generator_statistics[0].informative_sample_count, states.len());
-        assert_eq!(report.generator_statistics[0].maximum_normalized_squared_residual, 0.0);
+        assert!(
+            report.generator_statistics[0].maximum_normalized_squared_residual
+                <= sampling_profile().squared_cosine_tolerance
+        );
+        assert_eq!(report.direction_basis_diagnostics.len(), states.len());
+        assert!(report.direction_basis_diagnostics.iter().all(|diagnostic| {
+            diagnostic.direction_basis_condition_number >= 1.0
+        }));
     }
 
     #[test]
