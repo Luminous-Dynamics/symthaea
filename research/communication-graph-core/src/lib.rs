@@ -1,3 +1,5 @@
+pub mod generator;
+
 //! Typed communication graphs for multi-agent experiments.
 //!
 //! Delegation graphs and communication graphs are different domain objects.
