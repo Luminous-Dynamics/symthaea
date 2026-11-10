@@ -1,0 +1,197 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_id": "SYNTHETIC-MARINE-CAUSAL-PROTOCOL-0001",
+  "record_status": "synthetic",
+  "study": {
+    "vessel_id": "SYNTHETIC-CARGO-VESSEL-001",
+    "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "service_fingerprint": "e3ec23f5308213b6d7ea3743e6cf483623436bec5384e29d3044d525d736fca9",
+    "target_population": "Synthetic matched container-service segments only.",
+    "route_scope": "SYNTHETIC-ROUTE-001",
+    "season_scope": "Synthetic test season",
+    "study_start": "2026-11-01T00:00:00Z",
+    "study_end": "2026-11-30T00:00:00Z",
+    "preregistered_at": "2026-10-31T00:00:00Z",
+    "study_owner": "SYNTHETIC-RESEARCH-OWNER"
+  },
+  "estimand": {
+    "estimand_id": "SYNTHETIC-WAPS-ATE-001",
+    "type": "average_treatment_effect",
+    "treatment_strategy": "WAPS device enabled within an approved synthetic operating envelope.",
+    "control_strategy": "Same device feathered/stowed under the synthetic matched service profile.",
+    "outcome_id": "PROPULSION-FUEL-ENERGY",
+    "target_population": "Synthetic route segments meeting declared overlap and operating conditions.",
+    "effect_scale": "relative",
+    "normalization": "MJ per TEU-nautical-mile, with battery energy boundary closed.",
+    "followup_window_seconds": 900,
+    "estimation_target": "Synthetic software contract test only; no causal effect is estimated."
+  },
+  "treatment": {
+    "treatment_id": "SYNTHETIC-WAPS-STATE",
+    "treatment_unit": "route segment",
+    "assigned_state": "not randomized",
+    "commanded_state": "synthetic device enable command",
+    "achieved_state": "synthetic device state observation",
+    "state_definitions": [
+      "enabled",
+      "feathered_or_stowed"
+    ],
+    "configuration_revision": "0.0.1-synthetic",
+    "safety_envelope_id": "SYNTHETIC-SAFETY-ENVELOPE-NOT-APPROVED"
+  },
+  "design": {
+    "design_type": "matched_observational",
+    "assignment_mechanism": "Synthetic assignment labels generated for schema and audit testing.",
+    "time_zero_definition": "First valid timestamp of the synthetic comparison window.",
+    "window_seconds": 900,
+    "washout_seconds": 120,
+    "randomization_authorized": false,
+    "authorization_evidence_ids": [],
+    "analysis_methods": [
+      "exact route/load block match",
+      "synthetic overlap diagnostic placeholder"
+    ],
+    "predeclared_exclusions": [
+      "Synthetic sample only; do not infer a physical exclusion rule."
+    ]
+  },
+  "confounders": [
+    {
+      "confounder_id": "WIND-VECTOR",
+      "name": "Apparent wind vector",
+      "causal_role": "pre_treatment_confounder",
+      "measurement_id": "WIND-SENSOR-001",
+      "source_id": "SYNTHETIC-ONLY",
+      "adjustment_method": "predeclared exact/continuous adjustment"
+    },
+    {
+      "confounder_id": "WAVE-STATE",
+      "name": "Wave height and relative heading",
+      "causal_role": "pre_treatment_confounder",
+      "measurement_id": "WAVE-SENSOR-001",
+      "source_id": "SYNTHETIC-ONLY",
+      "adjustment_method": "predeclared stratification"
+    },
+    {
+      "confounder_id": "DRAFT-TRIM",
+      "name": "Draft and trim",
+      "causal_role": "pre_treatment_confounder",
+      "measurement_id": "DRAFT-SENSOR-001",
+      "source_id": "SYNTHETIC-ONLY",
+      "adjustment_method": "exact loading-condition match"
+    },
+    {
+      "confounder_id": "BATTERY-STATE",
+      "name": "Initial battery SOC/SOH/temperature",
+      "causal_role": "pre_treatment_confounder",
+      "measurement_id": "BMS-STATE-001",
+      "source_id": "SYNTHETIC-ONLY",
+      "adjustment_method": "matched initial boundary and declared adjustment"
+    }
+  ],
+  "outcomes": [
+    {
+      "outcome_id": "PROPULSION-FUEL-ENERGY",
+      "name": "Propulsion fuel energy",
+      "physical_boundary": "Main propulsion prime-mover fuel flow to lower heating value energy; hotel loads excluded.",
+      "unit": "MJ",
+      "normalization": "MJ per TEU-nautical-mile",
+      "measurement_id": "FUEL-FLOW-001",
+      "uncertainty_method": "calibration and propagated measurement uncertainty; synthetic placeholder"
+    }
+  ],
+  "battery_energy_accounting": {
+    "battery_present": true,
+    "soc_boundary_treatment": "unknown",
+    "initial_soc_evidence_id": "SYNTHETIC-SOC-START",
+    "final_soc_evidence_id": "SYNTHETIC-SOC-END",
+    "battery_energy_correction_method": "Not performed in synthetic fixture; must be predeclared for a real hybrid comparison.",
+    "boundary_uncertainty_method": "Unknown in synthetic fixture."
+  },
+  "identification_gates": {
+    "consistency": {
+      "status": "unknown",
+      "evidence_ids": [],
+      "review_note": "Synthetic fixture."
+    },
+    "exchangeability": {
+      "status": "unknown",
+      "evidence_ids": [],
+      "review_note": "Synthetic fixture."
+    },
+    "positivity": {
+      "status": "unknown",
+      "evidence_ids": [],
+      "review_note": "Synthetic fixture."
+    },
+    "no_interference_or_carryover": {
+      "status": "unknown",
+      "evidence_ids": [],
+      "review_note": "Synthetic fixture."
+    },
+    "temporal_integrity": {
+      "status": "unknown",
+      "evidence_ids": [],
+      "review_note": "Synthetic fixture."
+    },
+    "outcome_validity": {
+      "status": "unknown",
+      "evidence_ids": [],
+      "review_note": "Synthetic fixture."
+    },
+    "service_equivalence": {
+      "status": "unknown",
+      "evidence_ids": [],
+      "review_note": "Synthetic fixture."
+    },
+    "missingness_accounted": {
+      "status": "unknown",
+      "evidence_ids": [],
+      "review_note": "Synthetic fixture."
+    },
+    "model_support": {
+      "status": "unknown",
+      "evidence_ids": [],
+      "review_note": "Synthetic fixture."
+    },
+    "independent_replication": {
+      "status": "unknown",
+      "evidence_ids": [],
+      "review_note": "Synthetic fixture."
+    }
+  },
+  "diagnostics": {
+    "overlap_method": "synthetic placeholder",
+    "minimum_propensity": 0.1,
+    "maximum_propensity": 0.9,
+    "effective_sample_size": 0,
+    "maximum_weight": 0,
+    "treatment_adherence_fraction": 0,
+    "missingness_method": "unknown",
+    "cluster_unit": "voyage"
+  },
+  "negative_controls": [
+    {
+      "control_id": "PLACEBO-LEAD",
+      "control_type": "placebo_treatment_lead",
+      "status": "unknown",
+      "expected_result": "No treatment effect before assignment.",
+      "observed_result": "Not tested in synthetic fixture.",
+      "review_note": "Unknown is not a pass."
+    },
+    {
+      "control_id": "SOC-CARRYOVER",
+      "control_type": "battery_soc_carryover",
+      "status": "unknown",
+      "expected_result": "No free fuel benefit from lower final SOC.",
+      "observed_result": "Not tested in synthetic fixture.",
+      "review_note": "Unknown is not a pass."
+    }
+  ],
+  "evidence_source_ids": [
+    "SYNTHETIC-ONLY"
+  ],
+  "limitations": [
+    "Synthetic contract fixture; no ship, sensor, treatment, intervention, measured outcome or causal effect exists."
+  ]
+}
