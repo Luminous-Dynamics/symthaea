@@ -1415,7 +1415,7 @@ pub mod part_aware_v1 {
         let twice_remainder = remainder.checked_mul(2)?;
         let round_up = twice_remainder > denominator
             || (twice_remainder == denominator && quotient % 2 != 0);
-        let rounded = quotient.checked_add(i128::from(round_up))?;
+        let rounded = quotient.checked_add(if round_up { 1_i128 } else { 0_i128 })?;
         u64::try_from(rounded).ok()
     }
 
@@ -2184,6 +2184,14 @@ pub mod part_aware_v1 {
                 result,
                 Err(PartAwareMidiExportErrorV1::OverlappingSamePitchNotes { .. })
             ));
+        }
+
+        #[test]
+        fn rational_tick_quantization_uses_nearest_ties_to_even() {
+            assert_eq!(rational_to_tick(1, 1_920), Some(0));
+            assert_eq!(rational_to_tick(3, 1_920), Some(2));
+            assert_eq!(rational_to_tick(5, 1_920), Some(2));
+            assert_eq!(rational_to_tick(7, 1_920), Some(4));
         }
 
         #[test]
