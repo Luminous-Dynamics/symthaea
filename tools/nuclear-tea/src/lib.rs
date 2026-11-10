@@ -33,6 +33,8 @@ impl std::error::Error for ValidationError {}
 #[derive(Debug, Clone, Deserialize)]
 pub struct PortReferenceDataset {
     pub dataset_id: String,
+    pub schema_version: String,
+    pub country: String,
     pub source_class: String,
     pub sources: Vec<SourceReference>,
     pub shore_power_demand_estimates: Vec<ShorePowerDemandRow>,
@@ -90,6 +92,18 @@ pub fn validate_port_reference(
     if dataset.dataset_id.trim().is_empty() {
         errors.push(ValidationError::new("dataset_id", "must not be empty"));
     }
+    if dataset.schema_version != "1.0.0" {
+        errors.push(ValidationError::new(
+            "schema_version",
+            "must match the frozen 1.0.0 reference-data contract",
+        ));
+    }
+    if dataset.country != "South Africa" {
+        errors.push(ValidationError::new(
+            "country",
+            "this verifier is scoped to the South African eight-port reference corpus",
+        ));
+    }
     if dataset.source_class != "PUBLISHED_ESTIMATE" {
         errors.push(ValidationError::new(
             "source_class",
@@ -114,10 +128,18 @@ pub fn validate_port_reference(
             "must preserve explicit non-inference rules",
         ));
     }
-    if dataset.required_next_evidence.is_empty() {
+    if dataset.required_next_evidence.is_empty()
+        || dataset.required_next_evidence.iter().any(|item| item.trim().is_empty())
+    {
         errors.push(ValidationError::new(
             "required_next_evidence",
-            "must identify evidence required before project-specific reliance",
+            "must contain non-empty evidence requirements",
+        ));
+    }
+    if dataset.prohibited_inferences.iter().any(|item| item.trim().is_empty()) {
+        errors.push(ValidationError::new(
+            "prohibited_inferences",
+            "must not contain blank non-inference rules",
         ));
     }
 
@@ -191,6 +213,13 @@ pub fn validate_port_reference(
         }
     }
 
+    if ranks.len() != 8 || !(1..=8).all(|rank| ranks.contains(&rank)) {
+        errors.push(ValidationError::new(
+            "estimated_spare_port_intake_capacity.rank",
+            "ranks must contain each value from 1 through 8 exactly once",
+        ));
+    }
+
     const EXPECTED_FORMULA: &str =
         "0.9 * (firm_supply_mva - notified_maximum_demand_mva)";
     if dataset.spare_capacity_estimation.formula != EXPECTED_FORMULA {
@@ -211,33 +240,44 @@ pub fn validate_port_reference(
         ));
     }
 
-    let source_ids: BTreeSet<&str> = dataset
-        .sources
-        .iter()
-        .map(|source| source.source_id.as_str())
-        .collect();
+    let mut source_ids = BTreeSet::new();
+    for (index, source) in dataset.sources.iter().enumerate() {
+        let field = format!("sources[{index}]");
+        let normalized_id = source.source_id.trim().to_ascii_lowercase();
+        if normalized_id.is_empty() {
+            errors.push(ValidationError::new(
+                format!("{field}.source_id"),
+                "source identifier must not be empty",
+            ));
+        } else if !source_ids.insert(normalized_id) {
+            errors.push(ValidationError::new(
+                format!("{field}.source_id"),
+                "duplicate source identifier",
+            ));
+        }
+        if source.method.is_empty() || source.method.iter().any(|item| item.trim().is_empty()) {
+            errors.push(ValidationError::new(
+                format!("{field}.method"),
+                "source method must contain non-empty entries",
+            ));
+        }
+        if source.limitations.is_empty()
+            || source.limitations.iter().any(|item| item.trim().is_empty())
+        {
+            errors.push(ValidationError::new(
+                format!("{field}.limitations"),
+                "source limitations must contain non-empty entries",
+            ));
+        }
+    }
     for required in [
         "CSIR-PTX-SHOREPOWER-2025",
         "CSIR-PTX-PORT-CONNECTION-2025",
     ] {
-        if !source_ids.contains(required) {
+        if !dataset.sources.iter().any(|source| source.source_id == required) {
             errors.push(ValidationError::new(
                 "sources",
                 format!("missing required source record {required}"),
-            ));
-        }
-    }
-    for (index, source) in dataset.sources.iter().enumerate() {
-        if source.method.is_empty() {
-            errors.push(ValidationError::new(
-                format!("sources[{index}].method"),
-                "source method must be retained",
-            ));
-        }
-        if source.limitations.is_empty() {
-            errors.push(ValidationError::new(
-                format!("sources[{index}].limitations"),
-                "source limitations must be retained",
             ));
         }
     }
@@ -339,6 +379,12 @@ impl EconomicSeries {
         if self.price_basis.currency().trim().is_empty() {
             return Err(ValidationError::new("price_basis.currency", "must not be empty"));
         }
+        if self.price_basis.base_year() == 0 {
+            return Err(ValidationError::new(
+                "price_basis.base_year",
+                "must declare a non-zero price base year",
+            ));
+        }
         if self.price_basis != self.discount_basis {
             return Err(ValidationError::new(
                 "discount_basis",
@@ -381,10 +427,10 @@ impl EconomicSeries {
         for (index, flow) in self.annual_flows.iter().enumerate() {
             let field = format!("annual_flows[{index}]");
             if let Some(previous) = previous_year {
-                if flow.year_index <= previous {
+                if previous.checked_add(1) != Some(flow.year_index) {
                     return Err(ValidationError::new(
                         field.clone(),
-                        "year_index values must be strictly increasing and unique",
+                        "annual flows must be contiguous; omitted years require explicit zero-valued records",
                     ));
                 }
             }
@@ -509,9 +555,12 @@ pub fn evaluate_mandatory_gates(findings: &[GateFinding]) -> GateDisposition {
     if mandatory.iter().any(|item| item.state == GateState::Fail) {
         return GateDisposition::NoGo;
     }
+    let mut gate_ids = BTreeSet::new();
     if mandatory.iter().any(|item| {
+        let normalized_id = item.gate_id.trim().to_ascii_lowercase();
         item.state == GateState::Unknown
-            || item.gate_id.trim().is_empty()
+            || normalized_id.is_empty()
+            || !gate_ids.insert(normalized_id)
             || item
                 .evidence_ref
                 .as_deref()
@@ -562,6 +611,14 @@ pub fn compare_eligible_series(
         return Err(ValidationError::new(
             "comparison.delivery_boundary",
             "delivery boundaries must match",
+        ));
+    }
+    if left.annual_flows.last().map(|flow| flow.year_index)
+        != right.annual_flows.last().map(|flow| flow.year_index)
+    {
+        return Err(ValidationError::new(
+            "comparison.analysis_horizon",
+            "direct comparison requires the same lifecycle analysis horizon",
         ));
     }
 
@@ -796,5 +853,80 @@ mod tests {
             &passing_gates()
         )
         .is_err());
+    }
+
+    #[test]
+    fn port_reference_rejects_duplicate_source_identifiers() {
+        let input = include_str!("../../../research/nuclear/port-reference-evidence-sa-2025.json");
+        let mut dataset: PortReferenceDataset =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        let duplicate = dataset.sources[0].clone();
+        dataset.sources.push(duplicate);
+        assert!(validate_port_reference(&dataset).is_err());
+    }
+
+    #[test]
+    fn port_reference_rejects_incomplete_capacity_ranks() {
+        let input = include_str!("../../../research/nuclear/port-reference-evidence-sa-2025.json");
+        let mut dataset: PortReferenceDataset =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        dataset.estimated_spare_port_intake_capacity[0].rank = 9;
+        assert!(validate_port_reference(&dataset).is_err());
+    }
+
+    #[test]
+    fn port_reference_rejects_blank_source_limitations() {
+        let input = include_str!("../../../research/nuclear/port-reference-evidence-sa-2025.json");
+        let mut dataset: PortReferenceDataset =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        dataset.sources[0].limitations[0] = "   ".to_string();
+        assert!(validate_port_reference(&dataset).is_err());
+    }
+
+    #[test]
+    fn port_reference_rejects_blank_required_evidence() {
+        let input = include_str!("../../../research/nuclear/port-reference-evidence-sa-2025.json");
+        let mut dataset: PortReferenceDataset =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        dataset.required_next_evidence[0] = String::new();
+        assert!(validate_port_reference(&dataset).is_err());
+    }
+
+    #[test]
+    fn zero_price_base_year_is_rejected() {
+        let mut series = exact_series("zero_base_year");
+        series.price_basis = PriceBasis::Real {
+            currency: "USD".to_string(),
+            base_year: 0,
+        };
+        series.discount_basis = series.price_basis.clone();
+        assert!(series.validate().is_err());
+    }
+
+    #[test]
+    fn omitted_annual_flow_year_is_rejected() {
+        let mut series = exact_series("missing_year");
+        series.annual_flows[1].year_index = 2;
+        assert!(series.validate().is_err());
+    }
+
+    #[test]
+    fn direct_comparison_requires_identical_lifecycle_horizon() {
+        let left = exact_series("left_horizon");
+        let mut right = exact_series("right_horizon");
+        right.annual_flows.push(AnnualFlow {
+            year_index: 2,
+            lifecycle_cost: 0.0,
+            delivered_service: 0.0,
+        });
+        let gates = passing_gates();
+        assert!(compare_eligible_series(&left, &gates, &right, &gates).is_err());
+    }
+
+    #[test]
+    fn duplicate_mandatory_gate_ids_are_unknown() {
+        let mut gates = passing_gates();
+        gates[1].gate_id = gates[0].gate_id.clone();
+        assert_eq!(evaluate_mandatory_gates(&gates), GateDisposition::Unknown);
     }
 }
