@@ -336,6 +336,7 @@ impl VocalPerformance {
         for (i, syllable) in syllables.iter().enumerate() {
             let previous = i
                 .checked_sub(1)
+                .filter(|&j| syllables[j].phrase_index == syllable.phrase_index)
                 .map(|j| syllables[j].last_note().frequency)
                 .unwrap_or(syllable.note.frequency);
             for (note_index, note) in syllable.notes().enumerate() {
@@ -1539,6 +1540,39 @@ mod tests {
         assert_eq!(second[1].tension, 0.4);
         assert_eq!(second[2].tension, 0.05);
         performance.validate().unwrap();
+    }
+
+    #[test]
+    fn pitch_curve_does_not_glide_across_a_phrase_boundary() {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 440.0,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+        ];
+        let phrase_ends = [1, 2];
+        let performance = VocalPerformance::from_melody_with_phrase_ends(
+            "light bright",
+            &notes,
+            "en",
+            &phrase_ends,
+        )
+        .unwrap();
+
+        let second_phrase_onset = performance
+            .pitch_curve
+            .iter()
+            .find(|point| (point.time_s - 1.0).abs() < 1e-6)
+            .expect("second phrase onset must be represented in the pitch curve");
+        assert_eq!(second_phrase_onset.frequency_hz, 440.0);
     }
 
     #[test]
