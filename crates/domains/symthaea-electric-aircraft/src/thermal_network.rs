@@ -255,6 +255,15 @@ impl ThermalNetwork {
             .sum::<f64>();
         let energy_balance_residual_j =
             heat_input_j - ambient_rejected_energy_j - stored_energy_change_j;
+        if !heat_input_j.is_finite()
+            || !ambient_rejected_energy_j.is_finite()
+            || !stored_energy_change_j.is_finite()
+            || !energy_balance_residual_j.is_finite()
+        {
+            return Err(ThermalNetworkError::InvalidStep(
+                "thermal energy accounting overflowed",
+            ));
+        }
 
         Ok(ThermalStepReport {
             state: ThermalState { temperatures_k: next_temperatures },
@@ -395,6 +404,16 @@ mod tests {
             network.step(&state, &[100.0], 10.0, 293.0),
             Err(ThermalNetworkError::TemperatureLimitExceeded { node_id, .. })
                 if node_id == "battery"
+        ));
+    }
+
+    #[test]
+    fn duplicate_node_ids_are_rejected() {
+        let mut network = one_node_network();
+        network.nodes.push(network.nodes[0].clone());
+        assert!(matches!(
+            network.validate(),
+            Err(ThermalNetworkError::DuplicateNodeId(id)) if id == "battery"
         ));
     }
 
