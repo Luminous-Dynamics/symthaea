@@ -92,14 +92,18 @@ impl std::error::Error for LinearLieAlgebraQualificationErrorV1 {}
 /// Scale factors that map a normalized whitened generator back to its
 /// original metric-whitened magnitude:
 ///
-/// B_i = max_abs_i * scaled_frobenius_norm_i * C_i.
-///
-/// Keeping the factors separate avoids overflow in their product.
+/// B_i = input_scale_i * whitened_max_abs_i * scaled_frobenius_norm_i * C_i,
+/// where B_i = L^T A_i L^-T. Keeping the factors separate avoids overflow
+/// in their product.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinearLieGeneratorNormalizationV1 {
     pub generator_id: String,
-    pub maximum_absolute_entry: f64,
-    pub scaled_frobenius_norm: f64,
+    /// Maximum absolute entry of the caller-supplied A_i before whitening.
+    pub input_generator_maximum_absolute_entry: f64,
+    /// Maximum absolute entry after whitening A_i / input_scale_i.
+    pub whitened_maximum_absolute_entry: f64,
+    /// Frobenius norm after dividing the whitened matrix by its maximum entry.
+    pub whitened_scaled_frobenius_norm: f64,
 }
 
 /// Structure constants for one ordered pair i < j, in the returned normalized
@@ -232,26 +236,29 @@ impl AdmittedLinearGroupActionV1 {
         let mut normalized_generators = Vec::with_capacity(generator_count);
         let mut normalizations = Vec::with_capacity(generator_count);
         for generator in &declaration.generators {
-            let whitened = whiten_generator(
+            let (whitened, input_generator_maximum_absolute_entry) = whiten_generator(
                 &generator.matrix,
                 self.scaled_metric_cholesky_lower(),
             )
             .ok_or_else(|| LinearLieAlgebraQualificationErrorV1::GeneratorWhiteningFailed {
                 generator_id: generator.id.clone(),
             })?;
-            let maximum_absolute_entry = matrix_max_abs(&whitened);
-            if !maximum_absolute_entry.is_finite() {
+            let whitened_maximum_absolute_entry = matrix_max_abs(&whitened);
+            if !whitened_maximum_absolute_entry.is_finite() {
                 return Err(LinearLieAlgebraQualificationErrorV1::NonFiniteWhitenedGenerator {
                     generator_id: generator.id.clone(),
                 });
             }
-            if maximum_absolute_entry == 0.0 {
+            if whitened_maximum_absolute_entry == 0.0 {
                 return Err(LinearLieAlgebraQualificationErrorV1::ZeroWhitenedGenerator {
                     generator_id: generator.id.clone(),
                 });
             }
-            let scaled_frobenius_norm = matrix_scaled_frobenius_norm(&whitened, maximum_absolute_entry);
-            if !scaled_frobenius_norm.is_finite() || scaled_frobenius_norm == 0.0 {
+            let whitened_scaled_frobenius_norm =
+                matrix_scaled_frobenius_norm(&whitened, whitened_maximum_absolute_entry);
+            if !whitened_scaled_frobenius_norm.is_finite()
+                || whitened_scaled_frobenius_norm == 0.0
+            {
                 return Err(LinearLieAlgebraQualificationErrorV1::NonFiniteWhitenedGenerator {
                     generator_id: generator.id.clone(),
                 });
@@ -260,15 +267,19 @@ impl AdmittedLinearGroupActionV1 {
                 .iter()
                 .map(|row| {
                     row.iter()
-                        .map(|value| (value / maximum_absolute_entry) / scaled_frobenius_norm)
+                        .map(|value| {
+                            (value / whitened_maximum_absolute_entry)
+                                / whitened_scaled_frobenius_norm
+                        })
                         .collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>();
             normalized_generators.push(normalized);
             normalizations.push(LinearLieGeneratorNormalizationV1 {
                 generator_id: generator.id.clone(),
-                maximum_absolute_entry,
-                scaled_frobenius_norm,
+                input_generator_maximum_absolute_entry,
+                whitened_maximum_absolute_entry,
+                whitened_scaled_frobenius_norm,
             });
         }
 
@@ -492,7 +503,10 @@ fn choose_three(value: usize) -> usize {
 }
 
 /// Metric-whiten A as L^T A L^-T, where G / scale = L L^T.
-fn whiten_generator(generator: &[Vec<f64>], lower: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
+fn whiten_generator(
+    generator: &[Vec<f64>],
+    lower: &[Vec<f64>],
+) -> Option<(Vec<Vec<f64>>, f64)> {
     let dimension = generator.len();
     let generator_scale = generator
         .iter()
@@ -534,7 +548,7 @@ fn whiten_generator(generator: &[Vec<f64>], lower: &[Vec<f64>]) -> Option<Vec<Ve
         }
         whitened[row_index] = solved_row;
     }
-    Some(whitened)
+    Some((whitened, generator_scale))
 }
 
 fn matrix_max_abs(matrix: &[Vec<f64>]) -> f64 {
