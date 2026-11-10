@@ -90,6 +90,10 @@ struct Prerequisites {
     equipment_available: bool,
     protocol_digest: String,
     equipment_digest: String,
+    safety_approval_digest: String,
+    safety_authority_ref: String,
+    calibration_record_digest: String,
+    domain_scope_digest: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -119,6 +123,10 @@ pub struct TestReceipt {
     pub equipment_available: bool,
     pub protocol_digest: String,
     pub equipment_digest: String,
+    pub safety_approval_digest: String,
+    pub safety_authority_ref: String,
+    pub calibration_record_digest: String,
+    pub domain_scope_digest: String,
     pub likelihood_model_digest: String,
     pub calibration_evidence_digest: String,
     pub calibration_cohort_digest: String,
@@ -334,6 +342,10 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
         }
         if !is_digest(&test.prerequisites.protocol_digest)
             || !is_digest(&test.prerequisites.equipment_digest)
+            || !is_digest(&test.prerequisites.safety_approval_digest)
+            || !nonempty(&test.prerequisites.safety_authority_ref)
+            || !is_digest(&test.prerequisites.calibration_record_digest)
+            || !is_digest(&test.prerequisites.domain_scope_digest)
             || !is_digest(&test.likelihood_model_digest)
             || !is_digest(&test.calibration_evidence_digest)
             || !is_digest(&test.calibration_cohort_digest)
@@ -601,6 +613,10 @@ fn optimize_node(
                     equipment_available: test.prerequisites.equipment_available,
                     protocol_digest: test.prerequisites.protocol_digest.clone(),
                     equipment_digest: test.prerequisites.equipment_digest.clone(),
+                    safety_approval_digest: test.prerequisites.safety_approval_digest.clone(),
+                    safety_authority_ref: test.prerequisites.safety_authority_ref.clone(),
+                    calibration_record_digest: test.prerequisites.calibration_record_digest.clone(),
+                    domain_scope_digest: test.prerequisites.domain_scope_digest.clone(),
                     likelihood_model_digest: test.likelihood_model_digest.clone(),
                     calibration_evidence_digest: test.calibration_evidence_digest.clone(),
                     calibration_cohort_digest: test.calibration_cohort_digest.clone(),
@@ -931,9 +947,9 @@ mod tests {
     #[test]
     fn frozen_corpus_plans_five_cases_and_rejects_one() {
         let report = report();
-        assert_eq!(report.payload.case_count, 7);
-        assert_eq!(report.payload.planned_count, 6);
-        assert_eq!(report.payload.rejected_count, 1);
+        assert_eq!(report.payload.case_count, 11);
+        assert_eq!(report.payload.planned_count, 9);
+        assert_eq!(report.payload.rejected_count, 2);
     }
 
     #[test]
@@ -960,6 +976,10 @@ mod tests {
         assert!(is_digest(&receipt.test_cost_digest));
         assert!(is_digest(&receipt.downtime_cost_digest));
         assert!(receipt.safety_approved && receipt.calibration_valid);
+        assert!(is_digest(&receipt.safety_approval_digest));
+        assert!(!receipt.safety_authority_ref.is_empty());
+        assert!(is_digest(&receipt.calibration_record_digest));
+        assert!(is_digest(&receipt.domain_scope_digest));
         for test_id in ["test-a", "test-b"] {
             let candidate = planned.one_step_candidates.iter()
                 .find(|candidate| candidate.test_id == test_id)
@@ -1036,6 +1056,23 @@ mod tests {
         assert_eq!(planned.root_choice, "NO_TEST");
         assert_eq!(planned.root_test_id, None);
         assert_eq!(planned.net_value, 0.0);
+    }
+
+    #[test]
+    fn calibration_domain_and_equipment_gates_each_block_selection() {
+        let result = report();
+        for case_id in [
+            "invalid-calibration-blocks-test",
+            "unsupported-domain-blocks-test",
+            "unavailable-equipment-blocks-test",
+        ] {
+            let planned = result.payload.cases.iter()
+                .find(|case| case.case_id == case_id)
+                .and_then(|case| case.plan.as_ref())
+                .expect("prerequisite control plan");
+            assert_eq!(planned.root_choice, "NO_TEST");
+            assert_eq!(planned.root_test_id, None);
+        }
     }
 
     #[test]
