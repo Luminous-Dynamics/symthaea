@@ -2048,6 +2048,201 @@
           "efc_method_digest": "00000000000000000000000000000000000000000000000000000000000032cc"
         }
       }
+    },
+    {
+      "case_id": "heterogeneous-nominal-capacity-no-beta-soh",
+      "expectation": "accept",
+      "profile": {
+        "profile_version": "ev-pack-capability-metrics/0.2",
+        "profile_id": "heterogeneous-nominal-capacity-no-beta-soh",
+        "asset": {
+          "vehicle_ref": "vehicle-complete-qualified-series-pack",
+          "vehicle_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "pack_ref": "pack-complete-qualified-series-pack",
+          "pack_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "chemistry": "nmc"
+        },
+        "population": {
+          "comparison_resolution": "cell",
+          "declared_unit_count": 3,
+          "observed_unit_count": 3,
+          "inventory_digest": "0000000000000000000000000000000000000000000000000000000000000003"
+        },
+        "topology": {
+          "status": "qualified",
+          "architecture": "series_single_parallel",
+          "topology_ref": "topology-series-v1",
+          "topology_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "qualification": {
+            "qualification_ref": "qualification://complete-qualified-series-pack",
+            "authority_ref": "authority://independent-pack-configuration-review",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000001f40",
+            "evidence_class": "synthetic_fixture"
+          }
+        },
+        "reference_conditions": {
+          "capacity": {
+            "condition_ref": "capacity-ref-25c",
+            "temperature_c": 25,
+            "c_rate": 0.5,
+            "lower_cutoff_voltage_v": 2.5,
+            "upper_cutoff_voltage_v": 4.2,
+            "protocol_ref": "capacity-v1",
+            "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+            "maximum_measurement_skew_ms": 1000
+          },
+          "resistance": {
+            "condition_ref": "resistance-ref-25c-50soc",
+            "temperature_c": 25,
+            "soc_fraction": 0.5,
+            "pulse_current_a": 3,
+            "pulse_duration_ms": 1000,
+            "protocol_ref": "dcir-v1",
+            "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000006"
+          }
+        },
+        "provenance": {
+          "source_batch_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "analysis_method_ref": "ev-pack-metrics-audit-v0.2",
+          "analysis_method_digest": "0000000000000000000000000000000000000000000000000000000000000008"
+        },
+        "units": [
+          {
+            "unit_ref": "cell-001",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.8499999999999996,
+              "uncertainty_ah": 0.006,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic-reference-capacity",
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+              "condition_ref": "capacity-ref-25c",
+              "measurement_time_ms": 1799999999900
+            },
+            "resistance": {
+              "value_mohm": 21,
+              "uncertainty_mohm": 0.2,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic-dcir",
+              "evidence_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-002",
+            "nominal_capacity_ah": 2.7,
+            "capacity": {
+              "value_ah": 2.43,
+              "uncertainty_ah": 0.006,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic-reference-capacity",
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000d431",
+              "condition_ref": "capacity-ref-25c",
+              "measurement_time_ms": 1799999999910
+            },
+            "resistance": {
+              "value_mohm": 22,
+              "uncertainty_mohm": 0.2,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic-dcir",
+              "evidence_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-003",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.55,
+              "uncertainty_ah": 0.006,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic-reference-capacity",
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+              "condition_ref": "capacity-ref-25c",
+              "measurement_time_ms": 1799999999920
+            },
+            "resistance": {
+              "value_mohm": 23,
+              "uncertainty_mohm": 0.2,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic-dcir",
+              "evidence_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          }
+        ],
+        "soc_snapshot": {
+          "event_type": "end_of_charge",
+          "snapshot_ref": "snapshot-eoc-01",
+          "pack_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "condition_ref": "eoc-ref-01",
+          "maximum_sample_skew_ms": 100,
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000190",
+          "observations": [
+            {
+              "unit_ref": "cell-001",
+              "soc_fraction": 0.95,
+              "sample_time_ms": 1800000000000,
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019a",
+              "evidence_class": "synthetic_fixture",
+              "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+            },
+            {
+              "unit_ref": "cell-002",
+              "soc_fraction": 0.9,
+              "sample_time_ms": 1800000000010,
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000d432",
+              "evidence_class": "synthetic_fixture",
+              "soh_measurement_digest": "000000000000000000000000000000000000000000000000000000000000d431"
+            },
+            {
+              "unit_ref": "cell-003",
+              "soc_fraction": 0.85,
+              "sample_time_ms": 1800000000020,
+              "evidence_digest": "000000000000000000000000000000000000000000000000000000000000019c",
+              "evidence_class": "synthetic_fixture",
+              "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+            }
+          ],
+          "maximum_soh_measurement_age_ms": 5000
+        },
+        "lifetime_evidence": {
+          "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
+          "eol_threshold_soh_fraction": 0.85,
+          "evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+          "units": [
+            {
+              "unit_ref": "cell-001",
+              "status": "observed_eol",
+              "efc_to_eol": 1000,
+              "eol_event_ref": "eol-cell-001",
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "unit_ref": "cell-002",
+              "status": "observed_eol",
+              "efc_to_eol": 900,
+              "eol_event_ref": "eol-cell-002",
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000137",
+              "evidence_class": "synthetic_fixture"
+            },
+            {
+              "unit_ref": "cell-003",
+              "status": "observed_eol",
+              "efc_to_eol": 800,
+              "eol_event_ref": "eol-cell-003",
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000138",
+              "evidence_class": "synthetic_fixture"
+            }
+          ],
+          "pack_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "eol_rule_digest": "00000000000000000000000000000000000000000000000000000000000032ca",
+          "service_history_digest": "00000000000000000000000000000000000000000000000000000000000032cb",
+          "efc_method_ref": "synthetic-efc-throughput-integrator",
+          "efc_method_digest": "00000000000000000000000000000000000000000000000000000000000032cc"
+        }
+      }
     }
   ]
 }
