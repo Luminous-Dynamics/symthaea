@@ -743,6 +743,16 @@ mod tests {
     }
 
     #[test]
+    fn fixed_preprocessing_must_be_frozen_before_the_split() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "fixed-preprocessing-after-split-rejected")
+            .expect("late fixed-transform control");
+        assert!(!case.accepted);
+        assert!(case.summary.is_none());
+    }
+
+    #[test]
     fn protocol_report_digest_is_invariant_to_observation_order() {
         let original = report();
         let mut value: Value = serde_json::from_slice(CORPUS).expect("corpus JSON");
