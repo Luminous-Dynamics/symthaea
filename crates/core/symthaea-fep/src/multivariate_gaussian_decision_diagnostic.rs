@@ -969,4 +969,106 @@ mod tests {
         .expect("valid changed task digest");
         assert_ne!(original.problem_digest, changed_task.problem_digest);
     }
+
+    #[test]
+    fn joint_covariance_and_signal_scaling_preserve_mahalanobis_decision() {
+        let root_three = 3.0_f64.sqrt();
+        let (hypotheses, actions) = fixture(
+            [vec![0.0, 0.0], vec![root_three, root_three]],
+            vec![vec![1.0, 0.5], vec![0.5, 1.0]],
+            [0.5, 0.5],
+        );
+        let baseline = evaluate(&hypotheses, &actions);
+        for covariance_scale in [1e-100_f64, 1e100_f64] {
+            let signal_scale = covariance_scale.sqrt();
+            let mut scaled_hypotheses = hypotheses.clone();
+            for hypothesis in &mut scaled_hypotheses {
+                for value in &mut hypothesis.mean_by_action[0] {
+                    *value *= signal_scale;
+                }
+            }
+            let mut scaled_actions = actions.clone();
+            for row in &mut scaled_actions[0].covariance {
+                for value in row {
+                    *value *= covariance_scale;
+                }
+            }
+            let scaled = evaluate(&scaled_hypotheses, &scaled_actions);
+            assert!(
+                (scaled.actions[0].mahalanobis_squared
+                    - baseline.actions[0].mahalanobis_squared)
+                    .abs()
+                    < 1e-10
+            );
+            assert!(
+                (scaled.actions[0].expected_posterior_bayes_risk
+                    - baseline.actions[0].expected_posterior_bayes_risk)
+                    .abs()
+                    < 1e-10
+            );
+        }
+    }
+
+    #[test]
+    fn near_singular_but_positive_covariance_is_finite_and_matches_eigen_reference() {
+        let epsilon = 1e-10_f64;
+        let covariance = vec![
+            vec![1.0, 1.0 - epsilon],
+            vec![1.0 - epsilon, 1.0],
+        ];
+        // [1, 1] is an eigenvector with eigenvalue 2 - epsilon, so
+        // delta^T Sigma^-1 delta = 2 / (2 - epsilon).
+        let expected_d_squared = 2.0 / (2.0 - epsilon);
+        let (hypotheses, actions) = fixture(
+            [vec![0.0, 0.0], vec![1.0, 1.0]],
+            covariance,
+            [0.5, 0.5],
+        );
+        let result = evaluate(&hypotheses, &actions);
+        assert!(result.actions[0].mahalanobis_squared.is_finite());
+        assert!(
+            (result.actions[0].mahalanobis_squared - expected_d_squared).abs() < 1e-6
+        );
+        assert!(result.actions[0].expected_posterior_bayes_risk.is_finite());
+    }
+
+    #[test]
+    fn extreme_but_valid_priors_keep_risk_finite_and_bounded() {
+        for rare_prior in [1e-12_f64, 1e-100_f64, 1e-300_f64] {
+            let (hypotheses, actions) = fixture(
+                [vec![0.0, 0.0], vec![8.0, 8.0]],
+                vec![vec![1.0, 0.2], vec![0.2, 1.0]],
+                [rare_prior, 1.0 - rare_prior],
+            );
+            let result = evaluate(&hypotheses, &actions);
+            let risk = result.actions[0].expected_posterior_bayes_risk;
+            assert!(risk.is_finite());
+            assert!(risk >= 0.0);
+            assert!(risk <= rare_prior + NORMAL_CDF_APPROXIMATION_ERROR_ENVELOPE);
+            assert!(result.actions[0].expected_value_of_sample_information.is_finite());
+        }
+    }
+
+    #[test]
+    fn normal_cdf_tail_fixtures_stay_inside_declared_empirical_envelope() {
+        // Reference values are conventional high-precision normal-CDF values.
+        // This finite fixture is a regression test, not a proof of the global envelope.
+        let fixtures = [
+            (-8.0, 6.22096057427178e-16),
+            (-4.0, 3.167124183311986e-5),
+            (-2.0, 0.02275013194817921),
+            (0.0, 0.5),
+            (2.0, 0.9772498680518208),
+            (4.0, 0.9999683287581669),
+            (8.0, 1.0 - 6.22096057427178e-16),
+        ];
+        for (value, expected) in fixtures {
+            let error = (standard_normal_cdf(value) - expected).abs();
+            assert!(
+                error <= NORMAL_CDF_APPROXIMATION_ERROR_ENVELOPE,
+                "normal CDF error {error} exceeded the declared envelope at {value}"
+            );
+        }
+    }
+
 }
