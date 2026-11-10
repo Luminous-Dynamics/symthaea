@@ -205,6 +205,8 @@ pub struct FamilyGuardrailBinding {
     pub candidate_model_digest: String,
     /// Frozen task, split and loss protocol digest.
     pub evaluation_protocol_digest: String,
+    /// Exact parent sequential campaign confirmatory shard digest.
+    pub confirmatory_shard_digest: String,
     /// Exact parent ConfirmatoryEpisodeManifest digest.
     pub confirmatory_episode_manifest_digest: String,
     /// Existing open-world/model-adequacy precondition digest.
@@ -410,6 +412,7 @@ impl FamilyNonInferiorityGate {
             ("baseline_model_digest", &binding.baseline_model_digest),
             ("candidate_model_digest", &binding.candidate_model_digest),
             ("evaluation_protocol_digest", &binding.evaluation_protocol_digest),
+            ("confirmatory_shard_digest", &binding.confirmatory_shard_digest),
             ("confirmatory_episode_manifest_digest", &binding.confirmatory_episode_manifest_digest),
             ("precondition_gate_digest", &binding.precondition_gate_digest),
         ] {
@@ -905,6 +908,7 @@ mod tests {
             baseline_model_digest: "a".repeat(64),
             candidate_model_digest: "b".repeat(64),
             evaluation_protocol_digest: "c".repeat(64),
+            confirmatory_shard_digest: "e".repeat(64),
             confirmatory_episode_manifest_digest: plan.confirmatory_episode_manifest_digest(),
             precondition_gate_digest: "d".repeat(64),
             maximum_total_observations: plan.maximum_total_observations(),
