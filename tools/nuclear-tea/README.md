@@ -51,6 +51,10 @@ The source dataset contains separate published estimates for:
 
 These are not one synchronized load-flow record. The verifier does not join them, subtract one from the other, or infer a grid connection offer. The dataset remains PUBLISHED_ESTIMATE, not metered observation.
 
+## Build reproducibility status
+
+This initial slice does not yet include a committed Cargo.lock. The direct dependencies use semver ranges, so the resolved transitive dependency graph is not frozen. Before any production or long-lived benchmark use, generate and commit the exact lockfile, pin the toolchain, and bind the lockfile/toolchain digests into the build receipt. The current workflow checks source formatting, Clippy, tests and input structure, but does not by itself freeze the dependency graph.
+
 ## Evidence and claim ceiling
 
 A successful port-data receipt establishes only that the exact input file meets the structural checks in this package and that the stated conversion arithmetic is internally consistent. It does not verify the original studies, prove source truth, validate a port electrical network, establish a nuclear site, or approve any infrastructure.
