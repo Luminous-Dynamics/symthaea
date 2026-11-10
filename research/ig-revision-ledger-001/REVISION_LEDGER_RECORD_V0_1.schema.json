@@ -110,6 +110,54 @@
           "items": {
             "type": "string"
           }
+        },
+        "confidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "scale",
+            "calibration_profile_sha256",
+            "calibration_receipt_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "NotProvided",
+                "SelfReported",
+                "Calibrated"
+              ]
+            },
+            "value": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "scale": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "calibration_profile_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "calibration_receipt_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
         }
       }
     },
@@ -156,6 +204,54 @@
           "uniqueItems": true,
           "items": {
             "type": "string"
+          }
+        },
+        "confidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "scale",
+            "calibration_profile_sha256",
+            "calibration_receipt_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "NotProvided",
+                "SelfReported",
+                "Calibrated"
+              ]
+            },
+            "value": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "scale": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "calibration_profile_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "calibration_receipt_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            }
           }
         }
       }
