@@ -560,6 +560,25 @@ fn validate_case_spec(case: &EditCaseSpecV1) -> Result<(), EditAssuranceError> {
                 ))
             })?;
             validate_digest(digest, "timbre_reference_sha256")?;
+            match case.timbre_mode {
+                TimbreModeV1::SameTimbre
+                    if digest != case.melody_reference_sha256.as_str() =>
+                {
+                    return Err(EditAssuranceError::new(format!(
+                        "same-timbre case {} must use the melody reference as its timbre reference",
+                        case.sample_id
+                    )));
+                }
+                TimbreModeV1::CrossTimbre
+                    if digest == case.melody_reference_sha256.as_str() =>
+                {
+                    return Err(EditAssuranceError::new(format!(
+                        "cross-timbre case {} must use a distinct timbre reference",
+                        case.sample_id
+                    )));
+                }
+                _ => {}
+            }
         }
     }
 
@@ -958,7 +977,7 @@ mod tests {
             technique_id: "legato".to_owned(),
             source_audio_sha256: digest('e'),
             melody_reference_sha256: digest('f'),
-            timbre_reference_sha256: Some(digest('1')),
+            timbre_reference_sha256: Some(digest('f')),
             original_lyrics_sha256: Some(digest('2')),
             requested_lyrics_sha256: Some(digest('3')),
             task_manifest_sha256: digest('4'),
@@ -1255,6 +1274,28 @@ mod tests {
         assert!(evaluate_edit_benchmark(
             &benchmark_spec(),
             &[case],
+            &[produced_execution()],
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn timbre_reference_mode_must_match_actual_reference_identity() {
+        let mut same_timbre = case_spec();
+        same_timbre.timbre_reference_sha256 = Some(digest('1'));
+        assert!(evaluate_edit_benchmark(
+            &benchmark_spec(),
+            &[same_timbre],
+            &[produced_execution()],
+        )
+        .is_err());
+
+        let mut cross_timbre = case_spec();
+        cross_timbre.timbre_mode = TimbreModeV1::CrossTimbre;
+        cross_timbre.timbre_reference_sha256 = Some(digest('f'));
+        assert!(evaluate_edit_benchmark(
+            &benchmark_spec(),
+            &[cross_timbre],
             &[produced_execution()],
         )
         .is_err());
