@@ -7358,7 +7358,7 @@ mod tests {
         // A real cadence-free canvas: no existing melody to interfere with
         // (the pass removes whatever's there in its own window anyway).
         score.total_beats = Duration::new(24, 1); // 3 sections * 2*4 bars * 4 beats
-        apply_additive_process(&mut score, &form, 4, 4.0, seed);
+        apply_additive_process(&mut score, GENERAL_MELODY_PART_V1, &form, 4, 4.0, seed);
 
         let cell =
             crate::hook::HookCell::generate_with(&crate::spec::MelodicDna::default(), seed, 4.0);
@@ -9002,7 +9002,13 @@ mod tests {
                 section_intensity: 1.0,
             });
         }
-        apply_full_drone(&mut score, key);
+        apply_full_drone(
+            &mut score,
+            PartId(1),
+            PartId(2),
+            PartId(0),
+            key,
+        );
         let tonic_pc = key.tonic;
         let fifth_pc = key.scale().degree_pitch_class(5);
         let harmony = score.voice(VoiceRole::Harmony);
