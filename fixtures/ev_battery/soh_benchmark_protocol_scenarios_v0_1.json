@@ -311,7 +311,7 @@
           "nominal_interval_level": 0.9,
           "observed_coverage": 0.91,
           "calibration_partition": "validation",
-          "calibration_group_disjointness": true
+          "calibration_group_disjointness": false
         },
         "execution": {
           "source_commit_digest": "0000000000000000000000000000000000000000000000000000000000000057",
