@@ -56,6 +56,9 @@ pub struct CalibrationBinding {
     pub forecast_model_id: String,
     pub task_protocol_id: String,
     pub evaluation_domain_id: String,
+    /// Nominal two-sided prediction interval coverage in basis points (e.g. 9500 = 95%).
+    /// This is a declared target, not empirical proof that the interval attains coverage.
+    pub nominal_coverage_basis_points: u16,
     pub calibration_split_id: String,
     pub evaluation_split_id: String,
 }
@@ -73,6 +76,9 @@ impl CalibrationBinding {
             if value.trim().is_empty() {
                 return Err(RobustSensingError::MissingCalibrationIdentity);
             }
+        }
+        if !(1..=10_000).contains(&self.nominal_coverage_basis_points) {
+            return Err(RobustSensingError::InvalidNominalCoverage);
         }
         if self.calibration_split_id == self.evaluation_split_id {
             return Err(RobustSensingError::CalibrationEvaluationSplitOverlap);
@@ -154,13 +160,14 @@ impl RobustSensingOption {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RobustSensingError {
     InvalidProbabilityInterval,
     InvalidBudget,
     EmptySensorId,
     MissingCalibrationIdentity,
     CalibrationEvaluationSplitOverlap,
+    InvalidNominalCoverage,
     CalibrationBindingMismatch(String),
     MissingResourceUpperBound,
     InvalidResourceUpperBound,
@@ -461,6 +468,7 @@ mod tests {
             forecast_model_id: "risk-model-v4".into(),
             task_protocol_id: "robodojo-rc-v1".into(),
             evaluation_domain_id: "heldout-layout-family-b".into(),
+            nominal_coverage_basis_points: 9_500,
             calibration_split_id: "calibration-seeds-001-050".into(),
             evaluation_split_id: "evaluation-seeds-051-100".into(),
         }
@@ -524,6 +532,23 @@ mod tests {
         assert_eq!(
             ProbabilityInterval::new(0.0, 1.1),
             Err(RobustSensingError::InvalidProbabilityInterval)
+        );
+    }
+
+    #[test]
+    fn nominal_interval_coverage_must_be_explicit_and_bounded() {
+        let mut context = binding();
+        context.nominal_coverage_basis_points = 0;
+        assert_eq!(
+            context.validate(),
+            Err(RobustSensingError::InvalidNominalCoverage)
+        );
+
+        let mut context = binding();
+        context.nominal_coverage_basis_points = 10_001;
+        assert_eq!(
+            context.validate(),
+            Err(RobustSensingError::InvalidNominalCoverage)
         );
     }
 
@@ -640,6 +665,48 @@ mod tests {
     }
 
     #[test]
+    fn required_confidence_sensing_is_selected_only_when_lower_bound_is_restored() {
+        let mut current = state();
+        current.predicted_success = ProbabilityInterval::new(0.30, 0.60).unwrap();
+        let sensor = option(
+            "reobserve",
+            ProbabilityInterval::new(0.82, 0.94).unwrap(),
+            ProbabilityInterval::new(0.01, 0.03).unwrap(),
+            5.0,
+            50.0,
+        );
+        let result = choose_robust_active_sensing(&current, &[sensor], policy()).unwrap();
+        assert!(matches!(
+            result.recommendation,
+            RobustSensingRecommendation::AcquireObservation {
+                required_for_risk_gate: false,
+                required_for_confidence_gate: true,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn confidence_gate_escalates_when_no_sensor_restores_success_lower_bound() {
+        let mut current = state();
+        current.predicted_success = ProbabilityInterval::new(0.30, 0.60).unwrap();
+        let sensor = option(
+            "reobserve",
+            ProbabilityInterval::new(0.70, 0.95).unwrap(),
+            ProbabilityInterval::new(0.01, 0.03).unwrap(),
+            5.0,
+            50.0,
+        );
+        let result = choose_robust_active_sensing(&current, &[sensor], policy()).unwrap();
+        assert_eq!(
+            result.recommendation,
+            RobustSensingRecommendation::StopAndEscalate {
+                reason: RobustStopReason::NoSensorMeetsRequiredGates
+            }
+        );
+    }
+
+    #[test]
     fn required_risk_sensing_is_selected_even_when_economic_lcb_is_negative() {
         let mut current = state();
         current.unsafe_event_probability = ProbabilityInterval::new(0.04, 0.20).unwrap();
@@ -650,7 +717,16 @@ mod tests {
             90.0,
             900.0,
         );
-        let result = choose_robust_active_sensing(&current, &[sensor], policy()).unwrap();
+        let mut expensive_policy = policy();
+        expensive_policy.utility_per_joule = 1.0;
+        let result =
+            choose_robust_active_sensing(&current, &[sensor], expensive_policy).unwrap();
+        assert!(
+            result.evaluations[0]
+                .conservative_net_benefit
+                .expect("an in-budget robust option has a value")
+                < 0.0
+        );
         assert!(matches!(
             result.recommendation,
             RobustSensingRecommendation::AcquireObservation {
