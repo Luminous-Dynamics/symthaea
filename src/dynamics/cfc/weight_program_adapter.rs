@@ -4648,7 +4648,7 @@ mod tests {
 
             // The raw parameter digest must distinguish a different coordinate
             // representation, even when the represented function is unchanged.
-            if *permutation != [0, 1, 2, 3] {
+            if permutation.as_slice() != &[0, 1, 2, 3] {
                 assert_ne!(
                     permuted_candidate.candidate_native_model_digest,
                     source_digest
