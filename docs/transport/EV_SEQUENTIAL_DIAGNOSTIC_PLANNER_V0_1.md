@@ -28,7 +28,7 @@ A separate fixture makes test B conditionally available only after A=a1. The sel
 
 ## Frozen corpus
 
-Six cases: complementary positive sequence, conditionally available second test, positive one-step test, perfect-information/zero-decision-value control, missing-safety-approval control, and invalid-likelihood rejection.
+Seven cases: complementary positive sequence, conditionally available second test, positive one-step test, perfect-information/zero-decision-value control, missing-safety-approval control, invalid-likelihood rejection, and no-admissible-terminal-action ABSTAIN.
 
 ## Benchmark tournament
 
