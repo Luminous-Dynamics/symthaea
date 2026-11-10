@@ -247,8 +247,7 @@
       "dates": {
         "adopted_on": "2026-05-01",
         "entry_into_force_on": "2027-09-01",
-        "applies_from": "2027-09-01",
-        "applies_through": ""
+        "applies_from": "2027-09-01"
       },
       "applicability": {
         "ship_scope": "Ships subject to MARPOL Annex VI sulphur requirements while operating within the designated ECA.",
@@ -283,12 +282,6 @@
         "metric_id": "nea_eca_applicability",
         "formula_or_method": "Evaluate route-segment intersection with the official MEPC.407(84) polygon and the voyage date. Evaluate SOx/PM fuel sulphur requirements from 2028-09-01. Separately evaluate NOx Tier III engine/ship applicability against building contract, keel-laying/similar-stage and delivery dates, engine power threshold, and operation in the ECA.",
         "phase_in": [
-          {
-            "year": 2027,
-            "value": 1,
-            "unit": "date",
-            "meaning": "ECA amendment enters into force 1 September 2027; NOx Tier III applies for eligible new ships with build contract from 1 January 2027, keel from 1 July 2027 or delivery from 1 January 2031."
-          },
           {
             "year": 2028,
             "value": 0.1,
@@ -382,14 +375,24 @@
     },
     {
       "source_id": "IMO-NE-ATLANTIC-ECA-2026",
-      "title": "North-East Atlantic ECA adopted at MEPC 84",
+      "title": "North-East Atlantic Ocean ECA adopted by Resolution MEPC.407(84)",
       "publisher": "IMO",
       "uri": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
       "publication_date": "2026-05-01",
       "evidence_class": "official_adopted_marpole_amendment",
       "limitations": [
-        "Use adopted MARPOL amendment and charted coordinates."
-      ]
+        "ECA entry into force, SOx/PM application and NOx Tier III construction-date criteria are separate legal milestones.",
+        "Use Resolution MEPC.407(84) and its official charted coordinates for the definitive boundary and legal details.",
+        "Route geometry alone does not establish fuel sulphur or engine certification compliance."
+      ],
+      "scope": {
+        "resolution": "MEPC.407(84)",
+        "adopted": "MEPC 84, 27 April–1 May 2026",
+        "entry_into_force": "1 September 2027",
+        "sox_pm_application": "1 September 2028 (0.10% sulphur by mass following one-year delay)",
+        "nox_tier_iii": "For relevant marine diesel engines over 130 kW on ships with building contract from 1 January 2027; absent a contract, keel/similar construction stage from 1 July 2027; or delivery from 1 January 2031.",
+        "geography": "Designated EEZs and territorial seas extending up to 200 nautical miles from baselines of Greenland, Iceland, Faroe Islands, Ireland, UK, France, Spain and Portugal."
+      }
     },
     {
       "source_id": "IMO-NETZERO-FRAMEWORK-STATUS-2026-11-10",
