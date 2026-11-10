@@ -2,7 +2,13 @@
 
 ## Model identity
 
-electric-fixed-wing-energy-v0.1.0 is a deterministic reduced-order estimator for steady mission segments. Its output is useful for screening architecture choices and exposing energy-budget assumptions. It is not validated against a flight-test article.
+electric-fixed-wing-energy-v0.2.0 is a deterministic reduced-order estimator for steady mission segments. Its output is useful for screening architecture choices and exposing energy-budget assumptions. It is not validated against a flight-test article.
+
+## Characterized propulsion extension (v0.2)
+
+An optional characterized evaluation accepts three one-dimensional curves: motor efficiency versus shaft-load fraction, inverter efficiency versus inverter input-load fraction, and propeller efficiency versus advance ratio. Values and absolute uncertainty bounds are linearly interpolated only inside each supplied domain. The mission evaluator uses nominal efficiency minus the absolute bound and records dataset IDs. No extrapolation is permitted.
+
+This is an improvement over a single scalar efficiency, but it remains limited: the motor and inverter maps are one-dimensional projections, not full speed/torque/voltage/temperature maps; the propeller curve is not a full coefficient map over advance ratio, blade pitch, Reynolds number, Mach number and blade condition. The current code checks the SHA-256 string's syntax but does not obtain the dataset or calculate its digest. Evidence verification must happen in a separate trusted pipeline. The absolute uncertainty bound is not a statistical confidence interval.
 
 ## Current equations
 
