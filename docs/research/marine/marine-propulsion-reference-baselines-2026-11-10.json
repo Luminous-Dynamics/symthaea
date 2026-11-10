@@ -1505,7 +1505,16 @@
             2,
             7
           ],
-          "route_reoptimization_relative_foc_saving_improvement_percent": 1.25
+          "route_reoptimization_relative_foc_saving_improvement_percent": 1.25,
+          "route_case": {
+            "one_dof_optimized_route_evaluated_with_3dof_foc_reduction_percent": 7.07,
+            "three_dof_optimized_route_evaluated_with_3dof_foc_reduction_percent": 8.32,
+            "additional_foc_saving_percentage_points": 1.25,
+            "relative_voyage_time_increase_percent": 0.85,
+            "approximate_additional_voyage_time_hours": 2,
+            "approximate_fuel_difference_tonnes": 3,
+            "interpretation": "The 3-DOF optimized route used about three tonnes less total fuel but took roughly two hours longer than the 1-DOF optimized route in this specific replay; cargo-service arrival constraints determine eligibility."
+          }
         },
         "dataset_doi": "10.5281/zenodo.17859015",
         "dataset_license": "CC BY 4.0",
