@@ -785,6 +785,11 @@ fn polynomial_multiply_variable(
     Ok(result)
 }
 
+fn polynomial_depends_on_variable(polynomial: &ExactPolynomial, variable_index: usize) -> bool {
+    polynomial
+        .keys()
+        .any(|monomial| monomial.get(variable_index).is_some_and(|power| *power > 0))
+}
 /// Exact Lie derivative for the SO(n) generator with δx_i=-x_j, δx_j=x_i.
 fn exact_polynomial_lie_derivative_is_zero(
     polynomial: &ExactPolynomial,
@@ -822,7 +827,9 @@ fn exact_polynomial_symmetry_candidate(
     let dimension = variable_names.len();
     let generator_count = dimension * (dimension - 1) / 2;
 
-    let mut all_generators_invariant = true;
+    let all_coordinates_present =
+        (0..dimension).all(|index| polynomial_depends_on_variable(&polynomial, index));
+    let mut all_generators_invariant = all_coordinates_present;
     for i in 0..dimension {
         for j in (i + 1)..dimension {
             if !exact_polynomial_lie_derivative_is_zero(&polynomial, i, j, profile)? {
@@ -845,7 +852,10 @@ fn exact_polynomial_symmetry_candidate(
     if profile.pairwise_so2_search {
         for i in 0..dimension {
             for j in (i + 1)..dimension {
-                if exact_polynomial_lie_derivative_is_zero(&polynomial, i, j, profile)? {
+                if polynomial_depends_on_variable(&polynomial, i)
+                    && polynomial_depends_on_variable(&polynomial, j)
+                    && exact_polynomial_lie_derivative_is_zero(&polynomial, i, j, profile)?
+                {
                     return Ok(Some((
                         LieGroup::SO(2),
                         vec![variable_names[i].clone(), variable_names[j].clone()],
@@ -1252,6 +1262,23 @@ mod tests {
         assert_eq!(report.exact_polynomial_status, ExactPolynomialSearchStatus::CompletedNoCandidate);
     }
 
+    #[test]
+    fn exact_polynomial_search_does_not_infer_rotation_on_unused_variables() {
+        // The source AST mentions x and y, but both disappear after multiplying by zero.
+        let expr = add(
+            var("z"),
+            add(
+                mul(Expr::Const(0.0), var("x")),
+                mul(Expr::Const(0.0), var("y")),
+            ),
+        );
+        let report = infer_symmetry_with_evidence(&expr);
+        assert!(report.candidate.is_none());
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::ExactPolynomialSearchCompletedNoCandidate
+        );
+    }
     #[test]
     fn exact_polynomial_search_uses_full_so3_generator_basis() {
         let radial_squared = add(add(pow2("x"), pow2("y")), pow2("z"));
