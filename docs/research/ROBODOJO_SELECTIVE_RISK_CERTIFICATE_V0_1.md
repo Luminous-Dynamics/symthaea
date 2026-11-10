@@ -24,6 +24,8 @@ The Luminous implementation deliberately starts with one pre-registered selectiv
 Each held-out episode contributes:
 - a stable sample/episode ID;
 - task ID;
+- evaluator-defined state/motion regime ID (for example, free motion, contact onset, sustained contact, constrained insertion or release);
+- SHA-256 of the exact regime predicate/partition;
 - exact policy-artifact SHA-256;
 - exact forecast/risk-estimator and post-processing pipeline SHA-256;
 - exact environment/shift-condition SHA-256;
