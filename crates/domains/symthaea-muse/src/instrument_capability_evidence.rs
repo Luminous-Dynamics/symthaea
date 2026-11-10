@@ -139,6 +139,8 @@ pub struct CapabilityClaimV1 {
     /// Merely setting disposition=qualified is not sufficient.
     pub qualification_record_id: Option<String>,
     pub qualification_record_sha256: Option<String>,
+    pub qualification_authority_id: Option<String>,
+    pub qualification_record_uri: Option<String>,
     pub evidence: EvidenceProvenanceV1,
 }
 
@@ -165,6 +167,7 @@ pub enum CapabilityEvidenceIssueCodeV1 {
     InvalidCapabilityValue,
     MalformedContentDigest,
     MalformedQualificationRecordDigest,
+    MissingQualificationAuthority,
     AssetDigestMismatch,
     QualifiedAssetWithoutLicense,
     EmptyClaims,
@@ -180,6 +183,7 @@ pub enum CapabilityEvidenceIssueCodeV1 {
     MissingQualifiedPolyphony,
     MissingQualifiedRendererPatch,
     RendererPatchUnavailable,
+    QualificationNotTrusted,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -233,6 +237,15 @@ pub enum CapabilityMaterializationErrorV1 {
 /// Evidence receipt kept beside the existing orchestration capability.
 /// Downstream planners should retain this value instead of copying only the
 /// range/polyphony numbers and losing their qualification lineage.
+/// Approved qualification attestations supplied by a separately authenticated
+/// trust registry. The registry loader must verify authority/signature or other
+/// governance proof before constructing this set; this module checks only
+/// exact authority + record ID + content-digest membership.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct QualificationTrustPolicyV1 {
+    pub approved_records: BTreeSet<(String, String, String)>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QualifiedInstrumentCapabilityV1 {
     pub capability: InstrumentCapabilityV1,
@@ -427,6 +440,15 @@ fn validate_evidence(
                 "qualified claims require a 64-character lowercase SHA-256 of the qualification record",
             );
         }
+        if !nonempty(&claim.qualification_authority_id)
+            || !nonempty(&claim.qualification_record_uri)
+        {
+            report.push(
+                CapabilityEvidenceIssueCodeV1::MissingQualificationAuthority,
+                Some(&claim.claim_id),
+                "qualified claims require an authority identifier and qualification record URI",
+            );
+        }
         if matches!(
             evidence.evidence_class,
             EvidenceClassV1::Estimated | EvidenceClassV1::Unverified
@@ -566,6 +588,7 @@ pub fn materialize_qualified_instrument_capability_v1(
     profile: &InstrumentCapabilityEvidenceProfileV1,
     required_performance_scope: &CapabilityScopeV1,
     required_renderer_scope: Option<&CapabilityScopeV1>,
+    trust_policy: &QualificationTrustPolicyV1,
 ) -> Result<QualifiedInstrumentCapabilityV1, CapabilityMaterializationErrorV1> {
     let validation = validate_instrument_capability_evidence_v1(profile);
     if !validation.valid {
@@ -573,7 +596,9 @@ pub fn materialize_qualified_instrument_capability_v1(
     }
 
     if !validate_scope(required_performance_scope)
-        || required_renderer_scope.is_some_and(|scope| !validate_scope(scope))
+        || required_renderer_scope.is_some_and(|scope| {
+            !validate_scope(scope) || scope.renderer_id.is_none() || scope.patch_id.is_none()
+        })
     {
         return Err(CapabilityMaterializationErrorV1::ScopeMismatch);
     }
@@ -680,6 +705,19 @@ pub fn materialize_qualified_instrument_capability_v1(
     }
     required_claims.sort_by(|a, b| a.claim_id.cmp(&b.claim_id));
 
+    // Do not trust the profile's own "qualified" string. The calling boundary
+    // must supply a trust policy loaded from an authenticated registry.
+    for claim in &required_claims {
+        let trusted_key = (
+            claim.qualification_authority_id.clone().unwrap_or_default(),
+            claim.qualification_record_id.clone().unwrap_or_default(),
+            claim.qualification_record_sha256.clone().unwrap_or_default(),
+        );
+        if !trust_policy.approved_records.contains(&trusted_key) {
+            return Err(CapabilityMaterializationErrorV1::QualificationNotTrusted);
+        }
+    }
+
     let profile_sha256 = instrument_capability_profile_sha256_v1(profile)
         .map_err(|_| CapabilityMaterializationErrorV1::ProfileSerialization)?;
     let claim_ids = required_claims
@@ -785,7 +823,21 @@ mod tests {
             disposition: QualificationDispositionV1::Qualified,
             qualification_record_id: Some(format!("review-{claim_id}")),
             qualification_record_sha256: Some(sha('d')),
+            qualification_authority_id: Some("music-performer-review-board".into()),
+            qualification_record_uri: Some(format!("https://example.invalid/reviews/{claim_id}")),
             evidence,
+        }
+    }
+
+    fn trust_policy(profile: &InstrumentCapabilityEvidenceProfileV1) -> QualificationTrustPolicyV1 {
+        QualificationTrustPolicyV1 {
+            approved_records: profile.claims.iter().filter_map(|claim| {
+                Some((
+                    claim.qualification_authority_id.clone()?,
+                    claim.qualification_record_id.clone()?,
+                    claim.qualification_record_sha256.clone()?,
+                ))
+            }).collect(),
         }
     }
 
@@ -839,10 +891,12 @@ mod tests {
     fn exact_scope_measured_claims_materialize_existing_capability_contract() {
         let (profile, required_performance_scope, required_renderer_scope) = valid_profile(true);
         let renderer_scope = required_renderer_scope.as_ref().unwrap();
+        let policy = trust_policy(&profile);
         let capability = materialize_qualified_instrument_capability_v1(
             &profile,
             &required_performance_scope,
             Some(renderer_scope),
+            &policy,
         )
         .unwrap();
         assert_eq!(capability.capability.id, "solo-cello-01");
@@ -894,7 +948,12 @@ mod tests {
         let mut wrong_scope = performance_scope;
         wrong_scope.instrument_model = Some("cello-model-b".into());
         assert_eq!(
-            materialize_qualified_instrument_capability_v1(&profile, &wrong_scope, None),
+            materialize_qualified_instrument_capability_v1(
+                &profile,
+                &wrong_scope,
+                None,
+                &trust_policy(&profile),
+            ),
             Err(CapabilityMaterializationErrorV1::ScopeMismatch)
         );
     }
@@ -929,6 +988,7 @@ mod tests {
                 &profile,
                 &performance_scope,
                 Some(renderer_scope),
+                &trust_policy(&profile),
             ),
             Err(CapabilityMaterializationErrorV1::MissingQualifiedRendererPatch)
         );
@@ -952,6 +1012,34 @@ mod tests {
         assert!(report.issues.iter().any(|issue| {
             issue.code == CapabilityEvidenceIssueCodeV1::MalformedQualificationRecordDigest
         }));
+    }
+
+    #[test]
+    fn qualified_claims_need_an_authenticated_trust_policy_match() {
+        let (profile, performance_scope, _) = valid_profile(false);
+        assert_eq!(
+            materialize_qualified_instrument_capability_v1(
+                &profile,
+                &performance_scope,
+                None,
+                &QualificationTrustPolicyV1::default(),
+            ),
+            Err(CapabilityMaterializationErrorV1::QualificationNotTrusted)
+        );
+    }
+
+    #[test]
+    fn renderer_scope_must_name_both_renderer_and_patch() {
+        let (profile, performance_scope, _) = valid_profile(false);
+        assert_eq!(
+            materialize_qualified_instrument_capability_v1(
+                &profile,
+                &performance_scope,
+                Some(&performance_scope),
+                &trust_policy(&profile),
+            ),
+            Err(CapabilityMaterializationErrorV1::ScopeMismatch)
+        );
     }
 
     #[test]
