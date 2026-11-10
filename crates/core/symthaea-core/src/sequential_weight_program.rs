@@ -927,6 +927,10 @@ mod tests {
                 break;
             }
         }
+        assert_eq!(
+            family_report.status,
+            crate::family_noninferiority::FamilyGuardrailStatus::AllFamiliesNonInferior
+        );
         bind_sequential_verification_evidence(
             session,
             candidate_native_model_digest,
@@ -1106,6 +1110,12 @@ mod tests {
         assert_eq!(receipt.result_manifest_digest, digest('7'));
         assert_eq!(receipt.precondition_gate_digest, digest('5'));
         assert!(validate_digest(&receipt.statistical_verification_report_digest).is_ok());
+        assert!(validate_digest(&receipt.family_guardrail_report_digest).is_ok());
+        assert_eq!(
+            receipt.family_guardrail_report_digest,
+            evidence_binding.family_guardrail_report_digest()
+        );
+        assert_eq!(receipt.format_version, 3);
         assert_eq!(advanced.next_batch_index, 1);
         assert_eq!(advanced.latest_candidate_model_digest, digest('9'));
         assert_eq!(receipt.parent_candidate_model_digest, base.model_digest);
