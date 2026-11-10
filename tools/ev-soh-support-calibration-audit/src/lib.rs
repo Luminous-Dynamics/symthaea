@@ -989,11 +989,11 @@ mod tests {
     }
 
     #[test]
-    fn frozen_corpus_accepts_three_and_rejects_eight_controls() {
+    fn frozen_corpus_accepts_four_and_rejects_nine_controls() {
         let report = report();
-        assert_eq!(report.payload.case_count, 11);
-        assert_eq!(report.payload.accepted_count, 3);
-        assert_eq!(report.payload.rejected_count, 8);
+        assert_eq!(report.payload.case_count, 13);
+        assert_eq!(report.payload.accepted_count, 4);
+        assert_eq!(report.payload.rejected_count, 9);
         assert_eq!(report.payload.extrapolation_undercovered_count, 2);
         assert_eq!(report.payload.support_detector_failure_count, 1);
     }
