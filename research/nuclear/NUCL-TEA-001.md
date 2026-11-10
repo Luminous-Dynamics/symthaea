@@ -166,6 +166,10 @@ Sources:
 - CSIR / PtX Hub, *Shore Power Demand for South African Ports* (September 2025), especially executive summary p. 6 and demand results. [Publication page](https://ptx-hub.org/publication/shore-power-demand-for-south-african-ports/) · [PDF](https://ptx-hub.org/wp-content/uploads/2025/10/PtX-Hub-Shore-Power-Demand-for-South-African-Ports-2.pdf)
 - CSIR / PtX Hub, *Load Connection Capacity Assessment of South African National Ports* (September 2025), especially discussion and Table 10, p. 34. [Publication page](https://ptx-hub.org/publication/load-connection-capactiy-assessment-of-south-african-national-ports/) · [PDF](https://ptx-hub.org/wp-content/uploads/2025/11/PtX-Hub-Load-Connection-Capacity-Assessment-of-South-African-National-Ports_final-1.pdf)
 
+**South African policy timing.** South Africa's Department of Electricity and Energy, in the October 2025 IRP 2025, stated that SMRs were not yet commercially viable at publication time, cited EPRI's expectation of commercial deployment post-2030, and projected South African availability post-2035 because the regulatory framework still needed development. Treat this as a dated national planning assumption, not a guarantee that a particular vendor or design will be available then. The near-term port programme should therefore emphasize demand data, grid/shore-power upgrades, storage/flexibility, port readiness, manufacturing capability and regulatory evidence; nuclear supply remains a later scenario whose availability date must be sensitivity-tested.
+
+Source: [Department of Electricity and Energy — IRP 2025, October 2025 (SMR discussion, printed p. 13)](https://www.dmpr.gov.za/Portals/0/Energy%20Resources/IRP/IRP%202025/User-Friendly-IRP-2025.pdf?ver=d278hZ0IzvO7hIWLiwLoaQ%3D%3D).
+
 **Reference-case selection:** use Durban for a high-demand / grid-constrained stress test; use Ngqura for a higher-spare-capacity screening case; retain Cape Town as a high-demand/low-spare-capacity contrast. Add Richards Bay as an industrial-load case. These are analytical case selections only, not site or technology recommendations.
 
 Compare the same service demand under:
