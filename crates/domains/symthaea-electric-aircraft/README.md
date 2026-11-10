@@ -53,3 +53,10 @@ The pack maps are still reduced-order: they do not model cell-level electrochemi
 This is a research/mission-planning model, not an aircraft performance prediction, flight simulator, battery qualification tool, flight-control system, or certification artefact. It assumes steady segments and a supplied L/D ratio. It does not model takeoff transients, stall, compressibility, detailed propeller maps, voltage/SOC/temperature-dependent cell electrochemistry, thermal runaway, cell imbalance, battery fault propagation, aeroelasticity, structural loads, control laws, or regulatory reserve rules. A successful software test is not evidence of airworthiness.
 
 See docs/ARCHITECTURE_TRADE_STUDY.md for the mission-first architecture decision framework, docs/MODEL_LIMITATIONS.md for promotion gates, and docs/BENCHMARK_PLAN.md plus docs/METRIC_BOUNDARIES.md for industry comparisons.
+
+## Coupled battery electro-thermal substep
+
+The first time-resolved feedback primitive is in [`coupled_battery.rs`](src/coupled_battery.rs). It composes the conservative battery OCV/resistance surfaces with the existing multi-node implicit thermal network. The API holds the required terminal load fixed over one declared substep and fails closed on OOD characterization, current/power/reserve/temperature limits, non-convergence or energy-balance failure.
+
+This is intentionally a first slice, not the complete coupled mission solver. Motor/inverter temperature feedback, dynamic TMS flow and system-level co-design remain open. See [the substep contract](docs/coupled-battery-substep.md).
+The production substep is also compared against the independent scalar bisection oracle on matched constant-resistance and temperature-dependent cases in [`tests/coupled_battery_differential.rs`](tests/coupled_battery_differential.rs). This checks cross-implementation agreement only; physical validation remains an explicit promotion gate.
