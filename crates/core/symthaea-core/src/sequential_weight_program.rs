@@ -1330,6 +1330,26 @@ mod tests {
             ))
         ));
 
+        let mut wrong_family_guardrail = correctly_bound.clone();
+        wrong_family_guardrail.claims.family_guardrail_report_digest = digest('2');
+        let message = sequential_verifier_attestation_message(&wrong_family_guardrail.claims)
+            .expect("message for re-signed mismatched family guardrail");
+        wrong_family_guardrail.signature = signing_key.sign(&message).to_bytes().to_vec();
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &evidence_binding,
+                &wrong_family_guardrail,
+                &pinned_key,
+            ),
+            Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                "family_guardrail_report_digest"
+            ))
+        ));
+
         let mut wrong_precondition = correctly_bound.clone();
         wrong_precondition.claims.precondition_gate_digest = digest('3');
         let message = sequential_verifier_attestation_message(&wrong_precondition.claims)
