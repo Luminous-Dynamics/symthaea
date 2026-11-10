@@ -44,7 +44,9 @@
           "calibration_valid": true,
           "domain_supported": true,
           "protocol_ref": "synthetic-pulse-protocol",
-          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010"
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013"
         },
         "pulse": {
           "direction": "discharge",
@@ -68,7 +70,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
             "temperature_evidence_class": "synthetic_fixture",
@@ -81,7 +82,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-002",
@@ -98,7 +100,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
             "temperature_evidence_class": "synthetic_fixture",
@@ -111,7 +112,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-003",
@@ -128,7 +130,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
             "temperature_evidence_class": "synthetic_fixture",
@@ -141,7 +142,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 25
           }
         ]
       }
@@ -151,8 +153,8 @@
       "expectation": "computed",
       "expected_limiting_cell": "cell-003",
       "expected_limiting_constraint": "cell_voltage_floor",
-      "expected_max_current_a": null,
-      "expected_power_w": null,
+      "expected_max_current_a": 19.354838709677423,
+      "expected_power_w": 185.55671175858484,
       "profile": {
         "profile_version": "ev-cell-limited-power-envelope/0.1",
         "profile_id": "weak-cell-voltage-limited",
@@ -188,7 +190,9 @@
           "calibration_valid": true,
           "domain_supported": true,
           "protocol_ref": "synthetic-pulse-protocol",
-          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010"
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013"
         },
         "pulse": {
           "direction": "discharge",
@@ -212,7 +216,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
             "temperature_evidence_class": "synthetic_fixture",
@@ -225,7 +228,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-002",
@@ -242,7 +246,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
             "temperature_evidence_class": "synthetic_fixture",
@@ -255,7 +258,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-003",
@@ -272,7 +276,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
             "temperature_evidence_class": "synthetic_fixture",
@@ -285,7 +288,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 25
           }
         ]
       }
@@ -295,8 +299,8 @@
       "expectation": "computed",
       "expected_limiting_cell": "cell-001",
       "expected_limiting_constraint": "cell_thermal_ceiling",
-      "expected_max_current_a": null,
-      "expected_power_w": null,
+      "expected_max_current_a": 47.130507141505134,
+      "expected_power_w": 497.3046567516801,
       "profile": {
         "profile_version": "ev-cell-limited-power-envelope/0.1",
         "profile_id": "thermal-limited",
@@ -332,7 +336,9 @@
           "calibration_valid": true,
           "domain_supported": true,
           "protocol_ref": "synthetic-pulse-protocol",
-          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010"
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013"
         },
         "pulse": {
           "direction": "discharge",
@@ -356,7 +362,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 50,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
             "temperature_evidence_class": "synthetic_fixture",
@@ -368,8 +373,9 @@
             "thermal_capacity_lower_j_per_k": 100,
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
             "thermal_evidence_class": "synthetic_fixture",
-            "maximum_temperature_lower_c": 56,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385"
+            "maximum_temperature_lower_c": 50.8,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 49
           },
           {
             "cell_ref": "cell-002",
@@ -386,7 +392,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 50,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
             "temperature_evidence_class": "synthetic_fixture",
@@ -398,8 +403,9 @@
             "thermal_capacity_lower_j_per_k": 100,
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
             "thermal_evidence_class": "synthetic_fixture",
-            "maximum_temperature_lower_c": 56,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386"
+            "maximum_temperature_lower_c": 50.8,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 49
           },
           {
             "cell_ref": "cell-003",
@@ -416,7 +422,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 50,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
             "temperature_evidence_class": "synthetic_fixture",
@@ -428,8 +433,9 @@
             "thermal_capacity_lower_j_per_k": 100,
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
             "thermal_evidence_class": "synthetic_fixture",
-            "maximum_temperature_lower_c": 56,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387"
+            "maximum_temperature_lower_c": 50.8,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 49
           }
         ]
       }
@@ -440,7 +446,7 @@
       "expected_limiting_cell": "cell-002",
       "expected_limiting_constraint": "cell_current_rating",
       "expected_max_current_a": 30,
-      "expected_power_w": null,
+      "expected_power_w": 285.3,
       "profile": {
         "profile_version": "ev-cell-limited-power-envelope/0.1",
         "profile_id": "current-rating-limited",
@@ -476,7 +482,9 @@
           "calibration_valid": true,
           "domain_supported": true,
           "protocol_ref": "synthetic-pulse-protocol",
-          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010"
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013"
         },
         "pulse": {
           "direction": "discharge",
@@ -500,7 +508,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
             "temperature_evidence_class": "synthetic_fixture",
@@ -513,7 +520,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-002",
@@ -530,7 +538,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
             "temperature_evidence_class": "synthetic_fixture",
@@ -543,7 +550,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-003",
@@ -560,7 +568,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
             "temperature_evidence_class": "synthetic_fixture",
@@ -573,7 +580,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 25
           }
         ]
       }
@@ -620,7 +628,9 @@
           "calibration_valid": true,
           "domain_supported": true,
           "protocol_ref": "synthetic-pulse-protocol",
-          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010"
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013"
         },
         "pulse": {
           "direction": "discharge",
@@ -644,7 +654,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
             "temperature_evidence_class": "synthetic_fixture",
@@ -657,7 +666,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-002",
@@ -674,7 +684,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
             "temperature_evidence_class": "synthetic_fixture",
@@ -687,7 +696,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-003",
@@ -704,7 +714,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
             "temperature_evidence_class": "synthetic_fixture",
@@ -717,7 +726,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 25
           }
         ]
       }
@@ -764,7 +774,9 @@
           "calibration_valid": true,
           "domain_supported": true,
           "protocol_ref": "synthetic-pulse-protocol",
-          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010"
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013"
         },
         "pulse": {
           "direction": "discharge",
@@ -788,7 +800,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
             "temperature_evidence_class": "synthetic_fixture",
@@ -801,7 +812,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-002",
@@ -818,7 +830,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 55,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
             "temperature_evidence_class": "synthetic_fixture",
@@ -831,7 +842,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 55
           },
           {
             "cell_ref": "cell-003",
@@ -848,7 +860,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
             "temperature_evidence_class": "synthetic_fixture",
@@ -861,7 +872,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 25
           }
         ]
       }
@@ -908,7 +920,9 @@
           "calibration_valid": true,
           "domain_supported": true,
           "protocol_ref": "synthetic-pulse-protocol",
-          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010"
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013"
         },
         "pulse": {
           "direction": "discharge",
@@ -932,7 +946,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
             "temperature_evidence_class": "synthetic_fixture",
@@ -945,7 +958,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-002",
@@ -962,7 +976,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
             "temperature_evidence_class": "synthetic_fixture",
@@ -975,7 +988,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-003",
@@ -992,7 +1006,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
             "temperature_evidence_class": "synthetic_fixture",
@@ -1005,7 +1018,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 25
           }
         ]
       }
@@ -1052,7 +1066,9 @@
           "calibration_valid": false,
           "domain_supported": true,
           "protocol_ref": "synthetic-pulse-protocol",
-          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010"
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013"
         },
         "pulse": {
           "direction": "discharge",
@@ -1076,7 +1092,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
             "temperature_evidence_class": "synthetic_fixture",
@@ -1089,7 +1104,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-002",
@@ -1106,7 +1122,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
             "temperature_evidence_class": "synthetic_fixture",
@@ -1119,7 +1134,8 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 25
           },
           {
             "cell_ref": "cell-003",
@@ -1136,7 +1152,6 @@
             "soc_uncertainty": 0.01,
             "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
             "soc_evidence_class": "synthetic_fixture",
-            "temperature_upper_c": 25,
             "temperature_uncertainty_c": 0.5,
             "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
             "temperature_evidence_class": "synthetic_fixture",
@@ -1149,7 +1164,154 @@
             "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
             "thermal_evidence_class": "synthetic_fixture",
             "maximum_temperature_lower_c": 60,
-            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387"
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 25
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "no-admissible-discharge-when-thermal-margin-exhausted",
+      "expectation": "no_admissible_discharge",
+      "expected_limiting_cell": "cell-001",
+      "expected_limiting_constraint": "cell_thermal_ceiling",
+      "expected_max_current_a": 0,
+      "expected_power_w": null,
+      "profile": {
+        "profile_version": "ev-cell-limited-power-envelope/0.1",
+        "profile_id": "equal-series-reference",
+        "asset": {
+          "vehicle_ref": "vehicle-equal-series-reference",
+          "vehicle_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000a",
+          "pack_ref": "pack-equal-series-reference",
+          "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
+          "chemistry": "nmc",
+          "declared_cell_count": 3
+        },
+        "topology": {
+          "status": "qualified",
+          "architecture": "series_single_parallel",
+          "topology_ref": "synthetic-series-string-v1",
+          "topology_digest": "000000000000000000000000000000000000000000000000000000000000000c",
+          "qualification": {
+            "qualification_ref": "synthetic-qualification-1",
+            "authority_ref": "synthetic-authority",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000000d",
+            "evidence_class": "synthetic_fixture"
+          }
+        },
+        "model": {
+          "model_ref": "thevenin-first-order-thermal-v1",
+          "model_digest": "000000000000000000000000000000000000000000000000000000000000000e",
+          "equation_ref": "constant-current-ohmic-plus-lumped-thermal",
+          "parameter_digest": "000000000000000000000000000000000000000000000000000000000000000f",
+          "soc_valid_min": 0.1,
+          "soc_valid_max": 0.95,
+          "temperature_valid_min_c": 0,
+          "temperature_valid_max_c": 50,
+          "calibration_valid": true,
+          "domain_supported": true,
+          "protocol_ref": "synthetic-pulse-protocol",
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013"
+        },
+        "pulse": {
+          "direction": "discharge",
+          "duration_s": 10,
+          "ambient_temperature_upper_c": 25,
+          "ambient_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000011"
+        },
+        "cells": [
+          {
+            "cell_ref": "cell-001",
+            "cell_identity_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "ocv_lower_v": 3.8,
+            "ocv_upper_v": 3.82,
+            "ocv_evidence_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+            "ocv_evidence_class": "synthetic_fixture",
+            "resistance_lower_ohm": 0.02,
+            "resistance_upper_ohm": 0.021,
+            "resistance_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "resistance_evidence_class": "synthetic_fixture",
+            "soc_fraction": 0.6,
+            "soc_uncertainty": 0.01,
+            "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+            "soc_evidence_class": "synthetic_fixture",
+            "temperature_uncertainty_c": 0.5,
+            "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
+            "temperature_evidence_class": "synthetic_fixture",
+            "minimum_voltage_v": 2.5,
+            "voltage_limit_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000259",
+            "maximum_discharge_current_lower_a": 100,
+            "current_limit_evidence_digest": "00000000000000000000000000000000000000000000000000000000000002bd",
+            "thermal_resistance_upper_k_per_w": 0.5,
+            "thermal_capacity_lower_j_per_k": 500,
+            "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
+            "thermal_evidence_class": "synthetic_fixture",
+            "maximum_temperature_lower_c": 24.5,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 25
+          },
+          {
+            "cell_ref": "cell-002",
+            "cell_identity_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "ocv_lower_v": 3.8,
+            "ocv_upper_v": 3.82,
+            "ocv_evidence_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "ocv_evidence_class": "synthetic_fixture",
+            "resistance_lower_ohm": 0.02,
+            "resistance_upper_ohm": 0.021,
+            "resistance_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012e",
+            "resistance_evidence_class": "synthetic_fixture",
+            "soc_fraction": 0.6,
+            "soc_uncertainty": 0.01,
+            "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+            "soc_evidence_class": "synthetic_fixture",
+            "temperature_uncertainty_c": 0.5,
+            "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
+            "temperature_evidence_class": "synthetic_fixture",
+            "minimum_voltage_v": 2.5,
+            "voltage_limit_evidence_digest": "000000000000000000000000000000000000000000000000000000000000025a",
+            "maximum_discharge_current_lower_a": 100,
+            "current_limit_evidence_digest": "00000000000000000000000000000000000000000000000000000000000002be",
+            "thermal_resistance_upper_k_per_w": 0.5,
+            "thermal_capacity_lower_j_per_k": 500,
+            "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
+            "thermal_evidence_class": "synthetic_fixture",
+            "maximum_temperature_lower_c": 24.5,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 25
+          },
+          {
+            "cell_ref": "cell-003",
+            "cell_identity_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "ocv_lower_v": 3.8,
+            "ocv_upper_v": 3.82,
+            "ocv_evidence_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
+            "ocv_evidence_class": "synthetic_fixture",
+            "resistance_lower_ohm": 0.02,
+            "resistance_upper_ohm": 0.021,
+            "resistance_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+            "resistance_evidence_class": "synthetic_fixture",
+            "soc_fraction": 0.6,
+            "soc_uncertainty": 0.01,
+            "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+            "soc_evidence_class": "synthetic_fixture",
+            "temperature_uncertainty_c": 0.5,
+            "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+            "temperature_evidence_class": "synthetic_fixture",
+            "minimum_voltage_v": 2.5,
+            "voltage_limit_evidence_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+            "maximum_discharge_current_lower_a": 100,
+            "current_limit_evidence_digest": "00000000000000000000000000000000000000000000000000000000000002bf",
+            "thermal_resistance_upper_k_per_w": 0.5,
+            "thermal_capacity_lower_j_per_k": 500,
+            "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
+            "thermal_evidence_class": "synthetic_fixture",
+            "maximum_temperature_lower_c": 24.5,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 25
           }
         ]
       }
