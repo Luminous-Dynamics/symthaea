@@ -178,7 +178,7 @@ impl VssiExperimentReceipt {
             observations_digest: &self.observations_digest,
             previous_receipt_digest: self.previous_receipt_digest.as_deref(),
         };
-        if sha256_serializable(b"symthaea-vssi-experiment-receipt-v1\\0", &claims)?
+        if sha256_serializable(b"symthaea-vssi-experiment-receipt-v1\0", &claims)?
             != self.receipt_digest
         {
             return Err(VssiFixtureError::ReceiptDigestMismatch);
@@ -192,7 +192,7 @@ impl VssiExperimentResult {
     pub fn validate(&self) -> Result<(), VssiFixtureError> {
         self.receipt.validate()?;
         let digest =
-            sha256_serializable(b"symthaea-vssi-observation-batch-v1\\0", &self.observations)?;
+            sha256_serializable(b"symthaea-vssi-observation-batch-v1\0", &self.observations)?;
         if digest != self.receipt.observations_digest {
             return Err(VssiFixtureError::ObservationDigestMismatch);
         }
