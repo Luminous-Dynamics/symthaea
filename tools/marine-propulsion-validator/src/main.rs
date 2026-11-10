@@ -1359,6 +1359,22 @@ mod tests {
     const SERVICE_FINGERPRINT_VECTOR_V1: &str =
         include_str!("../../../docs/research/marine/fixtures/service-fingerprint-v1-vector-0001.json");
 
+    fn synthetic_matched_pair() -> (Value, Value) {
+        let fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        let mut baseline = fixture.clone();
+        let mut candidate = fixture;
+        baseline["case_id"] = serde_json::json!("SYNTHETIC-BASELINE-0001");
+        candidate["case_id"] = serde_json::json!("SYNTHETIC-CANDIDATE-0001");
+        baseline["comparison"]["role"] = serde_json::json!("baseline");
+        candidate["comparison"]["role"] = serde_json::json!("candidate");
+        baseline["comparison"]["paired_case_id"] =
+            serde_json::json!("SYNTHETIC-CANDIDATE-0001");
+        candidate["comparison"]["paired_case_id"] =
+            serde_json::json!("SYNTHETIC-BASELINE-0001");
+        (baseline, candidate)
+    }
+
     #[test]
     fn published_service_fingerprint_vector_matches_canonical_bytes_and_digest() {
         let vector: Value = serde_json::from_str(SERVICE_FINGERPRINT_VECTOR_V1)
@@ -1546,6 +1562,59 @@ mod tests {
             serde_json::json!(0.001);
         check_trial(&fixture, &mut findings);
         assert!(findings.invalid);
+    }
+
+    #[test]
+    fn reciprocal_matched_pair_is_eligible_for_comparability_only() {
+        let (baseline, candidate) = synthetic_matched_pair();
+        let mut findings = Findings::default();
+        validate_semantics(&baseline, &mut findings, true);
+        validate_semantics(&candidate, &mut findings, true);
+        check_pair(&baseline, &candidate, &mut findings);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+        assert!(!findings.incomparable, "{:?}", findings.diagnostics);
+        assert!(findings.incomplete); // synthetic evidence and unknown gates remain non-qualified
+    }
+
+    #[test]
+    fn changed_route_with_recomputed_hash_is_incomparable() {
+        let (baseline, mut candidate) = synthetic_matched_pair();
+        candidate["route"]["segments"][0]["target_speed"]["value"] =
+            serde_json::json!(19);
+        let digest = compute_service_fingerprint(&candidate).expect("candidate fingerprint");
+        candidate["comparison"]["service_fingerprint"] = serde_json::json!(digest);
+        candidate["trial_evidence"]["service_fingerprint"] = serde_json::json!(digest);
+        let mut findings = Findings::default();
+        validate_semantics(&baseline, &mut findings, true);
+        validate_semantics(&candidate, &mut findings, true);
+        check_pair(&baseline, &candidate, &mut findings);
+        assert!(findings.incomparable, "{:?}", findings.diagnostics);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn stale_fingerprint_after_service_mutation_is_invalid() {
+        let (_, mut candidate) = synthetic_matched_pair();
+        candidate["service"]["service_contract_id"] =
+            serde_json::json!("MUTATED-CONTRACT");
+        let mut findings = Findings::default();
+        check_service_fingerprint(&candidate, &mut findings);
+        assert!(findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn metocean_profile_remains_a_separate_pair_boundary() {
+        let (baseline, mut candidate) = synthetic_matched_pair();
+        candidate["environment"]["profile_revision"] =
+            serde_json::json!("changed-weather-profile");
+        // The declared service fingerprint intentionally remains identical.
+        assert_eq!(
+            compute_service_fingerprint(&baseline).unwrap(),
+            compute_service_fingerprint(&candidate).unwrap()
+        );
+        let mut findings = Findings::default();
+        check_pair(&baseline, &candidate, &mut findings);
+        assert!(findings.incomparable, "{:?}", findings.diagnostics);
     }
 
     #[test]
