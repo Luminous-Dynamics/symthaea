@@ -630,6 +630,25 @@ fn metric_skew_relative_defect(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nalgebra::Matrix2;
+
+    fn rows_2x2(matrix: &Matrix2<f64>) -> Vec<Vec<f64>> {
+        matrix
+            .row_iter()
+            .map(|row| row.iter().copied().collect())
+            .collect()
+    }
+
+    fn coordinate_changes() -> [Matrix2<f64>; 6] {
+        [
+            Matrix2::new(1.0, 1.0, 0.0, 1.0),
+            Matrix2::new(2.0, 1.0, 1.0, 1.0),
+            Matrix2::new(1.0, 0.5, -0.25, 2.0),
+            Matrix2::new(0.5, -1.0, 1.0, 1.0),
+            Matrix2::new(2.0, -1.0, 0.5, 1.0),
+            Matrix2::new(1.0, 0.0, 3.0, 1.0),
+        ]
+    }
 
     fn profile() -> LinearGroupActionAdmissionProfileV1 {
         LinearGroupActionAdmissionProfileV1::default()
@@ -712,29 +731,15 @@ mod tests {
     }
 
     #[test]
-    fn metric_symmetry_admission_is_invariant_under_nonorthogonal_basis_change() {
-        // D = [[1, 1], [0, 1]] and G' = D^-T G D^-1. The same
-        // small antisymmetric perturbation must receive the same whitened
-        // metric-symmetry defect in both coordinate representations.
+    fn metric_symmetry_admission_is_invariant_across_nonorthogonal_basis_changes() {
         let tolerance = 5.0e-4;
-        let mut canonical = canonical_so2();
-        canonical.metric = vec![vec![1.0, 0.001], vec![-0.001, 1.0]];
-        let mut canonical_profile = profile();
-        canonical_profile.metric_symmetry_relative_tolerance = tolerance;
-        let transformed = LinearGroupActionV1 {
-            action_id: "so2-sheared-nonsymmetric-metric".to_string(),
-            coordinate_basis_id: "xy-sheared".to_string(),
-            coordinate_names: vec!["X".to_string(), "Y".to_string()],
-            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
-            metric: vec![vec![1.0, -0.999], vec![-1.001, 2.0]],
-            generators: vec![LinearGeneratorV1 {
-                id: "conjugated-J".to_string(),
-                matrix: vec![vec![1.0, -2.0], vec![1.0, -1.0]],
-            }],
-        };
-        let canonical_error = canonical.try_admit(canonical_profile).unwrap_err();
-        let transformed_error = transformed.try_admit(canonical_profile).unwrap_err();
+        let base_metric = Matrix2::new(1.0, 0.001, -0.001, 1.0);
+        let mut selected_profile = profile();
+        selected_profile.metric_symmetry_relative_tolerance = tolerance;
 
+        let mut canonical = canonical_so2();
+        canonical.metric = rows_2x2(&base_metric);
+        let canonical_error = canonical.try_admit(selected_profile).unwrap_err();
         let relative_defect = |error: LinearGroupActionAdmissionError| match error {
             LinearGroupActionAdmissionError::MetricNotSymmetric { relative_defect } => {
                 relative_defect
@@ -742,44 +747,44 @@ mod tests {
             other => panic!("expected metric-symmetry rejection, got {other:?}"),
         };
         let canonical_defect = relative_defect(canonical_error);
-        let transformed_defect = relative_defect(transformed_error);
-        assert!((canonical_defect - transformed_defect).abs() < 1.0e-12);
         assert!(canonical_defect > tolerance);
-        assert!(transformed_defect > tolerance);
+
+        let base_generator = Matrix2::new(0.0, -1.0, 1.0, 0.0);
+        for (index, transform) in coordinate_changes().iter().enumerate() {
+            let inverse = transform.try_inverse().expect("frozen transform is invertible");
+            let transformed_metric = inverse.transpose() * base_metric * inverse;
+            let transformed_generator = transform * base_generator * inverse;
+            let transformed = LinearGroupActionV1 {
+                action_id: format!("nonsymmetric-metric-basis-{index}"),
+                coordinate_basis_id: format!("basis-{index}"),
+                coordinate_names: vec!["X".to_string(), "Y".to_string()],
+                coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+                metric: rows_2x2(&transformed_metric),
+                generators: vec![LinearGeneratorV1 {
+                    id: "conjugated-J".to_string(),
+                    matrix: rows_2x2(&transformed_generator),
+                }],
+            };
+            let error = transformed.try_admit(selected_profile).unwrap_err();
+            let defect = relative_defect(error);
+            assert!(
+                (canonical_defect - defect).abs() < 2.0e-12,
+                "metric symmetry residual changed for basis {index}: {canonical_defect} vs {defect}"
+            );
+        }
     }
 
     #[test]
-    fn metric_skew_admission_is_invariant_under_nonorthogonal_basis_change() {
-        // D = [[1, 1], [0, 1]], A' = D A D^-1, and G' = D^-T D^-1.
-        // The epsilon perturbation is intentionally not metric-skew. Admission
-        // must make the same decision and report the same normalized defect in
-        // both representations.
+    fn metric_skew_admission_is_invariant_across_nonorthogonal_basis_changes() {
         let tolerance = 5.0e-4;
+        let base_metric = Matrix2::identity();
+        let approximate_generator = Matrix2::new(0.001, -1.0, 1.0, -0.001);
+        let mut selected_profile = profile();
+        selected_profile.metric_skew_relative_tolerance = tolerance;
+
         let mut canonical = canonical_so2();
-        canonical.generators[0].matrix =
-            vec![vec![0.001, -1.0], vec![1.0, -0.001]];
-        let mut canonical_profile = profile();
-        canonical_profile.metric_skew_relative_tolerance = tolerance;
-
-        let transformed = LinearGroupActionV1 {
-            action_id: "so2-sheared-approximate".to_string(),
-            coordinate_basis_id: "xy-sheared".to_string(),
-            coordinate_names: vec!["X".to_string(), "Y".to_string()],
-            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
-            metric: vec![vec![1.0, -1.0], vec![-1.0, 2.0]],
-            generators: vec![LinearGeneratorV1 {
-                id: "conjugated-J-perturbed".to_string(),
-                matrix: vec![vec![1.001, -2.002], vec![1.0, -1.001]],
-            }],
-        };
-        let transformed_profile = canonical_profile;
-        let canonical_error = canonical
-            .try_admit(canonical_profile)
-            .unwrap_err();
-        let transformed_error = transformed
-            .try_admit(transformed_profile)
-            .unwrap_err();
-
+        canonical.generators[0].matrix = rows_2x2(&approximate_generator);
+        let canonical_error = canonical.try_admit(selected_profile).unwrap_err();
         let relative_defect = |error: LinearGroupActionAdmissionError| match error {
             LinearGroupActionAdmissionError::GeneratorNotMetricSkew {
                 relative_defect,
@@ -788,10 +793,30 @@ mod tests {
             other => panic!("expected metric-skew rejection, got {other:?}"),
         };
         let canonical_defect = relative_defect(canonical_error);
-        let transformed_defect = relative_defect(transformed_error);
-        assert!((canonical_defect - transformed_defect).abs() < 1.0e-12);
         assert!(canonical_defect > tolerance);
-        assert!(transformed_defect > tolerance);
+
+        for (index, transform) in coordinate_changes().iter().enumerate() {
+            let inverse = transform.try_inverse().expect("frozen transform is invertible");
+            let transformed_metric = inverse.transpose() * base_metric * inverse;
+            let transformed_generator = transform * approximate_generator * inverse;
+            let transformed = LinearGroupActionV1 {
+                action_id: format!("approximate-action-basis-{index}"),
+                coordinate_basis_id: format!("basis-{index}"),
+                coordinate_names: vec!["X".to_string(), "Y".to_string()],
+                coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+                metric: rows_2x2(&transformed_metric),
+                generators: vec![LinearGeneratorV1 {
+                    id: "conjugated-J-perturbed".to_string(),
+                    matrix: rows_2x2(&transformed_generator),
+                }],
+            };
+            let error = transformed.try_admit(selected_profile).unwrap_err();
+            let defect = relative_defect(error);
+            assert!(
+                (canonical_defect - defect).abs() < 2.0e-10,
+                "metric-skew residual changed for basis {index}: {canonical_defect} vs {defect}"
+            );
+        }
     }
 
     #[test]
