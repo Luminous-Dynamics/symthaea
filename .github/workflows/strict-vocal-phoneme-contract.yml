@@ -64,8 +64,19 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Format-check only the changed Rust files
-        run: rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs src/voice/formant_singing_engine.rs src/voice/singing_quality.rs src/voice/kokoro_singing.rs src/voice/diffsinger.rs examples/muse_vocal_release_gate.rs
+      - name: Apply pinned rustfmt and check changed Rust files
+        run: |
+          rustfmt +1.96.0 --edition 2024 src/voice/mod.rs src/voice/singing_engine.rs src/voice/formant_singing_engine.rs src/voice/singing_quality.rs src/voice/kokoro_singing.rs src/voice/diffsinger.rs examples/muse_vocal_release_gate.rs
+          rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs src/voice/formant_singing_engine.rs src/voice/singing_quality.rs src/voice/kokoro_singing.rs src/voice/diffsinger.rs examples/muse_vocal_release_gate.rs
+
+      - name: Upload canonical formatter output
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitch-prior-rustfmt-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            src/voice/formant_singing_engine.rs
+            src/voice/singing_quality.rs
+          if-no-files-found: error
 
       - name: Format-check standalone pronunciation lattice
         run: cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
