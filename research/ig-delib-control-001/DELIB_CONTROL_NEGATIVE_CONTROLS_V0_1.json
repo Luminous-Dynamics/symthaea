@@ -1,7 +1,7 @@
 {
   "schema_version": "ig-delib-control-negative-v0.1",
   "status": "synthetic_negative_controls_unexecuted",
-  "fixture_count": 24,
+  "fixture_count": 30,
   "fixtures": [
     {
       "fixture_id": "NEG-001",
@@ -83,15 +83,15 @@
     },
     {
       "fixture_id": "NEG-007",
-      "description": "non-boolean evidence completeness",
+      "description": "Unknown evidence-closure status is rejected.",
       "target_fixture_id": "DC-001-1",
       "mutation": {
         "operation": "set",
-        "path": "/state/evidence_complete",
-        "value": "yes"
+        "path": "/state/evidence_closure_status",
+        "value": "Closed"
       },
       "expected_violations": [
-        "evidence_complete_invalid"
+        "evidence_closure_status_invalid"
       ]
     },
     {
@@ -313,6 +313,86 @@
       },
       "expected_violations": [
         "expected_action_invalid"
+      ]
+    },
+    {
+      "fixture_id": "NEG-025",
+      "description": "A verified closure without receipt digest is rejected.",
+      "target_fixture_id": "DC-001-2",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/evidence_closure_status",
+        "value": "Verified"
+      },
+      "expected_violations": [
+        "evidence_closure_receipt_missing",
+        "evidence_closure_validator_identity_missing",
+        "evidence_closure_validator_version_missing"
+      ]
+    },
+    {
+      "fixture_id": "NEG-026",
+      "description": "A verified closure with malformed receipt digest is rejected.",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/evidence_closure_receipt_sha256",
+        "value": "not-a-digest"
+      },
+      "expected_violations": [
+        "evidence_closure_receipt_missing"
+      ]
+    },
+    {
+      "fixture_id": "NEG-027",
+      "description": "A verified closure without validator identity is rejected.",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/evidence_closure_validator_id",
+        "value": null
+      },
+      "expected_violations": [
+        "evidence_closure_validator_identity_missing"
+      ]
+    },
+    {
+      "fixture_id": "NEG-028",
+      "description": "A verified closure without validator version is rejected.",
+      "target_fixture_id": "DC-001-1",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/evidence_closure_validator_version",
+        "value": null
+      },
+      "expected_violations": [
+        "evidence_closure_validator_version_missing"
+      ]
+    },
+    {
+      "fixture_id": "NEG-029",
+      "description": "An incomplete closure cannot carry a verification receipt.",
+      "target_fixture_id": "DC-001-2",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/evidence_closure_receipt_sha256",
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "expected_violations": [
+        "evidence_closure_receipt_unexpected"
+      ]
+    },
+    {
+      "fixture_id": "NEG-030",
+      "description": "An unassessed closure cannot carry validator identity.",
+      "target_fixture_id": "DC-001-2",
+      "mutation": {
+        "operation": "set",
+        "path": "/state/evidence_closure_validator_id",
+        "value": "synthetic-validator"
+      },
+      "expected_violations": [
+        "evidence_closure_validator_identity_unexpected"
       ]
     }
   ],
