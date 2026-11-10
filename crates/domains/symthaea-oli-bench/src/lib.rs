@@ -574,6 +574,18 @@ mod tests {
         assert!((accuracy[2] - 0.613_333_333_3).abs() < 1.0e-9);
         assert!((accuracy[3] - 0.493_333_333_3).abs() < 1.0e-9);
         assert!((accuracy[4] - 0.493_333_333_3).abs() < 1.0e-9);
+        assert!(
+            (report.condition_results[0].cluster_bootstrap_95[0] - 0.853_333_333_3).abs()
+                < 1.0e-9
+        );
+        assert!(
+            (report.condition_results[4].cluster_bootstrap_95[1] - 0.586_666_666_7).abs()
+                < 1.0e-9
+        );
+        assert!(
+            (report.paired_subject_differences[0].mean_difference - 0.293_333_333_3).abs()
+                < 1.0e-9
+        );
     }
 
     #[test]
@@ -586,6 +598,13 @@ mod tests {
             assert!(baseline.brier_score.is_finite());
             assert!(baseline.mean_log_loss.is_finite());
         }
+        let condition_only = report
+            .leave_one_subject_out_baselines
+            .iter()
+            .find(|baseline| baseline.baseline == "condition_only_laplace_rate")
+            .expect("condition-only baseline should be present");
+        assert!((condition_only.brier_score - 0.214_766_496_2).abs() < 1.0e-9);
+        assert!((condition_only.mean_log_loss - 0.612_932_312_4).abs() < 1.0e-9);
     }
 
     #[test]
