@@ -29,8 +29,16 @@ Secondary estimands:
 - heterogeneous treatment effects by apparent-wind angle, wind speed, device configuration, loading state, sea state and route segment;
 - effect of an EMS dispatch policy versus the reference policy under forecasts actually available at decision time.
 
+Gas-resolved secondary estimands:
+- average treatment effect on per-engine CH4 and N2O mass rate over eligible windows;
+- gas-specific mass per delivered tonne-nautical-mile or TEU-nautical-mile after aggregating only eligible matched-service windows;
+- heterogeneous gas response by engine load, fuel batch, WAPS achieved state, apparent-wind angle and ambient conditions.
+
+Gas effects require the engine-resolved evidence contract in [MARINE-GAS-RESOLVED-EVIDENCE-001](./MARINE-GAS-RESOLVED-EVIDENCE-001.md) and [#11532](https://github.com/Luminous-Dynamics/symthaea/issues/11532). Direct test-bed/onboard measurement, engine-load-calculated emissions and CEMS must remain distinct evidence methods. Do not combine their values without a predeclared method-comparison model and uncertainty treatment. Do not convert gas mass to CO2e without a frozen GWP edition and regulatory/accounting boundary.
+
 Do not conflate:
 - device command with achieved aerodynamic force;
+- commanded WAPS state with achieved WAPS state; a state mismatch is non-adherence, not a successful treatment exposure;
 - shaft power with total fuel;
 - fuel mass with primary energy;
 - tank-to-wake emissions with well-to-wake emissions;
