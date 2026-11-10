@@ -259,6 +259,11 @@ pub fn solve_coupled_battery_substep(
             let capacity_j = battery.nominal_energy_wh
                 * battery.state_of_health
                 * SECONDS_PER_HOUR;
+            if !capacity_j.is_finite() || capacity_j <= 0.0 {
+                return Err(CoupledBatteryStepError::InvalidBatteryState(
+                    "usable pack energy capacity overflowed or is non-positive",
+                ));
+            }
             let state_of_charge_end =
                 state_of_charge - chemical_energy_j / capacity_j;
             if !state_of_charge_end.is_finite()
@@ -355,7 +360,7 @@ fn validate_inputs(
         || !battery.maximum_temperature_k.is_finite()
         || battery.maximum_temperature_k <= 0.0
         || !battery.reserve_state_of_charge.is_finite()
-        || !(0.0..1.0).contains(&battery.reserve_state_of_charge)
+        || !(0.0..=1.0).contains(&battery.reserve_state_of_charge)
     {
         return Err(CoupledBatteryStepError::InvalidBatteryState(
             "battery capacity, SOH, limits, temperature ceiling, or reserve is invalid",
@@ -741,4 +746,38 @@ mod tests {
         );
         assert!(matches!(result, Err(CoupledBatteryStepError::ElectricalInfeasible { .. })));
     }
+    #[test]
+    fn zero_reserve_is_valid_and_energy_capacity_overflow_fails_closed() {
+        let mut zero_reserve = battery();
+        zero_reserve.reserve_state_of_charge = 0.0;
+        let no_load = solve_coupled_battery_substep(
+            &zero_reserve,
+            &characterization([[0.04, 0.04], [0.04, 0.04]], 360.0),
+            &network(360.0, 100_000.0),
+            &ThermalState { temperatures_k: vec![298.15] },
+            0.8,
+            0.0,
+            &[0.0],
+            &config(1.0),
+        )
+        .unwrap();
+        assert_eq!(no_load.state_of_charge_end, 0.8);
+
+        let mut overflowing_capacity = battery();
+        overflowing_capacity.nominal_energy_wh = f64::MAX;
+        assert!(matches!(
+            solve_coupled_battery_substep(
+                &overflowing_capacity,
+                &characterization([[0.04, 0.04], [0.04, 0.04]], 360.0),
+                &network(360.0, 100_000.0),
+                &ThermalState { temperatures_k: vec![298.15] },
+                0.8,
+                0.0,
+                &[0.0],
+                &config(1.0),
+            ),
+            Err(CoupledBatteryStepError::InvalidBatteryState(_))
+        ));
+    }
+
 }
