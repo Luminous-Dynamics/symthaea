@@ -109,7 +109,8 @@
         ]
       },
       "expected_violations": [
-        "fit_evaluation_group_overlap"
+        "fit_evaluation_group_overlap",
+        "evaluation_group_unbound"
       ]
     },
     {
@@ -123,7 +124,8 @@
         ]
       },
       "expected_violations": [
-        "validation_evaluation_group_overlap"
+        "validation_evaluation_group_overlap",
+        "evaluation_group_unbound"
       ]
     },
     {
