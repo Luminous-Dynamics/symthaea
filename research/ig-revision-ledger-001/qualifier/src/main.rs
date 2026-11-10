@@ -7,7 +7,7 @@ use std::{
 
 const LEDGER_ID: &str = "IG-REVISION-LEDGER-001";
 const MANIFEST_SCHEMA_VERSION: &str = "ig-revision-ledger-fixtures-v0.1";
-const EXPECTED_FIXTURES: usize = 17;
+const EXPECTED_FIXTURES: usize = 21;
 
 #[derive(Debug, PartialEq, Eq)]
 struct Report {
@@ -93,6 +93,44 @@ fn validate_state(state: &Value, context: &str, errors: &mut Vec<String>) {
         let values = string_array(&state[key]);
         if values.len() != string_set(&state[key]).len() {
             add(errors, context, format!("state {key} must not contain duplicates"));
+        }
+    }
+
+    if !state["confidence"].is_null() {
+        let confidence = &state["confidence"];
+        let value = confidence["value"].as_f64();
+        let scale = field(confidence, "scale");
+        let profile = field(confidence, "calibration_profile_sha256");
+        let receipt = field(confidence, "calibration_receipt_sha256");
+        match field(confidence, "status") {
+            Some("NotProvided") => {
+                if value.is_some() || scale.is_some() || profile.is_some() || receipt.is_some() {
+                    add(errors, context, "confidence_not_provided_must_be_empty");
+                }
+            }
+            Some("SelfReported") => {
+                if value.is_none_or(|value| !(0.0..=1.0).contains(&value)) {
+                    add(errors, context, "confidence_value_out_of_range");
+                }
+                if scale.is_none() {
+                    add(errors, context, "confidence_scale_missing");
+                }
+                if profile.is_some() || receipt.is_some() {
+                    add(errors, context, "self_report_confidence_cannot_claim_calibration");
+                }
+            }
+            Some("Calibrated") => {
+                if value.is_none_or(|value| !(0.0..=1.0).contains(&value)) {
+                    add(errors, context, "confidence_value_out_of_range");
+                }
+                if scale.is_none()
+                    || profile.is_none_or(|value| !is_sha256(value))
+                    || receipt.is_none_or(|value| !is_sha256(value))
+                {
+                    add(errors, context, "confidence_calibration_evidence_missing");
+                }
+            }
+            Some(_) | None => add(errors, context, "confidence_status_invalid"),
         }
     }
 }
@@ -635,16 +673,16 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_seventeen_fixture_oracles_validate() {
+    fn checked_in_twenty_one_fixture_oracles_validate() {
         let report = validate_manifest(
             &parsed(MANIFEST),
             &parsed(MANIFEST_SCHEMA),
             &parsed(RECORD_SCHEMA),
         )
         .expect("manifest and event fixtures must validate");
-        assert_eq!(report.fixtures, 17);
-        assert_eq!(report.valid_controls, 8);
-        assert_eq!(report.negative_controls, 9);
+        assert_eq!(report.fixtures, 21);
+        assert_eq!(report.valid_controls, 10);
+        assert_eq!(report.negative_controls, 11);
     }
 
     #[test]
@@ -687,6 +725,32 @@ mod tests {
             record["causal_attribution"]["varied_factor"]["treatment_sha256"].clone();
         let errors = validate_record(&record);
         assert!(errors.contains(&"causal_pair_has_no_distinct_intervention_factor".to_string()));
+    }
+
+    #[test]
+    fn self_reported_confidence_is_not_calibrated_evidence() {
+        let record = parsed(MANIFEST)["fixtures"][17]["record"].clone();
+        let errors = validate_record(&record);
+        assert!(errors.is_empty());
+        assert_eq!(
+            record["next_state"]["confidence"]["status"].as_str(),
+            Some("SelfReported")
+        );
+        assert!(record["evidence_delta"]["newly_available"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn calibrated_confidence_requires_external_profile_and_receipt() {
+        let record = parsed(MANIFEST)["fixtures"][19]["record"].clone();
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"confidence_calibration_evidence_missing".to_string()));
+    }
+
+    #[test]
+    fn confidence_probability_must_remain_in_unit_interval() {
+        let record = parsed(MANIFEST)["fixtures"][20]["record"].clone();
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"confidence_value_out_of_range".to_string()));
     }
 
     #[test]
