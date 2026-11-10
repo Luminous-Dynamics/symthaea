@@ -2102,6 +2102,119 @@ pub mod part_aware_v1 {
             }
         }
 
+        fn assert_parsed_midi_matches_receipt(artifact: &PartAwareMidiArtifactV1) {
+            let smf = midly::Smf::parse(&artifact.midi_bytes)
+                .expect("part-aware exporter must emit a parseable Standard MIDI File");
+            assert_eq!(smf.tracks.len(), artifact.receipt.track_count);
+            assert!(matches!(
+                smf.header.timing,
+                midly::Timing::Metrical(ticks)
+                    if ticks.as_int() == MIDI_TICKS_PER_QUARTER_V1
+            ));
+
+            let mut actual_note_ons = Vec::<(u16, u8, u8, u8, u64)>::new();
+            let mut actual_note_offs = Vec::<(u16, u8, u8, u64)>::new();
+            let mut actual_program_changes = Vec::<(u16, u8, u8, u64)>::new();
+            for (track_index, track) in smf.tracks.iter().enumerate() {
+                let mut absolute_tick = 0_u64;
+                for event in track {
+                    absolute_tick += u64::from(event.delta.as_int());
+                    let midly::TrackEventKind::Midi { channel, message } = &event.kind else {
+                        continue;
+                    };
+                    let channel = channel.as_int();
+                    match message {
+                        midly::MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
+                            actual_note_ons.push((
+                                track_index as u16,
+                                channel,
+                                key.as_int(),
+                                vel.as_int(),
+                                absolute_tick,
+                            ));
+                        }
+                        midly::MidiMessage::NoteOff { key, .. } => {
+                            actual_note_offs.push((
+                                track_index as u16,
+                                channel,
+                                key.as_int(),
+                                absolute_tick,
+                            ));
+                        }
+                        midly::MidiMessage::NoteOn { key, vel } if vel.as_int() == 0 => {
+                            actual_note_offs.push((
+                                track_index as u16,
+                                channel,
+                                key.as_int(),
+                                absolute_tick,
+                            ));
+                        }
+                        midly::MidiMessage::ProgramChange { program } => {
+                            actual_program_changes.push((
+                                track_index as u16,
+                                channel,
+                                program.as_int(),
+                                absolute_tick,
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            let mut expected_note_ons: Vec<_> = artifact
+                .receipt
+                .event_map
+                .iter()
+                .map(|event| {
+                    (
+                        event.track_index,
+                        event.channel,
+                        event.midi_pitch,
+                        event.midi_velocity,
+                        event.onset_tick,
+                    )
+                })
+                .collect();
+            let mut expected_note_offs: Vec<_> = artifact
+                .receipt
+                .event_map
+                .iter()
+                .map(|event| {
+                    (
+                        event.track_index,
+                        event.channel,
+                        event.midi_pitch,
+                        event.offset_tick,
+                    )
+                })
+                .collect();
+            let mut expected_program_changes: Vec<_> = artifact
+                .receipt
+                .program_changes
+                .iter()
+                .map(|event| {
+                    (
+                        event.track_index,
+                        event.channel,
+                        event.program,
+                        event.start_tick,
+                    )
+                })
+                .collect();
+
+            actual_note_ons.sort_unstable();
+            actual_note_offs.sort_unstable();
+            actual_program_changes.sort_unstable();
+            expected_note_ons.sort_unstable();
+            expected_note_offs.sort_unstable();
+            expected_program_changes.sort_unstable();
+
+            assert_eq!(actual_note_ons, expected_note_ons);
+            assert_eq!(actual_note_offs, expected_note_offs);
+            assert_eq!(actual_program_changes, expected_program_changes);
+        }
+
         #[test]
         fn changed_score_is_rejected_when_caller_reuses_a_stale_digest() {
             let source = score(vec![note(1, 60, Duration::zero(), Duration::quarter())]);
@@ -2223,6 +2336,7 @@ pub mod part_aware_v1 {
                 .event_map
                 .iter()
                 .all(|mapping| mapping.score_sha256 == digest));
+            assert_parsed_midi_matches_receipt(&artifact);
         }
 
         #[test]
@@ -2275,6 +2389,7 @@ pub mod part_aware_v1 {
             assert_eq!(artifact.receipt.program_changes[0].program, 42);
             assert_eq!(artifact.receipt.program_changes[1].program, 73);
             assert_eq!(artifact.receipt.program_changes[1].segment_id, "response");
+            assert_parsed_midi_matches_receipt(&artifact);
         }
 
         #[test]
