@@ -514,7 +514,9 @@
         "future_wind_measurement_certification"
       ],
       "source_ids": [
-        "EU-MRV-FUELEU-REVISION-2026-0210"
+        "EU-MRV-FUELEU-REVISION-2026-0210",
+        "EU-MRV-FUELEU-COM2026-620-TEXT",
+        "EU-MRV-FUELEU-COM2026-620-ANNEX"
       ],
       "limitations": [
         "Proposal published 17 July 2026; refresh as the ordinary legislative procedure progresses.",
@@ -623,6 +625,35 @@
       "limitations": [
         "Procedure 2026/0210(COD) is a pending proposal, not adopted law.",
         "Wind-energy standards/certification are future implementing acts and are not specified by this source record."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-FUELEU-COM2026-620-TEXT",
+      "title": "COM(2026) 620 final — proposed regulation amending maritime MRV and FuelEU",
+      "publisher": "European Commission",
+      "uri": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52026PC0620",
+      "publication_date": "2026-07-17",
+      "evidence_class": "official_legislative_proposal_text",
+      "limitations": [
+        "Pending legislative proposal, not adopted law.",
+        "Text may be amended during procedure 2026/0210(COD)."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-FUELEU-COM2026-620-ANNEX",
+      "title": "Annex to COM(2026) 620 final — proposed methods for monitoring GHG emissions and energy used",
+      "publisher": "European Commission / Publications Office of the European Union",
+      "uri": "https://publications.europa.eu/resource/cellar/bef58239-81f4-11f1-bf5e-01aa75ed71a1.0001.03/DOC_2",
+      "publication_date": "2026-07-17",
+      "evidence_class": "official_legislative_proposal_annex",
+      "scope": {
+        "proposal": "COM(2026) 620 final / 2026/0210(COD)",
+        "wind_power_method": "Proposed Annex I formula treats energy used from substitute sources separately; wind-energy amount is to be determined using international standards and certification references set by implementing acts under proposed Article 5(4).",
+        "retention": "Proposal text sets 10-year retention for monitoring records to support reproducibility."
+      },
+      "limitations": [
+        "Proposed method only; implementing-act standards/certification have not yet been issued by this proposal.",
+        "Do not use this annex as the current statutory WAPS calculation or certification method."
       ]
     }
   ]
