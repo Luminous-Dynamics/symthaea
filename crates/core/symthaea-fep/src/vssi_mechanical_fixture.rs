@@ -330,9 +330,9 @@ impl VssiMechanicalEnvironment {
             .collect::<Vec<_>>();
         let budget_after = (budget_before - spec.observation_cost).max(0.0);
         let public_task_digest =
-            sha256_serializable(b"symthaea-vssi-public-task-v1\\0", &self.task)?;
+            sha256_serializable(b"symthaea-vssi-public-task-v1\0", &self.task)?;
         let observations_digest =
-            sha256_serializable(b"symthaea-vssi-observation-batch-v1\\0", &observations)?;
+            sha256_serializable(b"symthaea-vssi-observation-batch-v1\0", &observations)?;
         let experiment_index = self.experiment_receipts.len() as u64 + 1;
         let previous_receipt_digest = self
             .experiment_receipts
@@ -351,7 +351,7 @@ impl VssiMechanicalEnvironment {
             previous_receipt_digest: previous_receipt_digest.as_deref(),
         };
         let receipt_digest =
-            sha256_serializable(b"symthaea-vssi-experiment-receipt-v1\\0", &claims)?;
+            sha256_serializable(b"symthaea-vssi-experiment-receipt-v1\0", &claims)?;
         let receipt = VssiExperimentReceipt {
             scenario_id: self.task.scenario_id.clone(),
             public_task_digest,
@@ -710,7 +710,7 @@ mod tests {
         assert_eq!(
             first.receipt.observations_digest,
             sha256_serializable(
-                b"symthaea-vssi-observation-batch-v1\\0",
+                b"symthaea-vssi-observation-batch-v1\0",
                 &first.observations
             )
             .unwrap()
