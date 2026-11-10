@@ -596,7 +596,10 @@ mod tests {
                     maximum_absolute_delta: 0.5,
                 },
                 CollateralLimit {
-                    metric: MetricContract { metric_id: "phrase_energy_db".into(), unit: "dB".into() },
+                    metric: MetricContract {
+                        metric_id: "phrase_energy_db".into(),
+                        unit: "dB".into(),
+                    },
                     maximum_absolute_delta: 0.1,
                 },
             ],
