@@ -35,6 +35,8 @@ Each correction iteration:
 - binds the same source case and frozen context digest;
 - binds a new output digest and complete metric family.
 
+The specification also names an action-norm profile. That profile defines the control coordinates, normalization/scaling and norm convention, so a numeric action bound is not silently compared across incompatible control spaces. The action-norm profile ID is preserved in the final trajectory report.
+
 The frozen context digest must commit to the source case, lyrics, pronunciation plan, score/alignment, voice identity and authorization, renderer and voicebank artifacts, analyzer artifacts, preprocessing, calibration profile and other fixed inputs. A changed context starts a new trajectory.
 
 ## Target and collateral rules
