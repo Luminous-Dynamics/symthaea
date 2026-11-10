@@ -268,7 +268,7 @@
     },
     "metrics": {
       "type": "array",
-      "minItems": 12,
+      "minItems": 16,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -314,7 +314,12 @@
         "communication_graph_semantics_separate_from_delegation",
         "centrality_preconditions_and_tie_breaks_explicit",
         "include_confidence_and_diversity_controls",
-        "include_consensus_free_trajectory_baseline"
+        "include_consensus_free_trajectory_baseline",
+        "include_separate_verbal_internal_confidence_channels",
+        "include_argumentation_and_rebuttal_quality_comparator",
+        "include_epistemic_aleatoric_uncertainty_decomposition",
+        "include_posterior_guided_routing_under_equal_budget",
+        "confidence_never_grants_voice_or_authority"
       ],
       "properties": {
         "fixture_count": {
@@ -363,6 +368,21 @@
           "const": true
         },
         "include_consensus_free_trajectory_baseline": {
+          "const": true
+        },
+        "include_separate_verbal_internal_confidence_channels": {
+          "const": true
+        },
+        "include_argumentation_and_rebuttal_quality_comparator": {
+          "const": true
+        },
+        "include_epistemic_aleatoric_uncertainty_decomposition": {
+          "const": true
+        },
+        "include_posterior_guided_routing_under_equal_budget": {
+          "const": true
+        },
+        "confidence_never_grants_voice_or_authority": {
           "const": true
         }
       }
@@ -426,7 +446,7 @@
       "properties": {
         "required_commitments": {
           "type": "array",
-          "minItems": 34,
+          "minItems": 41,
           "uniqueItems": true,
           "items": {
             "type": "string"
@@ -485,7 +505,7 @@
     },
     "external_research": {
       "type": "array",
-      "minItems": 12,
+      "minItems": 16,
       "uniqueItems": true,
       "items": {
         "type": "object",
