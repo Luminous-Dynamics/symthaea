@@ -53,7 +53,9 @@ pub struct PitchBenchmarkSpecV1 {
     pub reference_suite_version: String,
     pub reference_manifest_sha256: String,
     pub calibration_split_id: String,
+    pub calibration_manifest_sha256: String,
     pub evaluation_split_id: String,
+    pub evaluation_manifest_sha256: String,
     pub voicing_calibration_receipt_sha256: String,
     /// Some trackers expose a confidence value with a frozen numeric cutoff;
     /// trackers with an intrinsic voiced/unvoiced decision use None and must
@@ -333,6 +335,8 @@ fn validate_spec(spec: &PitchBenchmarkSpecV1) -> Result<(), PitchBenchmarkError>
             "voicing calibration split must be disjoint from the evaluation split",
         ));
     }
+    require_digest(&spec.calibration_manifest_sha256, "calibration_manifest_sha256")?;
+    require_digest(&spec.evaluation_manifest_sha256, "evaluation_manifest_sha256")?;
     require_digest(
         &spec.voicing_calibration_receipt_sha256,
         "voicing_calibration_receipt_sha256",
@@ -631,7 +635,9 @@ mod tests {
             reference_suite_version: "v1".to_owned(),
             reference_manifest_sha256: digest('b'),
             calibration_split_id: "singer-song-session-calibration".to_owned(),
+            calibration_manifest_sha256: digest('8'),
             evaluation_split_id: "singer-song-session-heldout".to_owned(),
+            evaluation_manifest_sha256: digest('9'),
             voicing_calibration_receipt_sha256: digest('7'),
             voicing_confidence_threshold: Some(0.5),
             preprocessing_manifest_sha256: digest('c'),
