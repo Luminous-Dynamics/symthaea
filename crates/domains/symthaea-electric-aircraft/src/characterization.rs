@@ -86,6 +86,16 @@ pub enum CharacterizationError {
         maximum: f64,
     },
     InvalidOperatingPoint(String),
+    InvalidGrid(String),
+    GridOutsideCalibrationDomain {
+        grid_id: String,
+        x_observed: f64,
+        y_observed: f64,
+        x_minimum: f64,
+        x_maximum: f64,
+        y_minimum: f64,
+        y_maximum: f64,
+    },
 }
 
 impl fmt::Display for CharacterizationError {
@@ -285,6 +295,230 @@ impl PropulsionCharacterization {
             self.motor_efficiency_by_load.evidence.id.clone(),
             self.inverter_efficiency_by_load.evidence.id.clone(),
             self.propeller_efficiency_by_advance_ratio.evidence.id.clone(),
+        ];
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ScalarGridPoint {
+    pub value: f64,
+    /// Absolute uncertainty bound; not a standard deviation.
+    pub absolute_uncertainty: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ScalarGridSample {
+    pub nominal_value: f64,
+    pub absolute_uncertainty: f64,
+    pub conservative_lower_bound: f64,
+    pub conservative_upper_bound: f64,
+}
+
+/// Rectilinear scalar grid stored as rows of x and columns of y.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScalarGrid2D {
+    pub id: String,
+    pub x_axis: String,
+    pub x_unit: String,
+    pub x_values: Vec<f64>,
+    pub y_axis: String,
+    pub y_unit: String,
+    pub y_values: Vec<f64>,
+    pub evidence: EvidenceRecord,
+    /// values[x_index][y_index]
+    pub values: Vec<Vec<ScalarGridPoint>>,
+}
+
+impl ScalarGrid2D {
+    pub fn validate(&self) -> Result<(), CharacterizationError> {
+        self.evidence.validate()?;
+        if self.id.trim().is_empty()
+            || self.x_axis.trim().is_empty()
+            || self.x_unit.trim().is_empty()
+            || self.y_axis.trim().is_empty()
+            || self.y_unit.trim().is_empty()
+            || self.x_values.len() < 2
+            || self.y_values.len() < 2
+            || self.values.len() != self.x_values.len()
+        {
+            return Err(CharacterizationError::InvalidGrid(
+                "grid metadata, axes, or row count are invalid".into(),
+            ));
+        }
+
+        for axis in [&self.x_values, &self.y_values] {
+            let mut previous = None;
+            for value in axis {
+                if !value.is_finite() || previous.is_some_and(|prior| *value <= prior) {
+                    return Err(CharacterizationError::InvalidGrid(
+                        "grid axes must be finite and strictly increasing".into(),
+                    ));
+                }
+                previous = Some(*value);
+            }
+        }
+
+        for row in &self.values {
+            if row.len() != self.y_values.len() {
+                return Err(CharacterizationError::InvalidGrid(
+                    "grid rows must match the y-axis length".into(),
+                ));
+            }
+            for point in row {
+                if !point.value.is_finite()
+                    || point.value <= 0.0
+                    || !point.absolute_uncertainty.is_finite()
+                    || point.absolute_uncertainty < 0.0
+                    || point.absolute_uncertainty >= point.value
+                {
+                    return Err(CharacterizationError::InvalidGrid(
+                        "grid values and absolute uncertainty bounds must be finite and positive".into(),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn sample(&self, x: f64, y: f64) -> Result<ScalarGridSample, CharacterizationError> {
+        self.validate()?;
+        if !x.is_finite() || !y.is_finite() {
+            return Err(CharacterizationError::InvalidOperatingPoint(
+                "grid operating coordinates must be finite".into(),
+            ));
+        }
+        let x_min = self.x_values[0];
+        let x_max = *self.x_values.last().expect("validated x axis");
+        let y_min = self.y_values[0];
+        let y_max = *self.y_values.last().expect("validated y axis");
+        if x < x_min || x > x_max || y < y_min || y > y_max {
+            return Err(CharacterizationError::GridOutsideCalibrationDomain {
+                grid_id: self.id.clone(),
+                x_observed: x,
+                y_observed: y,
+                x_minimum: x_min,
+                x_maximum: x_max,
+                y_minimum: y_min,
+                y_maximum: y_max,
+            });
+        }
+
+        let (x0, x1, tx) = bracket(&self.x_values, x);
+        let (y0, y1, ty) = bracket(&self.y_values, y);
+        let value_at_x0 = interpolate(
+            self.values[x0][y0].value,
+            self.values[x0][y1].value,
+            ty,
+        );
+        let value_at_x1 = interpolate(
+            self.values[x1][y0].value,
+            self.values[x1][y1].value,
+            ty,
+        );
+        let uncertainty_at_x0 = interpolate(
+            self.values[x0][y0].absolute_uncertainty,
+            self.values[x0][y1].absolute_uncertainty,
+            ty,
+        );
+        let uncertainty_at_x1 = interpolate(
+            self.values[x1][y0].absolute_uncertainty,
+            self.values[x1][y1].absolute_uncertainty,
+            ty,
+        );
+        let nominal_value = interpolate(value_at_x0, value_at_x1, tx);
+        let absolute_uncertainty =
+            interpolate(uncertainty_at_x0, uncertainty_at_x1, tx);
+        Ok(ScalarGridSample {
+            nominal_value,
+            absolute_uncertainty,
+            conservative_lower_bound: nominal_value - absolute_uncertainty,
+            conservative_upper_bound: nominal_value + absolute_uncertainty,
+        })
+    }
+}
+
+fn bracket(axis: &[f64], value: f64) -> (usize, usize, f64) {
+    if value == axis[axis.len() - 1] {
+        let lower = axis.len() - 2;
+        return (lower, lower + 1, 1.0);
+    }
+    let lower = axis
+        .windows(2)
+        .position(|pair| value >= pair[0] && value <= pair[1])
+        .expect("validated in-domain point has a bracket");
+    let fraction = (value - axis[lower]) / (axis[lower + 1] - axis[lower]);
+    (lower, lower + 1, fraction)
+}
+
+fn interpolate(lower: f64, upper: f64, fraction: f64) -> f64 {
+    lower + fraction * (upper - lower)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BatteryOperatingPoint {
+    /// Conservative low-side voltage used by the mission solver.
+    pub open_circuit_voltage_v: f64,
+    /// Conservative high-side resistance used by the mission solver.
+    pub internal_resistance_ohm: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BatteryCharacterization {
+    /// Pack open-circuit voltage over state of charge and pack temperature.
+    pub open_circuit_voltage: ScalarGrid2D,
+    /// Pack DC resistance over state of charge and pack temperature.
+    pub internal_resistance: ScalarGrid2D,
+}
+
+impl BatteryCharacterization {
+    pub fn validate(&self) -> Result<(), CharacterizationError> {
+        self.open_circuit_voltage.validate()?;
+        self.internal_resistance.validate()?;
+
+        let voltage = &self.open_circuit_voltage;
+        let resistance = &self.internal_resistance;
+        if voltage.x_axis != "state_of_charge"
+            || voltage.x_unit != "1"
+            || voltage.y_axis != "temperature"
+            || voltage.y_unit != "K"
+            || resistance.x_axis != voltage.x_axis
+            || resistance.x_unit != voltage.x_unit
+            || resistance.y_axis != voltage.y_axis
+            || resistance.y_unit != voltage.y_unit
+            || resistance.x_values != voltage.x_values
+            || resistance.y_values != voltage.y_values
+        {
+            return Err(CharacterizationError::InvalidGrid(
+                "battery OCV and resistance grids must share SOC/temperature axes and units".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Resolve conservative OCV and resistance at the current SOC/temperature.
+    /// OCV uncertainty is subtracted; resistance uncertainty is added.
+    pub fn operating_point(
+        &self,
+        state_of_charge: f64,
+        temperature_k: f64,
+    ) -> Result<BatteryOperatingPoint, CharacterizationError> {
+        self.validate()?;
+        let voltage = self.open_circuit_voltage.sample(state_of_charge, temperature_k)?;
+        let resistance = self.internal_resistance.sample(state_of_charge, temperature_k)?;
+        Ok(BatteryOperatingPoint {
+            open_circuit_voltage_v: voltage.conservative_lower_bound,
+            internal_resistance_ohm: resistance.conservative_upper_bound,
+        })
+    }
+
+    pub fn evidence_ids(&self) -> Vec<String> {
+        let mut ids = vec![
+            self.open_circuit_voltage.evidence.id.clone(),
+            self.internal_resistance.evidence.id.clone(),
         ];
         ids.sort();
         ids.dedup();
