@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-energy-source-ledger:0.1.0",
+  "title": "Luminous Marine Energy Source Ledger v0.1.0",
+  "description": "Directed energy-source and conversion-flow graph with integer micro-GJ source-input accounting. Research contract, not a statutory energy formula.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ledger_id",
+    "record_status",
+    "accounting_basis",
+    "vessel_configuration_sha256",
+    "service_fingerprint",
+    "reporting_window",
+    "energy_sources",
+    "evidence_source_ids",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "ledger_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "enum": [
+        "synthetic",
+        "research_record",
+        "reviewed"
+      ]
+    },
+    "accounting_basis": {
+      "const": "research_source_input_boundary_v1"
+    },
+    "vessel_configuration_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "service_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "reporting_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "timebase_id"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timebase_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "energy_sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/energy_source"
+      }
+    },
+    "evidence_source_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "energy_value": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value_micro_gj",
+            "evidence_source_id"
+          ],
+          "properties": {
+            "value_micro_gj": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "evidence_source_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value_micro_gj",
+            "unknown_reason",
+            "evidence_source_id"
+          ],
+          "properties": {
+            "value_micro_gj": {
+              "type": "null"
+            },
+            "unknown_reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_source_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "energy_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "measurement_id",
+        "source_type",
+        "flow_role",
+        "consumer_boundary",
+        "energy",
+        "method_id",
+        "parent_source_ids",
+        "limitations"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "enum": [
+            "fuel_consumption",
+            "shore_electricity",
+            "onboard_renewable",
+            "wind_assistance",
+            "generator_output",
+            "battery_discharge",
+            "shaft_output",
+            "conversion_loss"
+          ]
+        },
+        "flow_role": {
+          "enum": [
+            "primary_input",
+            "substitute_input",
+            "conversion_output",
+            "loss"
+          ]
+        },
+        "consumer_boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "energy": {
+          "$ref": "#/$defs/energy_value"
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_source_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
