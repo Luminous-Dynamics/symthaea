@@ -1332,7 +1332,8 @@
         "no_live_peer_access_in_private_reelicitation",
         "claim_ceiling_preserved",
         "pluralism_no_single_ground_truth",
-        "dissent_and_tradeoffs_preserved"
+        "dissent_and_tradeoffs_preserved",
+        "exposure_memory_digest_recorded_when_persistence_is_measured"
       ],
       "scenario_note": "Fictional municipal water allocation balances household affordability against ecological reserve; no single preference ordering is designated correct.",
       "paired_content_ref": null,
@@ -1361,7 +1362,8 @@
         "no_live_peer_access_in_private_reelicitation",
         "claim_ceiling_preserved",
         "pluralism_no_single_ground_truth",
-        "dissent_and_tradeoffs_preserved"
+        "dissent_and_tradeoffs_preserved",
+        "exposure_memory_digest_recorded_when_persistence_is_measured"
       ],
       "scenario_note": "Fictional transport planning balances access, travel time, disability accommodation and neighborhood disruption; reasonable trade-offs remain plural.",
       "paired_content_ref": null,
@@ -1390,7 +1392,8 @@
         "no_live_peer_access_in_private_reelicitation",
         "claim_ceiling_preserved",
         "pluralism_no_single_ground_truth",
-        "dissent_and_tradeoffs_preserved"
+        "dissent_and_tradeoffs_preserved",
+        "exposure_memory_digest_recorded_when_persistence_is_measured"
       ],
       "scenario_note": "Fictional data-sharing policy balances privacy, public accountability and service efficiency; evaluate reasons and rights rather than convergence.",
       "paired_content_ref": null,
@@ -1419,7 +1422,8 @@
         "no_live_peer_access_in_private_reelicitation",
         "claim_ceiling_preserved",
         "pluralism_no_single_ground_truth",
-        "dissent_and_tradeoffs_preserved"
+        "dissent_and_tradeoffs_preserved",
+        "exposure_memory_digest_recorded_when_persistence_is_measured"
       ],
       "scenario_note": "Fictional emergency planning balances immediate relief with long-term resilience; multiple strategies are defensible under different value priorities.",
       "paired_content_ref": null,
@@ -1448,7 +1452,8 @@
         "no_live_peer_access_in_private_reelicitation",
         "claim_ceiling_preserved",
         "pluralism_no_single_ground_truth",
-        "dissent_and_tradeoffs_preserved"
+        "dissent_and_tradeoffs_preserved",
+        "exposure_memory_digest_recorded_when_persistence_is_measured"
       ],
       "scenario_note": "Fictional cooperative investment balances equal access, local autonomy and shared capacity; preserve dissent and explain trade-offs without a single answer key.",
       "paired_content_ref": null,
