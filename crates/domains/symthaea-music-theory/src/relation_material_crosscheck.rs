@@ -477,6 +477,59 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_material_timeline_bound_to_another_score() {
+        let mut materials = valid_materials();
+        materials.score_sha256 = "b".repeat(64);
+        let report = validate_relation_material_crosscheck(
+            &score(),
+            &relation_timeline(vec![
+                relation(EnsembleRelationKindV1::Doubling, Some("theme-A")),
+            ]),
+            &materials,
+            &digest(),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == RelationMaterialIssueCodeV1::BaseMaterialTimelineInvalid
+        }));
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == RelationMaterialIssueCodeV1::SidecarDigestMismatch
+        }));
+    }
+
+    #[test]
+    fn rejects_a_relation_timeline_using_an_unknown_digest_schema() {
+        let mut relations = relation_timeline(vec![
+            relation(EnsembleRelationKindV1::Canon, Some("theme-A")),
+        ]);
+        relations.score_digest_schema = "unknown-score-digest-v2".into();
+        let report = validate_relation_material_crosscheck(
+            &score(),
+            &relations,
+            &valid_materials(),
+            &digest(),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == RelationMaterialIssueCodeV1::BaseRelationTimelineInvalid
+        }));
+        assert!(!report.relation_report.valid);
+    }
+
+    #[test]
+    fn planned_silence_still_rejects_an_unknown_material_family() {
+        let report = validate_relation_material_crosscheck(
+            &score(),
+            &relation_timeline(vec![
+                relation(EnsembleRelationKindV1::PlannedSilence, Some("missing-family")),
+            ]),
+            &valid_materials(),
+            &digest(),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == RelationMaterialIssueCodeV1::UnknownMaterialFamily
+        }));
+    }
+
+    #[test]
     fn reports_component_validator_failures_without_cross_graph_acceptance() {
         let mut materials = valid_materials();
         materials.instances[0].event_indices[0] = 99;
