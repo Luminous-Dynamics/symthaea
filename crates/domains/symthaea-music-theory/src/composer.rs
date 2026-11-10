@@ -888,14 +888,14 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
         let Some(base_harmony_onset) = base_harmony_onset else {
             continue;
         };
-        let base_shape: Vec<(i32, f32)> = score
+        let base_shape: Vec<(i32, f32, PartId)> = score
             .notes
             .iter()
             .filter(|n| {
                 n.role == VoiceRole::Harmony
                     && (n.onset.beats() - base_harmony_onset.beats()).abs() < 1e-6
             })
-            .map(|n| (n.pitch.midi() as i32, n.velocity))
+            .map(|n| (n.pitch.midi() as i32, n.velocity, n.part))
             .collect();
         if base_shape.is_empty() {
             continue;
@@ -905,9 +905,9 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
         });
         for (onset, duration, midi, si_intensity) in melody {
             let shift = midi - base_melody_midi;
-            for &(base_midi, vel) in &base_shape {
+            for &(base_midi, vel, part) in &base_shape {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part,
                     pitch: Pitch::from_midi((base_midi + shift).clamp(0, 127) as u8),
                     onset,
                     duration,
@@ -1284,13 +1284,13 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
         let total = n.duration.beats();
         let lean_beats = (total / 2.0).min(1.0);
         let lean_480 = (lean_beats * 480.0).round() as i64;
-        let (onset, velocity, si) = (n.onset, n.velocity, n.section_intensity);
+        let (onset, velocity, si, part) = (n.onset, n.velocity, n.section_intensity, n.part);
         let note = &mut score.notes[i];
         note.onset = onset + Duration::new(lean_480, 480);
         note.duration = note.duration.saturating_sub(Duration::new(lean_480, 480));
         note.velocity *= 0.92; // the resolution releases
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: lean_pitch,
             onset,
             duration: Duration::new(lean_480, 480),
@@ -1352,6 +1352,7 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
         };
         // The cut borrows a sixteenth, capped so it never eats more than a
         // fifth of the main note — a flick, not a lean.
+        let part = n.part;
         let total = n.duration.beats();
         let cut_beats: f64 = 0.25_f64.min(total * 0.2);
         let cut_480 = ((cut_beats * 480.0).round() as i64).max(1);
@@ -1360,7 +1361,7 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
         note.onset = onset + Duration::new(cut_480, 480);
         note.duration = note.duration.saturating_sub(Duration::new(cut_480, 480));
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: cut_pitch,
             onset,
             duration: Duration::new(cut_480, 480),
@@ -1458,7 +1459,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
                 dur
             };
             chain.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: n.part,
                 pitch,
                 onset: t,
                 duration: this_dur,
@@ -1555,13 +1556,13 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
     onsets.sort_by(f64::total_cmp);
     onsets.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
 
-    let chord_at = |t: f64, score: &Score| -> Vec<(usize, Pitch, Duration, f32, f32)> {
+    let chord_at = |t: f64, score: &Score| -> Vec<(usize, Pitch, Duration, f32, f32, PartId)> {
         score
             .notes
             .iter()
             .enumerate()
             .filter(|(_, n)| n.role == VoiceRole::Harmony && (n.onset.beats() - t).abs() < 1e-9)
-            .map(|(idx, n)| (idx, n.pitch, n.duration, n.velocity, n.section_intensity))
+            .map(|(idx, n)| (idx, n.pitch, n.duration, n.velocity, n.section_intensity, n.part))
             .collect()
     };
 
@@ -1576,8 +1577,8 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
         if chord1.is_empty() || chord2.is_empty() {
             continue;
         }
-        let mut found: Option<(Pitch, usize, Pitch, Duration, f32, f32)> = None;
-        for &(j_idx, p2, dur2, vel2, si2) in &chord2 {
+        let mut found: Option<(Pitch, usize, Pitch, Duration, f32, f32, PartId)> = None;
+        for &(j_idx, p2, dur2, vel2, si2, part) in &chord2 {
             let degree = (1..=15)
                 .min_by_key(|&d| (scale.degree_pitch(d, 4).midi() as i32 - p2.midi() as i32).abs())
                 .unwrap();
@@ -1585,11 +1586,11 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             if let Some(&(_, p1, ..)) = chord1.iter().find(|&&(_, p1, ..)| {
                 p1.pitch_class() == target_pc && (p1.midi() as i32 - p2.midi() as i32).abs() <= 3
             }) {
-                found = Some((p1, j_idx, p2, dur2, vel2, si2));
+                found = Some((p1, j_idx, p2, dur2, vel2, si2, part));
                 break;
             }
         }
-        let Some((suspended_pitch, j_idx, resolved_pitch, dur2, vel2, si2)) = found else {
+        let Some((suspended_pitch, j_idx, resolved_pitch, dur2, vel2, si2, part)) = found else {
             continue;
         };
         counter += 1;
@@ -1606,7 +1607,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
         let hold = Duration::new((hold_beats * 480.0).round() as i64, 480);
         resolved_indices.push(j_idx);
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: suspended_pitch,
             onset: onset2,
             duration: hold,
@@ -1616,7 +1617,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             section_intensity: si2,
         });
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part,
             pitch: resolved_pitch,
             onset: onset2 + hold,
             duration: dur2.saturating_sub(hold),
@@ -2657,14 +2658,15 @@ fn apply_damage(
             (step.abs() == 2
                 && gap_end - gap_start >= -1e-6
                 && a.duration.beats() >= 0.5
-                && gap_is_clear)
+                && gap_is_clear
+                && a.part == b.part)
                 .then_some((w[0], w[1], step.signum()))
         });
         if let Some((ai, bi, dir)) = pair {
             let grace = Duration::sixteenth();
             let passing_onset = score.notes[bi].onset.saturating_sub(grace);
             let passing = ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: score.notes[ai].part,
                 pitch: score.notes[ai].pitch.transpose(dir),
                 onset: passing_onset,
                 duration: grace,
@@ -3191,8 +3193,9 @@ fn alter_statement(
                 }
                 let vel = (score.notes[peak].velocity * 0.8).clamp(0.1, 1.0);
                 let intensity = score.notes[peak].section_intensity;
+                let part = score.notes[peak].part;
                 score.notes.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part,
                     pitch: above,
                     onset: peak_onset.saturating_sub(grace),
                     duration: grace,
