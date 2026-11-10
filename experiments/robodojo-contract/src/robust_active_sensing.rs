@@ -571,7 +571,7 @@ mod tests {
         let unsafe_sensor = option(
             "depth",
             ProbabilityInterval::new(0.90, 0.95).unwrap(),
-            ProbabilityInterval::new(0.01, 0.10).unwrap(),
+            ProbabilityInterval::new(0.00, 0.08).unwrap(),
             5.0,
             50.0,
         );
