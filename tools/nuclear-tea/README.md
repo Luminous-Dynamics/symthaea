@@ -38,9 +38,9 @@ sum(discounted lifecycle costs)
 sum(discounted delivered service)
 ```
 
-The delivered service unit and delivery boundary are mandatory. Comparisons are blocked unless both cases have matching currency, price basis, base year, service unit and delivery boundary, and every mandatory feasibility gate is explicitly PASS.
+The delivered service unit and delivery boundary are mandatory. Comparisons are blocked unless both cases have matching currency, price basis, base year, discount rate, service unit and delivery boundary. Every mandatory feasibility gate must be explicitly PASS and carry a non-empty evidence reference.
 
-Hard gates are not costs. A failed gate yields NO_GO; an unresolved mandatory gate yields UNKNOWN. A set with no mandatory gates is UNKNOWN rather than vacuously eligible.
+Hard gates are not costs. A failed gate yields NO_GO; an unresolved mandatory gate, a blank gate ID, or a PASS without an evidence reference yields UNKNOWN. A set with no mandatory gates is UNKNOWN rather than vacuously eligible. Evidence references are locators only: this package does not authenticate issuers or determine legal authority.
 
 ## South African source dataset
 
@@ -56,4 +56,4 @@ A successful port-data receipt establishes only that the exact input file meets 
 
 A successful arithmetic unit test establishes only the tested calculation semantics against the synthetic analytical fixtures. It does not establish actual levelized costs or comparative competitiveness.
 
-The research parent is [NUCL-TEA-001 #11343](https://github.com/Luminous-Dynamics/symthaea/issues/11343); the implementation child is [#11363](https://github.com/Luminous-Dynamics/symthaea/issues/11363).
+The research parent is [NUCL-TEA-001 #11343](https://github.com/Luminous-Dynamics/symthaea/issues/11343); the implementation child is [#11363](https://github.com/Luminous-Dynamics/symthaea/issues/11363). The wider programme includes the UCL merchant-shipping TCO benchmark, the separate Lloyd's Register containership scenario, and South African port-readiness cases; these are not assumed to be directly comparable.
