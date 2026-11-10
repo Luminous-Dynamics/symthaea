@@ -24,6 +24,12 @@ pub struct VocalQualityMetrics {
     pub prior_mismatch_fraction: f32,
     /// None means insufficient independent coverage; Some(false) means a material mismatch.
     pub score_independent_pitch_audit_pass: Option<bool>,
+    /// Second-family YIN difference-function estimate; not conditioned on score pitch.
+    pub yin_median_pitch_error_cents: f32,
+    pub yin_p95_pitch_error_cents: f32,
+    pub yin_valid_fraction: f32,
+    pub yin_median_confidence: f32,
+    pub yin_pitch_audit_pass: Option<bool>,
     pub median_onset_error_ms: f32,
     pub duration_error_ms: f32,
     pub peak_sample_delta: f32,
@@ -112,6 +118,10 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     let mut score_independent_matches = 0usize;
     let mut score_independent_errors = Vec::new();
     let mut prior_mismatch_frames = 0usize;
+    let mut yin_matches = 0usize;
+    let mut yin_errors = Vec::new();
+    let mut yin_confidences = Vec::new();
+    let mut yin_mismatch_frames = 0usize;
     if stem.samples.len() >= frame {
         for start in (0..=stem.samples.len() - frame).step_by(hop.max(1)) {
             let time = (start + frame / 2) as f32 / rate as f32;
@@ -145,15 +155,26 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
                     // This search deliberately ignores the expected score pitch.
                     // It is still autocorrelation-based, so it is a broad-prior
                     // cross-check rather than a fully independent algorithm family.
-                    if let Some(independent) =
-                        estimate_f0_broad(&stem.samples[start..start + frame], rate)
-                    {
+                    let frame_samples = &stem.samples[start..start + frame];
+                    if let Some(independent) = estimate_f0_broad(frame_samples, rate) {
                         score_independent_matches += 1;
                         let independent_error =
                             (1200.0 * (independent / expected).log2()).abs();
                         score_independent_errors.push(independent_error);
                         if independent_error > 300.0 {
                             prior_mismatch_frames += 1;
+                        }
+                    }
+                    // YIN uses a normalized difference function rather than the
+                    // autocorrelation peak used by both score-conditioned and
+                    // broad-range estimators.
+                    if let Some((yin_hz, confidence)) = estimate_f0_yin(frame_samples, rate) {
+                        yin_matches += 1;
+                        let yin_error = (1200.0 * (yin_hz / expected).log2()).abs();
+                        yin_errors.push(yin_error);
+                        yin_confidences.push(confidence);
+                        if yin_error > 300.0 {
+                            yin_mismatch_frames += 1;
                         }
                     }
 
@@ -200,6 +221,18 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         } else {
             Some(prior_mismatch_fraction <= 0.10)
         };
+    yin_errors.sort_by(f32::total_cmp);
+    yin_confidences.sort_by(f32::total_cmp);
+    let yin_median_pitch_error_cents = percentile(&yin_errors, 0.5);
+    let yin_p95_pitch_error_cents = percentile(&yin_errors, 0.95);
+    let yin_valid_fraction = yin_matches as f32 / score_conditioned_matches.max(1) as f32;
+    let yin_median_confidence = percentile(&yin_confidences, 0.5);
+    let yin_mismatch_fraction = yin_mismatch_frames as f32 / yin_matches.max(1) as f32;
+    let yin_pitch_audit_pass = if yin_valid_fraction < 0.8 || yin_matches == 0 {
+        None
+    } else {
+        Some(yin_mismatch_fraction <= 0.10)
+    };
     // An onset-from-silence metric is meaningful for the first note and after
     // an actual gap, not at a connected legato boundary where audio continues.
     let mut previous_end = None;
@@ -252,6 +285,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         && physical_stability_pass
         && render_cleanliness_pass
         && score_independent_pitch_audit_pass == Some(true)
+        && yin_pitch_audit_pass == Some(true)
         // Raw physical renders intentionally retain diagnostic headroom. The
         // gallery emits a separate loudness-normalized listening copy, so a
         // clean quiet source must not fail the synthesis-quality gate merely
@@ -271,6 +305,11 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         prior_mismatch_frames,
         prior_mismatch_fraction,
         score_independent_pitch_audit_pass,
+        yin_median_pitch_error_cents,
+        yin_p95_pitch_error_cents,
+        yin_valid_fraction,
+        yin_median_confidence,
+        yin_pitch_audit_pass,
         median_onset_error_ms,
         duration_error_ms,
         peak_sample_delta,
@@ -416,6 +455,97 @@ fn estimate_f0_broad(x: &[f32], rate: u32) -> Option<f32> {
                 .map(|(lag, _)| *lag)
         })?;
     Some(rate as f32 / selected as f32)
+}
+
+/// YIN-style F0 estimate using the difference function and cumulative
+/// mean normalized difference (CMNDF). Returns (frequency_hz, confidence).
+///
+/// A small 3-tap smoothing filter precedes 2:1 decimation to bound evaluation
+/// cost while retaining the 40-1200 Hz fundamental range. Confidence is
+/// 1-CMNDF at the selected trough. This is a second estimator family relative
+/// to the autocorrelation peak search, not an independent reference signal.
+fn estimate_f0_yin(x: &[f32], rate: u32) -> Option<(f32, f32)> {
+    if x.len() < 8 || rate < 80 {
+        return None;
+    }
+    let mut downsampled = Vec::with_capacity(x.len().div_ceil(2));
+    for center in (0..x.len()).step_by(2) {
+        let left = if center == 0 { x[0] } else { x[center - 1] };
+        let middle = x[center];
+        let right = x.get(center + 1).copied().unwrap_or(middle);
+        downsampled.push((left + 2.0 * middle + right) * 0.25);
+    }
+    let effective_rate = rate as f64 / 2.0;
+    let rms = (downsampled.iter().map(|value| value * value).sum::<f32>()
+        / downsampled.len().max(1) as f32)
+        .sqrt();
+    if rms < 0.003 {
+        return None;
+    }
+
+    let min_lag = (effective_rate / 1200.0).floor().max(1.0) as usize;
+    let max_lag = ((effective_rate / 40.0).ceil() as usize).min(downsampled.len() - 1);
+    if min_lag > max_lag {
+        return None;
+    }
+
+    let mut difference = vec![0.0f64; max_lag + 1];
+    for lag in 1..=max_lag {
+        let mut sum = 0.0f64;
+        for index in 0..downsampled.len() - lag {
+            let delta = (downsampled[index] - downsampled[index + lag]) as f64;
+            sum += delta * delta;
+        }
+        difference[lag] = sum;
+    }
+
+    let mut cmndf = vec![1.0f64; max_lag + 1];
+    let mut cumulative = 0.0f64;
+    for lag in 1..=max_lag {
+        cumulative += difference[lag];
+        if cumulative > f64::EPSILON {
+            cmndf[lag] = difference[lag] * lag as f64 / cumulative;
+        }
+    }
+
+    const CMNDF_THRESHOLD: f64 = 0.10;
+    let mut selected = None;
+    let mut lag = min_lag;
+    while lag <= max_lag {
+        if cmndf[lag] < CMNDF_THRESHOLD {
+            while lag < max_lag && cmndf[lag + 1] < cmndf[lag] {
+                lag += 1;
+            }
+            selected = Some(lag);
+            break;
+        }
+        lag += 1;
+    }
+    let selected = selected.or_else(|| {
+        let candidate = (min_lag..=max_lag).min_by(|&left, &right| {
+            cmndf[left].total_cmp(&cmndf[right])
+        })?;
+        (cmndf[candidate] <= 0.25).then_some(candidate)
+    })?;
+
+    let mut refined_lag = selected as f64;
+    if selected > min_lag && selected < max_lag {
+        let left = cmndf[selected - 1];
+        let centre = cmndf[selected];
+        let right = cmndf[selected + 1];
+        let denominator = left - 2.0 * centre + right;
+        if denominator.abs() > 1e-12 {
+            let offset = (0.5 * (left - right) / denominator).clamp(-1.0, 1.0);
+            refined_lag += offset;
+        }
+    }
+    if refined_lag <= 0.0 {
+        return None;
+    }
+    let frequency = (effective_rate / refined_lag) as f32;
+    let confidence = (1.0 - cmndf[selected]).clamp(0.0, 1.0) as f32;
+    (frequency.is_finite() && (40.0..=1200.0).contains(&frequency))
+        .then_some((frequency, confidence))
 }
 
 fn expected_pitch_at(performance: &VocalPerformance, time: f32) -> Option<f32> {
@@ -594,6 +724,56 @@ mod tests {
         assert!(metrics.prior_mismatch_fraction > 0.1, "{metrics:?}");
         assert_eq!(metrics.score_independent_pitch_audit_pass, Some(false));
         assert!(!metrics.objective_pass);
+    }
+
+    #[test]
+    fn yin_crosscheck_detects_octave_subharmonic_false_reassurance() {
+        let note = symthaea_muse::Note {
+            frequency: 240.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.8,
+        };
+        let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        let rate = 24_000;
+        let actual_hz = 480.0;
+        let samples: Vec<_> = (0..rate / 2)
+            .map(|index| {
+                (std::f32::consts::TAU * actual_hz * index as f32 / rate as f32).sin() * 0.2
+            })
+            .collect();
+        let stem = VocalStem {
+            samples,
+            sample_rate: rate,
+            backend: "yin-octave-negative-control".into(),
+        };
+        let metrics = analyze_vocal_stem(&performance, &stem);
+        assert!(
+            metrics.yin_median_pitch_error_cents > 1100.0,
+            "YIN should identify the true 480 Hz fundamental: {metrics:?}"
+        );
+        assert!(metrics.yin_median_confidence > 0.9, "{metrics:?}");
+        assert_eq!(metrics.yin_pitch_audit_pass, Some(false));
+        assert!(!metrics.objective_pass);
+    }
+
+    #[test]
+    fn yin_retains_fundamental_when_upper_harmonics_dominate() {
+        let rate = 24_000;
+        let fundamental = 220.0f32;
+        let samples: Vec<_> = (0..rate / 20)
+            .map(|index| {
+                let time = index as f32 / rate as f32;
+                0.02 * (std::f32::consts::TAU * fundamental * time).sin()
+                    + 0.20 * (std::f32::consts::TAU * fundamental * 2.0 * time).sin()
+                    + 0.12 * (std::f32::consts::TAU * fundamental * 3.0 * time).sin()
+                    + 0.04 * (std::f32::consts::TAU * fundamental * 4.0 * time).sin()
+            })
+            .collect();
+        let (estimated, confidence) = estimate_f0_yin(&samples, rate).unwrap();
+        let error_cents = (1200.0 * (estimated / fundamental).log2()).abs();
+        assert!(error_cents < 25.0, "estimate={estimated}, error={error_cents}");
+        assert!(confidence > 0.9, "confidence={confidence}");
     }
 
     #[test]
