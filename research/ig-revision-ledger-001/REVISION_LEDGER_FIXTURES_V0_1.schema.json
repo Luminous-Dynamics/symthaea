@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-revision-ledger-001/REVISION_LEDGER_FIXTURES_V0_1.schema.json",
+  "title": "IG-REVISION-LEDGER-001 fixture manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ledger_id",
+    "status",
+    "owning_issue",
+    "parent_issue",
+    "communication_graph_owner",
+    "delegation_graph_owner",
+    "fixture_count",
+    "fixtures",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-revision-ledger-fixtures-v0.1"
+    },
+    "ledger_id": {
+      "const": "IG-REVISION-LEDGER-001"
+    },
+    "status": {
+      "enum": [
+        "synthetic_fixture_design_unexecuted",
+        "synthetic_fixture_design_frozen"
+      ]
+    },
+    "owning_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "parent_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "communication_graph_owner": {
+      "type": "string",
+      "format": "uri"
+    },
+    "delegation_graph_owner": {
+      "type": "string",
+      "format": "uri"
+    },
+    "fixture_count": {
+      "type": "integer",
+      "minimum": 16
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "description",
+          "record",
+          "expected_violations"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20
+          },
+          "record": {
+            "type": "object"
+          },
+          "expected_violations": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 60
+    }
+  }
+}
