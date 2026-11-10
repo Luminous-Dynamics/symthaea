@@ -85,11 +85,13 @@ pub use recognize::{
 };
 pub use symmetry::SymmetryEncoder;
 pub use symmetry_inference::{
-    ExactPolynomialLieProfileV1, ExactPolynomialSearchStatus, NumericLieDerivativeProfileV2,
-    LieDerivativeSampleStatisticsV1, StructuralSymmetryPattern, SymmetryClaimScope,
-    SymmetryInferenceEvidence,
-    SymmetryInferenceReport,
-    SymmetryInferenceSearchStatus, infer_symmetry, infer_symmetry_numeric,
+    ExactPolynomialLieProfileV1, ExactPolynomialSearchStatus,
+    MetricAwareGeneratorSampleResultV1, MetricAwareLinearActionSampleErrorV1,
+    MetricAwareLinearActionSampleProfileV1, MetricAwareLinearActionSampleReportV1,
+    NumericLieDerivativeProfileV2, LieDerivativeSampleStatisticsV1,
+    StructuralSymmetryPattern, SymmetryClaimScope, SymmetryInferenceEvidence,
+    SymmetryInferenceReport, SymmetryInferenceSearchStatus,
+    evaluate_metric_aware_linear_action_samples, infer_symmetry, infer_symmetry_numeric,
     infer_symmetry_numeric_with_evidence, infer_symmetry_with_evidence,
 };
 pub use tensor_structure::TensorEncoder;
