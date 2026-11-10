@@ -211,7 +211,8 @@ fn validate_bundle(bundle: &Value) -> Vec<String> {
 
     let calibration_data = &profile["calibration_data"];
     let fit_digest = field(calibration_data, "fit_dataset_sha256").unwrap_or_default();
-    let validation_digest = field(calibration_data, "validation_dataset_sha256").unwrap_or_default();
+    let validation_digest =
+        field(calibration_data, "validation_dataset_sha256").unwrap_or_default();
     let evaluation_digest = field(bundle, "evaluation_dataset_sha256").unwrap_or_default();
     if !is_sha256(fit_digest) || !is_sha256(validation_digest) || !is_sha256(evaluation_digest) {
         add(&mut errors, "calibration_dataset_digest_invalid");
@@ -388,7 +389,9 @@ fn apply_fixture(bundle: &mut Value, fixture: &Value) -> bool {
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {
-        eprintln!("usage: ig-confidence-calibration-qualifier <evaluation.json> <negative-controls.json>");
+        eprintln!(
+            "usage: ig-confidence-calibration-qualifier <evaluation.json> <negative-controls.json>"
+        );
         return ExitCode::from(2);
     }
     let bundle = match read_json(&args[1]) {
@@ -443,7 +446,7 @@ fn main() -> ExitCode {
     }
     println!("NOT A CALIBRATOR: no calibration map was fitted by this evaluator.");
     println!(
-        "NOT AUTHORITY: confidence values do not create civic rights, voice, vote weight, or action authority."
+        "NOT AUTHORITY: confidence does not create rights, voice, vote weight, or authority."
     );
     println!("SYNTHETIC ONLY: the checked-in outcomes are fictional known-answer controls.");
     ExitCode::SUCCESS
@@ -499,8 +502,11 @@ mod tests {
     #[test]
     fn normative_values_cannot_be_scored_as_binary_correctness() {
         let mut bundle = parsed(BUNDLE);
-        bundle["evaluation_identity"]["task_truth_profile"] = Value::String("NormativePluralism".into());
-        assert!(validate_bundle(&bundle).contains(&"evaluation_truth_profile_unsupported".to_string()));
+        bundle["evaluation_identity"]["task_truth_profile"] =
+            Value::String("NormativePluralism".into());
+        assert!(
+            validate_bundle(&bundle).contains(&"evaluation_truth_profile_unsupported".to_string())
+        );
     }
 
     #[test]
