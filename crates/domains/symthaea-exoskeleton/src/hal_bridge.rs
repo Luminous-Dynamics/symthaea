@@ -77,14 +77,21 @@ pub fn run_software_stub_session(
         report.ticks_executed += 1;
     }
 
-    let spine_finite = sim
-        .spine_chain
-        .links
-        .first()
-        .and_then(|&handle| sim.world.body(handle))
-        .map(|body| body.transform.translation.0.iter().all(|value| value.is_finite()))
-        .unwrap_or(false);
-    report.simulator_finite = spine_finite;
+    // Check every body and the numerical health of its rotation state.
+    // A single spine-link translation is not sufficient evidence that the
+    // complete articulated research plant remained finite.
+    report.simulator_finite = !sim.world.bodies.is_empty()
+        && sim.world.bodies.iter().all(|body| {
+            body.transform
+                .translation
+                .0
+                .iter()
+                .all(|value| value.is_finite())
+                && body.linear_velocity.iter().all(|value| value.is_finite())
+                && body.angular_velocity.is_finite()
+                && body.transform.rotation.orthogonality_error().is_finite()
+                && body.transform.rotation.determinant().is_finite()
+        });
     report
 }
 
@@ -111,6 +118,24 @@ mod tests {
         assert_eq!(report.commands_checked, 20);
         assert!(report.all_commands_zero_torque);
         assert!(report.simulator_finite);
+    }
+
+    #[test]
+    fn software_stub_detects_non_finite_state_in_any_body() {
+        let mut sim = FullFrameSimulator::new();
+        let handle = sim.right_arm.links[2];
+        sim.world
+            .body_mut(handle)
+            .expect("right-arm link exists")
+            .linear_velocity[0] = f64::NAN;
+
+        // Zero ticks isolates the reporting check from the integrator's
+        // input sanitization path.
+        let report = run_software_stub_session(
+            &mut sim,
+            SoftwareStubConfig { max_ticks: 0 },
+        );
+        assert!(!report.simulator_finite);
     }
 
     #[test]
