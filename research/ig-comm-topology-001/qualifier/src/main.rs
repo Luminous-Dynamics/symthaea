@@ -653,7 +653,7 @@ mod tests {
             .map(|node| field(node, "agent_instance_id").unwrap().to_string())
             .collect();
         assert_eq!(ids.len(), 8);
-        assert_eq!(profile["nodes"][6]["principal_ref"], profile["nodes"][7]["principal_ref"]);
+        assert_eq!(profile["nodes"][3]["principal_ref"], profile["nodes"][7]["principal_ref"]);
     }
 
     #[test]
