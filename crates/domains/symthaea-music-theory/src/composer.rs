@@ -708,7 +708,13 @@ fn compose_with_spec_and_form_and_grammar_impl(
     }
     match attitude {
         Some(crate::spec::Attitude::Grief) => {
-            apply_grief_suspensions(&mut score, &form, meter_beats, intent);
+            apply_grief_suspensions(
+                &mut score,
+                &form,
+                meter_beats,
+                intent,
+                GENERAL_GRIEF_SUSPENSION_PART_V1,
+            );
         }
         Some(crate::spec::Attitude::Defiance) => {
             apply_defiant_syncopation(&mut score, meter_beats);
@@ -1812,6 +1818,22 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
 }
 
 /// THE DRONE — the Celtic style's other habit: a sustained tonic-fifth
+/// Return a role's source identity only when every event in that role
+/// belongs to the same assigned PartId. Mixed or incomplete identity remains
+/// explicitly unassigned; this is not reconstructed from role or register.
+fn unambiguous_role_part(score: &Score, role: VoiceRole) -> PartId {
+    let mut matching = score.notes.iter().filter(|note| note.role == role);
+    let Some(first) = matching.next() else {
+        return PartId::UNASSIGNED;
+    };
+    let candidate = first.part;
+    if !candidate.is_assigned() || matching.any(|note| note.part != candidate) {
+        PartId::UNASSIGNED
+    } else {
+        candidate
+    }
+}
+
 /// pedal replaces the walking bass for the whole piece. Deliberately
 /// independent of the harmony above it (unlike every other bass note the
 /// engine writes, which follows the chord roots) — that's the entire
@@ -1819,6 +1841,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
 /// harmony moving freely against it. Runs LAST, after every other bass
 /// note is in place, and simply replaces them all.
 fn apply_drone_pedal(score: &mut Score, key: Key) {
+    let bass_part = unambiguous_role_part(score, VoiceRole::Bass);
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -1848,7 +1871,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
         let onset = bar.scale(m, 1);
         let si = intensity_near(onset.beats());
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part,
             pitch: tonic,
             onset,
             duration: half,
@@ -1858,7 +1881,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
             section_intensity: si,
         });
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part,
             pitch: fifth,
             onset: onset + half,
             duration: half,
@@ -1885,6 +1908,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
 /// effect wanted is identical.
 fn apply_full_drone(score: &mut Score, key: Key) {
     apply_drone_pedal(score, key);
+    let harmony_part = unambiguous_role_part(score, VoiceRole::Harmony);
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -1913,7 +1937,7 @@ fn apply_full_drone(score: &mut Score, key: Key) {
         let si = intensity_near(onset.beats());
         for pitch in [tonic, fifth, octave] {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part,
                 pitch,
                 onset,
                 duration: bar,
@@ -2338,6 +2362,7 @@ fn apply_grief_suspensions(
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
+    part_id: PartId,
 ) {
     let vel = ((0.28 + intent.energy.clamp(0.0, 1.0) * 0.25) * 0.95).clamp(0.18, 0.5);
     let bar = Duration::new(meter_beats as i64, 1);
@@ -2366,7 +2391,7 @@ fn apply_grief_suspensions(
             };
             let onset = bar.scale(measure + i as i64, 1);
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: sus,
                 onset,
                 duration: Duration::new(1, 1),
@@ -2376,7 +2401,7 @@ fn apply_grief_suspensions(
                 section_intensity: section.role.intensity(),
             });
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: resolution,
                 onset: onset + Duration::new(1, 1),
                 duration: Duration::new((meter_beats as i64 - 1).max(1), 1),
@@ -4754,6 +4779,119 @@ mod tests {
     use super::*;
     use crate::harmony::{Progression, Tonality};
     use crate::score::VoiceRole;
+
+    #[test]
+    fn grief_suspension_line_uses_its_composer_authored_part_id() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let phrase = crate::phrase::Phrase {
+            line: Motif::new(Vec::new()),
+            progression: vec![1, 5],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![crate::form::Section {
+                role: SectionRole::A,
+                key,
+                period: crate::phrase::Period {
+                    antecedent: phrase.clone(),
+                    consequent: phrase,
+                },
+            }],
+        };
+        let mut score = Score::new(key, 100.0, 4);
+        let part = PartId(49);
+        apply_grief_suspensions(
+            &mut score,
+            &form,
+            4.0,
+            &MusicalIntent::default(),
+            part,
+        );
+        assert!(!score.notes.is_empty(), "I-to-V has a valid 4-3 suspension");
+        assert!(score.notes.iter().all(|note| note.part == part));
+    }
+
+    #[test]
+    fn drone_pedal_inherits_a_single_unambiguous_bass_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ScoreNote {
+            part: PartId(80),
+            pitch: Pitch::from_midi(36),
+            onset: Duration::zero(),
+            duration: Duration::new(8, 1),
+            velocity: 0.5,
+            role: VoiceRole::Bass,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        apply_drone_pedal(&mut score, key);
+        let bass: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Bass)
+            .collect();
+        assert_eq!(bass.len(), 4);
+        assert!(bass.iter().all(|note| note.part == PartId(80)));
+    }
+
+    #[test]
+    fn full_drone_preserves_distinct_bass_and_harmony_part_ids() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ScoreNote {
+            part: PartId(80),
+            pitch: Pitch::from_midi(36),
+            onset: Duration::zero(),
+            duration: Duration::new(8, 1),
+            velocity: 0.5,
+            role: VoiceRole::Bass,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        for midi in [60u8, 64, 67] {
+            score.push(ScoreNote {
+                part: PartId(81),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::zero(),
+                duration: Duration::new(8, 1),
+                velocity: 0.3,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        apply_full_drone(&mut score, key);
+        let bass: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Bass)
+            .collect();
+        let harmony: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Harmony)
+            .collect();
+        assert!(!bass.is_empty() && !harmony.is_empty());
+        assert!(bass.iter().all(|note| note.part == PartId(80)));
+        assert!(harmony.iter().all(|note| note.part == PartId(81)));
+    }
+
+    #[test]
+    fn mixed_role_identities_do_not_get_collapsed_by_drone_replacement() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for part in [PartId(80), PartId(82)] {
+            score.push(ScoreNote {
+                part,
+                pitch: Pitch::from_midi(36),
+                onset: Duration::zero(),
+                duration: Duration::new(8, 1),
+                velocity: 0.5,
+                role: VoiceRole::Bass,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        apply_drone_pedal(&mut score, key);
+        assert!(score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Bass)
+            .all(|note| note.part == PartId::UNASSIGNED));
+    }
 
     #[test]
     fn suspension_and_resolution_inherit_the_replaced_harmony_part_identity() {
