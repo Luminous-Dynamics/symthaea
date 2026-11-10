@@ -290,6 +290,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         }));
     }
 
+    if alpha_one_consistency_error > 1e-10 {
+        return Err(IoError::other(
+            "alpha=1 robust-information posterior diverged from the nominal Bayesian reference",
+        )
+        .into());
+    }
+
     let robust = evaluate_tv_robust_decision_diagnostics(
         &hypotheses,
         &actions,
