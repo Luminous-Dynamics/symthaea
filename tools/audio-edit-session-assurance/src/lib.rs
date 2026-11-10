@@ -305,7 +305,7 @@ pub fn evaluate_session_ledger(
         }
 
         if expected_index == 0
-            && !matches!(event.kind, SessionEventKindV1::SessionStarted { .. })
+            && !matches!(&event.kind, SessionEventKindV1::SessionStarted { .. })
         {
             return Err(LedgerError::new(
                 "the first event must be SessionStarted",
@@ -567,7 +567,8 @@ pub fn evaluate_session_ledger(
                 for constraint in active {
                     let has_final_observation = observations.iter().any(|observation| {
                         observation.constraint_id == constraint.constraint_id
-                            && observation.output_audio_sha256 == *final_output_sha256
+                            && observation.output_audio_sha256.as_str()
+                                == final_output_sha256.as_str()
                     });
                     if !has_final_observation {
                         return Err(LedgerError::new(format!(
@@ -1099,7 +1100,7 @@ mod tests {
     }
 
     #[test]
-    fn unf inalized_session_is_reported_in_progress() {
+    fn unfinalized_session_is_reported_in_progress() {
         let mut events = Vec::new();
         start(&mut events);
         open_turn(&mut events, 1, '2');
