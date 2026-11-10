@@ -79,6 +79,7 @@ pub mod controller;
 pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
+pub mod option_preservation;
 pub mod perturbations;
 pub mod plugin;
 pub mod reward;
