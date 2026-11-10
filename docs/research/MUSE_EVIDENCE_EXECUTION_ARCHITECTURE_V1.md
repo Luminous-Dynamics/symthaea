@@ -26,6 +26,10 @@ Intent & score layer
 CQEP-001 plan compiler
   |  typed DAG; capability profiles; independent observer obligations
   v
+MUSE-RUNTIME-001 transaction gate
+  |  one-shot grant; exact plan/registry/parent/action/user authorization
+  |  DISPATCHED persisted before call; OUTCOME_UNKNOWN blocks new mutation
+  v
 Runtime authority gate
   |  authorization; exact parent digest; registry snapshot; budget; sandbox
   v
@@ -74,7 +78,7 @@ The plan compiler, per-case evaluator, correction evaluator and session ledger a
 |---|---|---|
 | Intent layer | Normalize user intent, score, lyrics, scope and constraints | Whether a renderer can meet them |
 | CQEP-001 | Select a declared eligible operator/observer and create a typed plan | Runtime execution authorization or capability truth |
-| Runtime gate | Permit one mutation when plan, authority, parent and budget checks pass | Whether output sounds correct |
+| MUSE-RUNTIME-001 | Issue one-shot mutation grants; record dispatch; reconcile unknown outcomes | Audio quality, durable persistence or host-level locking without production integration |
 | Renderer / DSP | Produce the declared transformation and output receipt | Its own correctness or preservation |
 | Independent observers | Measure declared acoustic/perceptual properties using pinned evaluators | User intent or permission to mutate |
 | VMEA-001 | Score all required instruction/preservation rubrics for one case | Audio measurement or human naturalness unless those receipts are supplied |
@@ -97,7 +101,7 @@ Each mutation should follow the same transaction:
 4. **Execute:** Run only the declared operation in the designated isolation boundary. Record tool attempt, action digest, configuration, seed/determinism and output digest.
 5. **Observe:** Run independent evaluators on the exact output; bind every interval to evaluator artifact and calibration receipts.
 6. **Decide:** PASS only when the entire uncertainty interval is within its frozen acceptance region. FAIL when wholly outside; INDETERMINATE when overlapping.
-7. **Commit or stop:** Only a qualified state can authorize a dependent mutation. Failed/unsupported/abstained attempts remain in the ledger. Unknown outcome requires reconciliation before a new mutation.
+7. **Commit or stop:** Only a qualified state can authorize a dependent mutation. MUSE-RUNTIME-001 persists DISPATCHED before the external call and advances the audio head only after a valid commit receipt. Failed/unsupported/abstained attempts remain in the ledger. Unknown outcome blocks every new mutation until reconciliation proves committed output or definite no-mutation.
 8. **Finalize:** Re-evaluate every active instruction and preservation constraint against the exact final output. Finalization is immutable; later edits create a new session/version.
 
 This is deliberately stricter than a conversational model deciding that its last output "sounds right."
@@ -156,7 +160,8 @@ For a 500-case benchmark, report binomial uncertainty and paired test difference
 1. Run the dedicated exact-head contracts for #11488, #11491, #11506, #11517, #11523 and #11528; resolve failures without weakening gates.
 2. Integrate VMEA rubric profiles with VCCR/VIA/VPTB observations through the versioned observation adapter.
 3. Connect VCRB/VNOC response identification to VRCO's bounded solver, then require CQEP/runtime preflight before any proposed control delta is executed.
-4. Add the runtime authority gate that verifies the exact CQEP plan, registry snapshot, parent artifact and evidence preconditions before any renderer/DSP mutation.
+4. Integrate MUSE-RUNTIME-001 as the sole pre-mutation grant and unknown-outcome reconciliation gate; production host integration must provide durable CAS/locking and sandbox boundaries.
+5. Add the runtime authority gate that verifies the exact CQEP plan, registry snapshot, parent artifact and evidence preconditions before any renderer/DSP mutation.
 5. Build the first real, rights-cleared singing edit pilot: one-word substitution, one-phone correction, one-note edit and one phrase-level edit.
 6. Compare current Muse render path against YingMusic-Singer-Plus and Vevo2 on matched LyricEditBench tasks, and independently measure preservation/locality.
 7. Use MMAE public development data to compare naive routing, fixed sequences, static capability-qualified plans and evidence-feedback replanning.
@@ -174,6 +179,7 @@ For a 500-case benchmark, report binomial uncertainty and paired test difference
 - #11523 MMAE-EXPORT-001 submission manifest exporter (draft PR)
 - #11528 CQEP-001 capability-qualified edit planner (draft PR)
 - #11533 / PR #11536 VRCO-001 robust bounded vocal control solver (draft PR)
+- #11540 / PR #11542 MUSE-RUNTIME-001 one-shot execution authorization and unknown-outcome reconciliation (draft PR)
 - #11356 renderer-neutral VocalEditPatch
 - #11402 versioned acoustic observation integration
 - #11525 CQEP-001 plan compiler issue
