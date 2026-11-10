@@ -15,8 +15,8 @@ use thiserror::Error;
 
 use crate::family_guardrail::{FamilyGuardrailStatus, FamilyGuardrailVerifier};
 use crate::sequential_weight_verification::{
-    SequentialWeightVerificationError, SequentialWeightVerificationReport,
-    validate_qualified_report,
+    ConfirmatoryEpisodeManifest, SequentialWeightVerificationError,
+    SequentialWeightVerificationReport, validate_qualified_report,
 };
 use crate::weight_space_program::{
     ValidatedWeightCandidate, WeightModelSnapshot, WeightProgram, WeightProgramError,
@@ -108,6 +108,8 @@ pub struct SequentialStepReceipt {
     pub statistical_verification_report_digest: String,
     /// All-preregistered-families non-inferiority report bound into the signed claims.
     pub family_guardrail_report_digest: String,
+    /// Combined aggregate-plus-family alpha budget, stored as exact IEEE-754 bits.
+    pub combined_campaign_alpha_budget_bits: u64,
     pub previous_step_receipt_digest: Option<String>,
     pub cumulative_l2_path_after: f64,
     pub cumulative_parameter_change_events_after: usize,
@@ -143,6 +145,8 @@ pub struct SequentialVerifierAttestationClaims {
     pub statistical_verification_report_digest: String,
     /// Qualified all-families non-inferiority report digest.
     pub family_guardrail_report_digest: String,
+    /// Preregistered combined alpha budget, stored as exact IEEE-754 bits.
+    pub combined_campaign_alpha_budget_bits: u64,
     /// False is a signed rejection. A verifier must never sign true before all
     /// required tests and negative controls have completed.
     pub accepted: bool,
@@ -158,6 +162,7 @@ pub struct SequentialVerifierEvidenceBinding {
     precondition_gate_digest: String,
     statistical_verification_report_digest: String,
     family_guardrail_report_digest: String,
+    combined_campaign_alpha_budget_bits: u64,
 }
 
 impl SequentialVerifierEvidenceBinding {
@@ -174,6 +179,11 @@ impl SequentialVerifierEvidenceBinding {
     /// Digest of the independently qualified all-family non-inferiority report.
     pub fn family_guardrail_report_digest(&self) -> &str {
         &self.family_guardrail_report_digest
+    }
+
+    /// Exact preregistered total alpha budget included in the verifier's signed claims.
+    pub fn combined_campaign_alpha_budget_bits(&self) -> u64 {
+        self.combined_campaign_alpha_budget_bits
     }
 }
 
@@ -212,6 +222,23 @@ pub fn bind_sequential_verification_evidence(
     if family_report.status != FamilyGuardrailStatus::AllFamiliesNonInferior {
         return Err(SequentialWeightProgramError::FamilyGuardrailNotQualified);
     }
+    let family_episode_ids = family_manifest
+        .families
+        .iter()
+        .flat_map(|family| family.episode_ids.iter().cloned())
+        .collect::<Vec<_>>();
+    let reconstructed_confirmatory_manifest =
+        ConfirmatoryEpisodeManifest::new(family_episode_ids)?;
+    if reconstructed_confirmatory_manifest.manifest_digest
+        != report.binding.confirmatory_episode_manifest_digest
+        || reconstructed_confirmatory_manifest.manifest_digest
+            != family_manifest.confirmatory_manifest_digest
+    {
+        return Err(SequentialWeightProgramError::FamilyGuardrailEvidenceMismatch(
+            "confirmatory_manifest_membership",
+        ));
+    }
+
     for (field, matches) in [
         (
             "candidate_index",
@@ -265,6 +292,7 @@ pub fn bind_sequential_verification_evidence(
         precondition_gate_digest: report.binding.precondition_gate_digest.clone(),
         statistical_verification_report_digest: report.report_digest.clone(),
         family_guardrail_report_digest: family_report.report_digest,
+        combined_campaign_alpha_budget_bits: combined_alpha_budget.to_bits(),
     })
 }
 
@@ -563,6 +591,10 @@ pub fn accept_verified_sequential_candidate(
             ));
         }
     }
+    let claimed_alpha_budget = f64::from_bits(claims.combined_campaign_alpha_budget_bits);
+    if !claimed_alpha_budget.is_finite() || !(0.0..1.0).contains(&claimed_alpha_budget) {
+        return Err(SequentialWeightProgramError::CombinedAlphaBudgetExceeded);
+    }
     if claims.verifier_id.trim().is_empty() {
         return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
             "verifier_id",
@@ -648,6 +680,13 @@ pub fn accept_verified_sequential_candidate(
             ));
         }
     }
+    if claims.combined_campaign_alpha_budget_bits
+        != evidence_binding.combined_campaign_alpha_budget_bits()
+    {
+        return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+            "combined_campaign_alpha_budget_bits",
+        ));
+    }
     let message = sequential_verifier_attestation_message(claims)?;
     let signature = Signature::from_slice(&attestation.signature)
         .map_err(|_| SequentialWeightProgramError::InvalidVerifierSignature)?;
@@ -710,6 +749,7 @@ pub fn accept_verified_sequential_candidate(
             .statistical_verification_report_digest
             .clone(),
         family_guardrail_report_digest: claims.family_guardrail_report_digest.clone(),
+        combined_campaign_alpha_budget_bits: claims.combined_campaign_alpha_budget_bits,
         previous_step_receipt_digest: session.previous_step_receipt_digest.clone(),
         cumulative_l2_path_after: cumulative_l2_path,
         cumulative_parameter_change_events_after: cumulative_parameter_change_events,
@@ -1006,6 +1046,8 @@ mod tests {
             family_guardrail_report_digest: evidence_binding
                 .family_guardrail_report_digest()
                 .to_owned(),
+            combined_campaign_alpha_budget_bits: evidence_binding
+                .combined_campaign_alpha_budget_bits(),
             accepted,
         };
         let message =
