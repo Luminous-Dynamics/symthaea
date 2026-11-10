@@ -1,0 +1,553 @@
+{
+  "corpus_version": "ev-sequential-diagnostic-corpus/0.1",
+  "schema_id": "https://luminousdynamics.io/schemas/transport/ev-sequential-diagnostic-scenario/0.1",
+  "cases": [
+    {
+      "case_id": "complementary-tests-positive-sequence",
+      "expectation": "plan",
+      "expected_root_choice": "TEST",
+      "expected_root_test_id": "test-a",
+      "expected_net_value": 1.175,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.1",
+        "scenario_id": "complementary-tests",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 2,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "A0B0",
+            "prior": 0.2
+          },
+          {
+            "id": "A1B0",
+            "prior": 0.3
+          },
+          {
+            "id": "A0B1",
+            "prior": 0.3
+          },
+          {
+            "id": "A1B1",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "hold",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "A0B0": 0,
+              "A1B0": 0,
+              "A0B1": 0,
+              "A1B1": 12
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "A0B0": 5,
+              "A1B0": 5,
+              "A0B1": 5,
+              "A1B1": 5
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-a",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c2",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000326"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "a0",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 1,
+                  "A1B0": 0,
+                  "A0B1": 1,
+                  "A1B1": 0
+                }
+              },
+              {
+                "id": "a1",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 0,
+                  "A1B0": 1,
+                  "A0B1": 0,
+                  "A1B1": 1
+                }
+              }
+            ]
+          },
+          {
+            "id": "test-b",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c2",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000326"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "b0",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 1,
+                  "A1B0": 1,
+                  "A0B1": 0,
+                  "A1B1": 0
+                }
+              },
+              {
+                "id": "b1",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 0,
+                  "A1B0": 0,
+                  "A0B1": 1,
+                  "A1B1": 1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "conditional-second-test-only-after-a1",
+      "expectation": "plan",
+      "expected_root_choice": "TEST",
+      "expected_root_test_id": "test-a",
+      "expected_net_value": 1.175,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.1",
+        "scenario_id": "conditional-second-test",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 2,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "A0B0",
+            "prior": 0.2
+          },
+          {
+            "id": "A1B0",
+            "prior": 0.3
+          },
+          {
+            "id": "A0B1",
+            "prior": 0.3
+          },
+          {
+            "id": "A1B1",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "hold",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "A0B0": 0,
+              "A1B0": 0,
+              "A0B1": 0,
+              "A1B1": 12
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "A0B0": 5,
+              "A1B0": 5,
+              "A0B1": 5,
+              "A1B1": 5
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-a",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c2",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000326"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "a0",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 1,
+                  "A1B0": 0,
+                  "A0B1": 1,
+                  "A1B1": 0
+                }
+              },
+              {
+                "id": "a1",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 0,
+                  "A1B0": 1,
+                  "A0B1": 0,
+                  "A1B1": 1
+                }
+              }
+            ]
+          },
+          {
+            "id": "test-b",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c2",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000326"
+            },
+            "requires": {
+              "test_id": "test-a",
+              "outcome": "a1"
+            },
+            "outcomes": [
+              {
+                "id": "b0",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 1,
+                  "A1B0": 1,
+                  "A0B1": 0,
+                  "A1B1": 0
+                }
+              },
+              {
+                "id": "b1",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 0,
+                  "A1B0": 0,
+                  "A0B1": 1,
+                  "A1B1": 1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "positive-one-step-evsi",
+      "expectation": "plan",
+      "expected_root_choice": "TEST",
+      "expected_root_test_id": "test-eis",
+      "expected_net_value": 1.1,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.1",
+        "scenario_id": "positive-one-step-evsi",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "healthy",
+            "prior": 0.8
+          },
+          {
+            "id": "faulty",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 0,
+              "faulty": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 3,
+              "faulty": 3
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-eis",
+            "test_cost": 0.2,
+            "downtime_cost": 0.1,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "normal",
+                "likelihood_by_hypothesis": {
+                  "healthy": 1,
+                  "faulty": 0
+                }
+              },
+              {
+                "id": "fault",
+                "likelihood_by_hypothesis": {
+                  "healthy": 0,
+                  "faulty": 1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "high-information-zero-decision-value",
+      "expectation": "plan",
+      "expected_root_choice": "NO_TEST",
+      "expected_root_test_id": null,
+      "expected_net_value": 0,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.1",
+        "scenario_id": "high-information-zero-decision-value",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "state-0",
+            "prior": 0.5
+          },
+          {
+            "id": "state-1",
+            "prior": 0.5
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "state-0": 0,
+              "state-1": 0
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "state-0": 8,
+              "state-1": 8
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "perfect-but-useless",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002cf",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000333"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "reveals-0",
+                "likelihood_by_hypothesis": {
+                  "state-0": 1,
+                  "state-1": 0
+                }
+              },
+              {
+                "id": "reveals-1",
+                "likelihood_by_hypothesis": {
+                  "state-0": 0,
+                  "state-1": 1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "safety-prerequisite-blocks-high-value-test",
+      "expectation": "plan",
+      "expected_root_choice": "NO_TEST",
+      "expected_root_test_id": null,
+      "expected_net_value": 0,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.1",
+        "scenario_id": "high-value-test-without-safety-approval",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "healthy",
+            "prior": 0.8
+          },
+          {
+            "id": "faulty",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 0,
+              "faulty": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 3,
+              "faulty": 3
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-eis",
+            "test_cost": 0.2,
+            "downtime_cost": 0.1,
+            "prerequisites": {
+              "safety_approved": false,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "normal",
+                "likelihood_by_hypothesis": {
+                  "healthy": 1,
+                  "faulty": 0
+                }
+              },
+              {
+                "id": "fault",
+                "likelihood_by_hypothesis": {
+                  "healthy": 0,
+                  "faulty": 1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "likelihood-normalization-rejected",
+      "expectation": "reject",
+      "expected_root_choice": null,
+      "expected_root_test_id": null,
+      "expected_net_value": null,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.1",
+        "scenario_id": "likelihood-normalization-rejected",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "state-0",
+            "prior": 0.5
+          },
+          {
+            "id": "state-1",
+            "prior": 0.5
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "state-0": 0,
+              "state-1": 0
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "state-0": 8,
+              "state-1": 8
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "perfect-but-useless",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002cf",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000333"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "reveals-0",
+                "likelihood_by_hypothesis": {
+                  "state-0": 0.9,
+                  "state-1": 0
+                }
+              },
+              {
+                "id": "reveals-1",
+                "likelihood_by_hypothesis": {
+                  "state-0": 0,
+                  "state-1": 1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
