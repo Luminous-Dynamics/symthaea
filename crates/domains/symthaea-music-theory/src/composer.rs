@@ -5185,6 +5185,88 @@ mod tests {
     use crate::score::VoiceRole;
 
     #[test]
+    fn general_composer_preserves_identity_through_grief_development_and_arrangement() {
+        let mut spec = crate::style::Style::Classical.spec();
+        spec.form_pool = vec![crate::spec::FormKind::Ternary];
+        spec.attitude = Some(crate::spec::Attitude::Grief);
+        spec.development = crate::spec::DevelopmentDna::Sequential;
+        spec.texture.counter_melody = true;
+        spec.texture.hook_cell = true;
+        spec.texture.intro_bars = 1;
+        spec.texture.coda_bars = 2;
+        spec.texture.damage = 0.6;
+        spec.texture.suspension_rate = 1.0;
+        spec.texture.planing = true;
+        spec.validate().expect("the configured period-form score must be valid");
+
+        let score = compose_with_spec(
+            &MusicalIntent {
+                seed: 17,
+                ..MusicalIntent::default()
+            },
+            &spec,
+        );
+        assert!(
+            score.has_part_identity(),
+            "every generated event must retain a source-authored PartId"
+        );
+
+        for (part, role) in [
+            (GENERAL_MELODY_PART_V1, VoiceRole::Melody),
+            (GENERAL_BASS_PART_V1, VoiceRole::Bass),
+            (GENERAL_HARMONY_PART_V1, VoiceRole::Harmony),
+            (GENERAL_COUNTERMELODY_PART_V1, VoiceRole::CounterMelody),
+        ] {
+            assert!(score.notes.iter().any(|note| note.part == part));
+            assert!(score.notes.iter().filter(|note| note.part == part).all(|note| {
+                note.role == role
+            }));
+        }
+        assert!(
+            score.notes.iter()
+                .filter(|note| note.part == GENERAL_GRIEF_SUSPENSION_PART_V1)
+                .all(|note| note.role == VoiceRole::Harmony)
+        );
+    }
+
+    #[test]
+    fn additive_melody_and_full_drone_preserve_their_source_parts() {
+        let mut spec = crate::style::Style::Classical.spec();
+        spec.form_pool = vec![crate::spec::FormKind::Ternary];
+        spec.development = crate::spec::DevelopmentDna::Classic;
+        spec.texture.additive_process = true;
+        spec.texture.full_drone = true;
+        spec.texture.harmonic_stasis = true;
+        spec.texture.intro_bars = 1;
+        spec.texture.coda_bars = 1;
+        spec.texture.damage = 0.0;
+        spec.texture.counter_melody = false;
+        spec.validate().expect("the additive/full-drone configuration must be valid");
+
+        let score = compose_with_spec(
+            &MusicalIntent {
+                seed: 29,
+                ..MusicalIntent::default()
+            },
+            &spec,
+        );
+        assert!(score.has_part_identity());
+        assert!(score.notes.iter().any(|note| {
+            note.part == GENERAL_MELODY_PART_V1 && note.role == VoiceRole::Melody
+        }));
+        assert!(score.notes.iter().any(|note| {
+            note.part == GENERAL_BASS_PART_V1 && note.role == VoiceRole::Bass
+        }));
+        assert!(score.notes.iter().any(|note| {
+            note.part == GENERAL_HARMONY_PART_V1 && note.role == VoiceRole::Harmony
+        }));
+        assert!(
+            score.notes.iter().all(|note| note.part != PartId::UNASSIGNED),
+            "additive replacement and full-drone replacement must not create unassigned notes"
+        );
+    }
+
+    #[test]
     fn general_composer_default_route_assigns_identity_to_every_generated_note() {
         let intent = MusicalIntent {
             seed: 41,
