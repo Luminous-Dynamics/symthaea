@@ -12,7 +12,7 @@ The paper evaluates four NASA PCoE NCA cells using 200-sample partial-charge vol
 
 ## Paradigm
 
-A single marginal coverage number can conceal undercoverage in the region that matters most. This audit therefore binds every held-out prediction and target to a predeclared training-support score, classifies samples into in-support, boundary and extrapolation strata, and independently replays each stratum's coverage, width and error.
+A single marginal coverage number can conceal undercoverage in the region that matters most. This audit therefore binds every held-out prediction and target to both (1) a label-free support score produced by the detector and (2) a separate offline reference support state derived from the frozen train/test relation. Calibration is measured within reference states; the detector is evaluated against those states. This prevents a detector from defining the very OOD groups used to claim that it works.
 
 At deployment the true target is not available, so the system cannot directly observe live coverage. It can compute a label-free support score and choose to abstain. Held-out labels are used only to evaluate whether that score predicts conditional miscoverage.
 
@@ -38,11 +38,11 @@ For each support stratum the auditor computes:
 - 90% and 95% interval scores (proper interval scoring rules);
 - undercoverage flags using predeclared engineering tolerances.
 
-The auditor also evaluates the support detector against the offline reference support state at physical-group level: extrapolation recall, false-extrapolation rate and group-aggregated score AUROC. It computes a risk-coverage curve at frozen support-score cutoffs: retained sample/group count, retained fraction, MAE, RMSE and worst-group MAE. Calibration strata are grouped by offline reference state, never by the detector's own thresholds. A model with good marginal accuracy but poor extrapolation coverage is accepted as a *reproducible audit record* with an explicit SUPPORT_STRATUM_UNDERCOVERAGE_DETECTED status. That is not a successful calibration gate and cannot be advertised as calibrated deployment performance.
+The auditor also evaluates the support detector against the offline reference support state at physical-group level: extrapolation recall, false-extrapolation rate and group-aggregated score AUROC. It computes a risk-coverage curve at frozen support-score cutoffs: retained sample/group count, retained fraction, MAE, RMSE and worst-group MAE. Calibration strata are grouped by offline reference state, never by the detector's own thresholds. A model with good marginal accuracy but poor extrapolation coverage is preserved as a reproducible audit record with SUPPORT_STRATUM_UNDERCOVERAGE_DETECTED. If the detector also misses an extrapolating physical group, the status becomes OOD_MISDETECTION_AND_UNDERCOVERAGE. A tiny synthetic corpus with only two independent groups per state is always labelled INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE, even when observed PICP is perfect. None of these states constitutes a successful calibration gate or calibrated deployment claim.
 
 ## Frozen synthetic corpus
 
-Ten fixtures: two accepted results (one support-conditional result within tolerance, one with OOD undercoverage that must be surfaced) and eight rejected controls covering test-label leakage into support scoring, threshold freeze after the split, calibration/test group overlap, missing extrapolation coverage, duplicate sample identity, test/validation group overlap, non-nested intervals and non-monotonic abstention cutoffs.
+Eleven fixtures: three accepted audit records and eight rejected controls. The accepted records include a support-conditional case with insufficient independent-group evidence, an OOD undercoverage case, and an OOD undercoverage case where the detector misses one extrapolating physical group. The eight rejected controls cover test-label leakage into support scoring, post-freeze thresholds, calibration/test asset overlap, missing reference support strata, duplicate sample identity, train/test group overlap, invalid interval nesting and non-monotonic abstention cutoffs.
 
 These fixtures validate arithmetic and evidence gates only; they are not physical battery evidence.
 
