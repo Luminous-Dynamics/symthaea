@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
+      - ".github/scripts/assert-hlb-test-discovery.sh"
       - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
       - "crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs"
       - "crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs"
@@ -50,6 +51,7 @@ on:
     branches: [research/hlb-fep-wsp-factorial-v2]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
+      - ".github/scripts/assert-hlb-test-discovery.sh"
       - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
       - "crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs"
       - "crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs"
@@ -194,6 +196,11 @@ jobs:
           cargo metadata --locked --format-version 1 > /dev/null
           sha256sum Cargo.lock research-results/Cargo.lock.generated > research-results/Cargo.lock.SHA256SUMS
 
+      - name: Assert focused Rust test filters discover tests
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash .github/scripts/assert-hlb-test-discovery.sh
+
       - name: Test four-factor contract invariants
         run: |
           set -euo pipefail
@@ -314,7 +321,7 @@ jobs:
           set -euo pipefail
           mkdir -p research-results
           cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
-          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md docs/research/HLB_EVIDENCE_GOVERNED_SUBSTRATE_ADAPTATION.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs crates/core/symthaea-core/src/sequential_weight_verification.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/Cargo.toml crates/core/symthaea-fep/Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-core/src/hdc/structured_mixer.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/gaussian_decision_diagnostic.rs crates/core/symthaea-fep/src/causal_diagnostic_semantics.rs crates/core/symthaea-fep/src/open_world_robust_decision.rs crates/core/symthaea-fep/src/sibson_alpha_information.rs crates/core/symthaea-fep/src/open_world_weight_program_gate.rs crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs crates/core/symthaea-fep/src/static_model_diagnostic.rs crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs research-results/hlb-open-world-robustness.json research-results/hlb-decision-diagnostic.json research-results/hlb-static-model-diagnostic.json crates/core/symthaea-fep/src/gaussian_model_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log research-results/hlb-vsa-bundle-capacity.csv research-results/hlb-structured-mixer.csv > research-results/SHA256SUMS
+          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md docs/research/HLB_EVIDENCE_GOVERNED_SUBSTRATE_ADAPTATION.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs crates/core/symthaea-core/src/sequential_weight_verification.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/Cargo.toml crates/core/symthaea-fep/Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-core/src/hdc/structured_mixer.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/gaussian_decision_diagnostic.rs crates/core/symthaea-fep/src/causal_diagnostic_semantics.rs crates/core/symthaea-fep/src/open_world_robust_decision.rs crates/core/symthaea-fep/src/sibson_alpha_information.rs crates/core/symthaea-fep/src/open_world_weight_program_gate.rs crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs crates/core/symthaea-fep/src/static_model_diagnostic.rs crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs research-results/hlb-open-world-robustness.json research-results/hlb-decision-diagnostic.json research-results/hlb-static-model-diagnostic.json crates/core/symthaea-fep/src/gaussian_model_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log research-results/hlb-test-discovery.txt research-results/hlb-vsa-bundle-capacity.csv research-results/hlb-structured-mixer.csv > research-results/SHA256SUMS
           cat research-results/SHA256SUMS
 
       - name: Upload protocol-validation receipt
