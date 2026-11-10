@@ -1133,8 +1133,7 @@ mod tests {
             for (successes, mass) in surviving_mass.iter().copied().enumerate() {
                 for (is_positive, branch_probability) in [(false, 0.5), (true, 0.5)] {
                     let next_successes = successes + usize::from(is_positive);
-                    let mean_improvement =
-                        (2.0 * next_successes as f64 - n) / n;
+                    let mean_improvement = (2.0 * next_successes as f64 - n) / n;
                     let lower_bound = (mean_improvement - radius).max(-1.0);
                     let branch_mass = mass * branch_probability;
 
