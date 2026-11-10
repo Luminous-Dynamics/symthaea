@@ -8,7 +8,7 @@
 
 A score-conditioned pitch estimator can hide a wrong rendition by searching only near the expected note. Muse's primary pitch audit has already been changed to remove that search prior. The next requirement is to qualify that estimator against independent singing F0 references and matched alternative trackers.
 
-The evaluator at tools/vocal-pitch-benchmark-eval accepts aligned reference/estimate pairs and calculates FFE, GPE, VDE, voicing coverage, abstention, false-voiced, octave/subharmonic and cents-error metrics. It requires a primary score-independent track and records exact tracker, reference, preprocessing, split, frame-grid and voicing-policy identities.
+The evaluator at tools/vocal-pitch-benchmark-eval accepts aligned reference/estimate pairs and calculates FFE, GPE, VDE, voicing coverage, abstention, false-voiced, octave/subharmonic and cents-error metrics. It requires a primary score-independent track and records exact tracker, reference, preprocessing, split, frame-grid and voicing-policy identities. Each segment also binds the source WAV, independent reference-F0 track and tracker-output track digests. Language, register, vocal technique and SNR strata are retained. The expected corpus × condition group set is predeclared and complete; missing or unexpected groups reject the benchmark run rather than silently changing the macro denominator.
 
 ## Metric definitions
 
