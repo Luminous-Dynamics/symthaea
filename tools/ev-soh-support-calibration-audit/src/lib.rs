@@ -146,6 +146,9 @@ pub struct SupportDetectionSummary {
     pub extrapolation_recall: f64,
     pub false_extrapolation_rate: f64,
     pub extrapolation_auroc: f64,
+    pub sample_extrapolation_recall: f64,
+    pub sample_false_extrapolation_rate: f64,
+    pub sample_extrapolation_auroc: f64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -372,7 +375,6 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
 
     let mut sample_ids = BTreeSet::new();
     let mut test_groups = BTreeSet::new();
-    let mut group_strata: BTreeMap<String, String> = BTreeMap::new();
     let mut rows_by_stratum: BTreeMap<String, Vec<&TestEntry>> = BTreeMap::new();
     for entry in &manifest.test_entries {
         if !is_digest(&entry.sample_digest) || !sample_ids.insert(entry.sample_digest.clone()) {
@@ -415,14 +417,9 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
             errors.push("target or nested 90/95 prediction intervals are invalid".to_owned());
         }
 
-        // Offline reference support is used to stratify calibration results;
-        // the detector only sees its own label-free support_score.
+        // Reference support state belongs to each observation, not permanently
+        // to a physical cell. A trajectory may cross support boundaries as it ages.
         let stratum = entry.reference_support_state.clone();
-        if let Some(existing) = group_strata.insert(entry.group_identity_digest.clone(), stratum.clone()) {
-            if existing != stratum {
-                errors.push("samples from one physical group were assigned to different support strata".to_owned());
-            }
-        }
         test_groups.insert(entry.group_identity_digest.clone());
         rows_by_stratum.entry(stratum).or_default().push(entry);
     }
@@ -619,13 +616,49 @@ fn summarize_risk_coverage(manifest: &Manifest) -> Vec<RiskCoveragePoint> {
         .collect()
 }
 
+fn auc(positive_scores: &[f64], negative_scores: &[f64]) -> f64 {
+    let mut wins = 0.0;
+    for positive in positive_scores {
+        for negative in negative_scores {
+            if positive > negative { wins += 1.0; }
+            else if (positive - negative).abs() <= EPSILON { wins += 0.5; }
+        }
+    }
+    wins / (positive_scores.len() * negative_scores.len()) as f64
+}
+
 fn compute_support_detection(manifest: &Manifest) -> SupportDetectionSummary {
-    let mut by_group: BTreeMap<String, (String, f64, usize)> = BTreeMap::new();
+    // Sample-level detector performance shows which individual predictions
+    // were flagged. These rates are descriptive; windows are not independent.
+    let mut sample_tp = 0usize;
+    let mut sample_fn = 0usize;
+    let mut sample_fp = 0usize;
+    let mut sample_tn = 0usize;
+    let mut sample_pos = Vec::new();
+    let mut sample_neg = Vec::new();
+    for entry in &manifest.test_entries {
+        let actual_ood = entry.reference_support_state == "extrapolation";
+        let predicted_ood = entry.support_score >= manifest.support_scoring.extrapolation_min_score;
+        match (actual_ood, predicted_ood) {
+            (true, true) => sample_tp += 1,
+            (true, false) => sample_fn += 1,
+            (false, true) => sample_fp += 1,
+            (false, false) => sample_tn += 1,
+        }
+        if actual_ood { sample_pos.push(entry.support_score); }
+        else { sample_neg.push(entry.support_score); }
+    }
+
+    // Physical-group metrics prevent a high count of correlated windows from
+    // masquerading as many independent batteries. A group is reference-OOD if
+    // any test observation crosses the predeclared extrapolation boundary;
+    // its detector score is the maximum support score over its test windows.
+    let mut by_group: BTreeMap<String, (bool, f64)> = BTreeMap::new();
     for entry in &manifest.test_entries {
         let row = by_group.entry(entry.group_identity_digest.clone())
-            .or_insert((entry.reference_support_state.clone(), 0.0, 0));
-        row.1 += entry.support_score;
-        row.2 += 1;
+            .or_insert((false, 0.0));
+        row.0 |= entry.reference_support_state == "extrapolation";
+        row.1 = row.1.max(entry.support_score);
     }
     let mut tp = 0usize;
     let mut fn_count = 0usize;
@@ -633,9 +666,7 @@ fn compute_support_detection(manifest: &Manifest) -> SupportDetectionSummary {
     let mut tn = 0usize;
     let mut positive_scores = Vec::new();
     let mut negative_scores = Vec::new();
-    for (_, (truth, score_sum, count)) in by_group {
-        let score = score_sum / count as f64;
-        let actual_ood = truth == "extrapolation";
+    for (_, (actual_ood, score)) in by_group {
         let predicted_ood = score >= manifest.support_scoring.extrapolation_min_score;
         match (actual_ood, predicted_ood) {
             (true, true) => tp += 1,
@@ -643,17 +674,13 @@ fn compute_support_detection(manifest: &Manifest) -> SupportDetectionSummary {
             (false, true) => fp += 1,
             (false, false) => tn += 1,
         }
-        if actual_ood { positive_scores.push(score); } else { negative_scores.push(score); }
-    }
-    let mut wins = 0.0;
-    for positive in &positive_scores {
-        for negative in &negative_scores {
-            if positive > negative { wins += 1.0; }
-            else if (positive - negative).abs() <= EPSILON { wins += 0.5; }
-        }
+        if actual_ood { positive_scores.push(score); }
+        else { negative_scores.push(score); }
     }
     let positives = positive_scores.len();
     let negatives = negative_scores.len();
+    let sample_positives = sample_pos.len();
+    let sample_negatives = sample_neg.len();
     SupportDetectionSummary {
         reference_extrapolation_group_count: positives,
         predicted_extrapolation_group_count: tp + fp,
@@ -663,7 +690,10 @@ fn compute_support_detection(manifest: &Manifest) -> SupportDetectionSummary {
         true_negative_group_count: tn,
         extrapolation_recall: tp as f64 / positives as f64,
         false_extrapolation_rate: fp as f64 / negatives as f64,
-        extrapolation_auroc: wins / (positives * negatives) as f64,
+        extrapolation_auroc: auc(&positive_scores, &negative_scores),
+        sample_extrapolation_recall: sample_tp as f64 / sample_positives as f64,
+        sample_false_extrapolation_rate: sample_fp as f64 / sample_negatives as f64,
+        sample_extrapolation_auroc: auc(&sample_pos, &sample_neg),
     }
 }
 
@@ -689,7 +719,9 @@ fn compute_result(manifest: &Manifest) -> SupportCalibrationResult {
         .any(|summary| summary.undercovered_90 || summary.undercovered_95);
     let support_detection = compute_support_detection(manifest);
     let support_detector_failed = support_detection.extrapolation_recall < 0.90
-        || support_detection.false_extrapolation_rate > 0.10;
+        || support_detection.false_extrapolation_rate > 0.10
+        || support_detection.sample_extrapolation_recall < 0.90
+        || support_detection.sample_false_extrapolation_rate > 0.10;
     let insufficient_groups = strata.iter().any(|summary| {
         summary.distinct_group_count < manifest.minimum_independent_groups_per_stratum
     });
@@ -928,6 +960,31 @@ mod tests {
                 && pair[0].retained_fraction <= pair[1].retained_fraction
         }));
         assert_eq!(case.risk_coverage.last().unwrap().retained_sample_count, 6);
+    }
+
+    #[test]
+    fn one_physical_cell_may_cross_support_strata_over_its_aging_trajectory() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "valid-support-conditioned-calibration")
+            .and_then(|case| case.result.as_ref())
+            .expect("temporal support crossing fixture");
+        assert_eq!(case.audit_status, "INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE");
+        let manifest: Manifest = serde_json::from_slice(
+            &serde_json::to_vec(
+                &serde_json::from_slice::<Value>(CORPUS).unwrap()["cases"]
+                    .as_array().unwrap().iter()
+                    .find(|value| value["case_id"] == "valid-support-conditioned-calibration")
+                    .unwrap()["manifest"]
+            ).unwrap()
+        ).unwrap();
+        let first_group = &manifest.test_entries[0].group_identity_digest;
+        let states: BTreeSet<&str> = manifest.test_entries.iter()
+            .filter(|entry| &entry.group_identity_digest == first_group)
+            .map(|entry| entry.reference_support_state.as_str())
+            .collect();
+        assert!(states.contains("in_support"));
+        assert!(states.contains("extrapolation"));
     }
 
     #[test]
