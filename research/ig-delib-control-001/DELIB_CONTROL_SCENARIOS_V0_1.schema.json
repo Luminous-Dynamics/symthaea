@@ -136,7 +136,10 @@
               "rounds_used",
               "round_limit",
               "agent_agreement",
-              "evidence_complete",
+              "evidence_closure_status",
+              "evidence_closure_receipt_sha256",
+              "evidence_closure_validator_id",
+              "evidence_closure_validator_version",
               "high_impact_unresolved_count",
               "contradictory_source_count",
               "hypothesis_diversity_count",
@@ -174,9 +177,6 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1
-              },
-              "evidence_complete": {
-                "type": "boolean"
               },
               "high_impact_unresolved_count": {
                 "type": "integer",
@@ -242,6 +242,34 @@
                     "pattern": "^[a-f0-9]{64}$"
                   }
                 }
+              },
+              "evidence_closure_status": {
+                "enum": [
+                  "NotAssessed",
+                  "Incomplete",
+                  "Verified"
+                ]
+              },
+              "evidence_closure_receipt_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "evidence_closure_validator_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "evidence_closure_validator_version": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
               }
             }
           },
