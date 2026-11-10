@@ -1728,8 +1728,11 @@ fn apply_harmonic_sequence(form: &mut Form) {
 /// wanting genuine harmonic stillness (drone, soundscape, film-score
 /// pad) rather than block-chord re-attack on every bar.
 fn apply_harmonic_stasis(score: &mut Score) {
-    let parts: Vec<PartId> = score.parts();
-    apply_harmonic_stasis_for_parts(score, &parts);
+    // Legacy/test compatibility: include UNASSIGNED as one explicit legacy
+    // bucket. Production composition uses the part-scoped API below.
+    let parts: std::collections::BTreeSet<PartId> =
+        score.notes.iter().map(|note| note.part).collect();
+    apply_harmonic_stasis_for_parts(score, &parts.into_iter().collect::<Vec<_>>());
 }
 
 /// Tie repeated Harmony/Bass pitches within each exact persistent part.
