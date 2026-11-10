@@ -1,12 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Zero-torque HAL command-shape stub for the full-frame research model.
+//! Software-only command-shape stub for the full-frame research model.
 //!
-//! This module currently constructs a 21-channel all-zero command and checks
-//! its shape in software. It does not instantiate `HalRuntime`, open I2C,
-//! drive servos, implement an emergency stop, or authorize physical actuation.
-//! It is not a hardware adapter. A separately qualified HAL and independent
-//! hardware safety path are required before any physical device connection.
+//! The historical module name is retained for source compatibility, but this
+//! file does not instantiate a HAL runtime, open I2C, drive servos, implement
+//! an emergency stop, or authorize physical actuation. It only emits an
+//! all-zero command in a proposed 21-channel logical layout and checks that
+//! the software loop remains finite.
+//!
+//! A real hardware adapter requires a separately reviewed transport, calibrated
+//! actuators and sensors, independent hardware safety controls, watchdogs,
+//! acknowledgements, fault injection and hardware-in-the-loop qualification.
 
 #![cfg(feature = "hal")]
 
@@ -14,88 +18,73 @@ use symthaea_humanoid::types::HumanoidCommand;
 
 use crate::full_frame::{FullFrameSimulator, NUM_FULL_FRAME_JOINTS};
 
-/// HAL channel count (2× PCA9685 × 16 channels = 32, we use 21 for humanoid).
+/// Proposed logical command width only; no physical pinout or board mapping is
+/// implemented or validated by this research stub.
 pub const HAL_CHANNELS: usize = 21;
 
-/// Maps 20 full-frame joints to 21 HAL channels.
+/// Emit the current all-zero placeholder command.
 ///
-/// HAL channel layout (PCA9685 boards 0x40 and 0x41):
-/// - Channel 0-1:   Spine (neck, lumbar)
-/// - Channel 2-7:   Left arm (6 joints)
-/// - Channel 8-13:  Right arm (6 joints)
-/// - Channel 14-16: Left leg (3 joints)
-/// - Channel 17-19: Right leg (3 joints)
-/// - Channel 20:    Reserved (head/gripper)
-/// Produce the current zero-torque placeholder in the declared channel layout.
-///
-/// The simulator is intentionally not an actuator-command source. The input
-/// is retained for call-site compatibility but cannot affect the emitted values.
-pub fn full_frame_to_humanoid_command(_sim: &FullFrameSimulator) -> HumanoidCommand {
+/// This function intentionally takes no simulator or cognitive input: the
+/// research plant is not an actuator-command source.
+pub fn zero_torque_humanoid_command() -> HumanoidCommand {
     HumanoidCommand {
         torques: vec![0.0f32; HAL_CHANNELS],
     }
 }
 
-/// Bridge configuration.
+/// Configuration for the software-only research smoke loop.
 #[derive(Debug, Clone)]
-pub struct HalBridgeConfig {
-    /// Maximum ticks to run (None = until e-stop).
-    pub max_ticks: Option<u64>,
-    /// Legacy configuration placeholder. No I2C transport is wired or consulted.
-    pub use_mock_i2c: bool,
+pub struct SoftwareStubConfig {
+    /// Number of simulation ticks to execute.
+    pub max_ticks: u64,
 }
 
-impl Default for HalBridgeConfig {
+impl Default for SoftwareStubConfig {
     fn default() -> Self {
-        Self {
-            max_ticks: Some(50), // Matches current full-frame stability envelope
-            use_mock_i2c: true,
-        }
+        Self { max_ticks: 50 }
     }
 }
 
-/// Summary of a HAL bridge session.
+/// Report from the software-only zero-command loop.
 #[derive(Debug, Clone, Default)]
-pub struct HalBridgeReport {
+pub struct SoftwareStubReport {
     pub ticks_executed: u64,
-    /// True only if every command generated in this software-only loop was zero torque.
+    pub commands_checked: u64,
+    /// True only if every checked command had the declared width and all-zero torque.
     pub all_commands_zero_torque: bool,
     pub simulator_finite: bool,
 }
 
-/// Run a software-only loop that steps the research plant and checks the
-/// zero-torque command shape. No HAL runtime or I2C device is used.
-pub fn run_bridged_session(
+/// Step the simplified research plant and check the zero-torque command shape.
+///
+/// No HAL runtime or I2C device is used. The result is software smoke evidence
+/// only, not hardware, safety, biomechanics or human-subject qualification.
+pub fn run_software_stub_session(
     sim: &mut FullFrameSimulator,
-    config: HalBridgeConfig,
-) -> HalBridgeReport {
-    let mut report = HalBridgeReport {
+    config: SoftwareStubConfig,
+) -> SoftwareStubReport {
+    let mut report = SoftwareStubReport {
         all_commands_zero_torque: true,
-        ..HalBridgeReport::default()
+        ..SoftwareStubReport::default()
     };
 
-    let max = config.max_ticks.unwrap_or(50);
-    for _ in 0..max {
-        // Step the physics simulation
+    for _ in 0..config.max_ticks {
         sim.step(0.001);
-
-        // Generate HAL command from simulator state
-        let cmd = full_frame_to_humanoid_command(sim);
-        report.all_commands_zero_torque &= cmd.torques.len() == HAL_CHANNELS
-            && cmd.torques.iter().all(|torque| *torque == 0.0);
+        let command = zero_torque_humanoid_command();
+        report.all_commands_zero_torque &= command.torques.len() == HAL_CHANNELS
+            && command.torques.iter().all(|torque| *torque == 0.0);
+        report.commands_checked += 1;
         report.ticks_executed += 1;
     }
 
-    // Check that at least one chain tip is still finite
     let spine_finite = sim
         .spine_chain
         .links
         .first()
-        .and_then(|&h| sim.world.body(h))
-        .map(|b| b.transform.translation.0.iter().all(|v| v.is_finite()))
+        .and_then(|&handle| sim.world.body(handle))
+        .map(|body| body.transform.translation.0.iter().all(|value| value.is_finite()))
         .unwrap_or(false);
     report.simulator_finite = spine_finite;
-
     report
 }
 
@@ -104,46 +93,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_command_generation_matches_hal_layout() {
-        let sim = FullFrameSimulator::new();
-        let cmd = full_frame_to_humanoid_command(&sim);
-        assert_eq!(cmd.torques.len(), HAL_CHANNELS);
+    fn zero_command_has_declared_logical_width() {
+        let command = zero_torque_humanoid_command();
+        assert_eq!(command.torques.len(), HAL_CHANNELS);
         assert_eq!(HAL_CHANNELS, 21);
+        assert!(command.torques.iter().all(|torque| *torque == 0.0));
     }
 
     #[test]
-    fn test_command_is_zero_independent_of_simulator_state() {
-        let sim = FullFrameSimulator::new();
-        let cmd = full_frame_to_humanoid_command(&sim);
-        assert_eq!(cmd.torques.len(), HAL_CHANNELS);
-        assert!(cmd.torques.iter().all(|torque| *torque == 0.0));
-    }
-
-    #[test]
-    fn test_bridged_session_runs_to_completion() {
+    fn software_stub_loop_reports_only_zero_commands() {
         let mut sim = FullFrameSimulator::new();
-        let config = HalBridgeConfig::default();
-        let report = run_bridged_session(&mut sim, config);
-
-        assert_eq!(report.ticks_executed, 50);
-        assert!(report.simulator_finite, "Simulator should remain finite");
-    }
-
-    #[test]
-    fn test_software_loop_reports_zero_torque_commands() {
-        let mut sim = FullFrameSimulator::new();
-        let config = HalBridgeConfig {
-            max_ticks: Some(20),
-            use_mock_i2c: true,
-        };
-        let report = run_bridged_session(&mut sim, config);
+        let report = run_software_stub_session(
+            &mut sim,
+            SoftwareStubConfig { max_ticks: 20 },
+        );
         assert_eq!(report.ticks_executed, 20);
+        assert_eq!(report.commands_checked, 20);
         assert!(report.all_commands_zero_torque);
+        assert!(report.simulator_finite);
     }
 
     #[test]
-    fn test_full_frame_joint_count_matches_expectation() {
-        // Sanity: 20 full-frame joints, 21 HAL channels (1 reserved)
+    fn full_frame_joint_count_matches_research_model() {
         assert_eq!(NUM_FULL_FRAME_JOINTS, 20);
         assert_eq!(HAL_CHANNELS, 21);
     }
