@@ -624,9 +624,27 @@ mod tests {
                 kind: VssiExperimentKind::PassiveObservation
             })
         ));
-        assert_eq!(first, environment.observe_experiment(VssiExperimentKind::ThermalImpulse).unwrap_or_default());
-        // A distinct protocol is a separate counterfactual; its input history
-        // is unchanged until the declared intervention tick.
+        let pulse = environment
+            .observe_experiment(VssiExperimentKind::ThermalImpulse)
+            .unwrap();
+        assert_ne!(first, pulse);
+        assert!(first.iter().all(|row| row.event_time > 3.0));
+        assert!(pulse.iter().all(|row| row.event_time > 3.0));
+        // Distinct protocols share the same pre-intervention task observations.
+        let repeated_initial = VssiMechanicalEnvironment::new(
+            "vssi-passive-replay-baseline-control",
+            VssiFixtureCase::HealthyControl,
+        )
+        .unwrap();
+        let pulse_initial = VssiMechanicalEnvironment::new(
+            "vssi-thermal-baseline-control",
+            VssiFixtureCase::HealthyControl,
+        )
+        .unwrap();
+        assert_eq!(
+            repeated_initial.public_task().initial_observations,
+            pulse_initial.public_task().initial_observations
+        );
         assert_eq!(spent_after_first, 0.25);
         assert!(environment.spent_observation_cost() > spent_after_first);
     }
