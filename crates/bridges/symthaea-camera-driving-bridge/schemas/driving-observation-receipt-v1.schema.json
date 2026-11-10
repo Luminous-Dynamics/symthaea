@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/symthaea-driving-observation-receipt-v1.schema.json",
+  "title": "Symthaea fused driving observation receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "identity",
+    "capture_sequence",
+    "capture_timestamp_us",
+    "vehicle_state_timestamp_us",
+    "derived_dt_us",
+    "width",
+    "height",
+    "channels",
+    "visual_weight_ppm",
+    "vision_config_sha256",
+    "vehicle_encoder_seed_sha256",
+    "hdc_dimension",
+    "vehicle_encoder_levels",
+    "upstream_observation_id",
+    "upstream_receipt_sha256",
+    "upstream_frame_sha256",
+    "upstream_clock_id",
+    "upstream_tick",
+    "upstream_agent_id",
+    "upstream_camera_calibration_sha256",
+    "upstream_renderer_revision",
+    "upstream_capture_timestamp_us",
+    "upstream_render_completed_timestamp_us",
+    "upstream_delivered_timestamp_us",
+    "upstream_applied_action_receipt_id",
+    "upstream_applied_action_receipt_sha256",
+    "upstream_applied_action_command_id",
+    "upstream_applied_action_tick",
+    "previous_receipt_sha256",
+    "raw_frame_sha256",
+    "visual_state_sha256",
+    "vehicle_state_sha256",
+    "previous_vehicle_state_sha256",
+    "previous_visual_state_sha256",
+    "proprioceptive_hv_sha256",
+    "fused_policy_input_sha256",
+    "vision_telemetry",
+    "vision_learning_frozen",
+    "vision_training_steps_before",
+    "vision_training_steps_after",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "episode_id",
+        "scenario_id",
+        "agent_id",
+        "camera_id",
+        "simulator_revision",
+        "policy_revision"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "agent_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "camera_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "simulator_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "policy_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "capture_sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capture_timestamp_us": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "vehicle_state_timestamp_us": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "derived_dt_us": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096
+    },
+    "height": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096
+    },
+    "channels": {
+      "enum": [
+        1,
+        3,
+        4
+      ]
+    },
+    "visual_weight_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "vision_config_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "vehicle_encoder_seed_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "hdc_dimension": {
+      "const": 16384
+    },
+    "vehicle_encoder_levels": {
+      "const": 32
+    },
+    "upstream_observation_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "upstream_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "upstream_frame_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "upstream_clock_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "upstream_tick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "upstream_agent_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "upstream_camera_calibration_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "upstream_renderer_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "upstream_capture_timestamp_us": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "upstream_render_completed_timestamp_us": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "upstream_delivered_timestamp_us": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "upstream_applied_action_receipt_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "upstream_applied_action_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "upstream_applied_action_command_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "upstream_applied_action_tick": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "previous_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "raw_frame_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "visual_state_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "vehicle_state_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "previous_vehicle_state_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "previous_visual_state_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "proprioceptive_hv_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "fused_policy_input_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "vision_telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prediction_error",
+        "manifold_coherence",
+        "attention_entropy",
+        "motion_surprise",
+        "num_salient_patches",
+        "frame_sequence",
+        "training_triggered"
+      ],
+      "properties": {
+        "prediction_error": {
+          "type": "number"
+        },
+        "manifold_coherence": {
+          "type": "number"
+        },
+        "attention_entropy": {
+          "type": "number"
+        },
+        "motion_surprise": {
+          "type": "number"
+        },
+        "num_salient_patches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "frame_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "training_triggered": {
+          "type": "boolean"
+        }
+      }
+    },
+    "vision_learning_frozen": {
+      "const": true
+    },
+    "vision_training_steps_before": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "vision_training_steps_after": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "x-invariants": [
+    "The source policy observation ID and receipt SHA-256 are recomputed from the source RGB bytes and policy-visible receipt fields; this verifies unkeyed internal consistency, not publisher authenticity.",
+    "previous_receipt_sha256 links this receipt to the immediately preceding accepted bridge receipt.",
+    "previous_vehicle_state_sha256 and previous_visual_state_sha256 bind derivative and temporal manifold history.",
+    "vision_training_steps_before equals vision_training_steps_after and vision_telemetry.training_triggered is false.",
+    "The fused HDC bytes are stored as an external binary artifact: u64 little-endian dimension followed by dimension f32 little-endian components; fused_policy_input_sha256 covers the dimension prefix plus components."
+  ]
+}
