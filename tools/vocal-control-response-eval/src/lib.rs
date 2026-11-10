@@ -649,7 +649,9 @@ mod tests {
         let mut trials = valid_trials();
         for pair in &mut trials[0].pairs {
             for observation in &mut pair.intervention {
-                if observation.metric_id == "pitch_error_cents" { observation.value = -200.0; }
+                if observation.metric_id == "pitch_error_cents" {
+                    observation.value = -200.0;
+                }
             }
         }
         let report = evaluate_control_response_matrix(
@@ -664,7 +666,9 @@ mod tests {
         let mut trials = valid_trials();
         for pair in &mut trials[1].pairs {
             for observation in &mut pair.intervention {
-                if observation.metric_id == "vibrato_depth_cents" { observation.value = 30.0; }
+                if observation.metric_id == "vibrato_depth_cents" {
+                    observation.value = 30.0;
+                }
             }
         }
         let report = evaluate_control_response_matrix(
@@ -678,7 +682,9 @@ mod tests {
         let mut trials = valid_trials();
         for pair in &mut trials[0].pairs {
             for observation in &mut pair.intervention {
-                if observation.metric_id == "vibrato_depth_cents" { observation.value = 31.0; }
+                if observation.metric_id == "vibrato_depth_cents" {
+                    observation.value = 31.0;
+                }
             }
         }
         let report = evaluate_control_response_matrix(
