@@ -74,6 +74,11 @@ pub use linear_group_action::{
     LinearGroupActionAdmissionDiagnosticsV1, LinearGroupActionAdmissionError,
     LinearGroupActionAdmissionProfileV1, LinearGroupActionV1,
 };
+pub use linear_action_sampling::{
+    LinearActionGeneratorSampleStatisticsV1, LinearActionSampleV1,
+    LinearActionSampledInvarianceReportV1, LinearActionSamplingErrorV1,
+    LinearActionSamplingProfileV1, evaluate_linear_action_samples,
+};
 pub use recognize::{
     RecognitionReport, expr_to_equation_node, recognize_expr, recognize_expr_with_units,
 };
