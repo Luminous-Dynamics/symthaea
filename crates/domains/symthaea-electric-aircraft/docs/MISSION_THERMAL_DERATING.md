@@ -53,7 +53,7 @@ The present API accepts numerical points but does not authenticate a source, fet
 - Derating points are sorted by strictly increasing temperature.
 - Available power must be non-increasing with temperature.
 - Linear interpolation is used only between measured points.
-- Temperatures outside the characterized curve domain are rejected, never extrapolated.
+- Temperatures outside the characterized curve domain are rejected, never extrapolated. Power curves may be non-monotonic so battery cold-side limits and hot-side derating can both be represented from measured points.
 - Mission durations are subdivided to a declared maximum integration step.
 - Thermal state is returned only if all modeled node ceilings and power limits pass.
 - Each thermal step reports a network energy-balance residual; the maximum absolute residual is retained.
