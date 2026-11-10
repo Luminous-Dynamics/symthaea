@@ -49,6 +49,7 @@ struct Asset {
     vehicle_configuration_digest: String,
     pack_ref: String,
     pack_configuration_digest: String,
+    cell_inventory_digest: String,
     chemistry: String,
     declared_cell_count: usize,
 }
@@ -163,6 +164,10 @@ pub struct PowerEnvelope {
     pub conservative_terminal_power_lower_w: Option<f64>,
     pub limiting_cell: String,
     pub limiting_constraint: String,
+    pub topology_qualification_ref: String,
+    pub topology_authority_ref: String,
+    pub model_ref: String,
+    pub model_digest: String,
     pub cells: Vec<CellLimit>,
     pub evidence: Vec<EvidenceRef>,
 }
@@ -258,6 +263,7 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         || profile.cells.len() < 2
         || !is_digest(&profile.asset.vehicle_configuration_digest)
         || !is_digest(&profile.asset.pack_configuration_digest)
+        || !is_digest(&profile.asset.cell_inventory_digest)
     {
         errors.push("asset identity or declared series-cell count is invalid".to_owned());
     }
@@ -467,6 +473,7 @@ fn build_evidence(profile: &Profile) -> Vec<EvidenceRef> {
             &profile.asset.pack_configuration_digest,
             None,
         ),
+        evidence("cell_inventory", &profile.asset.cell_inventory_digest, None),
         evidence("topology_descriptor", &profile.topology.topology_digest, None),
         evidence("model", &profile.model.model_digest, None),
         evidence("model_equation_parameters", &profile.model.parameter_digest, None),
@@ -577,6 +584,10 @@ fn compute(profile: &Profile) -> PowerEnvelope {
             conservative_terminal_power_lower_w: None,
             limiting_cell: limiting.cell_ref.clone(),
             limiting_constraint: limiting.limiting_constraint.clone(),
+            topology_qualification_ref: profile.topology.qualification.as_ref().unwrap().qualification_ref.clone(),
+            topology_authority_ref: profile.topology.qualification.as_ref().unwrap().authority_ref.clone(),
+            model_ref: profile.model.model_ref.clone(),
+            model_digest: profile.model.model_digest.clone(),
             cells,
             evidence,
         };
@@ -606,8 +617,9 @@ fn compute(profile: &Profile) -> PowerEnvelope {
             + selected_current.powi(2) * thermal_gain;
         cells.push(CellLimit {
             cell_ref: cell.cell_ref.clone(),
-            voltage_limited_current_a: (cell.ocv_lower_v - cell.minimum_voltage_v)
-                / cell.resistance_upper_ohm,
+            voltage_limited_current_a: ((cell.ocv_lower_v - cell.minimum_voltage_v)
+                / cell.resistance_upper_ohm)
+                .max(0.0),
             current_rating_limit_a: cell.maximum_discharge_current_lower_a,
             thermal_limited_current_a: cell_limit(cell, profile).thermal_limit_a,
             admissible_current_a: cell_limit(cell, profile).admissible_limit_a,
@@ -629,6 +641,10 @@ fn compute(profile: &Profile) -> PowerEnvelope {
         conservative_terminal_power_lower_w: Some(power_lower),
         limiting_cell: limiting.cell_ref.clone(),
         limiting_constraint: limiting.limiting_constraint.clone(),
+        topology_qualification_ref: profile.topology.qualification.as_ref().unwrap().qualification_ref.clone(),
+        topology_authority_ref: profile.topology.qualification.as_ref().unwrap().authority_ref.clone(),
+        model_ref: profile.model.model_ref.clone(),
+        model_digest: profile.model.model_digest.clone(),
         cells,
         evidence,
     }
@@ -695,7 +711,25 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
                 Ok(profile) => {
                     let errors = validate_profile(&profile);
                     if errors.is_empty() {
-                        Ok(compute(&profile))
+                        let envelope = compute(&profile);
+                        let numeric_values = [
+                            Some(envelope.maximum_admissible_current_a),
+                            envelope.selected_current_a,
+                            envelope.pack_terminal_voltage_lower_v,
+                            envelope.conservative_terminal_power_lower_w,
+                        ];
+                        if numeric_values
+                            .iter()
+                            .flatten()
+                            .any(|value| !value.is_finite() || *value < 0.0)
+                        {
+                            Err(vec![
+                                "power envelope contains a non-finite or negative output"
+                                    .to_owned(),
+                            ])
+                        } else {
+                            Ok(envelope)
+                        }
                     } else {
                         Err(errors)
                     }
