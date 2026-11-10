@@ -60,6 +60,7 @@ symthaea-fep|sibson_alpha_information::tests|1
 symthaea-fep|sequential_diagnostic_planning::tests|1
 symthaea-fep|sequential_diagnostic_benchmark::tests|1
 symthaea-fep|static_model_diagnostic::tests|1
+symthaea-fep|vssi_mechanical_fixture::tests|1
 symthaea-fep|decision_diagnostic_benchmark::tests|1
 symthaea-fep|gaussian_model_information_gain::tests|1
 symthaea-fep|bayesian_model_reduction::tests|1
