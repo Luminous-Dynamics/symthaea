@@ -1,0 +1,35 @@
+name: Melothaea part-aware MIDI realization
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-muse/src/midi_export.rs"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-music-theory/src/orchestration.rs"
+      - "crates/domains/symthaea-music-theory/src/orchestration_timeline.rs"
+      - ".github/workflows/melothaea-part-aware-midi-realization.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  part-aware-midi:
+    name: Format and focused realization tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+
+      - name: Check MIDI exporter formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/midi_export.rs
+
+      - name: Run part-aware MIDI regression tests
+        run: cargo test -p symthaea-muse --features theory --lib part_aware_v1::tests::
