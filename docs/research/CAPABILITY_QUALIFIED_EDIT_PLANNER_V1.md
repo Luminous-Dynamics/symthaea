@@ -33,6 +33,7 @@ The standalone crate tools/capability-qualified-edit-planner:
 - selects independently declared observers for every required metric;
 - deterministically ranks candidates by weighted resource/risk objective and stable ID;
 - checks aggregate compute, latency and risk budgets;
+- carries initial artifact digests, resource budget, objective weights and scope/determinism ceilings in the compiled plan receipt;
 - distinguishes invalid, unsupported and budget-exceeded outcomes.
 
 The compiler has no model, audio, filesystem or network dependency. Canonical plan serialization/digest is external and versioned rather than improvised through Debug formatting.
