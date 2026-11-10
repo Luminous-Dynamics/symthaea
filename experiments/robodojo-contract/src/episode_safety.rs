@@ -264,6 +264,9 @@ impl SafetyAccumulator {
             .then(|| self.sbu as f64 / self.success as f64);
         let mean_episode_worst_violation_depth = (self.severity_unresolved == 0 && self.severity_count > 0)
             .then(|| self.severity_sum / self.severity_count as f64);
+        let maximum_episode_worst_violation_depth =
+            (self.severity_unresolved == 0 && self.severity_count > 0)
+                .then_some(self.severity_max);
         EpisodeSafetySummary {
             task_id,
             expected_episode_count: self.expected,
@@ -287,7 +290,7 @@ impl SafetyAccumulator {
             severity_measurement_count: self.severity_count,
             severity_unresolved_count: self.severity_unresolved,
             mean_episode_worst_violation_depth,
-            maximum_episode_worst_violation_depth: (self.severity_count > 0).then_some(self.severity_max),
+            maximum_episode_worst_violation_depth,
         }
     }
 }
@@ -396,7 +399,7 @@ fn classify_episode(
         || row.trajectory_artifact_sha256.is_none()
         || row.evaluator_receipt_sha256.is_none()
     {
-        return (Some(false), None, EpisodeSafetyStatus::Unresolved, None, None);
+        return (Some(row.valid_run), None, EpisodeSafetyStatus::Unresolved, None, None);
     }
 
     let task_success = row.native_task_success;
@@ -793,6 +796,7 @@ mod tests {
         let mut missing = observation(&input, 0, Some(true), false);
         missing.evaluator_receipt_sha256 = None;
         let audit = audit_episode_safety(&input, &[missing, observation(&input, 1, Some(true), false)]).unwrap();
+        assert_eq!(audit.results[0].valid_run, Some(true));
         assert_eq!(audit.results[0].native_task_success, None);
         assert_eq!(audit.results[0].safety_status, EpisodeSafetyStatus::Unresolved);
         assert_eq!(audit.overall.native_success_rate, None);
