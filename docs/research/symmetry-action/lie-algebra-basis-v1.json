@@ -1,0 +1,182 @@
+{
+  "schema": "linear-lie-algebra-qualification/v1",
+  "purpose": "Frozen analytic references for numerical generator independence, commutator closure, structure constants, Jacobi consistency, and coordinate-representation covariance.",
+  "normalization": {
+    "metric_whitening": "B_i = L^T A_i L^-T, where G/scale = L L^T",
+    "generator_basis": "C_i = B_i / ||B_i||_F",
+    "structure_constant_convention": "[C_i,C_j] = sum_k c_ij^k C_k",
+    "commutator_convention": "[A,B] = A B - B A",
+    "evidence_scope": "Numerical rank / closure / Jacobi qualification. This fixture is an analytic reference, not a Rust execution receipt or a formal proof."
+  },
+  "positive_controls": [
+    {
+      "fixture_id": "SO2_ONE_GENERATOR_001",
+      "coordinate_names": ["x", "y"],
+      "metric": [[1, 0], [0, 1]],
+      "generators": {
+        "J": [[0, -1], [1, 0]]
+      },
+      "expected_generator_rank": 1,
+      "expected_bracket_count": 0,
+      "expected_jacobi_triple_count": 0,
+      "expected_classification": "closed_one_dimensional_abelian_lie_algebra"
+    },
+    {
+      "fixture_id": "SO3_STANDARD_BASIS_001",
+      "coordinate_names": ["x", "y", "z"],
+      "metric": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      "generators": {
+        "Jx": [[0, 0, 0], [0, 0, -1], [0, 1, 0]],
+        "Jy": [[0, 0, 1], [0, 0, 0], [-1, 0, 0]],
+        "Jz": [[0, -1, 0], [1, 0, 0], [0, 0, 0]]
+      },
+      "normalized_basis": "C_i = J_i / sqrt(2)",
+      "expected_generator_rank": 3,
+      "expected_brackets": [
+        {
+          "left": "Jx",
+          "right": "Jy",
+          "coefficients": [0, 0, "1/sqrt(2)"]
+        },
+        {
+          "left": "Jx",
+          "right": "Jz",
+          "coefficients": [0, "-1/sqrt(2)", 0]
+        },
+        {
+          "left": "Jy",
+          "right": "Jz",
+          "coefficients": ["1/sqrt(2)", 0, 0]
+        }
+      ],
+      "expected_jacobi": "zero_for_all_triples",
+      "expected_classification": "closed_nonabelian_so3"
+    },
+    {
+      "fixture_id": "SO2_DIRECT_SUM_SO2_001",
+      "coordinate_names": ["x", "y", "z", "w"],
+      "metric": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+      "generators": {
+        "Jxy": [
+          [0, -1, 0, 0],
+          [1, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0]
+        ],
+        "Jzw": [
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, -1],
+          [0, 0, 1, 0]
+        ]
+      },
+      "expected_generator_rank": 2,
+      "expected_bracket_coefficients": [[0, 0]],
+      "expected_classification": "closed_abelian_so2_plus_so2"
+    }
+  ],
+  "negative_controls": [
+    {
+      "fixture_id": "SO3_NONCLOSED_TWO_GENERATOR_SUBSET_001",
+      "coordinate_names": ["x", "y", "z"],
+      "metric": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      "generators": {
+        "Jx": [[0, 0, 0], [0, 0, -1], [0, 1, 0]],
+        "Jy": [[0, 0, 1], [0, 0, 0], [-1, 0, 0]]
+      },
+      "expected_bracket": {
+        "left": "Jx",
+        "right": "Jy",
+        "matrix": [[0, -1, 0], [1, 0, 0], [0, 0, 0]],
+        "interpretation": "The commutator is Jz, which is outside the supplied span."
+      },
+      "expected_classification": "reject_bracket_not_closed"
+    },
+    {
+      "fixture_id": "SO3_DUPLICATE_GENERATOR_001",
+      "coordinate_names": ["x", "y", "z"],
+      "metric": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      "generators": {
+        "Jx": [[0, 0, 0], [0, 0, -1], [0, 1, 0]],
+        "Jy": [[0, 0, 1], [0, 0, 0], [-1, 0, 0]],
+        "Jx_copy": [[0, 0, 0], [0, 0, -1], [0, 1, 0]]
+      },
+      "expected_generator_rank": 2,
+      "expected_classification": "reject_rank_deficient"
+    }
+  ],
+  "nonorthogonal_representation_control": {
+    "fixture_id": "SO3_DENSE_COORDINATE_CONJUGATION_001",
+    "coordinate_convention": "x_prime = D*x",
+    "D_rational": [
+      ["2", "1", "1/2"],
+      ["0", "3/2", "1/4"],
+      ["0", "0", "3/4"]
+    ],
+    "D_inverse_rational": [
+      ["1/2", "-1/3", "-2/9"],
+      ["0", "2/3", "-2/9"],
+      ["0", "0", "4/3"]
+    ],
+    "metric_prime_rational": [
+      ["1/4", "-1/6", "-1/9"],
+      ["-1/6", "5/9", "-2/27"],
+      ["-1/9", "-2/27", "152/81"]
+    ],
+    "generators_prime_rational": {
+      "Jx": [
+        ["0", "1/3", "-13/9"],
+        ["0", "1/6", "-37/18"],
+        ["0", "1/2", "-1/6"]
+      ],
+      "Jy": [
+        ["-1/4", "1/6", "25/9"],
+        ["-1/8", "1/12", "1/18"],
+        ["-3/8", "1/4", "1/6"]
+      ],
+      "Jz": [
+        ["1/2", "-5/3", "2/9"],
+        ["3/4", "-1/2", "-1/3"],
+        ["0", "0", "0"]
+      ]
+    },
+    "rules": {
+      "generator": "A_prime = D*A*D_inverse",
+      "metric": "G_prime = D_inverse^T*G*D_inverse"
+    },
+    "expected": "The normalized metric-whitened generator basis, singular values, structure constants, closure residuals and Jacobi diagnostics agree with the canonical representation up to floating-point error and orthogonal whitening ambiguity."
+  },
+  "nontrivial_jacobi_cancellation_control": {
+    "fixture_id": "SO3_MIXED_GENERATOR_BASIS_JACOBI_001",
+    "coordinate_names": ["x", "y", "z"],
+    "metric": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+    "unnormalized_generators": {
+      "B1": "Jx",
+      "B2": "Jy + Jz",
+      "B3": "Jz"
+    },
+    "normalized_generators": {
+      "C1": "Jx/sqrt(2)",
+      "C2": "(Jy+Jz)/2",
+      "C3": "Jz/sqrt(2)"
+    },
+    "expected_structure_constants": {
+      "[C1,C2]": [0, "-1/sqrt(2)", 1],
+      "[C1,C3]": [0, -1, "1/sqrt(2)"],
+      "[C2,C3]": ["1/2", 0, 0]
+    },
+    "jacobi_identity": "[C1,[C2,C3]] + [C2,[C3,C1]] + [C3,[C1,C2]] = 0",
+    "nonzero_terms": ["-1/(2*sqrt(2))*C1", "1/(2*sqrt(2))*C1"],
+    "expected": "Individual nested terms are nonzero and cancel. The Jacobi diagnostic must report a nonzero normalization_term_norm and a near-zero absolute residual."
+  },
+  "not_established": [
+    "global integration to a Lie subgroup",
+    "connected or disconnected component structure",
+    "finite-group or reflection components",
+    "exact rational/formal proof of the Lie algebra axioms",
+    "scalar expression invariance",
+    "vector-field or discrete step-map equivariance",
+    "conservation or Noether momentum maps",
+    "physical simulator correctness"
+  ]
+}
