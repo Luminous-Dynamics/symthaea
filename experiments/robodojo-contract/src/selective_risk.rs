@@ -12,6 +12,11 @@ use std::collections::BTreeSet;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RiskContext {
     pub task_id: String,
+    /// State/motion stratum, e.g. free_motion, contact_onset, sustained_contact,
+    /// constrained_insertion or release. The regime is evaluator-defined.
+    pub state_regime_id: String,
+    /// Digest of the exact predicate/partition that assigns a state to this regime.
+    pub state_regime_definition_sha256: String,
     pub policy_artifact_sha256: String,
     /// Digest of the forecast/risk estimator and output post-processing path.
     pub forecast_pipeline_sha256: String,
@@ -21,10 +26,11 @@ pub struct RiskContext {
 
 impl RiskContext {
     pub fn validate(&self) -> Result<(), RiskCertificateError> {
-        if self.task_id.trim().is_empty() {
+        if self.task_id.trim().is_empty() || self.state_regime_id.trim().is_empty() {
             return Err(RiskCertificateError::EmptyIdentity);
         }
         for digest in [
+            self.state_regime_definition_sha256.as_str(),
             self.policy_artifact_sha256.as_str(),
             self.forecast_pipeline_sha256.as_str(),
             self.environment_condition_sha256.as_str(),
@@ -434,6 +440,8 @@ mod tests {
     fn context(condition: &str) -> RiskContext {
         RiskContext {
             task_id: "wash_lettuce".to_owned(),
+            state_regime_id: "contactless".to_owned(),
+            state_regime_definition_sha256: "6".repeat(64),
             policy_artifact_sha256: "1".repeat(64),
             forecast_pipeline_sha256: "5".repeat(64),
             environment_condition_sha256: condition.repeat(64),
@@ -554,6 +562,26 @@ mod tests {
         other_forecast_pipeline.forecast_pipeline_sha256 = "8".repeat(64);
         assert_eq!(
             certificate.check_runtime_score(&other_forecast_pipeline, 0.95, 0.01),
+            Err(RiskCertificateError::RuntimeContextMismatch)
+        );
+    }
+
+    #[test]
+    fn runtime_must_match_the_exact_state_regime_and_its_definition() {
+        let certificate =
+            certify_selective_risk(&safe_samples(100), policy(), "4".repeat(64)).unwrap();
+
+        let mut other_regime = context("2");
+        other_regime.state_regime_id = "sustained_contact".to_owned();
+        assert_eq!(
+            certificate.check_runtime_score(&other_regime, 0.95, 0.01),
+            Err(RiskCertificateError::RuntimeContextMismatch)
+        );
+
+        let mut changed_partition = context("2");
+        changed_partition.state_regime_definition_sha256 = "7".repeat(64);
+        assert_eq!(
+            certificate.check_runtime_score(&changed_partition, 0.95, 0.01),
             Err(RiskCertificateError::RuntimeContextMismatch)
         );
     }
