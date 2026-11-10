@@ -42,7 +42,124 @@
       "type": "array"
     },
     "tests": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "test_cost",
+          "test_cost_digest",
+          "downtime_cost",
+          "downtime_cost_digest",
+          "prerequisites",
+          "requires",
+          "outcomes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "test_cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "test_cost_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "downtime_cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "downtime_cost_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "prerequisites": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "safety_approved",
+              "calibration_valid",
+              "domain_supported",
+              "equipment_available",
+              "protocol_digest",
+              "equipment_digest"
+            ],
+            "properties": {
+              "safety_approved": {
+                "type": "boolean"
+              },
+              "calibration_valid": {
+                "type": "boolean"
+              },
+              "domain_supported": {
+                "type": "boolean"
+              },
+              "equipment_available": {
+                "type": "boolean"
+              },
+              "protocol_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "equipment_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "requires": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "test_id",
+              "outcome"
+            ],
+            "properties": {
+              "test_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "outcome": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "outcomes": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "likelihood_by_hypothesis"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "likelihood_by_hypothesis": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
