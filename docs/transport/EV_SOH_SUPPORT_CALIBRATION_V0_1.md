@@ -23,8 +23,8 @@ At deployment the true target is not available, so the system cannot directly ob
 - Physical train, validation/calibration and test group identity sets are explicit and disjoint.
 - Support-score method, feature schema and score outputs have digests; fit scope is train-only; validation/test labels are forbidden.
 - Support direction is fixed: larger score means less support. In-support and extrapolation thresholds are frozen before the benchmark split.
-- Every test sample carries physical group identity, support score/evidence, observed target/evidence and nested 90%/95% predicted intervals.
-- Each physical group must stay inside one support stratum. The audit requires at least two independent test groups in each of in-support, boundary and extrapolation.
+- Every test sample carries physical group identity, a label-free support score/evidence, a separate offline reference support state/evidence, observed target/evidence and nested 90%/95% predicted intervals. The reference state is used only to evaluate whether the support score predicts miscoverage; it is never used to calculate the score. Calibration is fitted after the development split is frozen and before any test access.
+- Each physical group must stay inside one reference support state. The audit requires at least two independent test groups per reference state for a synthetic audit record. It also requires a declared minimum of 30 independent groups per state before it will label coverage evidence as sufficient. Thirty is an initial benchmark floor, not a statistical guarantee; the required group count should be preregistered from the application tolerance, expected within-group dependence and power analysis.
 - Validation-only calibration groups must be a subset of the validation partition and disjoint from test. External calibration must bind a source digest and remain disjoint from development and test groups.
 - Abstention cutoffs are predeclared and strictly increasing.
 
@@ -32,13 +32,13 @@ At deployment the true target is not available, so the system cannot directly ob
 
 For each support stratum the auditor computes:
 - PICP at 90% and 95%;
-- Wilson 95% lower confidence bounds for empirical interval coverage;
+- Per-physical-group coverage pass rates and Wilson 95% lower bounds over independent groups (not over correlated sample windows);
 - mean interval width at both levels;
 - MAE and RMSE;
 - 90% and 95% interval scores (proper interval scoring rules);
 - undercoverage flags using predeclared engineering tolerances.
 
-The auditor also computes a risk-coverage curve at the frozen support-score cutoffs: retained sample/group count, retained fraction, MAE, RMSE and worst-group MAE. A model with good marginal accuracy but poor extrapolation coverage is accepted as a *reproducible audit record* with an explicit SUPPORT_STRATUM_UNDERCOVERAGE_DETECTED status. That is not a successful calibration gate and cannot be advertised as calibrated deployment performance.
+The auditor also evaluates the support detector against the offline reference support state at physical-group level: extrapolation recall, false-extrapolation rate and group-aggregated score AUROC. It computes a risk-coverage curve at frozen support-score cutoffs: retained sample/group count, retained fraction, MAE, RMSE and worst-group MAE. Calibration strata are grouped by offline reference state, never by the detector's own thresholds. A model with good marginal accuracy but poor extrapolation coverage is accepted as a *reproducible audit record* with an explicit SUPPORT_STRATUM_UNDERCOVERAGE_DETECTED status. That is not a successful calibration gate and cannot be advertised as calibrated deployment performance.
 
 ## Frozen synthetic corpus
 
