@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-contagion-001/IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.schema.json",
+  "title": "IG-CONTAGION-001 scenario matrix v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "protocol_id",
+    "protocol_version",
+    "fixture_count",
+    "family_count",
+    "families",
+    "fixtures",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-contagion-scenario-matrix-v0.1"
+    },
+    "status": {
+      "enum": [
+        "synthetic_scenario_design_unexecuted",
+        "synthetic_scenario_design_frozen",
+        "executed"
+      ]
+    },
+    "protocol_id": {
+      "const": "IG-CONTAGION-001"
+    },
+    "protocol_version": {
+      "const": "0.1.0"
+    },
+    "fixture_count": {
+      "type": "integer",
+      "minimum": 40
+    },
+    "family_count": {
+      "type": "integer",
+      "minimum": 8
+    },
+    "families": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "description",
+          "condition"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20
+          },
+          "condition": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 40,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "family_id",
+          "class",
+          "topology_family",
+          "graph_generator_issue",
+          "graph_profile_ref",
+          "agent_placement",
+          "paired_block_id",
+          "seed",
+          "condition",
+          "expected_measurement_properties",
+          "scenario_note"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "pattern": "^IGC-[0-9]{3}$"
+          },
+          "family_id": {
+            "type": "string"
+          },
+          "class": {
+            "enum": [
+              "red_team",
+              "positive_control",
+              "measurement_control"
+            ]
+          },
+          "topology_family": {
+            "type": "string"
+          },
+          "graph_generator_issue": {
+            "type": "string",
+            "format": "uri"
+          },
+          "graph_profile_ref": {
+            "type": "string"
+          },
+          "agent_placement": {
+            "type": "string"
+          },
+          "paired_block_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "condition": {
+            "type": "string"
+          },
+          "expected_measurement_properties": {
+            "type": "array",
+            "minItems": 5,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "scenario_note": {
+            "type": "string",
+            "minLength": 20
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 30
+    }
+  }
+}
