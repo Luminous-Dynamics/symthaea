@@ -116,12 +116,6 @@ pub enum HillClimbError<E> {
     InvalidConfidence { query_index: usize, confidence: f64 },
 }
 
-impl<E> From<E> for HillClimbError<E> {
-    fn from(error: E) -> Self {
-        Self::Model(error)
-    }
-}
-
 /// Run greedy single-site confidence ascent.
 ///
 /// A mutation selects one position uniformly from the sequence and one replacement symbol
@@ -266,7 +260,15 @@ impl DeterministicRng {
     }
 
     fn index(&mut self, upper_exclusive: usize) -> usize {
-        (self.next_u64() % upper_exclusive as u64) as usize
+        let bound = upper_exclusive as u64;
+        // Rejection sampling avoids modulo bias in the mutation proposal distribution.
+        let threshold = bound.wrapping_neg() % bound;
+        loop {
+            let value = self.next_u64();
+            if value >= threshold {
+                return (value % bound) as usize;
+            }
+        }
     }
 
     fn replacement(&mut self, alphabet: &[u8], current: u8) -> u8 {
