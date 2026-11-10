@@ -1562,6 +1562,103 @@ mod tests {
     }
 
     #[test]
+    fn sampled_linear_action_rejects_linear_algebra_budget_excess() {
+        let dimension = HARD_MAX_LINEAR_ACTION_DIMENSION;
+        let names: Vec<String> = (0..dimension).map(|index| format!("x{index}")).collect();
+        let mut generator = vec![vec![0.0_f64; dimension]; dimension];
+        for plane in (0..dimension).step_by(2) {
+            generator[plane][plane + 1] = -1.0;
+            generator[plane + 1][plane] = 1.0;
+        }
+        let action = LinearGroupActionV1 {
+            action_id: "budget-so2-product".to_string(),
+            coordinate_basis_id: "x0-through-x31".to_string(),
+            coordinate_unit_ids: vec!["1".to_string(); dimension],
+            coordinate_names: names,
+            metric: (0..dimension)
+                .map(|row| {
+                    (0..dimension)
+                        .map(|column| if row == column { 1.0 } else { 0.0 })
+                        .collect()
+                })
+                .collect(),
+            generators: vec![LinearGeneratorV1 {
+                id: "block-so2".to_string(),
+                matrix: generator,
+            }],
+        }
+        .try_admit(LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+
+        let direction_basis: Vec<Vec<f64>> = (0..dimension)
+            .map(|column| {
+                (0..dimension)
+                    .map(|row| if row == column { 1.0 } else { 0.0 })
+                    .collect()
+            })
+            .collect();
+        let samples: Vec<LinearActionSampleV1> = (0..400)
+            .map(|index| LinearActionSampleV1 {
+                sample_id: format!("budget-{index}"),
+                state: vec![1.0; dimension],
+                direction_basis: direction_basis.clone(),
+            })
+            .collect();
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &Expr::Var("x0".to_string()),
+                &action,
+                &samples,
+                LinearActionSamplingProfileV1 {
+                    maximum_samples: HARD_MAX_LINEAR_ACTION_SAMPLES,
+                    minimum_informative_samples: 1,
+                    ..LinearActionSamplingProfileV1::default()
+                }
+            ),
+            Err(LinearActionSamplingErrorV1::LinearAlgebraBudgetExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn sampled_linear_action_rejects_generator_count_above_sampling_ceiling() {
+        let mut action = LinearGroupActionV1 {
+            action_id: "too-many-generators".to_string(),
+            coordinate_basis_id: "xy".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: (0..=HARD_MAX_LINEAR_ACTION_GENERATORS)
+                .map(|index| LinearGeneratorV1 {
+                    id: format!("J-{index}"),
+                    matrix: vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+                })
+                .collect(),
+        };
+        let action = action
+            .try_admit(LinearGroupActionAdmissionProfileV1 {
+                maximum_generators: HARD_MAX_LINEAR_ACTION_GENERATORS + 1,
+                ..LinearGroupActionAdmissionProfileV1::default()
+            })
+            .unwrap();
+        let sample_batch = samples(
+            &[[0.7, 1.1], [1.2, 0.8], [1.7, 2.1], [2.3, 1.4]],
+            [[1.0, 0.0], [0.0, 1.0]],
+        );
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &add(square("x"), square("y")),
+                &action,
+                &sample_batch,
+                sampling_profile()
+            ),
+            Err(LinearActionSamplingErrorV1::GeneratorCountLimitExceeded {
+                actual: 129,
+                maximum: 128
+            })
+        ));
+    }
+
+    #[test]
     fn sampled_linear_action_rejects_ill_conditioned_direction_basis() {
         let states = [[0.7, 1.1], [1.2, 0.8], [1.7, 2.1], [2.3, 1.4]];
         let profile = LinearActionSamplingProfileV1 {
