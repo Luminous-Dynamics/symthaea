@@ -25,3 +25,8 @@ Additional formal results were located in `Main.lean`, `FurtherResults.lean`, an
 The audit pins repository commit `4eaee87548250b2682affda7d05d947c05554bae` and records blob identities for every inspected source file. Verify each blob against that commit before relying on the mapping. Update this artifact by versioning a new crosswalk rather than silently rewriting the historical audit.
 
 This file is a research crosswalk, not an evidence receipt, theorem prover, or scientific truth score.
+## Riemannian geodesic-Nikodym appendix
+
+See `FAMILY_079_RIEMANNIAN_GEODESIC_NIKODYM_APPENDIX_V0_1.json` for a second pinned source crosswalk covering the Euclidean Nikodym definitions and the local Riemannian geodesic-tube formalization.
+
+Important boundary: the formalization uses smooth **Riemannian** manifolds, local Beltrami charts and (for its literal chart/tube existence theorem) a constant-sectional-curvature hypothesis. It is not a Lorentzian Kerr theorem and says nothing directly about null geodesic Jacobi maps or black-hole caustics. The new Symtropy #4519 work is a numerical/geometric experiment, not a theorem transfer.
