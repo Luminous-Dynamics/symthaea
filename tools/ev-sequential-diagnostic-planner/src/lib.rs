@@ -65,7 +65,9 @@ struct DecisionAction {
 struct DiagnosticTest {
     id: String,
     test_cost: f64,
+    test_cost_digest: String,
     downtime_cost: f64,
+    downtime_cost_digest: String,
     prerequisites: Prerequisites,
     requires: Option<TestCondition>,
     outcomes: Vec<TestOutcome>,
@@ -97,11 +99,27 @@ struct TestOutcome {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct TestReceipt {
+    pub test_id: String,
+    pub test_cost: f64,
+    pub test_cost_digest: String,
+    pub downtime_cost: f64,
+    pub downtime_cost_digest: String,
+    pub safety_approved: bool,
+    pub calibration_valid: bool,
+    pub domain_supported: bool,
+    pub equipment_available: bool,
+    pub protocol_digest: String,
+    pub equipment_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct PolicyNode {
     pub branch_probability: Option<f64>,
     pub posterior: BTreeMap<String, f64>,
     pub choice: String,
     pub test_id: Option<String>,
+    pub selected_test_receipt: Option<TestReceipt>,
     pub terminal_action: Option<String>,
     pub expected_total_loss: f64,
     pub immediate_test_cost: f64,
@@ -130,6 +148,10 @@ pub struct PlanResult {
     pub expected_tests: f64,
     pub max_tests_on_path: usize,
     pub one_step_candidates: Vec<OneStepValue>,
+    pub greedy_root_choice: String,
+    pub greedy_root_test_id: Option<String>,
+    pub greedy_net_value: f64,
+    pub sequential_uplift_over_greedy: f64,
     pub policy: PolicyNode,
 }
 
@@ -267,8 +289,10 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
         }
         if !test.test_cost.is_finite()
             || test.test_cost < 0.0
+            || !is_digest(&test.test_cost_digest)
             || !test.downtime_cost.is_finite()
             || test.downtime_cost < 0.0
+            || !is_digest(&test.downtime_cost_digest)
         {
             errors.push(format!("test {} has invalid cost", test.id));
         }
@@ -451,6 +475,7 @@ fn optimize_node(
         posterior: posterior.clone(),
         choice: "NO_TEST".to_owned(),
         test_id: None,
+        selected_test_receipt: None,
         terminal_action: Some(action),
         expected_total_loss: stop_loss,
         immediate_test_cost: 0.0,
@@ -520,6 +545,19 @@ fn optimize_node(
                 posterior: posterior.clone(),
                 choice: "TEST".to_owned(),
                 test_id: Some(test.id.clone()),
+                selected_test_receipt: Some(TestReceipt {
+                    test_id: test.id.clone(),
+                    test_cost: test.test_cost,
+                    test_cost_digest: test.test_cost_digest.clone(),
+                    downtime_cost: test.downtime_cost,
+                    downtime_cost_digest: test.downtime_cost_digest.clone(),
+                    safety_approved: test.prerequisites.safety_approved,
+                    calibration_valid: test.prerequisites.calibration_valid,
+                    domain_supported: test.prerequisites.domain_supported,
+                    equipment_available: test.prerequisites.equipment_available,
+                    protocol_digest: test.prerequisites.protocol_digest.clone(),
+                    equipment_digest: test.prerequisites.equipment_digest.clone(),
+                }),
                 terminal_action: None,
                 expected_total_loss: candidate_loss,
                 immediate_test_cost: immediate_cost,
@@ -628,8 +666,30 @@ fn plan_scenario(scenario: &Scenario) -> Result<PlanResult, String> {
         None,
         &mut node_budget,
     )?;
+    let greedy = one_step
+        .iter()
+        .filter(|candidate| candidate.admissible_at_root)
+        .filter_map(|candidate| {
+            candidate
+                .net_value
+                .filter(|value| *value > EPSILON)
+                .map(|value| (candidate.test_id.clone(), value))
+        })
+        .max_by(|left, right| {
+            left.1
+                .total_cmp(&right.1)
+                .then_with(|| right.0.cmp(&left.0))
+        });
+    let (greedy_root_choice, greedy_root_test_id, greedy_net_value) = match greedy {
+        Some((test_id, value)) => ("TEST".to_owned(), Some(test_id), value),
+        None => ("NO_TEST".to_owned(), None, 0.0),
+    };
     let net_value = baseline - policy.expected_total_loss;
-    if !net_value.is_finite() || !policy.expected_total_loss.is_finite() {
+    let sequential_uplift_over_greedy = net_value - greedy_net_value;
+    if !net_value.is_finite()
+        || !policy.expected_total_loss.is_finite()
+        || !sequential_uplift_over_greedy.is_finite()
+    {
         return Err("planner produced non-finite expected loss".to_owned());
     }
     Ok(PlanResult {
@@ -642,6 +702,10 @@ fn plan_scenario(scenario: &Scenario) -> Result<PlanResult, String> {
         expected_tests: policy.expected_tests,
         max_tests_on_path: policy.max_tests_on_path,
         one_step_candidates: one_step,
+        greedy_root_choice,
+        greedy_root_test_id,
+        greedy_net_value,
+        sequential_uplift_over_greedy,
         policy,
     })
 }
@@ -835,6 +899,15 @@ mod tests {
         assert!((planned.net_value - 1.175).abs() < 1e-9);
         assert!((planned.expected_tests - 1.5).abs() < 1e-9);
         assert_eq!(planned.max_tests_on_path, 2);
+        assert_eq!(planned.greedy_root_choice, "NO_TEST");
+        assert_eq!(planned.greedy_root_test_id, None);
+        assert_eq!(planned.greedy_net_value, 0.0);
+        assert!((planned.sequential_uplift_over_greedy - 1.175).abs() < 1e-9);
+        let receipt = planned.policy.selected_test_receipt.as_ref().unwrap();
+        assert_eq!(receipt.test_id, "test-a");
+        assert!(is_digest(&receipt.test_cost_digest));
+        assert!(is_digest(&receipt.downtime_cost_digest));
+        assert!(receipt.safety_approved && receipt.calibration_valid);
         for test_id in ["test-a", "test-b"] {
             let candidate = planned.one_step_candidates.iter()
                 .find(|candidate| candidate.test_id == test_id)
@@ -862,6 +935,23 @@ mod tests {
         assert_eq!(planned.policy.test_id.as_deref(), Some("test-a"));
         assert_eq!(planned.policy.branches["a0"].choice, "NO_TEST");
         assert_eq!(planned.policy.branches["a1"].test_id.as_deref(), Some("test-b"));
+    }
+
+    #[test]
+    fn positive_one_step_value_is_reported_as_the_greedy_baseline() {
+        let result = report();
+        let planned = result.payload.cases.iter()
+            .find(|case| case.case_id == "positive-one-step-evsi")
+            .and_then(|case| case.plan.as_ref())
+            .expect("one-step plan");
+        assert_eq!(planned.greedy_root_choice, "TEST");
+        assert_eq!(planned.greedy_root_test_id.as_deref(), Some("test-eis"));
+        assert!((planned.greedy_net_value - 1.1).abs() < 1e-9);
+        assert!(planned.sequential_uplift_over_greedy.abs() < 1e-9);
+        let receipt = planned.policy.selected_test_receipt.as_ref().unwrap();
+        assert_eq!(receipt.test_id, "test-eis");
+        assert_eq!(receipt.test_cost, 0.2);
+        assert_eq!(receipt.downtime_cost, 0.1);
     }
 
     #[test]
