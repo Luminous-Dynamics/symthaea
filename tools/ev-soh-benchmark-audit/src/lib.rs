@@ -382,9 +382,12 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
         }
     }
     let a=&m.target_adaptation;
-    if !is_digest(&a.protocol_digest)||a.labeled_target_budget!=0
-        ||(a.mode=="none"&&a.unlabeled_target_budget!=0)
-        ||!matches!(a.mode.as_str(),"none"|"unlabeled_target") {
+    if !is_digest(&a.protocol_digest)
+        || a.labeled_target_budget != 0
+        || (a.mode == "none" && a.unlabeled_target_budget != 0)
+        || (a.mode == "unlabeled_target" && a.unlabeled_target_budget == 0)
+        || !matches!(a.mode.as_str(), "none" | "unlabeled_target")
+    {
         errors.push("target adaptation must be explicitly label-free and budgeted".to_owned());
     }
 
@@ -402,8 +405,33 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
                 errors.push(format!("metric {} has invalid or duplicate strata",metric.name));
             }
         }
-        if metric.aggregation=="worst_domain"&&(metric.strata.len()<2||!m.uncertainty.domain_stratified) {
-            errors.push(format!("worst-domain metric {} requires at least two domain strata",metric.name));
+        let required_group = match metric.aggregation.as_str() {
+            "macro_cell" | "p95_cell" => Some("cell"),
+            "macro_pack" => Some("pack"),
+            "macro_vehicle" => Some("vehicle"),
+            "macro_domain" | "worst_domain" => Some("domain"),
+            "micro_sample" => None,
+            _ => None,
+        };
+        if required_group.is_some_and(|group| group != m.evaluation.group_level) {
+            errors.push(format!(
+                "metric {} aggregation does not match the declared physical grouping level",
+                metric.name
+            ));
+        }
+        if matches!(metric.aggregation.as_str(), "macro_domain" | "worst_domain")
+            && metric.strata.len() < 2
+        {
+            errors.push(format!(
+                "domain metric {} requires at least two domain strata",
+                metric.name
+            ));
+        }
+        if metric.aggregation == "worst_domain" && !m.uncertainty.domain_stratified {
+            errors.push(format!(
+                "worst-domain metric {} requires domain-stratified uncertainty reporting",
+                metric.name
+            ));
         }
     }
     let u=&m.uncertainty;
@@ -421,7 +449,18 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
                 errors.push("not_reported uncertainty must not claim calibration evidence".to_owned());
             }
         }
-        "not_applicable" => {}
+        "not_applicable" => {
+            if u.method.is_some()
+                || !u.nominal_levels.is_empty()
+                || u.calibration_partition != "none"
+                || u.domain_stratified
+            {
+                errors.push(
+                    "not_applicable uncertainty must not claim method or calibration evidence"
+                        .to_owned(),
+                );
+            }
+        }
         _ => errors.push("unknown uncertainty status".to_owned()),
     }
     if !matches!(u.calibration_partition.as_str(),"validation_only"|"train_only"|"external_calibration"|"none") {
@@ -451,6 +490,11 @@ fn canonicalize(value:&mut Value) {
             }
             if let Some(rows)=manifest.get_mut("preprocessing").and_then(Value::as_array_mut) {
                 rows.sort_by(|a,b|a.get("transform_id").and_then(Value::as_str).cmp(&b.get("transform_id").and_then(Value::as_str)));
+            }
+            if let Some(seeds)=manifest.get_mut("execution")
+                .and_then(|execution| execution.get_mut("random_seeds"))
+                .and_then(Value::as_array_mut) {
+                seeds.sort_by(|a,b| a.as_u64().cmp(&b.as_u64()));
             }
             if let Some(rows)=manifest.get_mut("metrics").and_then(Value::as_array_mut) {
                 rows.sort_by(|a,b|a.get("name").and_then(Value::as_str).cmp(&b.get("name").and_then(Value::as_str)));
