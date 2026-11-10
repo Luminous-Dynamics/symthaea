@@ -26,6 +26,7 @@ struct CorpusCase {
     case_id: String,
     expectation: String,
     expected_extrapolation_undercovered: Option<bool>,
+    expected_audit_status: Option<String>,
     manifest: Value,
 }
 
@@ -40,6 +41,8 @@ struct Manifest {
     model_digest: String,
     evaluation_mode: String,
     split_frozen_at_ms: u64,
+    test_accessed_at_ms: u64,
+    minimum_independent_groups_per_stratum: usize,
     train_group_identity_digests: Vec<String>,
     validation_group_identity_digests: Vec<String>,
     support_scoring: SupportScoring,
@@ -94,6 +97,9 @@ struct TestEntry {
     lower_95: f64,
     upper_95: f64,
     prediction_digest: String,
+    reference_support_state: String,
+    reference_support_evidence_digest: String,
+    reference_support_evidence_class: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -103,8 +109,11 @@ pub struct StratumSummary {
     pub distinct_group_count: usize,
     pub picp_90: f64,
     pub picp_95: f64,
-    pub picp_90_wilson_lower_95: f64,
-    pub picp_95_wilson_lower_95: f64,
+    pub group_coverage_pass_rate_90: f64,
+    pub group_coverage_pass_rate_95: f64,
+    pub group_coverage_pass_rate_90_wilson_lower_95: f64,
+    pub group_coverage_pass_rate_95_wilson_lower_95: f64,
+    pub evidence_status: String,
     pub mean_interval_width_90: f64,
     pub mean_interval_width_95: f64,
     pub mae: f64,
@@ -127,6 +136,19 @@ pub struct RiskCoveragePoint {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct SupportDetectionSummary {
+    pub reference_extrapolation_group_count: usize,
+    pub predicted_extrapolation_group_count: usize,
+    pub true_positive_group_count: usize,
+    pub false_negative_group_count: usize,
+    pub false_positive_group_count: usize,
+    pub true_negative_group_count: usize,
+    pub extrapolation_recall: f64,
+    pub false_extrapolation_rate: f64,
+    pub extrapolation_auroc: f64,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct SupportCalibrationResult {
     pub manifest_id: String,
     pub test_sample_count: usize,
@@ -135,11 +157,13 @@ pub struct SupportCalibrationResult {
     pub support_method_digest: String,
     pub support_threshold_evidence_digest: String,
     pub calibration_method_digest: String,
+    pub support_detection: SupportDetectionSummary,
     pub strata: Vec<StratumSummary>,
     pub risk_coverage: Vec<RiskCoveragePoint>,
     pub audit_status: String,
     pub extrapolation_undercovered_90: bool,
     pub extrapolation_undercovered_95: bool,
+    pub support_detector_failed: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -161,6 +185,7 @@ struct ReportPayload {
     accepted_count: usize,
     rejected_count: usize,
     extrapolation_undercovered_count: usize,
+    support_detector_failure_count: usize,
     cases: Vec<CaseAudit>,
 }
 
@@ -258,8 +283,11 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
     ) {
         errors.push("support calibration v0.1 requires a group-disjoint unseen-asset evaluation mode".to_owned());
     }
-    if manifest.split_frozen_at_ms == 0 {
-        errors.push("split freeze timestamp is missing".to_owned());
+    if manifest.split_frozen_at_ms == 0
+        || manifest.test_accessed_at_ms <= manifest.split_frozen_at_ms
+        || manifest.minimum_independent_groups_per_stratum < 2
+    {
+        errors.push("split/test-access timing or independent-group evidence minimum is invalid".to_owned());
     }
 
     let train = unique_digest_set(
@@ -324,8 +352,8 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
     if !nonempty(&calibration.method_ref)
         || !is_digest(&calibration.method_digest)
         || !is_digest(&calibration.calibration_split_digest)
-        || calibration.fitted_at_ms == 0
-        || calibration.fitted_at_ms > manifest.split_frozen_at_ms
+        || calibration.fitted_at_ms <= manifest.split_frozen_at_ms
+        || calibration.fitted_at_ms >= manifest.test_accessed_at_ms
     {
         errors.push("calibration method, split identity or fit timestamp is invalid".to_owned());
     }
@@ -367,6 +395,9 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
             || !is_digest(&entry.target_evidence_digest)
             || !valid_evidence_class(&entry.target_evidence_class)
             || !is_digest(&entry.prediction_digest)
+            || !matches!(entry.reference_support_state.as_str(), "in_support" | "boundary" | "extrapolation")
+            || !is_digest(&entry.reference_support_evidence_digest)
+            || !valid_evidence_class(&entry.reference_support_evidence_class)
         {
             errors.push("test entry evidence digest or evidence class is invalid".to_owned());
         }
@@ -393,7 +424,9 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
             errors.push("target or nested 90/95 prediction intervals are invalid".to_owned());
         }
 
-        let stratum = stratum_for(entry.support_score, support).to_owned();
+        // Offline reference support is used to stratify calibration results;
+        // the detector only sees its own label-free support_score.
+        let stratum = entry.reference_support_state.clone();
         if let Some(existing) = group_strata.insert(entry.group_identity_digest.clone(), stratum.clone()) {
             if existing != stratum {
                 errors.push("samples from one physical group were assigned to different support strata".to_owned());
@@ -430,8 +463,18 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
         });
         if count < 2 || groups < 2 {
             errors.push(format!(
-                "support stratum {stratum} requires at least two independent test groups"
+                "reference support stratum {stratum} requires at least two independent test groups"
             ));
+        }
+    }
+    if let (Some(first), Some(last)) = (
+        support.risk_coverage_cutoffs.first(),
+        support.risk_coverage_cutoffs.last(),
+    ) {
+        if !manifest.test_entries.iter().any(|entry| entry.support_score <= *first)
+            || manifest.test_entries.iter().any(|entry| entry.support_score > *last)
+        {
+            errors.push("risk-coverage cutoffs must retain at least one sample initially and all samples at the final point".to_owned());
         }
     }
     errors
@@ -463,62 +506,75 @@ fn interval_score(target: f64, lower: f64, upper: f64, nominal: f64) -> f64 {
     }
 }
 
-fn summarize_stratum(stratum_id: &str, rows: &[&TestEntry]) -> StratumSummary {
+fn summarize_stratum(
+    stratum_id: &str,
+    rows: &[&TestEntry],
+    minimum_independent_groups: usize,
+) -> StratumSummary {
     let count = rows.len();
-    let covered_90 = rows
-        .iter()
-        .filter(|row| row.lower_90 <= row.target_value && row.target_value <= row.upper_90)
-        .count();
-    let covered_95 = rows
-        .iter()
-        .filter(|row| row.lower_95 <= row.target_value && row.target_value <= row.upper_95)
-        .count();
-    let mae = rows
-        .iter()
-        .map(|row| (row.predicted_mean - row.target_value).abs())
-        .sum::<f64>()
-        / count as f64;
-    let mse = rows
-        .iter()
-        .map(|row| (row.predicted_mean - row.target_value).powi(2))
-        .sum::<f64>()
-        / count as f64;
-    let groups = rows
-        .iter()
-        .map(|row| row.group_identity_digest.clone())
-        .collect::<BTreeSet<_>>();
+    let covered_90 = rows.iter().filter(|row| {
+        row.lower_90 <= row.target_value && row.target_value <= row.upper_90
+    }).count();
+    let covered_95 = rows.iter().filter(|row| {
+        row.lower_95 <= row.target_value && row.target_value <= row.upper_95
+    }).count();
+    let mae = rows.iter().map(|row| (row.predicted_mean - row.target_value).abs())
+        .sum::<f64>() / count as f64;
+    let mse = rows.iter().map(|row| (row.predicted_mean - row.target_value).powi(2))
+        .sum::<f64>() / count as f64;
+    let mut per_group: BTreeMap<String, Vec<&TestEntry>> = BTreeMap::new();
+    for row in rows {
+        per_group.entry(row.group_identity_digest.clone()).or_default().push(row);
+    }
+    let groups = per_group.len();
+    let mut group_pass_90 = 0usize;
+    let mut group_pass_95 = 0usize;
+    for entries in per_group.values() {
+        let c90 = entries.iter().filter(|row| {
+            row.lower_90 <= row.target_value && row.target_value <= row.upper_90
+        }).count() as f64 / entries.len() as f64;
+        let c95 = entries.iter().filter(|row| {
+            row.lower_95 <= row.target_value && row.target_value <= row.upper_95
+        }).count() as f64 / entries.len() as f64;
+        if c90 >= 0.90 { group_pass_90 += 1; }
+        if c95 >= 0.95 { group_pass_95 += 1; }
+    }
+    let picp_90 = covered_90 as f64 / count as f64;
+    let picp_95 = covered_95 as f64 / count as f64;
+    let undercovered_90 = picp_90 < UNDER_COVERAGE_90;
+    let undercovered_95 = picp_95 < UNDER_COVERAGE_95;
+    let evidence_status = if undercovered_90 || undercovered_95 {
+        "OBSERVED_UNDERCOVERAGE"
+    } else if groups < minimum_independent_groups {
+        "INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE"
+    } else {
+        "OBSERVED_COVERAGE_WITHIN_TOLERANCE"
+    };
     StratumSummary {
         stratum_id: stratum_id.to_owned(),
         sample_count: count,
-        distinct_group_count: groups.len(),
-        picp_90: covered_90 as f64 / count as f64,
-        picp_95: covered_95 as f64 / count as f64,
-        picp_90_wilson_lower_95: wilson_lower(covered_90, count),
-        picp_95_wilson_lower_95: wilson_lower(covered_95, count),
-        mean_interval_width_90: rows
-            .iter()
-            .map(|row| row.upper_90 - row.lower_90)
-            .sum::<f64>()
-            / count as f64,
-        mean_interval_width_95: rows
-            .iter()
-            .map(|row| row.upper_95 - row.lower_95)
-            .sum::<f64>()
-            / count as f64,
+        distinct_group_count: groups,
+        picp_90,
+        picp_95,
+        group_coverage_pass_rate_90: group_pass_90 as f64 / groups as f64,
+        group_coverage_pass_rate_95: group_pass_95 as f64 / groups as f64,
+        group_coverage_pass_rate_90_wilson_lower_95: wilson_lower(group_pass_90, groups),
+        group_coverage_pass_rate_95_wilson_lower_95: wilson_lower(group_pass_95, groups),
+        evidence_status: evidence_status.to_owned(),
+        mean_interval_width_90: rows.iter().map(|row| row.upper_90 - row.lower_90)
+            .sum::<f64>() / count as f64,
+        mean_interval_width_95: rows.iter().map(|row| row.upper_95 - row.lower_95)
+            .sum::<f64>() / count as f64,
         mae,
         rmse: mse.sqrt(),
-        mean_interval_score_90: rows
-            .iter()
-            .map(|row| interval_score(row.target_value, row.lower_90, row.upper_90, 0.90))
-            .sum::<f64>()
-            / count as f64,
-        mean_interval_score_95: rows
-            .iter()
-            .map(|row| interval_score(row.target_value, row.lower_95, row.upper_95, 0.95))
-            .sum::<f64>()
-            / count as f64,
-        undercovered_90: covered_90 as f64 / count as f64 < UNDER_COVERAGE_90,
-        undercovered_95: covered_95 as f64 / count as f64 < UNDER_COVERAGE_95,
+        mean_interval_score_90: rows.iter().map(|row| {
+            interval_score(row.target_value, row.lower_90, row.upper_90, 0.90)
+        }).sum::<f64>() / count as f64,
+        mean_interval_score_95: rows.iter().map(|row| {
+            interval_score(row.target_value, row.lower_95, row.upper_95, 0.95)
+        }).sum::<f64>() / count as f64,
+        undercovered_90,
+        undercovered_95,
     }
 }
 
@@ -572,49 +628,108 @@ fn summarize_risk_coverage(manifest: &Manifest) -> Vec<RiskCoveragePoint> {
         .collect()
 }
 
+fn compute_support_detection(manifest: &Manifest) -> SupportDetectionSummary {
+    let mut by_group: BTreeMap<String, (String, f64, usize)> = BTreeMap::new();
+    for entry in &manifest.test_entries {
+        let row = by_group.entry(entry.group_identity_digest.clone())
+            .or_insert((entry.reference_support_state.clone(), 0.0, 0));
+        row.1 += entry.support_score;
+        row.2 += 1;
+    }
+    let mut tp = 0usize;
+    let mut fn_count = 0usize;
+    let mut fp = 0usize;
+    let mut tn = 0usize;
+    let mut positive_scores = Vec::new();
+    let mut negative_scores = Vec::new();
+    for (_, (truth, score_sum, count)) in by_group {
+        let score = score_sum / count as f64;
+        let actual_ood = truth == "extrapolation";
+        let predicted_ood = score >= manifest.support_scoring.extrapolation_min_score;
+        match (actual_ood, predicted_ood) {
+            (true, true) => tp += 1,
+            (true, false) => fn_count += 1,
+            (false, true) => fp += 1,
+            (false, false) => tn += 1,
+        }
+        if actual_ood { positive_scores.push(score); } else { negative_scores.push(score); }
+    }
+    let mut wins = 0.0;
+    for positive in &positive_scores {
+        for negative in &negative_scores {
+            if positive > negative { wins += 1.0; }
+            else if (positive - negative).abs() <= EPSILON { wins += 0.5; }
+        }
+    }
+    let positives = positive_scores.len();
+    let negatives = negative_scores.len();
+    SupportDetectionSummary {
+        reference_extrapolation_group_count: positives,
+        predicted_extrapolation_group_count: tp + fp,
+        true_positive_group_count: tp,
+        false_negative_group_count: fn_count,
+        false_positive_group_count: fp,
+        true_negative_group_count: tn,
+        extrapolation_recall: tp as f64 / positives as f64,
+        false_extrapolation_rate: fp as f64 / negatives as f64,
+        extrapolation_auroc: wins / (positives * negatives) as f64,
+    }
+}
+
 fn compute_result(manifest: &Manifest) -> SupportCalibrationResult {
     let mut rows_by_stratum: BTreeMap<String, Vec<&TestEntry>> = BTreeMap::new();
     for entry in &manifest.test_entries {
-        rows_by_stratum
-            .entry(stratum_for(entry.support_score, &manifest.support_scoring).to_owned())
-            .or_default()
-            .push(entry);
+        rows_by_stratum.entry(entry.reference_support_state.clone()).or_default().push(entry);
     }
     let strata: Vec<StratumSummary> = ["in_support", "boundary", "extrapolation"]
         .iter()
-        .map(|stratum| summarize_stratum(stratum, &rows_by_stratum[*stratum]))
+        .map(|stratum| summarize_stratum(
+            stratum,
+            &rows_by_stratum[*stratum],
+            manifest.minimum_independent_groups_per_stratum,
+        ))
         .collect();
-    let extrapolation = strata
-        .iter()
+    let extrapolation = strata.iter()
         .find(|summary| summary.stratum_id == "extrapolation")
-        .expect("validation requires extrapolation stratum");
+        .expect("validation requires reference extrapolation stratum");
     let extrapolation_undercovered_90 = extrapolation.undercovered_90;
     let extrapolation_undercovered_95 = extrapolation.undercovered_95;
-    let any_undercovered = strata
-        .iter()
+    let any_undercovered = strata.iter()
         .any(|summary| summary.undercovered_90 || summary.undercovered_95);
+    let support_detection = compute_support_detection(manifest);
+    let support_detector_failed = support_detection.extrapolation_recall < 0.90
+        || support_detection.false_extrapolation_rate > 0.10;
+    let insufficient_groups = strata.iter().any(|summary| {
+        summary.distinct_group_count < manifest.minimum_independent_groups_per_stratum
+    });
+    let audit_status = if any_undercovered && support_detector_failed {
+        "OOD_MISDETECTION_AND_UNDERCOVERAGE"
+    } else if any_undercovered {
+        "SUPPORT_STRATUM_UNDERCOVERAGE_DETECTED"
+    } else if support_detector_failed {
+        "SUPPORT_DETECTOR_FAILED"
+    } else if insufficient_groups {
+        "INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE"
+    } else {
+        "SUPPORT_CONDITIONAL_COVERAGE_WITHIN_TOLERANCE"
+    };
     SupportCalibrationResult {
         manifest_id: manifest.manifest_id.clone(),
         test_sample_count: manifest.test_entries.len(),
-        test_group_count: manifest
-            .test_entries
-            .iter()
+        test_group_count: manifest.test_entries.iter()
             .map(|entry| entry.group_identity_digest.clone())
-            .collect::<BTreeSet<_>>()
-            .len(),
+            .collect::<BTreeSet<_>>().len(),
         calibration_partition: manifest.calibration.partition.clone(),
         support_method_digest: manifest.support_scoring.method_digest.clone(),
         support_threshold_evidence_digest: manifest.support_scoring.threshold_evidence_digest.clone(),
         calibration_method_digest: manifest.calibration.method_digest.clone(),
+        support_detection,
         strata,
         risk_coverage: summarize_risk_coverage(manifest),
-        audit_status: if any_undercovered {
-            "SUPPORT_STRATUM_UNDERCOVERAGE_DETECTED".to_owned()
-        } else {
-            "SUPPORT_CONDITIONAL_COVERAGE_WITHIN_TOLERANCE".to_owned()
-        },
+        audit_status: audit_status.to_owned(),
         extrapolation_undercovered_90,
         extrapolation_undercovered_95,
+        support_detector_failed,
     }
 }
 
@@ -670,6 +785,7 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
     let mut accepted_count = 0usize;
     let mut rejected_count = 0usize;
     let mut extrapolation_undercovered_count = 0usize;
+    let mut support_detector_failure_count = 0usize;
 
     for case in corpus.cases {
         if !nonempty(&case.case_id) || !seen.insert(case.case_id.clone()) {
@@ -718,6 +834,15 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
                 if result.extrapolation_undercovered_90 || result.extrapolation_undercovered_95 {
                     extrapolation_undercovered_count += 1;
                 }
+                if result.support_detector_failed {
+                    support_detector_failure_count += 1;
+                }
+                if case.expected_audit_status.as_deref() != Some(result.audit_status.as_str()) {
+                    return Err(format!(
+                        "case {} audit status differs from expected status: {}",
+                        case.case_id, result.audit_status
+                    ));
+                }
                 accepted_count += 1;
                 (Some(result), Vec::new())
             }
@@ -750,6 +875,7 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
         accepted_count,
         rejected_count,
         extrapolation_undercovered_count,
+        support_detector_failure_count,
         cases,
     };
     let bytes =
@@ -775,12 +901,13 @@ mod tests {
     }
 
     #[test]
-    fn frozen_corpus_accepts_two_and_rejects_eight_controls() {
+    fn frozen_corpus_accepts_three_and_rejects_eight_controls() {
         let report = report();
-        assert_eq!(report.payload.case_count, 10);
-        assert_eq!(report.payload.accepted_count, 2);
+        assert_eq!(report.payload.case_count, 11);
+        assert_eq!(report.payload.accepted_count, 3);
         assert_eq!(report.payload.rejected_count, 8);
-        assert_eq!(report.payload.extrapolation_undercovered_count, 1);
+        assert_eq!(report.payload.extrapolation_undercovered_count, 2);
+        assert_eq!(report.payload.support_detector_failure_count, 1);
     }
 
     #[test]
@@ -810,6 +937,33 @@ mod tests {
                 && pair[0].retained_fraction <= pair[1].retained_fraction
         }));
         assert_eq!(case.risk_coverage.last().unwrap().retained_sample_count, 6);
+    }
+
+    #[test]
+    fn undercoverage_with_a_support_detector_false_negative_is_distinguished() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "ood-undercoverage-with-support-detector-false-negative")
+            .and_then(|case| case.result.as_ref())
+            .expect("detector miss case");
+        assert!(case.extrapolation_undercovered_95);
+        assert!(case.support_detector_failed);
+        assert!(case.support_detection.false_negative_group_count > 0);
+        assert_eq!(case.audit_status, "OOD_MISDETECTION_AND_UNDERCOVERAGE");
+    }
+
+    #[test]
+    fn tiny_synthetic_group_count_is_never_described_as_calibrated_evidence() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "valid-support-conditioned-calibration")
+            .and_then(|case| case.result.as_ref())
+            .expect("valid calibration fixture");
+        assert_eq!(case.audit_status, "INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE");
+        assert!(case.strata.iter().all(|stratum| {
+            stratum.distinct_group_count < 30
+                && stratum.evidence_status == "INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE"
+        }));
     }
 
     #[test]
