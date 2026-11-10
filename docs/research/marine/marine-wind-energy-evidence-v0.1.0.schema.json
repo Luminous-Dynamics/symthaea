@@ -17,7 +17,8 @@
     "energy_sources",
     "wind_energy_assessment",
     "limitations",
-    "evidence_source_ids"
+    "evidence_source_ids",
+    "trial_evidence_id"
   ],
   "properties": {
     "schema_version": {
@@ -101,6 +102,10 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "trial_evidence_id": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "$defs": {
