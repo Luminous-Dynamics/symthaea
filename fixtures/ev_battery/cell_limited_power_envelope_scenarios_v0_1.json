@@ -1,5 +1,5 @@
 {
-  "corpus_version": "ev-cell-limited-power-envelope-corpus/0.1",
+  "corpus_version": "ev-cell-limited-power-envelope-corpus/0.2",
   "schema_id": "https://luminousdynamics.io/schemas/transport/ev-cell-limited-power-envelope/0.1",
   "cases": [
     {
@@ -171,7 +171,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": 1
     },
     {
       "case_id": "weak-cell-voltage-limited",
@@ -342,7 +343,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": 0.5101673255969201
     },
     {
       "case_id": "thermal-limited",
@@ -513,7 +515,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": 1
     },
     {
       "case_id": "current-rating-limited",
@@ -684,7 +687,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": 0.7050993868496311
     },
     {
       "case_id": "soc-domain-rejected",
@@ -855,7 +859,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": null
     },
     {
       "case_id": "temperature-domain-rejected",
@@ -1026,7 +1031,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": null
     },
     {
       "case_id": "unsupported-topology-rejected",
@@ -1197,7 +1203,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": null
     },
     {
       "case_id": "invalid-calibration-rejected",
@@ -1368,7 +1375,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": null
     },
     {
       "case_id": "no-admissible-discharge-when-thermal-margin-exhausted",
@@ -1539,7 +1547,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": null
     },
     {
       "case_id": "ocv-soc-context-mismatch-rejected",
@@ -1710,7 +1719,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": null
     },
     {
       "case_id": "ocv-temperature-context-mismatch-rejected",
@@ -1881,7 +1891,8 @@
             "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
-      }
+      },
+      "expected_beta_power": null
     }
   ]
 }
