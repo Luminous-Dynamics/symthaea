@@ -53,7 +53,16 @@ Source: Du et al., *Integrated Design and Dynamic Performance Optimisation of Hy
 
 Implication: this is a strong coastal hybrid design/control reproduction target. It is **not** a deep-sea wind-assisted performance estimate, and its percentages must not be carried into another vessel class.
 
-### 2.4 CFD progress does not remove the need for vessel-specific validation
+### 2.4 Deep-sea containership economic/service anchors: UCL and Lloyd's Register
+
+The adjacent nuclear merchant-shipping assessment work has already admitted two useful, but non-equivalent, reference cases into the Symthaea marine economics programme: [NUCL-TEA-001 #11343](https://github.com/Luminous-Dynamics/symthaea/issues/11343), [reference verifier PR #11346](https://github.com/Luminous-Dynamics/symthaea/pull/11346).
+
+- **UCL Energy Institute (published 5 November 2026):** large containership class 14,500–19,999 TEU; 25-year lifecycle; a 14.85-knot reference and a 25-knot high-speed case; multiple fuel/policy scenarios; TCO normalized by transport work. Its central conclusion is conditional: without the IMO Net-Zero Framework, no nuclear option is cheaper than conventional ships even at low assumed reactor costs; under the framework, competitiveness appears only with substantial reactor-cost reductions that have not yet been demonstrated. https://www.ucl.ac.uk/bartlett/publications/2026/nov/nuclear-reactors-merchant-shipping-total-cost-ownership-assessment-low-carbon-pathway
+- **Lloyd's Register Advisory / LucidCatalyst for Seaspan (public case study, 14 July 2026):** 15,000 TEU at 25 knots; public summary models up to 38% more annual cargo capacity from 6.3 rather than 5 annual round voyages and up to 5% extra container space from removal of fuel tanks. Public summary inputs are insufficient to reconstruct the full model. https://www.lr.org/en/knowledge/case-studies/power-shift-nuclear-power-pathways-for-future-containership-fleets/
+
+These cases must remain separate. UCL's TCO analysis and LR's high-speed cargo-throughput case do not share a fully disclosed common speed, route, capital-cost, service, utilization, fuel-policy or financing boundary. They are useful for testing our ability to preserve distinct assumptions and compare throughput alongside TCO; they are not directly comparable performance points and neither is a wind-assisted benchmark. Reproduce the source-specific cases before creating any bridge scenario. Unknown LR inputs remain unknown; do not infer hidden values.
+
+### 2.5 CFD progress does not remove the need for vessel-specific validation
 
 A 2026 systematic review reports ranges from heterogeneous studies for hull resistance reduction, surface drag reduction and propeller/wake improvements. Those reported ranges are not additive, are not a universal design allowance, and should not be treated as the expected performance of a proposed hull or device.
 
