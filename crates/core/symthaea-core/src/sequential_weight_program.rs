@@ -220,6 +220,7 @@ pub fn bind_sequential_verification_evidence(
         baseline_model_digest: session.latest_candidate_model_digest.clone(),
         candidate_model_digest: candidate_native_model_digest.to_owned(),
         evaluation_protocol_digest: report.binding.evaluation_protocol_digest.clone(),
+        confirmatory_shard_digest: report.binding.confirmatory_shard_digest.clone(),
         confirmatory_episode_manifest_digest: report
             .binding
             .confirmatory_episode_manifest_digest
@@ -888,6 +889,7 @@ mod tests {
             baseline_model_digest: session.latest_candidate_model_digest.clone(),
             candidate_model_digest: candidate_native_model_digest.to_owned(),
             evaluation_protocol_digest: digest('8'),
+            confirmatory_shard_digest: digest('6'),
             confirmatory_episode_manifest_digest: family_plan
                 .confirmatory_episode_manifest_digest(),
             precondition_gate_digest: digest('5'),
