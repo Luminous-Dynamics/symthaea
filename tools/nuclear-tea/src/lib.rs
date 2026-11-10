@@ -444,7 +444,7 @@ impl EconomicSeries {
             name: self.name.clone(),
             currency: self.price_basis.currency().to_string(),
             base_year: self.price_basis.base_year(),
-            price_basis: match self.price_basis {
+            price_basis: match &self.price_basis {
                 PriceBasis::Real { .. } => "REAL".to_string(),
                 PriceBasis::Nominal { .. } => "NOMINAL".to_string(),
             },
@@ -517,6 +517,12 @@ pub fn compare_eligible_series(
         return Err(ValidationError::new(
             "comparison.price_basis",
             "currency, price basis and base year must match",
+        ));
+    }
+    if left.discount_rate.to_bits() != right.discount_rate.to_bits() {
+        return Err(ValidationError::new(
+            "comparison.discount_rate",
+            "discount rates must match for a direct matched comparison",
         ));
     }
     if left.service_unit != right.service_unit {
