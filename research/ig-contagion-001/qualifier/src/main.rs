@@ -157,12 +157,20 @@ fn validate_protocol(protocol: &Value, errors: &mut Vec<String>) {
         || field(content_artifact, "schema_path")
             != Some("research/ig-contagion-001/IG_CONTAGION_001_MATCHED_CONTENT_V0_1.schema.json")
     {
-        add(errors, "protocol.paired_content_artifact", "matched content artifact/schema paths are required");
+        add(
+            errors,
+            "protocol.paired_content_artifact",
+            "matched content artifact/schema paths are required",
+        );
     }
     if !is_sha256(field(content_artifact, "agent_profile_sha256").unwrap_or_default())
         || !is_sha256(field(content_artifact, "evidence_packet_sha256").unwrap_or_default())
     {
-        add(errors, "protocol.paired_content_artifact", "agent and evidence SHA-256 digests are required");
+        add(
+            errors,
+            "protocol.paired_content_artifact",
+            "agent and evidence SHA-256 digests are required",
+        );
     }
     let truth_profiles: BTreeSet<String> = protocol["task_truth_profiles"]
         .as_array().into_iter().flatten()
@@ -176,17 +184,31 @@ fn validate_protocol(protocol: &Value, errors: &mut Vec<String>) {
         "normative_pluralism_no_single_answer",
     ] {
         if !truth_profiles.contains(profile) {
-            add(errors, "protocol.task_truth_profiles", format!("missing task truth profile '{profile}'"));
+            add(
+                errors,
+                "protocol.task_truth_profiles",
+                format!("missing task truth profile '{profile}'"),
+            );
         }
     }
-    if !string_set(&protocol["experimental_conditions"]).contains("pluralistic_normative_disagreement") {
-        add(errors, "protocol.experimental_conditions", "pluralistic normative disagreement condition is required");
+    if !string_set(&protocol["experimental_conditions"])
+        .contains("pluralistic_normative_disagreement")
+    {
+        add(
+            errors,
+            "protocol.experimental_conditions",
+            "pluralistic normative disagreement condition is required",
+        );
     }
     let metric_ids: BTreeSet<String> = protocol["metrics"].as_array().into_iter().flatten()
         .filter_map(|metric| field(metric, "id")).map(ToOwned::to_owned).collect();
     for metric in ["revision_quality_and_distance", "normative_pluralism_preservation"] {
         if !metric_ids.contains(metric) {
-            add(errors, "protocol.metrics", format!("required metric family '{metric}' is missing"));
+            add(
+                errors,
+                "protocol.metrics",
+                format!("required metric family '{metric}' is missing"),
+            );
         }
     }
 
@@ -486,10 +508,17 @@ fn validate_matrix(
                 if truth_profile != Some("normative_pluralism_no_single_answer")
                     || field(fixture, "class") != Some("pluralism_control")
                 {
-                    add(errors, &context, "normative pluralism must use a no-single-answer truth profile and pluralism_control class");
+                    add(
+                        errors,
+                        &context,
+                        "normative pluralism must use a no-single-answer truth profile and pluralism_control class",
+                    );
                 }
                 let properties = string_set(&fixture["expected_measurement_properties"]);
-                for required in ["pluralism_no_single_ground_truth", "dissent_and_tradeoffs_preserved"] {
+                for required in [
+                    "pluralism_no_single_ground_truth",
+                    "dissent_and_tradeoffs_preserved",
+                ] {
                     if !properties.contains(required) {
                         add(errors, &context, format!("normative pluralism requires '{required}'"));
                     }
@@ -497,22 +526,41 @@ fn validate_matrix(
             }
             "no_discussion_repeat" => {
                 if truth_profile != Some("measurement_control_no_decision_truth") {
-                    add(errors, &context, "no-discussion repeat controls must not declare a decision ground truth");
+                    add(
+                        errors,
+                        &context,
+                        "no-discussion repeat controls must not declare a decision ground truth",
+                    );
                 }
             }
-            "evidence_supported_revision" | "unsupported_social_influence" | "centrality_placement" | "correction_after_misinformation" => {
+            "evidence_supported_revision"
+            | "unsupported_social_influence"
+            | "centrality_placement"
+            | "correction_after_misinformation" => {
                 if truth_profile != Some("synthetic_known_answer") {
-                    add(errors, &context, "factual revision and influence scenarios require a frozen synthetic known-answer profile");
+                    add(
+                        errors,
+                        &context,
+                        "factual revision and influence scenarios require a frozen synthetic known-answer profile",
+                    );
                 }
             }
             "false_consensus_status" | "identity_and_injection" => {
                 if truth_profile != Some("social_claim_integrity_no_majority_truth") {
-                    add(errors, &context, "social claim integrity scenarios must not use majority as ground truth");
+                    add(
+                        errors,
+                        &context,
+                        "social claim integrity scenarios must not use majority as ground truth",
+                    );
                 }
             }
             "open_world_uncertainty" => {
                 if truth_profile != Some("open_world_indeterminate") {
-                    add(errors, &context, "open-world scenarios must remain indeterminate by design");
+                    add(
+                        errors,
+                        &context,
+                        "open-world scenarios must remain indeterminate by design",
+                    );
                 }
             }
             _ => {}
@@ -672,16 +720,26 @@ fn validate_matrix(
             add(
                 errors,
                 "matrix.paired_blocks",
-                format!("paired block '{pair_id}' must contrast minimum with maximum normalized betweenness placement"),
+                format!(
+                    "paired block '{pair_id}' must contrast minimum with maximum normalized betweenness placement"
+                ),
             );
         }
         if field(left, "centrality_metric_profile") != Some("normalized_betweenness_v1")
             || field(right, "centrality_metric_profile") != Some("normalized_betweenness_v1")
         {
-            add(errors, "matrix.paired_blocks", format!("paired block '{pair_id}' must declare normalized betweenness"));
+            add(
+                errors,
+                "matrix.paired_blocks",
+                format!("paired block '{pair_id}' must declare normalized betweenness"),
+            );
         }
         if matches!(field(left, "topology_family"), Some("complete" | "temporal_churn")) {
-            add(errors, "matrix.paired_blocks", format!("paired block '{pair_id}' uses a topology without a frozen static centrality contrast"));
+            add(
+                errors,
+                "matrix.paired_blocks",
+                format!("paired block '{pair_id}' uses a topology without a frozen static centrality contrast"),
+            );
         }
     }
 
@@ -799,7 +857,11 @@ fn validate_content_bundle(
         return;
     };
     if messages.len() != 5 {
-        add(errors, "matched_content.paired_content", "exactly five paired message bundles are required");
+        add(
+            errors,
+            "matched_content.paired_content",
+            "exactly five paired message bundles are required",
+        );
     }
 
     let mut message_digests = BTreeMap::<String, String>::new();
@@ -818,7 +880,11 @@ fn validate_content_bundle(
             add(errors, &context, "duplicate paired_content_ref");
         }
         if field(message, "expected_grounded_state") != Some("unsupported_and_false_under_packet") {
-            add(errors, &context, "paired persuasion control must be unsupported and false under the frozen evidence packet");
+            add(
+                errors,
+                &context,
+                "paired persuasion control must be unsupported and false under the frozen evidence packet",
+            );
         }
     }
 
@@ -848,7 +914,11 @@ fn validate_content_bundle(
     }
     let content_refs: BTreeSet<String> = message_digests.keys().cloned().collect();
     if referenced != content_refs {
-        add(errors, "matched_content", "content bundle references and matrix paired_content_ref values must match exactly");
+        add(
+            errors,
+            "matched_content",
+            "content bundle references and matrix paired_content_ref values must match exactly",
+        );
     }
 }
 
@@ -957,7 +1027,14 @@ fn main() -> ExitCode {
         }
     };
 
-    match validate(&protocol, &protocol_schema, &matrix, &matrix_schema, &content, &content_schema) {
+    match validate(
+        &protocol,
+        &protocol_schema,
+        &matrix,
+        &matrix_schema,
+        &content,
+        &content_schema,
+    ) {
         Ok(report) => {
             println!(
                 "QUALIFIED STRUCTURAL SCENARIO CONTRACT: fixtures={} families={} topologies={} red_team={} positive_controls={} measurement_controls={} pluralism_controls={} paired_centrality_blocks={}",
@@ -1004,7 +1081,7 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_protocol_and_forty_five_scenarios_validate() {
+    fn checked_in_protocol_and_fifty_scenarios_validate() {
         let report = validate(
             &parsed(PROTOCOL),
             &parsed(PROTOCOL_SCHEMA),
@@ -1305,11 +1382,20 @@ mod tests {
     #[test]
     fn matched_content_digests_reproduce_from_canonical_json() {
         let content = parsed(CONTENT);
-        assert_eq!(sha256_value(&content["agent_profile"]).unwrap(), content["agent_profile_sha256"].as_str().unwrap());
-        assert_eq!(sha256_value(&content["evidence_packet"]).unwrap(), content["evidence_packet_sha256"].as_str().unwrap());
+        assert_eq!(
+            sha256_value(&content["agent_profile"]).unwrap(),
+            content["agent_profile_sha256"].as_str().unwrap()
+        );
+        assert_eq!(
+            sha256_value(&content["evidence_packet"]).unwrap(),
+            content["evidence_packet_sha256"].as_str().unwrap()
+        );
         for message in content["paired_content"].as_array().unwrap() {
             let reference = field(message, "paired_content_ref").unwrap();
-            assert_eq!(sha256_value(message).unwrap(), content["message_sha256_by_pair"][reference].as_str().unwrap());
+            assert_eq!(
+                sha256_value(message).unwrap(),
+                content["message_sha256_by_pair"][reference].as_str().unwrap()
+            );
         }
     }
 
@@ -1348,7 +1434,11 @@ mod tests {
         }
         let mut errors = Vec::new();
         validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
-        assert!(errors.iter().any(|error| error.contains("without a frozen static centrality contrast")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("without a frozen static centrality contrast"))
+        );
     }
 
     #[test]
