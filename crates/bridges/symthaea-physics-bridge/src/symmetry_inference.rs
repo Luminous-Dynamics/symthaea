@@ -1743,6 +1743,164 @@ mod tests {
         .unwrap()
     }
 
+    fn sheared_so2_action() -> AdmittedLinearGroupActionV1 {
+        crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "exact-so2-sheared".to_string(),
+            coordinate_basis_id: "XY".to_string(),
+            coordinate_names: vec!["X".to_string(), "Y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, -1.0], vec![-1.0, 2.0]],
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "conjugated-J".to_string(),
+                matrix: vec![vec![1.0, -2.0], vec![1.0, -1.0]],
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap()
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_accepts_radial_damping() {
+        let vector_field = vec![
+            mul(Expr::Const(-1.0), var("x")),
+            mul(Expr::Const(-1.0), var("y")),
+        ];
+        let report = check_exact_linear_action_vector_field_equivariance(
+            &vector_field,
+            &admitted_so2_action(),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(
+            report.generator_results[0].component_residual_term_counts,
+            vec![0, 0]
+        );
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_accepts_the_rotation_generator_field() {
+        let vector_field = vec![mul(Expr::Const(-1.0), var("y")), var("x")];
+        let report = check_exact_linear_action_vector_field_equivariance(
+            &vector_field,
+            &admitted_so2_action(),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(
+            report.generator_results[0].component_residual_term_counts,
+            vec![0, 0]
+        );
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_rejects_anisotropic_dynamics() {
+        let vector_field = vec![
+            mul(Expr::Const(-1.0), var("x")),
+            mul(Expr::Const(-2.0), var("y")),
+        ];
+        let report = check_exact_linear_action_vector_field_equivariance(
+            &vector_field,
+            &admitted_so2_action(),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(!report.equivariant_under_every_generator());
+        assert!(
+            report.generator_results[0]
+                .component_residual_term_counts
+                .iter()
+                .all(|term_count| *term_count > 0)
+        );
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_is_covariant_under_sheared_coordinates() {
+        // F(x,y)=Jx transforms as F'(X,Y)=D J D^-1 [X,Y]^T.
+        let vector_field = vec![
+            sub(var("X"), mul(Expr::Const(2.0), var("Y"))),
+            sub(var("X"), var("Y")),
+        ];
+        let report = check_exact_linear_action_vector_field_equivariance(
+            &vector_field,
+            &sheared_so2_action(),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(
+            report.generator_results[0].component_residual_term_counts,
+            vec![0, 0]
+        );
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_keeps_unacted_parameters_fixed() {
+        // F(x,y;z) = z J[x,y], with z a fixed parameter under the action.
+        let vector_field = vec![
+            mul(Expr::Const(-1.0), mul(var("z"), var("y"))),
+            mul(var("z"), var("x")),
+        ];
+        let report = check_exact_linear_action_vector_field_equivariance(
+            &vector_field,
+            &admitted_so2_action(),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(
+            report.expression_variables,
+            vec!["z".to_string(), "y".to_string(), "x".to_string()]
+        );
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_fails_closed_on_bad_shapes_and_limits() {
+        let too_few_components = vec![var("x")];
+        assert_eq!(
+            check_exact_linear_action_vector_field_equivariance(
+                &too_few_components,
+                &admitted_so2_action(),
+                ExactPolynomialLieProfileV1::default()
+            ),
+            Err(LinearActionVectorFieldErrorV1::ComponentCountMismatch {
+                expected: 2,
+                actual: 1
+            })
+        );
+
+        let unsupported = vec![
+            Expr::Func(UnaryFn::Sqrt, Box::new(pow2("x"))),
+            var("y"),
+        ];
+        assert_eq!(
+            check_exact_linear_action_vector_field_equivariance(
+                &unsupported,
+                &admitted_so2_action(),
+                ExactPolynomialLieProfileV1::default()
+            ),
+            Err(LinearActionVectorFieldErrorV1::UnsupportedExpression)
+        );
+
+        let vector_field = vec![var("x"), var("y")];
+        let mut bounded = ExactPolynomialLieProfileV1::default();
+        bounded.maximum_term_products = 1;
+        assert_eq!(
+            check_exact_linear_action_vector_field_equivariance(
+                &vector_field,
+                &admitted_so2_action(),
+                bounded
+            ),
+            Err(LinearActionVectorFieldErrorV1::ResourceLimitExceeded)
+        );
+    }
+
     #[test]
     fn exact_linear_action_checker_proves_radial_polynomial_invariance() {
         let expression = add(pow2("x"), pow2("y"));
