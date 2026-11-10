@@ -117,6 +117,21 @@ The competitive claim should be a Pareto profile across:
 Do not claim state-of-the-art edit locality until at least two integrated backends and a held-out, human-reviewed edit corpus have been evaluated under the same protocol.
 
 
+
+## Relationship to MEL-MR-EVAL-005
+
+VELB-001 is a **vocal-specific measurement profile**, not a replacement for the general music-edit benchmark. Issue [MEL-MR-EVAL-005 #8799](https://github.com/Luminous-Dynamics/symthaea/issues/8799) already defines the broader protocol: exact symbolic source and requested operation, content-addressed source/target/output assets, target-change success, non-target musical preservation, localization uncertainty, seam artifacts, blinded listener usefulness, latency/compute, held-out splits, calibrated thresholds and critical no-op/leakage/omission controls.
+
+VELB contributes a narrow waveform measurement for dry mono vocal stems:
+- the target must change;
+- protected sample regions must remain within an explicit tolerance;
+- no-op and wrong-region changes must fail;
+- the exact source and output artifacts must remain independently identifiable.
+
+The current evaluator does **not** measure symbolic edit correctness, multitrack/instrument preservation, polyphonic leakage, edit-operation success, listener usefulness, localization-detector uncertainty, latency or compute. Those belong to the broader MEL-MR-EVAL-005 protocol. VELB results should be emitted as one modality-specific report in that shared bundle, with region IDs and digests traceable to the common source/operation manifest.
+
+Do not create a separate set of incompatible split rules or quality thresholds. Use the same held-out source-family/singer/song/phrase partitions, predeclared calibration thresholds, no-op/omission/wrong-region/leakage controls, and uncertainty reporting required by #8799. For nondeterministic renderers, protected thresholds must be calibrated from a no-edit self-variance split before confirmatory testing.
+
 ## Research references and comparison boundaries
 
 - **STARS (Findings of ACL 2025)** combines singing transcription, phoneme-audio alignment, note transcription/timing, vocal-technique identification and global style annotation. This is useful for authoring the target/protected intervals and evaluating whether an edit preserved the surrounding phonetic and musical structure. It is an annotation framework, not a localized-edit benchmark. https://aclanthology.org/2025.findings-acl.781/
