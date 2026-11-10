@@ -137,7 +137,7 @@ fn unit_dimension(unit: &str) -> Option<&'static str> {
         "kg/s" | "tonne/day" => Some("mass_flow"),
         "L" | "litre" => Some("volume"),
         "m3/h" => Some("volume_flow"),
-        "%" => Some("dimensionless"),
+        "%" | "ppm" => Some("dimensionless"),
         _ => None,
     }
 }
@@ -362,11 +362,14 @@ fn check_lineage(case: &Value, f: &mut Findings) {
         .collect();
     let mut provenance_refs = BTreeSet::new();
     collect_provenance_source_refs(case, &mut provenance_refs);
+    let mut evidence_refs = BTreeSet::new();
+    collect_string_refs(case, "evidence_source_id", &mut evidence_refs);
+    provenance_refs.extend(evidence_refs);
     for source in provenance_refs.difference(&source_ids) {
         f.push(
             "/evidence/sources",
             "INCOMPLETE",
-            format!("provenance source '{source}' has no corresponding evidence source record"),
+            format!("provenance/evidence source '{source}' has no corresponding evidence source record"),
         );
     }
 
@@ -413,6 +416,46 @@ fn check_trial(case: &Value, f: &mut Findings) {
             "/trial_evidence/service_fingerprint",
             "INCOMPARABLE",
             "trial service fingerprint does not equal the case comparison fingerprint",
+        );
+    }
+
+    let calibration_records = trial
+        .get("calibration_records")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let timebases = trial
+        .get("timebases")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let calibration_by_id: BTreeMap<String, Value> = calibration_records
+        .iter()
+        .filter_map(|record| {
+            record
+                .get("calibration_record_id")
+                .and_then(Value::as_str)
+                .map(|id| (id.to_owned(), record.clone()))
+        })
+        .collect();
+    let timebase_by_id: BTreeMap<String, Value> = timebases
+        .iter()
+        .filter_map(|record| {
+            record
+                .get("timebase_id")
+                .and_then(Value::as_str)
+                .map(|id| (id.to_owned(), record.clone()))
+        })
+        .collect();
+    let minimum_observed_fraction = trial
+        .pointer("/sample_completeness_policy/minimum_observed_fraction")
+        .and_then(Value::as_f64);
+
+    if minimum_observed_fraction.is_some_and(|v| !(0.0..=1.0).contains(&v)) {
+        f.push(
+            "/trial_evidence/sample_completeness_policy/minimum_observed_fraction",
+            "INVALID",
+            "minimum observed sample fraction must be between zero and one",
         );
     }
 
@@ -480,6 +523,205 @@ fn check_trial(case: &Value, f: &mut Findings) {
                     "INVALID",
                     "sample window timestamps must be valid RFC3339 date-times",
                 ),
+            }
+        }
+
+        let expected_samples = channel.get("expected_sample_count").and_then(Value::as_u64);
+        let observed_samples = channel.get("observed_sample_count").and_then(Value::as_u64);
+        let missing_samples = channel.get("missing_sample_count").and_then(Value::as_u64);
+        if let (Some(expected), Some(observed), Some(missing)) =
+            (expected_samples, observed_samples, missing_samples)
+        {
+            if expected == 0 || observed.saturating_add(missing) != expected {
+                f.push(
+                    &path,
+                    "INVALID",
+                    "sample counts must satisfy expected > 0 and observed + missing = expected",
+                );
+            } else if let Some(minimum) = minimum_observed_fraction {
+                let coverage = observed as f64 / expected as f64;
+                if coverage < minimum {
+                    f.push(
+                        pointer_child(&path, "observed_sample_count"),
+                        "INCOMPLETE",
+                        format!(
+                            "observed sample coverage {coverage:.6} is below the predeclared minimum {minimum:.6}"
+                        ),
+                    );
+                }
+            }
+        }
+
+        let window = match (start, end) {
+            (Some(start), Some(end)) => match (
+                DateTime::parse_from_rfc3339(start),
+                DateTime::parse_from_rfc3339(end),
+            ) {
+                (Ok(start), Ok(end)) if start < end => Some((start, end)),
+                _ => None,
+            },
+            _ => None,
+        };
+
+        if let Some(calibration_id) = channel.get("calibration_record_id").and_then(Value::as_str) {
+            match calibration_by_id.get(calibration_id) {
+                None if !calibration_records.is_empty() => f.push(
+                    pointer_child(&path, "calibration_record_id"),
+                    "INVALID",
+                    format!("calibration record '{calibration_id}' does not resolve in trial registry"),
+                ),
+                None => f.push(
+                    pointer_child(&path, "calibration_record_id"),
+                    "INCOMPLETE",
+                    "calibration record is not resolvable because this trial has no calibration registry",
+                ),
+                Some(record) => {
+                    let record_path = format!(
+                        "/trial_evidence/calibration_records/{}",
+                        calibration_records.iter().position(|r| r.get("calibration_record_id").and_then(Value::as_str)==Some(calibration_id)).unwrap_or(0)
+                    );
+                    if record.get("physical_quantity") != channel.get("physical_quantity")
+                        || record.get("unit") != channel.get("unit")
+                    {
+                        f.push(
+                            pointer_child(&path, "unit"),
+                            "INVALID",
+                            "calibration quantity and unit must exactly match the measurement channel",
+                        );
+                    }
+                    for identity_field in ["id", "revision"] {
+                        if record.pointer(&format!("/instrument_identity/{identity_field}"))
+                            != channel.pointer(&format!("/instrument_identity/{identity_field}"))
+                        {
+                            f.push(
+                                pointer_child(&path, "instrument_identity"),
+                                "INVALID",
+                                format!("calibration instrument {identity_field} does not match channel instrument"),
+                            );
+                            break;
+                        }
+                    }
+                    let range_min = record.get("range_min").and_then(Value::as_f64);
+                    let range_max = record.get("range_max").and_then(Value::as_f64);
+                    if matches!((range_min, range_max), (Some(lo), Some(hi)) if lo > hi) {
+                        f.push(
+                            &record_path,
+                            "INVALID",
+                            "calibration range_min must not exceed range_max",
+                        );
+                    }
+                    let status = record.get("disposition").and_then(Value::as_str);
+                    if status != channel.get("calibration_status").and_then(Value::as_str) {
+                        f.push(
+                            pointer_child(&path, "calibration_status"),
+                            "INVALID",
+                            "channel calibration_status must match the referenced calibration record disposition",
+                        );
+                    }
+                    match status {
+                        Some("in_tolerance") => {}
+                        Some("out_of_tolerance") => f.push(
+                            pointer_child(&path, "calibration_record_id"),
+                            "INVALID",
+                            "referenced calibration is out of tolerance",
+                        ),
+                        Some("stale") | Some("unknown") | None => f.push(
+                            pointer_child(&path, "calibration_record_id"),
+                            "INCOMPLETE",
+                            "referenced calibration is stale or unknown",
+                        ),
+                        _ => {}
+                    }
+                    if let Some((sample_start, sample_end)) = window {
+                        let valid_from = record.get("valid_from").and_then(Value::as_str)
+                            .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
+                        let valid_until = record.get("valid_until").and_then(Value::as_str)
+                            .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
+                        match (valid_from, valid_until) {
+                            (Some(from), Some(until)) if from < sample_start && until >= sample_end => {}
+                            (Some(from), Some(until)) if from >= until => f.push(
+                                &record_path,
+                                "INVALID",
+                                "calibration validity interval must have valid_from earlier than valid_until",
+                            ),
+                            _ => f.push(
+                                &record_path,
+                                "INCOMPLETE",
+                                "calibration validity does not cover the complete measurement sample window",
+                            ),
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(timebase_id) = channel.get("timebase_id").and_then(Value::as_str) {
+            match timebase_by_id.get(timebase_id) {
+                None if !timebases.is_empty() => f.push(
+                    pointer_child(&path, "timebase_id"),
+                    "INVALID",
+                    format!("timebase '{timebase_id}' does not resolve in trial registry"),
+                ),
+                None => f.push(
+                    pointer_child(&path, "timebase_id"),
+                    "INCOMPLETE",
+                    "timebase is not resolvable because this trial has no timebase registry",
+                ),
+                Some(record) => {
+                    let record_path = format!(
+                        "/trial_evidence/timebases/{}",
+                        timebases.iter().position(|r| r.get("timebase_id").and_then(Value::as_str)==Some(timebase_id)).unwrap_or(0)
+                    );
+                    if let Some((sample_start, sample_end)) = window {
+                        let valid_from = record.get("valid_from").and_then(Value::as_str)
+                            .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
+                        let valid_until = record.get("valid_until").and_then(Value::as_str)
+                            .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
+                        match (valid_from, valid_until) {
+                            (Some(from), Some(until)) if from < sample_start && until >= sample_end => {}
+                            (Some(from), Some(until)) if from >= until => f.push(
+                                &record_path,
+                                "INVALID",
+                                "timebase validity interval must have valid_from earlier than valid_until",
+                            ),
+                            _ => f.push(
+                                &record_path,
+                                "INCOMPLETE",
+                                "timebase validity does not cover the complete measurement sample window",
+                            ),
+                        }
+                    }
+
+                    let channel_uncertainty = channel
+                        .pointer("/time_alignment_uncertainty/value")
+                        .and_then(Value::as_f64);
+                    let channel_unit = channel
+                        .pointer("/time_alignment_uncertainty/unit")
+                        .and_then(Value::as_str);
+                    let clock_uncertainty = record
+                        .pointer("/synchronization_uncertainty/value")
+                        .and_then(Value::as_f64);
+                    let clock_unit = record
+                        .pointer("/synchronization_uncertainty/unit")
+                        .and_then(Value::as_str);
+                    if let (Some(channel_value), Some(channel_unit), Some(clock_value), Some(clock_unit)) =
+                        (channel_uncertainty, channel_unit, clock_uncertainty, clock_unit)
+                    {
+                        if channel_unit != clock_unit || channel_value < clock_value {
+                            f.push(
+                                pointer_child(&path, "time_alignment_uncertainty"),
+                                "INVALID",
+                                "channel alignment uncertainty must use the timebase uncertainty unit and must not understate it",
+                            );
+                        }
+                    } else {
+                        f.push(
+                            pointer_child(&path, "time_alignment_uncertainty"),
+                            "INCOMPLETE",
+                            "channel and timebase synchronization uncertainty must both be known",
+                        );
+                    }
+                }
             }
         }
 
@@ -569,6 +811,8 @@ fn check_unique_scopes(case: &Value, f: &mut Findings) {
     unique_ids_at(case, "/evidence/sources", "source_id", f);
     unique_ids_at(case, "/evidence/model_identities", "model_id", f);
     unique_ids_at(case, "/candidate_metrics", "metric_id", f);
+    unique_ids_at(case, "/trial_evidence/calibration_records", "calibration_record_id", f);
+    unique_ids_at(case, "/trial_evidence/timebases", "timebase_id", f);
 }
 
 fn check_gates(case: &Value, f: &mut Findings) {
@@ -893,6 +1137,41 @@ mod tests {
         include_str!("../../../docs/research/marine/marine-propulsion-case.schema.json");
     const SYNTHETIC_CASE: &str =
         include_str!("../../../docs/research/marine/fixtures/synthetic-waps-case-0001.json");
+
+    const MARINE_SCHEMA_V2: &str =
+        include_str!("../../../docs/research/marine/marine-propulsion-case-v0.2.0.schema.json");
+    const SYNTHETIC_CASE_V2: &str =
+        include_str!("../../../docs/research/marine/fixtures/synthetic-waps-case-v0.2.0.json");
+
+    #[test]
+    fn v0_2_schema_and_fixture_resolve_calibration_and_timebase_contracts() {
+        let schema: Value = serde_json::from_str(MARINE_SCHEMA_V2).expect("v0.2 schema JSON");
+        let fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        assert!(jsonschema::draft202012::meta::is_valid(&schema));
+        let validator = jsonschema::draft202012::options()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("v0.2 schema compiles");
+        assert!(validator.is_valid(&fixture));
+        let mut findings = Findings::default();
+        check_unique_scopes(&fixture, &mut findings);
+        check_trial(&fixture, &mut findings);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn v0_2_sample_count_mismatch_is_invalid() {
+        let mut findings = Findings::default();
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        fixture["trial_evidence"]["channels"][0]["observed_sample_count"] =
+            serde_json::json!(59);
+        let schema: Value = serde_json::from_str(MARINE_SCHEMA_V2).expect("v0.2 schema JSON");
+        validate_instance(&schema, &fixture, "case", &mut findings);
+        check_trial(&fixture, &mut findings);
+        assert!(findings.invalid);
+    }
 
     #[test]
     fn committed_schema_and_fixture_pass_structural_validation() {
