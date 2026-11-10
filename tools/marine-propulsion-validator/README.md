@@ -58,6 +58,10 @@ cargo run -- <schema.json> <baseline.json> <candidate.json>
   matching, validity-window coverage, sample-count arithmetic and a predeclared
   sample-completeness threshold.
 
+## Canonical service fingerprint
+
+The v0.2.0 profile is documented in `docs/research/marine/MARINE-SERVICE-FINGERPRINT-PROFILE-001.md` and its independent byte/digest vector is `docs/research/marine/fixtures/service-fingerprint-v1-vector-0001.json`. The validator recomputes the projection and SHA-256. The profile is Symthaea's named canonical JSON encoding, not RFC 8785/JCS. Weather and metocean conditions are separate comparison inputs.
+
 ## Schema versions
 
 - marine-propulsion-case.schema.json is retained as the v0.1.0 schema. It is not silently
@@ -66,6 +70,8 @@ cargo run -- <schema.json> <baseline.json> <candidate.json>
   registries, expected/observed sample counts and an explicit sample-completeness policy.
 - The v0.2.0 fixture is synthetic. Its registry entries are test data, not calibration,
   metrology or operational evidence. Its service fingerprint is a known-answer software test vector.
+- The service fingerprint distinguishes numeric zero, explicit unknown, explicit not-applicable,
+  and omitted optional fields. Required transport work and route distance cannot be not-applicable.
 
 ## Deliberate limits
 
