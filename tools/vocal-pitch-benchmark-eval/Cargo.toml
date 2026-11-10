@@ -1,0 +1,11 @@
+[package]
+name = "vocal-pitch-benchmark-eval"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Reproducible, score-independent F0 tracker evaluation for held-out singing references"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
