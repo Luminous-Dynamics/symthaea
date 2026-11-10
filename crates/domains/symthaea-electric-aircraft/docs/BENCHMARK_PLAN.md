@@ -17,6 +17,12 @@ Baseline date: 2026-11-10. Public specifications and regulatory sources change; 
 - EASA SC E-19 defines special conditions for electric/hybrid propulsion certification: https://www.easa.europa.eu/en/special-condition-sc-e-19-electric-hybrid-propulsion-system
 - SACAA's airworthiness page explains that a South African Type Acceptance Certificate (TAC) accepts a foreign type certificate, and that the foreign type-certificate holder applies; a TAC is not a substitute for an original type-certification programme for a new Luminous aircraft: https://www.caa.co.za/industry-information/airworthiness/
 
+## Operational-life and infrastructure benchmarks
+
+The industry comparison must include more than energy density. Pipistrel's published 35–95% charging time, 30–100% charging time, liquid cooling, non-swappable battery arrangement, initial 500-hour battery limitation, and 2,000-hour motor TBO establish useful operational reference points. BETA's 10-K estimates typical battery replacement after 12–24 months depending on customer usage and reports a five-pack modular architecture, in-house destructive battery testing, and a charger network. Those are manufacturer statements, not independently comparable fleet data.
+
+For every Luminous aircraft concept, collect and compare: battery calendar age and equivalent full cycles at retirement; energy throughput to retirement; usable energy at defined SOC/temperature/age; replacement labour and pack cost; charger power and grid connection; charging turnaround including thermal conditioning; dispatch availability; maintenance hours; and payload-kilometres per pack-life. Do not compare calendar-life or cycle-life without matching depth of discharge, C-rate, temperature, storage conditions, and end-of-life criterion.
+
 ## Benchmark tiers
 
 ### Tier 0 — analytical/software correctness
