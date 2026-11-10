@@ -96,7 +96,7 @@ impl FamilyGuardrailPlan {
             }
             if family.minimum_observations == 0
                 || family.minimum_observations > family.maximum_observations
-                || family.maximum_observations as usize > MAX_EPISODES_PER_FAMILY
+                || family.maximum_observations > MAX_EPISODES_PER_FAMILY as u64
             {
                 return Err(FamilyGuardrailError::InvalidObservationLimits {
                     family_id: family.family_id.clone(),
@@ -535,7 +535,7 @@ pub fn validate_family_guardrail_report(
         || !(0.0..1.0).contains(&report.campaign_alpha)
         || !report.candidate_alpha_all_families.is_finite()
         || !report.simultaneous_family_bounds
-        || !is_lowercase_sha256_or_blake3(&report.report_digest)
+        || !is_lowercase_hex_digest(&report.report_digest)
         || !is_lowercase_sha256_or_blake3(&report.plan_digest)
     {
         return Err(FamilyGuardrailError::ReportDigestMismatch);
@@ -605,7 +605,7 @@ mod tests {
         FamilyGuardrailSpec {
             family_id: family_id.to_owned(),
             non_inferiority_margin: margin,
-            minimum_observations: max as u64,
+            minimum_observations: (max as u64).div_ceil(2),
             maximum_observations: max as u64,
             episode_ids: (0..max)
                 .map(|index| format!("{family_id}-episode-{index:04}"))
@@ -657,7 +657,7 @@ mod tests {
                 .iter()
                 .all(|family| family.status == FamilyNonInferiorityStatus::NonInferior)
         );
-        assert_eq!(gate.is_terminal(), true);
+        assert!(gate.is_terminal());
         validate_family_guardrail_report(&report).unwrap();
     }
 
