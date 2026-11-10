@@ -25,17 +25,21 @@ Iteration zero is the frozen baseline:
 - no parent output;
 - no action digest;
 - zero action norm;
-- output digest exactly matches the baseline digest in the specification.
+- output digest exactly matches the baseline digest in the specification;
+- control-state digest exactly matches the initial control-state digest.
 
 Each correction iteration:
 - has a sequential index;
 - references the exact previous output digest;
+- carries the resulting control-state digest;
 - carries a non-empty action digest and positive finite action norm;
 - stays within the declared maximum action norm;
 - binds the same source case and frozen context digest;
 - binds a new output digest and complete metric family.
 
 The specification also names an action-norm profile. That profile defines the control coordinates, normalization/scaling and norm convention, so a numeric action bound is not silently compared across incompatible control spaces. The action-norm profile ID is preserved in the final trajectory report.
+
+Repeated control-state digests are detected as cycles even when a stochastic renderer emits different waveform digests. Repeated output digests are also stalled, even if analyzer noise makes the measured metrics appear to improve.
 
 The frozen context digest must commit to the source case, lyrics, pronunciation plan, score/alignment, voice identity and authorization, renderer and voicebank artifacts, analyzer artifacts, preprocessing, calibration profile and other fixed inputs. A changed context starts a new trajectory.
 
