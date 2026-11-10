@@ -686,6 +686,7 @@ mod tests {
             maximum_expression_variables: 64,
             minimum_informative_samples: 4,
             maximum_direction_basis_condition: 1e6,
+            maximum_directional_reconstruction_relative_residual: 1e-8,
         }
     }
 
@@ -912,6 +913,25 @@ mod tests {
                 sampling_profile()
             ),
             Err(LinearActionSamplingErrorV1::InsufficientInformativeSamples { .. })
+        ));
+    }
+
+    #[test]
+    fn sampled_linear_action_rejects_invalid_reconstruction_residual_budget() {
+        let states = [[0.7, 1.1], [1.2, 0.8], [1.7, 2.1], [2.3, 1.4]];
+        let profile = LinearActionSamplingProfileV1 {
+            maximum_directional_reconstruction_relative_residual: 1.01,
+            minimum_informative_samples: 1,
+            ..sampling_profile()
+        };
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &add(square("x"), square("y")),
+                &canonical_action(),
+                &samples(&states, [[1.0, 0.0], [0.0, 1.0]]),
+                profile
+            ),
+            Err(LinearActionSamplingErrorV1::InvalidProfile)
         ));
     }
 
