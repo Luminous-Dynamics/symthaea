@@ -14,6 +14,8 @@ use crate::rhythm::Duration;
 use crate::score::{PartId, Score};
 
 pub const ENSEMBLE_RELATION_SCHEMA_V1: &str = "ensemble-relations-v1";
+/// Exact domain-separated digest recipe emitted by #9461 ScoreDemandProfile.
+pub const ENSEMBLE_RELATION_SCORE_DIGEST_SCHEMA_V1: &str = "muse-score-serde-json-sha256-v1";
 pub const MAX_ENSEMBLE_RELATIONS_V1: usize = 4_096;
 const MAX_RELATION_BEAT_NUMERATOR: i128 = 1_000_000_000;
 const MAX_RELATION_BEAT_DENOMINATOR: i128 = 1_000_000;
@@ -65,6 +67,8 @@ pub struct EnsembleRelationV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnsembleRelationTimelineV1 {
     pub schema: String,
+    /// Digest recipe/version used for score_sha256.
+    pub score_digest_schema: String,
     /// SHA-256 of the exact symbolic Score, computed by the trusted upstream
     /// score-demand/provenance layer and passed separately to validation.
     pub score_sha256: String,
@@ -75,6 +79,7 @@ pub struct EnsembleRelationTimelineV1 {
 #[serde(rename_all = "snake_case")]
 pub enum EnsembleRelationIssueCodeV1 {
     InvalidSchema,
+    InvalidScoreDigestSchema,
     InvalidScoreDigest,
     InvalidExpectedScoreDigest,
     ScoreDigestMismatch,
@@ -231,6 +236,14 @@ pub fn validate_ensemble_relations(
             None,
             None,
             "unsupported ensemble-relation schema",
+        );
+    }
+    if timeline.score_digest_schema != ENSEMBLE_RELATION_SCORE_DIGEST_SCHEMA_V1 {
+        report.push(
+            EnsembleRelationIssueCodeV1::InvalidScoreDigestSchema,
+            None,
+            None,
+            "relationship timeline must use the exact score-demand digest schema",
         );
     }
     if !is_valid_digest(&timeline.score_sha256) {
@@ -491,6 +504,7 @@ mod tests {
     fn timeline(relations: Vec<EnsembleRelationV1>) -> EnsembleRelationTimelineV1 {
         EnsembleRelationTimelineV1 {
             schema: ENSEMBLE_RELATION_SCHEMA_V1.into(),
+            score_digest_schema: ENSEMBLE_RELATION_SCORE_DIGEST_SCHEMA_V1.into(),
             score_sha256: digest(),
             relations,
         }
@@ -547,6 +561,17 @@ mod tests {
         let report = validate_ensemble_relations(&score, &timeline(vec![empty, beyond]), &digest());
         assert!(report.issues.iter().any(|issue| issue.code == EnsembleRelationIssueCodeV1::EmptyInterval));
         assert!(report.issues.iter().any(|issue| issue.code == EnsembleRelationIssueCodeV1::IntervalBeyondScore));
+    }
+
+    #[test]
+    fn rejects_an_unknown_score_digest_schema() {
+        let score = score();
+        let mut relation_timeline = timeline(vec![relation(EnsembleRelationKindV1::Imitation)]);
+        relation_timeline.score_digest_schema = "sha256-json-v0".into();
+        let report = validate_ensemble_relations(&score, &relation_timeline, &digest());
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == EnsembleRelationIssueCodeV1::InvalidScoreDigestSchema
+        }));
     }
 
     #[test]
