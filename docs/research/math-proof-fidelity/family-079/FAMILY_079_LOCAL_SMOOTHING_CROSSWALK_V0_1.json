@@ -1,7 +1,7 @@
 {
   "schema_version": "luminous.math-proof-fidelity-crosswalk.v0.1",
   "audit_id": "openai-math-family-079-local-smoothing-preliminary-2026-11-10",
-  "audit_status": "preliminary_static_source_audit",
+  "audit_status": "preliminary_static_source_audit_with_expanded_declaration_inventory",
   "claim_ceiling": "This artifact records a source-level correspondence inspection only. It is not an independent Lean rebuild, axiom audit over the full dependency closure, expert proof review, or validation of the mathematical theorem.",
   "sources": {
     "external_repository": {
@@ -147,36 +147,188 @@
       "declaration": "tube_union_logarithmic_three_dimensional",
       "reported_consequence": "at least delta^-2 unit-length tubes with delta-separated directions have union volume >= c/(1+log(1/delta))^66, uniformly over centers and 0<delta<=1",
       "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/MeasureTheory/Kakeya/Logarithmic.lean"
+    },
+    "declaration_level_audit": {
+      "source_commit": "4eaee87548250b2682affda7d05d947c05554bae",
+      "method": "Exact-commit source inspection of declaration modules, theorem proof wiring, and paper TeX sections; not a Lean build or semantic equivalence review.",
+      "claims": [
+        {
+          "paper_claim": "critical annular logarithmic refinement",
+          "paper_location": "introduction.tex, Theorem thm:main / equation eq:main",
+          "declarations": [
+            "OAI.Analysis.Fourier.LocalSmoothing.logarithmic_refinement",
+            "OAI.Analysis.Fourier.LocalSmoothing.LogarithmicRefinement"
+          ],
+          "source_blobs": [
+            "Main.lean:3b95ea013123b96932afb88cc11e6aa1579c59ed",
+            "Definitions.lean:0357f1691510ac94e787093073c08bee294192fe"
+          ],
+          "proof_wiring": "Main.lean derives logarithmic_refinement from positive_packet_solvability.",
+          "status": "declaration_and_proof_wiring_located; exact_statement_crosswalk_pending"
+        },
+        {
+          "paper_claim": "logarithmic Sobolev estimate",
+          "paper_location": "introduction.tex, Corollary cor:log-sobolev",
+          "declarations": [
+            "OAI.Analysis.Fourier.LocalSmoothing.logarithmic_sobolev",
+            "OAI.Analysis.Fourier.LocalSmoothing.LogarithmicSobolev"
+          ],
+          "source_blobs": [
+            "Main.lean:3b95ea013123b96932afb88cc11e6aa1579c59ed",
+            "Definitions.lean:0357f1691510ac94e787093073c08bee294192fe"
+          ],
+          "proof_wiring": "Derived in Main.lean from logarithmic_refinement.",
+          "status": "declaration_and_proof_wiring_located; exact_statement_crosswalk_pending"
+        },
+        {
+          "paper_claim": "Bochner-Riesz uniform, maximal and convergence estimates",
+          "paper_location": "introduction.tex, Theorem thm:bochner-riesz",
+          "declarations": [
+            "OAI.Analysis.Fourier.BochnerRiesz.bo​​chner_riesz",
+            "OAI.Analysis.Fourier.BochnerRiesz.bo​​chner_riesz_schwartz",
+            "OAI.Analysis.Fourier.BochnerRiesz.BochnerRieszMainTheorem"
+          ],
+          "source_blobs": [
+            "Main.lean:a2285a9be3b923db7b9c095ec987bb75debc5c05"
+          ],
+          "proof_wiring": "bochner_riesz is constructed from EuclideanLocalSmoothing; the proposition type is defined in the imported MainTheorem module.",
+          "status": "declaration_and_proof_wiring_located; p/alpha/maximal-range crosswalk_pending"
+        },
+        {
+          "paper_claim": "Stein square-function estimate and full-Lp extension",
+          "paper_location": "introduction.tex, Theorem thm:stein-square",
+          "declarations": [
+            "OAI.Analysis.Fourier.SquareFunction.stein_square",
+            "OAI.Analysis.Fourier.SquareFunction.SteinSquareFullLp",
+            "OAI.Analysis.Fourier.SquareFunction.stein_square_fullLp"
+          ],
+          "source_blobs": [
+            "Main.lean:8d8c885e35038e8780a493a6874b0339b0554573"
+          ],
+          "proof_wiring": "stein_square follows from EuclideanLocalSmoothing; the full-Lp extension uses localSmoothing_squareLpExtension.",
+          "status": "declaration_and_proof_wiring_located; alpha/p-range crosswalk_pending"
+        },
+        {
+          "paper_claim": "spherical restriction and truncated-cone extension",
+          "paper_location": "introduction.tex, Corollary cor:spherical-restriction and adjacent slicing statement",
+          "declarations": [
+            "OAI.Analysis.Fourier.Restriction.spherical_restriction",
+            "OAI.Analysis.Fourier.Cone.cone_extension"
+          ],
+          "source_blobs": [
+            "Restriction/Main.lean:e3983175cff01cb8f0a9b3061605e23ac43a93ad",
+            "Cone/Main.lean:6daaa3be85bdc2162516e4c36bc039a13abedb66"
+          ],
+          "proof_wiring": "Both declarations are built from EuclideanLocalSmoothing through their respective transfer lemmas.",
+          "status": "declaration_and_proof_wiring_located; mixed-range/geometric-definition crosswalk_pending"
+        },
+        {
+          "paper_claim": "compact paraboloid extension and free Schrödinger local smoothing",
+          "paper_location": "parabolic.tex, Corollary cor:parabolic; equations eq:paraboloid-extension-mixed, eq:parabolic-critical and eq:parabolic-exact",
+          "declarations": [],
+          "source_blobs": [
+            "parabolic.tex:b82cc9feb6327d773d5fa2c33608494c5035d2aa"
+          ],
+          "statement_summary": "d>=1 and p_c=2(d+1)/d; mixed-norm extension range requires 1<a<=infinity, p_c<b<infinity, b>(d+2)a'/d. The critical frequency-truncated Schrödinger estimate has log(2+N)^(2/p_c); for p>p_c, the Besov/Sobolev order is s=d(1-2/p)-2/r.",
+          "status": "paper_claim_pinned; dedicated_Lean_declaration_or_exact_derivation_not_yet_located",
+          "note": "Do not infer non-formalization from the absence of a top-level declaration in the inspected modules. Search the exact Lean tree and trace cap-rescaling / transfer lemmas."
+        },
+        {
+          "paper_claim": "Kakeya maximal estimate and full Hausdorff/Minkowski dimension consequences",
+          "paper_location": "introduction.tex, Corollary cor:quant-kakeya; FurtherResults Minkowski consequence",
+          "declarations": [
+            "OAI.MeasureTheory.Kakeya.kakeya_maximal",
+            "OAI.MeasureTheory.Kakeya.kakeya",
+            "OAI.Analysis.Fourier.LocalSmoothing.kakeya_minkowski"
+          ],
+          "source_blobs": [
+            "Kakeya/Main.lean:14441e0b9ef840955ca38ba802441b26ac73c179",
+            "FurtherResults.lean:f2601bbfa00ddcdddc4b732bc244f16caac15011"
+          ],
+          "proof_wiring": "Kakeya maximal follows from the local-smoothing restriction bound; Hausdorff dimension follows from Kakeya maximal; bounded-set Minkowski dimension is separately declared.",
+          "status": "declaration_and_proof_wiring_located; quantifier/epsilon/domain crosswalk_pending"
+        },
+        {
+          "paper_claim": "Nikodym maximal and dimension consequences",
+          "paper_location": "introduction.tex, equation eq:kakeya-nikodym and Nikodym paragraph",
+          "declarations": [
+            "OAI.Analysis.Fourier.LocalSmoothing.nikodym_maximal",
+            "OAI.Analysis.Fourier.LocalSmoothing.nikodym_dimension"
+          ],
+          "source_blobs": [
+            "FurtherResults.lean:f2601bbfa00ddcdddc4b732bc244f16caac15011"
+          ],
+          "proof_wiring": "nikodym_maximal follows from the Kakeya maximal theorem; nikodym_dimension follows from the Nikodym maximal theorem.",
+          "status": "declaration_and_proof_wiring_located; geometric definitions/incidence hypotheses crosswalk_pending"
+        },
+        {
+          "paper_claim": "logarithmic Kakeya tube-union volume lower bound",
+          "paper_location": "repository formal development; no direct main-paper theorem label identified in this pass",
+          "declarations": [
+            "OAI.MeasureTheory.Kakeya.tube_union_logarithmic",
+            "OAI.MeasureTheory.Kakeya.tube_union_logarithmic_three_dimensional"
+          ],
+          "source_blobs": [
+            "Logarithmic.lean:c67e99f07f748a7c4d3a2556242ba420cf10157d"
+          ],
+          "statement_summary": "For m radius-delta unit tubes with delta-separated unit directions, the general-n estimate has logarithmic exponent 2n(2n+5); in n=3, if m*delta^2>=1, occupied volume is at least c/(1+log(1/delta))^66 uniformly over centers and 0<delta<=1.",
+          "status": "formal_declaration_and_proof_term_located; manuscript_correspondence_not_yet_claimed"
+        },
+        {
+          "paper_claim": "wave-data, constant-elliptic, massive and quadratic-curve further results",
+          "paper_location": "FurtherResults and imported wave/dispersion/geometry modules in the pinned repository",
+          "declarations": [
+            "OAI.Analysis.PDE.WaveEquation.wave_data",
+            "OAI.Analysis.Fourier.LocalSmoothing.wave_data_sobolev",
+            "OAI.Analysis.Fourier.LocalSmoothing.constant_elliptic_local_smoothing",
+            "OAI.Analysis.Fourier.LocalSmoothing.constant_elliptic_logarithmic_sobolev",
+            "OAI.Analysis.Fourier.LocalSmoothing.massive_local_smoothing",
+            "OAI.Analysis.Fourier.LocalSmoothing.massive_logarithmic_sobolev",
+            "OAI.Analysis.Fourier.LocalSmoothing.quadratic_curve_dimension_infimum_attained",
+            "OAI.Analysis.Fourier.LocalSmoothing.matrix_quadratic_curve_dimension_infimum_attained"
+          ],
+          "source_blobs": [
+            "WaveEquation/Main.lean:9c5bdb87521bf819bab4894885af3479d018dcae",
+            "FurtherResults.lean:f2601bbfa00ddcdddc4b732bc244f16caac15011"
+          ],
+          "status": "formal_declarations_and_proof_wiring_located; not_yet_classified_as_main_paper_claims"
+        }
+      ]
     }
   },
   "open_crosswalk_items": [
     {
       "paper_claim": "compact paraboloid extension estimate",
-      "status": "not_yet_mapped_in_this_audit",
-      "note": "Do not infer absence from the six comparator targets; locate exact declaration and compare its domain/range."
+      "status": "paper_claim_pinned; dedicated_Lean_declaration_or_exact_derivation_not_yet_located",
+      "paper_location": "parabolic.tex, Corollary cor:parabolic, equation eq:paraboloid-extension-mixed",
+      "note": "Exact mixed-norm range is recorded in declaration_level_audit. Trace cap-rescaling and Fourier-extension transfer statements."
     },
     {
-      "paper_claim": "Schrodinger local smoothing consequence",
-      "status": "not_yet_mapped_in_this_audit",
-      "note": "Locate the exact formal declaration and compare dimension, critical exponent and Sobolev order."
+      "paper_claim": "Schrödinger local smoothing consequence",
+      "status": "paper_claim_pinned; dedicated_Lean_declaration_or_exact_derivation_not_yet_located",
+      "paper_location": "parabolic.tex, Corollary cor:parabolic, equations eq:parabolic-critical and eq:parabolic-exact",
+      "note": "Exact critical and noncritical estimates are recorded in declaration_level_audit. Trace the derivation from spherical extension and transfer lemmas."
     },
     {
       "paper_claim": "truncated-cone extension estimate",
-      "status": "formal_module_located_statement_crosswalk_pending",
-      "declaration": "OAI.Analysis.Fourier.Cone.cone_extension"
+      "status": "formal_declaration_and_proof_wiring_located; exact_statement_crosswalk_pending",
+      "declaration": "OAI.Analysis.Fourier.Cone.cone_extension",
+      "source_blob": "6daaa3be85bdc2162516e4c36bc039a13abedb66"
     },
     {
       "paper_claim": "Nikodym maximal and dimension consequences",
-      "status": "formal_modules_located_statement_crosswalk_pending",
+      "status": "formal_declarations_and_proof_wiring_located; exact_geometry_crosswalk_pending",
       "declarations": [
         "OAI.Analysis.Fourier.LocalSmoothing.nikodym_maximal",
         "OAI.Analysis.Fourier.LocalSmoothing.nikodym_dimension"
-      ]
+      ],
+      "source_blob": "f2601bbfa00ddcdddc4b732bc244f16caac15011"
     },
     {
       "paper_claim": "logarithmic tube-union lower bound",
-      "status": "formal_module_located_statement_crosswalk_pending",
-      "declaration": "OAI.MeasureTheory.Kakeya.tube_union_logarithmic_three_dimensional"
+      "status": "formal_declaration_and_proof_term_located; manuscript_correspondence_not_yet_claimed",
+      "declaration": "OAI.MeasureTheory.Kakeya.tube_union_logarithmic_three_dimensional",
+      "source_blob": "c67e99f07f748a7c4d3a2556242ba420cf10157d"
     }
   ],
   "validation": {
@@ -186,13 +338,17 @@
     "kernel_replay_independently_run": false,
     "full_dependency_closure_axiom_report": false,
     "independent_mathematical_review": false,
-    "proof_correctness_assessed": false
+    "proof_correctness_assessed": false,
+    "expanded_declaration_inventory": true,
+    "exact_parabolic_lean_declaration_located": false,
+    "paper_claim_correspondence_for_all_consequences": false
   },
   "next_steps": [
-    "Complete one-to-one crosswalk of every material theorem and corollary in the exact paper source to Lean declarations.",
-    "Inspect compact-paraboloid, Schrödinger, cone, Nikodym, and logarithmic tube-volume statements and compare their precise hypotheses.",
-    "Replay the exact Lean project in the pinned toolchain and record Lake manifest, dependency closure, theorem types, axioms, and build digest.",
-    "Run mutation checks for endpoint, epsilon, quantifier, domain, normalization, and operator-definition substitutions.",
-    "Obtain an independent specialist review of the analytic proof and its formalization correspondence."
+    "Trace the compact-paraboloid and Schrödinger corollary through the exact Lean tree, including cap-rescaling and transfer lemmas.",
+    "Compare each declaration's quantifiers, exponent/range, cutoff, norm, geometry and endpoint against its exact paper TeX claim.",
+    "Complete line-by-line proof wiring and transitive dependency inventory for every paper claim.",
+    "Replay the pinned Lean project and record Lake manifest, dependency closure, axiom set, build output and theorem identities.",
+    "Run adversarial statement mutations for endpoint, epsilon, quantifier, domain, Fourier sign, function-space and normalization substitutions.",
+    "Obtain independent specialist review of analytic proof strategy and formalization correspondence."
   ]
 }
