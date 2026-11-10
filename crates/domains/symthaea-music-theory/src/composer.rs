@@ -788,7 +788,10 @@ fn compose_with_spec_and_form_and_grammar_impl(
         // After intro/coda, same reasoning as the drone pedal below — a
         // drone/stasis texture that dropped its habit for the intro or
         // coda would stop being what it is.
-        apply_harmonic_stasis(&mut score);
+        apply_harmonic_stasis_for_parts(
+            &mut score,
+            &[GENERAL_HARMONY_PART_V1, GENERAL_BASS_PART_V1],
+        );
     }
     if tx.full_drone {
         // Supersedes the plain drone below (it calls `apply_drone_pedal`
@@ -1725,11 +1728,19 @@ fn apply_harmonic_sequence(form: &mut Form) {
 /// wanting genuine harmonic stillness (drone, soundscape, film-score
 /// pad) rather than block-chord re-attack on every bar.
 fn apply_harmonic_stasis(score: &mut Score) {
-    for role in [VoiceRole::Harmony, VoiceRole::Bass] {
+    let parts: Vec<PartId> = score.parts();
+    apply_harmonic_stasis_for_parts(score, &parts);
+}
+
+/// Tie repeated Harmony/Bass pitches within each exact persistent part.
+/// Separate parts may share a role, pitch and onset without being merged.
+fn apply_harmonic_stasis_for_parts(score: &mut Score, part_ids: &[PartId]) {
+    for &part_id in part_ids {
+      for role in [VoiceRole::Harmony, VoiceRole::Bass] {
         let mut onsets: Vec<f64> = score
             .notes
             .iter()
-            .filter(|n| n.role == role)
+            .filter(|n| n.part == part_id && n.role == role)
             .map(|n| n.onset.beats())
             .collect();
         onsets.sort_by(f64::total_cmp);
@@ -1743,7 +1754,7 @@ fn apply_harmonic_stasis(score: &mut Score) {
                 .notes
                 .iter()
                 .enumerate()
-                .filter(|(_, n)| n.role == role && (n.onset.beats() - t).abs() < 1e-9)
+                .filter(|(_, n)| n.part == part_id && n.role == role && (n.onset.beats() - t).abs() < 1e-9)
                 .map(|(idx, _)| idx)
                 .collect();
             let mut still_active: std::collections::HashMap<u8, usize> =
@@ -1768,6 +1779,7 @@ fn apply_harmonic_stasis(score: &mut Score) {
         for &i in removed.iter().rev() {
             score.notes.remove(i);
         }
+      }
     }
 }
 
@@ -1989,7 +2001,7 @@ fn apply_full_drone(
             });
         }
     }
-    apply_harmonic_stasis(score);
+    apply_harmonic_stasis_for_parts(score, &[harmony_part, bass_part]);
 }
 
 /// PIVOT-CHORD MODULATION — the first REAL key travel in the engine.
