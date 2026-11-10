@@ -30,8 +30,8 @@ jobs:
         run: |
           cargo run --manifest-path tools/ev-soh-adaptation-portfolio-audit/Cargo.toml -- --schema schemas/transport/ev_soh_adaptation_portfolio_v0_1.schema.json --corpus fixtures/ev_battery/soh_adaptation_portfolios_v0_1.json > "$RUNNER_TEMP/ev-soh-adaptation-portfolio-report.json"
           jq -e '
-            .case_count == 13 and
+            .case_count == 16 and
             .accepted_count == 5 and
-            .rejected_count == 8 and
+            .rejected_count == 11 and
             (.report_sha256 | test("^[a-f0-9]{64}$"))
           ' "$RUNNER_TEMP/ev-soh-adaptation-portfolio-report.json"
