@@ -40,6 +40,7 @@ At every correction:
 - at least one unsatisfied target improves by its declared minimum or becomes compliant;
 - the action norm stays within the predeclared maximum under a versioned action-norm profile that defines control coordinates and normalization;
 - the output must bind to the previous iteration's exact output digest;
+- the control state is content-addressed under a versioned action-norm/control-coordinate profile, and repeated control-state or render-output digests are detected as cycles;
 - source case and frozen context remain unchanged.
 
 The first converged, indeterminate, noncompliant or stalled iteration is terminal. A later mutation in the same trace is rejected. If the maximum correction budget expires first, the result is ITERATION_LIMIT_REACHED, never converged.
@@ -64,7 +65,7 @@ Keep the exact source performance, renderer/model/voicebank, analyzer, score, pr
 - monotonic convergence into every target range;
 - one target improves while another regresses beyond allowance;
 - target overshoot and reversal;
-- alternating two-step oscillation;
+- alternating two-step control-state oscillation with changing stochastic output hashes;
 - no-op action with unchanged output digest;
 - non-zero action with no measurable target progress;
 - action magnitude beyond its declared bound;
