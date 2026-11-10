@@ -156,6 +156,217 @@ fn digest_json(value: &Value) -> Option<String> {
     Some(format!("{hash:x}"))
 }
 
+
+const SUPPORTED_SCHEMA_KEYWORDS: [&str; 16] = [
+    "$schema", "$id", "title", "type", "additionalProperties", "required",
+    "properties", "const", "enum", "minLength", "pattern", "minimum",
+    "minItems", "uniqueItems", "items", "maximum",
+];
+
+fn validate_schema_definition(schema: &Value, context: &str, errors: &mut Vec<String>) {
+    let Some(object) = schema.as_object() else {
+        add(errors, &format!("{context}:schema_node_not_object"));
+        return;
+    };
+    for keyword in object.keys() {
+        if !SUPPORTED_SCHEMA_KEYWORDS.contains(&keyword.as_str()) {
+            add(errors, &format!("{context}:unsupported_schema_keyword:{keyword}"));
+        }
+    }
+    if let Some(kind) = schema.get("type") {
+        let supported = ["object", "array", "string", "number", "integer", "boolean", "null"];
+        let types: Vec<&str> = if let Some(single) = kind.as_str() {
+            vec![single]
+        } else {
+            kind.as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect()
+        };
+        if types.is_empty() || types.iter().any(|item| !supported.contains(item)) {
+            add(errors, &format!("{context}:unsupported_schema_type"));
+        }
+    }
+    if let Some(pattern) = schema.get("pattern").and_then(Value::as_str) {
+        if pattern != "^[a-f0-9]{64}$" {
+            add(errors, &format!("{context}:unsupported_schema_pattern"));
+        }
+    }
+    if let Some(properties) = schema.get("properties") {
+        if let Some(properties) = properties.as_object() {
+            for (name, child) in properties {
+                validate_schema_definition(child, &format!("{context}.{name}"), errors);
+            }
+        } else {
+            add(errors, &format!("{context}:schema_properties_not_object"));
+        }
+    }
+    if let Some(items) = schema.get("items") {
+        validate_schema_definition(items, &format!("{context}[]"), errors);
+    }
+}
+
+fn schema_type_matches(value: &Value, kind: &str) -> bool {
+    match kind {
+        "object" => value.is_object(),
+        "array" => value.is_array(),
+        "string" => value.is_string(),
+        "number" => value.is_number(),
+        "integer" => value.as_i64().is_some() || value.as_u64().is_some(),
+        "boolean" => value.is_boolean(),
+        "null" => value.is_null(),
+        _ => false,
+    }
+}
+
+fn validate_json_schema(value: &Value, schema: &Value, context: &str, errors: &mut Vec<String>) {
+    if let Some(kind) = schema.get("type") {
+        let matches = if let Some(single) = kind.as_str() {
+            schema_type_matches(value, single)
+        } else {
+            kind.as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .any(|candidate| schema_type_matches(value, candidate))
+        };
+        if !matches {
+            add(errors, &format!("{context}:schema_type_mismatch"));
+            return;
+        }
+    }
+    if let Some(expected) = schema.get("const") {
+        if value != expected {
+            add(errors, &format!("{context}:schema_const_mismatch"));
+        }
+    }
+    if let Some(variants) = schema.get("enum").and_then(Value::as_array) {
+        if !variants.contains(value) {
+            add(errors, &format!("{context}:schema_enum_mismatch"));
+        }
+    }
+    if let Some(text) = value.as_str() {
+        if let Some(minimum) = schema.get("minLength").and_then(Value::as_u64) {
+            if text.chars().count() < minimum as usize {
+                add(errors, &format!("{context}:schema_min_length"));
+            }
+        }
+        if schema.get("pattern").is_some() && !is_sha256(text) {
+            add(errors, &format!("{context}:schema_pattern_mismatch"));
+        }
+    }
+    if let Some(number) = value.as_f64() {
+        if let Some(minimum) = schema.get("minimum").and_then(Value::as_f64) {
+            if number < minimum {
+                add(errors, &format!("{context}:schema_minimum"));
+            }
+        }
+        if let Some(maximum) = schema.get("maximum").and_then(Value::as_f64) {
+            if number > maximum {
+                add(errors, &format!("{context}:schema_maximum"));
+            }
+        }
+    }
+    if let Some(items) = value.as_array() {
+        if let Some(minimum) = schema.get("minItems").and_then(Value::as_u64) {
+            if items.len() < minimum as usize {
+                add(errors, &format!("{context}:schema_min_items"));
+            }
+        }
+        if schema.get("uniqueItems").and_then(Value::as_bool) == Some(true) {
+            let serialized: BTreeSet<String> =
+                items.iter().map(Value::to_string).collect();
+            if serialized.len() != items.len() {
+                add(errors, &format!("{context}:schema_unique_items"));
+            }
+        }
+        if let Some(item_schema) = schema.get("items") {
+            for (index, item) in items.iter().enumerate() {
+                validate_json_schema(item, item_schema, &format!("{context}[{index}]"), errors);
+            }
+        }
+    }
+    if let Some(object) = value.as_object() {
+        if let Some(required) = schema.get("required").and_then(Value::as_array) {
+            for property in required.iter().filter_map(Value::as_str) {
+                if !object.contains_key(property) {
+                    add(errors, &format!("{context}:schema_required_missing:{property}"));
+                }
+            }
+        }
+        let properties = schema.get("properties").and_then(Value::as_object);
+        if schema.get("additionalProperties").and_then(Value::as_bool) == Some(false) {
+            for property in object.keys() {
+                if !properties.is_some_and(|known| known.contains_key(property)) {
+                    add(errors, &format!("{context}:schema_additional_property:{property}"));
+                }
+            }
+        }
+        if let Some(properties) = properties {
+            for (name, child_schema) in properties {
+                if let Some(child_value) = object.get(name) {
+                    validate_json_schema(
+                        child_value,
+                        child_schema,
+                        &format!("{context}.{name}"),
+                        errors,
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn validate_schema_header(
+    schema: &Value,
+    expected_id: &str,
+    context: &str,
+    errors: &mut Vec<String>,
+) {
+    if schema["$schema"].as_str()
+        != Some("https://json-schema.org/draft/2020-12/schema")
+    {
+        add(errors, &format!("{context}:schema_dialect_invalid"));
+    }
+    if schema["$id"].as_str() != Some(expected_id) {
+        add(errors, &format!("{context}:schema_id_mismatch"));
+    }
+    if schema["type"].as_str() != Some("object")
+        || schema["additionalProperties"].as_bool() != Some(false)
+    {
+        add(errors, &format!("{context}:schema_root_contract_invalid"));
+    }
+}
+
+fn validate_schema_pair(
+    evaluation: &Value,
+    evaluation_schema: &Value,
+    controls: &Value,
+    controls_schema: &Value,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    validate_schema_definition(evaluation_schema, "evaluation_schema", &mut errors);
+    validate_schema_definition(controls_schema, "controls_schema", &mut errors);
+    validate_schema_header(
+        evaluation_schema,
+        "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-confidence-calibration-001/CONFIDENCE_EVALUATION_V0_1.schema.json",
+        "evaluation_schema",
+        &mut errors,
+    );
+    validate_schema_header(
+        controls_schema,
+        "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-confidence-calibration-001/CONFIDENCE_NEGATIVE_CONTROLS_V0_1.schema.json",
+        "controls_schema",
+        &mut errors,
+    );
+    validate_json_schema(evaluation, evaluation_schema, "evaluation", &mut errors);
+    validate_json_schema(controls, controls_schema, "negative_controls", &mut errors);
+    errors.sort();
+    errors.dedup();
+    errors
+}
+
 fn validate_bundle(bundle: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     if field(bundle, "schema_version") != Some("ig-confidence-evaluation-v0.1")
@@ -452,9 +663,9 @@ fn apply_fixture(bundle: &mut Value, fixture: &Value) -> bool {
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 3 {
+    if args.len() != 5 {
         eprintln!(
-            "usage: ig-confidence-calibration-qualifier <evaluation.json> <negative-controls.json>"
+            "usage: ig-confidence-calibration-qualifier <evaluation.json> <negative-controls.json> <evaluation.schema.json> <negative-controls.schema.json>"
         );
         return ExitCode::from(2);
     }
@@ -466,7 +677,19 @@ fn main() -> ExitCode {
         Ok(value) => value,
         Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
     };
-    let mut findings = validate_bundle(&bundle);
+    let evaluation_schema = match read_json(&args[3]) {
+        Ok(value) => value,
+        Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
+    };
+    let controls_schema = match read_json(&args[4]) {
+        Ok(value) => value,
+        Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
+    };
+
+    let mut findings =
+        validate_schema_pair(&bundle, &evaluation_schema, &controls, &controls_schema);
+    findings.extend(validate_bundle(&bundle));
+
     let fixtures = controls["fixtures"].as_array().cloned().unwrap_or_default();
     if fixtures.len() != EXPECTED_FIXTURES
         || controls["fixture_count"].as_u64() != Some(EXPECTED_FIXTURES as u64)
@@ -530,9 +753,64 @@ mod tests {
 
     const BUNDLE: &str = include_str!("../../CONFIDENCE_EVALUATION_V0_1.json");
     const CONTROLS: &str = include_str!("../../CONFIDENCE_NEGATIVE_CONTROLS_V0_1.json");
+    const BUNDLE_SCHEMA: &str =
+        include_str!("../../CONFIDENCE_EVALUATION_V0_1.schema.json");
+    const CONTROLS_SCHEMA: &str =
+        include_str!("../../CONFIDENCE_NEGATIVE_CONTROLS_V0_1.schema.json");
 
     fn parsed(source: &str) -> Value {
         serde_json::from_str(source).expect("checked-in JSON must parse")
+    }
+
+    #[test]
+    fn checked_in_schemas_are_applied_to_both_artifacts() {
+        let errors = validate_schema_pair(
+            &parsed(BUNDLE),
+            &parsed(BUNDLE_SCHEMA),
+            &parsed(CONTROLS),
+            &parsed(CONTROLS_SCHEMA),
+        );
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[test]
+    fn unsupported_keyword_in_absent_optional_schema_property_is_rejected() {
+        let mut schema = parsed(BUNDLE_SCHEMA);
+        schema["properties"]["unused_optional"] =
+            serde_json::json!({"type":"string","maxLength":10});
+        let errors = validate_schema_pair(
+            &parsed(BUNDLE),
+            &schema,
+            &parsed(CONTROLS),
+            &parsed(CONTROLS_SCHEMA),
+        );
+        assert!(errors.iter().any(|error| error.contains("unsupported_schema_keyword:maxLength")));
+    }
+
+    #[test]
+    fn evaluation_artifact_rejects_undeclared_properties() {
+        let mut bundle = parsed(BUNDLE);
+        bundle["undeclared_field"] = Value::Bool(true);
+        let errors = validate_schema_pair(
+            &bundle,
+            &parsed(BUNDLE_SCHEMA),
+            &parsed(CONTROLS),
+            &parsed(CONTROLS_SCHEMA),
+        );
+        assert!(errors.iter().any(|error| error.contains("schema_additional_property:undeclared_field")));
+    }
+
+    #[test]
+    fn negative_control_schema_rejects_undeclared_fixture_fields() {
+        let mut controls = parsed(CONTROLS);
+        controls["fixtures"][0]["unregistered"] = Value::Bool(true);
+        let errors = validate_schema_pair(
+            &parsed(BUNDLE),
+            &parsed(BUNDLE_SCHEMA),
+            &controls,
+            &parsed(CONTROLS_SCHEMA),
+        );
+        assert!(errors.iter().any(|error| error.contains("schema_additional_property:unregistered")));
     }
 
     #[test]
