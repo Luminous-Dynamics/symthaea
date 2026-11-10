@@ -125,7 +125,7 @@ pub fn validate_port_reference(
     for (index, row) in dataset.shore_power_demand_estimates.iter().enumerate() {
         let field = format!("shore_power_demand_estimates[{index}]");
         if row.port.trim().is_empty() {
-            errors.push(ValidationError::new(&field, "port must not be empty"));
+            errors.push(ValidationError::new(field.clone(), "port must not be empty"));
         }
         if !demand_ports.insert(row.port.trim().to_ascii_lowercase()) {
             errors.push(ValidationError::new(&field, "duplicate port identifier"));
@@ -136,7 +136,7 @@ pub fn validate_port_reference(
             || row.absolute_maximum_mw < 0.0
         {
             errors.push(ValidationError::new(
-                &field,
+                field.clone(),
                 "demand values must be finite and nonnegative",
             ));
         } else if row.absolute_maximum_mw < row.average_maximum_mw {
@@ -290,7 +290,9 @@ pub struct AnnualFlow {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EconomicSeries {
+    pub scenario_id: String,
     pub name: String,
+    pub input_evidence_refs: Vec<String>,
     pub price_basis: PriceBasis,
     pub discount_basis: PriceBasis,
     /// A decimal rate (0.08 means 8%), expressed in discount_basis.
@@ -302,7 +304,9 @@ pub struct EconomicSeries {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LevelizedCostResult {
+    pub scenario_id: String,
     pub name: String,
+    pub input_evidence_refs: Vec<String>,
     pub currency: String,
     pub base_year: u16,
     pub price_basis: String,
@@ -315,8 +319,22 @@ pub struct LevelizedCostResult {
 
 impl EconomicSeries {
     pub fn validate(&self) -> Result<(), ValidationError> {
+        if self.scenario_id.trim().is_empty() {
+            return Err(ValidationError::new("scenario_id", "must not be empty"));
+        }
         if self.name.trim().is_empty() {
             return Err(ValidationError::new("name", "must not be empty"));
+        }
+        if self.input_evidence_refs.is_empty()
+            || self
+                .input_evidence_refs
+                .iter()
+                .any(|reference| reference.trim().is_empty())
+        {
+            return Err(ValidationError::new(
+                "input_evidence_refs",
+                "at least one non-empty source or fixture reference is required",
+            ));
         }
         if self.price_basis.currency().trim().is_empty() {
             return Err(ValidationError::new("price_basis.currency", "must not be empty"));
@@ -365,7 +383,7 @@ impl EconomicSeries {
             if let Some(previous) = previous_year {
                 if flow.year_index <= previous {
                     return Err(ValidationError::new(
-                        &field,
+                        field.clone(),
                         "year_index values must be strictly increasing and unique",
                     ));
                 }
@@ -373,7 +391,7 @@ impl EconomicSeries {
             previous_year = Some(flow.year_index);
             if !flow.lifecycle_cost.is_finite() || flow.lifecycle_cost < 0.0 {
                 return Err(ValidationError::new(
-                    &field,
+                    field.clone(),
                     "lifecycle_cost must be finite and nonnegative",
                 ));
             }
@@ -441,7 +459,9 @@ impl EconomicSeries {
         }
 
         Ok(LevelizedCostResult {
+            scenario_id: self.scenario_id.clone(),
             name: self.name.clone(),
+            input_evidence_refs: self.input_evidence_refs.clone(),
             currency: self.price_basis.currency().to_string(),
             base_year: self.price_basis.base_year(),
             price_basis: match &self.price_basis {
@@ -563,7 +583,9 @@ mod tests {
 
     fn exact_series(name: &str) -> EconomicSeries {
         EconomicSeries {
+            scenario_id: format!("fixture-{name}"),
             name: name.to_string(),
+            input_evidence_refs: vec!["fixture://analytical-inputs".to_string()],
             price_basis: real_usd_basis(),
             discount_basis: real_usd_basis(),
             discount_rate: 0.10,
