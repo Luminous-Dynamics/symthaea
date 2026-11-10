@@ -107,7 +107,7 @@ impl Default for NumericLieDerivativeProfileV1 {
 pub struct ExactPolynomialLieProfileV1 {
     pub maximum_variables: usize,
     pub maximum_terms: usize,
-    pub maximum_term_products: usize,
+    /// Maximum monomial-pair multiplications per polynomial product operation.
     pub maximum_total_degree: usize,
     pub maximum_power: u32,
     pub maximum_dyadic_denominator_power: u32,
@@ -191,7 +191,7 @@ pub enum SymmetryInferenceSearchStatus {
 
 /// Auditable result of symmetry inference.
 ///
-/// A missing candidate means only that this bounded search found no candidate;
+/// A missing candidate means only that the recorded bounded search found no candidate;
 /// it is not evidence that the expression has no symmetry.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SymmetryInferenceReport {
@@ -499,16 +499,30 @@ impl ExactRational {
     }
 
     fn checked_add(self, other: Self) -> Option<Self> {
-        let left = self.numerator.checked_mul(other.denominator)?;
-        let right = other.numerator.checked_mul(self.denominator)?;
+        // Use the least common denominator to avoid avoidable intermediate growth.
+        let common = exact_gcd(self.denominator as u128, other.denominator as u128);
+        let common = i128::try_from(common).ok()?;
+        let left_scale = other.denominator / common;
+        let right_scale = self.denominator / common;
+        let left = self.numerator.checked_mul(left_scale)?;
+        let right = other.numerator.checked_mul(right_scale)?;
         let numerator = left.checked_add(right)?;
-        let denominator = self.denominator.checked_mul(other.denominator)?;
+        let denominator = self.denominator.checked_mul(left_scale)?;
         Self::new(numerator, denominator)
     }
 
     fn checked_mul(self, other: Self) -> Option<Self> {
-        let numerator = self.numerator.checked_mul(other.numerator)?;
-        let denominator = self.denominator.checked_mul(other.denominator)?;
+        // Cross-cancel before multiplication to preserve the bounded exact domain.
+        let cancel_left = exact_gcd(self.numerator.unsigned_abs(), other.denominator as u128);
+        let cancel_right = exact_gcd(other.numerator.unsigned_abs(), self.denominator as u128);
+        let cancel_left = i128::try_from(cancel_left).ok()?;
+        let cancel_right = i128::try_from(cancel_right).ok()?;
+        let left_numerator = self.numerator / cancel_left;
+        let right_denominator = other.denominator / cancel_left;
+        let right_numerator = other.numerator / cancel_right;
+        let left_denominator = self.denominator / cancel_right;
+        let numerator = left_numerator.checked_mul(right_numerator)?;
+        let denominator = left_denominator.checked_mul(right_denominator)?;
         Self::new(numerator, denominator)
     }
 
