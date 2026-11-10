@@ -251,9 +251,11 @@ fn set_at_path(root: &mut Value, path: &str, replacement: Value) -> bool {
                 Some(value) => value,
                 None => return false,
             },
-            Value::Array(items) => match part.parse::<usize>().ok().and_then(|index| items.get_mut(index)) {
-                Some(value) => value,
-                None => return false,
+            Value::Array(items) => {
+                match part.parse::<usize>().ok().and_then(|index| items.get_mut(index)) {
+                    Some(value) => value,
+                    None => return false,
+                }
             },
             _ => return false,
         };
@@ -285,9 +287,11 @@ fn remove_at_path(root: &mut Value, path: &str) -> bool {
                 Some(value) => value,
                 None => return false,
             },
-            Value::Array(items) => match part.parse::<usize>().ok().and_then(|index| items.get_mut(index)) {
-                Some(value) => value,
-                None => return false,
+            Value::Array(items) => {
+                match part.parse::<usize>().ok().and_then(|index| items.get_mut(index)) {
+                    Some(value) => value,
+                    None => return false,
+                }
             },
             _ => return false,
         };
@@ -378,18 +382,27 @@ fn validate_manifest(scenarios: &Value, controls: &Value) -> Vec<String> {
     for fixture in &negative {
         let target_id = field(fixture, "target_fixture_id").unwrap_or_default();
         let Some(target) = rows.iter().find(|row| field(row, "fixture_id") == Some(target_id)) else {
-            errors.push(format!("{}:negative_control_target_missing", field(fixture, "fixture_id").unwrap_or("unknown")));
+            errors.push(format!(
+                "{}:negative_control_target_missing",
+                field(fixture, "fixture_id").unwrap_or("unknown")
+            ));
             continue;
         };
         let mut mutated = target.clone();
         if !apply_mutation(&mut mutated, &fixture["mutation"]) {
-            errors.push(format!("{}:negative_control_mutation_invalid", field(fixture, "fixture_id").unwrap_or("unknown")));
+            errors.push(format!(
+                "{}:negative_control_mutation_invalid",
+                field(fixture, "fixture_id").unwrap_or("unknown")
+            ));
             continue;
         }
         let actual: BTreeSet<String> = validate_scenario(&mutated).into_iter().collect();
         let expected = string_set(&fixture["expected_violations"]);
         if actual != expected {
-            errors.push(format!("{}:negative_control_oracle_mismatch:{actual:?}:{expected:?}", field(fixture, "fixture_id").unwrap_or("unknown")));
+            errors.push(format!(
+                "{}:negative_control_oracle_mismatch:{actual:?}:{expected:?}",
+                field(fixture, "fixture_id").unwrap_or("unknown")
+            ));
         }
     }
     errors.sort();
@@ -436,8 +449,12 @@ fn main() -> ExitCode {
         for error in errors { eprintln!(" - {error}"); }
         return ExitCode::FAILURE;
     }
-    println!("QUALIFIED DETERMINISTIC REFERENCE CONTROLLER: scenarios=40 families=8 negative_controls=24");
-    println!("BASELINE WARNING: agreement-stop and fixed-round-stop are comparators, not correctness criteria.");
+    println!(
+        "QUALIFIED DETERMINISTIC REFERENCE CONTROLLER: scenarios=40 families=8 negative_controls=24"
+    );
+    println!(
+        "BASELINE WARNING: agreement-stop and fixed-round-stop are comparators, not correctness criteria."
+    );
     println!("NOT A LEARNED MODERATOR: no model policy has been trained or evaluated.");
     println!("NOT EXECUTED: no LLM debate or human deliberation was run.");
     ExitCode::SUCCESS
@@ -530,7 +547,11 @@ mod tests {
         let rows = scenarios["scenarios"].as_array().unwrap();
         for fixture in controls["fixtures"].as_array().unwrap() {
             let target = field(fixture, "target_fixture_id").unwrap();
-            let mut scenario = rows.iter().find(|row| field(row, "fixture_id") == Some(target)).unwrap().clone();
+            let mut scenario = rows
+                .iter()
+                .find(|row| field(row, "fixture_id") == Some(target))
+                .unwrap()
+                .clone();
             assert!(apply_mutation(&mut scenario, &fixture["mutation"]));
             let actual: BTreeSet<String> = validate_scenario(&scenario).into_iter().collect();
             assert_eq!(
