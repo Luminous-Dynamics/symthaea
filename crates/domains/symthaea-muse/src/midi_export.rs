@@ -1575,7 +1575,7 @@ pub mod part_aware_v1 {
             return Err(PartAwareMidiExportErrorV1::InvalidTempoOrMeter);
         }
 
-        let mut tempo_track = Track {
+        let tempo_track = Track {
             name: "Tempo".into(),
             channel: 0,
             events: vec![
@@ -1769,31 +1769,10 @@ pub mod part_aware_v1 {
         }
 
         let mut tracks = Vec::with_capacity(part_ids.len() + 1);
-        for (part_index, part_id) in part_ids.iter().enumerate() {
+        for part_id in &part_ids {
             let channel = channel_by_part[part_id];
             let mut events = events_by_part.remove(part_id).unwrap_or_default();
             events.sort_by_key(event_ordering_key);
-            let instrument_ids: Vec<String> = timeline
-                .segments
-                .iter()
-                .filter(|segment| segment.part_id == *part_id)
-                .map(|segment| segment.instrument_id.clone())
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .collect();
-            let mapping_references: Vec<String> = instrument_ids
-                .iter()
-                .filter_map(|instrument_id| {
-                    binding_by_instrument
-                        .get(instrument_id)
-                        .map(|binding| binding.mapping_reference.clone())
-                })
-                .collect();
-            let note_count = event_map
-                .iter()
-                .filter(|mapping| mapping.part_id == *part_id)
-                .count();
-            let _ = part_index;
             tracks.push(Track {
                 name: format!("Part-{}", part_id),
                 channel,
