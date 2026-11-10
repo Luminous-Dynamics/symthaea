@@ -732,6 +732,10 @@ fn compose_with_spec_and_form_and_grammar_impl(
             tx.damage,
             tx.swing,
             intent.seed,
+            GENERAL_MELODY_PART_V1,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            GENERAL_COUNTERMELODY_PART_V1,
         );
     }
     match attitude {
@@ -2564,6 +2568,10 @@ fn apply_damage(
     amount: f32,
     swing: f32,
     seed: u64,
+    melody_part: PartId,
+    bass_part: PartId,
+    harmony_part: PartId,
+    counter_part: PartId,
 ) {
     let sections = section_bar_map(form);
     let plan = plan_damage(score, meter_beats, swing, amount, seed);
@@ -2581,17 +2589,19 @@ fn apply_damage(
         && let Some(climax) = score
             .notes
             .iter()
-            .find(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
+            .find(|n| n.part == melody_part && n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
     {
         let win_start = (climax.onset.beats() / meter_beats).floor() * meter_beats;
         let win_end = ((climax.onset + climax.duration).beats() / meter_beats).ceil() * meter_beats;
         score.notes.retain(|n| {
-            !(matches!(n.role, VoiceRole::Harmony | VoiceRole::Bass)
+            !(((n.role == VoiceRole::Harmony && n.part == harmony_part)
+                || (n.role == VoiceRole::Bass && n.part == bass_part))
                 && n.onset.beats() >= win_start - 1e-9
                 && n.onset.beats() < win_end - 1e-9)
         });
         for n in score.notes.iter_mut() {
-            if matches!(n.role, VoiceRole::Harmony | VoiceRole::Bass)
+            if ((n.role == VoiceRole::Harmony && n.part == harmony_part)
+                || (n.role == VoiceRole::Bass && n.part == bass_part))
                 && n.onset.beats() < win_start
                 && (n.onset + n.duration).beats() > win_start + 1e-9
             {
@@ -2605,7 +2615,7 @@ fn apply_damage(
         && let Some(first_bass) = score
             .notes
             .iter_mut()
-            .filter(|n| n.role == VoiceRole::Bass)
+            .filter(|n| n.part == bass_part && n.role == VoiceRole::Bass)
             .min_by(|a, b| a.onset.beats().total_cmp(&b.onset.beats()))
         && first_bass.pitch.midi() >= 36
     {
@@ -2618,7 +2628,8 @@ fn apply_damage(
     {
         let target = (ret.start_bar + 1) as f64 * meter_beats;
         if let Some(idx) = score.notes.iter().position(|n| {
-            n.role == VoiceRole::Melody
+            n.part == melody_part
+                && n.role == VoiceRole::Melody
                 && (n.onset.beats() - target).abs() < 1e-6
                 && n.emphasis == Emphasis::Normal
         }) {
@@ -2638,7 +2649,8 @@ fn apply_damage(
             .iter()
             .enumerate()
             .filter(|(_, n)| {
-                n.role == VoiceRole::Melody
+                n.part == melody_part
+                    && n.role == VoiceRole::Melody
                     && n.onset.beats() >= b0
                     && n.onset.beats() < b1
                     && n.emphasis == Emphasis::Normal
@@ -2660,6 +2672,7 @@ fn apply_damage(
             let gap_is_clear = !score.notes.iter().enumerate().any(|(idx, n)| {
                 idx != w[0]
                     && idx != w[1]
+                    && n.part == melody_part
                     && n.role == VoiceRole::Melody
                     && n.onset.beats() < gap_end - 1e-9
                     && (n.onset + n.duration).beats() > gap_start + 1e-9
@@ -2675,7 +2688,7 @@ fn apply_damage(
             let grace = Duration::sixteenth();
             let passing_onset = score.notes[bi].onset.saturating_sub(grace);
             let passing = ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: melody_part,
                 pitch: score.notes[ai].pitch.transpose(dir),
                 onset: passing_onset,
                 duration: grace,
@@ -2701,7 +2714,7 @@ fn apply_damage(
             .notes
             .iter()
             .enumerate()
-            .filter(|(_, n)| n.role == VoiceRole::CounterMelody)
+            .filter(|(_, n)| n.part == counter_part && n.role == VoiceRole::CounterMelody)
             .map(|(i, _)| i)
             .collect();
         if counter.len() >= 6 {
@@ -2723,7 +2736,7 @@ fn apply_damage(
     // note past where the next counter-melody note (shifted or not) begins.
     // De-overlap defensively rather than trying to reason about every
     // shift/floor interaction inline.
-    deoverlap_voice(score, VoiceRole::CounterMelody);
+    deoverlap_part(score, VoiceRole::CounterMelody, counter_part);
 
     // Keep the melody line onset-ordered for downstream consumers.
     let _ = key; // key reserved for future harmonic damage devices
@@ -2774,6 +2787,44 @@ pub(crate) fn deoverlap_voice(score: &mut Score, role: VoiceRole) {
     to_remove.dedup();
     for i in to_remove.into_iter().rev() {
         score.notes.remove(i);
+    }
+}
+
+/// De-overlap one source-identified part within a local VoiceRole.
+/// Other parts performing the same role are independent and must not be
+/// truncated against this line.
+fn deoverlap_part(score: &mut Score, role: VoiceRole, part_id: PartId) {
+    let mut idxs: Vec<usize> = score
+        .notes
+        .iter()
+        .enumerate()
+        .filter(|(_, note)| note.part == part_id && note.role == role)
+        .map(|(index, _)| index)
+        .collect();
+    idxs.sort_by(|&a, &b| {
+        score.notes[a]
+            .onset
+            .beats()
+            .total_cmp(&score.notes[b].onset.beats())
+    });
+    let mut to_remove = Vec::new();
+    for pair in idxs.windows(2) {
+        let (left, right) = (pair[0], pair[1]);
+        let left_end = (score.notes[left].onset + score.notes[left].duration).beats();
+        let right_onset = score.notes[right].onset.beats();
+        if left_end > right_onset + 1e-9 {
+            let gap = score.notes[right].onset.saturating_sub(score.notes[left].onset);
+            if gap.beats() <= 1e-9 {
+                to_remove.push(left);
+            } else {
+                score.notes[left].duration = gap;
+            }
+        }
+    }
+    to_remove.sort_unstable();
+    to_remove.dedup();
+    for index in to_remove.into_iter().rev() {
+        score.notes.remove(index);
     }
 }
 
