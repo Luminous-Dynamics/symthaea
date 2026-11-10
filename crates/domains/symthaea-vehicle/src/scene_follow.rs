@@ -25,11 +25,15 @@ pub(crate) enum SceneSourceRole {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SceneSourceReceipt {
     source_id: String,
+    source_event_id: String,
     role: SceneSourceRole,
     current: bool,
     calibration_current: bool,
     frame_id: String,
     clock_domain_id: String,
+    clock_transform_id: String,
+    calibration_profile_id: String,
+    extrinsic_profile_id: String,
 }
 
 /// Track state classification from the scene admission result.
@@ -80,6 +84,8 @@ pub(crate) struct SceneTrackReceipt {
     state: SceneTrackState,
     visibility: SceneVisibility,
     source_ids: Vec<String>,
+    /// Identifies how the upstream scene admission derived this uncertainty radius.
+    uncertainty_semantics_id: String,
     /// Number of alternative hypotheses attached to this physical track lineage.
     hypotheses_for_lineage: usize,
 }
@@ -94,11 +100,14 @@ pub(crate) struct SceneTrackReceipt {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SceneAdmissionReceipt {
     snapshot_id: String,
+    schema_version: String,
     snapshot_digest: [u8; 32],
     provenance_receipt_digest: [u8; 32],
     sequence: u64,
     frame_id: String,
+    frame_transform_id: String,
     clock_domain_id: String,
+    clock_transform_id: String,
     event_tick_ns: u64,
     receive_tick_ns: u64,
     processing_tick_ns: u64,
@@ -125,11 +134,14 @@ impl SceneAdmissionReceipt {
     #[allow(dead_code)] // No qualified physical scene-admission producer exists yet.
     pub(crate) fn from_validated_scene_admission(
         snapshot_id: String,
+        schema_version: String,
         snapshot_digest: [u8; 32],
         provenance_receipt_digest: [u8; 32],
         sequence: u64,
         frame_id: String,
+        frame_transform_id: String,
         clock_domain_id: String,
+        clock_transform_id: String,
         event_tick_ns: u64,
         receive_tick_ns: u64,
         processing_tick_ns: u64,
@@ -147,8 +159,11 @@ impl SceneAdmissionReceipt {
         tracks: Vec<SceneTrackReceipt>,
     ) -> Result<Self, FollowEvidenceError> {
         if snapshot_id.is_empty()
+            || schema_version != "0.1.0"
             || frame_id.is_empty()
+            || frame_transform_id.is_empty()
             || clock_domain_id.is_empty()
+            || clock_transform_id.is_empty()
             || snapshot_digest == [0; 32]
             || provenance_receipt_digest == [0; 32]
             || sequence == 0
@@ -166,11 +181,14 @@ impl SceneAdmissionReceipt {
 
         Ok(Self {
             snapshot_id,
+            schema_version,
             snapshot_digest,
             provenance_receipt_digest,
             sequence,
             frame_id,
+            frame_transform_id,
             clock_domain_id,
+            clock_transform_id,
             event_tick_ns,
             receive_tick_ns,
             processing_tick_ns,
@@ -195,6 +213,7 @@ impl SceneAdmissionReceipt {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AdmittedLocalFollowTarget {
     scene_snapshot_id: String,
+    schema_version: String,
     scene_digest: [u8; 32],
     provenance_receipt_digest: [u8; 32],
     scene_sequence: u64,
@@ -202,6 +221,11 @@ pub struct AdmittedLocalFollowTarget {
     track_lineage_id: String,
     source_ids: Vec<String>,
     frame_id: String,
+    frame_transform_id: String,
+    clock_domain_id: String,
+    clock_transform_id: String,
+    target_measurement_tick_ns: u64,
+    uncertainty_semantics_id: String,
     observation_age_s: f64,
     gap_lower_bound_m: f64,
     relative_speed_mps: f64,
@@ -211,6 +235,30 @@ pub struct AdmittedLocalFollowTarget {
 impl AdmittedLocalFollowTarget {
     pub fn scene_snapshot_id(&self) -> &str {
         &self.scene_snapshot_id
+    }
+
+    pub fn schema_version(&self) -> &str {
+        &self.schema_version
+    }
+
+    pub fn frame_transform_id(&self) -> &str {
+        &self.frame_transform_id
+    }
+
+    pub fn clock_domain_id(&self) -> &str {
+        &self.clock_domain_id
+    }
+
+    pub fn clock_transform_id(&self) -> &str {
+        &self.clock_transform_id
+    }
+
+    pub fn target_measurement_tick_ns(&self) -> u64 {
+        self.target_measurement_tick_ns
+    }
+
+    pub fn uncertainty_semantics_id(&self) -> &str {
+        &self.uncertainty_semantics_id
     }
 
     pub fn scene_digest(&self) -> [u8; 32] {
@@ -329,6 +377,10 @@ pub(crate) fn admit_local_follow_target(
     }
     for source in &receipt.sources {
         if source.source_id.is_empty()
+            || source.source_event_id.is_empty()
+            || source.clock_transform_id.is_empty()
+            || source.calibration_profile_id.is_empty()
+            || source.extrinsic_profile_id.is_empty()
             || source.frame_id != receipt.frame_id
             || source.clock_domain_id != receipt.clock_domain_id
             || !source.current
@@ -371,7 +423,7 @@ pub(crate) fn admit_local_follow_target(
         || target.hypothesis_id.is_empty()
         || target.track_lineage_id.is_empty()
         || target.source_ids.is_empty()
-        || target.measurement_tick_ns > receipt.evaluated_at_tick_ns
+        || target.measurement_tick_ns > receipt.event_tick_ns
         || receipt
             .evaluated_at_tick_ns
             .saturating_sub(target.measurement_tick_ns)
@@ -379,6 +431,7 @@ pub(crate) fn admit_local_follow_target(
         || !target.position_x_m.is_finite()
         || !target.position_y_m.is_finite()
         || !target.velocity_x_mps.is_finite()
+        || target.uncertainty_semantics_id.is_empty()
         || !target.distance_uncertainty_radius_m.is_finite()
         || target.distance_uncertainty_radius_m < 0.0
     {
@@ -403,6 +456,7 @@ pub(crate) fn admit_local_follow_target(
 
     Ok(AdmittedLocalFollowTarget {
         scene_snapshot_id: receipt.snapshot_id.clone(),
+        schema_version: receipt.schema_version.clone(),
         scene_digest: receipt.snapshot_digest,
         provenance_receipt_digest: receipt.provenance_receipt_digest,
         scene_sequence: receipt.sequence,
@@ -410,6 +464,11 @@ pub(crate) fn admit_local_follow_target(
         track_lineage_id: target.track_lineage_id.clone(),
         source_ids: target.source_ids.clone(),
         frame_id: receipt.frame_id.clone(),
+        frame_transform_id: receipt.frame_transform_id.clone(),
+        clock_domain_id: receipt.clock_domain_id.clone(),
+        clock_transform_id: receipt.clock_transform_id.clone(),
+        target_measurement_tick_ns: target.measurement_tick_ns,
+        uncertainty_semantics_id: target.uncertainty_semantics_id.clone(),
         observation_age_s,
         gap_lower_bound_m: (gap_m - target.distance_uncertainty_radius_m).max(0.0),
         relative_speed_mps,
@@ -451,11 +510,14 @@ mod tests {
     fn valid_receipt() -> SceneAdmissionReceipt {
         SceneAdmissionReceipt::from_validated_scene_admission(
             "scene-1".into(),
+            "0.1.0".into(),
             [0x11; 32],
             [0x22; 32],
             12,
             "road-local".into(),
+            "map-to-road-local-v1".into(),
             "vehicle-monotonic".into(),
+            "clock-transform-v1".into(),
             12_000_000_000,
             12_001_000_000,
             12_002_000_000,
@@ -471,11 +533,15 @@ mod tests {
             1.8,
             vec![SceneSourceReceipt {
                 source_id: "front-lidar".into(),
+                source_event_id: "lidar-scan-12".into(),
                 role: SceneSourceRole::LocalSensorObservation,
                 current: true,
                 calibration_current: true,
                 frame_id: "road-local".into(),
                 clock_domain_id: "vehicle-monotonic".into(),
+                clock_transform_id: "clock-transform-v1".into(),
+                calibration_profile_id: "lidar-cal-v1".into(),
+                extrinsic_profile_id: "lidar-extrinsic-v1".into(),
             }],
             vec![SceneTrackReceipt {
                 hypothesis_id: "hyp-1".into(),
@@ -490,6 +556,7 @@ mod tests {
                 state: SceneTrackState::Observed,
                 visibility: SceneVisibility::Visible,
                 source_ids: vec!["front-lidar".into()],
+                uncertainty_semantics_id: "scene-track-interval-bound-v1".into(),
                 hypotheses_for_lineage: 1,
             }],
         )
