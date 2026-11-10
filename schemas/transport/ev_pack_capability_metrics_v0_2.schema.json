@@ -181,7 +181,8 @@
             "upper_cutoff_voltage_v",
             "protocol_ref",
             "protocol_digest",
-            "maximum_measurement_skew_ms"
+            "maximum_measurement_skew_ms",
+            "condition_digest"
           ],
           "properties": {
             "condition_ref": {
@@ -214,6 +215,10 @@
             "maximum_measurement_skew_ms": {
               "type": "integer",
               "minimum": 1
+            },
+            "condition_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
             }
           }
         },
@@ -413,7 +418,9 @@
         "maximum_sample_skew_ms",
         "snapshot_digest",
         "observations",
-        "maximum_soh_measurement_age_ms"
+        "maximum_soh_measurement_age_ms",
+        "protocol_digest",
+        "condition_digest"
       ],
       "properties": {
         "event_type": {
@@ -491,6 +498,14 @@
         "maximum_soh_measurement_age_ms": {
           "type": "integer",
           "minimum": 1
+        },
+        "protocol_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "condition_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       }
     },
