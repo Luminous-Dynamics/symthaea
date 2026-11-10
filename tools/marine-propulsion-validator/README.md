@@ -45,6 +45,16 @@ service/route/environment/boundary equality:
 cargo run -- <schema.json> <baseline.json> <candidate.json>
 ~~~
 
+Audit the corrected v0.2.0 regulatory rule register (preferred current snapshot):
+
+~~~sh
+cargo run --bin marine-regulatory-rule-audit -- \
+  ../../docs/research/marine/marine-regulatory-rule-register-v0.2.0.schema.json \
+  ../../docs/research/marine/marine-regulatory-rule-register-2026-11-10-v0.2.0.json
+~~~
+
+The retained v0.1.0 snapshot remains available for historical comparison. v0.2.0 separates emissions year from surrender year, statutory voyage-coverage fraction from surrender phase-in, and EU MRV gas-monitoring years from EU ETS gas-surrender years.
+
 Audit the dated regulatory rule register:
 
 ~~~sh
