@@ -283,7 +283,7 @@ mod tests {
         assert!(matches!(report.conflict_class, ConflictClass::Cooperative));
         assert_eq!(report.phoneme_projected, vec![1.0, 0.0]);
         assert_eq!(report.pitch_projected, vec![1.0, 1.0]);
-        assert_eq!(report.original_cosine, Some(2.0_f64.sqrt() / 2.0));
+        assert!((report.original_cosine.unwrap() - 2.0_f64.sqrt() / 2.0).abs() < 1e-12);
         assert!(report.two_objective_guidance_direction_available);
     }
 
