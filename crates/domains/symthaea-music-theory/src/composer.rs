@@ -7145,7 +7145,7 @@ mod tests {
         let mut twin = score.clone();
         apply_phrase_rhetoric(
             &mut twin,
-            PartId::UNASSIGNED,
+            GENERAL_MELODY_PART_V1,
             crate::spec::PhraseRhetoric::Classic,
             4.0,
         );
