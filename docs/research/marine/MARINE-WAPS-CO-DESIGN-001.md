@@ -71,6 +71,25 @@ Source: Ma et al., *CFD-based approaches for low-carbon shipping: A systematic r
 
 Implication: the benchmark should report error and validation by observable and operating condition, not only one aggregate CFD score.
 
+### 2.6 Commercial deployment is real; public savings claims still need normalization
+
+The industry landscape has moved beyond prototypes into commercial installations and integrated systems:
+
+- **Sea-Cargo / Norsepower, 17 April 2026:** Trans Hav and Trans Sol entered full operations after retrofits with three rotor sails per vessel, alongside solar, battery storage, power management and optimized propulsion. Norsepower reports installation/commissioning without off-hire and mechanical installation in as little as two working days per vessel. Sea-Cargo's own figures, quoted in the supplier announcement, report up to 35% lower CO₂ per tonne transported for the rebuilt vessels and up to 50% total emissions reduction across its upgraded fleet. The same announcement says rotor thrust can be equivalent to about 7,500 kW under favourable wind. These are **operator/vendor-reported combined-programme figures**, not independently audited rotor-only savings. https://www.norsepower.com/post/norsepower-rotor-sails-support-the-launch-of-sea-cargos-trans-hav-and-trans-sol-into-full-operations-following-major-efficiency-upgrade
+- **LD Armateurs / Norsepower, 15 October 2026:** six 35 m × 5 m rotor sails were installed on the new RoRo cargo vessel Spirit of Toulouse, first of three low-emission RoRo ships for Airbus transport. The installation is paired with dual-fuel main engines and dual-fuel generator sets capable of using e-methanol, bio-methanol or marine diesel oil. This is an important integration example: wind devices, alternative fuels and ship service must be costed as a system, not as independent savings. https://www.lda.fr/en/ld-armateurs-worlds-largest-wind-propelled-cargo-vessel-fitted-with-norsepower-rotor-sails/
+- **ABB / Econowind, 2026:** ABB reports a 2025 supply contract for about 150 VentoFoil units across 50 ships and says SPOS weather routing is used on more than 4,500 vessels. ABB describes VentoFoil fuel reductions of 6–10%. Preserve these as supplier claims and adoption statistics, not independently validated results or evidence that 4,500 ships carry VentoFoils. The commercial opportunity is the joined system: apparent-wind/device operation plus voyage routing and measurable counterfactual performance. https://www.abb.com/global/en/news/137533/how-abb-and-econowind-optimize-the-route-to-wind-assisted-shipping
+- **BAR Technologies WindWings:** the vendor lists a 37.5 m × 20 m, 750 m² rigid wing for vessels above 40,000 DWT, with 1.5 tonnes/day average and 2.1 tonnes/day achievable fuel-saving claims; the compact 20–24 m variant is designed to tilt down to deck level for pilotage/dockside operations. Those values are product-page vendor claims; they are not transferable without ship, route, weather, baseline consumption and service normalization. https://www.bartechnologies.uk/commercial-ships/windwings/
+
+These cases tell us where to compete: not by merely proposing a rotor, suction wing or wing sail, but by publishing a **better integrated, independently reproducible, service-matched performance record**. At minimum the evidence package should contain installation downtime, route and apparent-wind distribution, load/payload and speed schedule, device state/availability, parasitic power, engine/shaft/fuel traces, calibration, uncertainty, environmental corrections, maintenance events and a declared emissions boundary.
+
+### 2.7 Safety and regulation are moving, but a work plan is not an operating code
+
+The Maritime Technologies Forum (MTF), which includes flag States and classification societies, published WAPS safety-management guidance on 30 March 2026. It addresses wind-assisted ships using rotor, suction and wing sails; the scope is wind-assisted rather than primary wind-powered vessels. Its relevance is operational: manoeuvrability, visibility, maintenance, emergency preparedness, risk assessment, crew procedures and learning from near-misses. https://www.maritimetechnologiesforum.com/en/news-publications/maritime-technologies-forum-announces-new-guidelines-to-strengthen-safety-management-for-ships-using-wind-assisted-propulsion-systems
+
+Lloyd's Register's LR-GN-044 (2 January 2024) also explicitly addresses WAPS foundations, hull support structure, deck plating and under-deck reinforcement. https://www.lr.org/en/knowledge/lloyds-register-rules/guidance-notes/guidance-notes-on-wind-assisted-propulsion-systems/
+
+The IMO MSC 111 (13–22 May 2026) endorsed an SDC safety-framework work plan covering wind propulsion and wind-assisted power, batteries and swappable traction battery containers, alongside nuclear power. This is a regulatory development programme, **not** a completed harmonized code or specific vessel approval. https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-msc-111.aspx
+
 ## 3. Paradigm shifts and hypotheses
 
 ### P1. Wind propulsion becomes a controllable energy subsystem
@@ -226,6 +245,10 @@ Report CAPEX, OPEX, replacement, maintenance, fuel/electricity, port infrastruct
 | Speed-power sea-trial comparison | ISO 15016:2025 and relevant ITTC procedures | Store trial protocol, raw trace digests, corrected observations and uncertainty; qualified methods remain with their owners |
 | In-service hull/propeller performance tracking | ISO 19030-1/-2/-3:2016, within their stated scope | Integrate the same-ship time-series indicators with revision, maintenance and service evidence |
 | Hybrid electric route sizing and control | Du et al. 2026 coastal general-cargo study | Reproduce its declared case as a coastal benchmark; improve robustness/held-out validation before extending to deep sea |
+| Commercial rotor-sail integration | Norsepower / Sea-Cargo Trans Hav and Trans Sol (2026) | Benchmark installation downtime, retrofit integration and multi-measure whole-system evidence; treat emissions percentages as operator/vendor reports |
+| Commercial suction wing + weather routing | ABB / Econowind VentoFoil (2025-26) | Compare device operation and routing as a coupled control system; vendor 6-10% claim is not an independent baseline |
+| Commercial rigid folding wing | BAR Technologies WindWings | Compare installed geometry, folding, deck/port restrictions and route-normalized net fuel; vendor t/day claims require matched-case evidence |
+| Safety-management practice | Maritime Technologies Forum 2026 WAPS SMS guidance; LR-GN-044 | Bind hazard controls, manoeuvrability, visibility, crew training, maintenance, structural foundations and emergency procedures to design configuration |
 | Whole-ship efficiency measure taxonomy | IMO GreenVoyage2050 technology portal | Use its categories as a coverage checklist; compare combined measures and interactions on matched service |
 
 Public references:
