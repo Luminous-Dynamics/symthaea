@@ -362,11 +362,10 @@ fn relative_symmetry_defect(
     scale: f64,
     metric_norm_scaled: f64,
 ) -> f64 {
-    let dimension = metric.len();
     let mut defect_norm = 0.0_f64;
-    for row in 0..dimension {
-        for column in 0..dimension {
-            let difference = metric[row][column] / scale - metric[column][row] / scale;
+    for (row_index, row) in metric.iter().enumerate() {
+        for (column_index, value) in row.iter().enumerate() {
+            let difference = *value / scale - metric[column_index][row_index] / scale;
             defect_norm = defect_norm.hypot(difference);
         }
     }
@@ -380,32 +379,34 @@ fn cholesky_lower_scaled_metric(
     let dimension = metric.len();
     let mut lower = vec![vec![0.0_f64; dimension]; dimension];
 
-    for row in 0..dimension {
-        for column in 0..=row {
+    for (row_index, metric_row) in metric.iter().enumerate() {
+        for (column_index, metric_entry) in metric_row.iter().take(row_index + 1).enumerate() {
             // Average only after the relative symmetry check; normalize first to
             // avoid overflowing the addition for large but finite metric entries.
-            let value = 0.5
-                * (metric[row][column] / scale + metric[column][row] / scale);
+            let value = 0.5 * (*metric_entry / scale + metric[column_index][row_index] / scale);
             let mut residual = value;
-            for inner in 0..column {
-                residual -= lower[row][inner] * lower[column][inner];
+            for (left, right) in lower[row_index][..column_index]
+                .iter()
+                .zip(lower[column_index][..column_index].iter())
+            {
+                residual -= left * right;
             }
-            if row == column {
+            if row_index == column_index {
                 if !residual.is_finite() || residual <= 0.0 {
                     return Err(LinearGroupActionAdmissionError::MetricNotPositiveDefinite {
-                        pivot_index: row,
+                        pivot_index: row_index,
                     });
                 }
-                lower[row][column] = residual.sqrt();
+                lower[row_index][column_index] = residual.sqrt();
             } else {
-                let pivot = lower[column][column];
+                let pivot = lower[column_index][column_index];
                 let entry = residual / pivot;
                 if !entry.is_finite() {
                     return Err(LinearGroupActionAdmissionError::MetricFactorizationFailed {
-                        pivot_index: column,
+                        pivot_index: column_index,
                     });
                 }
-                lower[row][column] = entry;
+                lower[row_index][column_index] = entry;
             }
         }
     }
@@ -418,19 +419,18 @@ fn metric_skew_relative_defect(
     generator_scale: f64,
     metric_scale: f64,
 ) -> f64 {
-    let dimension = generator.len();
     let generator_norm = scaled_frobenius_norm(generator, generator_scale);
     let metric_norm = scaled_frobenius_norm(metric, metric_scale);
     let mut defect_norm = 0.0_f64;
 
-    for row in 0..dimension {
-        for column in 0..dimension {
+    for (row_index, generator_row) in generator.iter().enumerate() {
+        for (column_index, _) in generator_row.iter().enumerate() {
             let mut residual = 0.0_f64;
-            for inner in 0..dimension {
-                let a_inner_row = generator[inner][row] / generator_scale;
-                let a_inner_column = generator[inner][column] / generator_scale;
-                let g_inner_column = metric[inner][column] / metric_scale;
-                let g_row_inner = metric[row][inner] / metric_scale;
+            for (inner_index, generator_inner_row) in generator.iter().enumerate() {
+                let a_inner_row = generator_inner_row[row_index] / generator_scale;
+                let a_inner_column = generator_inner_row[column_index] / generator_scale;
+                let g_inner_column = metric[inner_index][column_index] / metric_scale;
+                let g_row_inner = metric[row_index][inner_index] / metric_scale;
                 residual += a_inner_row * g_inner_column + g_row_inner * a_inner_column;
             }
             defect_norm = defect_norm.hypot(residual);
