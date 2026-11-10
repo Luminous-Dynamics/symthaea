@@ -158,15 +158,18 @@ pub enum ExactPolynomialSearchStatus {
 }
 
 /// Structural pattern that produced a symmetry candidate.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum StructuralSymmetryPattern {
     /// A sum of distinct squared variables with one shared finite nonzero coefficient.
     EqualCoefficientSumOfSquares {
-        variable_count: u8,
+        variables: Vec<String>,
         shared_coefficient: f64,
     },
-    /// A two-dimensional antisymmetric bilinear determinant with four distinct variables.
-    TwoDimensionalAntisymmetricBilinear,
+    /// A determinant invariant under one diagonal SO(2) action on two coordinate pairs.
+    TwoDimensionalAntisymmetricBilinear {
+        first_pair: [String; 2],
+        second_pair: [String; 2],
+    },
 }
 
 /// Evidence source for a candidate symmetry.
@@ -239,14 +242,15 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
     let numeric_profile = NumericLieDerivativeProfileV1::default();
     let exact_polynomial_profile = ExactPolynomialLieProfileV1::default();
 
-    if let Some((n, shared_coefficient)) = detect_sum_of_squares(expr)
-        && (2..=10).contains(&n)
+    if let Some((variables, shared_coefficient)) = detect_sum_of_squares(expr)
+        && (2..=10).contains(&variables.len())
     {
+        let dimension = variables.len() as u8;
         return SymmetryInferenceReport {
-            candidate: Some(SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(n)], false)),
+            candidate: Some(SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(dimension)], false)),
             evidence: Some(SymmetryInferenceEvidence::StructuralPatternMatch {
                 pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares {
-                    variable_count: n,
+                    variables,
                     shared_coefficient,
                 },
             }),
@@ -257,11 +261,14 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
         };
     }
 
-    if detect_2d_antisymmetric_cross(expr) {
+    if let Some((first_pair, second_pair)) = detect_2d_antisymmetric_cross(expr) {
         return SymmetryInferenceReport {
             candidate: Some(SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false)),
             evidence: Some(SymmetryInferenceEvidence::StructuralPatternMatch {
-                pattern: StructuralSymmetryPattern::TwoDimensionalAntisymmetricBilinear,
+                pattern: StructuralSymmetryPattern::TwoDimensionalAntisymmetricBilinear {
+                    first_pair,
+                    second_pair,
+                },
             }),
             search_status: SymmetryInferenceSearchStatus::StructuralMatchShortCircuit,
             numeric_profile,
@@ -989,7 +996,7 @@ fn flatten_add_only<'a>(expr: &'a Expr, out: &mut Vec<&'a Expr>) {
 /// If expr is `c * (x₁² + ... + xₖ²)` for k ≥ 2 distinct variables and one
 /// shared finite, nonzero coefficient c, return k. Unequal weights define an
 /// ellipsoid rather than an SO(k)-invariant quadratic form and are rejected.
-fn detect_sum_of_squares(expr: &Expr) -> Option<(u8, f64)> {
+fn detect_sum_of_squares(expr: &Expr) -> Option<(Vec<String>, f64)> {
     let mut terms = Vec::new();
     flatten_add_only(expr, &mut terms);
     if terms.len() < 2 {
@@ -1019,7 +1026,7 @@ fn detect_sum_of_squares(expr: &Expr) -> Option<(u8, f64)> {
         }
         seen.push(var);
     }
-    Some((seen.len() as u8, common_coefficient?))
+    Some((seen, common_coefficient?))
 }
 
 /// Return (variable name, total scalar coefficient) for a squared variable.
@@ -1054,35 +1061,32 @@ fn squared_term(expr: &Expr) -> Option<(String, f64)> {
 /// Example matches: `x*vy - y*vx`, `p*q - q*p` → SO(2). The match is
 /// structural only; we don't verify that the variables form an actual
 /// canonical pair (position/momentum), just that the shape is antisymmetric.
-fn detect_2d_antisymmetric_cross(expr: &Expr) -> bool {
+fn detect_2d_antisymmetric_cross(expr: &Expr) -> Option<([String; 2], [String; 2])> {
     let Expr::BinOp(BinOp::Sub, l, r) = expr else {
-        return false;
+        return None;
     };
     let Expr::BinOp(BinOp::Mul, l1, l2) = l.as_ref() else {
-        return false;
+        return None;
     };
     let Expr::BinOp(BinOp::Mul, r1, r2) = r.as_ref() else {
-        return false;
+        return None;
     };
-    let (l1v, l2v, r1v, r2v) = match (l1.as_ref(), l2.as_ref(), r1.as_ref(), r2.as_ref()) {
+    let (a, b, c, d) = match (l1.as_ref(), l2.as_ref(), r1.as_ref(), r2.as_ref()) {
         (Expr::Var(a), Expr::Var(b), Expr::Var(c), Expr::Var(d)) => (a, b, c, d),
-        _ => return false,
+        _ => return None,
     };
-    // {l1, r1} and {l2, r2} should each be a pair of distinct variables,
-    // and the two pairs together must use 4 distinct names (e.g. x, vy, y, vx).
-    let all = [l1v, l2v, r1v, r2v];
+    // Interpret a*b-c*d as det([[a,d],[c,b]]). Left SO(2) multiplication
+    // rotates (a,c) and (d,b) by the same angle, preserving the determinant.
+    let all = [a, b, c, d];
     let unique_count = all
         .iter()
         .enumerate()
         .filter(|(i, name)| !all[..*i].contains(name))
         .count();
     if unique_count != 4 {
-        return false;
+        return None;
     }
-    // The shape `a·b - c·d` is antisymmetric iff swapping `a↔c` and `b↔d`
-    // negates the expression, which is automatic when {a,c} and {b,d} are
-    // the two pairs of the cross product.
-    true
+    Some(([a.clone(), c.clone()], [d.clone(), b.clone()]))
 }
 
 // Silence unused-import warning when UnaryFn is referenced only in rustdoc.
@@ -1129,7 +1133,7 @@ mod tests {
             report.evidence,
             Some(SymmetryInferenceEvidence::StructuralPatternMatch {
                 pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares {
-                    variable_count: 2,
+                    variables: vec!["x".to_string(), "y".to_string()],
                     shared_coefficient: 1.0,
                 },
             })
@@ -1347,7 +1351,7 @@ mod tests {
             mul(Expr::Const(2.5), pow2("x")),
             mul(Expr::Const(2.5), pow2("y")),
         );
-        assert_eq!(detect_sum_of_squares(&expr), Some((2, 2.5)));
+        assert_eq!(detect_sum_of_squares(&expr), Some((vec!["x".to_string(), "y".to_string()], 2.5)));
         assert_eq!(infer_symmetry(&expr).lie_groups, vec![LieGroup::SO(2)]);
     }
 
@@ -1357,7 +1361,7 @@ mod tests {
             mul(Expr::Const(-3.0), pow2("x")),
             mul(Expr::Const(-3.0), pow2("y")),
         );
-        assert_eq!(detect_sum_of_squares(&expr), Some((2, -3.0)));
+        assert_eq!(detect_sum_of_squares(&expr), Some((vec!["x".to_string(), "y".to_string()], -3.0)));
         assert_eq!(infer_symmetry(&expr).lie_groups, vec![LieGroup::SO(2)]);
     }
 
@@ -1371,6 +1375,21 @@ mod tests {
         assert!(infer_symmetry(&expr).lie_groups.is_empty());
     }
 
+    #[test]
+    fn antisymmetric_bilinear_report_binds_the_diagonal_rotation_action() {
+        let expr = sub(mul(var("x"), var("vy")), mul(var("y"), var("vx")));
+        let report = infer_symmetry_with_evidence(&expr);
+        assert!(matches!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: StructuralSymmetryPattern::TwoDimensionalAntisymmetricBilinear {
+                    first_pair,
+                    second_pair,
+                },
+            }) if first_pair == ["x".to_string(), "y".to_string()]
+                && second_pair == ["vx".to_string(), "vy".to_string()]
+        ));
+    }
     #[test]
     fn angular_momentum_cartesian_infers_so2() {
         // x*vy - y*vx
