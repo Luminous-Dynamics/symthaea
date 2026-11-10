@@ -5,7 +5,7 @@
 
 ## Research basis
 
-Masse, *Public Battery Field Data*, arXiv:2610.05811, first posted 5 October 2026: https://arxiv.org/abs/2610.05811. It catalogues 22 field-data releases from 16 research groups across passenger EVs, buses, light mobility, grid/distributed storage, consumer electronics and industrial robotics. Where source releases permit measurement, the catalogue reports 223 GB, at least 131,096 cells, 1,998 battery systems, 44.1 MWh and 1,253 unit-years, with 293 reported faults. It publishes metadata, source/checksum information and dataset-specific loaders; access terms differ across releases.
+Masse, *Public Battery Field Data*, arXiv:2610.05811, first posted 5 October 2026: https://arxiv.org/abs/2610.05811. The paper's initial snapshot described 22 releases from 16 research groups. The living companion registry has since advanced to v1.2.0 (16 October 2026): 35 releases, 3,187 battery systems, 149,188 Li-ion cells, 6,465 faults (5,680 fault-labelled charging sessions), 115.6 MWh (35.84 stated + 79.76 computed), 3,040 unit-years and 331,704 observation-hours; 31,449 charging sessions are held separately from battery counts. The dashboard reports 256 GB of release data and does not host publisher raw files. These are registry snapshot totals, not a harmonized label set or a single independently comparable benchmark. Sources: https://github.com/Astrolabe-Analytics/public-battery-field-data (v1.2.0, 2026-10-16), https://astrolabe-analytics.github.io/public-battery-field-data/dashboard/.
 
 Battery Data Commons is a living metadata registry, not a central raw-data host: https://batterydatacommons.org/ and Hassini et al., *Joule* (online 23 October 2026), https://doi.org/10.1016/j.joule.2026.102712.
 
