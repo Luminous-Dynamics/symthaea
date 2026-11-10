@@ -517,8 +517,7 @@ pub(crate) fn admit_local_follow_target(
 
     if target.association != SceneAssociationState::Confirmed
         || target.hypotheses_for_lineage != 1
-        || target.state != SceneTrackState::Observed
-            && target.state != SceneTrackState::Estimated
+        || target.state != SceneTrackState::Observed && target.state != SceneTrackState::Estimated
         || target.visibility != SceneVisibility::Visible
         || target.hypothesis_id.is_empty()
         || target.track_lineage_id.is_empty()
@@ -555,7 +554,9 @@ pub(crate) fn admit_local_follow_target(
             || !source.frame_transform_admitted
             || source.clock_domain_id != receipt.clock_domain_id
             || source.receive_tick_ns > receipt.evaluated_at_tick_ns
-            || receipt.evaluated_at_tick_ns.saturating_sub(source.acquisition_tick_ns)
+            || receipt
+                .evaluated_at_tick_ns
+                .saturating_sub(source.acquisition_tick_ns)
                 > (max_age_s * 1_000_000_000.0) as u64
         {
             return Err(FollowEvidenceError::SceneAdmissionRejected);
@@ -731,7 +732,10 @@ mod tests {
         assert_eq!(admitted.frame_transform_id(), "map-to-road-local-v1");
         assert_eq!(admitted.clock_domain_id(), "vehicle-monotonic");
         assert_eq!(admitted.clock_transform_id(), "clock-transform-v1");
-        assert_eq!(admitted.uncertainty_semantics_id(), "scene-track-interval-bound-v1");
+        assert_eq!(
+            admitted.uncertainty_semantics_id(),
+            "scene-track-interval-bound-v1"
+        );
     }
 
     #[test]
@@ -879,8 +883,7 @@ mod tests {
 
     #[test]
     fn command_consumer_rejects_reused_or_future_scene_capability() {
-        let admitted =
-            admit_local_follow_target(&valid_receipt(), &deployment_profile()).unwrap();
+        let admitted = admit_local_follow_target(&valid_receipt(), &deployment_profile()).unwrap();
         let mut state = VehicleState::cruising(4.0);
         state.timestamp = admitted.evaluated_at_s() + admitted.max_age_s() + 0.001;
         assert_eq!(
