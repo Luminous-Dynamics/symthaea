@@ -39,4 +39,6 @@ jobs:
         run: |
           cargo run --manifest-path research/ig-confidence-calibration-001/qualifier/Cargo.toml -- \
             research/ig-confidence-calibration-001/CONFIDENCE_EVALUATION_V0_1.json \
-            research/ig-confidence-calibration-001/CONFIDENCE_NEGATIVE_CONTROLS_V0_1.json
+            research/ig-confidence-calibration-001/CONFIDENCE_NEGATIVE_CONTROLS_V0_1.json \
+            research/ig-confidence-calibration-001/CONFIDENCE_EVALUATION_V0_1.schema.json \
+            research/ig-confidence-calibration-001/CONFIDENCE_NEGATIVE_CONTROLS_V0_1.schema.json
