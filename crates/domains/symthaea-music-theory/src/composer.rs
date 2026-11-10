@@ -18,6 +18,14 @@ use crate::rhythm::Duration;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
+/// Source-authored persistent parts for the general composer. IDs are scoped
+/// to one Score; local VoiceRole may change without changing these identities.
+const GENERAL_MELODY_PART_V1: PartId = PartId(0);
+const GENERAL_BASS_PART_V1: PartId = PartId(1);
+const GENERAL_HARMONY_PART_V1: PartId = PartId(2);
+const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
+const GENERAL_GRIEF_SUSPENSION_PART_V1: PartId = PartId(4);
+
 /// A muse-independent expressive intent. muse maps its cognitive state onto
 /// this; the composer maps this onto structure.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -3836,6 +3844,28 @@ pub(crate) fn realize_melody(
     meter_beats: f64,
     climax_grace: bool,
 ) {
+    realize_melody_for_part(
+        score,
+        PartId::UNASSIGNED,
+        form,
+        intent,
+        start_beat,
+        meter_beats,
+        climax_grace,
+    );
+}
+
+/// Explicit-ID variant used when the composition owner knows the continuing
+/// melody entity. Legacy callers keep the old unassigned behavior above.
+pub(crate) fn realize_melody_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    intent: &MusicalIntent,
+    start_beat: Duration,
+    meter_beats: f64,
+    climax_grace: bool,
+) {
     let melody_octave = 5;
     let base_vel = 0.35 + intent.energy.clamp(0.0, 1.0) * 0.45; // 0.35–0.8
 
@@ -4024,7 +4054,7 @@ pub(crate) fn realize_melody(
                     *dur
                 };
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch: *p,
                     onset,
                     duration: sounded,
@@ -4087,7 +4117,7 @@ pub(crate) fn realize_melody(
                 score.notes.insert(
                     ci,
                     ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: part_id,
                         pitch: below,
                         onset: climax_onset.saturating_sub(grace),
                         duration: grace,
