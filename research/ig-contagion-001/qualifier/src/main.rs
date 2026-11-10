@@ -1087,8 +1087,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
-        &parsed(CONTENT),
-        &parsed(CONTENT_SCHEMA),
+            &parsed(CONTENT),
+            &parsed(CONTENT_SCHEMA),
         )
         .expect("protocol and matrix should validate");
         assert_eq!(report.fixtures, 50);
@@ -1109,8 +1109,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
-        &parsed(CONTENT),
-        &parsed(CONTENT_SCHEMA),
+            &parsed(CONTENT),
+            &parsed(CONTENT_SCHEMA),
         )
         .unwrap_err();
         assert!(
@@ -1129,8 +1129,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
-        &parsed(CONTENT),
-        &parsed(CONTENT_SCHEMA),
+            &parsed(CONTENT),
+            &parsed(CONTENT_SCHEMA),
         )
         .unwrap_err();
         assert!(
@@ -1149,8 +1149,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
-        &parsed(CONTENT),
-        &parsed(CONTENT_SCHEMA),
+            &parsed(CONTENT),
+            &parsed(CONTENT_SCHEMA),
         )
         .unwrap_err();
         assert!(
@@ -1170,8 +1170,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
-        &parsed(CONTENT),
-        &parsed(CONTENT_SCHEMA),
+            &parsed(CONTENT),
+            &parsed(CONTENT_SCHEMA),
         )
         .unwrap_err();
         assert!(
@@ -1191,8 +1191,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
-        &parsed(CONTENT),
-        &parsed(CONTENT_SCHEMA),
+            &parsed(CONTENT),
+            &parsed(CONTENT_SCHEMA),
         )
         .unwrap_err();
         assert!(
