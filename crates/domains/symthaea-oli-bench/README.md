@@ -29,3 +29,13 @@ The audit validates task rows and computes condition-level descriptive statistic
 ## Claim ceiling
 
 This is one study and one spatial/object-tracking task. It does not produce an animal intelligence ranking, a universal intelligence score, or a consciousness/sentience inference. It does not establish cross-study or cross-laboratory generalization.
+
+
+## Baseline score semantics
+
+The LOSO receipt reports Brier score and mean log loss as proper probability scores. It also reports:
+- mean_predicted_success_probability;
+- observed_success_rate;
+- threshold_accuracy_at_0_5.
+
+Threshold accuracy is a binary decision metric for predicting whether a trial is correct. It is **not** the behavioural success rate of a random-choice policy. The random-choice baseline predicts a one-third chance of a correct trial; its expected success probability must be read from mean_predicted_success_probability, not from threshold accuracy.
