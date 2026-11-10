@@ -1411,6 +1411,171 @@
         "Do not use this annex as the current statutory WAPS calculation or certification method."
       ],
       "url": "https://publications.europa.eu/resource/cellar/bef58239-81f4-11f1-bf5e-01aa75ed71a1.0001.03/DOC_2"
+    },
+    {
+      "source_id": "ITTC-WAPS-POWER-SAVING-2024",
+      "title": "ITTC Recommended Procedure 7.5-02-03-01.9: Predicting the Power Saving of Wind Powered Ships",
+      "publisher": "International Towing Tank Conference",
+      "publication_date": "2024-09",
+      "url": "https://ittc.info/media/11806/75-02-03-019.pdf",
+      "evidence_class": "official_recommended_procedure",
+      "scope": {
+        "prediction_levels": [
+          "Level I: surge / 1-DOF",
+          "Level II: 3-4 DOF (surge, sway, roll, yaw)",
+          "Level III: 4 DOF",
+          "Level IV: at least 4 DOF; 6-DOF seakeeping where route optimization requires motion constraints"
+        ],
+        "requirements": [
+          "realistic WPS control and operating limits",
+          "idle-device resistance when WPS cannot thrust and cannot retract/tilt",
+          "source and validation of lift/drag coefficients",
+          "wind profile and weather data source",
+          "uncertainty analysis and observable-specific verification"
+        ],
+        "verification_note": "No complete experimental/CFD standard exists for full wind power-saving prediction; hybrid model tests or sea trials are currently highest fidelity."
+      },
+      "limitations": [
+        "Procedure recommends methods and levels; it does not validate any specific ship model.",
+        "Follow the latest ITTC revision and justify model fidelity for each output."
+      ],
+      "eligible_use": [
+        "WAPS model-fidelity selection",
+        "power-saving prediction protocol",
+        "documentation and validation requirements"
+      ],
+      "ineligible_use": [
+        "Claiming generic or automatic model validation"
+      ]
+    },
+    {
+      "source_id": "SINTEF-SOBC1-WAPS-CYBERPHYSICAL-TESTS-2026",
+      "title": "Cyber-Physical Testing of Wind-Assisted Ships: Recent Developments and Open Data Set for the SOBC-1 Bulk Carrier",
+      "publisher": "SINTEF Ocean / Journal of Sailing Technology",
+      "publication_date": "2026-10-02",
+      "url": "https://doi.org/10.5957/jst/2026.11.1.453",
+      "evidence_class": "published_physical_model_test_campaign_with_open_data_description",
+      "scope": {
+        "vessel": "SOBC-1 open bulk carrier design",
+        "campaign": "SINTEF Ocean September 2025 test campaign",
+        "scale_or_method": "free-running physical ship model coupled in real time to dynamic lifting-line aerodynamic model",
+        "reported_test_count": "nearly 100 tests",
+        "phenomena": [
+          "transient aerodynamic effects",
+          "sail-hull and sail-sail interactions",
+          "sail/propeller thrust distribution",
+          "alternative sail configurations and operating profiles",
+          "parametric side-force magnitude and application point",
+          "coastal wind direction/speed changes",
+          "aerodynamic loads on superstructure"
+        ],
+        "data_access": "Publication describes an open data set; obtain the files and record exact licence, provenance and variable dictionary before benchmark use."
+      },
+      "limitations": [
+        "Model-scale physical tests require scaling and uncertainty treatment before full-scale transfer.",
+        "Open-data description does not itself guarantee every raw file or complete metadata are available."
+      ],
+      "eligible_use": [
+        "Independent WAPS physical-model benchmark",
+        "lateral-force/application-point model validation",
+        "transient wind and sail interaction tests"
+      ],
+      "ineligible_use": [
+        "Direct full-scale fuel-savings claim",
+        "Assuming an unverified dataset licence"
+      ]
+    },
+    {
+      "source_id": "JMSE-WAPS-3DOF-ROUTE-2026-148",
+      "title": "Weather Routing Optimisation for Ships with Wind-Assisted Propulsion",
+      "publisher": "Journal of Marine Science and Engineering",
+      "publication_date": "2026-01-09",
+      "url": "https://doi.org/10.3390/jmse14020148",
+      "evidence_class": "peer_reviewed_3dof_weather_routing_case_with_open_dataset",
+      "scope": {
+        "vessel": "Kamsarmax bulk carrier with suction sails",
+        "models": [
+          "1-DOF longitudinal force balance",
+          "3-DOF surge/sway/yaw with leeway and rudder equilibrium"
+        ],
+        "reported_results": {
+          "one_dof_peak_reported_foc_saving_percent": 26,
+          "three_dof_peak_reported_foc_saving_percent": 23.5,
+          "one_vs_three_dof_me_power_difference_mcr_percent_range": [
+            2,
+            7
+          ],
+          "route_reoptimization_relative_foc_saving_improvement_percent": 1.25
+        },
+        "dataset_doi": "10.5281/zenodo.17859015",
+        "dataset_license": "CC BY 4.0",
+        "article_details": "1-DOF overstates the modelled WAPS benefit in the studied slices; 3-DOF changes optimal route through side-force/yaw/rudder effects."
+      },
+      "limitations": [
+        "Reported case is a Kamsarmax with a particular suction-sail system and route/weather profile.",
+        "Reported figures are not transferable fuel-savings predictions for other ships.",
+        "Reproduce exact tables and definitions before comparing the summarized peak and average values."
+      ],
+      "eligible_use": [
+        "1-vs-3 DOF benchmark reproduction",
+        "weather-routing model and dataset pipeline",
+        "route-rank sensitivity under lateral forces"
+      ],
+      "ineligible_use": [
+        "Generic WAPS performance guarantee",
+        "Transfer to other hulls without model validation"
+      ]
+    },
+    {
+      "source_id": "OCEANENG-LEeway-RUDDER-WAPS-2026-127431",
+      "title": "Impact of leeway and rudder angles on propulsive performance of a single screw wind-powered ship",
+      "publisher": "Ocean Engineering",
+      "publication_date": "2026-09-01",
+      "url": "https://doi.org/10.1016/j.oceaneng.2026.127431",
+      "evidence_class": "peer_reviewed_self_propulsion_towing_tank_experiment",
+      "scope": {
+        "hull": "Single-screw containership model",
+        "conditions": {
+          "leeway_degrees": [
+            -5,
+            5
+          ],
+          "rudder_angle_degrees": [
+            -30,
+            30
+          ],
+          "wind_thrust_offloading_percent": [
+            0,
+            40
+          ]
+        },
+        "observables": [
+          "thrust deduction factor",
+          "effective wake fraction",
+          "relative rotative efficiency",
+          "hull efficiency",
+          "quasi-propulsive efficiency"
+        ],
+        "reported_highlights": [
+          "leeway strongly affects thrust deduction and wake with asymmetry",
+          "yaw-balancing rudder angles reduce propulsive efficiency",
+          "quasi-propulsive efficiency departures from +16% to -31% across tested conditions",
+          "positive leeway around +2.5 degrees gave greatest net power saving in the studied full-scale extrapolation"
+        ]
+      },
+      "limitations": [
+        "Results are configuration/condition-specific and must not be used as a universal leeway/rudder correction factor.",
+        "Full-scale extrapolation carries method uncertainty; preserve model-scale data and extrapolation method."
+      ],
+      "eligible_use": [
+        "Propeller-hull-rudder interaction benchmark",
+        "leeway/rudder coefficient-map validation",
+        "M5 self-propulsion coupling reproduction"
+      ],
+      "ineligible_use": [
+        "Applying the +16/-31% range as a generic correction",
+        "Generalizing to multi-screw or other hull forms without validation"
+      ]
     }
   ]
 }
