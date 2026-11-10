@@ -4933,6 +4933,58 @@ mod tests {
     use crate::harmony::{Progression, Tonality};
     use crate::score::VoiceRole;
 
+    #[test]
+    fn general_composer_core_parts_remain_identified_through_normal_pipeline() {
+        let intent = MusicalIntent {
+            seed: 41,
+            ..MusicalIntent::default()
+        };
+        let spec = crate::spec::CompositionSpec::default();
+        let score = compose_with_spec(&intent, &spec);
+
+        assert!(
+            score.has_part_identity(),
+            "the selected general-composer route must not lose identity in its normal transformations"
+        );
+        let assigned: std::collections::BTreeSet<u16> =
+            score.parts().into_iter().map(|part| part.0).collect();
+        assert!(assigned.contains(&GENERAL_MELODY_PART_V1.0));
+        assert!(assigned.contains(&GENERAL_BASS_PART_V1.0));
+        assert!(assigned.contains(&GENERAL_HARMONY_PART_V1.0));
+
+        assert!(score.notes.iter().all(|note| match note.part {
+            GENERAL_MELODY_PART_V1 => note.role == VoiceRole::Melody,
+            GENERAL_BASS_PART_V1 => note.role == VoiceRole::Bass,
+            GENERAL_HARMONY_PART_V1 => note.role == VoiceRole::Harmony,
+            GENERAL_COUNTERMELODY_PART_V1 => note.role == VoiceRole::CounterMelody,
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn grief_suspension_overlay_is_a_distinct_part_not_merged_into_chordal_harmony() {
+        let intent = MusicalIntent {
+            seed: 43,
+            ..MusicalIntent::default()
+        };
+        let mut spec = crate::spec::CompositionSpec::default();
+        spec.attitude = Some(crate::spec::Attitude::Grief);
+        let score = compose_with_spec(&intent, &spec);
+
+        assert!(
+            score.has_part_identity(),
+            "the grief overlay must retain a real part identity"
+        );
+        let grief_line: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.part == GENERAL_GRIEF_SUSPENSION_PART_V1)
+            .collect();
+        assert!(
+            !grief_line.is_empty(),
+            "grief suspension chain must be represented as its own authored line"
+        );
+        assert!(grief_line.iter().all(|note| note.role == VoiceRole::Harmony));
+    }
+
     /// Regression test for the counter-melody overlap bugs fixed in
     /// `apply_counter_hook_echoes` and `DamageDevice::CounterShift`: a
     /// 300-seed sweep of `Style::Classical`'s default composition — the
