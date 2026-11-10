@@ -2345,7 +2345,7 @@
       "node_identity": "AgentInstanceId",
       "edge_semantics": "directed_message_channel",
       "rng_algorithm": "luminous-lcg32-v1",
-      "seed": 1020,
+      "seed": 1019,
       "nodes": [
         {
           "agent_instance_id": "AGENT-00",
@@ -2817,7 +2817,7 @@
         "minimum_selected_agent_instance_id": "AGENT-00",
         "maximum_selected_agent_instance_id": "AGENT-03"
       },
-      "graph_sha256": "07c2601902d77ea3b969c6a759ba6d6c3d053a06c5abe9a25c6939d1d64823b1"
+      "graph_sha256": "83f1e9f13efd057629cb3a32f487bc38692be262cae537929e38842709f1296c"
     },
     {
       "profile_id": "IG-COMM-TOPOLOGY-001/core_periphery/v0.1",
@@ -2826,7 +2826,7 @@
       "node_identity": "AgentInstanceId",
       "edge_semantics": "directed_message_channel",
       "rng_algorithm": "luminous-lcg32-v1",
-      "seed": 1021,
+      "seed": 1020,
       "nodes": [
         {
           "agent_instance_id": "AGENT-00",
@@ -3296,7 +3296,7 @@
         "minimum_selected_agent_instance_id": "AGENT-03",
         "maximum_selected_agent_instance_id": "AGENT-02"
       },
-      "graph_sha256": "7c1dc4e072860ff230caa90c17f8860a0dd30dbb78f06cfd5d0a745b72269b69"
+      "graph_sha256": "571c9efe1599fe5891265822329061bb816ba7e806ae587e57d9bbb57b6bea70"
     },
     {
       "profile_id": "IG-COMM-TOPOLOGY-001/temporal_churn/v0.1",
