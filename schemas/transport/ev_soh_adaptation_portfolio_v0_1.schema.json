@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev_soh_adaptation_portfolio/0.1",
+  "title": "SOH adaptation portfolio and target-data budget manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "portfolio_id",
+    "parent_benchmark_manifest_digest",
+    "dataset_digest",
+    "split_manifest_digest",
+    "evaluation_mode",
+    "split_frozen_at_ms",
+    "test_accessed_at_ms",
+    "source_domain_group_identity_digests",
+    "target_domain",
+    "router",
+    "experts",
+    "selected_expert_id"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "ev-soh-adaptation-portfolio/0.1"
+    },
+    "portfolio_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parent_benchmark_manifest_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "dataset_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "split_manifest_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_mode": {
+      "enum": [
+        "unseen_cell",
+        "unseen_pack",
+        "unseen_vehicle",
+        "unseen_lab",
+        "unseen_domain"
+      ]
+    },
+    "split_frozen_at_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "test_accessed_at_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_domain_group_identity_digests": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "target_domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain_id",
+        "adaptation_group_identity_digests",
+        "evaluation_group_identity_digests"
+      ],
+      "properties": {
+        "domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adaptation_group_identity_digests": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "uniqueItems": true
+        },
+        "evaluation_group_identity_digests": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "router": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "router_ref",
+        "router_digest",
+        "feature_schema_digest",
+        "training_group_identity_digests",
+        "fit_scope",
+        "uses_target_evaluation_labels",
+        "selection_time_ms",
+        "selection_receipt_digest",
+        "features"
+      ],
+      "properties": {
+        "router_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "router_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "feature_schema_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "training_group_identity_digests": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "uniqueItems": true
+        },
+        "fit_scope": {
+          "const": "source_domains_only"
+        },
+        "uses_target_evaluation_labels": {
+          "const": false
+        },
+        "selection_time_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "selection_receipt_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "features": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "feature_id",
+              "feature_scope",
+              "available_at_ms",
+              "requires_target_labels",
+              "evidence_digest",
+              "evidence_class"
+            ],
+            "properties": {
+              "feature_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "feature_scope": {
+                "enum": [
+                  "fleet_metadata",
+                  "sensor_prefix",
+                  "model_internal_uncertainty",
+                  "reference_test_measurement"
+                ]
+              },
+              "available_at_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "requires_target_labels": {
+                "const": false
+              },
+              "evidence_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "evidence_class": {
+                "enum": [
+                  "physical_observation",
+                  "derived_from_physical",
+                  "model_prediction",
+                  "simulation",
+                  "synthetic_fixture",
+                  "vendor_claim"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "experts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expert_id",
+          "strategy",
+          "model_digest",
+          "target_adaptation_group_identity_digests",
+          "unlabeled_target_group_budget",
+          "labeled_target_group_budget",
+          "labeled_target_evidence_digest",
+          "minimum_support_group_count",
+          "max_updates",
+          "wall_time_ms",
+          "peak_memory_bytes",
+          "energy_wh",
+          "evaluation_group_identity_digests",
+          "selection_status",
+          "result_digest"
+        ],
+        "properties": {
+          "expert_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "strategy": {
+            "enum": [
+              "zero_shot",
+              "unlabeled_tta",
+              "supervised_finetune",
+              "few_shot_maml",
+              "physical_statistical",
+              "abstain"
+            ]
+          },
+          "model_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "target_adaptation_group_identity_digests": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "uniqueItems": true
+          },
+          "unlabeled_target_group_budget": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "labeled_target_group_budget": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "labeled_target_evidence_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "minimum_support_group_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_updates": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "wall_time_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "peak_memory_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "energy_wh": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "evaluation_group_identity_digests": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "uniqueItems": true
+          },
+          "selection_status": {
+            "enum": [
+              "selected",
+              "not_selected",
+              "abstain"
+            ]
+          },
+          "result_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "selected_expert_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
