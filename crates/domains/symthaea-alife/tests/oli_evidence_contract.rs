@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use symthaea_alife::agnostic_evidence::{
-    AlternativeHypothesis, EvidenceBasis, EvidenceRecord, EvidenceState, HypothesisClass,
-    ObservationCoverage, Property, PropertyFinding, SystemProfile, OLI_SCHEMA_VERSION,
+    EvidenceBasis, EvidenceOutcome, EvidenceRecord, HypothesisClass, ObservationCoverage,
+    Property, PropertyAssessment, PropertyFinding, SystemProfile, OLI_SCHEMA_VERSION,
 };
 
 fn profile() -> SystemProfile {
@@ -18,10 +18,11 @@ fn profile() -> SystemProfile {
     }
 }
 
-fn measurement(id: &str) -> EvidenceRecord {
+fn measurement(id: &str, outcome: EvidenceOutcome) -> EvidenceRecord {
     EvidenceRecord {
         id: id.to_owned(),
         basis: EvidenceBasis::DirectMeasurement,
+        outcome,
         method: "calibrated optical imaging".to_owned(),
         source_ref: Some("https://doi.org/10.1038/s42005-023-01337-3".to_owned()),
         artifact_sha256: None,
@@ -39,48 +40,98 @@ fn coverage() -> ObservationCoverage {
     }
 }
 
-#[test]
-fn non_detection_requires_measurement_and_coverage() {
-    let mut candidate = profile();
-    candidate.evidence.push(measurement("m1"));
-    candidate.findings.push(PropertyFinding {
-        property: Property::SelfProduction,
-        state: EvidenceState::NotDetected,
-        evidence_ids: vec!["m1".to_owned()],
+fn finding(property: Property, assessment: PropertyAssessment, evidence_ids: &[&str]) -> PropertyFinding {
+    PropertyFinding {
+        property,
+        assessment,
+        evidence_ids: evidence_ids.iter().map(|id| (*id).to_owned()).collect(),
         coverage: None,
-        notes: "No self-production observed in this measurement window.".to_owned(),
-    });
-
-    let errors = candidate.validate().expect_err("coverage is mandatory");
-    assert!(errors.iter().any(|error| error.contains("requires observation coverage")));
+        notes: "Scoped property assessment; not a global life verdict.".to_owned(),
+    }
 }
 
 #[test]
-fn qualified_non_detection_is_not_an_absence_claim() {
+fn property_vocabulary_round_trips_to_canonical_m0_values() {
+    let values = [
+        (PropertyAssessment::SupportedWithinScope, "SUPPORTED_WITHIN_SCOPE"),
+        (PropertyAssessment::ContradictedWithinScope, "CONTRADICTED_WITHIN_SCOPE"),
+        (PropertyAssessment::InsufficientEvidence, "INSUFFICIENT_EVIDENCE"),
+        (PropertyAssessment::NotTested, "NOT_TESTED"),
+        (
+            PropertyAssessment::NotObservableWithCurrentInstrument,
+            "NOT_OBSERVABLE_WITH_CURRENT_INSTRUMENT",
+        ),
+        (PropertyAssessment::ModelInadequate, "MODEL_INADEQUATE"),
+    ];
+
+    for (assessment, expected) in values {
+        let encoded = serde_json::to_string(&assessment).expect("serializes");
+        assert_eq!(encoded, format!("\"{expected}\""));
+        let decoded: PropertyAssessment =
+            serde_json::from_str(&encoded).expect("deserializes");
+        assert_eq!(decoded, assessment);
+    }
+}
+
+#[test]
+fn non_detection_is_not_a_property_state_and_requires_coverage() {
     let mut candidate = profile();
-    candidate.evidence.push(measurement("m1"));
-    candidate.findings.push(PropertyFinding {
-        property: Property::SelfProduction,
-        state: EvidenceState::NotDetected,
-        evidence_ids: vec!["m1".to_owned()],
-        coverage: Some(coverage()),
-        notes: "Not detected within the stated spatial and temporal coverage.".to_owned(),
-    });
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::NoDetection));
+    candidate.findings.push(finding(
+        Property::SelfMaintenance,
+        PropertyAssessment::InsufficientEvidence,
+        &["m1"],
+    ));
+
+    let errors = candidate.validate().expect_err("coverage is mandatory");
+    assert!(errors.iter().any(|error| error.contains("requires coverage")));
+}
+
+#[test]
+fn qualified_non_detection_remains_insufficient_evidence() {
+    let mut candidate = profile();
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::NoDetection));
+    let mut property = finding(
+        Property::SelfMaintenance,
+        PropertyAssessment::InsufficientEvidence,
+        &["m1"],
+    );
+    property.coverage = Some(coverage());
+    candidate.findings.push(property);
 
     assert!(candidate.validate().is_ok());
-    assert_eq!(candidate.findings[0].state, EvidenceState::NotDetected);
+    assert_eq!(
+        candidate.findings[0].assessment,
+        PropertyAssessment::InsufficientEvidence
+    );
+}
+
+#[test]
+fn no_detection_cannot_be_promoted_to_positive_support() {
+    let mut candidate = profile();
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::NoDetection));
+    let mut property = finding(
+        Property::Learning,
+        PropertyAssessment::SupportedWithinScope,
+        &["m1"],
+    );
+    property.coverage = Some(coverage());
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("negative-only evidence cannot support");
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("cannot be SupportedWithinScope solely from NoDetection")));
 }
 
 #[test]
 fn observed_property_requires_a_linked_evidence_record() {
     let mut candidate = profile();
-    candidate.findings.push(PropertyFinding {
-        property: Property::AdaptiveResponse,
-        state: EvidenceState::Observed,
-        evidence_ids: Vec::new(),
-        coverage: None,
-        notes: "Unreferenced assertion must fail.".to_owned(),
-    });
+    candidate.findings.push(finding(
+        Property::AdaptiveResponse,
+        PropertyAssessment::SupportedWithinScope,
+        &[],
+    ));
 
     let errors = candidate.validate().expect_err("evidence reference is mandatory");
     assert!(errors.iter().any(|error| error.contains("requires at least one evidence record")));
@@ -92,18 +143,17 @@ fn simulation_evidence_remains_distinct_from_measurement() {
     candidate.evidence.push(EvidenceRecord {
         id: "sim1".to_owned(),
         basis: EvidenceBasis::Simulation,
+        outcome: EvidenceOutcome::SimulationResult,
         method: "molecular-dynamics simulation".to_owned(),
         source_ref: None,
         artifact_sha256: None,
         independence_group: None,
     });
-    candidate.findings.push(PropertyFinding {
-        property: Property::InformationPersistence,
-        state: EvidenceState::Observed,
-        evidence_ids: vec!["sim1".to_owned()],
-        coverage: None,
-        notes: "Observed in simulation only; not a laboratory measurement.".to_owned(),
-    });
+    candidate.findings.push(finding(
+        Property::InformationRetention,
+        PropertyAssessment::SupportedWithinScope,
+        &["sim1"],
+    ));
 
     let encoded = serde_json::to_string(&candidate).expect("serializes");
     let decoded: SystemProfile = serde_json::from_str(&encoded).expect("deserializes");
@@ -112,33 +162,29 @@ fn simulation_evidence_remains_distinct_from_measurement() {
 }
 
 #[test]
-fn conflicted_finding_requires_multiple_evidence_records() {
+fn not_observable_requires_an_instrument_and_coverage_record() {
     let mut candidate = profile();
-    candidate.evidence.push(measurement("m1"));
-    candidate.findings.push(PropertyFinding {
-        property: Property::Learning,
-        state: EvidenceState::Conflicted,
-        evidence_ids: vec!["m1".to_owned()],
-        coverage: None,
-        notes: "A conflict cannot be represented by one record.".to_owned(),
-    });
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::InvalidMeasurement));
+    candidate.findings.push(finding(
+        Property::InformationTransfer,
+        PropertyAssessment::NotObservableWithCurrentInstrument,
+        &["m1"],
+    ));
 
-    let errors = candidate.validate().expect_err("two records are required");
-    assert!(errors.iter().any(|error| error.contains("requires at least two evidence records")));
+    let errors = candidate.validate().expect_err("coverage is mandatory");
+    assert!(errors.iter().any(|error| error.contains("NotObservable requires observation coverage")));
 }
 
 #[test]
 fn unfamiliar_substrate_labels_are_open_world() {
     let mut candidate = profile();
     candidate.substrate_family = "unknown field-coupled hybrid substrate".to_owned();
-    candidate.evidence.push(measurement("m1"));
-    candidate.findings.push(PropertyFinding {
-        property: Property::BoundaryMaintenance,
-        state: EvidenceState::Observed,
-        evidence_ids: vec!["m1".to_owned()],
-        coverage: None,
-        notes: "A property observation does not imply life.".to_owned(),
-    });
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::SignalDetected));
+    candidate.findings.push(finding(
+        Property::Boundary,
+        PropertyAssessment::SupportedWithinScope,
+        &["m1"],
+    ));
 
     assert!(candidate.validate().is_ok());
 }
@@ -146,14 +192,18 @@ fn unfamiliar_substrate_labels_are_open_world() {
 #[test]
 fn alternative_hypotheses_must_make_discriminating_predictions() {
     let mut candidate = profile();
-    candidate.alternative_hypotheses.push(AlternativeHypothesis {
-        id: "abiotic-null".to_owned(),
-        class: HypothesisClass::AbioticPhysical,
-        mechanism: "reaction-diffusion instability".to_owned(),
-        discriminating_predictions: Vec::new(),
-        evidence_ids: Vec::new(),
-    });
+    candidate.alternative_hypotheses.push(
+        symthaea_alife::agnostic_evidence::AlternativeHypothesis {
+            id: "abiotic-null".to_owned(),
+            class: HypothesisClass::AbioticPhysical,
+            mechanism: "reaction-diffusion instability".to_owned(),
+            discriminating_predictions: Vec::new(),
+            evidence_ids: Vec::new(),
+        },
+    );
 
     let errors = candidate.validate().expect_err("predictions are required");
-    assert!(errors.iter().any(|error| error.contains("requires non-empty discriminating predictions")));
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("requires non-empty discriminating predictions")));
 }
