@@ -103,6 +103,14 @@ cargo run --bin marine-emissions-evidence-audit -- \
   ../../docs/research/marine/fixtures/synthetic-gas-emissions-v0.1.0.json
 ~~~
 
+The context-bound v0.2.0 record adds service fingerprint, voyage/route segment, propulsion/loading state, speed through water, wind/wave/current conditions and per-device commanded/achieved WAPS state:
+
+~~~sh
+cargo run --bin marine-emissions-evidence-audit -- \
+  ../../docs/research/marine/marine-emissions-evidence-v0.2.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-gas-emissions-v0.2.0.json
+~~~
+
 The emissions audit validates the Draft 2020-12 evidence contract, method-to-IMO-resolution mapping, measured-vs-engine-load-calculated evidence mode, gas completeness, calibration disposition, rights, sample counts, timebase binding and sample-rate/window consistency. A synthetic or incomplete record cannot qualify as physical performance evidence.
 
 ## Enforced checks
@@ -183,6 +191,7 @@ the documentation does not imply a test pass.
 ## Gas-resolved emissions evidence
 
 - `marine-emissions-evidence-v0.1.0.schema.json` and its synthetic fixture define CH4/N2O per-engine evidence.
+- `marine-emissions-evidence-v0.2.0.schema.json` adds matched service/voyage context and WAPS device commanded/achieved state; v0.1.0 remains unchanged.
 - `marine-emissions-evidence-audit` keeps MEPC.414 test-bed/onboard measurement, MEPC.415 engine-load calculation and MEPC.416 CEMS paths distinct.
 - Expected gases must be observed or explicitly declared unmeasured with a reason. Missing is not zero.
 - Gas mass-rate uncertainty remains quantified or explicitly unknown. No CO2e conversion is performed without a declared GWP and accounting boundary.
