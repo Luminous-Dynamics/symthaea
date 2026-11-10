@@ -18,6 +18,14 @@ use crate::rhythm::Duration;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
+// Stable identities owned by the general period-form composer. These are
+// score-local musical lines, not instrument assignments or VoiceRoles.
+const GENERAL_MELODY_PART_V1: PartId = PartId(0);
+const GENERAL_BASS_PART_V1: PartId = PartId(1);
+const GENERAL_HARMONY_PART_V1: PartId = PartId(2);
+const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
+const GENERAL_GRIEF_SUSPENSION_PART_V1: PartId = PartId(4);
+
 /// A muse-independent expressive intent. muse maps its cognitive state onto
 /// this; the composer maps this onto structure.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -576,8 +584,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
         spec.accompaniment(intent.seed)
     };
     let tx = &spec.texture;
-    realize_melody(
+    realize_melody_for_part(
         &mut score,
+        GENERAL_MELODY_PART_V1,
         &form,
         intent,
         Duration::zero(),
@@ -603,8 +612,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
     // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
     // and never read each other's state, so the emitted NOTES are unchanged.
-    realize_bass(
+    realize_bass_for_part(
         &mut score,
+        GENERAL_BASS_PART_V1,
         &form,
         meter_beats,
         intent,
@@ -613,8 +623,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
         tx.cadential_harmonic_rhythm,
         spec.development != crate::spec::DevelopmentDna::Classic,
     );
-    realize_harmony(
+    realize_harmony_for_part(
         &mut score,
+        GENERAL_HARMONY_PART_V1,
         &form,
         meter_beats,
         intent,
@@ -634,7 +645,13 @@ fn compose_with_spec_and_form_and_grammar_impl(
         );
     }
     if tx.counter_melody {
-        realize_counter_melody(&mut score, &form, meter_beats, intent);
+        realize_counter_melody_for_part(
+            &mut score,
+            GENERAL_COUNTERMELODY_PART_V1,
+            &form,
+            meter_beats,
+            intent,
+        );
         if tx.held_arrivals && tx.hook_cell {
             apply_counter_hook_echoes(
                 &mut score,
@@ -3836,6 +3853,26 @@ pub(crate) fn realize_melody(
     meter_beats: f64,
     climax_grace: bool,
 ) {
+    realize_melody_for_part(
+        score,
+        PartId::UNASSIGNED,
+        form,
+        intent,
+        start_beat,
+        meter_beats,
+        climax_grace,
+    );
+}
+
+pub(crate) fn realize_melody_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    intent: &MusicalIntent,
+    start_beat: Duration,
+    meter_beats: f64,
+    climax_grace: bool,
+) {
     let melody_octave = 5;
     let base_vel = 0.35 + intent.energy.clamp(0.0, 1.0) * 0.45; // 0.35–0.8
 
@@ -4024,7 +4061,7 @@ pub(crate) fn realize_melody(
                     *dur
                 };
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch: *p,
                     onset,
                     duration: sounded,
@@ -4087,7 +4124,7 @@ pub(crate) fn realize_melody(
                 score.notes.insert(
                     ci,
                     ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: part_id,
                         pitch: below,
                         onset: climax_onset.saturating_sub(grace),
                         duration: grace,
@@ -4367,6 +4404,16 @@ pub(crate) fn realize_counter_melody(
     meter_beats: f64,
     intent: &MusicalIntent,
 ) {
+    realize_counter_melody_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent);
+}
+
+pub(crate) fn realize_counter_melody_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+) {
     let counter_octave = 4;
     let base_vel = (0.28 + intent.energy.clamp(0.0, 1.0) * 0.28).clamp(0.12, 0.58);
     let bar = Duration::new(meter_beats as i64, 1);
@@ -4439,7 +4486,7 @@ pub(crate) fn realize_counter_melody(
                         1.1 - 0.3 * ((pos - 0.65) / 0.35)
                     };
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: part_id,
                         pitch: p,
                         onset,
                         duration: tone_dur,
