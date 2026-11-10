@@ -50,7 +50,8 @@ Thresholds are expressed in the input amplitude units. No universal tolerance is
 
 ### Synthetic positive and negative controls
 
-The six unit tests currently cover:
+The seven unit tests currently cover:
+- zero target-change thresholds and duplicate region labels are rejected;
 - target-only modification with bit-exact protected regions (positive control);
 - unchanged target (negative control);
 - a collateral change in a protected phrase (negative control);
