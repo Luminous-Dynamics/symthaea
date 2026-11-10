@@ -22,7 +22,13 @@ The newly released official test-set cards report:
 
 These are different tracks and must not be compared as if they were a matched model ablation. The organizer page also describes earlier MMAE systems as below 5% EMR; the newly released track-specific baselines are the appropriate comparison points for this challenge test release. The official score separates Instruction Following Rate, Consistency Rate and Exact Match Rate. Challenge registration closed October 8; public development evaluation and access to the released test inputs are separate from official leaderboard eligibility.
 
-The official SDK repository specifies Python 3.11+, exactly 500 sample IDs for the selected track, one nonempty 16 kHz mono 16-bit PCM WAV per ID, at most 300 seconds per file and a 2 GiB total upload package. It requires organizer-issued evaluation URL and track-specific secret key; uploading does not itself start evaluation. Any local validator must prepare/validate output artifacts but cannot bypass the official SDK or credentials.
+The official MIT-licensed SDK requires Python 3.11+ and validates a submission directory containing submission.jsonl plus an audio directory. Each nonempty UTF-8 JSONL line must contain exactly two string fields, id and audio_path. All 500 official IDs for the selected track must appear exactly once; audio paths must be unique, canonical relative POSIX paths ending in .wav. The manifest is limited to 1 MiB.
+
+Every referenced WAV must be a nonempty little-endian RIFF/WAVE PCM file at 16 kHz, mono, 16-bit integer PCM, and no longer than 300 seconds. The SDK validates RIFF framing and actual PCM bytes, not merely a filename or header claim. Symlinks, path traversal, unreferenced files, links and non-USTAR archive extensions are rejected.
+
+The archive is uncompressed USTAR, with submission.jsonl as the first member, one audio file for every manifest entry, correct tar padding and terminators, and a 2 GiB limit that includes headers and padding. The SDK fetches the current server policy before validation, so the supported policy and expected IDs are authoritative at submission time. The upload service requires an organizer-issued evaluation URL and track-specific secret key; uploading does not itself start evaluation.
+
+Architecture consequence: Muse should produce a clean, content-addressed Rust export manifest and preserve the exact output WAVs, then hand the package to the official SDK validator as the final submission gate. Do not duplicate the organizer's RIFF/USTAR validator or claim our local VMEA scorer reproduces hidden official rubrics. The local adapter must not store, log or commit competition secrets.
 
 ## Paradigm: two-sided edit contracts
 
