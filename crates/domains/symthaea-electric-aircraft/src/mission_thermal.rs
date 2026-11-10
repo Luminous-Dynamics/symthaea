@@ -178,7 +178,7 @@ pub struct MissionThermalReport {
     /// Upstream battery evidence records copied from the source MissionReport.
     pub source_battery_characterization_evidence_records: Vec<crate::characterization::EvidenceRecord>,
     /// Source MissionReport flag; this overlay copies but does not re-establish byte verification.
-    pub source_evidence_content_digests_verified: bool,
+    pub source_report_claims_evidence_content_digests_verified: bool,
     pub segments: Vec<MissionThermalSegmentReport>,
     pub final_state: ThermalState,
     pub maximum_temperature_k: f64,
@@ -447,7 +447,7 @@ pub fn evaluate_mission_thermal_overlay(
             energy_report.characterization_evidence_records.clone(),
         source_battery_characterization_evidence_records:
             energy_report.battery_characterization_evidence_records.clone(),
-        source_evidence_content_digests_verified:
+        source_report_claims_evidence_content_digests_verified:
             energy_report.evidence_content_digests_verified,
         segments: segment_reports,
         final_state: state,
@@ -1178,7 +1178,7 @@ mod tests {
 
         assert_eq!(result.source_characterization_evidence_records, vec![propulsion_record]);
         assert_eq!(result.source_battery_characterization_evidence_records, vec![battery_record]);
-        assert!(result.source_evidence_content_digests_verified);
+        assert!(result.source_report_claims_evidence_content_digests_verified);
     }
 
     #[test]
