@@ -26,9 +26,25 @@
 //! NOT classified — we prefer to undersell symmetry than to claim false
 //! rotational invariance on a transcendental like the Lotka-Volterra invariant.
 //!
-//! ## Beyond the two structural heuristics: numeric Lie-derivative fallback
+//! ## Exact polynomial and sampled Lie-derivative lanes
 //!
-//! The two heuristics above are exact-shape pattern matches — fast, but blind
+//! For bounded polynomial ASTs (constants, variables, addition, subtraction,
+//! multiplication and non-negative integer powers), the exact lane normalizes
+//! the expression into sparse monomials with exact rational coefficients and
+//! checks every generator's Lie derivative. Finite `f64` literals are interpreted
+//! as their exact IEEE-754 dyadic rationals. A zero residual is an exact algebraic
+//! identity for that interpreted polynomial, not a Lean proof or a physical-units proof.
+//!
+//! Unsupported constructs and resource-limit outcomes fall through to the sampled
+//! numeric lane, which preserves its seed, domain, finite-difference step and tolerances.
+//! A sampled candidate is never promoted to exact or formal evidence.
+//!
+//! ## Sampled numeric Lie-derivative fallback
+//!
+//! The sampled lane can detect radial expressions such as square roots and reciprocal
+//! functions that are outside the polynomial fragment, but it remains finite evidence.
+//!
+//! The two structural heuristics above are exact-shape pattern matches — fast, but blind
 //! to anything that isn't literally a monomial sum-of-squares or cross-product
 //! (e.g. `sqrt(x²+y²)`, `1/(x²+y²)`, or any other radially-symmetric function
 //! of the same invariant). [`infer_symmetry_numeric`] closes that gap using the
@@ -108,6 +124,7 @@ pub struct ExactPolynomialLieProfileV1 {
     pub maximum_variables: usize,
     pub maximum_terms: usize,
     /// Maximum monomial-pair multiplications per polynomial product operation.
+    pub maximum_term_products: usize,
     pub maximum_total_degree: usize,
     pub maximum_power: u32,
     pub maximum_dyadic_denominator_power: u32,
