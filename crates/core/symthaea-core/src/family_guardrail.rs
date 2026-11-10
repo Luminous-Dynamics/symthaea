@@ -39,10 +39,13 @@ const DIGEST_HEX_LENGTH: usize = 64;
 /// Preregistered evaluation family and its candidate-specific confirmatory episodes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FamilyGuardrailSpec {
+    /// Stable task-family identity, such as a machine family or fault mechanism.
     pub family_id: String,
     /// Maximum tolerable loss increase for this family, in normalized loss units.
     pub noninferiority_margin: f64,
+    /// Minimum number of paired confirmatory episodes required before a decision.
     pub minimum_observations: u64,
+    /// Maximum number of paired confirmatory episodes permitted for this family.
     pub maximum_observations: u64,
     /// Stable source-record episode IDs reserved for this family.
     pub episode_ids: Vec<String>,
@@ -51,11 +54,15 @@ pub struct FamilyGuardrailSpec {
 /// Frozen identity and family membership for one candidate's guardrail evaluation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FamilyGuardrailManifest {
+    /// Manifest schema version.
     pub format_version: u32,
     /// One-based ordinal assigned by the shared candidate campaign ledger.
     pub candidate_index: u64,
+    /// SHA-256 digest of the frozen baseline model.
     pub baseline_model_digest: String,
+    /// SHA-256 digest of the frozen candidate model.
     pub candidate_model_digest: String,
+    /// SHA-256 digest of the fixed evaluation protocol.
     pub evaluation_protocol_digest: String,
     /// Digest of the complete candidate-specific confirmatory episode manifest.
     pub confirmatory_manifest_digest: String,
@@ -63,68 +70,100 @@ pub struct FamilyGuardrailManifest {
     pub campaign_alpha: f64,
     /// Sorted by family_id; each family's episode_ids are sorted.
     pub families: Vec<FamilyGuardrailSpec>,
+    /// Canonical digest binding identities, margins, family membership and alpha allocation.
     pub manifest_digest: String,
 }
 
 /// One paired baseline/candidate loss from one registered task family.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FamilyPairedLossObservation {
+    /// Registered family that owns the source episode.
     pub family_id: String,
+    /// Stable source-record identity included in the frozen family manifest.
     pub episode_id: String,
+    /// Baseline loss on the episode, normalized to [0, 1].
     pub baseline_loss: f64,
+    /// Candidate loss on the same episode, normalized to [0, 1].
     pub candidate_loss: f64,
 }
 
 /// Qualification state for one family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FamilyNonInferiorityStatus {
+    /// The preregistered minimum episode count has not been reached.
     InsufficientEvidence,
+    /// The lower bound is above the negative non-inferiority margin.
     NonInferior,
+    /// The upper bound is below the negative non-inferiority margin.
     MaterialRegression,
+    /// Evidence is not yet decisive and the observation budget remains.
     Undetermined,
+    /// The observation budget ended without proving non-inferiority or regression.
     UndeterminedAtBudget,
 }
 
 /// Overall family-guardrail decision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FamilyGuardrailStatus {
+    /// At least one registered family needs more confirmatory evidence.
     Collecting,
+    /// Every preregistered family has demonstrated non-inferiority.
     AllFamiliesNonInferior,
+    /// At least one preregistered family has demonstrated material regression.
     MaterialRegressionDetected,
+    /// At least one family exhausted its budget without a decisive result.
     InconclusiveAtBudget,
 }
 
 /// Per-family anytime-valid report.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FamilyGuardrailResult {
+    /// Registered task-family identity.
     pub family_id: String,
+    /// Number of paired confirmatory episodes consumed for this family.
     pub observation_count: u64,
+    /// Mean paired improvement (baseline loss minus candidate loss), when observed.
     pub mean_improvement: Option<f64>,
-    /// Lower/upper confidence-sequence bounds for baseline loss minus candidate loss.
-    /// These are per-family bounds, not simultaneous intervals over all families.
+    /// Lower confidence-sequence bound for baseline loss minus candidate loss.
+    /// This is a per-family bound, not part of simultaneous family-wise intervals.
     pub lower_improvement_bound: Option<f64>,
+    /// Upper confidence-sequence bound for baseline loss minus candidate loss.
+    /// This is a per-family bound, not part of simultaneous family-wise intervals.
     pub upper_improvement_bound: Option<f64>,
+    /// Preregistered maximum tolerable loss increase for this family.
     pub noninferiority_margin: f64,
+    /// Family-specific disposition of the current evidence.
     pub status: FamilyNonInferiorityStatus,
 }
 
 /// Complete all-families non-inferiority report.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FamilyGuardrailReport {
+    /// Report schema version.
     pub format_version: u32,
+    /// One-based candidate ordinal from the shared campaign ledger.
     pub candidate_index: u64,
+    /// Frozen baseline model digest.
     pub baseline_model_digest: String,
+    /// Frozen candidate model digest.
     pub candidate_model_digest: String,
+    /// Frozen evaluation protocol digest.
     pub evaluation_protocol_digest: String,
+    /// Digest of the family and episode manifest.
     pub manifest_digest: String,
+    /// Alpha budget consumed by this family-guardrail campaign.
     pub campaign_alpha: f64,
+    /// Overall all-families non-inferiority decision.
     pub status: FamilyGuardrailStatus,
+    /// Per-family outcomes in canonical family-ID order.
     pub family_results: Vec<FamilyGuardrailResult>,
+    /// Digest binding the complete report claims.
     pub report_digest: String,
 }
 
 /// Input, provenance, or numerical failure. All malformed inputs fail closed.
 #[derive(Debug, Clone, PartialEq, Error)]
+#[allow(missing_docs)]
 pub enum FamilyGuardrailError {
     #[error("unsupported family guardrail manifest version {0}")]
     UnsupportedManifestVersion(u32),
@@ -255,6 +294,11 @@ impl FamilyGuardrailVerifier {
             return Err(FamilyGuardrailError::AlreadyTerminal);
         }
         let family_id = observation.family_id.as_str();
+        if !self.accumulators.contains_key(family_id) {
+            return Err(FamilyGuardrailError::UnknownFamily(
+                observation.family_id.clone(),
+            ));
+        }
         let registered_family = self
             .episode_to_family
             .get(&observation.episode_id)
