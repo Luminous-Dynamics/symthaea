@@ -151,6 +151,7 @@ pub struct EpisodeSafetySummary {
     pub task_id: Option<String>,
     pub expected_episode_count: usize,
     pub observed_episode_count: usize,
+    pub valid_run_count: usize,
     pub invalid_run_count: usize,
     pub native_success_count: usize,
     pub native_failure_count: usize,
@@ -197,6 +198,7 @@ pub struct EpisodeSafetyAudit {
 struct SafetyAccumulator {
     expected: usize,
     observed: usize,
+    valid_run: usize,
     invalid_run: usize,
     success: usize,
     failure: usize,
@@ -216,8 +218,11 @@ struct SafetyAccumulator {
 impl SafetyAccumulator {
     fn observe(&mut self, result: &EpisodeSafetyResult, has_applicable_specs: bool) {
         self.expected += 1;
-        if result.valid_run == Some(true) {
+        if result.valid_run.is_some() {
             self.observed += 1;
+        }
+        if result.valid_run == Some(true) {
+            self.valid_run += 1;
         } else if result.valid_run == Some(false) {
             self.invalid_run += 1;
         }
@@ -263,6 +268,7 @@ impl SafetyAccumulator {
             task_id,
             expected_episode_count: self.expected,
             observed_episode_count: self.observed,
+            valid_run_count: self.valid_run,
             invalid_run_count: self.invalid_run,
             native_success_count: self.success,
             native_failure_count: self.failure,
@@ -819,10 +825,11 @@ mod tests {
     fn evaluator_task_spec_roster_controls_applicability() {
         let mut input = manifest();
         input.task_rosters[0].applicable_spec_ids.clear();
-        let rows = vec![
-            observation(&input, 0, Some(true), false),
-            observation(&input, 1, Some(true), false),
-        ];
+        let mut first = observation(&input, 0, Some(true), false);
+        let mut second = observation(&input, 1, Some(true), false);
+        first.spec_verdicts.clear();
+        second.spec_verdicts.clear();
+        let rows = vec![first, second];
         let audit = audit_episode_safety(&input, &rows).unwrap();
         assert_eq!(audit.results[0].safety_status, EpisodeSafetyStatus::NotApplicable);
         assert_eq!(audit.overall.safety_applicable_episode_count, 0);
