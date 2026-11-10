@@ -60,6 +60,8 @@ const HARD_MAX_LINEAR_ACTION_SAMPLES: usize = 4096;
 const HARD_MAX_LINEAR_ACTION_EXPRESSION_VARIABLES: usize = 512;
 const HARD_MAX_LINEAR_ACTION_DIMENSION: usize = 32;
 const HARD_MAX_EXPRESSION_EVALUATION_COST: usize = 50_000_000;
+const HARD_MAX_LINEAR_ALGEBRA_OPERATION_COST: usize = 100_000_000;
+const HARD_MAX_LINEAR_ACTION_GENERATORS: usize = 128;
 const HARD_MAX_DIRECTION_BASIS_CONDITION: f64 = 1e12;
 
 impl Default for LinearActionSamplingProfileV1 {
@@ -127,6 +129,8 @@ pub struct LinearActionSampledInvarianceReportV1 {
     pub sampling_profile_blake3: String,
     /// Conservative upper bound on AST node evaluations for this batch.
     pub estimated_expression_evaluation_cost: usize,
+    /// Conservative operation budget for direction SVDs and generator tangents.
+    pub estimated_linear_algebra_operation_cost: usize,
     pub sample_ids: Vec<String>,
     pub direction_basis_diagnostics: Vec<LinearActionSampleConditionDiagnosticV1>,
     pub generator_statistics: Vec<LinearActionGeneratorSampleStatisticsV1>,
@@ -159,6 +163,8 @@ pub enum LinearActionSamplingErrorV1 {
     ExpressionVariableBudgetExceeded { actual: usize, maximum: usize },
     ActionDimensionLimitExceeded { actual: usize, maximum: usize },
     ExpressionEvaluationBudgetExceeded { estimated: usize, maximum: usize },
+    GeneratorCountLimitExceeded { actual: usize, maximum: usize },
+    LinearAlgebraBudgetExceeded { estimated: usize, maximum: usize },
     NonFiniteState { sample_id: String, index: usize },
     DirectionBasisDimensionMismatch {
         sample_id: String,
@@ -836,6 +842,35 @@ pub fn evaluate_linear_action_samples(
         });
     }
 
+    if declaration.generators.len() > HARD_MAX_LINEAR_ACTION_GENERATORS {
+        return Err(LinearActionSamplingErrorV1::GeneratorCountLimitExceeded {
+            actual: declaration.generators.len(),
+            maximum: HARD_MAX_LINEAR_ACTION_GENERATORS,
+        });
+    }
+
+    // Bound the cubic direction-basis SVD work plus the per-generator tangent
+    // matrix-vector products. The SVD multiplier is a conservative operation
+    // proxy, not a hardware-calibrated runtime model.
+    let dimension_squared = dimension.checked_mul(dimension).unwrap_or(usize::MAX);
+    let direction_factorization_cost = dimension_squared
+        .checked_mul(dimension)
+        .and_then(|cost| cost.checked_mul(10))
+        .unwrap_or(usize::MAX);
+    let tangent_cost = dimension_squared
+        .checked_mul(declaration.generators.len())
+        .unwrap_or(usize::MAX);
+    let estimated_linear_algebra_operation_cost = direction_factorization_cost
+        .checked_add(tangent_cost)
+        .and_then(|cost| cost.checked_mul(samples.len()))
+        .unwrap_or(usize::MAX);
+    if estimated_linear_algebra_operation_cost > HARD_MAX_LINEAR_ALGEBRA_OPERATION_COST {
+        return Err(LinearActionSamplingErrorV1::LinearAlgebraBudgetExceeded {
+            estimated: estimated_linear_algebra_operation_cost,
+            maximum: HARD_MAX_LINEAR_ALGEBRA_OPERATION_COST,
+        });
+    }
+
     // Each sample requires one plus/minus evaluation for every action
     // coordinate direction. Sum nodes are conservatively charged for their
     // maximum 101 body evaluations, so a small AST cannot hide an expensive sum.
@@ -1030,6 +1065,7 @@ pub fn evaluate_linear_action_samples(
         sample_batch_blake3: sample_batch_blake3(&variable_names, samples),
         sampling_profile_blake3: sampling_profile_blake3(profile),
         estimated_expression_evaluation_cost,
+        estimated_linear_algebra_operation_cost,
         sample_ids: samples.iter().map(|sample| sample.sample_id.clone()).collect(),
         direction_basis_diagnostics,
         generator_statistics,
