@@ -1,6 +1,6 @@
 {
   "schema": "sam-benchmark-evidence-registry-v0.1",
-  "snapshot_date": "2026-11-09",
+  "snapshot_date": "2026-11-10",
   "parent_issue": "Luminous-Dynamics/symthaea#6256",
   "semantics": {
     "source_status": [
@@ -655,8 +655,8 @@
       "rights_status": "source_terms_to_check",
       "snapshot": {
         "secondary_board": "SOTA2",
-        "snapshot_date": "2026-11-08",
-        "leaderboard_version": "NAVSIM v2 as displayed by SOTA2; evaluator/split identity not independently confirmed",
+        "snapshot_date": "2026-11-10",
+        "leaderboard_version": "SOTA2 NAVSIM v2 display crawled 2026-11-10; secondary page does not expose exact evaluator/split",
         "methods": [
           {
             "name": "Human Agent",
@@ -670,58 +670,6 @@
             "HC": 98.1,
             "EC": 90.1,
             "EPDMS": 90.3
-          },
-          {
-            "name": "LWDrive",
-            "NC": 98.8,
-            "DAC": 98.4,
-            "DDC": 99,
-            "TLC": 99.7,
-            "EP": 90.3,
-            "TTC": 98.6,
-            "LK": 96.3,
-            "HC": 97.9,
-            "EC": 73.3,
-            "EPDMS": 89.6
-          },
-          {
-            "name": "ExploreVLA",
-            "NC": 98.8,
-            "DAC": 96.2,
-            "DDC": 99.6,
-            "TLC": 99.8,
-            "EP": 87.1,
-            "TTC": 98.2,
-            "LK": 97.8,
-            "HC": 98.3,
-            "EC": 86.8,
-            "EPDMS": 88.8
-          },
-          {
-            "name": "ELF-VLA-8B",
-            "NC": 98.9,
-            "DAC": 98.1,
-            "DDC": 99.4,
-            "TLC": 99.8,
-            "EP": 88.5,
-            "TTC": 98.4,
-            "LK": 96.9,
-            "HC": 98.3,
-            "EC": 87.2,
-            "EPDMS": 87.1
-          },
-          {
-            "name": "DriveWorld-VLA",
-            "NC": 98.6,
-            "DAC": 99.1,
-            "DDC": 99.6,
-            "TLC": 99.8,
-            "EP": 87.4,
-            "TTC": 97.9,
-            "LK": 97,
-            "HC": 97.8,
-            "EC": 78.6,
-            "EPDMS": 86.8
           },
           {
             "name": "TPS-Drive",
@@ -750,6 +698,19 @@
             "EPDMS": 86.4
           },
           {
+            "name": "DriveVLA-W0",
+            "NC": 98.5,
+            "DAC": 99.1,
+            "DDC": 98,
+            "TLC": 99.7,
+            "EP": 86.4,
+            "TTC": 98.1,
+            "LK": 93.2,
+            "HC": 97.9,
+            "EC": 58.9,
+            "EPDMS": 86.1
+          },
+          {
             "name": "HydraMDP++",
             "NC": 98.5,
             "DAC": 98.5,
@@ -761,6 +722,45 @@
             "HC": 98.2,
             "EC": 75.7,
             "EPDMS": 85.6
+          },
+          {
+            "name": "ResAD",
+            "NC": 97.8,
+            "DAC": 97.2,
+            "DDC": 99.5,
+            "TLC": 99.8,
+            "EP": 88.2,
+            "TTC": 96.9,
+            "LK": 97,
+            "HC": 98.4,
+            "EC": 88.2,
+            "EPDMS": 85.5
+          },
+          {
+            "name": "DiffusionDrive",
+            "NC": 98.2,
+            "DAC": 95.9,
+            "DDC": 99.4,
+            "TLC": 99.8,
+            "EP": 87.5,
+            "TTC": 97.3,
+            "LK": 96.8,
+            "HC": 98.3,
+            "EC": 87.7,
+            "EPDMS": 84.5
+          },
+          {
+            "name": "PRIX",
+            "NC": 98,
+            "DAC": 95.6,
+            "DDC": 99.5,
+            "TLC": 99.8,
+            "EP": 87.4,
+            "TTC": 97.2,
+            "LK": 97.1,
+            "HC": 98.3,
+            "EC": 87.6,
+            "EPDMS": 84.2
           },
           {
             "name": "ARTEMIS",
@@ -781,7 +781,7 @@
         "snapshot_split": "unknown_not_exposed_by_secondary_board"
       },
       "caveats": [
-        "SOTA2 is a secondary leaderboard and these values are not independently verified by SAM.",
+        "SOTA2 is a secondary leaderboard and the 2026-11-10 displayed table is not independently verified by SAM; values are discovery references only.",
         "NAVSIM v2 includes two-stage pseudo-closed-loop evaluation and reactive traffic-agent policy support, but the official README states pseudo-simulation is neither sequential nor interactive; do not describe it as a reciprocal online ego/actor policy loop.",
         "The secondary SOTA2 snapshot does not expose a verifiable exact devkit release or split. Pin those before reproducing or comparing scores.",
         "EPDMS aggregates multiple component metrics; report NC, DAC, DDC, TLC, EP, TTC, LK, HC and EC separately.",
@@ -1412,7 +1412,8 @@
     "SAM-developed Follow oracle/observation-domain experiments remain in internal_conformance_crucibles until exact-head tests and frozen scenario/action metrics are executed; no authored test is a result.",
     "WOD-E2E is an open-loop expert-preference / long-tail trajectory benchmark; RFS is not a closed-loop safety or counterfactual outcome metric.",
     "Different secondary leaderboard pages for WOD-E2E are distinct benchmark views until exact split, label, evaluator and submission protocols are proven identical; never compare scores across those views directly.",
-    "Research method references (for example SURE-Plan) are distinct from benchmark records; do not invent leaderboard values or infer a matched SOTA comparison from abstract-level claims."
+    "Research method references (for example SURE-Plan) are distinct from benchmark records; do not invent leaderboard values or infer a matched SOTA comparison from abstract-level claims.",
+    "Observation-constrained future option preservation is stored as a SAM-developed synthetic falsification crucible, not an external benchmark result; a common continuation across a declared finite envelope is not a global viability or physical safety proof."
   ],
   "system_references": [
     {
@@ -1882,6 +1883,82 @@
         "https://arxiv.org/abs/2606.14058",
         "https://arxiv.org/abs/2511.10403",
         "https://github.com/Luminous-Dynamics/symthaea/issues/9010"
+      ]
+    },
+    {
+      "id": "sam-option-preservation-clairvoyance-trap-v0.1",
+      "name": "SAM Observation-Constrained Future Option Preservation — Clairvoyance Trap v0.1",
+      "category": "synthetic_falsification_conformance",
+      "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11291",
+      "capability_target": [
+        "observation_constrained_recoverability",
+        "hidden_state_indistinguishability",
+        "clairvoyance_gap",
+        "finite_manifest_integrity",
+        "fail_closed_incomplete_evidence"
+      ],
+      "protocol": {
+        "kind": "two_hidden_state_one_observation_analytic_counterexample",
+        "parent_action_set": [
+          "continue"
+        ],
+        "continuation_action_set": [
+          "brake",
+          "coast"
+        ],
+        "observation_classes": 1,
+        "hidden_state_cells": 2,
+        "observation_equivalence": "both hidden states share one exact delivered-observation receipt",
+        "hidden_state_a": {
+          "brake": "feasible",
+          "coast": "infeasible"
+        },
+        "hidden_state_b": {
+          "brake": "infeasible",
+          "coast": "feasible"
+        },
+        "expected_robust_lower_set": [],
+        "expected_possible_upper_set": [],
+        "expected_clairvoyant_union": [
+          "brake",
+          "coast"
+        ],
+        "expected_clairvoyance_gap": 2
+      },
+      "metrics": [
+        "robust_option_width",
+        "possible_option_width",
+        "clairvoyance_gap",
+        "parent_action_status",
+        "observation_class_status",
+        "missing_cell_count",
+        "missing_action_outcome_count",
+        "duplicate_execution_receipt_rejection",
+        "manifest_digest_mismatch_rejection",
+        "evaluator_latency_p50_p95_p99"
+      ],
+      "source_status": "implementation_authored_exact_head_ci_pending",
+      "rights_status": "synthetic_analytic_fixture_no_external_dataset",
+      "implementation": {
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/11299",
+        "exact_head": "126edced4206b9ba37233b6dd8cd19f7a18469d1",
+        "fixture": "docs/autonomy/fixtures/SAM_OPTION_PRESERVATION_CLAIRVOYANCE_TRAP_V0_1.json",
+        "authored_rust_test_functions": 19,
+        "dedicated_workflow_run_id": 42766701368,
+        "dedicated_workflow_status_at_snapshot": "queued"
+      },
+      "validation_result": null,
+      "caveats": [
+        "The dedicated exact-head Rust format/test/Clippy workflow is queued; authored tests are not recorded as passed.",
+        "This fixture checks a two-cell set-intersection result, not statistical performance across real traffic.",
+        "The canonical manifest digest detects mutation/order ambiguity but does not prove that the declared successor-cell universe is complete.",
+        "Upstream receipt identities are passed through and status-gated; this evaluator does not authenticate receipts or independently qualify the action domain, references, execution or observation partition.",
+        "No probabilities are inferred from cell/action counts and no physical safety or roadworthiness claim is implied."
+      ],
+      "sources": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11299",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11291",
+        "https://github.com/Luminous-Dynamics/symthaea/actions/runs/42766701368"
       ]
     }
   ],
