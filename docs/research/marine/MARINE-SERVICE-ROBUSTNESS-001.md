@@ -298,6 +298,15 @@ The 2026 JMSE physics-informed daily-fuel paper provides a leakage-resistant met
 
 A WAPS-specific predictor should test conditional physical constraints against longitudinal aerodynamic assistance/resistance and declared device state rather than impose a blanket monotonic rule on raw wind speed. The corresponding experiment is specified in [MARINE-EMS-FORECAST-REGRET-001](./MARINE-EMS-FORECAST-REGRET-001.md) and tracked in [#11473](https://github.com/Luminous-Dynamics/symthaea/issues/11473).
 
+### 14.7 Couple wind force to leeway, rudder and propeller response
+
+New public evidence shows why longitudinal-only WAPS optimization is insufficient:
+- The January 2026 Kamsarmax weather-routing study reports 1-DOF versus 3-DOF differences of 2–7% in predicted savings, up to 7% MCR in main-engine power estimates, and a 1.25% improvement when route optimization itself uses 3-DOF rather than optimizing on 1-DOF and then evaluating at 3-DOF.
+- September 2026 single-screw self-propulsion tests report strong leeway effects on thrust deduction/wake and rudder-induced propulsive-efficiency changes across tested angles.
+- SINTEF's SOBC-1 campaign provides nearly 100 physical cyber-physical test cases including variable sail side-force/application point and transient wind.
+
+These are case-specific benchmarks, not transferable correction factors. The new [#11510 WAPS 3-DOF coupling benchmark](https://github.com/Luminous-Dynamics/symthaea/issues/11510) specifies a fidelity ladder from 1-DOF screening to steady 3/4-DOF, 6-DOF route/motion analysis, propeller-hull-rudder self-propulsion and transient aerodynamic coupling. Use the lowest fidelity shown adequate for each output, and validate every observable separately.
+
 ## 15. Sources
 
 - Liu et al., 2026 wind-propelled ship deployment and technology review, International Journal of Naval Architecture and Ocean Engineering 18, 100785. https://doi.org/10.1016/j.ijnaoe.2026.100785
