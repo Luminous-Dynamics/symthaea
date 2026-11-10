@@ -69,7 +69,7 @@ This programme consumes those comparison protocols rather than creating a parall
 | **Symthaea** | Requirements decomposition, engineering knowledge, scenario orchestration, change-impact reasoning, assumptions and evidence comparison, uncertainty communication, decision-support proposals. | Not a nuclear regulator, licensed operator, safety authority or autonomous plant operator. |
 | **Symtropy** | Deterministic synthetic execution, physical rehearsal within declared model scope, event/replay evidence, counterfactuals, numerical-integrity reporting. | Not a neutronics, thermal-hydraulics, CFD, FEM, grid, naval-hydrodynamics or nuclear-safety solver by virtue of being a physics engine. |
 | **Sol-Atlas** | Spatial/geometric context, site and port layers, vessel/plant envelopes, reference frames, corridor/access reasoning, design-to-as-built comparison and spatial provenance. | Not a substitute for certified CAD, BIM, geotechnical, structural, survey or hydrographic authority. |
-| **Mycelix** | Cross-organization provenance, supplier/component records, inspection and custody evidence, revision lineage, credentials and selective disclosure. | Not the nuclear operator, safety control system, safeguards authority, emergency command or source-of-truth for external approvals. |
+| **Mycelix** | Cross-organization provenance, supplier/component records, inspection and custody evidence, revision lineage, credentials and selective disclosure; compose [NUCL-MFG-EVID-001 #6016](https://github.com/Luminous-Dynamics/mycelix/issues/6016). | Not the nuclear operator, safety control system, safeguards authority, emergency command or source-of-truth for external approvals. |
 
 ### 3.1 Composed digital-thread boundary
 
