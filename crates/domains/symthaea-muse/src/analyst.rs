@@ -1310,6 +1310,7 @@ mod tests {
             phrases: vec![],
             notes: vec![SymbolicNoteEvent {
                 id: "n".into(),
+                part_id: Some(1),
                 midi: 60,
                 pitch_name: "C4".into(),
                 onset: time(0.0),
@@ -1400,6 +1401,7 @@ mod tests {
     fn trace_fixture() -> (ListenCompositionBundle, ComposerStructuralTrace) {
         let note = |id: &str, beat: f64, emphasis: &str| SymbolicNoteEvent {
             id: id.into(),
+            part_id: Some(1),
             midi: 60 + beat as u8,
             pitch_name: "C4".into(),
             onset: time(beat),
@@ -1641,12 +1643,15 @@ mod tests {
                 id: "melody".into(),
                 name: "Melody".into(),
                 instrument: "piano".into(),
+                part_id: Some(1),
+                voice_role: Some("Melody".into()),
                 note_count: 1,
             }],
             notes: vec![PerformedNoteEvent {
                 id: "p0".into(),
                 voice_id: "melody".into(),
                 source_note_id: Some("n0".into()),
+                part_id: Some(1),
                 start_seconds: 0.0,
                 duration_seconds: 0.5,
                 frequency_hz: 261.6,
