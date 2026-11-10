@@ -496,9 +496,9 @@ pub struct PerformedVoice {
 }
 
 /// Current version of the composition-side Listen bundle.
-pub const LISTEN_COMPOSITION_BUNDLE_VERSION: u32 = 2;
+pub const LISTEN_COMPOSITION_BUNDLE_VERSION: u32 = 3;
 /// Current version of the rendered-performance bundle.
-pub const LISTEN_PERFORMANCE_BUNDLE_VERSION: u32 = 1;
+pub const LISTEN_PERFORMANCE_BUNDLE_VERSION: u32 = 2;
 /// Current version of the provenance bundle.
 pub const PIECE_PROVENANCE_BUNDLE_VERSION: u32 = 1;
 /// Current version of the Analyst verification bundle.
