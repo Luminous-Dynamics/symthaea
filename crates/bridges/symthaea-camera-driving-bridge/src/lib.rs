@@ -284,11 +284,17 @@ impl CameraDrivingBridge {
         let proprioceptive_hv = self.vehicle_encoder.encode(observation.vehicle_state).normalize();
         let visual_weight = self.config.visual_weight_ppm as f32 / 1_000_000.0;
         let proprioceptive_weight = 1.0 - visual_weight;
-        let policy_input = ContinuousHV::weighted_bundle(
-            &[&visual_state, &proprioceptive_hv],
-            &[visual_weight, proprioceptive_weight],
-        )
-        .normalize();
+        let policy_input = if self.config.visual_weight_ppm == 0 {
+            proprioceptive_hv.clone()
+        } else if self.config.visual_weight_ppm == 1_000_000 {
+            visual_state.clone()
+        } else {
+            ContinuousHV::weighted_bundle(
+                &[&visual_state, &proprioceptive_hv],
+                &[visual_weight, proprioceptive_weight],
+            )
+            .normalize()
+        };
 
         if !visual_state.as_slice().iter().all(|value| value.is_finite())
             || !proprioceptive_hv.as_slice().iter().all(|value| value.is_finite())
@@ -766,14 +772,15 @@ mod tests {
 
     #[test]
     fn rejects_frame_over_configured_allocation_bound() {
-        let mut bridge = bridge();
+        let mut cfg = config();
+        cfg.max_frame_bytes = 512;
+        let mut bridge = CameraDrivingBridge::try_new(cfg, VisionConfig::default()).unwrap();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        let mut item = observation(&pixels, 1, 10_000, &state);
-        item.pixels = &pixels;
-        item.width = 32;
-        item.height = 32;
-        assert_eq!(bridge.observe(item).err(), Some(BridgeError::FrameExceedsByteBound));
+        assert_eq!(
+            bridge.observe(observation(&pixels, 1, 10_000, &state)).err(),
+            Some(BridgeError::FrameExceedsByteBound)
+        );
         assert_eq!(bridge.frames_processed(), 0);
     }
 
