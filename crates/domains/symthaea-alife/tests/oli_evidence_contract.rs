@@ -175,6 +175,41 @@ fn not_observable_requires_an_instrument_and_coverage_record() {
     assert!(errors.iter().any(|error| error.contains("NotObservable requires observation coverage")));
 }
 
+fn model_diagnostic(id: &str) -> EvidenceRecord {
+    EvidenceRecord {
+        id: id.to_owned(),
+        basis: EvidenceBasis::DerivedInference,
+        outcome: EvidenceOutcome::DerivedResult,
+        method: "posterior-predictive residual adequacy check".to_owned(),
+        source_ref: Some("run://model-adequacy/run-001".to_owned()),
+        artifact_sha256: None,
+        independence_group: Some("model-fit-run-001".to_owned()),
+    }
+}
+
+#[test]
+fn model_inadequacy_requires_a_derived_adequacy_diagnostic() {
+    let mut unsupported = profile();
+    unsupported.findings.push(finding(
+        Property::Learning,
+        PropertyAssessment::ModelInadequate,
+        &[],
+    ));
+    let errors = unsupported.validate().expect_err("diagnostic is mandatory");
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("requires a derived model-adequacy diagnostic")));
+
+    let mut supported = profile();
+    supported.evidence.push(model_diagnostic("residuals-001"));
+    supported.findings.push(finding(
+        Property::Learning,
+        PropertyAssessment::ModelInadequate,
+        &["residuals-001"],
+    ));
+    assert!(supported.validate().is_ok());
+}
+
 #[test]
 fn unfamiliar_substrate_labels_are_open_world() {
     let mut candidate = profile();
