@@ -249,7 +249,7 @@ The published abstract describes an unconditional diffusion prior guided by two 
 
 **Muse research hypothesis:** retain the evidence-bearing performance compiler as the source of truth, then explore classifier guidance as an optional acoustic refinement stage. The phoneme and pitch objectives should remain separately observable and separately gated. Gradient conflict must not be "resolved" by silently relaxing an exact-phone or score constraint.
 
-Proposed ablation matrix on one frozen lyric/pronunciation/score corpus:
+Proposed ablation matrix on one frozen lyric/pronunciation/score corpus. The isolated research utility at `tools/vocal-guidance-lab` now accepts externally exported phoneme and pitch gradients, checks their dimensions and provenance, measures original and projected cosine similarity, and records when the two-objective projection leaves no joint guidance direction. Its fixture is synthetic mathematics only; it is not a diffusion implementation or an audio-quality result.
 
 1. Unguided acoustic baseline.
 2. Phoneme guidance only.
