@@ -33,6 +33,8 @@ const STORE_SIZES: [usize; 4] = [64, 256, 1024, 4096];
 const BATCH_SIZES: [usize; 4] = [1, 4, 16, 64];
 const TARGET_NOISE_BITS: usize = 64;
 const NOISE_STRIDE: usize = 7919;
+const MAX_QUERY_OBSERVATIONS: usize = 100_000;
+const MAX_WARMUP_BATCHES: usize = 1_000;
 
 #[derive(Debug)]
 struct Config {
@@ -96,6 +98,17 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     let config = parse_args(&args)?;
+    let query_observation_capacity = config.repetitions
+        .checked_mul(config.batch_size)
+        .ok_or_else(|| "repetition × batch sample count overflows usize".to_owned())?;
+    let scan_order_capacity = config.repetitions
+        .checked_mul(3)
+        .ok_or_else(|| "repetition × scan-arm count overflows usize".to_owned())?;
+    if query_observation_capacity > MAX_QUERY_OBSERVATIONS {
+        return Err(format!(
+            "requested {query_observation_capacity} query observations exceeds safety cap {MAX_QUERY_OBSERVATIONS}"
+        ));
+    }
     let repo_root = PathBuf::from(git_text(None, &["rev-parse", "--show-toplevel"])?);
     let repo_root = fs::canonicalize(&repo_root)
         .map_err(|error| format!("cannot canonicalize repository root: {error}"))?;
@@ -187,7 +200,7 @@ fn run() -> Result<(), String> {
     // for the alternative traversal orders. Each timed arm uses the same store,
     // query batch and canonical BinaryHV::hamming_distance implementation.
     let query_major_reference = retrieve_batch_query_major(&store, &queries)?;
-    let mut scan_order_observations = Vec::with_capacity(config.repetitions * 3);
+    let mut scan_order_observations = Vec::with_capacity(scan_order_capacity);
     let mut scan_order_elapsed_ns: [Vec<u128>; 3] =
         std::array::from_fn(|_| Vec::with_capacity(config.repetitions));
     let mut scan_order_parity_mismatches = [0usize; 3];
@@ -237,7 +250,7 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let mut observations = Vec::with_capacity(config.repetitions * config.batch_size);
+    let mut observations = Vec::with_capacity(query_observation_capacity);
     let mut batch_elapsed_ns = Vec::with_capacity(config.repetitions);
     let wall_started = Instant::now();
     for repetition in 0..config.repetitions {
@@ -623,6 +636,7 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
         let flag = args[index].as_str();
         if flag == "--help" || flag == "-h" {
             println!("hdc_retrieval_host_benchmark [--store-size 64|256|1024|4096] [--batch-size 1|4|16|64] [--repetitions N] [--warmup N] [--out DIR]");
+            println!("limits: <= {MAX_QUERY_OBSERVATIONS} query observations and <= {MAX_WARMUP_BATCHES} warm-up batches");
             std::process::exit(0);
         }
         let value = args.get(index + 1).ok_or_else(|| format!("missing value for {flag}"))?;
@@ -644,6 +658,19 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
     }
     if config.repetitions == 0 {
         return Err("--repetitions must be greater than zero".to_owned());
+    }
+    if config.warmup > MAX_WARMUP_BATCHES {
+        return Err(format!(
+            "--warmup exceeds safety cap of {MAX_WARMUP_BATCHES} batches"
+        ));
+    }
+    let query_observations = config.repetitions
+        .checked_mul(config.batch_size)
+        .ok_or_else(|| "repetition × batch sample count overflows usize".to_owned())?;
+    if query_observations > MAX_QUERY_OBSERVATIONS {
+        return Err(format!(
+            "requested {query_observations} query observations exceeds safety cap {MAX_QUERY_OBSERVATIONS}"
+        ));
     }
     Ok(config)
 }
@@ -948,6 +975,30 @@ mod tests {
         assert_eq!(percentile(&samples, 0.50), 30);
         assert_eq!(percentile(&samples, 0.95), 50);
         assert_eq!(percentile(&samples, 0.99), 50);
+    }
+
+    #[test]
+    fn benchmark_sample_and_warmup_limits_prevent_unbounded_allocations() {
+        let too_many_queries = parse_args(&[
+            "--batch-size".to_owned(), "64".to_owned(),
+            "--repetitions".to_owned(), "2000".to_owned(),
+        ]);
+        assert!(too_many_queries.is_err());
+
+        let too_many_warmups = parse_args(&[
+            "--warmup".to_owned(), (MAX_WARMUP_BATCHES + 1).to_string(),
+        ]);
+        assert!(too_many_warmups.is_err());
+    }
+
+    #[test]
+    fn p99_qualification_sample_plan_is_allowed_within_cap() {
+        let config = parse_args(&[
+            "--batch-size".to_owned(), "1".to_owned(),
+            "--repetitions".to_owned(), "1000".to_owned(),
+        ]).unwrap();
+        assert_eq!(config.repetitions * config.batch_size, 1000);
+        assert!(config.repetitions * config.batch_size <= MAX_QUERY_OBSERVATIONS);
     }
 
     #[test]
