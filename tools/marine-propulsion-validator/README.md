@@ -4,7 +4,7 @@ A small, standalone Rust CLI for the MARINE-WAPS-CO-DESIGN-001 case contract.
 
 ## Run
 
-From this directory, test the retained v0.1.0, v0.2.0 and v0.3.0 contracts:
+From this directory, test the retained v0.1.0, v0.2.0, v0.3.0 and v0.4.0 contracts:
 
 ~~~sh
 cargo test
@@ -119,6 +119,9 @@ The regulatory audit checks the register against Draft 2020-12, verifies source/
   requirements; timebase evidence-source/rights binding; nominal-vs-measured sample-rate basis;
   start-inclusive/end-exclusive windows; explicit rate/count tolerance and sample-rate/window
   consistency checks.
+- v0.4.0 timebase reference epoch and residual drift-rate uncertainty; channel alignment bounds
+  include base synchronization uncertainty plus accumulated drift uncertainty at the farthest
+  sample-window endpoint. Unknown drift uncertainty remains INCOMPLETE, never zero.
 - v0.3.0 timebase uncertainty comparison uses reviewed conversion between seconds, milliseconds,
   microseconds, minutes and hours rather than requiring identical unit strings.
 
@@ -135,11 +138,13 @@ The v0.2.0 profile is documented in `docs/research/marine/MARINE-SERVICE-FINGERP
 - marine-propulsion-case-v0.3.0.schema.json adds calibration evidence source, certificate
   digest, reviewer, method and rights metadata; timebase evidence/rights metadata; sample-rate
   basis; and a declared half-open sample-window convention with count/rate tolerance.
+- marine-propulsion-case-v0.4.0.schema.json adds reference_epoch and a provenance-bearing
+  drift_uncertainty_ppm quantity, with an explicit residual-rate-after-correction interpretation.
 - `marine-regulatory-rule-register-v0.2.0.schema.json` and its dated register are the preferred current snapshot; they keep emissions year, surrender year, route coverage and gas-scope years separate.
 - `marine-causal-study-protocol-v0.1.0.schema.json` defines preregistered estimands, treatment states, confounders, battery boundaries, identification gates and negative controls. Its synthetic fixture is deliberately NOT_READY.
 - The package also contains standalone audit binaries for the regulatory register, causal-study protocol , WAPS wind-energy evidence and deterministic source-energy ledger. The wind-energy audit deliberately leaves statutory wind energy unknown until a valid implementing-act method is represented. They check contract/readiness conditions only; neither is a regulatory decision nor a causal estimator.
-- v0.2.0 and v0.3.0 fixtures are synthetic. Their registry entries are software-test data,
-  not calibration, metrology or operational evidence. The v0.2.0 service fingerprint is a
+- v0.2.0, v0.3.0 and v0.4.0 fixtures are synthetic. Their registry entries are software-test
+  data, not calibration, metrology or operational evidence. The v0.2.0 service fingerprint is a
   known-answer software test vector.
 - The service fingerprint distinguishes numeric zero, explicit unknown, explicit not-applicable,
   and omitted optional fields. Required transport work and route distance cannot be not-applicable.
