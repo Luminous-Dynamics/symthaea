@@ -327,6 +327,46 @@
       "limitations": [
         "This snapshot becomes stale after subsequent IMO sessions or decisions; refresh before future use."
       ]
+    },
+    {
+      "rule_id": "IMO-ISSM-NEW-SHIPS-DRAFT-2026",
+      "title": "Draft International Ship Manoeuvrability Standards and goal-based SOLAS steering/propulsion revisions",
+      "authority": "International Maritime Organization",
+      "instrument": "SDC 12 outcome and ongoing SOLAS Chapter II-1 (Part C)/Chapter V work",
+      "revision_or_resolution": "SDC 12, 19–23 January 2026; dated regulatory snapshot 10 November 2026",
+      "rule_status": "under_review",
+      "legal_character": "committee_workplan",
+      "dates": {
+        "review_scheduled_from": "2027-01-01"
+      },
+      "applicability": {
+        "ship_scope": "Proposed new ISSM intended for new ships subject to draft goal-based SOLAS steering/propulsion regulations; exact ship/type/date scope is not yet adopted.",
+        "geographic_scope": "Potential international SOLAS application, subject to final instruments and ratification/entry-into-force terms.",
+        "voyage_scope": "Design/manoeuvrability test and trial requirements; future standards are not yet binding.",
+        "conditions": [
+          "SDC 12 continued work on goal-based SOLAS II-1 (Part C) and Chapter V steering/propulsion revisions intended to cover traditional and non-traditional systems.",
+          "SDC 12 discussed new International Ship Manoeuvrability Standards for new ships subject to the new goal-based regulations; basic principles were agreed in principle but further technical work was required.",
+          "Current roadmap anticipates SDC 13 work in 2027, expected adoption around 2029 and target entry into force 1 January 2032; dates are planned milestones only.",
+          "Current MSC.137(76) standards remain the manoeuvrability reference for existing ships under the stated roadmap."
+        ],
+        "exclusions_or_unknowns": [
+          "No new ISSM has been adopted as of 10 November 2026.",
+          "Do not treat roadmap dates as binding application dates.",
+          "Final ship scope, construction-date transition and manoeuvring criteria remain subject to technical and legal development."
+        ]
+      },
+      "output_scope": [
+        "future manoeuvrability rule scenario",
+        "new-ship design/test planning",
+        "trial-data contribution planning"
+      ],
+      "source_ids": [
+        "IMO-SDC12-STEERING-MANOEUVRABILITY-ROADMAP-2026"
+      ],
+      "limitations": [
+        "Committee outcome and roadmap do not create a current compliance obligation.",
+        "Confirm later SDC/MSC decisions and final text before use."
+      ]
     }
   ],
   "sources": [
@@ -403,6 +443,17 @@
       "evidence_class": "dated_official_status_snapshot",
       "limitations": [
         "Pending proposals are not binding requirements; refresh after MEPC 85."
+      ]
+    },
+    {
+      "source_id": "IMO-SDC12-STEERING-MANOEUVRABILITY-ROADMAP-2026",
+      "title": "IMO SDC 12 steering/propulsion and new manoeuvrability standards roadmap",
+      "publisher": "IMO",
+      "uri": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/sdc-12.aspx",
+      "publication_date": "2026-01-23",
+      "evidence_class": "official_subcommittee_workplan",
+      "limitations": [
+        "Draft ISSM and SOLAS revisions are not adopted/effective requirements in the dated snapshot."
       ]
     }
   ]
