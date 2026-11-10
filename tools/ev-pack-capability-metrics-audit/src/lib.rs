@@ -1205,7 +1205,8 @@ mod tests {
 
     #[test]
     fn censored_eol_never_gets_dropped_from_beta_life() {
-        let row = report()
+        let audited = report();
+        let row = audited
             .payload
             .cases
             .iter()
@@ -1223,7 +1224,8 @@ mod tests {
 
     #[test]
     fn partial_coverage_computes_sigma_only_for_observed_subset() {
-        let row = report()
+        let audited = report();
+        let row = audited
             .payload
             .cases
             .iter()
@@ -1243,7 +1245,8 @@ mod tests {
 
     #[test]
     fn module_resolution_never_uses_cell_specific_beta_metrics() {
-        let row = report()
+        let audited = report();
+        let row = audited
             .payload
             .cases
             .iter()
