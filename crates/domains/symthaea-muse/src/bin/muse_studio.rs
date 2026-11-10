@@ -4105,7 +4105,7 @@ fn performance_bundle_payload(
         let exact_source_mapping = source_part_id.is_some()
             && expected_count == Some(voice.notes.len());
 
-        if let Some(role) = source_role {
+        if source_role.is_some() {
             let expected = expected_count.unwrap_or(0);
             if expected != voice.notes.len() {
                 warnings.push(BundleWarning {
@@ -4125,7 +4125,6 @@ fn performance_bundle_payload(
                     ),
                 });
             }
-            let _ = role;
         }
 
         summaries.push(PerformanceVoiceSummary {
@@ -4191,7 +4190,8 @@ fn title_recipe_summary(
 #[cfg(test)]
 mod piece_bundle_tests {
     use super::{
-        cadence_events, orchestration_regions, section_regions, sonority_regions, symbolic_notes,
+        cadence_events, orchestration_regions, section_regions, sonority_regions,
+        source_part_id_for_role, symbolic_notes,
     };
     use symthaea_music_theory::{
         Duration, Emphasis, FormKind, Key, PartId, Pitch, PitchClass, Score, ScoreNote, VoiceRole,
