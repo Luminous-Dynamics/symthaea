@@ -39,7 +39,9 @@ Delegation graph semantics remain separate: #11248 owns mandate/delegation edges
 
 The v0.1 corpus contains 17 synthetic cases:
 - Eight valid fixtures: repeat/no-change, evidence-supported revision, social exposure without evidence, abstention under uncertainty, matched-pair estimate, normative pluralism, missing measurement and source correction.
-- Eight negative controls: false Changed with identical state hashes, Missing with a post-state, causal estimate without a pair, overlapping claim deltas, delivered message without channel event, missing answer-space identity, open-world correctness score, same-run treatment/control, and a mismatched shared-input digest in a causal pair.
+- Nine negative controls: false Changed with identical state hashes, Missing with a post-state, causal estimate without a pair, overlapping claim deltas, delivered message without channel event, missing answer-space identity, open-world correctness score, same-run treatment/control, and a mismatched shared-input digest in a causal pair.
+
+Truth profiles are assigned by fixture semantics: only tasks with a frozen synthetic answer space use `SyntheticKnownAnswer`; measurement, social-claim-integrity, open-world and normative-pluralism controls do not inherit a correctness oracle by default.
 
 Negative controls are expected to be rejected; they are not failed empirical experiments.
 
