@@ -644,6 +644,10 @@ pub struct PhraseRegion {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SymbolicNoteEvent {
     pub id: String,
+    /// Generator-authored persistent musical line identity. None means the
+    /// source Score did not provide a real PartId; consumers must not infer it.
+    #[serde(default)]
+    pub part_id: Option<u16>,
     pub midi: u8,
     pub pitch_name: String,
     pub onset: MusicalTime,
@@ -803,6 +807,12 @@ pub struct PerformanceVoiceSummary {
     pub id: String,
     pub name: String,
     pub instrument: String,
+    /// Set only when this realized voice maps to exactly one source PartId.
+    /// Role-aggregated and renderer-added voices leave it absent.
+    #[serde(default)]
+    pub part_id: Option<u16>,
+    #[serde(default)]
+    pub voice_role: Option<String>,
     pub note_count: usize,
 }
 
@@ -814,6 +824,9 @@ pub struct PerformedNoteEvent {
     pub id: String,
     pub voice_id: String,
     pub source_note_id: Option<String>,
+    /// Exact source PartId only when source_note_id is safely mapped.
+    #[serde(default)]
+    pub part_id: Option<u16>,
     pub start_seconds: f64,
     pub duration_seconds: f64,
     pub frequency_hz: f64,
