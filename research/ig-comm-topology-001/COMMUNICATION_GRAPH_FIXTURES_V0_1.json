@@ -313,7 +313,8 @@
           "AGENT-04"
         ],
         "minimum_selected_agent_instance_id": "AGENT-00",
-        "maximum_selected_agent_instance_id": "AGENT-03"
+        "maximum_selected_agent_instance_id": "AGENT-03",
+        "reciprocity": "required"
       },
       "graph_sha256": "ceae4d221d2efebd93c0d24375ffaa935960ef39c7fcac9576a8a077552b89ad"
     },
@@ -626,7 +627,8 @@
           "AGENT-00"
         ],
         "minimum_selected_agent_instance_id": "AGENT-01",
-        "maximum_selected_agent_instance_id": "AGENT-00"
+        "maximum_selected_agent_instance_id": "AGENT-00",
+        "reciprocity": "required"
       },
       "graph_sha256": "e8028a024c82c789385e47e6cf23d4c5771f486701cd195a23bacf248791a2ea"
     },
@@ -964,7 +966,8 @@
           "AGENT-01"
         ],
         "minimum_selected_agent_instance_id": "AGENT-04",
-        "maximum_selected_agent_instance_id": "AGENT-01"
+        "maximum_selected_agent_instance_id": "AGENT-01",
+        "reciprocity": "required"
       },
       "graph_sha256": "4c743ccec547317f633398dd48cd4753e36f6e5c397b12601b016b62c6168df4"
     },
@@ -1873,7 +1876,8 @@
           "AGENT-07"
         ],
         "minimum_selected_agent_instance_id": "AGENT-00",
-        "maximum_selected_agent_instance_id": "AGENT-00"
+        "maximum_selected_agent_instance_id": "AGENT-00",
+        "reciprocity": "not_required_for_unsupported_tie_control"
       },
       "graph_sha256": "4f6c2b8546e3b03ef6cf81bdae4371a181c66571a667a8f900e19daff8c02187"
     },
@@ -2334,7 +2338,8 @@
           "AGENT-07"
         ],
         "minimum_selected_agent_instance_id": "AGENT-00",
-        "maximum_selected_agent_instance_id": "AGENT-00"
+        "maximum_selected_agent_instance_id": "AGENT-00",
+        "reciprocity": "not_required_for_unsupported_tie_control"
       },
       "graph_sha256": "103f18bb9803992f2a8a3245b69ee97cf7d7f329ef2217191cacc00b0085cb9b"
     },
@@ -2815,7 +2820,8 @@
           "AGENT-04"
         ],
         "minimum_selected_agent_instance_id": "AGENT-00",
-        "maximum_selected_agent_instance_id": "AGENT-03"
+        "maximum_selected_agent_instance_id": "AGENT-03",
+        "reciprocity": "required"
       },
       "graph_sha256": "83f1e9f13efd057629cb3a32f487bc38692be262cae537929e38842709f1296c"
     },
@@ -3294,7 +3300,8 @@
           "AGENT-02"
         ],
         "minimum_selected_agent_instance_id": "AGENT-03",
-        "maximum_selected_agent_instance_id": "AGENT-02"
+        "maximum_selected_agent_instance_id": "AGENT-02",
+        "reciprocity": "required"
       },
       "graph_sha256": "571c9efe1599fe5891265822329061bb816ba7e806ae587e57d9bbb57b6bea70"
     },
@@ -3310,42 +3317,65 @@
         {
           "agent_instance_id": "AGENT-00",
           "principal_ref": "PRINCIPAL-00",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-01",
           "principal_ref": "PRINCIPAL-01",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-02",
           "principal_ref": "PRINCIPAL-02",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-03",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-04",
           "principal_ref": "PRINCIPAL-04",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-05",
           "principal_ref": "PRINCIPAL-05",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-06",
           "principal_ref": "PRINCIPAL-06",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": null
         },
         {
           "agent_instance_id": "AGENT-07",
           "principal_ref": "PRINCIPAL-03",
-          "role": "participant"
+          "role": "participant",
+          "active_from_round": 0,
+          "active_until_round": 6
+        },
+        {
+          "agent_instance_id": "AGENT-07-R2",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant",
+          "active_from_round": 8,
+          "active_until_round": null
         }
       ],
       "edges": [
@@ -3443,6 +3473,20 @@
             "challenge"
           ],
           "active_from_round": 0,
+          "active_until_round": 2,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-3-4-F-R2",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 4,
           "active_until_round": null,
           "capacity_per_round": 4,
           "latency_ticks": 0
@@ -3457,6 +3501,20 @@
             "challenge"
           ],
           "active_from_round": 0,
+          "active_until_round": 2,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-3-4-R-R2",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 4,
           "active_until_round": null,
           "capacity_per_round": 4,
           "latency_ticks": 0
@@ -3527,6 +3585,20 @@
             "challenge"
           ],
           "active_from_round": 0,
+          "active_until_round": 6,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-6-7-F-R2",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-07-R2",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 8,
           "active_until_round": null,
           "capacity_per_round": 4,
           "latency_ticks": 0
@@ -3541,6 +3613,20 @@
             "challenge"
           ],
           "active_from_round": 0,
+          "active_until_round": 6,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-6-7-R-R2",
+          "sender": "AGENT-07-R2",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 8,
           "active_until_round": null,
           "capacity_per_round": 4,
           "latency_ticks": 0
@@ -3641,9 +3727,10 @@
           "AGENT-04"
         ],
         "minimum_selected_agent_instance_id": "AGENT-00",
-        "maximum_selected_agent_instance_id": "AGENT-03"
+        "maximum_selected_agent_instance_id": "AGENT-03",
+        "reciprocity": "required"
       },
-      "graph_sha256": "6b220afcf8b1638336ca0565b8b3a0bdb5bf47440123c471a1c001575003380c"
+      "graph_sha256": "219759a5474177136e2818a62e7fc5f060c5ca96bbbc510a36b95d4abdc1242e"
     }
   ],
   "fixtures": [
