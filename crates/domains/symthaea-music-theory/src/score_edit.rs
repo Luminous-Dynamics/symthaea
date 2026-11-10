@@ -670,10 +670,40 @@ mod tests {
     #[test]
     fn rejects_a_note_that_crosses_the_edit_window_boundary() {
         let source = source_score();
-        let result = apply_score_edit_plan(&source, &plan(vec![operation("partial", 1, 2)]), &digest());
+        // The first note sounds on [0,1); this edit starts at 1/2, so the
+        // source event crosses the left boundary and must not be truncated.
+        let mut op = operation("partial", 1, 2);
+        op.start = EditBeatV1 { numerator: 1, denominator: 2 };
+        let result = apply_score_edit_plan(&source, &plan(vec![op]), &digest());
         assert!(result.is_err());
         assert!(result.unwrap_err().iter().any(|issue| {
             issue.code == ScoreEditIssueCodeV1::PartialNoteBoundary
+        }));
+    }
+
+    #[test]
+    fn exact_half_open_boundary_does_not_edit_the_note_ending_at_window_start() {
+        let source = source_score();
+        // Part 10's first note ends exactly at beat 1. The half-open edit
+        // window [1,2) must not select or report a partial overlap for it.
+        let result = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("after-first-note", 1, 2)]),
+            &digest(),
+        ).expect("abutting note boundary is valid");
+        assert_eq!(result.receipt.changed_note_indices, vec![1]);
+        assert_eq!(result.candidate.notes[0].velocity, source.notes[0].velocity);
+        assert_eq!(result.candidate.notes[1].velocity, source.notes[1].velocity / 2.0);
+    }
+
+    #[test]
+    fn rejects_a_target_window_with_no_fully_contained_notes() {
+        let source = source_score();
+        let mut op = operation("empty-target", 10, 11);
+        op.part_id = 10;
+        let result = apply_score_edit_plan(&source, &plan(vec![op]), &digest());
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEditIssueCodeV1::EmptyTargetSelection
         }));
     }
 
