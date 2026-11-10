@@ -29,6 +29,7 @@ use std::collections::BTreeSet;
 use thiserror::Error;
 
 const MAX_FEATURES: usize = 4096;
+const MAX_DENSE_REFERENCE_FEATURES: usize = 512;
 const MAX_FACTORS: usize = 64;
 const DIGEST_LENGTH: usize = 64;
 /// Declared covariance model Sigma = D + U U^T.
@@ -90,6 +91,8 @@ pub enum FactorCovarianceError {
     EmptyModelVersion,
     #[error("feature count must be in 1..={MAX_FEATURES}, received {actual}")]
     InvalidFeatureCount { actual: usize },
+    #[error("dense reference dimension {actual} exceeds the registered maximum {maximum}")]
+    DenseReferenceDimensionExceeded { actual: usize, maximum: usize },
     #[error("feature identifier at index {index} is empty or duplicated")]
     InvalidFeatureId { index: usize },
     #[error("feature unit at index {index} is empty")]
@@ -264,6 +267,12 @@ impl FactorCovarianceModel {
     pub fn dense_covariance(&self) -> Result<Vec<Vec<f64>>, FactorCovarianceError> {
         self.validate()?;
         let dimension = self.dimension();
+        if dimension > MAX_DENSE_REFERENCE_FEATURES {
+            return Err(FactorCovarianceError::DenseReferenceDimensionExceeded {
+                actual: dimension,
+                maximum: MAX_DENSE_REFERENCE_FEATURES,
+            });
+        }
         let rank = self.rank();
         let mut covariance = vec![vec![0.0; dimension]; dimension];
 
@@ -803,6 +812,20 @@ mod tests {
         let report = assess_residual_correlation_adequacy(&evidence).unwrap();
         assert_eq!(report.status, FactorAdequacyStatus::NoDetectedResidualCorrelation);
         assert_eq!(report.evidence_digest, evidence.evidence_digest);
+    }
+
+    #[test]
+    fn dense_reference_materialization_is_capped_to_small_fixtures() {
+        let model = fixture(513, 1);
+        assert!(matches!(
+            model.dense_covariance(),
+            Err(FactorCovarianceError::DenseReferenceDimensionExceeded {
+                actual: 513,
+                maximum: 512
+            })
+        ));
+        // The production Woodbury path remains available above the dense cap.
+        assert!(model.mahalanobis_squared(&residual(513)).is_ok());
     }
 
     #[test]
