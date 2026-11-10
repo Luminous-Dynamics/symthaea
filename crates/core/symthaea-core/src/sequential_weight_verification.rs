@@ -1400,13 +1400,10 @@ mod tests {
         // production alpha-spending schedule. Each finite DP computes the
         // exact path probability under a zero-mean bounded paired-loss null.
         for candidate_index in 1..=8_u64 {
-            let false_accept_probability = exact_null_false_accept_probability(
-                candidate_index,
-                max_look,
-                campaign_alpha,
-            );
-            let candidate_alpha = campaign_alpha
-                / (candidate_index as f64 * (candidate_index + 1) as f64);
+            let false_accept_probability =
+                exact_null_false_accept_probability(candidate_index, max_look, campaign_alpha);
+            let candidate_alpha =
+                campaign_alpha / (candidate_index as f64 * (candidate_index + 1) as f64);
 
             assert!(
                 false_accept_probability <= candidate_alpha + 1e-12,
