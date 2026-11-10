@@ -583,7 +583,6 @@ impl FormantSingingEngine {
     }
 }
 
-
 fn validate_formant_language(language: &str) -> Result<()> {
     if !matches!(language, "en" | "en-US") {
         bail!(
@@ -1607,7 +1606,10 @@ mod tests {
             )
             .unwrap_err()
             .to_string();
-        assert!(error.contains("cannot satisfy required control PhraseExpressionCurve"), "{error}");
+        assert!(
+            error.contains("cannot satisfy required control PhraseExpressionCurve"),
+            "{error}"
+        );
 
         let stem = engine
             .render_resolved_plan_with_policy(
