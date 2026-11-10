@@ -1,0 +1,96 @@
+{
+  "schema_version": "oli-ape-spatial-source-manifest-v0.1",
+  "manifest_id": "OLI-APE-SPATIAL-001-SOURCE-001",
+  "task": {
+    "name": "great-ape-hidden-object-displacement",
+    "cognitive_domain": "physical",
+    "specific_domain": "tracking_object_displacements",
+    "study_id": "albiach2010great",
+    "publication": {
+      "authors": "Albiach-Serrano, Call, and Barth",
+      "year": 2010,
+      "title": "Great apes track hidden objects after changes in the objects' position and in subject's orientation",
+      "journal": "American Journal of Primatology",
+      "doi": "10.1002/ajp.20790"
+    }
+  },
+  "dataset": {
+    "name": "EVApeCognition Dataset",
+    "repository": "https://github.com/ccp-eva/EVApeCognition",
+    "concept_doi": "https://doi.org/10.5281/zenodo.18846348",
+    "immutable_version_doi": null,
+    "immutable_version_status": "PENDING_VERSION_RESOLUTION",
+    "reported_license": "CC-BY-4.0",
+    "license_evidence": [
+      "EVApeCognition repository README states CC-BY 4.0",
+      "Scientific Data descriptor states the dataset is CC-BY 4.0"
+    ],
+    "rights_boundary": "Do not ingest or redistribute data beyond the declared dataset release. The dataset paper states that original contributing authors remain responsible for the accuracy and completeness of contributed data."
+  },
+  "source_artifacts": [
+    {
+      "path": "study_files/albiach2010great/albiach2010great.yaml",
+      "git_blob_sha": "48c496801758f2db7b46edab5a2f2f9772535f35",
+      "role": "study metadata, abstract, task taxonomy and experiment scope"
+    },
+    {
+      "path": "study_files/albiach2010great/albiach2010great_data.csv",
+      "git_blob_sha": "92499810019fb631fffb508dbacc1de2e550797b",
+      "role": "standardized trial-level source data; not copied into this research artifact"
+    },
+    {
+      "path": "study_files/albiach2010great/albiach2010great_glossary.csv",
+      "git_blob_sha": "0ef7b2a6f61e664f41d52a96d6773142a538a51e",
+      "role": "variable definitions"
+    },
+    {
+      "path": "general_files/domains_definitions.csv",
+      "git_blob_sha": "fe3d935e75173a8b712b88af00f91754e8d1ced5",
+      "role": "dataset-wide cognitive domain definitions"
+    }
+  ],
+  "observed_data_profile": {
+    "rows": 375,
+    "study_count": 1,
+    "experiment_count": 1,
+    "subjects": 25,
+    "conditions": [
+      "no_displacement",
+      "rotate",
+      "slide",
+      "rotate-slide",
+      "slide-rotate"
+    ],
+    "trials_per_subject_per_condition": 3,
+    "invalid_outcomes": 0,
+    "species_counts": {
+      "chimpanzee": 8,
+      "bonobo": 5,
+      "gorilla": 5,
+      "orangutan": 7
+    }
+  },
+  "data_minimization": {
+    "raw_participant_names_exported": false,
+    "separate_ape_roster_ingested": false,
+    "birth_dates_or_parentage_ingested": false,
+    "exact_individual_history_exported": false,
+    "subject_linkage": "Use an internal stable pseudonymous token only for repeated-measures grouping and subject-held-out split construction. Do not export the token-to-name mapping.",
+    "demographics": "Age and sex are excluded from the initial pilot; species may be retained as a coarse source descriptor but not used to rank species."
+  },
+  "evaluation_boundary": {
+    "independent_unit": "subject",
+    "split_policy": "leave-one-subject-out; all trials from a subject remain in the same fold",
+    "cross_study_generalization": false,
+    "cross_species_ranking": false,
+    "universal_intelligence_claim": false,
+    "consciousness_claim": false
+  },
+  "limitations": [
+    "This is one study and one spatial/object-tracking task.",
+    "The standardized source contains repeated trials within subjects.",
+    "Only 150 of 246 publications in the EVApeCognition source-literature pool were standardized at the time reported in the 2026 descriptor.",
+    "The source authors disclaim responsibility for the accuracy/completeness of contributing original datasets.",
+    "The exact immutable Zenodo version DOI must be resolved before a benchmark release."
+  ]
+}
