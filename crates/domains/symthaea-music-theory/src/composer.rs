@@ -592,7 +592,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
         tx.climax_grace,
     );
     if tx.held_arrivals {
-        apply_held_arrivals(&mut score, meter_beats);
+        apply_held_arrivals(&mut score, GENERAL_MELODY_PART_V1, meter_beats);
     }
     if tx.hook_cell {
         apply_hook_memory(
@@ -685,7 +685,15 @@ fn compose_with_spec_and_form_and_grammar_impl(
         );
     }
     if tx.deceptive_close {
-        apply_deceptive_first_close(&mut score, key, intent.bars.max(1) as i64, meter_beats);
+        apply_deceptive_first_close(
+            &mut score,
+            GENERAL_MELODY_PART_V1,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            key,
+            intent.bars.max(1) as i64,
+            meter_beats,
+        );
     }
     apply_pivot_modulations(
         &mut score,
@@ -702,6 +710,8 @@ fn compose_with_spec_and_form_and_grammar_impl(
         // the coda becomes the true arrival.
         apply_evaded_return_close(
             &mut score,
+            GENERAL_MELODY_PART_V1,
+            GENERAL_BASS_PART_V1,
             key,
             &form,
             intent.bars.max(1) as i64,
@@ -722,7 +732,13 @@ fn compose_with_spec_and_form_and_grammar_impl(
         apply_parallel_planing(&mut score, &form, bars as i64, meter_beats);
     }
     if tx.staged_entrances {
-        apply_staged_entrances(&mut score, &form, meter_beats);
+        apply_staged_entrances(
+            &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            &form,
+            meter_beats,
+        );
     }
     if tx.damage > 0.0 {
         apply_damage(
@@ -744,7 +760,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
             apply_grief_suspensions(&mut score, &form, meter_beats, intent);
         }
         Some(crate::spec::Attitude::Defiance) => {
-            apply_defiant_syncopation(&mut score, meter_beats);
+            apply_defiant_syncopation(&mut score, GENERAL_MELODY_PART_V1, meter_beats);
             for n in score.notes.iter_mut() {
                 if n.role == VoiceRole::Bass {
                     n.velocity = (n.velocity + 0.08).clamp(0.1, 1.0);
@@ -752,7 +768,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
             }
         }
         Some(crate::spec::Attitude::Joy) => {
-            apply_joyful_lift(&mut score);
+            apply_joyful_lift(&mut score, GENERAL_MELODY_PART_V1);
         }
         _ => {}
     }
@@ -819,7 +835,12 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // style's phrase rhetoric — the conversational layer the second
     // melodic-DNA review localized ("the opening sentence differs; the
     // conversation afterward still sounds recognizably Muse").
-    apply_phrase_rhetoric(&mut score, spec.rhetoric, meter_beats);
+    apply_phrase_rhetoric(
+        &mut score,
+        GENERAL_MELODY_PART_V1,
+        spec.rhetoric,
+        meter_beats,
+    );
     (score, Some(form))
 }
 
@@ -1199,6 +1220,8 @@ fn apply_development_style(
 /// coda's) is never touched.
 fn apply_evaded_return_close(
     score: &mut Score,
+    melody_part: PartId,
+    bass_part: PartId,
     key: Key,
     form: &Form,
     bars: i64,
@@ -1223,12 +1246,12 @@ fn apply_evaded_return_close(
             continue;
         }
         match n.role {
-            VoiceRole::Bass => {
+            VoiceRole::Bass if n.part == bass_part => {
                 // First inversion: the ground under the cadence is the
                 // mediant, not the root — the weight never lands.
                 score.notes[i].pitch = mediant_bass;
             }
-            VoiceRole::Melody => {
+            VoiceRole::Melody if n.part == melody_part => {
                 if n.pitch.pitch_class() == tonic_pc {
                     // The tune gestures at home and steps to 3̂ instead.
                     score.notes[i].pitch = scale.degree_pitch(3, 5);
@@ -2204,7 +2227,15 @@ fn nearest_leading(
 /// close honestly — the deception works because the promise is
 /// eventually kept), and the pass runs before intro-shift so bar
 /// arithmetic is section-relative.
-fn apply_deceptive_first_close(score: &mut Score, key: Key, bars: i64, meter_beats: f64) {
+fn apply_deceptive_first_close(
+    score: &mut Score,
+    melody_part: PartId,
+    bass_part: PartId,
+    harmony_part: PartId,
+    key: Key,
+    bars: i64,
+    meter_beats: f64,
+) {
     // The opening period spans bars 0..2*bars; its consequent's final bar:
     let target_bar = 2 * bars - 1;
     let (lo, hi) = (
@@ -2222,7 +2253,7 @@ fn apply_deceptive_first_close(score: &mut Score, key: Key, bars: i64, meter_bea
     let mut harmony_idx: Vec<usize> = (0..score.notes.len())
         .filter(|&i| {
             let n = &score.notes[i];
-            n.role == VoiceRole::Harmony && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
+            n.part == harmony_part && n.role == VoiceRole::Harmony && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
         })
         .collect();
     harmony_idx.sort_by(|&a, &b| {
@@ -2240,7 +2271,7 @@ fn apply_deceptive_first_close(score: &mut Score, key: Key, bars: i64, meter_bea
     // Bass: the deceptive step — up to the submediant root.
     for i in 0..score.notes.len() {
         let n = &score.notes[i];
-        if n.role == VoiceRole::Bass && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi {
+        if n.part == bass_part && n.role == VoiceRole::Bass && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi {
             score.notes[i].pitch = scale.degree_pitch(6, 2);
         }
     }
@@ -2249,7 +2280,8 @@ fn apply_deceptive_first_close(score: &mut Score, key: Key, bars: i64, meter_bea
     // 3̂ are — the deception is smoothest when the tune doesn't move).
     for i in 0..score.notes.len() {
         let n = &score.notes[i];
-        if n.role == VoiceRole::Melody
+        if n.part == melody_part
+            && n.role == VoiceRole::Melody
             && n.onset.beats() >= lo - 1e-9
             && n.onset.beats() < hi
             && !vi_pcs.contains(&n.pitch.pitch_class())
@@ -2288,6 +2320,7 @@ fn apply_deceptive_first_close(score: &mut Score, key: Key, bars: i64, meter_bea
 ///   drum-major would give even with no kit playing.
 fn apply_phrase_rhetoric(
     score: &mut Score,
+    melody_part: PartId,
     rhetoric: crate::spec::PhraseRhetoric,
     meter_beats: f64,
 ) {
@@ -2298,7 +2331,8 @@ fn apply_phrase_rhetoric(
     let cadentials: Vec<usize> = {
         let mut idx: Vec<usize> = (0..score.notes.len())
             .filter(|&i| {
-                score.notes[i].role == VoiceRole::Melody
+                score.notes[i].part == melody_part
+                    && score.notes[i].role == VoiceRole::Melody
                     && score.notes[i].emphasis == Emphasis::Cadential
             })
             .collect();
@@ -2323,7 +2357,8 @@ fn apply_phrase_rhetoric(
                     let target = (0..score.notes.len())
                         .filter(|&j| {
                             let n = &score.notes[j];
-                            n.role == VoiceRole::Melody
+                            n.part == melody_part
+                                && n.role == VoiceRole::Melody
                                 && n.emphasis != Emphasis::Climax
                                 && n.onset.beats() < stop - 0.25
                                 && (n.onset + n.duration).beats() > stop
@@ -2356,7 +2391,9 @@ fn apply_phrase_rhetoric(
                 let prev = (0..score.notes.len())
                     .filter(|&j| {
                         let n = &score.notes[j];
-                        n.role == VoiceRole::Melody
+                        n.part == melody_part
+                            && n.part == melody_part
+                            && n.role == VoiceRole::Melody
                             && ((n.onset + n.duration).beats() - cad_onset.beats()).abs() < 1e-6
                     })
                     .max_by(|&a, &b| {
@@ -2495,10 +2532,10 @@ fn apply_grief_suspensions(
 /// score itself (so the MIDI carries it, not just the render). Phrase
 /// starts, cadences, and the climax keep their placement: defiance
 /// disturbs the middle of the sentence, not its punctuation.
-fn apply_defiant_syncopation(score: &mut Score, meter_beats: f64) {
+fn apply_defiant_syncopation(score: &mut Score, melody_part: PartId, meter_beats: f64) {
     let eighth = Duration::new(1, 2);
     for n in score.notes.iter_mut() {
-        if n.role != VoiceRole::Melody || n.emphasis != Emphasis::Normal {
+        if n.part != melody_part || n.role != VoiceRole::Melody || n.emphasis != Emphasis::Normal {
             continue;
         }
         let beats = n.onset.beats();
@@ -2518,9 +2555,9 @@ fn apply_defiant_syncopation(score: &mut Score, meter_beats: f64) {
 /// Joy's signature: LIFT. Interior melody notes sound lighter — a tenth
 /// shorter — so the line dances instead of singing legato. Long tones
 /// (holds, cadences) keep their length; joy is airborne, not clipped.
-fn apply_joyful_lift(score: &mut Score) {
+fn apply_joyful_lift(score: &mut Score, melody_part: PartId) {
     for n in score.notes.iter_mut() {
-        if n.role == VoiceRole::Melody && n.emphasis == Emphasis::Normal && n.duration.beats() < 1.5
+        if n.part == melody_part && n.role == VoiceRole::Melody && n.emphasis == Emphasis::Normal && n.duration.beats() < 1.5
         {
             n.duration = n.duration.scale(9, 10);
         }
@@ -2530,11 +2567,11 @@ fn apply_joyful_lift(score: &mut Score) {
 /// Curiosity's signature: the QUESTION. The piece's very last melody tone
 /// resolves UP to scale degree 2 instead of settling on the tonic —
 /// question intonation, the ending that leaves without answering.
-fn apply_curious_question(score: &mut Score, key: Key) {
+fn apply_curious_question(score: &mut Score, melody_part: PartId, key: Key) {
     let Some(last) = score
         .notes
         .iter_mut()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.part == melody_part && n.role == VoiceRole::Melody)
         .max_by(|a, b| a.onset.beats().total_cmp(&b.onset.beats()))
     else {
         return;
@@ -3438,7 +3475,13 @@ pub fn section_bar_map(form: &Form) -> Vec<SectionBars> {
 /// - **Pre-return thinning**: in the bar before every `ReturnA`, the bass
 ///   drops out entirely and the harmony drops out of the second half — a
 ///   held breath, so the reprise lands as an arrival, not another bar.
-fn apply_staged_entrances(score: &mut Score, form: &Form, meter_beats: f64) {
+fn apply_staged_entrances(
+    score: &mut Score,
+    bass_part: PartId,
+    harmony_part: PartId,
+    form: &Form,
+    meter_beats: f64,
+) {
     let sections = section_bar_map(form);
     let Some(first) = sections.first() else {
         return;
@@ -3456,10 +3499,10 @@ fn apply_staged_entrances(score: &mut Score, form: &Form, meter_beats: f64) {
     score.notes.retain(|n| {
         let t = n.onset.beats();
         match n.role {
-            VoiceRole::Bass => {
+            VoiceRole::Bass if n.part == bass_part => {
                 t >= bass_entry_beat && !thin_windows.iter().any(|&(b0, _, b1)| t >= b0 && t < b1)
             }
-            VoiceRole::Harmony => !thin_windows.iter().any(|&(_, h0, h1)| t >= h0 && t < h1),
+            VoiceRole::Harmony if n.part == harmony_part => !thin_windows.iter().any(|&(_, h0, h1)| t >= h0 && t < h1),
             _ => true,
         }
     });
@@ -3479,13 +3522,13 @@ fn apply_staged_entrances(score: &mut Score, form: &Form, meter_beats: f64) {
 ///   (its duration extends to cover both), so the peak is a long note,
 ///   not a passing one. The existing agogic rubato pause then dwells even
 ///   longer, and muse's climax doubling doubles the HELD note.
-fn apply_held_arrivals(score: &mut Score, meter_beats: f64) {
+fn apply_held_arrivals(score: &mut Score, melody_part: PartId, meter_beats: f64) {
     // --- Cadence holds ---
     let cadential: Vec<usize> = score
         .notes
         .iter()
         .enumerate()
-        .filter(|(_, n)| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Cadential)
+        .filter(|(_, n)| n.part == melody_part && n.role == VoiceRole::Melody && n.emphasis == Emphasis::Cadential)
         .map(|(i, _)| i)
         .collect();
     // The final cadence (largest onset) is exempt.
@@ -3508,7 +3551,8 @@ fn apply_held_arrivals(score: &mut Score, meter_beats: f64) {
             .iter()
             .enumerate()
             .filter(|(_, n)| {
-                n.role == VoiceRole::Melody
+                n.part == melody_part
+                    && n.role == VoiceRole::Melody
                     && n.onset.beats() >= bar_start - 1e-9
                     && n.onset.beats() < bar_end - 1e-9
             })
@@ -3552,13 +3596,14 @@ fn apply_held_arrivals(score: &mut Score, meter_beats: f64) {
     let Some(ci) = score
         .notes
         .iter()
-        .position(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
+        .position(|n| n.part == melody_part && n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
     else {
         return;
     };
     let climax_end = score.notes[ci].onset + score.notes[ci].duration;
     let next = score.notes.iter().position(|n| {
-        n.role == VoiceRole::Melody
+        n.part == melody_part
+            && n.role == VoiceRole::Melody
             && n.emphasis == Emphasis::Normal
             && (n.onset.beats() - climax_end.beats()).abs() < 1e-6
     });
@@ -7264,7 +7309,12 @@ mod tests {
         spec.rhetoric = crate::spec::PhraseRhetoric::Classic;
         let score = compose_with_spec(&MusicalIntent::default(), &spec);
         let mut twin = score.clone();
-        apply_phrase_rhetoric(&mut twin, crate::spec::PhraseRhetoric::Classic, 4.0);
+        apply_phrase_rhetoric(
+            &mut twin,
+            PartId::UNASSIGNED,
+            crate::spec::PhraseRhetoric::Classic,
+            4.0,
+        );
         assert_eq!(score, twin);
     }
 
