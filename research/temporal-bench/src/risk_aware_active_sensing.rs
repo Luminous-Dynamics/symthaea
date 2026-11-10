@@ -85,6 +85,14 @@ pub enum RiskAwareRejectionReason {
 pub struct RejectedRiskAwareAction {
     /// Stable action identity from the input estimate.
     pub action_id: String,
+    /// Action kind and complete resource-cost estimate.
+    pub kind: ActiveSensingActionKind,
+    /// Incremental resource vector supplied for the action.
+    pub resource_cost: ActiveSensingResourceCost,
+    /// Digest of the cost model used to create the resource vector.
+    pub resource_cost_model_sha256: [u8; 32],
+    /// Complete finite outcome distribution used for rejection checks.
+    pub outcome_estimates: Vec<ObservationOutcomeEstimate>,
     /// Exact hard-gate reason for rejection.
     pub reason: RiskAwareRejectionReason,
 }
@@ -324,6 +332,20 @@ fn hash_cost(hasher: &mut CanonicalHasher, cost: ActiveSensingResourceCost) {
     hasher.u64(cost.memory_write_bytes);
 }
 
+fn rejected_action(
+    action: &ActiveSensingActionEstimate,
+    reason: RiskAwareRejectionReason,
+) -> RejectedRiskAwareAction {
+    RejectedRiskAwareAction {
+        action_id: action.action_id.clone(),
+        kind: action.kind,
+        resource_cost: action.resource_cost,
+        resource_cost_model_sha256: action.resource_cost_model_sha256,
+        outcome_estimates: action.outcomes.clone(),
+        reason,
+    }
+}
+
 fn hash_action(hasher: &mut CanonicalHasher, action: &RiskAwareActionValue) {
     hasher.bytes(action.action_id.as_bytes());
     hasher.u8(action.kind as u8);
@@ -358,6 +380,14 @@ fn compute_plan_digest(receipt: &RiskAwareActiveSensingReceipt) -> [u8; 32] {
     hasher.usize(receipt.rejected_actions.len());
     for rejected in &receipt.rejected_actions {
         hasher.bytes(rejected.action_id.as_bytes());
+        hasher.u8(rejected.kind as u8);
+        hash_cost(&mut hasher, rejected.resource_cost);
+        hasher.bytes(&rejected.resource_cost_model_sha256);
+        hasher.usize(rejected.outcome_estimates.len());
+        for outcome in &rejected.outcome_estimates {
+            hasher.u32(outcome.probability_ppm);
+            hasher.u32(outcome.posterior_decision_loss_ppm);
+        }
         hasher.u8(rejected.reason as u8);
     }
     hasher.finish()
@@ -421,20 +451,20 @@ pub fn plan_risk_aware_active_sensing_actions(
             ));
         }
         if !resource_cost_fits(action.resource_cost, context.remaining_resource_budget) {
-            rejected_actions.push(RejectedRiskAwareAction {
-                action_id: action.action_id.clone(),
-                reason: RiskAwareRejectionReason::ExceedsResourceBudget,
-            });
+            rejected_actions.push(rejected_action(
+                action,
+                RiskAwareRejectionReason::ExceedsResourceBudget,
+            ));
             continue;
         }
         let expected_after = expected_loss_ppm(&action.outcomes)?;
         let reduction =
             i64::from(context.current_expected_decision_loss_ppm) - i64::from(expected_after);
         if reduction <= 0 {
-            rejected_actions.push(RejectedRiskAwareAction {
-                action_id: action.action_id.clone(),
-                reason: RiskAwareRejectionReason::NoExpectedTaskLossReduction,
-            });
+            rejected_actions.push(rejected_action(
+                action,
+                RiskAwareRejectionReason::NoExpectedTaskLossReduction,
+            ));
             continue;
         }
         let (cvar, worst_case) =
@@ -443,20 +473,20 @@ pub fn plan_risk_aware_active_sensing_actions(
             .maximum_posterior_cvar_ppm
             .is_some_and(|ceiling| cvar > ceiling)
         {
-            rejected_actions.push(RejectedRiskAwareAction {
-                action_id: action.action_id.clone(),
-                reason: RiskAwareRejectionReason::ExceedsPosteriorCvarCeiling,
-            });
+            rejected_actions.push(rejected_action(
+                action,
+                RiskAwareRejectionReason::ExceedsPosteriorCvarCeiling,
+            ));
             continue;
         }
         if policy
             .maximum_worst_case_loss_ppm
             .is_some_and(|ceiling| worst_case > ceiling)
         {
-            rejected_actions.push(RejectedRiskAwareAction {
-                action_id: action.action_id.clone(),
-                reason: RiskAwareRejectionReason::ExceedsWorstCaseLossCeiling,
-            });
+            rejected_actions.push(rejected_action(
+                action,
+                RiskAwareRejectionReason::ExceedsWorstCaseLossCeiling,
+            ));
             continue;
         }
 
@@ -581,6 +611,79 @@ pub fn validate_risk_aware_active_sensing_receipt(
             return Err(RiskAwareSensingError::new(
                 "receipt.rejected_action_id",
                 "empty or duplicate action ID",
+            ));
+        }
+        if !digest_is_nonzero(&rejected.resource_cost_model_sha256) {
+            return Err(RiskAwareSensingError::new(
+                format!("receipt.rejected[{}].resource_cost_model_sha256", rejected.action_id),
+                "digest must not be all zero",
+            ));
+        }
+
+        let exceeds_budget = !resource_cost_fits(
+            rejected.resource_cost,
+            receipt.remaining_resource_budget,
+        );
+        if rejected.reason == RiskAwareRejectionReason::ExceedsResourceBudget {
+            if !exceeds_budget {
+                return Err(RiskAwareSensingError::new(
+                    format!("receipt.rejected[{}]", rejected.action_id),
+                    "resource-budget rejection does not reproduce",
+                ));
+            }
+            continue;
+        }
+        if exceeds_budget {
+            return Err(RiskAwareSensingError::new(
+                format!("receipt.rejected[{}]", rejected.action_id),
+                "a resource-infeasible action must use the resource-budget rejection reason",
+            ));
+        }
+
+        let expected_after = expected_loss_ppm(&rejected.outcome_estimates)?;
+        let reduction =
+            i64::from(receipt.current_expected_decision_loss_ppm) - i64::from(expected_after);
+        if rejected.reason == RiskAwareRejectionReason::NoExpectedTaskLossReduction {
+            if reduction > 0 {
+                return Err(RiskAwareSensingError::new(
+                    format!("receipt.rejected[{}]", rejected.action_id),
+                    "non-beneficial-action rejection does not reproduce",
+                ));
+            }
+            continue;
+        }
+        if reduction <= 0 {
+            return Err(RiskAwareSensingError::new(
+                format!("receipt.rejected[{}]", rejected.action_id),
+                "risk-ceiling rejection requires positive expected task-loss reduction",
+            ));
+        }
+        let (cvar, worst_case) = posterior_loss_tail_risk(
+            &rejected.outcome_estimates,
+            receipt.policy.tail_probability_ppm,
+        )?;
+        let reason_reproduces = match rejected.reason {
+            RiskAwareRejectionReason::ExceedsPosteriorCvarCeiling => receipt
+                .policy
+                .maximum_posterior_cvar_ppm
+                .is_some_and(|ceiling| cvar > ceiling),
+            RiskAwareRejectionReason::ExceedsWorstCaseLossCeiling => {
+                !receipt
+                    .policy
+                    .maximum_posterior_cvar_ppm
+                    .is_some_and(|ceiling| cvar > ceiling)
+                    && receipt
+                        .policy
+                        .maximum_worst_case_loss_ppm
+                        .is_some_and(|ceiling| worst_case > ceiling)
+            }
+            RiskAwareRejectionReason::ExceedsResourceBudget
+            | RiskAwareRejectionReason::NoExpectedTaskLossReduction => false,
+        };
+        if !reason_reproduces {
+            return Err(RiskAwareSensingError::new(
+                format!("receipt.rejected[{}]", rejected.action_id),
+                "risk-ceiling rejection does not reproduce from its stored outcome distribution",
             ));
         }
     }
@@ -847,6 +950,31 @@ mod tests {
             plan_risk_aware_active_sensing_actions(context(), policy(), &[good]).unwrap();
         validate_risk_aware_active_sensing_receipt(&receipt).unwrap();
         receipt.pareto_frontier[0].posterior_cvar_ppm ^= 1;
+        assert!(validate_risk_aware_active_sensing_receipt(&receipt).is_err());
+    }
+
+    #[test]
+    fn rejected_action_receipts_bind_outcomes_and_rejection_reason() {
+        let risky = action(
+            "risky",
+            vec![
+                ObservationOutcomeEstimate {
+                    probability_ppm: 990_000,
+                    posterior_decision_loss_ppm: 100_000,
+                },
+                ObservationOutcomeEstimate {
+                    probability_ppm: 10_000,
+                    posterior_decision_loss_ppm: 1_000_000,
+                },
+            ],
+            100,
+        );
+        let mut risk_policy = policy();
+        risk_policy.maximum_posterior_cvar_ppm = Some(200_000);
+        let mut receipt =
+            plan_risk_aware_active_sensing_actions(context(), risk_policy, &[risky]).unwrap();
+        validate_risk_aware_active_sensing_receipt(&receipt).unwrap();
+        receipt.rejected_actions[0].reason = RiskAwareRejectionReason::NoExpectedTaskLossReduction;
         assert!(validate_risk_aware_active_sensing_receipt(&receipt).is_err());
     }
 
