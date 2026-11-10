@@ -757,8 +757,28 @@ mod tests {
         let wrong_scope = scope(false);
         assert_eq!(
             materialize_qualified_instrument_capability_v1(&profile, &wrong_scope),
-            Err(CapabilityMaterializationErrorV1::MissingQualifiedSoundingRange)
+            Err(CapabilityMaterializationErrorV1::ScopeMismatch)
         );
+    }
+
+    #[test]
+    fn asset_scoped_claim_rejects_a_different_asset_digest() {
+        let (mut profile, _) = valid_profile(true);
+        profile.claims[0].evidence.bound_asset_sha256 = Some(sha('c'));
+        let report = validate_instrument_capability_evidence_v1(&profile);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == CapabilityEvidenceIssueCodeV1::AssetDigestMismatch
+        }));
+    }
+
+    #[test]
+    fn asset_scoped_qualified_claim_requires_explicit_license_permission() {
+        let (mut profile, _) = valid_profile(true);
+        profile.claims[0].evidence.license = ReusePermissionV1::Unknown;
+        let report = validate_instrument_capability_evidence_v1(&profile);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == CapabilityEvidenceIssueCodeV1::QualifiedAssetWithoutLicense
+        }));
     }
 
     #[test]
