@@ -183,6 +183,7 @@ pub enum CapabilityEvidenceIssueCodeV1 {
     EmptyClaimId,
     DuplicateClaimId,
     InvalidScope,
+    InsufficientPhysicalCapabilityScope,
     InvalidVelocityScope,
     KindValueMismatch,
     InvalidRange,
@@ -297,11 +298,11 @@ fn validate_value(
             lowest_midi,
             highest_midi,
         } => {
-            if lowest_midi > highest_midi {
+            if lowest_midi > highest_midi || *highest_midi > 127 {
                 report.push(
                     CapabilityEvidenceIssueCodeV1::InvalidRange,
                     Some(&claim.id),
-                    "inclusive MIDI range requires lowest_midi <= highest_midi",
+                    "inclusive MIDI range requires 0 <= lowest_midi <= highest_midi <= 127",
                 );
             }
         }
@@ -622,12 +623,27 @@ pub fn validate_instrument_capability_evidence(
                 "optional scope fields must be absent or non-empty",
             );
         }
+        if matches!(
+            claim.kind,
+            CapabilityKindV1::SoundingRange
+                | CapabilityKindV1::Tessitura
+                | CapabilityKindV1::MaximumPolyphony
+                | CapabilityKindV1::ArticulationSupport
+        ) && claim.scope.performer_level.is_none()
+            && claim.scope.technique_id.is_none()
+        {
+            report.push(
+                CapabilityEvidenceIssueCodeV1::InsufficientPhysicalCapabilityScope,
+                Some(&claim.id),
+                "physical capability claims require at least a performer-level or technique scope",
+            );
+        }
         if let (Some(min), Some(max)) = (claim.scope.velocity_min, claim.scope.velocity_max) {
-            if min > max {
+            if min > max || max > 127 {
                 report.push(
                     CapabilityEvidenceIssueCodeV1::InvalidVelocityScope,
                     Some(&claim.id),
-                    "velocity scope requires velocity_min <= velocity_max",
+                    "MIDI velocity scope requires 0 <= velocity_min <= velocity_max <= 127",
                 );
             }
         }
@@ -773,6 +789,36 @@ mod tests {
         );
         assert!(report.valid, "{:?}", report.issues);
         assert_eq!(report.qualified_claim_count, 1);
+    }
+
+    #[test]
+    fn rejects_pitch_values_outside_the_midi_seven_bit_domain() {
+        let mut claim = measured_range_claim();
+        claim.value = CapabilityValueV1::SoundingRange {
+            lowest_midi: 36,
+            highest_midi: 200,
+        };
+        let report = validate_instrument_capability_evidence(
+            &instrument(),
+            &profile(vec![claim]),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == CapabilityEvidenceIssueCodeV1::InvalidRange
+        }));
+    }
+
+    #[test]
+    fn rejects_unscoped_physical_capability_claims() {
+        let mut claim = measured_range_claim();
+        claim.scope.performer_level = None;
+        claim.scope.technique_id = None;
+        let report = validate_instrument_capability_evidence(
+            &instrument(),
+            &profile(vec![claim]),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == CapabilityEvidenceIssueCodeV1::InsufficientPhysicalCapabilityScope
+        }));
     }
 
     #[test]
