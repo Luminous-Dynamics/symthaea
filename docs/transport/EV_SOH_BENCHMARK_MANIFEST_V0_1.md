@@ -61,4 +61,4 @@ Report per-cell/per-pack/per-vehicle and worst-domain MAE/RMSE, R², interval co
 
 ## Claim ceiling
 
-The auditor validates structure and internal consistency. It does not verify raw dataset authenticity, independently certify hashes, prove declared splits match the underlying data, evaluate a model, or establish battery/vehicle safety. Physical group identity digests are commitments supplied by the benchmark producer; independent audit still requires access to the corresponding identity mapping or a trusted attestation.
+The auditor validates structure and internal consistency. It does not verify raw dataset authenticity, independently certify hashes, prove declared splits match the underlying data, evaluate a model, or establish battery/vehicle safety. Physical group identity digests are producer-declared commitments; independent audit still requires access to the corresponding identity mapping or a trusted external attestation. Accordingly, the current report labels physical evidence as producer-declared protocol evidence, not independently attested physical generalization.
