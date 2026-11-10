@@ -9601,6 +9601,7 @@ mod tests {
             &mut score,
             GENERAL_BASS_PART_V1,
             GENERAL_HARMONY_PART_V1,
+            GENERAL_MELODY_PART_V1,
             key,
         );
         let tonic_pc = key.tonic;
