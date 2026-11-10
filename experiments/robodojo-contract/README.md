@@ -91,6 +91,10 @@ The audit rejects duplicate manifest keys, malformed digests, unmatched or missi
 
 The report also includes a complete 3×3 paired outcome-transition matrix (baseline success/failure/unresolved × candidate success/failure/unresolved). It reports success→failure and failure→success separately, plus stable outcomes and unresolved pairs. An invalid/unscored run is **unresolved**, not silently converted into a policy failure. This distinguishes net completion-rate change from outcome sensitivity: opposite-direction flips can cancel to a zero net ΔSR while still exposing changed episode behavior. Sparse strata emit NA intervals rather than implying precision.
 
+The report's 3×3 outcome-transition matrix is documented in [ROBODOJO_PAIRED_OUTCOME_TRANSITIONS_V0_1.md](../../docs/research/ROBODOJO_PAIRED_OUTCOME_TRANSITIONS_V0_1.md). It distinguishes net completion-rate delta from bidirectional episode flips and leaves any pair containing an invalid/unscored arm in the unresolved cells.
+
+The shift module has seven synthetic tests, including zero-net-delta bidirectional flips and unresolved-pair preservation. These tests qualify the report arithmetic only; the RoboCasa-Shift paper values are external reference results, not measurements from this harness.
+
 The shift-plan fixture is synthetic test data, not an RC benchmark result. Physical evaluation must preserve the canonical configuration payload beside its digest, measure realized perturbations where possible, retain unsuccessful attempts, and pre-register conditions and stopping rules.
 
 ## Active-sensing benchmark ledger
