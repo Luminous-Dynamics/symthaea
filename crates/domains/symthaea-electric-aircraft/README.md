@@ -4,7 +4,7 @@ A small, inspectable Rust engineering kernel for reduced-order fixed-wing electr
 
 ## First increment
 
-The v0.2 crate estimates, for a supplied sequence of steady-flight mission segments:
+The v0.3 crate estimates, for a supplied sequence of steady-flight mission segments:
 
 - all-up mass and MTOW compliance;
 - aerodynamic drag from a declared lift-to-drag ratio;
@@ -15,6 +15,12 @@ The v0.2 crate estimates, for a supplied sequence of steady-flight mission segme
 - state-of-charge depletion, state-of-health-adjusted capacity, and protected reserve;
 - an explicit user-configured uncertainty margin;
 - evidence-bound propulsion efficiency curves with conservative uncertainty bounds and no extrapolation.
+
+
+
+The dedicated uncertainty module adds a deterministic adverse-corner screening evaluator. It applies declared one-sided bounds to mass, speed, L/D, climb, auxiliary demand, battery capacity/voltage/resistance/power/current/thermal limits and scalar propulsion efficiencies. It preserves both the nominal result and the exact adjusted input and adverse-corner outcome. It is not Monte Carlo, a confidence interval, a probabilistic worst-case proof or a certification method; it currently wraps the scalar mission evaluator rather than the characterized-map paths.
+
+Battery OCV and internal-resistance maps are two-dimensional over SOC and pack temperature. Both map families reject extrapolation and record the dataset IDs used. Evidence SHA-256 fields are syntax-checked only; artifact bytes still need external resolution, hash verification and authority/configuration checks. See docs/ROBUST_UNCERTAINTY.md.
 
 It is dependency-free Rust and uses fail-closed errors for invalid inputs, MTOW violations, battery power/current/voltage/temperature limits, and reserve infringement.
 
