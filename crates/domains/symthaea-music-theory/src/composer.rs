@@ -686,7 +686,15 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.deceptive_close {
         apply_deceptive_first_close(&mut score, key, intent.bars.max(1) as i64, meter_beats);
     }
-    apply_pivot_modulations(&mut score, &form, intent.bars.max(1) as i64, meter_beats);
+    apply_pivot_modulations(
+        &mut score,
+        &form,
+        intent.bars.max(1) as i64,
+        meter_beats,
+        GENERAL_MELODY_PART_V1,
+        GENERAL_BASS_PART_V1,
+        GENERAL_HARMONY_PART_V1,
+    );
     if tx.deceptive_close {
         // The evasion travels with the deception: styles that deny their
         // first close also let their LAST mid-piece close slip past, so
@@ -1990,7 +1998,15 @@ fn apply_full_drone(
 /// Returns keep the staged-entrance treatment (the thinned bar, the
 /// arrival) — you leave home by modulation, you come home by arrival.
 /// The fugue keeps its documented no-modulation limit (its own pipeline).
-fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beats: f64) {
+fn apply_pivot_modulations(
+    score: &mut Score,
+    form: &Form,
+    bars: i64,
+    meter_beats: f64,
+    melody_part: PartId,
+    bass_part: PartId,
+    harmony_part: PartId,
+) {
     let section_bars = 2 * bars; // antecedent + consequent
     let meter_i = meter_beats as i64;
     for i in 1..form.sections.len() {
@@ -2044,6 +2060,11 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
             }
             match n.role {
                 VoiceRole::Harmony | VoiceRole::Bass => {
+                    if (n.role == VoiceRole::Harmony && n.part != harmony_part)
+                        || (n.role == VoiceRole::Bass && n.part != bass_part)
+                    {
+                        continue;
+                    }
                     window_touched = true;
                     let role = n.role;
                     if on < win_lo - 1e-9 {
@@ -2077,6 +2098,9 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
                     }
                 }
                 VoiceRole::Melody => {
+                    if n.part != melody_part {
+                        continue;
+                    }
                     if on < win_lo - 1e-9 {
                         let mut tail = *n;
                         let kept = ((win_lo - on) * 480.0).round() as i64;
@@ -2104,7 +2128,7 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
         if !window_touched {
             for &pitch in &dom_voiced {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: harmony_part,
                     pitch,
                     onset: win_onset,
                     duration: half,
@@ -2115,7 +2139,7 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
                 });
             }
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: bass_part,
                 pitch: dom_root_bass,
                 onset: win_onset,
                 duration: half,
