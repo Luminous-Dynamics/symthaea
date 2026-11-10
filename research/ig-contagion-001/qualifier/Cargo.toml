@@ -1,0 +1,9 @@
+[package]
+name = "ig-contagion-qualifier"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Structural and scenario-matrix qualifier for IG-CONTAGION-001"
+
+[dependencies]
+serde_json = "1"
