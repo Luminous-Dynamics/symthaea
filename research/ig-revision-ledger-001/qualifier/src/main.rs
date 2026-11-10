@@ -377,6 +377,7 @@ fn validate_record(record: &Value) -> Vec<String> {
                 "effect_estimate_sha256",
                 "matched_inputs",
                 "varied_factor",
+                "pair_validator_id",
                 "pair_validation_receipt_sha256",
             ] {
                 if !causal[key].is_null() {
@@ -677,6 +678,17 @@ mod tests {
             record["causal_attribution"]["varied_factor"]["treatment_sha256"].clone();
         let errors = validate_record(&record);
         assert!(errors.contains(&"causal_pair_has_no_distinct_intervention_factor".to_string()));
+    }
+
+    #[test]
+    fn non_estimated_event_cannot_carry_a_pair_validator_identity() {
+        let mut record = parsed(MANIFEST)["fixtures"][0]["record"].clone();
+        record["causal_attribution"]["pair_validator_id"] =
+            Value::String("independent-pair-validator/v1".into());
+        let errors = validate_record(&record);
+        assert!(errors.contains(
+            &"causal_pair_fields_without_estimate".to_string()
+        ));
     }
 
     #[test]
