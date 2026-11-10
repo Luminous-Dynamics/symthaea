@@ -1142,6 +1142,103 @@ mod tests {
             report.evidence,
             Some(SymmetryInferenceEvidence::SampledLieDerivative { .. })
         ));
+        assert_eq!(
+            report.exact_polynomial_status,
+            ExactPolynomialSearchStatus::UnsupportedExpression
+        );
+    }
+    #[test]
+    fn quartic_radial_polynomial_has_exact_so2_lie_derivative_identity() {
+        let radial_squared = add(pow2("x"), pow2("y"));
+        let quartic = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(radial_squared),
+            Box::new(Expr::Const(2.0)),
+        );
+        // A dyadic coefficient tests the exact rational interpretation of f64 literals.
+        let expr = mul(Expr::Const(0.5), quartic);
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(
+            report.candidate.as_ref().unwrap().lie_groups,
+            vec![LieGroup::SO(2)]
+        );
+        let Some(SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
+            profile,
+            acted_on_variables,
+            group,
+            checked_generator_count,
+        }) = report.evidence
+        else {
+            panic!("supported radial polynomial should produce exact symbolic evidence");
+        };
+        assert_eq!(group, LieGroup::SO(2));
+        assert_eq!(acted_on_variables, vec!["x".to_string(), "y".to_string()]);
+        assert_eq!(checked_generator_count, 1);
+        assert_eq!(profile.maximum_terms, 4096);
+        assert_eq!(profile.maximum_term_products, 65_536);
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::ExactPolynomialIdentityFound
+        );
+        assert_eq!(report.exact_polynomial_status, ExactPolynomialSearchStatus::IdentityFound);
+    }
+
+    #[test]
+    fn exact_polynomial_search_finds_pairwise_rotation_with_an_unacted_parameter() {
+        // z*(x²+y²) is invariant under SO(2) acting on x,y while z remains fixed.
+        let expr = mul(
+            var("z"),
+            add(pow2("x"), pow2("y")),
+        );
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(
+            report.candidate.as_ref().unwrap().lie_groups,
+            vec![LieGroup::SO(2)]
+        );
+        assert!(matches!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
+                acted_on_variables,
+                checked_generator_count: 1,
+                ..
+            }) if acted_on_variables == vec!["x".to_string(), "y".to_string()]
+        ));
+    }
+
+    #[test]
+    fn exact_polynomial_search_rejects_anisotropic_quadratic_with_no_numeric_promotion() {
+        let expr = add(
+            pow2("x"),
+            mul(Expr::Const(1.00001), pow2("y")),
+        );
+        let report = infer_symmetry_with_evidence(&expr);
+        assert!(report.candidate.is_none());
+        assert!(report.evidence.is_none());
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::ExactPolynomialSearchCompletedNoCandidate
+        );
+        assert_eq!(report.exact_polynomial_status, ExactPolynomialSearchStatus::CompletedNoCandidate);
+    }
+
+    #[test]
+    fn exact_polynomial_search_uses_full_so3_generator_basis() {
+        let radial_squared = add(add(pow2("x"), pow2("y")), pow2("z"));
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(radial_squared),
+            Box::new(Expr::Const(2.0)),
+        );
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(report.candidate.unwrap().lie_groups, vec![LieGroup::SO(3)]);
+        assert!(matches!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
+                checked_generator_count: 3,
+                group: LieGroup::SO(3),
+                ..
+            })
+        ));
     }
     #[test]
     fn no_candidate_report_does_not_claim_absence_of_symmetry() {
