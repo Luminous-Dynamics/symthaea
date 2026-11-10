@@ -111,24 +111,7 @@
               "type": "string",
               "minLength": 1
             }
-          },
-          "allOf": [
-            {
-              "if": {
-                "required": [
-                  "lower",
-                  "upper"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "upper": {
-                    "minimum": -1.7976931348623157e+308
-                  }
-                }
-              }
-            }
-          ]
+          }
         },
         {
           "type": "object",
@@ -186,7 +169,8 @@
             }
           }
         }
-      ]
+      ],
+      "description": "One of a declared interval, standard uncertainty or explicit unknown. Cross-field validation must check lower <= upper and that uncertainty units match the parent quantity unit; JSON Schema structural validation alone cannot establish those equalities."
     },
     "quantity": {
       "oneOf": [
@@ -241,7 +225,8 @@
             }
           }
         }
-      ]
+      ],
+      "description": "A known finite value with explicit unit/provenance/uncertainty, or an explicit unknown with a reason. Cross-field dimensional consistency is enforced by the semantic validator, not inferred from free-text unit labels."
     },
     "identity": {
       "type": "object",
@@ -1229,5 +1214,35 @@
         "type": "string"
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "service": {
+            "properties": {
+              "functional_unit": {
+                "const": "declared_other"
+              }
+            },
+            "required": [
+              "functional_unit"
+            ]
+          }
+        },
+        "required": [
+          "service"
+        ]
+      },
+      "then": {
+        "properties": {
+          "service": {
+            "required": [
+              "declared_other_unit"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }
