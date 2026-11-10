@@ -1,10 +1,6 @@
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::{
-    collections::BTreeSet,
-    env, fs,
-    process::ExitCode,
-};
+use std::{collections::BTreeSet, env, fs, process::ExitCode};
 
 const LEDGER_ID: &str = "IG-REVISION-LEDGER-001";
 const MANIFEST_SCHEMA_VERSION: &str = "ig-revision-ledger-fixtures-v0.1";
@@ -18,7 +14,10 @@ struct Report {
 }
 
 fn field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
-    value.get(key)?.as_str().filter(|value| !value.trim().is_empty())
+    value
+        .get(key)?
+        .as_str()
+        .filter(|value| !value.trim().is_empty())
 }
 
 fn is_sha256(value: &str) -> bool {
@@ -73,13 +72,21 @@ fn validate_schema_header(
         add(errors, context, "unexpected JSON Schema dialect");
     }
     if schema["$id"].as_str() != Some(expected_id) {
-        add(errors, context, "schema $id does not match expected identity");
+        add(
+            errors,
+            context,
+            "schema $id does not match expected identity",
+        );
     }
     if schema["type"].as_str() != Some("object") {
         add(errors, context, "top-level schema type must be object");
     }
     if schema["additionalProperties"].as_bool() != Some(false) {
-        add(errors, context, "top-level schema must reject additional properties");
+        add(
+            errors,
+            context,
+            "top-level schema must reject additional properties",
+        );
     }
     let actual = string_set(&schema["required"]);
     for item in required {
@@ -93,11 +100,25 @@ fn validate_schema_header(
     }
 }
 
-
 const SUPPORTED_SCHEMA_KEYWORDS: [&str; 18] = [
-    "$schema", "$id", "title", "description", "type", "additionalProperties",
-    "required", "properties", "minLength", "enum", "pattern", "uniqueItems",
-    "items", "minimum", "maximum", "const", "minItems", "format",
+    "$schema",
+    "$id",
+    "title",
+    "description",
+    "type",
+    "additionalProperties",
+    "required",
+    "properties",
+    "minLength",
+    "enum",
+    "pattern",
+    "uniqueItems",
+    "items",
+    "minimum",
+    "maximum",
+    "const",
+    "minItems",
+    "format",
 ];
 
 fn validate_schema_definition(schema: &Value, context: &str, errors: &mut Vec<String>) {
@@ -107,15 +128,25 @@ fn validate_schema_definition(schema: &Value, context: &str, errors: &mut Vec<St
     };
     for keyword in object.keys() {
         if !SUPPORTED_SCHEMA_KEYWORDS.contains(&keyword.as_str()) {
-            add(errors, context, format!("unsupported schema keyword '{keyword}'"));
+            add(
+                errors,
+                context,
+                format!("unsupported schema keyword '{keyword}'"),
+            );
         }
     }
     if let Some(kind) = schema.get("type") {
-        let supported = ["object", "array", "string", "number", "integer", "boolean", "null"];
+        let supported = [
+            "object", "array", "string", "number", "integer", "boolean", "null",
+        ];
         let types: Vec<&str> = if let Some(single) = kind.as_str() {
             vec![single]
         } else {
-            kind.as_array().into_iter().flatten().filter_map(Value::as_str).collect()
+            kind.as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect()
         };
         if types.is_empty() || types.iter().any(|item| !supported.contains(item)) {
             add(errors, context, "schema type contains an unsupported value");
@@ -123,12 +154,20 @@ fn validate_schema_definition(schema: &Value, context: &str, errors: &mut Vec<St
     }
     if let Some(pattern) = schema.get("pattern").and_then(Value::as_str) {
         if pattern != "^[a-f0-9]{64}$" {
-            add(errors, context, format!("unsupported schema pattern '{pattern}'"));
+            add(
+                errors,
+                context,
+                format!("unsupported schema pattern '{pattern}'"),
+            );
         }
     }
     if let Some(format) = schema.get("format").and_then(Value::as_str) {
         if format != "uri" {
-            add(errors, context, format!("unsupported schema format '{format}'"));
+            add(
+                errors,
+                context,
+                format!("unsupported schema format '{format}'"),
+            );
         }
     }
     if let Some(properties) = schema.get("properties") {
@@ -163,11 +202,18 @@ fn validate_json_schema(value: &Value, schema: &Value, context: &str, errors: &m
         let matches = if let Some(single) = kind.as_str() {
             json_type_matches(value, single)
         } else {
-            kind.as_array().into_iter().flatten().filter_map(Value::as_str)
+            kind.as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
                 .any(|candidate| json_type_matches(value, candidate))
         };
         if !matches {
-            add(errors, context, format!("schema type mismatch: expected {kind}"));
+            add(
+                errors,
+                context,
+                format!("schema type mismatch: expected {kind}"),
+            );
             return;
         }
     }
@@ -230,7 +276,11 @@ fn validate_json_schema(value: &Value, schema: &Value, context: &str, errors: &m
         if let Some(required) = schema.get("required").and_then(Value::as_array) {
             for property in required.iter().filter_map(Value::as_str) {
                 if !object.contains_key(property) {
-                    add(errors, context, format!("schema required property '{property}' is missing"));
+                    add(
+                        errors,
+                        context,
+                        format!("schema required property '{property}' is missing"),
+                    );
                 }
             }
         }
@@ -238,14 +288,23 @@ fn validate_json_schema(value: &Value, schema: &Value, context: &str, errors: &m
         if schema.get("additionalProperties").and_then(Value::as_bool) == Some(false) {
             for property in object.keys() {
                 if !properties.is_some_and(|known| known.contains_key(property)) {
-                    add(errors, context, format!("schema additional property '{property}' is not allowed"));
+                    add(
+                        errors,
+                        context,
+                        format!("schema additional property '{property}' is not allowed"),
+                    );
                 }
             }
         }
         if let Some(properties) = properties {
             for (name, child_schema) in properties {
                 if let Some(child_value) = object.get(name) {
-                    validate_json_schema(child_value, child_schema, &format!("{context}.{name}"), errors);
+                    validate_json_schema(
+                        child_value,
+                        child_schema,
+                        &format!("{context}.{name}"),
+                        errors,
+                    );
                 }
             }
         }
@@ -258,7 +317,11 @@ fn validate_state(state: &Value, context: &str, errors: &mut Vec<String>) {
     }
     let declared_digest = field(state, "state_sha256").unwrap_or_default();
     if !is_sha256(declared_digest) {
-        add(errors, context, "state_sha256 must be a 64-character hexadecimal digest");
+        add(
+            errors,
+            context,
+            "state_sha256 must be a 64-character hexadecimal digest",
+        );
     } else if state_content_sha256(state).as_deref() != Some(declared_digest) {
         add(errors, context, "state_content_digest_mismatch");
     }
@@ -274,7 +337,11 @@ fn validate_state(state: &Value, context: &str, errors: &mut Vec<String>) {
         }
         let values = string_array(&state[key]);
         if values.len() != string_set(&state[key]).len() {
-            add(errors, context, format!("state {key} must not contain duplicates"));
+            add(
+                errors,
+                context,
+                format!("state {key} must not contain duplicates"),
+            );
         }
     }
 
@@ -298,7 +365,11 @@ fn validate_state(state: &Value, context: &str, errors: &mut Vec<String>) {
                     add(errors, context, "confidence_scale_missing");
                 }
                 if profile.is_some() || receipt.is_some() {
-                    add(errors, context, "self_report_confidence_cannot_claim_calibration");
+                    add(
+                        errors,
+                        context,
+                        "self_report_confidence_cannot_claim_calibration",
+                    );
                 }
             }
             Some("Calibrated") => {
@@ -322,7 +393,12 @@ fn validate_record(record: &Value) -> Vec<String> {
     let id = field(record, "revision_event_id").unwrap_or("<missing>");
     let context = format!("record[{id}]");
 
-    for key in ["revision_event_id", "run_id", "scenario_id", "agent_instance_id"] {
+    for key in [
+        "revision_event_id",
+        "run_id",
+        "scenario_id",
+        "agent_instance_id",
+    ] {
         if field(record, key).is_none() {
             add(&mut errors, &context, format!("{key} must be non-empty"));
         }
@@ -336,19 +412,31 @@ fn validate_record(record: &Value) -> Vec<String> {
     match field(record, "transition") {
         Some("Changed") => {
             if previous.is_null() || next.is_null() {
-                add(&mut errors, &context, "Changed requires previous and next states");
+                add(
+                    &mut errors,
+                    &context,
+                    "Changed requires previous and next states",
+                );
             } else {
                 if field(previous, "state_sha256") == field(next, "state_sha256") {
                     add(&mut errors, &context, "changed_state_digest_unchanged");
                 }
                 if state_content_without_digest(previous) == state_content_without_digest(next) {
-                    add(&mut errors, &context, "changed_transition_no_semantic_delta");
+                    add(
+                        &mut errors,
+                        &context,
+                        "changed_transition_no_semantic_delta",
+                    );
                 }
             }
         }
         Some("NoChange") => {
             if previous.is_null() || next.is_null() {
-                add(&mut errors, &context, "NoChange requires previous and next states");
+                add(
+                    &mut errors,
+                    &context,
+                    "NoChange requires previous and next states",
+                );
             } else {
                 if field(previous, "state_sha256") != field(next, "state_sha256") {
                     add(&mut errors, &context, "no_change_state_digest_mismatch");
@@ -368,9 +456,16 @@ fn validate_record(record: &Value) -> Vec<String> {
         }
         Some("Missing") => {
             if !next.is_null() {
-                add(&mut errors, &context, "missing_measurement_post_state_present");
+                add(
+                    &mut errors,
+                    &context,
+                    "missing_measurement_post_state_present",
+                );
             }
-            if !matches!(field(record, "event_status"), Some("NotRun" | "Indeterminate")) {
+            if !matches!(
+                field(record, "event_status"),
+                Some("NotRun" | "Indeterminate")
+            ) {
                 add(
                     &mut errors,
                     &context,
@@ -387,14 +482,22 @@ fn validate_record(record: &Value) -> Vec<String> {
                 );
             }
         }
-        Some(_) | None => add(&mut errors, &context, "transition is missing or unsupported"),
+        Some(_) | None => add(
+            &mut errors,
+            &context,
+            "transition is missing or unsupported",
+        ),
     }
 
     let delta = &record["claim_delta"];
     let mut primary_claims = BTreeSet::new();
     for key in ["added", "removed", "retained"] {
         if !delta[key].is_array() {
-            add(&mut errors, &context, format!("claim_delta.{key} must be an array"));
+            add(
+                &mut errors,
+                &context,
+                format!("claim_delta.{key} must be an array"),
+            );
         }
         for claim in string_array(&delta[key]) {
             if !primary_claims.insert(claim) {
@@ -404,7 +507,11 @@ fn validate_record(record: &Value) -> Vec<String> {
     }
     for key in ["contradicted", "retracted"] {
         if !delta[key].is_array() {
-            add(&mut errors, &context, format!("claim_delta.{key} must be an array"));
+            add(
+                &mut errors,
+                &context,
+                format!("claim_delta.{key} must be an array"),
+            );
         }
     }
 
@@ -421,21 +528,37 @@ fn validate_record(record: &Value) -> Vec<String> {
         let actual_retained: BTreeSet<String> = before.intersection(&after).cloned().collect();
         let reported_removed: BTreeSet<String> = removed.union(&retracted).cloned().collect();
 
-        if added != actual_added || reported_removed != actual_removed || retained != actual_retained {
+        if added != actual_added
+            || reported_removed != actual_removed
+            || retained != actual_retained
+        {
             add(&mut errors, &context, "claim_delta_state_mismatch");
         }
         if !contradicted.is_subset(&before)
             || !retracted.is_subset(&before)
             || !retracted.is_subset(&reported_removed)
         {
-            add(&mut errors, &context, "claim_contradiction_or_retraction_not_bound_to_previous_state");
+            add(
+                &mut errors,
+                &context,
+                "claim_contradiction_or_retraction_not_bound_to_previous_state",
+            );
         }
     }
 
     let evidence_delta = &record["evidence_delta"];
-    for key in ["available_before", "newly_available", "newly_unavailable", "invalidated"] {
+    for key in [
+        "available_before",
+        "newly_available",
+        "newly_unavailable",
+        "invalidated",
+    ] {
         if !evidence_delta[key].is_array() {
-            add(&mut errors, &context, format!("evidence_delta.{key} must be an array"));
+            add(
+                &mut errors,
+                &context,
+                format!("evidence_delta.{key} must be an array"),
+            );
         }
     }
 
@@ -444,17 +567,34 @@ fn validate_record(record: &Value) -> Vec<String> {
     let newly_unavailable = string_set(&evidence_delta["newly_unavailable"]);
     let invalidated = string_set(&evidence_delta["invalidated"]);
     if !available_before.is_disjoint(&newly_available) {
-        add(&mut errors, &context, "evidence_available_before_overlaps_newly_available");
+        add(
+            &mut errors,
+            &context,
+            "evidence_available_before_overlaps_newly_available",
+        );
     }
     if !newly_available.is_disjoint(&newly_unavailable) {
-        add(&mut errors, &context, "evidence_newly_available_overlaps_newly_unavailable");
+        add(
+            &mut errors,
+            &context,
+            "evidence_newly_available_overlaps_newly_unavailable",
+        );
     }
-    let available_during: BTreeSet<String> = available_before.union(&newly_available).cloned().collect();
+    let available_during: BTreeSet<String> =
+        available_before.union(&newly_available).cloned().collect();
     if !invalidated.is_subset(&available_during) {
-        add(&mut errors, &context, "invalidated_evidence_not_previously_available");
+        add(
+            &mut errors,
+            &context,
+            "invalidated_evidence_not_previously_available",
+        );
     }
     if !previous.is_null() && !string_set(&previous["evidence_ids"]).is_subset(&available_before) {
-        add(&mut errors, &context, "previous_state_evidence_not_in_available_before");
+        add(
+            &mut errors,
+            &context,
+            "previous_state_evidence_not_in_available_before",
+        );
     }
     if !next.is_null() {
         let mut usable_after = available_during.clone();
@@ -462,14 +602,22 @@ fn validate_record(record: &Value) -> Vec<String> {
             usable_after.remove(evidence);
         }
         if !string_set(&next["evidence_ids"]).is_subset(&usable_after) {
-            add(&mut errors, &context, "next_state_evidence_not_available_after_transition");
+            add(
+                &mut errors,
+                &context,
+                "next_state_evidence_not_available_after_transition",
+            );
         }
     }
 
     let mut seen_message_ids = BTreeSet::new();
     let mut seen_channel_event_ids = BTreeSet::new();
     let mut previous_delivery_sequence = 0_u64;
-    for message in record["delivered_messages"].as_array().into_iter().flatten() {
+    for message in record["delivered_messages"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
         let message_id = field(message, "message_id");
         let channel_event_id = field(message, "channel_event_id");
         let sender = field(message, "sender_agent_instance_id");
@@ -479,23 +627,39 @@ fn validate_record(record: &Value) -> Vec<String> {
             || channel_event_id.is_none()
             || !is_sha256(field(message, "payload_sha256").unwrap_or_default())
         {
-            add(&mut errors, &context, "delivered_message_missing_channel_event");
+            add(
+                &mut errors,
+                &context,
+                "delivered_message_missing_channel_event",
+            );
         }
         if !is_sha256(field(message, "channel_event_sha256").unwrap_or_default())
             || !is_sha256(field(message, "communication_graph_sha256").unwrap_or_default())
         {
-            add(&mut errors, &context, "delivered_message_missing_graph_or_event_digest");
+            add(
+                &mut errors,
+                &context,
+                "delivered_message_missing_graph_or_event_digest",
+            );
         }
         if sender.is_none() || recipient.is_none() || sender == recipient {
             add(&mut errors, &context, "delivered_message_identity_invalid");
         }
         if recipient != field(record, "agent_instance_id") {
-            add(&mut errors, &context, "delivered_message_recipient_mismatch");
+            add(
+                &mut errors,
+                &context,
+                "delivered_message_recipient_mismatch",
+            );
         }
         if message_id.is_some_and(|id| !seen_message_ids.insert(id.to_string()))
             || channel_event_id.is_some_and(|id| !seen_channel_event_ids.insert(id.to_string()))
         {
-            add(&mut errors, &context, "delivered_message_identity_duplicate");
+            add(
+                &mut errors,
+                &context,
+                "delivered_message_identity_duplicate",
+            );
         }
         match sequence {
             Some(value) if value > previous_delivery_sequence => previous_delivery_sequence = value,
@@ -527,10 +691,18 @@ fn validate_record(record: &Value) -> Vec<String> {
                 );
             }
         }
-        None => add(&mut errors, &context, "agent_report.provided must be boolean"),
+        None => add(
+            &mut errors,
+            &context,
+            "agent_report.provided must be boolean",
+        ),
     }
     if field(report, "kind") != Some("self_report") {
-        add(&mut errors, &context, "agent report must remain typed as self_report");
+        add(
+            &mut errors,
+            &context,
+            "agent report must remain typed as self_report",
+        );
     }
 
     let oracle = &record["oracle"];
@@ -539,10 +711,18 @@ fn validate_record(record: &Value) -> Vec<String> {
     match task_profile {
         Some("SyntheticKnownAnswer") => {
             if outcome == Some("NotApplicable") {
-                add(&mut errors, &context, "synthetic_known_answer_outcome_not_applicable");
+                add(
+                    &mut errors,
+                    &context,
+                    "synthetic_known_answer_outcome_not_applicable",
+                );
             }
             if !is_sha256(field(oracle, "answer_space_sha256").unwrap_or_default()) {
-                add(&mut errors, &context, "synthetic_oracle_missing_answer_space");
+                add(
+                    &mut errors,
+                    &context,
+                    "synthetic_oracle_missing_answer_space",
+                );
             }
             if !is_sha256(field(oracle, "oracle_receipt_sha256").unwrap_or_default()) {
                 add(&mut errors, &context, "synthetic_oracle_missing_receipt");
@@ -602,11 +782,7 @@ fn validate_record(record: &Value) -> Vec<String> {
                     "causal_estimate_missing_matched_pair",
                 );
             } else if field(causal, "treatment_run_id") == field(causal, "control_run_id") {
-                add(
-                    &mut errors,
-                    &context,
-                    "causal_pair_runs_must_be_distinct",
-                );
+                add(&mut errors, &context, "causal_pair_runs_must_be_distinct");
             }
             let matched_inputs = &causal["matched_inputs"];
             let required_dimensions = [
@@ -635,11 +811,7 @@ fn validate_record(record: &Value) -> Vec<String> {
                     break;
                 }
                 if treatment != control {
-                    add(
-                        &mut errors,
-                        &context,
-                        "causal_pair_shared_input_mismatch",
-                    );
+                    add(&mut errors, &context, "causal_pair_shared_input_mismatch");
                     break;
                 }
             }
@@ -675,9 +847,7 @@ fn validate_record(record: &Value) -> Vec<String> {
                 );
             }
             if field(causal, "pair_validator_id").is_none()
-                || !is_sha256(
-                    field(causal, "pair_validation_receipt_sha256").unwrap_or_default(),
-                )
+                || !is_sha256(field(causal, "pair_validation_receipt_sha256").unwrap_or_default())
             {
                 add(
                     &mut errors,
@@ -699,11 +869,7 @@ fn validate_record(record: &Value) -> Vec<String> {
                 "pair_validation_receipt_sha256",
             ] {
                 if !causal[key].is_null() {
-                    add(
-                        &mut errors,
-                        &context,
-                        "causal_pair_fields_without_estimate",
-                    );
+                    add(&mut errors, &context, "causal_pair_fields_without_estimate");
                     break;
                 }
             }
@@ -738,25 +904,45 @@ fn validate_record(record: &Value) -> Vec<String> {
     } else {
         string_set(&next["claim_ids"])
     };
-    for link in record["claim_evidence_links"].as_array().into_iter().flatten() {
+    for link in record["claim_evidence_links"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
         let claim_id = field(link, "claim_id");
         let evidence_id = field(link, "evidence_id");
         if claim_id.is_none_or(|claim| !known_claims.contains(claim)) {
-            add(&mut errors, &context, "claim_evidence_link_claim_not_bound_to_revision");
+            add(
+                &mut errors,
+                &context,
+                "claim_evidence_link_claim_not_bound_to_revision",
+            );
         }
         if evidence_id.is_none_or(|evidence| !known_evidence.contains(evidence)) {
-            add(&mut errors, &context, "claim_evidence_link_not_bound_to_available_evidence");
+            add(
+                &mut errors,
+                &context,
+                "claim_evidence_link_not_bound_to_available_evidence",
+            );
         }
         match field(link, "relationship") {
             Some("supports") => {
                 if claim_id.is_none_or(|claim| !current_claims.contains(claim))
                     || evidence_id.is_none_or(|evidence| !usable_evidence.contains(evidence))
                 {
-                    add(&mut errors, &context, "claim_support_link_not_bound_to_current_usable_state");
+                    add(
+                        &mut errors,
+                        &context,
+                        "claim_support_link_not_bound_to_current_usable_state",
+                    );
                 }
             }
             Some("contradicts" | "qualifies" | "contextualizes") => {}
-            _ => add(&mut errors, &context, "claim_evidence_link_relationship_invalid"),
+            _ => add(
+                &mut errors,
+                &context,
+                "claim_evidence_link_relationship_invalid",
+            ),
         }
     }
 
@@ -818,10 +1004,18 @@ fn validate_manifest(
     if field(manifest, "schema_version") != Some(MANIFEST_SCHEMA_VERSION)
         || field(manifest, "ledger_id") != Some(LEDGER_ID)
     {
-        add(&mut errors, "manifest", "unexpected ledger or schema identity");
+        add(
+            &mut errors,
+            "manifest",
+            "unexpected ledger or schema identity",
+        );
     }
     if field(manifest, "status") != Some("synthetic_fixture_design_unexecuted") {
-        add(&mut errors, "manifest", "fixture design must remain marked unexecuted");
+        add(
+            &mut errors,
+            "manifest",
+            "fixture design must remain marked unexecuted",
+        );
     }
     if manifest["owning_issue"].as_str()
         != Some("https://github.com/Luminous-Dynamics/symthaea/issues/11340")
@@ -847,7 +1041,11 @@ fn validate_manifest(
     }
 
     let Some(fixtures) = manifest["fixtures"].as_array() else {
-        add(&mut errors, "manifest.fixtures", "fixtures must be an array");
+        add(
+            &mut errors,
+            "manifest.fixtures",
+            "fixtures must be an array",
+        );
         return Err(errors);
     };
     if fixtures.len() != EXPECTED_FIXTURES
@@ -869,7 +1067,11 @@ fn validate_manifest(
         let context = format!("fixtures[{index}]");
         let id = field(fixture, "fixture_id").unwrap_or_default();
         if id.is_empty() || !ids.insert(id.to_string()) {
-            add(&mut errors, &context, "fixture_id must be non-empty and unique");
+            add(
+                &mut errors,
+                &context,
+                "fixture_id must be non-empty and unique",
+            );
         }
 
         validate_json_schema(
@@ -880,7 +1082,11 @@ fn validate_manifest(
         );
         let revision_id = field(&fixture["record"], "revision_event_id").unwrap_or_default();
         if revision_id.is_empty() || !revision_event_ids.insert(revision_id.to_string()) {
-            add(&mut errors, &context, "revision_event_id must be non-empty and unique across the corpus");
+            add(
+                &mut errors,
+                &context,
+                "revision_event_id must be non-empty and unique across the corpus",
+            );
         }
         let actual = validate_record(&fixture["record"]);
         let expected = string_array(&fixture["expected_violations"]);
@@ -984,12 +1190,9 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
 
-    const MANIFEST: &str =
-        include_str!("../../REVISION_LEDGER_FIXTURES_V0_1.json");
-    const MANIFEST_SCHEMA: &str =
-        include_str!("../../REVISION_LEDGER_FIXTURES_V0_1.schema.json");
-    const RECORD_SCHEMA: &str =
-        include_str!("../../REVISION_LEDGER_RECORD_V0_1.schema.json");
+    const MANIFEST: &str = include_str!("../../REVISION_LEDGER_FIXTURES_V0_1.json");
+    const MANIFEST_SCHEMA: &str = include_str!("../../REVISION_LEDGER_FIXTURES_V0_1.schema.json");
+    const RECORD_SCHEMA: &str = include_str!("../../REVISION_LEDGER_RECORD_V0_1.schema.json");
 
     fn parsed(text: &str) -> Value {
         serde_json::from_str(text).expect("checked-in JSON must parse")
@@ -999,7 +1202,10 @@ mod tests {
     fn state_content_digest_is_recomputed_from_canonical_state() {
         let record = parsed(MANIFEST)["fixtures"][1]["record"].clone();
         let state = &record["next_state"];
-        assert_eq!(state_content_sha256(state).as_deref(), field(state, "state_sha256"));
+        assert_eq!(
+            state_content_sha256(state).as_deref(),
+            field(state, "state_sha256")
+        );
     }
 
     #[test]
@@ -1031,7 +1237,10 @@ mod tests {
     fn duplicate_delivered_message_ids_are_rejected() {
         let mut record = parsed(MANIFEST)["fixtures"][2]["record"].clone();
         let first = record["delivered_messages"][0].clone();
-        record["delivered_messages"].as_array_mut().unwrap().push(first);
+        record["delivered_messages"]
+            .as_array_mut()
+            .unwrap()
+            .push(first);
         let errors = validate_record(&record);
         assert!(errors.contains(&"delivered_message_identity_duplicate".to_string()));
     }
@@ -1039,8 +1248,7 @@ mod tests {
     #[test]
     fn support_links_must_bind_current_claims_and_usable_evidence() {
         let mut record = parsed(MANIFEST)["fixtures"][1]["record"].clone();
-        record["claim_evidence_links"][0]["claim_id"] =
-            Value::String("UNRELATED-CLAIM".into());
+        record["claim_evidence_links"][0]["claim_id"] = Value::String("UNRELATED-CLAIM".into());
         let errors = validate_record(&record);
         assert!(errors.contains(&"claim_evidence_link_claim_not_bound_to_revision".to_string()));
     }
@@ -1067,24 +1275,26 @@ mod tests {
         let mut manifest_schema = parsed(MANIFEST_SCHEMA);
         manifest_schema["properties"]["optional_probe"] =
             serde_json::json!({"type":"string","maxLength":12});
-        let errors = validate_manifest(
-            &parsed(MANIFEST),
-            &manifest_schema,
-            &parsed(RECORD_SCHEMA),
-        ).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("unsupported schema keyword 'maxLength'")));
+        let errors = validate_manifest(&parsed(MANIFEST), &manifest_schema, &parsed(RECORD_SCHEMA))
+            .unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("unsupported schema keyword 'maxLength'"))
+        );
     }
 
     #[test]
     fn records_reject_undeclared_properties() {
         let mut manifest = parsed(MANIFEST);
         manifest["fixtures"][0]["record"]["unregistered"] = Value::Bool(true);
-        let errors = validate_manifest(
-            &manifest,
-            &parsed(MANIFEST_SCHEMA),
-            &parsed(RECORD_SCHEMA),
-        ).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("schema additional property 'unregistered'")));
+        let errors = validate_manifest(&manifest, &parsed(MANIFEST_SCHEMA), &parsed(RECORD_SCHEMA))
+            .unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("schema additional property 'unregistered'"))
+        );
     }
 
     #[test]
@@ -1092,12 +1302,13 @@ mod tests {
         let mut manifest = parsed(MANIFEST);
         manifest["fixtures"][1]["record"]["revision_event_id"] =
             manifest["fixtures"][0]["record"]["revision_event_id"].clone();
-        let errors = validate_manifest(
-            &manifest,
-            &parsed(MANIFEST_SCHEMA),
-            &parsed(RECORD_SCHEMA),
-        ).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("revision_event_id must be non-empty and unique")));
+        let errors = validate_manifest(&manifest, &parsed(MANIFEST_SCHEMA), &parsed(RECORD_SCHEMA))
+            .unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("revision_event_id must be non-empty and unique"))
+        );
     }
 
     #[test]
@@ -1133,13 +1344,10 @@ mod tests {
     fn agent_self_report_cannot_supply_a_matched_causal_estimate() {
         let mut record = parsed(MANIFEST)["fixtures"][2]["record"].clone();
         record["agent_report"]["reason_code"] = Value::String("Evidence".into());
-        record["causal_attribution"]["status"] =
-            Value::String("MatchedPairEstimate".into());
+        record["causal_attribution"]["status"] = Value::String("MatchedPairEstimate".into());
         record["causal_attribution"]["matched_pair_id"] = Value::Null;
         let errors = validate_record(&record);
-        assert!(errors.contains(
-            &"causal_estimate_missing_matched_pair".to_string()
-        ));
+        assert!(errors.contains(&"causal_estimate_missing_matched_pair".to_string()));
     }
 
     #[test]
@@ -1148,9 +1356,7 @@ mod tests {
         record["causal_attribution"]["control_run_id"] =
             record["causal_attribution"]["treatment_run_id"].clone();
         let errors = validate_record(&record);
-        assert!(errors.contains(
-            &"causal_pair_runs_must_be_distinct".to_string()
-        ));
+        assert!(errors.contains(&"causal_pair_runs_must_be_distinct".to_string()));
     }
 
     #[test]
@@ -1180,7 +1386,12 @@ mod tests {
             record["next_state"]["confidence"]["status"].as_str(),
             Some("SelfReported")
         );
-        assert!(record["evidence_delta"]["newly_available"].as_array().unwrap().is_empty());
+        assert!(
+            record["evidence_delta"]["newly_available"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1203,9 +1414,7 @@ mod tests {
         record["causal_attribution"]["pair_validator_id"] =
             Value::String("independent-pair-validator/v1".into());
         let errors = validate_record(&record);
-        assert!(errors.contains(
-            &"causal_pair_fields_without_estimate".to_string()
-        ));
+        assert!(errors.contains(&"causal_pair_fields_without_estimate".to_string()));
     }
 
     #[test]
@@ -1213,9 +1422,7 @@ mod tests {
         let mut record = parsed(MANIFEST)["fixtures"][11]["record"].clone();
         record["next_state"] = record["previous_state"].clone();
         let errors = validate_record(&record);
-        assert!(errors.contains(
-            &"missing_measurement_post_state_present".to_string()
-        ));
+        assert!(errors.contains(&"missing_measurement_post_state_present".to_string()));
     }
 
     #[test]
@@ -1223,9 +1430,9 @@ mod tests {
         let mut record = parsed(MANIFEST)["fixtures"][10]["record"].clone();
         record["oracle"]["outcome"] = Value::String("Supported".into());
         let errors = validate_record(&record);
-        assert!(errors.contains(
-            &"open_world_or_pluralism_cannot_have_correctness_outcome".to_string()
-        ));
+        assert!(
+            errors.contains(&"open_world_or_pluralism_cannot_have_correctness_outcome".to_string())
+        );
     }
 
     #[test]
@@ -1233,16 +1440,15 @@ mod tests {
         let mut record = parsed(MANIFEST)["fixtures"][3]["record"].clone();
         record["oracle"]["outcome"] = Value::String("Contradicted".into());
         let errors = validate_record(&record);
-        assert!(errors.contains(
-            &"open_world_or_pluralism_cannot_have_correctness_outcome".to_string()
-        ));
+        assert!(
+            errors.contains(&"open_world_or_pluralism_cannot_have_correctness_outcome".to_string())
+        );
     }
 
     #[test]
     fn self_report_is_not_an_external_oracle() {
         let mut record = parsed(MANIFEST)["fixtures"][2]["record"].clone();
-        record["agent_report"]["explanation_sha256"] =
-            Value::String("f".repeat(64));
+        record["agent_report"]["explanation_sha256"] = Value::String("f".repeat(64));
         record["oracle"]["oracle_receipt_sha256"] = Value::Null;
         let errors = validate_record(&record);
         assert!(errors.is_empty());
@@ -1251,63 +1457,48 @@ mod tests {
     #[test]
     fn evidence_link_must_resolve_to_an_available_evidence_reference() {
         let mut record = parsed(MANIFEST)["fixtures"][1]["record"].clone();
-        record["claim_evidence_links"][0]["evidence_id"] =
-            Value::String("MISSING-EVIDENCE".into());
+        record["claim_evidence_links"][0]["evidence_id"] = Value::String("MISSING-EVIDENCE".into());
         let errors = validate_record(&record);
-        assert!(errors.contains(
-            &"claim_evidence_link_not_bound_to_available_evidence".to_string()
-        ));
+        assert!(
+            errors.contains(&"claim_evidence_link_not_bound_to_available_evidence".to_string())
+        );
     }
 
     #[test]
     fn changed_state_requires_distinct_state_digests() {
         let mut record = parsed(MANIFEST)["fixtures"][4]["record"].clone();
-        record["next_state"]["state_sha256"] =
-            record["previous_state"]["state_sha256"].clone();
+        record["next_state"]["state_sha256"] = record["previous_state"]["state_sha256"].clone();
         let errors = validate_record(&record);
-        assert!(errors.contains(
-            &"changed_state_digest_unchanged".to_string()
-        ));
+        assert!(errors.contains(&"changed_state_digest_unchanged".to_string()));
     }
 
     #[test]
     fn communication_and_delegation_graph_owners_are_distinct() {
         let mut manifest = parsed(MANIFEST);
-        manifest["communication_graph_owner"] = Value::String(
-            "https://github.com/Luminous-Dynamics/symthaea/issues/11248".into(),
-        );
-        let errors = validate_manifest(
-            &manifest,
-            &parsed(MANIFEST_SCHEMA),
-            &parsed(RECORD_SCHEMA),
-        )
-        .unwrap_err();
+        manifest["communication_graph_owner"] =
+            Value::String("https://github.com/Luminous-Dynamics/symthaea/issues/11248".into());
+        let errors = validate_manifest(&manifest, &parsed(MANIFEST_SCHEMA), &parsed(RECORD_SCHEMA))
+            .unwrap_err();
         assert!(
-            errors.iter().any(|error| error.contains(
-                "communication and delegation graph ownership"
-            ))
+            errors
+                .iter()
+                .any(|error| error.contains("communication and delegation graph ownership"))
         );
     }
 
     #[test]
     fn claim_added_and_removed_overlap_is_rejected() {
         let mut record = parsed(MANIFEST)["fixtures"][7]["record"].clone();
-        record["claim_delta"]["retained"] =
-            serde_json::json!(["CLAIM-X"]);
+        record["claim_delta"]["retained"] = serde_json::json!(["CLAIM-X"]);
         let errors = validate_record(&record);
-        assert!(errors.contains(
-            &"claim_delta_sets_overlap".to_string()
-        ));
+        assert!(errors.contains(&"claim_delta_sets_overlap".to_string()));
     }
 
     #[test]
     fn delivered_message_must_bind_a_channel_event() {
         let mut record = parsed(MANIFEST)["fixtures"][8]["record"].clone();
-        record["delivered_messages"][0]["channel_event_id"] =
-            Value::String("".into());
+        record["delivered_messages"][0]["channel_event_id"] = Value::String("".into());
         let errors = validate_record(&record);
-        assert!(errors.contains(
-            &"delivered_message_missing_channel_event".to_string()
-        ));
+        assert!(errors.contains(&"delivered_message_missing_channel_event".to_string()));
     }
 }
