@@ -6,7 +6,7 @@
   "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
   "communication_graph_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
   "delegation_graph_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-  "fixture_count": 17,
+  "fixture_count": 21,
   "fixtures": [
     {
       "fixture_id": "REV-001",
@@ -1498,7 +1498,397 @@
       "expected_violations": [
         "causal_pair_shared_input_mismatch"
       ]
+    },
+    {
+      "fixture_id": "REV-018",
+      "description": "Self-reported confidence rises to 0.99 after a status cue but no new task evidence; this is not calibrated evidence.",
+      "record": {
+        "revision_event_id": "REV-018",
+        "run_id": "RUN-REV-018",
+        "scenario_id": "SCENARIO-REV-018",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000b4",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": [],
+          "confidence": {
+            "status": "SelfReported",
+            "value": 0.64,
+            "scale": "probability_correct",
+            "calibration_profile_sha256": null,
+            "calibration_receipt_sha256": null
+          }
+        },
+        "next_state": {
+          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000b5",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": [],
+          "confidence": {
+            "status": "SelfReported",
+            "value": 0.99,
+            "scale": "probability_correct",
+            "calibration_profile_sha256": null,
+            "calibration_receipt_sha256": null
+          }
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [
+          {
+            "message_id": "MSG-018",
+            "channel_event_id": "CHANNEL-EVENT-018",
+            "payload_sha256": "00000000000000000000000000000000000000000000000000000000000000b6"
+          }
+        ],
+        "agent_report": {
+          "provided": true,
+          "kind": "self_report",
+          "reason_code": "StatusCue",
+          "explanation_sha256": "00000000000000000000000000000000000000000000000000000000000000b7"
+        },
+        "oracle": {
+          "task_profile": "SocialClaimIntegrity",
+          "outcome": "Indeterminate",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": true,
+          "status_cue_exposure": true,
+          "repetition_cue_exposure": true,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "REV-019",
+      "description": "Confidence values carry an external calibration profile and receipt reference; fixture remains unexecuted.",
+      "record": {
+        "revision_event_id": "REV-019",
+        "run_id": "RUN-REV-019",
+        "scenario_id": "SCENARIO-REV-019",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000be",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [
+            "CLAIM-A"
+          ],
+          "evidence_ids": [
+            "EVID-OLD"
+          ],
+          "confidence": {
+            "status": "Calibrated",
+            "value": 0.61,
+            "scale": "probability_correct",
+            "calibration_profile_sha256": "00000000000000000000000000000000000000000000000000000000000000c0",
+            "calibration_receipt_sha256": "00000000000000000000000000000000000000000000000000000000000000c1"
+          }
+        },
+        "next_state": {
+          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000bf",
+          "stance": "B",
+          "uncertainty_state": "Certain",
+          "claim_ids": [
+            "CLAIM-B"
+          ],
+          "evidence_ids": [
+            "EVID-NEW"
+          ],
+          "confidence": {
+            "status": "Calibrated",
+            "value": 0.88,
+            "scale": "probability_correct",
+            "calibration_profile_sha256": "00000000000000000000000000000000000000000000000000000000000000c0",
+            "calibration_receipt_sha256": "00000000000000000000000000000000000000000000000000000000000000c1"
+          }
+        },
+        "claim_delta": {
+          "added": [
+            "CLAIM-B"
+          ],
+          "removed": [
+            "CLAIM-A"
+          ],
+          "retained": [],
+          "contradicted": [
+            "CLAIM-A"
+          ],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [
+            "EVID-OLD"
+          ],
+          "newly_available": [
+            "EVID-NEW"
+          ],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [
+          {
+            "claim_id": "CLAIM-B",
+            "evidence_id": "EVID-NEW",
+            "relationship": "supports"
+          }
+        ],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "Supported",
+          "answer_space_sha256": "000000000000000000000000000000000000000000000000000000000000005a",
+          "oracle_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000005b"
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": true
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "REV-020",
+      "description": "Negative control: confidence is labelled Calibrated without profile/receipt evidence.",
+      "record": {
+        "revision_event_id": "REV-020",
+        "run_id": "RUN-REV-020",
+        "scenario_id": "SCENARIO-REV-020",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateContextReset",
+        "transition": "NoChange",
+        "previous_state": {
+          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000c8",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": [],
+          "confidence": {
+            "status": "Calibrated",
+            "value": 0.91,
+            "scale": "probability_correct",
+            "calibration_profile_sha256": null,
+            "calibration_receipt_sha256": null
+          }
+        },
+        "next_state": {
+          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000c9",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": [],
+          "confidence": {
+            "status": "Calibrated",
+            "value": 0.94,
+            "scale": "probability_correct",
+            "calibration_profile_sha256": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "calibration_receipt_sha256": null
+          }
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "MeasurementOnly",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "confidence_calibration_evidence_missing"
+      ]
+    },
+    {
+      "fixture_id": "REV-021",
+      "description": "Negative control: probability-of-correctness confidence exceeds the [0,1] range.",
+      "record": {
+        "revision_event_id": "REV-021",
+        "run_id": "RUN-REV-021",
+        "scenario_id": "SCENARIO-REV-021",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateContextReset",
+        "transition": "NoChange",
+        "previous_state": {
+          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000d2",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": [],
+          "confidence": {
+            "status": "SelfReported",
+            "value": 1.25,
+            "scale": "probability_correct",
+            "calibration_profile_sha256": null,
+            "calibration_receipt_sha256": null
+          }
+        },
+        "next_state": {
+          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000d3",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [],
+          "evidence_ids": [],
+          "confidence": {
+            "status": "SelfReported",
+            "value": 0.98,
+            "scale": "probability_correct",
+            "calibration_profile_sha256": null,
+            "calibration_receipt_sha256": null
+          }
+        },
+        "claim_delta": {
+          "added": [],
+          "removed": [],
+          "retained": [],
+          "contradicted": [],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [],
+          "newly_available": [],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "MeasurementOnly",
+          "outcome": "NotApplicable",
+          "answer_space_sha256": null,
+          "oracle_receipt_sha256": null
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": false
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "confidence_value_out_of_range"
+      ]
     }
   ],
-  "claim_ceiling": "The fixtures test observable transition, evidence, self-report and causal-layer separation. They do not inspect hidden model states, establish human psychology, or prove causal effects outside matched experiments."
+  "claim_ceiling": "The fixtures test observable transition, evidence, self-report and causal-layer separation. They do not inspect hidden model states, establish human psychology, or prove causal effects outside matched experiments. Confidence values are self-reports unless bound to an external calibration profile and receipt; a structural record does not prove that calibration is valid or transferable."
 }
