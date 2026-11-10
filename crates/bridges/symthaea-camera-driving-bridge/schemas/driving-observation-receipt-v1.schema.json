@@ -121,19 +121,15 @@
     "width": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 4096
+      "maximum": 1280
     },
     "height": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 4096
+      "maximum": 720
     },
     "channels": {
-      "enum": [
-        1,
-        3,
-        4
-      ]
+      "const": 3
     },
     "visual_weight_ppm": {
       "type": "integer",
