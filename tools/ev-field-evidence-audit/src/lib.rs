@@ -117,6 +117,11 @@ struct Dataset {
     sentinel_handling: String,
     unlabeled_periods_are_negative: bool,
     censoring_supported: bool,
+    topology_descriptor_digest: Option<String>,
+    topology_qualification_digest: Option<String>,
+    service_event_completion_available: bool,
+    post_intervention_followup_available: bool,
+    matched_comparison_available: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -443,32 +448,47 @@ fn validate_manifest(manifest: &Manifest) -> (Vec<String>, usize, usize, usize, 
                 match task.task.as_str() {
                     "sensor_data_integrity"
                         if !dataset.measurement_time_available
-                            && !dataset.receive_time_available =>
+                            || !dataset.receive_time_available
+                            || dataset.timezone_basis == "unknown"
+                            || dataset.sentinel_handling == "unmapped" =>
                     {
-                        errors.push("sensor integrity support requires timestamp observations".to_owned());
+                        errors.push("sensor integrity support requires mapped timestamps, timezone semantics and sentinel handling".to_owned());
                     }
                     "operational_fault_detection"
                         if dataset.reported_fault_count == 0
                             || !dataset.measurement_time_available
-                            || !dataset.receive_time_available =>
+                            || !dataset.receive_time_available
+                            || dataset.timezone_basis == "unknown"
+                            || dataset.sentinel_handling == "unmapped" =>
                     {
-                        errors.push("fault detection support requires labelled fault events and event/receive times".to_owned());
+                        errors.push("fault detection support requires labelled fault events, mapped event/receive times and sentinel semantics".to_owned());
                     }
                     "soh_estimation" => {
-                        if !dataset.hierarchy_levels.iter().any(|level| level == "cell") {
-                            errors.push("SOH support requires cell-level identity".to_owned());
+                        if !dataset.hierarchy_levels.iter().any(|level| level == "cell")
+                            || dataset.unit_count == 0
+                        {
+                            errors.push("SOH support requires non-empty cell-level identity".to_owned());
                         }
                     }
-                    "remaining_life" if !dataset.censoring_supported => {
-                        errors.push("remaining-life support requires a censoring-aware observation contract".to_owned());
+                    "remaining_life" if !dataset.censoring_supported || dataset.unit_count == 0 => {
+                        errors.push("remaining-life support requires a censoring-aware observation contract and non-empty unit population".to_owned());
+                    }
+                    "intervention_outcomes"
+                        if !dataset.service_event_completion_available
+                            || !dataset.post_intervention_followup_available
+                            || !dataset.matched_comparison_available =>
+                    {
+                        errors.push("intervention outcomes require verified service completion, post-service follow-up and a matched comparison design".to_owned());
                     }
                     "pack_capability" => {
                         let levels = &dataset.hierarchy_levels;
                         if !levels.iter().any(|level| level == "cell")
                             || !levels.iter().any(|level| level == "module")
                             || !levels.iter().any(|level| level == "pack")
+                            || dataset.topology_descriptor_digest.as_deref().is_none_or(|digest| !is_digest(digest))
+                            || dataset.topology_qualification_digest.as_deref().is_none_or(|digest| !is_digest(digest))
                         {
-                            errors.push("pack capability support requires cell, module and pack hierarchy".to_owned());
+                            errors.push("pack capability support requires cell/module/pack hierarchy plus qualified topology evidence".to_owned());
                         }
                     }
                     _ => {}
@@ -778,6 +798,38 @@ mod tests {
         assert!(case.accepted);
         assert_eq!(case.supported_tasks, 2);
         assert_eq!(case.partial_tasks, 1);
+    }
+
+    #[test]
+    fn pack_capability_and_intervention_outcomes_require_distinct_physical_evidence() {
+        let report = report();
+        let qualified_pack = report.payload.cases.iter()
+            .find(|case| case.case_id == "qualified-pack-capability-task-supported")
+            .expect("qualified topology case");
+        assert!(qualified_pack.accepted);
+        for case_id in [
+            "pack-capability-supported-without-topology-rejected",
+            "intervention-supported-without-followup-rejected",
+            "unmapped-sentinel-with-supported-task-rejected",
+            "unknown-timezone-with-fault-support-rejected",
+        ] {
+            let case = report.payload.cases.iter()
+                .find(|case| case.case_id == case_id)
+                .expect("task prerequisite negative control");
+            assert!(!case.accepted);
+        }
+    }
+
+    #[test]
+    fn partial_adapter_does_not_claim_fully_supported_tasks() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "partial-adapter-declared-partial")
+            .expect("partial adapter case");
+        assert!(case.accepted);
+        assert_eq!(case.supported_tasks, 0);
+        assert_eq!(case.partial_tasks, 3);
+        assert_eq!(case.not_supported_tasks, 3);
     }
 
     #[test]
