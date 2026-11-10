@@ -332,11 +332,15 @@ impl VocalPerformance {
             })
             .collect();
 
+        const REST_EPSILON_S: f32 = 0.000_01;
         let mut pitch_curve = Vec::new();
         for (i, syllable) in syllables.iter().enumerate() {
             let previous = i
                 .checked_sub(1)
-                .filter(|&j| syllables[j].phrase_index == syllable.phrase_index)
+                .filter(|&j| {
+                    syllables[j].phrase_index == syllable.phrase_index
+                        && syllable.note.start_time - syllables[j].end_time_s() <= REST_EPSILON_S
+                })
                 .map(|j| syllables[j].last_note().frequency)
                 .unwrap_or(syllable.note.frequency);
             for (note_index, note) in syllable.notes().enumerate() {
@@ -346,7 +350,10 @@ impl VocalPerformance {
                     syllable
                         .notes()
                         .nth(note_index - 1)
-                        .map(|n| n.frequency)
+                        .filter(|prior| {
+                            note.start_time - (prior.start_time + prior.duration) <= REST_EPSILON_S
+                        })
+                        .map(|prior| prior.frequency)
                         .unwrap_or(note.frequency)
                 };
                 let transition = note.duration * syllable.portamento;
@@ -1582,6 +1589,58 @@ mod tests {
             Some(440.0),
             "the canonical renderer/evaluator target must also reset at a phrase boundary"
         );
+    }
+
+    #[test]
+    fn pitch_curve_resets_at_explicit_rest_inside_one_phrase() {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 440.0,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+        ];
+        let performance = VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
+        let rest_release_onset = performance
+            .pitch_curve
+            .iter()
+            .find(|point| (point.time_s - 1.0).abs() < 1e-6)
+            .expect("the post-rest note onset must be represented in the pitch curve");
+        assert_eq!(rest_release_onset.frequency_hz, 440.0);
+        assert_eq!(performance.target_pitch_center_at(1.0), Some(440.0));
+    }
+
+    #[test]
+    fn melisma_pitch_curve_resets_after_an_explicit_rest() {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 440.0,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+        ];
+        let performance = VocalPerformance::from_melody("light", &notes, "en").unwrap();
+        let melisma_onset = performance
+            .pitch_curve
+            .iter()
+            .find(|point| (point.time_s - 1.0).abs() < 1e-6)
+            .expect("the post-rest melisma onset must be represented in the pitch curve");
+        assert_eq!(melisma_onset.frequency_hz, 440.0);
+        assert_eq!(performance.target_pitch_center_at(1.0), Some(440.0));
     }
 
     #[test]
