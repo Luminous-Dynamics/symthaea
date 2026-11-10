@@ -238,9 +238,11 @@ mod tests {
 
     #[test]
     fn malformed_source_demand_fails_before_any_candidate_is_exposed() {
-        let mut source = source_score();
+        let valid_source = source_score();
+        let edit = plan(&valid_source);
+        let mut source = valid_source;
         source.notes[0].velocity = 1.5;
-        let error = preview_score_edit(&source, &plan(&source)).unwrap_err();
+        let error = preview_score_edit(&source, &edit).unwrap_err();
         assert!(matches!(
             error,
             ScoreEditServiceErrorV1::SourceDemand(ScoreDemandError::VelocityOutOfRange { note_index: 0 })
