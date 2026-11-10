@@ -775,6 +775,47 @@ mod tests {
     }
 
     #[test]
+    fn yin_handles_low_and_high_range_boundaries_after_decimation() {
+        let rate = 24_000;
+        for target_hz in [40.0f32, 80.0, 800.0, 1200.0] {
+            let samples: Vec<_> = (0..rate / 10)
+                .map(|index| {
+                    (std::f32::consts::TAU * target_hz * index as f32 / rate as f32).sin() * 0.2
+                })
+                .collect();
+            let (estimated, confidence) = estimate_f0_yin(&samples, rate).unwrap();
+            let error_cents = (1200.0 * (estimated / target_hz).log2()).abs();
+            assert!(
+                error_cents < 25.0,
+                "target={target_hz}, estimate={estimated}, error={error_cents}"
+            );
+            assert!(confidence > 0.9, "target={target_hz}, confidence={confidence}");
+        }
+    }
+
+    #[test]
+    fn yin_remains_stable_with_moderate_deterministic_noise() {
+        let rate = 24_000;
+        let target_hz = 220.0f32;
+        let mut state = 0x1234_5678u32;
+        let samples: Vec<_> = (0..rate / 20)
+            .map(|index| {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                let noise = ((state >> 8) as f32 / 16_777_215.0) * 2.0 - 1.0;
+                0.2 * (std::f32::consts::TAU * target_hz * index as f32 / rate as f32).sin()
+                    + 0.06 * noise
+            })
+            .collect();
+        let (estimated, confidence) = estimate_f0_yin(&samples, rate).unwrap();
+        let error_cents = (1200.0 * (estimated / target_hz).log2()).abs();
+        assert!(
+            error_cents < 25.0,
+            "estimate={estimated}, error={error_cents}, confidence={confidence}"
+        );
+        assert!(confidence > 0.85, "confidence={confidence}");
+    }
+
+    #[test]
     fn yin_retains_fundamental_when_upper_harmonics_dominate() {
         let rate = 24_000;
         let fundamental = 220.0f32;
