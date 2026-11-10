@@ -59,6 +59,41 @@ The Rust evaluator in tools/lyric-edit-assurance-eval:
 - requires complete predeclared operation × language × timbre-mode groups;
 - distinguishes its local rubric calculation from the official MMAE judge.
 
+## Published YingMusic-Singer results: what the numbers actually say
+
+YingMusic-Singer is the strongest directly relevant published melody-guided lyric-edit comparison in this protocol. It conditions on an optional timbre reference, an existing singing clip as melody reference and modified lyrics, without manual phoneme/MIDI alignment. The paper evaluates six task types across Chinese and English, with both cross-timbre Melody Control and same-timbre Sing Edit conditions.
+
+Selected cross-timbre rows from its published Table 2 illustrate why Muse must measure identity separately:
+
+| Condition | Model | PER ↓ | SIM ↑ | F0-CORR ↑ | Vocal Score ↑ |
+|---|---|---:|---:|---:|---:|
+| Chinese partial substitution | Vevo2 | 0.1378 | 0.6462 | 0.8471 | 1.3578 |
+| Chinese partial substitution | YingMusic | 0.0192 | 0.6543 | 0.9364 | 2.0779 |
+| Chinese translation | Vevo2 | 0.4409 | 0.6115 | 0.7678 | 1.3061 |
+| Chinese translation | YingMusic | 0.0881 | 0.5791 | 0.9378 | 1.9372 |
+| English partial substitution | Vevo2 | 0.3352 | 0.6357 | 0.8794 | 1.0340 |
+| English partial substitution | YingMusic | 0.0685 | 0.6078 | 0.9355 | 1.5054 |
+| English code-mixing | Vevo2 | 0.5132 | 0.6325 | 0.8927 | 1.0925 |
+| English code-mixing | YingMusic | 0.2668 | 0.6076 | 0.9389 | 1.5060 |
+
+These examples show substantial lyric and melody gains, alongside identity-similarity losses in some cross-timbre conditions. The paper reports PER/F0-CORR/Vocal Score improvements over Vevo2 across all six task families in both evaluation settings, but does not establish a universal win on every metric. We should preserve that distinction in any competitive claim. The same-timbre rows also show that identity similarity remains a difficult dimension even when melody and lyric metrics improve.
+
+The paper's benchmark uses PER from singing-trained Qwen3-ASR-1.7B converted to phonemes (tone markers removed), SIM from WavLM-large speaker-verification embeddings, F0-CORR from RMVPE framewise F0 contours, and Vocal Score from VocalVerse2. It additionally reports human N-MOS and M-MOS from 30 listeners on 120 sampled outputs. Muse should pin evaluator versions and report these separately, then supplement them with exact target-region/locality, neighboring-phone, onset/offset, protected-region and preservation receipts. ASR/phoneme errors on code-switching need human-reviewed audit samples because the paper itself notes potential ASR hallucination inflation on mixed-language PER.
+
+### Practical model comparison
+
+The YingMusic-Singer model is approximately 727.3M parameters (453.6M conditional flow-matching backbone, 156.1M VAE and 117.6M melody extractor) and the paper reports training on 8×A800 80GB GPUs with distributed training and bf16. This is a significant reproduction cost. Our near-term strategy should be:
+1. use its released inference code/weights as an external baseline where hardware, dependencies and component licences permit;
+2. first reproduce a small, pinned subset of its published test conditions and metrics;
+3. focus Muse's new research on bounded edits, explicit dependency/locality guarantees, joint identity–melody–lyric preservation and correction evidence rather than trying to retrain a 727M system from scratch;
+4. only pursue training once matched pilot data identifies a gap that cannot be solved through control, editing or integration.
+
+LyricEditBench is CC BY-NC-SA 4.0. Do not use the dataset in commercial model training, product validation or redistribution without explicit rights clearance. The paper says its own training used internally licensed singing tracks, not the benchmark test set. The published benchmark's rights do not automatically grant rights to its underlying GTSinger recordings or any source data. Keep the public benchmark as a research-only external comparison unless a separate rights review establishes otherwise.
+
+### Separate whole-singing synthesis reference
+
+The SOTA2 *Singing Voice Synthesis on Singing (evaluation set)* page currently displays its May 2026 in-house system at Quality Score 4.45, SingMOS 4.148, Sheet-SSQA 2.534, WER 0.118, Clarity 4.64, Naturalness 4.46 and Expressiveness 4.55. Its page says it was updated six months ago. This is a separate singing-generation evaluation, not a LyricEditBench result and not a directly comparable lyric-edit score. Use it only as a reference for the broader naturalness/intelligibility programme, with the evaluation set, model conditions and metric definitions independently verified before comparison.
+
 ## Required experiment matrix
 
 Compare the following on paired sources and requested tasks:
