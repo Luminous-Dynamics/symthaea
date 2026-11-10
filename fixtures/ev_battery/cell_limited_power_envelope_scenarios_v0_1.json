@@ -89,7 +89,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e20",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e21",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-002",
@@ -121,7 +126,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e22",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e23",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-003",
@@ -153,7 +163,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e24",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e25",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
       }
@@ -245,7 +260,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e26",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e27",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-002",
@@ -277,7 +297,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e28",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e29",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-003",
@@ -309,7 +334,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e2a",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e2b",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
       }
@@ -401,7 +431,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
             "temperature_estimate_c": 49,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 49,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e2c",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e2d",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-002",
@@ -433,7 +468,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
             "temperature_estimate_c": 49,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 49,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e2e",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e2f",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-003",
@@ -465,7 +505,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
             "temperature_estimate_c": 49,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 49,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e30",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e31",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
       }
@@ -557,7 +602,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e32",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e33",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-002",
@@ -589,7 +639,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e34",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e35",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-003",
@@ -621,7 +676,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e36",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e37",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
       }
@@ -713,7 +773,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.99,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e38",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e39",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-002",
@@ -745,7 +810,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e3a",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e3b",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-003",
@@ -777,7 +847,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e3c",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e3d",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
       }
@@ -869,7 +944,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e3e",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e3f",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-002",
@@ -901,7 +981,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
             "temperature_estimate_c": 55,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 55,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e40",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e41",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-003",
@@ -933,7 +1018,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e42",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e43",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
       }
@@ -1025,7 +1115,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e44",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e45",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-002",
@@ -1057,7 +1152,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e46",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e47",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-003",
@@ -1089,7 +1189,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e48",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e49",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
       }
@@ -1181,7 +1286,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e4a",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e4b",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-002",
@@ -1213,7 +1323,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e4c",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e4d",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-003",
@@ -1245,7 +1360,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e4e",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e4f",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
       }
@@ -1337,7 +1457,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e50",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e51",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-002",
@@ -1369,7 +1494,12 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e52",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e53",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           },
           {
             "cell_ref": "cell-003",
@@ -1401,7 +1531,354 @@
             "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
             "temperature_estimate_c": 25,
             "voltage_limit_evidence_class": "synthetic_fixture",
-            "current_limit_evidence_class": "synthetic_fixture"
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e54",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e55",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "ocv-soc-context-mismatch-rejected",
+      "expectation": "reject",
+      "expected_limiting_cell": null,
+      "expected_limiting_constraint": null,
+      "expected_max_current_a": null,
+      "expected_power_w": null,
+      "profile": {
+        "profile_version": "ev-cell-limited-power-envelope/0.1",
+        "profile_id": "equal-series-reference",
+        "asset": {
+          "vehicle_ref": "vehicle-equal-series-reference",
+          "vehicle_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000a",
+          "pack_ref": "pack-equal-series-reference",
+          "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
+          "chemistry": "nmc",
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
+        },
+        "topology": {
+          "status": "qualified",
+          "architecture": "series_single_parallel",
+          "topology_ref": "synthetic-series-string-v1",
+          "topology_digest": "000000000000000000000000000000000000000000000000000000000000000c",
+          "qualification": {
+            "qualification_ref": "synthetic-qualification-1",
+            "authority_ref": "synthetic-authority",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000000d",
+            "evidence_class": "synthetic_fixture"
+          }
+        },
+        "model": {
+          "model_ref": "thevenin-first-order-thermal-v1",
+          "model_digest": "000000000000000000000000000000000000000000000000000000000000000e",
+          "equation_ref": "constant-current-ohmic-plus-lumped-thermal",
+          "parameter_digest": "000000000000000000000000000000000000000000000000000000000000000f",
+          "soc_valid_min": 0.1,
+          "soc_valid_max": 0.95,
+          "temperature_valid_min_c": 0,
+          "temperature_valid_max_c": 50,
+          "calibration_valid": true,
+          "domain_supported": true,
+          "protocol_ref": "synthetic-pulse-protocol",
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013",
+          "calibration_evidence_class": "synthetic_fixture",
+          "domain_scope_evidence_class": "synthetic_fixture"
+        },
+        "pulse": {
+          "direction": "discharge",
+          "duration_s": 10,
+          "ambient_temperature_upper_c": 25,
+          "ambient_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000011",
+          "ambient_evidence_class": "synthetic_fixture"
+        },
+        "cells": [
+          {
+            "cell_ref": "cell-001",
+            "cell_identity_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "ocv_lower_v": 3.8,
+            "ocv_upper_v": 3.82,
+            "ocv_evidence_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+            "ocv_evidence_class": "synthetic_fixture",
+            "resistance_lower_ohm": 0.02,
+            "resistance_upper_ohm": 0.021,
+            "resistance_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "resistance_evidence_class": "synthetic_fixture",
+            "soc_fraction": 0.6,
+            "soc_uncertainty": 0.01,
+            "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+            "soc_evidence_class": "synthetic_fixture",
+            "temperature_uncertainty_c": 0.5,
+            "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
+            "temperature_evidence_class": "synthetic_fixture",
+            "minimum_voltage_v": 2.5,
+            "voltage_limit_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000259",
+            "maximum_discharge_current_lower_a": 100,
+            "current_limit_evidence_digest": "00000000000000000000000000000000000000000000000000000000000002bd",
+            "thermal_resistance_upper_k_per_w": 0.5,
+            "thermal_capacity_lower_j_per_k": 500,
+            "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
+            "thermal_evidence_class": "synthetic_fixture",
+            "maximum_temperature_lower_c": 60,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 25,
+            "voltage_limit_evidence_class": "synthetic_fixture",
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.9,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e20",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e21",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
+          },
+          {
+            "cell_ref": "cell-002",
+            "cell_identity_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "ocv_lower_v": 3.8,
+            "ocv_upper_v": 3.82,
+            "ocv_evidence_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "ocv_evidence_class": "synthetic_fixture",
+            "resistance_lower_ohm": 0.02,
+            "resistance_upper_ohm": 0.021,
+            "resistance_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012e",
+            "resistance_evidence_class": "synthetic_fixture",
+            "soc_fraction": 0.6,
+            "soc_uncertainty": 0.01,
+            "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+            "soc_evidence_class": "synthetic_fixture",
+            "temperature_uncertainty_c": 0.5,
+            "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
+            "temperature_evidence_class": "synthetic_fixture",
+            "minimum_voltage_v": 2.5,
+            "voltage_limit_evidence_digest": "000000000000000000000000000000000000000000000000000000000000025a",
+            "maximum_discharge_current_lower_a": 100,
+            "current_limit_evidence_digest": "00000000000000000000000000000000000000000000000000000000000002be",
+            "thermal_resistance_upper_k_per_w": 0.5,
+            "thermal_capacity_lower_j_per_k": 500,
+            "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
+            "thermal_evidence_class": "synthetic_fixture",
+            "maximum_temperature_lower_c": 60,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 25,
+            "voltage_limit_evidence_class": "synthetic_fixture",
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e22",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e23",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
+          },
+          {
+            "cell_ref": "cell-003",
+            "cell_identity_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "ocv_lower_v": 3.8,
+            "ocv_upper_v": 3.82,
+            "ocv_evidence_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
+            "ocv_evidence_class": "synthetic_fixture",
+            "resistance_lower_ohm": 0.02,
+            "resistance_upper_ohm": 0.021,
+            "resistance_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+            "resistance_evidence_class": "synthetic_fixture",
+            "soc_fraction": 0.6,
+            "soc_uncertainty": 0.01,
+            "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+            "soc_evidence_class": "synthetic_fixture",
+            "temperature_uncertainty_c": 0.5,
+            "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+            "temperature_evidence_class": "synthetic_fixture",
+            "minimum_voltage_v": 2.5,
+            "voltage_limit_evidence_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+            "maximum_discharge_current_lower_a": 100,
+            "current_limit_evidence_digest": "00000000000000000000000000000000000000000000000000000000000002bf",
+            "thermal_resistance_upper_k_per_w": 0.5,
+            "thermal_capacity_lower_j_per_k": 500,
+            "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
+            "thermal_evidence_class": "synthetic_fixture",
+            "maximum_temperature_lower_c": 60,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 25,
+            "voltage_limit_evidence_class": "synthetic_fixture",
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e24",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e25",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "ocv-temperature-context-mismatch-rejected",
+      "expectation": "reject",
+      "expected_limiting_cell": null,
+      "expected_limiting_constraint": null,
+      "expected_max_current_a": null,
+      "expected_power_w": null,
+      "profile": {
+        "profile_version": "ev-cell-limited-power-envelope/0.1",
+        "profile_id": "equal-series-reference",
+        "asset": {
+          "vehicle_ref": "vehicle-equal-series-reference",
+          "vehicle_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000a",
+          "pack_ref": "pack-equal-series-reference",
+          "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
+          "chemistry": "nmc",
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
+        },
+        "topology": {
+          "status": "qualified",
+          "architecture": "series_single_parallel",
+          "topology_ref": "synthetic-series-string-v1",
+          "topology_digest": "000000000000000000000000000000000000000000000000000000000000000c",
+          "qualification": {
+            "qualification_ref": "synthetic-qualification-1",
+            "authority_ref": "synthetic-authority",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000000d",
+            "evidence_class": "synthetic_fixture"
+          }
+        },
+        "model": {
+          "model_ref": "thevenin-first-order-thermal-v1",
+          "model_digest": "000000000000000000000000000000000000000000000000000000000000000e",
+          "equation_ref": "constant-current-ohmic-plus-lumped-thermal",
+          "parameter_digest": "000000000000000000000000000000000000000000000000000000000000000f",
+          "soc_valid_min": 0.1,
+          "soc_valid_max": 0.95,
+          "temperature_valid_min_c": 0,
+          "temperature_valid_max_c": 50,
+          "calibration_valid": true,
+          "domain_supported": true,
+          "protocol_ref": "synthetic-pulse-protocol",
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "calibration_digest": "0000000000000000000000000000000000000000000000000000000000000012",
+          "domain_scope_digest": "0000000000000000000000000000000000000000000000000000000000000013",
+          "calibration_evidence_class": "synthetic_fixture",
+          "domain_scope_evidence_class": "synthetic_fixture"
+        },
+        "pulse": {
+          "direction": "discharge",
+          "duration_s": 10,
+          "ambient_temperature_upper_c": 25,
+          "ambient_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000011",
+          "ambient_evidence_class": "synthetic_fixture"
+        },
+        "cells": [
+          {
+            "cell_ref": "cell-001",
+            "cell_identity_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "ocv_lower_v": 3.8,
+            "ocv_upper_v": 3.82,
+            "ocv_evidence_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+            "ocv_evidence_class": "synthetic_fixture",
+            "resistance_lower_ohm": 0.02,
+            "resistance_upper_ohm": 0.021,
+            "resistance_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "resistance_evidence_class": "synthetic_fixture",
+            "soc_fraction": 0.6,
+            "soc_uncertainty": 0.01,
+            "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+            "soc_evidence_class": "synthetic_fixture",
+            "temperature_uncertainty_c": 0.5,
+            "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
+            "temperature_evidence_class": "synthetic_fixture",
+            "minimum_voltage_v": 2.5,
+            "voltage_limit_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000259",
+            "maximum_discharge_current_lower_a": 100,
+            "current_limit_evidence_digest": "00000000000000000000000000000000000000000000000000000000000002bd",
+            "thermal_resistance_upper_k_per_w": 0.5,
+            "thermal_capacity_lower_j_per_k": 500,
+            "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000321",
+            "thermal_evidence_class": "synthetic_fixture",
+            "maximum_temperature_lower_c": 60,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "temperature_estimate_c": 25,
+            "voltage_limit_evidence_class": "synthetic_fixture",
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e20",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e21",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
+          },
+          {
+            "cell_ref": "cell-002",
+            "cell_identity_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "ocv_lower_v": 3.8,
+            "ocv_upper_v": 3.82,
+            "ocv_evidence_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "ocv_evidence_class": "synthetic_fixture",
+            "resistance_lower_ohm": 0.02,
+            "resistance_upper_ohm": 0.021,
+            "resistance_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012e",
+            "resistance_evidence_class": "synthetic_fixture",
+            "soc_fraction": 0.6,
+            "soc_uncertainty": 0.01,
+            "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+            "soc_evidence_class": "synthetic_fixture",
+            "temperature_uncertainty_c": 0.5,
+            "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
+            "temperature_evidence_class": "synthetic_fixture",
+            "minimum_voltage_v": 2.5,
+            "voltage_limit_evidence_digest": "000000000000000000000000000000000000000000000000000000000000025a",
+            "maximum_discharge_current_lower_a": 100,
+            "current_limit_evidence_digest": "00000000000000000000000000000000000000000000000000000000000002be",
+            "thermal_resistance_upper_k_per_w": 0.5,
+            "thermal_capacity_lower_j_per_k": 500,
+            "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000322",
+            "thermal_evidence_class": "synthetic_fixture",
+            "maximum_temperature_lower_c": 60,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "temperature_estimate_c": 25,
+            "voltage_limit_evidence_class": "synthetic_fixture",
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 45,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e22",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e23",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
+          },
+          {
+            "cell_ref": "cell-003",
+            "cell_identity_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "ocv_lower_v": 3.8,
+            "ocv_upper_v": 3.82,
+            "ocv_evidence_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
+            "ocv_evidence_class": "synthetic_fixture",
+            "resistance_lower_ohm": 0.02,
+            "resistance_upper_ohm": 0.021,
+            "resistance_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+            "resistance_evidence_class": "synthetic_fixture",
+            "soc_fraction": 0.6,
+            "soc_uncertainty": 0.01,
+            "soc_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+            "soc_evidence_class": "synthetic_fixture",
+            "temperature_uncertainty_c": 0.5,
+            "temperature_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+            "temperature_evidence_class": "synthetic_fixture",
+            "minimum_voltage_v": 2.5,
+            "voltage_limit_evidence_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+            "maximum_discharge_current_lower_a": 100,
+            "current_limit_evidence_digest": "00000000000000000000000000000000000000000000000000000000000002bf",
+            "thermal_resistance_upper_k_per_w": 0.5,
+            "thermal_capacity_lower_j_per_k": 500,
+            "thermal_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000323",
+            "thermal_evidence_class": "synthetic_fixture",
+            "maximum_temperature_lower_c": 60,
+            "cell_configuration_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "temperature_estimate_c": 25,
+            "voltage_limit_evidence_class": "synthetic_fixture",
+            "current_limit_evidence_class": "synthetic_fixture",
+            "ocv_soc_fraction": 0.6,
+            "ocv_temperature_c": 25,
+            "ocv_condition_digest": "0000000000000000000000000000000000000000000000000000000000004e24",
+            "maximum_temperature_evidence_digest": "0000000000000000000000000000000000000000000000000000000000004e25",
+            "maximum_temperature_evidence_class": "synthetic_fixture"
           }
         ]
       }
