@@ -49,8 +49,10 @@ jobs:
       - name: Exercise confidence calibration CLI with authoritative outcomes
         run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --calibrate experiments/robodojo-contract/examples/synthetic_forecasts.tsv experiments/robodojo-contract/examples/synthetic_trials.tsv
 
-      - name: Exercise shift-stratified robustness CLI
-        run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --shift-audit experiments/robodojo-contract/examples/synthetic_trials.tsv experiments/robodojo-contract/examples/synthetic_shift_plan.tsv baseline symthaea_sidecar
+      - name: Exercise paired shift robustness audit and 32-column output contract
+        run: |
+          cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --shift-audit experiments/robodojo-contract/examples/synthetic_trials.tsv experiments/robodojo-contract/examples/synthetic_shift_plan.tsv baseline symthaea_sidecar > /tmp/robodojo-shift-audit.tsv
+          awk -F '\t' 'NR == 1 { if (NF != 32 || $21 != "ss_to_ss" || $22 != "ss_to_f" || $29 != "u_to_u" || $31 != "changed_resolved_outcome_pairs") exit 1; next } { if (NF != 32) exit 1; rows++ } END { if (rows == 0) exit 1 }' /tmp/robodojo-shift-audit.tsv
 
       - name: Exercise paired active-sensing benchmark audit
         run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --sensing-audit experiments/robodojo-contract/examples/synthetic_sensing_trials.tsv

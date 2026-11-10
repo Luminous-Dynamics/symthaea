@@ -87,7 +87,13 @@ task_id trial_id condition_id family severity seed perturbation_spec_sha256
 
 Fields are tab-separated. Each task/trial pair has one manifest assignment shared by both variants. Families: nominal, appearance, geometry, lighting, occlusion, dynamics, sensor_latency, instruction_semantics, object_state, tool_failure. Severities: clean, mild, moderate, severe. The SHA-256 identifies the immutable perturbation configuration artifact; this harness validates the digest format but does not dereference or recompute that artifact.
 
-The audit rejects duplicate manifest keys, malformed digests, unmatched or missing rows, unpaired trials, and unexpected variants. Results are kept separate by family, severity, and exact spec digest. They include paired progress deltas/intervals where sample size permits, completion and valid-run deltas, runtime/cost, safety events, and operational failure-class deltas. Sparse strata emit NA intervals rather than implying precision.
+The audit rejects duplicate manifest keys, malformed digests, unmatched or missing rows, unpaired trials, and unexpected variants. Results are kept separate by family, severity, and exact spec digest. They include paired progress deltas/intervals where sample size permits, completion and valid-run deltas, runtime/cost, safety events, and operational failure-class deltas.
+
+The report also includes a complete 3×3 paired outcome-transition matrix (baseline success/failure/unresolved × candidate success/failure/unresolved). It reports success→failure and failure→success separately, plus stable outcomes and unresolved pairs. An invalid/unscored run is **unresolved**, not silently converted into a policy failure. This distinguishes net completion-rate change from outcome sensitivity: opposite-direction flips can cancel to a zero net ΔSR while still exposing changed episode behavior. Sparse strata emit NA intervals rather than implying precision.
+
+The report's 3×3 outcome-transition matrix is documented in [ROBODOJO_PAIRED_OUTCOME_TRANSITIONS_V0_1.md](../../docs/research/ROBODOJO_PAIRED_OUTCOME_TRANSITIONS_V0_1.md). It distinguishes net completion-rate delta from bidirectional episode flips and leaves any pair containing an invalid/unscored arm in the unresolved cells.
+
+The shift module has seven synthetic tests, including zero-net-delta bidirectional flips and unresolved-pair preservation. These tests qualify the report arithmetic only; the RoboCasa-Shift paper values are external reference results, not measurements from this harness.
 
 The shift-plan fixture is synthetic test data, not an RC benchmark result. Physical evaluation must preserve the canonical configuration payload beside its digest, measure realized perturbations where possible, retain unsuccessful attempts, and pre-register conditions and stopping rules.
 

@@ -177,14 +177,14 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .filter(|r| r.variant_id.as_str() == candidate_name.as_str()).cloned().collect();
             let summaries = audit_shift_robustness(&baseline, &candidate, &assignments, replicates, seed)
                 .map_err(|error| invalid_input(format!("cannot audit shift strata: {error:?}")))?;
-            println!("family\tseverity\tperturbation_spec_sha256\tconditions\tpairs\tscored_pairs\tprogress_delta_pp\tci95_low_pp\tci95_high_pp\tcompletion_rate_delta_pp\tvalid_rate_delta_pp\telapsed_delta_s\tcost_delta_usd\tsafety_event_delta\ttimeout_delta\tthermal_stop_delta\tserver_error_delta\tinvalid_action_delta\tsafety_stop_delta\tother_failure_delta");
+            println!("family\tseverity\tperturbation_spec_sha256\tconditions\tpairs\tscored_pairs\tprogress_delta_pp\tci95_low_pp\tci95_high_pp\tcompletion_rate_delta_pp\tvalid_rate_delta_pp\telapsed_delta_s\tcost_delta_usd\tsafety_event_delta\ttimeout_delta\tthermal_stop_delta\tserver_error_delta\tinvalid_action_delta\tsafety_stop_delta\tother_failure_delta\tss_to_ss\tss_to_f\tss_to_u\tf_to_ss\tf_to_f\tf_to_u\tu_to_ss\tu_to_f\tu_to_u\tresolved_outcome_pairs\tchanged_resolved_outcome_pairs\tunresolved_outcome_pairs");
             for row in summaries {
                 let (lo, hi) = match row.progress_delta_ci95 {
                     Some((lo, hi)) => (format!("{:.4}", lo * 100.0), format!("{:.4}", hi * 100.0)),
                     None => ("NA".to_owned(), "NA".to_owned()),
                 };
                 println!(
-                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                     row.family.as_str(), row.severity.as_str(), row.perturbation_spec_sha256,
                     row.condition_count, row.pairs, row.scored_pairs,
                     row.mean_progress_delta.map(|x| format!("{:.4}", x * 100.0)).unwrap_or_else(|| "NA".to_owned()),
@@ -192,7 +192,11 @@ fn run() -> Result<(), Box<dyn Error>> {
                     row.mean_elapsed_seconds_delta, row.mean_cost_usd_delta,
                     row.safety_event_count_delta, row.timeout_count_delta, row.thermal_stop_count_delta,
                     row.server_error_count_delta, row.invalid_action_count_delta,
-                    row.safety_stop_count_delta, row.other_failure_count_delta
+                    row.safety_stop_count_delta, row.other_failure_count_delta,
+                    row.success_to_success, row.success_to_failure, row.success_to_unresolved,
+                    row.failure_to_success, row.failure_to_failure, row.failure_to_unresolved,
+                    row.unresolved_to_success, row.unresolved_to_failure, row.unresolved_to_unresolved,
+                    row.resolved_outcome_pairs, row.changed_resolved_outcome_pairs, row.unresolved_outcome_pairs
                 );
             }
             Ok(())
