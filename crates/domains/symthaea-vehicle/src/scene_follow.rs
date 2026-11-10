@@ -39,6 +39,7 @@ pub(crate) struct SceneSourceReceipt {
     extrinsic_profile_id: String,
     frame_transform_admitted: bool,
     calibration_profile_id: String,
+    frame_transform_id: String,
     role: SceneSourceRole,
     current: bool,
     calibration_current: bool,
@@ -86,7 +87,9 @@ pub(crate) struct SceneTrackReceipt {
     measurement_tick_ns: u64,
     position_x_m: f64,
     position_y_m: f64,
+    orientation_yaw_rad: f64,
     velocity_x_mps: f64,
+    extent_length_m: f64,
     extent_width_m: f64,
     distance_uncertainty_radius_m: f64,
     association: SceneAssociationState,
@@ -128,6 +131,9 @@ pub(crate) struct SceneAdmissionReceipt {
     x_axis_is_forward: bool,
     ego_position_x_m: f64,
     ego_velocity_x_mps: f64,
+    ego_orientation_yaw_rad: f64,
+    ego_extent_length_m: f64,
+    ego_extent_width_m: f64,
     lane_min_y_m: f64,
     lane_max_y_m: f64,
     sources: Vec<SceneSourceReceipt>,
@@ -198,6 +204,7 @@ impl SceneAdmissionReceipt {
                 || source.source_clock_domain_id.is_empty()
                 || source.clock_transform_id.is_empty()
                 || source.calibration_profile_id.is_empty()
+                || source.frame_transform_id.is_empty()
                 || source.extrinsic_profile_id.is_empty()
                 || source.acquisition_tick_ns > source.receive_tick_ns
                 || !source_ids.insert(source.source_id.as_str())
@@ -214,9 +221,12 @@ impl SceneAdmissionReceipt {
                 || track.measurement_tick_ns > event_tick_ns
                 || !track.position_x_m.is_finite()
                 || !track.position_y_m.is_finite()
+                || !track.orientation_yaw_rad.is_finite()
                 || !track.velocity_x_mps.is_finite()
+                || !track.extent_length_m.is_finite()
+                || track.extent_length_m <= 0.0
                 || !track.extent_width_m.is_finite()
-                || track.extent_width_m < 0.0
+                || track.extent_width_m <= 0.0
                 || !track.distance_uncertainty_radius_m.is_finite()
                 || track.distance_uncertainty_radius_m < 0.0
                 || track.uncertainty_semantics_id.is_empty()
