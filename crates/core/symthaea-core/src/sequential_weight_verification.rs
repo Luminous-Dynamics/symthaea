@@ -187,9 +187,11 @@ fn validate_confirmatory_episode_manifest(
     )?;
     let expected = confirmatory_episode_manifest_digest(manifest)?;
     if expected != manifest.manifest_digest {
-        return Err(SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
-            "manifest digest mismatch",
-        ));
+        return Err(
+            SequentialWeightVerificationError::InvalidConfirmatoryEpisodeManifest(
+                "manifest digest mismatch",
+            ),
+        );
     }
     Ok(())
 }
