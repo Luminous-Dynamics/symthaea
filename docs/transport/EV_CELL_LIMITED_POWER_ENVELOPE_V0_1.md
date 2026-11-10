@@ -27,7 +27,7 @@ The pack's maximum admissible common current is min_i min(I_V,i, I_C,i, I_T,i). 
 
 OCV uses its lower bound; resistance and thermal resistance use upper bounds; thermal capacity uses its lower bound; cell temperature and ambient temperature use upper bounds; minimum allowed terminal voltage and temperature use lower bounds; current rating uses its lower bound. A zero or negative thermal margin produces NO_ADMISSIBLE_DISCHARGE, not a positive power estimate.
 
-All cell identities, asset/configuration digests, model/equation/parameter digests, protocol, calibration and domain evidence are bound into the output receipt with evidence class.
+All cell identities, the hashed pack cell-inventory manifest, asset/configuration digests, topology qualification and authority reference, model/equation/parameter digests, protocol, calibration and domain evidence are bound into the output receipt with evidence class. Voltage/current limits and ambient conditions also carry evidence digests and evidence classes.
 
 ## Frozen corpus
 
