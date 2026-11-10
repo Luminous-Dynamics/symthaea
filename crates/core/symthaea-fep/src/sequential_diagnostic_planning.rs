@@ -541,7 +541,7 @@ fn audit_policy_node(
         || used_actions & (1_u64 << action_index) != 0
         || !action.safety_risk.is_finite()
         || !(0.0..=1.0).contains(&action.safety_risk)
-        || action.safety_risk > decision_config.maximum_safety_risk + RISK_TOLERANCE
+        || action.safety_risk > decision_config.maximum_safety_risk
     {
         return Err(SequentialDiagnosticError::InvalidPolicyTree);
     }
@@ -809,7 +809,7 @@ pub fn verify_sequential_diagnostic_policy_receipt(
             .enumerate()
         {
             let expected_eligible = action.safety_risk
-                <= decision_config.maximum_safety_risk + RISK_TOLERANCE
+                <= decision_config.maximum_safety_risk
                 && action.safety_risk
                     <= expected_safety_budget.maximum_cumulative_risk + RISK_TOLERANCE;
             if value.action_index != index
@@ -825,7 +825,9 @@ pub fn verify_sequential_diagnostic_policy_receipt(
                 value.expected_safety_penalty,
             ];
             if (expected_eligible
-                && option_values.iter().any(|value| value.is_none_or(|x| !x.is_finite())))
+                && option_values
+                    .iter()
+                    .any(|value| value.is_none_or(|x| !x.is_finite() || x < 0.0)))
                 || (!expected_eligible && option_values.iter().any(|value| value.is_some()))
             {
                 return Err(SequentialDiagnosticError::InvalidEvaluationSummary);
