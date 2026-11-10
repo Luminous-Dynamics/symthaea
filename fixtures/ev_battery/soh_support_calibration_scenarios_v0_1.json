@@ -168,6 +168,25 @@
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
             "reference_support_evidence_class": "synthetic_fixture"
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b58",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "support_score": 2.2,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b59",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.85,
+            "target_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.855,
+            "lower_90": 0.835,
+            "upper_90": 0.875,
+            "lower_95": 0.825,
+            "upper_95": 0.885,
+            "prediction_digest": "0000000000000000000000000000000000000000000000000000000000001b5c",
+            "reference_support_state": "extrapolation",
+            "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
+            "reference_support_evidence_class": "synthetic_fixture"
           }
         ],
         "test_accessed_at_ms": 1200,
