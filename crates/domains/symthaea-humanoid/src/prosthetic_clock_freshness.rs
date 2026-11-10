@@ -39,6 +39,10 @@ pub struct SourceClockCorrelationV1 {
     pub acquisition_configuration_ref: String,
     /// Source-clock anchor, normalized to nanoseconds.
     pub source_anchor_ns: u64,
+    /// Immutable identity of the receiver monotonic clock profile.
+    pub receiver_clock_profile_ref: String,
+    /// Unique receiver monotonic clock epoch (for example, boot/session epoch).
+    pub receiver_clock_epoch_ref: String,
     /// Same anchor expressed in the trusted receiver monotonic domain.
     pub receiver_anchor_monotonic_ns: u64,
     /// Earliest source timestamp covered by this correlation.
@@ -71,6 +75,10 @@ pub struct SourceClockObservationV1 {
     pub sequence: u64,
     /// Source capture timestamp, normalized under the referenced clock profile.
     pub source_timestamp_ns: u64,
+    /// Immutable identity of the receiver monotonic clock profile.
+    pub receiver_clock_profile_ref: String,
+    /// Unique receiver monotonic clock epoch for receive/evaluation times.
+    pub receiver_clock_epoch_ref: String,
     /// Trusted receiver monotonic time when this observation arrived.
     pub received_monotonic_ns: u64,
     /// Trusted receiver monotonic time when freshness is evaluated.
@@ -95,6 +103,10 @@ pub enum SourceFreshnessIndeterminateReason {
     SensorIdentityMismatch,
     /// The immutable source-clock profile revision differs.
     ClockProfileMismatch,
+    /// The trusted receiver monotonic clock profile differs.
+    ReceiverClockProfileMismatch,
+    /// The trusted receiver monotonic clock epoch differs.
+    ReceiverClockEpochMismatch,
     /// The source-clock epoch differs, including a reboot/reset epoch mismatch.
     ClockEpochMismatch,
     /// The sensor firmware revision differs from the correlated revision.
@@ -187,11 +199,15 @@ pub fn assess_source_capture_freshness(
         || correlation.source_clock_epoch_ref.trim().is_empty()
         || correlation.firmware_revision_ref.trim().is_empty()
         || correlation.acquisition_configuration_ref.trim().is_empty()
+        || correlation.receiver_clock_profile_ref.trim().is_empty()
+        || correlation.receiver_clock_epoch_ref.trim().is_empty()
         || observation.sensor_id.trim().is_empty()
         || observation.source_clock_profile_ref.trim().is_empty()
         || observation.source_clock_epoch_ref.trim().is_empty()
         || observation.firmware_revision_ref.trim().is_empty()
         || observation.acquisition_configuration_ref.trim().is_empty()
+        || observation.receiver_clock_profile_ref.trim().is_empty()
+        || observation.receiver_clock_epoch_ref.trim().is_empty()
     {
         return indeterminate(SourceFreshnessIndeterminateReason::MissingIdentity, None);
     }
@@ -201,6 +217,15 @@ pub fn assess_source_capture_freshness(
     }
     if observation.source_clock_profile_ref != correlation.source_clock_profile_ref {
         return indeterminate(SourceFreshnessIndeterminateReason::ClockProfileMismatch, None);
+    }
+    if observation.receiver_clock_profile_ref != correlation.receiver_clock_profile_ref {
+        return indeterminate(
+            SourceFreshnessIndeterminateReason::ReceiverClockProfileMismatch,
+            None,
+        );
+    }
+    if observation.receiver_clock_epoch_ref != correlation.receiver_clock_epoch_ref {
+        return indeterminate(SourceFreshnessIndeterminateReason::ReceiverClockEpochMismatch, None);
     }
     if observation.source_clock_epoch_ref != correlation.source_clock_epoch_ref {
         return indeterminate(SourceFreshnessIndeterminateReason::ClockEpochMismatch, None);
@@ -465,6 +490,8 @@ mod tests {
             acquisition_configuration_ref: "daq-config-2".into(),
             source_anchor_ns: 100,
             receiver_anchor_monotonic_ns: 1_000,
+            receiver_clock_profile_ref: "receiver-monotonic-v1".into(),
+            receiver_clock_epoch_ref: "receiver-boot-12".into(),
             valid_source_from_ns: 0,
             valid_source_until_ns: 1_000,
             synchronization_uncertainty_ns: 2,
@@ -482,6 +509,8 @@ mod tests {
             acquisition_configuration_ref: "daq-config-2".into(),
             sequence: 1,
             source_timestamp_ns: 110,
+            receiver_clock_profile_ref: "receiver-monotonic-v1".into(),
+            receiver_clock_epoch_ref: "receiver-boot-12".into(),
             received_monotonic_ns: 1_020,
             evaluated_monotonic_ns: 1_025,
         }
@@ -577,6 +606,26 @@ mod tests {
                 age: None,
             }
         );
+
+        let mut sample = observation();
+        sample.receiver_clock_profile_ref = "receiver-monotonic-v2".into();
+        assert!(matches!(
+            assess_source_capture_freshness(&correlation(), &sample, 20),
+            SourceFreshnessAssessment::Indeterminate {
+                reason: SourceFreshnessIndeterminateReason::ReceiverClockProfileMismatch,
+                ..
+            }
+        ));
+
+        let mut sample = observation();
+        sample.receiver_clock_epoch_ref = "receiver-boot-13".into();
+        assert!(matches!(
+            assess_source_capture_freshness(&correlation(), &sample, 20),
+            SourceFreshnessAssessment::Indeterminate {
+                reason: SourceFreshnessIndeterminateReason::ReceiverClockEpochMismatch,
+                ..
+            }
+        ));
 
         let mut sample = observation();
         sample.source_clock_epoch_ref = "boot-8".into();
