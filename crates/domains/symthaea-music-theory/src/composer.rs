@@ -1290,7 +1290,7 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
         note.duration = note.duration.saturating_sub(Duration::new(lean_480, 480));
         note.velocity *= 0.92; // the resolution releases
         additions.push(ScoreNote {
-            part: part_id,
+            part,
             pitch: lean_pitch,
             onset,
             duration: Duration::new(lean_480, 480),
@@ -1361,7 +1361,7 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
         note.onset = onset + Duration::new(cut_480, 480);
         note.duration = note.duration.saturating_sub(Duration::new(cut_480, 480));
         additions.push(ScoreNote {
-            part: part_id,
+            part,
             pitch: cut_pitch,
             onset,
             duration: Duration::new(cut_480, 480),
@@ -1459,7 +1459,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
                 dur
             };
             chain.push(ScoreNote {
-                part: n.part: part_id,
+                part: n.part,
                 pitch,
                 onset: t,
                 duration: this_dur,
@@ -1607,7 +1607,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
         let hold = Duration::new((hold_beats * 480.0).round() as i64, 480);
         resolved_indices.push(j_idx);
         additions.push(ScoreNote {
-            part: part_id,
+            part,
             pitch: suspended_pitch,
             onset: onset2,
             duration: hold,
@@ -1617,7 +1617,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             section_intensity: si2,
         });
         additions.push(ScoreNote {
-            part: part_id,
+            part,
             pitch: resolved_pitch,
             onset: onset2 + hold,
             duration: dur2.saturating_sub(hold),
