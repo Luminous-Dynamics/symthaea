@@ -20,10 +20,12 @@ It is dependency-free Rust and uses fail-closed errors for invalid inputs, MTOW 
 
 ## Build and test
 
-From this crate directory:
+From the Symthaea workspace root:
 
 ```sh
-cargo test
+cargo fmt --manifest-path crates/domains/symthaea-electric-aircraft/Cargo.toml -- --check
+cargo test --locked -p symthaea-electric-aircraft
+cargo clippy --locked -p symthaea-electric-aircraft --all-targets -- -D warnings
 ```
 
 The crate is included automatically by the Symthaea workspace's crates/domains/* member glob. It intentionally has no third-party dependencies in this first increment.
