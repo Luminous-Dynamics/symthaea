@@ -2385,6 +2385,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn listen_part_identity_round_trips_through_symbolic_and_performed_events() {
+        let symbolic = SymbolicNoteEvent {
+            id: "score-part-42-0".into(),
+            part_id: Some(42),
+            midi: 60,
+            pitch_name: "C4".into(),
+            onset: MusicalTime { tick: 0, beats: 0.0, seconds: 0.0 },
+            duration_ticks: 480,
+            duration_beats: 1.0,
+            duration_seconds: 0.5,
+            velocity: 0.7,
+            voice_role: "Melody".into(),
+            emphasis: "normal".into(),
+            section_intensity: 1.0,
+        };
+        let encoded = serde_json::to_vec(&symbolic).unwrap();
+        let decoded: SymbolicNoteEvent = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded.part_id, Some(42));
+
+        let performed = PerformedNoteEvent {
+            id: "performance-0-0".into(),
+            voice_id: "melody".into(),
+            source_note_id: Some("score-part-42-0".into()),
+            part_id: Some(42),
+            start_seconds: 0.0,
+            duration_seconds: 0.5,
+            frequency_hz: 261.6,
+            velocity: 0.7,
+            onset_deviation_seconds: Some(0.0),
+            duration_deviation_seconds: Some(0.0),
+        };
+        let encoded = serde_json::to_vec(&performed).unwrap();
+        let decoded: PerformedNoteEvent = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded.part_id, Some(42));
+        assert_eq!(decoded.source_note_id.as_deref(), Some("score-part-42-0"));
+    }
+
+    #[test]
     fn older_listen_note_payloads_deserialize_without_part_identity() {
         let symbolic = serde_json::json!({
             "id": "score-melody-0",
