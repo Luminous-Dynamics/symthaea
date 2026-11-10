@@ -605,7 +605,7 @@ mod tests {
         assert_eq!(
             result.recommendation,
             RobustSensingRecommendation::StopAndEscalate {
-                reason: RobustStopReason::NoSensorRestoresRiskLimit
+                reason: RobustStopReason::NoSensorMeetsRequiredGates
             }
         );
     }
@@ -793,7 +793,7 @@ mod tests {
         assert_eq!(
             result.recommendation,
             RobustSensingRecommendation::StopAndEscalate {
-                reason: RobustStopReason::NoSensorRestoresRiskLimit
+                reason: RobustStopReason::NoSensorMeetsRequiredGates
             }
         );
     }
