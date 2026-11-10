@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 pub mod characterization;
+pub mod mission_thermal;
 pub mod thermal_network;
 pub mod uncertainty;
 
