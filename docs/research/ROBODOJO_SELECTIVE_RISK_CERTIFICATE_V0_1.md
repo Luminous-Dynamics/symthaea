@@ -25,6 +25,7 @@ Each held-out episode contributes:
 - a stable sample/episode ID;
 - task ID;
 - exact policy-artifact SHA-256;
+- exact forecast/risk-estimator and post-processing pipeline SHA-256;
 - exact environment/shift-condition SHA-256;
 - exact evaluator SHA-256;
 - predicted probability of full task success;
