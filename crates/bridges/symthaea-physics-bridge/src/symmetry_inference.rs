@@ -39,6 +39,17 @@
 //! numeric lane, which preserves its seed, domain, finite-difference step and tolerances.
 //! A sampled candidate is never promoted to exact or formal evidence.
 //!
+//! ## Declared-action metric-aware sampling
+//!
+//! `evaluate_metric_aware_linear_action_samples` accepts an admitted linear
+//! action, explicit sample states in its declared coordinate basis, and fixed
+//! parameter bindings. It uses forward-mode automatic differentiation for the
+//! supported smooth AST fragment, then evaluates the dual/primal cosine after
+//! Cholesky metric whitening. The exact states, action declarations, admission
+//! diagnostics and versioned expression encoding are retained in the report.
+//! Unsupported or nondifferentiable expressions abstain; invalid samples are
+//! counted and cannot produce a positive invariance decision.
+//!
 //! ## Sampled numeric Lie-derivative fallback
 //!
 //! The sampled lane can detect radial expressions such as square roots and reciprocal
