@@ -122,3 +122,51 @@ A passing Rust validator establishes only that the local typed profile satisfies
 - that an experiment is safe, authorized or executable.
 
 Scientific qualification requires exact data/model digests, matched baselines, independent known-truth evaluation, preregistered splits, adversarial testing and independent replication where appropriate.
+
+
+## 7. Mission and industry comparison: qualify the complete evidence chain
+
+OLI should not compare itself to a single commercial product by headline accuracy. The current landscape has distinct layers:
+
+- **Analytical instrument platforms** (py-GC-MS, GC×GC-HRTOF-MS, spectroscopy, microscopy, electrochemical and environmental sensors) produce domain-specific measurements. Instrument calibration, sample handling and detection limits define what the data can support.
+- **Scientific ML pipelines** learn distinctions within a declared sample population. Their result depends on sample families, preprocessing, lab/instrument, split strategy and the target label.
+- **NASA's Ladder of Life Detection** is a mission-design discussion framework for evaluating how specific a measurement is to life and how it can be obtained in realistic robotic missions. NASA explicitly says the Ladder does not endorse particular instruments or biosignatures and is not a definitive final product.
+- **NASA's 2026 Decadal Astrobiology Research and Exploration Strategy (DARES)** is a community strategy process and draft framework, not a deployed detection system or classifier benchmark.
+- **IAA's 2026 SETI Declaration** is a post-detection governance comparator for technosignature claims. It emphasizes rigorous verification, clear communication during verification, transparent correction when a candidate is ruled out, preservation/archiving of evidence, researcher protection and broad international consultation before any response to a confirmed detection.
+
+OLI's differentiation should be the assurance architecture joining these layers:
+
+1. **Instrument-aware input:** record instrument identity, calibration, sample chain, modality, units, resolution, detection limit and raw artifact digest.
+2. **Coverage-aware inference:** preserve what part of space/time was actually observed, what remained unobservable, and whether the target could be present but dormant, sparse or below resolution.
+3. **Open-world mechanism reasoning:** compare biological, abiotic, synthetic, collective and unresolved mechanisms without forced nearest-class assignment.
+4. **Causal challenge:** choose permitted interventions that discriminate passive pattern formation from repair, memory, heredity, adaptation or agency.
+5. **Independent verification:** assess the prediction and candidate with a separate evaluator or laboratory; never allow the model to grade its own confidence-search endpoints.
+6. **Evidence preservation and correction:** retain raw inputs, splits, model versions, uncertainty, independent replications, failed candidates, negative results, corrections and retractions.
+7. **Authority separation:** a scientific status must not silently grant legal personhood, consent, ownership, contact authority, or operational control.
+
+### Fair SOTA comparison protocol
+
+A claimed OLI advantage must be stated on a matched task:
+
+- **Reproduction panel:** reproduce each paper's own sample set, preprocessing, target definition and split.
+- **Generalization panel:** leave out entire geological/sample families, laboratories, instruments, acquisition campaigns and preprocessing pipelines.
+- **Open-world panel:** hold out entire abiotic mechanism families and unfamiliar measurement modalities.
+- **False-negative panel:** stratify positive cases by abundance, activity, preservation, temporal cadence, spatial coverage, obscuration and detection limit.
+- **Adversarial panel:** fixed-query optimization against each classifier, with a separate functional/physical oracle.
+- **Causal panel:** prospective predictions under interventions; compare to passive dynamics, feedback controllers and matched independent agents.
+- **Operational panel:** report compute, latency, instrument time, sample consumption, power, calibration burden, cost per resolved case and time-to-decision.
+
+The strongest baseline must be allowed to win. A result on Avida is not a result on py-GC-MS; a simulated reaction–diffusion pattern is not a field observation; a NASA framework is not a product classifier. Publish per-domain failures and uncertainty, not a pooled leaderboard score that hides them.
+
+### Post-detection protocol extension for OLI
+
+Use the 2026 IAA SETI update as a governance comparator, while recognizing that its legal and institutional scope is not automatically transferable to non-human biological or ecological discoveries. An OLI candidate report should at minimum preserve:
+- provisional status and the exact evidence threshold not yet met;
+- independent verification obligations and named reviewers;
+- raw-data and analysis archive locations, including independent geographically separated copies where rights and security permit;
+- a prompt correction path if the candidate is rejected or reclassified;
+- restrictions on contact, sampling, release, disclosure or intervention pending separate authority and safety review;
+- researcher safety, sensitive location protection, custodial rights and public communication review.
+
+This is an OLI evidence and governance design goal, not a claim that Mycelix or any partner currently enforces an international post-detection protocol.
+
