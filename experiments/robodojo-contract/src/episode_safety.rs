@@ -665,14 +665,14 @@ pub fn compare_episode_safety_arms(
             let rows = unit_deltas.iter()
                 .filter(|row| row.task_id == task_id && row.metric == metric)
                 .collect::<Vec<_>>();
-            task_summaries.push(summarize_safety_deltas(Some(task_id.to_owned()), metric, &rows, false));
+            task_summaries.push(summarize_safety_deltas(Some(task_id.to_owned()), metric, &rows));
         }
     }
 
     let mut summaries = Vec::new();
     for metric in metrics {
         let rows = unit_deltas.iter().filter(|row| row.metric == metric).collect::<Vec<_>>();
-        let mut summary = summarize_safety_deltas(None, metric, &rows, false);
+        let mut summary = summarize_safety_deltas(None, metric, &rows);
         let task_rows = task_summaries.iter()
             .filter(|row| row.metric == metric)
             .filter_map(|row| row.mean_paired_delta)
@@ -753,7 +753,6 @@ fn summarize_safety_deltas(
     task_id: Option<String>,
     metric: EpisodeSafetyMetric,
     rows: &[&EpisodeSafetyUnitDelta],
-    _aggregate: bool,
 ) -> EpisodeSafetyComparisonSummary {
     let contributing = rows.iter()
         .filter(|row| row.candidate_minus_baseline.is_some())
