@@ -43,11 +43,11 @@ EFC and EOL evidence are supplied per physical cell, not inferred from pack age 
 
 ## Evidence and output rules
 
-Every computed metric carries status, value, unit, population scope and source evidence digests. Non-computable metrics carry a stable reason code. No single weighted battery-health score is emitted. Hard topology, coverage and EOL gates are not compensable.
+Every computed metric carries status, value, unit, population scope, source evidence digests and the distinct evidence classes used by the calculation (measurement, derived estimate, prediction, simulation, synthetic fixture or vendor claim). A topology-dependent metric also binds the topology qualification record and its responsible authority reference. A digest establishes byte identity, not truth or authority; the authority reference identifies the accountable qualification source but does not itself constitute a regulatory certificate. Non-computable metrics carry a stable reason code. No single weighted battery-health score is emitted. Hard topology, coverage and EOL gates are not compensable.
 
-The SOC snapshot binds the exact pack configuration, end-of-charge event, reference condition, evidence digest and a maximum sample-skew window. The synchronization tolerance is declared in the fixture/protocol; it is not silently widened to accommodate late or stale samples. A snapshot missing any declared cell or exceeding the synchronization window cannot produce β_SOC.
+The SOC snapshot binds the exact pack configuration, end-of-charge event, reference condition, evidence digest, evidence class for each cell, and a maximum sample-skew window. The synchronization tolerance is declared in the fixture/protocol; it is not silently widened to accommodate late or stale samples. A snapshot missing any declared cell or exceeding the synchronization window cannot produce β_SOC.
 
-The lifetime contract binds the EOL rule, threshold, per-cell EFC, EOL event and evidence digest. A censored/unknown unit is retained and prevents β_life.
+The lifetime contract binds the EOL rule, threshold, per-cell EFC, EOL event, evidence digest and evidence class. A censored/unknown unit is retained and prevents β_life.
 
 Per-unit capacity/resistance uncertainty is preserved but not propagated into population confidence intervals in v0.2.
 
