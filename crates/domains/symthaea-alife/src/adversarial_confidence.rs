@@ -174,7 +174,9 @@ pub enum AttackError {
     ZeroQueryBudget,
     InvalidTemperature(f64),
     InvalidPopulationSize(usize),
+    QueryBudgetBelowPopulation { budget: usize, population_size: usize },
     PopulationSizeMismatch { expected: usize, actual: usize },
+    CandidateLengthMismatch { expected: usize, actual: usize },
     InvalidTournamentSize(usize),
     InvalidTruncationFraction(f64),
     ModelFailure(String),
@@ -204,9 +206,17 @@ impl fmt::Display for AttackError {
             Self::InvalidPopulationSize(value) => {
                 write!(f, "population size must be at least 2, got {value}")
             }
+            Self::QueryBudgetBelowPopulation { budget, population_size } => write!(
+                f,
+                "model query budget {budget} is smaller than initial population size {population_size}"
+            ),
             Self::PopulationSizeMismatch { expected, actual } => write!(
                 f,
                 "initial population length mismatch: expected {expected}, got {actual}"
+            ),
+            Self::CandidateLengthMismatch { expected, actual } => write!(
+                f,
+                "candidate length mismatch: expected {expected}, got {actual}"
             ),
             Self::InvalidTournamentSize(value) => {
                 write!(f, "tournament size must be at least 2, got {value}")
@@ -440,7 +450,10 @@ pub fn run_population_attack<M: ConfidenceModel>(
         ));
     }
     if config.max_model_queries < config.population_size {
-        return Err(AttackError::ZeroQueryBudget);
+        return Err(AttackError::QueryBudgetBelowPopulation {
+            budget: config.max_model_queries,
+            population_size: config.population_size,
+        });
     }
 
     let candidate_len = initial_population
@@ -453,7 +466,7 @@ pub fn run_population_attack<M: ConfidenceModel>(
     for candidate in initial_population {
         validate_candidate(candidate, alphabet_size)?;
         if candidate.len() != candidate_len {
-            return Err(AttackError::PopulationSizeMismatch {
+            return Err(AttackError::CandidateLengthMismatch {
                 expected: candidate_len,
                 actual: candidate.len(),
             });
