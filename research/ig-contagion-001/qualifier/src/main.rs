@@ -478,12 +478,12 @@ fn validate_matrix(
         topologies.insert(topology.to_string());
 
         if fixture["graph_generator_issue"].as_str()
-            != Some("https://github.com/Luminous-Dynamics/symthaea/issues/11248")
+            != Some("https://github.com/Luminous-Dynamics/symthaea/issues/11337")
         {
             add(
                 errors,
                 &context,
-                "graph generator must compose with Symthaea #11248",
+                "communication graph generator must compose with Symthaea #11337",
             );
         }
         if field(fixture, "graph_profile_ref").is_none() {
