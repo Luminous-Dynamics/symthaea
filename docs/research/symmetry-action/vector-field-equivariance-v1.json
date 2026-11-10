@@ -1,0 +1,86 @@
+{
+  "schema": "symmetry-action-vector-field-equivariance/v1",
+  "fixture_family": "SO2_LINEAR_ACTION_INF_INIT_EQUIVARIANCE",
+  "claim_scope": "infinitesimal_vector_field_equivariance_for_supplied_linear_generators",
+  "mathematical_condition": "D F(x) * A * x - A * F(x) = 0",
+  "coefficient_policy": "Every finite numeric coefficient is interpreted as its exact IEEE-754 dyadic rational value by the bounded polynomial checker.",
+  "canonical_action": {
+    "coordinate_names": ["x", "y"],
+    "generator": [[0, -1], [1, 0]],
+    "metric": [[1, 0], [0, 1]],
+    "coordinate_convention": "column vectors; x_dot = A*x",
+    "metric_skew_identity": "A^T*G + G*A = 0"
+  },
+  "positive_controls": [
+    {
+      "fixture_id": "SO2_RADIAL_DAMPING_001",
+      "vector_field": ["-x", "-y"],
+      "expected_component_residuals": ["0", "0"],
+      "expected_residual_term_counts": [0, 0],
+      "interpretation": "Isotropic linear damping is SO(2)-equivariant."
+    },
+    {
+      "fixture_id": "SO2_GENERATOR_FIELD_001",
+      "vector_field": ["-y", "x"],
+      "expected_component_residuals": ["0", "0"],
+      "expected_residual_term_counts": [0, 0],
+      "interpretation": "The generator vector field commutes with its own one-parameter action."
+    },
+    {
+      "fixture_id": "SO2_NONLINEAR_RADIAL_001",
+      "vector_field": ["-(x^2+y^2)*x", "-(x^2+y^2)*y"],
+      "expected_component_residuals": ["0", "0"],
+      "expected_residual_term_counts": [0, 0],
+      "interpretation": "Nonlinear radial dynamics remain equivariant; this is beyond a constant-matrix vector field."
+    },
+    {
+      "fixture_id": "SO2_FIXED_PARAMETER_001",
+      "expression_variables_in_first_seen_order": ["z", "y", "x"],
+      "vector_field": ["-z*y", "z*x"],
+      "fixed_parameters": ["z"],
+      "expected_component_residuals": ["0", "0"],
+      "expected_residual_term_counts": [0, 0],
+      "interpretation": "An unacted parameter is held fixed while the action rotates x and y."
+    }
+  ],
+  "negative_controls": [
+    {
+      "fixture_id": "SO2_ANISOTROPIC_DYNAMICS_001",
+      "vector_field": ["-x", "-2*y"],
+      "expected_component_residuals": ["-y", "-x"],
+      "expected_residual_term_counts": [1, 1],
+      "interpretation": "Different damping rates break rotational equivariance."
+    }
+  ],
+  "representation_covariance_control": {
+    "fixture_id": "SO2_VECTOR_FIELD_SHEARED_BASIS_001",
+    "coordinate_change": {
+      "D": [[1, 1], [0, 1]],
+      "D_inverse": [[1, -1], [0, 1]],
+      "convention": "X = D*x"
+    },
+    "transformed_action": {
+      "generator": [[1, -2], [1, -1]],
+      "metric": [[1, -1], [-1, 2]],
+      "generator_rule": "A_prime = D*A*D_inverse",
+      "metric_rule": "G_prime = D_inverse^T*G*D_inverse"
+    },
+    "canonical_vector_field": ["-y", "x"],
+    "transformed_vector_field": ["X-2*Y", "X-Y"],
+    "expected_component_residuals": ["0", "0"],
+    "expected_residual_term_counts": [0, 0],
+    "interpretation": "The vector field, generator and metric are transformed together; the exact equivariance result must be representation-independent."
+  },
+  "evidence_boundary": {
+    "established_by_zero_exact_residual": "The supplied polynomial vector field satisfies the infinitesimal equivariance identity for each supplied generator in the declared representation.",
+    "not_established": [
+      "linear independence or Lie-bracket closure of the supplied generators",
+      "global integration or disconnected group components",
+      "finite-time flow equivariance outside the smoothness / existence assumptions",
+      "numerical trajectory equivariance",
+      "discrete integrator or step-map equivariance",
+      "conservation, a Noether momentum map, or Hamiltonian structure",
+      "physical correctness of a simulator"
+    ]
+  }
+}

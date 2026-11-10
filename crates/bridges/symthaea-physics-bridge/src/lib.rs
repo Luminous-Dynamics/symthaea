@@ -81,10 +81,13 @@ pub use symmetry::SymmetryEncoder;
 pub use symmetry_inference::{
     ExactPolynomialLieProfileV1, ExactPolynomialSearchStatus,
     LinearActionGeneratorLieResultV1, LinearActionPolynomialErrorV1,
-    LinearActionPolynomialReportV1, NumericLieDerivativeProfileV2,
-    LieDerivativeSampleStatisticsV1, StructuralSymmetryPattern, SymmetryClaimScope,
+    LinearActionPolynomialReportV1, LinearActionVectorFieldErrorV1,
+    LinearActionVectorFieldEquivarianceReportV1, LinearActionVectorFieldGeneratorResultV1,
+    NumericLieDerivativeProfileV2, LieDerivativeSampleStatisticsV1,
+    StructuralSymmetryPattern, SymmetryClaimScope,
     SymmetryInferenceEvidence, SymmetryInferenceReport, SymmetryInferenceSearchStatus,
-    check_exact_linear_action_invariance, infer_symmetry, infer_symmetry_numeric,
+    check_exact_linear_action_invariance, check_exact_linear_action_vector_field_equivariance,
+    infer_symmetry, infer_symmetry_numeric,
     infer_symmetry_numeric_with_evidence, infer_symmetry_with_evidence,
 };
 pub use tensor_structure::TensorEncoder;
