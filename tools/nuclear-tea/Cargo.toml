@@ -1,0 +1,18 @@
+[package]
+name = "nuclear-tea-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Deterministic reference arithmetic and evidence validation for port/marine energy economics"
+
+[workspace]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
