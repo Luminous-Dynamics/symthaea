@@ -20,6 +20,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+use super::causal_diagnostic_semantics::{
+    CausalDiagnosticActionDescriptor, CausalDiagnosticActionError,
+    CausalDiagnosticDecisionProblemReceipt, validate_causal_diagnostic_decision_problem,
+};
 use super::decision_relevant_information::{
     DecisionDiagnosticConfig, DecisionDiagnosticError, DecisionHypothesis, DiagnosticAction,
     evaluate_decision_focused_diagnostics,
@@ -52,6 +56,37 @@ pub struct BudgetedSequentialDiagnosticEvaluation {
     /// Canonical SHA-256 over the exact numerical budget and risk-semantics digest.
     pub safety_budget_digest: String,
     pub evaluation: SequentialDiagnosticEvaluation,
+}
+
+/// Replayable identity binding for a budgeted adaptive diagnostic policy.
+///
+/// The receipt binds the causal decision-problem receipt, risk-budget semantics,
+/// planner limits, complete selected policy tree, and evaluation summary. It is
+/// an integrity/identity record, not an authenticated signature or proof that
+/// externally supplied risk calibration and causal-identification claims are true.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequentialDiagnosticPolicyReceipt {
+    pub schema_version: u32,
+    pub decision_problem_digest: String,
+    pub safety_budget_digest: String,
+    pub risk_semantics_digest: String,
+    pub planning_config_digest: String,
+    pub policy_tree_digest: String,
+    pub evaluation_digest: String,
+    /// Maximum sum of conditional adverse-event probability upper bounds over
+    /// any terminal path in the selected policy tree.
+    pub maximum_path_risk_upper_bound: f64,
+    /// Number of terminal paths represented by positive-probability model outcomes.
+    pub modeled_terminal_path_count: usize,
+    pub receipt_digest: String,
+}
+
+/// Result of budgeted sequential planning with a causal decision-problem receipt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BudgetedSequentialDiagnosticEvaluationWithReceipt {
+    pub budgeted_evaluation: BudgetedSequentialDiagnosticEvaluation,
+    pub decision_problem_receipt: CausalDiagnosticDecisionProblemReceipt,
+    pub policy_receipt: SequentialDiagnosticPolicyReceipt,
 }
 
 /// Finite-horizon search limits.
@@ -152,6 +187,12 @@ pub enum SequentialDiagnosticError {
     InvalidCumulativeSafetyRiskBudget,
     #[error("risk-semantics digest must be 64 lowercase hexadecimal characters")]
     InvalidRiskSemanticsDigest,
+    #[error(transparent)]
+    CausalDiagnosticAction(#[from] CausalDiagnosticActionError),
+    #[error("selected diagnostic policy tree is malformed or inconsistent with its action set")]
+    InvalidPolicyTree,
+    #[error("selected diagnostic policy path risk bound {bound} exceeds budget {budget}")]
+    PolicyExceedsSafetyBudget { bound: f64, budget: f64 },
 }
 
 /// Evaluate an adaptive diagnostic policy up to the requested horizon.
@@ -215,6 +256,349 @@ pub fn evaluate_sequential_decision_diagnostics_with_safety_budget(
 ///
 /// The digest binds the exact IEEE-754 bit pattern of the maximum cumulative
 /// risk together with the external risk-semantics/calibration digest.
+/// Evaluate a budgeted sequential policy and bind it to the exact causal decision problem.
+///
+/// The decision-problem receipt covers typed action semantics, action-likelihood
+/// tables, hypothesis priors, downstream losses, decision-policy configuration,
+/// and task specification. The policy receipt additionally covers the cumulative
+/// budget, planner limits, selected policy tree, and recomputed worst-path risk.
+///
+/// This does not authenticate the source of the causal/risk claims. Callers must
+/// still independently authenticate the receipts and calibrations before any
+/// physical action is considered.
+pub fn evaluate_sequential_decision_diagnostics_with_policy_receipt(
+    hypotheses: &[DecisionHypothesis],
+    actions: &[DiagnosticAction],
+    causal_action_descriptors: &[CausalDiagnosticActionDescriptor],
+    decision_config: DecisionDiagnosticConfig,
+    planning_config: SequentialDiagnosticConfig,
+    safety_budget: SequentialDiagnosticSafetyBudget,
+    task_specification_digest: &str,
+) -> Result<BudgetedSequentialDiagnosticEvaluationWithReceipt, SequentialDiagnosticError> {
+    let decision_problem_receipt = validate_causal_diagnostic_decision_problem(
+        actions,
+        causal_action_descriptors,
+        hypotheses,
+        decision_config,
+        task_specification_digest,
+    )?;
+    let budgeted_evaluation =
+        evaluate_sequential_decision_diagnostics_with_safety_budget(
+            hypotheses,
+            actions,
+            decision_config,
+            planning_config,
+            safety_budget,
+        )?;
+    let policy_receipt = compute_sequential_diagnostic_policy_receipt(
+        hypotheses,
+        actions,
+        planning_config,
+        &decision_problem_receipt,
+        &budgeted_evaluation,
+    )?;
+
+    Ok(BudgetedSequentialDiagnosticEvaluationWithReceipt {
+        budgeted_evaluation,
+        decision_problem_receipt,
+        policy_receipt,
+    })
+}
+
+/// Compute a canonical receipt over a freshly evaluated budgeted policy.
+///
+/// This remains private so callers cannot turn an arbitrary deserialized policy
+/// tree into a trusted evaluation receipt. The public combined API above performs
+/// causal validation and planning before receipt construction.
+fn compute_sequential_diagnostic_policy_receipt(
+    hypotheses: &[DecisionHypothesis],
+    actions: &[DiagnosticAction],
+    planning_config: SequentialDiagnosticConfig,
+    decision_problem_receipt: &CausalDiagnosticDecisionProblemReceipt,
+    budgeted_evaluation: &BudgetedSequentialDiagnosticEvaluation,
+) -> Result<SequentialDiagnosticPolicyReceipt, SequentialDiagnosticError> {
+    let budget_digest =
+        compute_sequential_diagnostic_safety_budget_digest(&budgeted_evaluation.safety_budget)?;
+    if budget_digest != budgeted_evaluation.safety_budget_digest
+        || budgeted_evaluation.evaluation.plan.selected_action_index
+            != budgeted_evaluation.evaluation.selected_action_index
+    {
+        return Err(SequentialDiagnosticError::InvalidPolicyTree);
+    }
+
+    let planning_config_digest = compute_planning_config_digest(planning_config);
+    let (policy_tree_digest, maximum_path_risk_upper_bound, modeled_terminal_path_count) =
+        compute_policy_tree_digest(
+            &budgeted_evaluation.evaluation.plan,
+            hypotheses,
+            actions,
+            budgeted_evaluation.safety_budget.maximum_cumulative_risk,
+        )?;
+    if maximum_path_risk_upper_bound
+        > budgeted_evaluation.safety_budget.maximum_cumulative_risk + RISK_TOLERANCE
+    {
+        return Err(SequentialDiagnosticError::PolicyExceedsSafetyBudget {
+            bound: maximum_path_risk_upper_bound,
+            budget: budgeted_evaluation.safety_budget.maximum_cumulative_risk,
+        });
+    }
+    let evaluation_digest = compute_policy_evaluation_digest(
+        &budgeted_evaluation.evaluation,
+        &policy_tree_digest,
+    );
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-budgeted-sequential-diagnostic-policy-receipt-v1\\0");
+    hash_receipt_field(
+        &mut hasher,
+        "decision_problem_digest",
+        decision_problem_receipt.decision_problem_digest.as_bytes(),
+    );
+    hash_receipt_field(
+        &mut hasher,
+        "safety_budget_digest",
+        budget_digest.as_bytes(),
+    );
+    hash_receipt_field(
+        &mut hasher,
+        "risk_semantics_digest",
+        budgeted_evaluation.safety_budget.risk_semantics_digest.as_bytes(),
+    );
+    hash_receipt_field(
+        &mut hasher,
+        "planning_config_digest",
+        planning_config_digest.as_bytes(),
+    );
+    hash_receipt_field(
+        &mut hasher,
+        "policy_tree_digest",
+        policy_tree_digest.as_bytes(),
+    );
+    hash_receipt_field(
+        &mut hasher,
+        "evaluation_digest",
+        evaluation_digest.as_bytes(),
+    );
+    hasher.update(maximum_path_risk_upper_bound.to_bits().to_le_bytes());
+    hasher.update((modeled_terminal_path_count as u64).to_le_bytes());
+
+    Ok(SequentialDiagnosticPolicyReceipt {
+        schema_version: 1,
+        decision_problem_digest: decision_problem_receipt.decision_problem_digest.clone(),
+        safety_budget_digest: budget_digest,
+        risk_semantics_digest: budgeted_evaluation.safety_budget.risk_semantics_digest.clone(),
+        planning_config_digest,
+        policy_tree_digest,
+        evaluation_digest,
+        maximum_path_risk_upper_bound,
+        modeled_terminal_path_count,
+        receipt_digest: format!("{:x}", hasher.finalize()),
+    })
+}
+
+fn compute_planning_config_digest(config: SequentialDiagnosticConfig) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-sequential-diagnostic-planning-config-v1\\0");
+    hasher.update((config.horizon as u64).to_le_bytes());
+    hasher.update((config.max_policy_expansions as u64).to_le_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn compute_policy_tree_digest(
+    plan: &SequentialDiagnosticPlanNode,
+    hypotheses: &[DecisionHypothesis],
+    actions: &[DiagnosticAction],
+    maximum_cumulative_risk: f64,
+) -> Result<(String, f64, usize), SequentialDiagnosticError> {
+    if hypotheses.is_empty() || actions.is_empty() {
+        return Err(SequentialDiagnosticError::InvalidPolicyTree);
+    }
+    let outcome_counts = &hypotheses[0].outcome_probabilities_by_action;
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-sequential-diagnostic-policy-tree-v1\\0");
+    let (maximum_path_risk, terminal_path_count) = hash_policy_node(
+        &mut hasher,
+        plan,
+        outcome_counts,
+        actions,
+        hypotheses.len(),
+        maximum_cumulative_risk,
+        0.0,
+        0,
+    )?;
+    Ok((format!("{:x}", hasher.finalize()), maximum_path_risk, terminal_path_count))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn hash_policy_node(
+    hasher: &mut Sha256,
+    node: &SequentialDiagnosticPlanNode,
+    outcome_counts: &[Vec<f64>],
+    actions: &[DiagnosticAction],
+    hypothesis_count: usize,
+    maximum_cumulative_risk: f64,
+    risk_before_node: f64,
+    used_actions: u64,
+) -> Result<(f64, usize), SequentialDiagnosticError> {
+    hasher.update(b"node-v1\\0");
+    let (risk_after_node, next_used_actions) = match node.selected_action_index {
+        Some(action_index) => {
+            let action = actions
+                .get(action_index)
+                .ok_or(SequentialDiagnosticError::InvalidPolicyTree)?;
+            if node.selected_action_id.as_deref() != Some(action.id.as_str())
+                || action_index >= 64
+                || used_actions & (1_u64 << action_index) != 0
+                || !action.safety_risk.is_finite()
+                || !(0.0..=1.0).contains(&action.safety_risk)
+            {
+                return Err(SequentialDiagnosticError::InvalidPolicyTree);
+            }
+            hasher.update([1]);
+            hasher.update((action_index as u64).to_le_bytes());
+            hash_receipt_field(hasher, "action_id", action.id.as_bytes());
+            hasher.update(action.safety_risk.to_bits().to_le_bytes());
+            (
+                risk_before_node + action.safety_risk,
+                used_actions | (1_u64 << action_index),
+            )
+        }
+        None => {
+            if node.selected_action_id.is_some() || !node.branches.is_empty() {
+                return Err(SequentialDiagnosticError::InvalidPolicyTree);
+            }
+            hasher.update([0]);
+            (risk_before_node, used_actions)
+        }
+    };
+    if !risk_after_node.is_finite()
+        || risk_after_node > maximum_cumulative_risk + RISK_TOLERANCE
+    {
+        return Err(SequentialDiagnosticError::PolicyExceedsSafetyBudget {
+            bound: risk_after_node,
+            budget: maximum_cumulative_risk,
+        });
+    }
+
+    for value in [
+        node.expected_total_cost,
+        node.expected_terminal_bayes_risk,
+        node.expected_observation_cost,
+        node.expected_safety_penalty,
+    ] {
+        if !value.is_finite() {
+            return Err(SequentialDiagnosticError::InvalidPolicyTree);
+        }
+        hasher.update(value.to_bits().to_le_bytes());
+    }
+    hasher.update((node.branches.len() as u64).to_le_bytes());
+
+    if node.branches.is_empty() {
+        return Ok((risk_after_node, 1));
+    }
+    let Some(action_index) = node.selected_action_index else {
+        return Err(SequentialDiagnosticError::InvalidPolicyTree);
+    };
+    let outcome_count = outcome_counts
+        .get(action_index)
+        .ok_or(SequentialDiagnosticError::InvalidPolicyTree)?
+        .len();
+    let mut previous_outcome = None;
+    let mut maximum_descendant_risk = risk_after_node;
+    let mut terminal_path_count = 0_usize;
+
+    for branch in &node.branches {
+        if branch.outcome_index >= outcome_count
+            || previous_outcome.is_some_and(|previous| branch.outcome_index <= previous)
+            || !branch.outcome_probability.is_finite()
+            || branch.outcome_probability <= 0.0
+            || branch.outcome_probability > 1.0
+            || branch.posterior_model_probabilities.len() != hypothesis_count
+            || branch.posterior_model_probabilities.iter().any(|probability| {
+                !probability.is_finite() || !(0.0..=1.0).contains(probability)
+            })
+        {
+            return Err(SequentialDiagnosticError::InvalidPolicyTree);
+        }
+        let posterior_mass: f64 = branch.posterior_model_probabilities.iter().sum();
+        if !posterior_mass.is_finite() || (posterior_mass - 1.0).abs() > 1e-8 {
+            return Err(SequentialDiagnosticError::InvalidPolicyTree);
+        }
+        previous_outcome = Some(branch.outcome_index);
+        hasher.update((branch.outcome_index as u64).to_le_bytes());
+        hasher.update(branch.outcome_probability.to_bits().to_le_bytes());
+        hasher.update((branch.posterior_model_probabilities.len() as u64).to_le_bytes());
+        for probability in &branch.posterior_model_probabilities {
+            hasher.update(probability.to_bits().to_le_bytes());
+        }
+
+        let (branch_maximum_risk, branch_path_count) = hash_policy_node(
+            hasher,
+            &branch.continuation,
+            outcome_counts,
+            actions,
+            hypothesis_count,
+            maximum_cumulative_risk,
+            risk_after_node,
+            next_used_actions,
+        )?;
+        maximum_descendant_risk = maximum_descendant_risk.max(branch_maximum_risk);
+        terminal_path_count = terminal_path_count
+            .checked_add(branch_path_count)
+            .ok_or(SequentialDiagnosticError::InvalidPolicyTree)?;
+    }
+
+    Ok((maximum_descendant_risk, terminal_path_count))
+}
+
+fn compute_policy_evaluation_digest(
+    evaluation: &SequentialDiagnosticEvaluation,
+    policy_tree_digest: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-sequential-diagnostic-evaluation-v1\\0");
+    hasher.update((evaluation.horizon as u64).to_le_bytes());
+    hasher.update((evaluation.expansions as u64).to_le_bytes());
+    hasher.update(evaluation.no_probe_bayes_risk.to_bits().to_le_bytes());
+    hasher.update(evaluation.expected_total_cost.to_bits().to_le_bytes());
+    match evaluation.selected_action_index {
+        Some(index) => {
+            hasher.update([1]);
+            hasher.update((index as u64).to_le_bytes());
+        }
+        None => hasher.update([0]),
+    }
+    hasher.update((evaluation.first_action_values.len() as u64).to_le_bytes());
+    for action in &evaluation.first_action_values {
+        hasher.update((action.action_index as u64).to_le_bytes());
+        hash_receipt_field(&mut hasher, "action_id", action.action_id.as_bytes());
+        hasher.update([u8::from(action.eligible)]);
+        for value in [
+            action.expected_total_cost,
+            action.expected_terminal_bayes_risk,
+            action.expected_observation_cost,
+            action.expected_safety_penalty,
+        ] {
+            match value {
+                Some(value) => {
+                    hasher.update([1]);
+                    hasher.update(value.to_bits().to_le_bytes());
+                }
+                None => hasher.update([0]),
+            }
+        }
+    }
+    hash_receipt_field(&mut hasher, "policy_tree_digest", policy_tree_digest.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn hash_receipt_field(hasher: &mut Sha256, name: &str, value: &[u8]) {
+    hasher.update((name.len() as u64).to_le_bytes());
+    hasher.update(name.as_bytes());
+    hasher.update((value.len() as u64).to_le_bytes());
+    hasher.update(value);
+}
+
 pub fn compute_sequential_diagnostic_safety_budget_digest(
     safety_budget: &SequentialDiagnosticSafetyBudget,
 ) -> Result<String, SequentialDiagnosticError> {
@@ -893,6 +1277,137 @@ mod tests {
                 result.plan.selected_action_index
             );
         }
+    }
+
+    fn causal_descriptors(
+        hypotheses: &[DecisionHypothesis],
+        actions: &[DiagnosticAction],
+    ) -> Vec<CausalDiagnosticActionDescriptor> {
+        use super::super::causal_diagnostic_semantics::{
+            CausalDiagnosticActionKind, compute_action_likelihood_table_digest,
+        };
+
+        actions
+            .iter()
+            .enumerate()
+            .map(|(action_index, action)| CausalDiagnosticActionDescriptor {
+                action_id: action.id.clone(),
+                action_likelihood_table_digest: compute_action_likelihood_table_digest(
+                    hypotheses,
+                    action_index,
+                )
+                .expect("valid action-likelihood table"),
+                kind: CausalDiagnosticActionKind::PassiveObservation {
+                    observation_model_digest: "a".repeat(64),
+                    evidence_scope_digest: "b".repeat(64),
+                },
+            })
+            .collect()
+    }
+
+    #[test]
+    fn policy_receipt_binds_decision_problem_budget_and_worst_path_risk() {
+        let (hypotheses, mut actions) = xor_complementary_probes();
+        for action in &mut actions {
+            action.safety_risk = 0.35;
+        }
+        let config = DecisionDiagnosticConfig {
+            safety_risk_weight: 0.1,
+            maximum_safety_risk: 0.5,
+            ..decision_config()
+        };
+        let planning = SequentialDiagnosticConfig {
+            horizon: 2,
+            max_policy_expansions: 64,
+        };
+        let descriptors = causal_descriptors(&hypotheses, &actions);
+        let result = evaluate_sequential_decision_diagnostics_with_policy_receipt(
+            &hypotheses,
+            &actions,
+            &descriptors,
+            config,
+            planning,
+            SequentialDiagnosticSafetyBudget {
+                maximum_cumulative_risk: 0.7,
+                risk_semantics_digest: "c".repeat(64),
+            },
+            &"d".repeat(64),
+        )
+        .expect("causally bound budgeted policy");
+
+        assert_eq!(result.policy_receipt.schema_version, 1);
+        assert_eq!(result.policy_receipt.decision_problem_digest,
+            result.decision_problem_receipt.decision_problem_digest);
+        assert_eq!(result.policy_receipt.maximum_path_risk_upper_bound, 0.7);
+        assert_eq!(result.policy_receipt.modeled_terminal_path_count, 4);
+        assert_eq!(
+            result.policy_receipt.receipt_digest.len(),
+            64
+        );
+
+        let repeated = evaluate_sequential_decision_diagnostics_with_policy_receipt(
+            &hypotheses,
+            &actions,
+            &descriptors,
+            config,
+            planning,
+            SequentialDiagnosticSafetyBudget {
+                maximum_cumulative_risk: 0.7,
+                risk_semantics_digest: "c".repeat(64),
+            },
+            &"d".repeat(64),
+        )
+        .expect("deterministic replay");
+        assert_eq!(
+            result.policy_receipt.receipt_digest,
+            repeated.policy_receipt.receipt_digest
+        );
+
+        let changed_budget = evaluate_sequential_decision_diagnostics_with_policy_receipt(
+            &hypotheses,
+            &actions,
+            &descriptors,
+            config,
+            planning,
+            SequentialDiagnosticSafetyBudget {
+                maximum_cumulative_risk: 0.7,
+                risk_semantics_digest: "e".repeat(64),
+            },
+            &"d".repeat(64),
+        )
+        .expect("changed risk semantics");
+        assert_ne!(
+            result.policy_receipt.receipt_digest,
+            changed_budget.policy_receipt.receipt_digest
+        );
+    }
+
+    #[test]
+    fn policy_receipt_rejects_a_stale_action_likelihood_descriptor() {
+        let (hypotheses, actions) = xor_complementary_probes();
+        let mut descriptors = causal_descriptors(&hypotheses, &actions);
+        descriptors[0].action_likelihood_table_digest = "f".repeat(64);
+        let result = evaluate_sequential_decision_diagnostics_with_policy_receipt(
+            &hypotheses,
+            &actions,
+            &descriptors,
+            decision_config(),
+            SequentialDiagnosticConfig {
+                horizon: 2,
+                max_policy_expansions: 64,
+            },
+            SequentialDiagnosticSafetyBudget {
+                maximum_cumulative_risk: 0.5,
+                risk_semantics_digest: "c".repeat(64),
+            },
+            &"d".repeat(64),
+        );
+        assert!(matches!(
+            result,
+            Err(SequentialDiagnosticError::CausalDiagnosticAction(
+                CausalDiagnosticActionError::ActionLikelihoodDigestMismatch(_)
+            ))
+        ));
     }
 
     #[test]
