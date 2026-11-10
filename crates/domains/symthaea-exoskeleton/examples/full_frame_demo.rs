@@ -18,7 +18,7 @@ use symthaea_exoskeleton::full_frame::{
     FullFrameSimulator, HumanLoadModel, NUM_FULL_FRAME_JOINTS,
 };
 use symthaea_exoskeleton::hal_bridge::{
-    HalBridgeConfig, full_frame_to_humanoid_command, run_bridged_session,
+    SoftwareStubConfig, run_software_stub_session, zero_torque_humanoid_command,
 };
 
 fn main() {
@@ -43,9 +43,9 @@ fn main() {
         sim.step(0.001);
     }
 
-    let config = HalBridgeConfig::default();
-    let report = run_bridged_session(&mut sim, config);
-    let command = full_frame_to_humanoid_command(&sim);
+    let config = SoftwareStubConfig::default();
+    let report = run_software_stub_session(&mut sim, config);
+    let command = zero_torque_humanoid_command();
 
     println!("Software-loop ticks: {}", report.ticks_executed);
     println!("Research plant finite: {}", report.simulator_finite);
