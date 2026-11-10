@@ -1,0 +1,47 @@
+# Rights-Aware Battery Field Evidence Registry v0.1
+
+**Status:** Metadata/provenance and rights audit prototype. It does not download, host, harmonize or redistribute third-party raw battery data.
+**Owner:** [EV-FIELD-EVIDENCE-001 #11421](https://github.com/Luminous-Dynamics/symthaea/issues/11421).
+
+## Research basis
+
+Masse, *Public Battery Field Data*, arXiv:2610.05811, first posted 5 October 2026: https://arxiv.org/abs/2610.05811. It catalogues 22 field-data releases from 16 research groups across passenger EVs, buses, light mobility, grid/distributed storage, consumer electronics and industrial robotics. Where source releases permit measurement, the catalogue reports 223 GB, at least 131,096 cells, 1,998 battery systems, 44.1 MWh and 1,253 unit-years, with 293 reported faults. It publishes metadata, source/checksum information and dataset-specific loaders; access terms differ across releases.
+
+Battery Data Commons is a living metadata registry, not a central raw-data host: https://batterydatacommons.org/ and Hassini et al., *Joule* (online 23 October 2026), https://doi.org/10.1016/j.joule.2026.102712.
+
+The sources are not a ready-made harmonized SOH benchmark. Some releases have restrictive reuse terms, and missing/unlabelled time is not negative evidence.
+
+## Paradigm: federated metadata, task-specific eligibility
+
+This contract keeps source data with the publisher. Each registry entry binds:
+- registry snapshot and exact dataset release/source checksum;
+- publisher, citation/source URLs, retrieval timestamp and licence/terms reference + digest;
+- independently evidenced permissions for access, local processing, derived-data publication, model training, weight release, commercial use and raw redistribution;
+- intended uses, checked one-by-one against those permissions;
+- application/chemistry, physical hierarchy, system/unit/fault counts and observation period;
+- measurement vs receive-time availability, timezone semantics, unit/sentinel/missingness mappings;
+- adapter/source-schema/mapping/test receipts;
+- six task-specific dispositions: sensor integrity, fault detection, SOH, remaining life, intervention outcomes and pack capability.
+
+Public download does not imply permission to train, publish derivatives, release model weights, use commercially or redistribute raw data. Conditional/unknown permissions do not satisfy an intended operation. Metadata-only entries can exist with no dataset processing claims.
+
+## Hard semantic and rights gates
+
+- Unlabelled periods must not be converted to negative fault labels.
+- Sentinel codes must not be collapsed to valid numeric zero.
+- Full SOH support requires cell hierarchy and an explicit reference target/label source.
+- Fault-detection support requires labelled faults and event/receive timestamps.
+- Remaining-life support requires a censoring-aware observation contract.
+- Pack-capability support requires cell/module/pack hierarchy.
+- Partial or unvalidated adapters cannot claim fully supported tasks.
+- Raw data are never hosted or copied into the registry; derived artifacts must retain their source rights lineage.
+
+## Frozen synthetic corpus
+
+Thirteen fixtures: five accepted metadata/rights/task profiles and eight rejected controls. Accepted fixtures include permissive open data, controlled non-commercial research use, metadata-only catalogue entries and a partially validated adapter. Negative controls exercise unknown rights, commercial use prohibited by terms, raw redistribution prohibited, conditional rights without clearance, unlabelled periods treated as negative, sentinels collapsed to zero, SOH claimed without reference labels, and fault detection claimed without timestamps.
+
+These fixtures verify the schema/auditor only. No real field dataset has been imported or evaluated by this PR.
+
+## Limits
+
+The auditor checks internal consistency of producer-declared rights evidence and metadata. It does not provide legal advice, authenticate a publisher's licence, prove that data checksums match a source download, resolve legal conflicts among terms, or infer that an available label is valid. Rights decisions remain dataset- and jurisdiction-specific.
