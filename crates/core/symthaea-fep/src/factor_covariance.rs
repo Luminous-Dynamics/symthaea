@@ -98,6 +98,8 @@ pub enum FactorCovarianceError {
     InvalidFeatureUnit { index: usize },
     #[error("diagonal variance count {actual} does not match feature count {expected}")]
     DiagonalDimensionMismatch { expected: usize, actual: usize },
+    #[error("feature-unit count {actual} does not match feature count {expected}")]
+    FeatureUnitCountMismatch { expected: usize, actual: usize },
     #[error("diagonal variance at index {index} must be finite and strictly positive")]
     InvalidDiagonalVariance { index: usize },
     #[error("factor count {actual} must be less than feature count {dimension} and no greater than {maximum}")]
@@ -143,7 +145,7 @@ impl FactorCovarianceModel {
             return Err(FactorCovarianceError::InvalidFeatureCount { actual: dimension });
         }
         if self.feature_units.len() != dimension {
-            return Err(FactorCovarianceError::DiagonalDimensionMismatch {
+            return Err(FactorCovarianceError::FeatureUnitCountMismatch {
                 expected: dimension,
                 actual: self.feature_units.len(),
             });
@@ -657,7 +659,17 @@ mod tests {
         }).collect();
 
         assert_eq!(model.model_digest().unwrap(), transformed.model_digest().unwrap());
-        assert_eq!(model.dense_covariance().unwrap(), transformed.dense_covariance().unwrap());
+        let original_covariance = model.dense_covariance().unwrap();
+        let transformed_covariance = transformed.dense_covariance().unwrap();
+        for row in 0..model.dimension() {
+            for column in 0..model.dimension() {
+                assert!(
+                    (original_covariance[row][column] - transformed_covariance[row][column]).abs()
+                        <= NUMERIC_TOLERANCE,
+                    "covariance mismatch at ({row}, {column})"
+                );
+            }
+        }
         let expected = model.mahalanobis_squared(&residual).unwrap();
         let actual = transformed.mahalanobis_squared(&residual).unwrap();
         assert!((actual - expected).abs() <= NUMERIC_TOLERANCE * expected.max(1.0));
@@ -748,6 +760,50 @@ mod tests {
             model.validate(),
             Err(FactorCovarianceError::InvalidProvenanceDigest)
         ));
+    }
+
+    #[test]
+    fn malformed_loading_shape_and_non_lower_rank_fail_closed() {
+        let mut model = fixture(4, 1);
+        model.loadings.pop();
+        assert!(matches!(
+            model.validate(),
+            Err(FactorCovarianceError::LoadingRowCountMismatch { .. })
+        ));
+
+        let mut model = fixture(4, 1);
+        model.loadings[0].clear();
+        assert!(matches!(
+            model.validate(),
+            Err(FactorCovarianceError::LoadingColumnCountMismatch { row: 0, .. })
+        ));
+
+        let mut model = fixture(4, 1);
+        model.factor_ids = vec![
+            "factor-a".to_owned(),
+            "factor-b".to_owned(),
+            "factor-c".to_owned(),
+            "factor-d".to_owned(),
+        ];
+        model.loadings = vec![vec![0.0; 4]; 4];
+        assert!(matches!(
+            model.validate(),
+            Err(FactorCovarianceError::InvalidFactorRank { .. })
+        ));
+    }
+
+    #[test]
+    fn adequate_residual_screen_is_not_a_general_adequacy_certificate() {
+        let evidence = FactorResidualAdequacyEvidence {
+            calibration_observation_count: 500,
+            minimum_observation_count: 100,
+            maximum_absolute_residual_correlation: 0.05,
+            maximum_allowed_residual_correlation: 0.15,
+            evidence_digest: "e".repeat(64),
+        };
+        let report = assess_residual_correlation_adequacy(&evidence).unwrap();
+        assert_eq!(report.status, FactorAdequacyStatus::NoDetectedResidualCorrelation);
+        assert_eq!(report.evidence_digest, evidence.evidence_digest);
     }
 
     #[test]
