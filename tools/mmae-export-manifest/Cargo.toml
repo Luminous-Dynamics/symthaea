@@ -1,0 +1,20 @@
+[package]
+name = "mmae-export-manifest"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Content-addressed Rust exporter for official MMAE submission manifests"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "mmae-export-manifest"
+path = "src/main.rs"
+
+[workspace]
