@@ -1200,9 +1200,8 @@ mod tests {
     fn family_report_must_match_the_exact_external_candidate_binding() {
         let plan = plan();
         let expected_binding = test_binding(&plan);
-        let plan_digest = plan.plan_digest().to_owned();
         let gate = FamilyNonInferiorityGate::new(
-            plan,
+            plan.clone(),
             0.05,
             1,
             expected_binding.clone(),
