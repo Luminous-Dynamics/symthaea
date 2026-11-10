@@ -5,6 +5,7 @@ on:
     paths:
       - "src/voice/singing_quality.rs"
       - "docs/research/VOCAL_PITCH_PRIOR_AUDIT_V1.md"
+      - "docs/research/VOCAL_PITCH_ESTIMATOR_BENCHMARK_V1.md"
       - ".github/workflows/vocal-pitch-prior-audit.yml"
   workflow_dispatch:
 
