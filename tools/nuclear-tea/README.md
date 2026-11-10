@@ -11,6 +11,7 @@ This package currently provides:
 - discounted lifecycle-cost and discounted delivered-service calculations;
 - explicit real/nominal cash-flow and discount-rate basis matching;
 - explicit service unit and delivery-boundary matching before comparisons;
+- scenario-level evidence references in every economic input series;
 - mandatory feasibility-gate aggregation that blocks economic ranking on FAIL or UNKNOWN.
 
 It does not model a reactor, grid load flow, ship hydrodynamics, thermal hydraulics, structural response, radiation, nuclear safety, insurance pricing, or actual project economics.
@@ -24,7 +25,7 @@ cargo test --manifest-path tools/nuclear-tea/Cargo.toml
 cargo run --release --manifest-path tools/nuclear-tea/Cargo.toml -- research/nuclear/port-reference-evidence-sa-2025.json
 ```
 
-The executable prints a JSON receipt with the exact input SHA-256, row counts and the limited validation status. It exits nonzero on parsing or validation failure.
+The executable prints a JSON receipt with the exact input SHA-256, package version, build commit (when run under GitHub Actions), row counts and the limited validation status. It exits nonzero on parsing or validation failure.
 
 ## Calculation semantics
 
