@@ -1,0 +1,368 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-soh-feature-availability/0.1",
+  "title": "SOH feature-time availability and reference lineage manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "manifest_id",
+    "evaluation_mode",
+    "dataset_digest",
+    "model_digest",
+    "split_manifest_digest",
+    "split_frozen_at_ms",
+    "test_accessed_at_ms",
+    "train_group_identity_digests",
+    "test_group_identity_digests",
+    "feature_definitions",
+    "prediction_rows",
+    "reference_randomization"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "ev-soh-feature-availability/0.1"
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_mode": {
+      "enum": [
+        "strict_online",
+        "offline_oracle"
+      ]
+    },
+    "dataset_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "model_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "split_manifest_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "split_frozen_at_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "test_accessed_at_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "train_group_identity_digests": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "test_group_identity_digests": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "feature_definitions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "feature_id",
+          "feature_schema_digest",
+          "implementation_digest",
+          "transform_ref",
+          "transform_digest",
+          "fit_scope",
+          "fit_at_ms",
+          "fit_group_identity_digests",
+          "predeclared_at_ms",
+          "predeclaration_digest",
+          "reference_kind",
+          "reference_policy_digest",
+          "uses_test_labels",
+          "uses_future_observations"
+        ],
+        "properties": {
+          "feature_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "feature_schema_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "implementation_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "transform_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "transform_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "fit_scope": {
+            "enum": [
+              "train_only",
+              "online_prefix",
+              "fixed_predeclared",
+              "full_trajectory",
+              "test_or_future"
+            ]
+          },
+          "fit_at_ms": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "fit_group_identity_digests": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "predeclared_at_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "predeclaration_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reference_kind": {
+            "enum": [
+              "none",
+              "same_asset_prefix",
+              "training_population",
+              "peer_asset",
+              "external_fixed",
+              "full_lifetime_extrema"
+            ]
+          },
+          "reference_policy_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "uses_test_labels": {
+            "type": "boolean"
+          },
+          "uses_future_observations": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "prediction_rows": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_digest",
+          "asset_identity_digest",
+          "decision_at_ms",
+          "target_value",
+          "target_evidence_digest",
+          "feature_uses"
+        ],
+        "properties": {
+          "sample_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "asset_identity_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "decision_at_ms": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "target_value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "target_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "feature_uses": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "feature_id",
+                "value_digest",
+                "latest_measurement_at_ms",
+                "latest_received_at_ms",
+                "derived_at_ms",
+                "reference_kind",
+                "reference_identity_digest",
+                "reference_population_digest",
+                "reference_measurement_at_ms",
+                "reference_received_at_ms",
+                "used_target_label",
+                "used_future_observation",
+                "availability_evidence_digest"
+              ],
+              "properties": {
+                "feature_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value_digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "latest_measurement_at_ms": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "latest_received_at_ms": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "derived_at_ms": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "reference_kind": {
+                  "enum": [
+                    "none",
+                    "same_asset_prefix",
+                    "training_population",
+                    "peer_asset",
+                    "external_fixed",
+                    "full_lifetime_extrema"
+                  ]
+                },
+                "reference_identity_digest": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "reference_population_digest": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "reference_measurement_at_ms": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1
+                },
+                "reference_received_at_ms": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1
+                },
+                "used_target_label": {
+                  "type": "boolean"
+                },
+                "used_future_observation": {
+                  "type": "boolean"
+                },
+                "availability_evidence_digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "reference_randomization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "method_ref",
+        "method_digest",
+        "assignment_digest",
+        "seed",
+        "derangement_count",
+        "schedule_frozen_at_ms",
+        "arms"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_applicable",
+            "pre_registered"
+          ]
+        },
+        "method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "assignment_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "derangement_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "schedule_frozen_at_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "arms": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
