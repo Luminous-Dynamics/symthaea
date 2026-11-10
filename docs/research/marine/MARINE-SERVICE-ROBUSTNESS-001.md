@@ -307,6 +307,14 @@ New public evidence shows why longitudinal-only WAPS optimization is insufficien
 
 These are case-specific benchmarks, not transferable correction factors. The new [#11510 WAPS 3-DOF coupling benchmark](https://github.com/Luminous-Dynamics/symthaea/issues/11510) specifies a fidelity ladder from 1-DOF screening to steady 3/4-DOF, 6-DOF route/motion analysis, propeller-hull-rudder self-propulsion and transient aerodynamic coupling. Use the lowest fidelity shown adequate for each output, and validate every observable separately.
 
+### 14.8 Optimize for validated Pareto improvement
+
+Multi-fidelity optimization is established in naval architecture and aerospace; it is not itself the novelty. MARIN has used low-cost potential-flow/coarse-grid models with high-fidelity RANS in ship afterbody optimization, and 2026 work explicitly models the deferred validation cost of low-fidelity optima.
+
+The benchmark should compare fidelity-selection/acquisition strategies by the **total cost to an independently validated Pareto improvement**, counting the final validation query, hard constraints, model discrepancy and rank reversals. Low-fidelity surrogate gains are not accepted as final outcomes.
+
+See [#11513 — validation-aware multi-fidelity design](https://github.com/Luminous-Dynamics/symthaea/issues/11513) and [MARINE-VALIDATED-MULTIFIDELITY-DESIGN-001](./MARINE-VALIDATED-MULTIFIDELITY-DESIGN-001.md).
+
 ## 15. Sources
 
 - Liu et al., 2026 wind-propelled ship deployment and technology review, International Journal of Naval Architecture and Ocean Engineering 18, 100785. https://doi.org/10.1016/j.ijnaoe.2026.100785
