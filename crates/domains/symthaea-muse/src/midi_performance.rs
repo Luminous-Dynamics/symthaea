@@ -1153,7 +1153,7 @@ mod tests {
             &score,
             vec![segment("p1", 1, "inst-a", (0, 1), (1, 1), None)],
         );
-        let mut capability_a = capability("inst-a", InstrumentKindV1::Violin);
+        let capability_a = capability("inst-a", InstrumentKindV1::Violin);
         let mut capability_b = capability_a.clone();
         capability_b.max_polyphony = 8;
         let bindings = vec![binding("inst-a", 40)];
@@ -1176,7 +1176,6 @@ mod tests {
             second.manifest.capability_sha256
         );
         assert_eq!(first.manifest.midi_bytes, second.manifest.midi_bytes);
-        capability_a.max_polyphony = 8;
     }
 
 }
