@@ -217,6 +217,7 @@ pub fn infer_symmetry(expr: &Expr) -> SymmetryDescriptor {
 /// Infer a symmetry candidate while preserving the evidence source and search limits.
 pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
     let numeric_profile = NumericLieDerivativeProfileV1::default();
+    let exact_polynomial_profile = ExactPolynomialLieProfileV1::default();
 
     if let Some((n, shared_coefficient)) = detect_sum_of_squares(expr)
         && (2..=10).contains(&n)
@@ -231,6 +232,8 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
             }),
             search_status: SymmetryInferenceSearchStatus::StructuralMatchShortCircuit,
             numeric_profile,
+            exact_polynomial_profile,
+            exact_polynomial_status: ExactPolynomialSearchStatus::NotRunStructuralShortcut,
         };
     }
 
@@ -242,15 +245,71 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
             }),
             search_status: SymmetryInferenceSearchStatus::StructuralMatchShortCircuit,
             numeric_profile,
+            exact_polynomial_profile,
+            exact_polynomial_status: ExactPolynomialSearchStatus::NotRunStructuralShortcut,
         };
     }
 
-    infer_symmetry_numeric_with_profile(expr, numeric_profile)
+    let mut var_names = Vec::new();
+    collect_var_names(expr, &mut var_names);
+    if var_names.len() < 2 {
+        return SymmetryInferenceReport {
+            candidate: None,
+            evidence: None,
+            search_status: SymmetryInferenceSearchStatus::NumericSearchSkippedTooFewVariables,
+            numeric_profile,
+            exact_polynomial_profile,
+            exact_polynomial_status: ExactPolynomialSearchStatus::SkippedTooFewVariables,
+        };
+    }
+
+    match exact_polynomial_symmetry_candidate(expr, &var_names, exact_polynomial_profile) {
+        Ok(Some((group, acted_on_variables, checked_generator_count))) => {
+            SymmetryInferenceReport {
+                candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
+                evidence: Some(SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
+                    profile: exact_polynomial_profile,
+                    acted_on_variables,
+                    group,
+                    checked_generator_count,
+                }),
+                search_status: SymmetryInferenceSearchStatus::ExactPolynomialIdentityFound,
+                numeric_profile,
+                exact_polynomial_profile,
+                exact_polynomial_status: ExactPolynomialSearchStatus::IdentityFound,
+            }
+        }
+        Ok(None) => SymmetryInferenceReport {
+            candidate: None,
+            evidence: None,
+            search_status: SymmetryInferenceSearchStatus::ExactPolynomialSearchCompletedNoCandidate,
+            numeric_profile,
+            exact_polynomial_profile,
+            exact_polynomial_status: ExactPolynomialSearchStatus::CompletedNoCandidate,
+        },
+        Err(ExactPolynomialError::UnsupportedExpression) => infer_symmetry_numeric_with_profile(
+            expr,
+            numeric_profile,
+            exact_polynomial_profile,
+            ExactPolynomialSearchStatus::UnsupportedExpression,
+        ),
+        Err(ExactPolynomialError::ResourceLimitExceeded) => infer_symmetry_numeric_with_profile(
+            expr,
+            numeric_profile,
+            exact_polynomial_profile,
+            ExactPolynomialSearchStatus::ResourceLimitExceeded,
+        ),
+    }
 }
 
 /// The generic numeric fallback, with its finite search domain and tolerances in the result.
 pub fn infer_symmetry_numeric_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
-    infer_symmetry_numeric_with_profile(expr, NumericLieDerivativeProfileV1::default())
+    infer_symmetry_numeric_with_profile(
+        expr,
+        NumericLieDerivativeProfileV1::default(),
+        ExactPolynomialLieProfileV1::default(),
+        ExactPolynomialSearchStatus::NotRequested,
+    )
 }
 
 /// Compatibility API for callers that need only a descriptor from the numeric fallback.
@@ -261,6 +320,8 @@ pub fn infer_symmetry_numeric(expr: &Expr) -> SymmetryDescriptor {
 fn infer_symmetry_numeric_with_profile(
     expr: &Expr,
     profile: NumericLieDerivativeProfileV1,
+    exact_polynomial_profile: ExactPolynomialLieProfileV1,
+    exact_polynomial_status: ExactPolynomialSearchStatus,
 ) -> SymmetryInferenceReport {
     let mut var_names = Vec::new();
     collect_var_names(expr, &mut var_names);
@@ -271,6 +332,8 @@ fn infer_symmetry_numeric_with_profile(
             evidence: None,
             search_status: SymmetryInferenceSearchStatus::NumericSearchSkippedTooFewVariables,
             numeric_profile: profile,
+            exact_polynomial_profile,
+            exact_polynomial_status,
         };
     }
 
@@ -289,6 +352,8 @@ fn infer_symmetry_numeric_with_profile(
             }),
             search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
             numeric_profile: profile,
+            exact_polynomial_profile,
+            exact_polynomial_status,
         };
     }
 
@@ -308,6 +373,8 @@ fn infer_symmetry_numeric_with_profile(
                         }),
                         search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
                         numeric_profile: profile,
+                        exact_polynomial_profile,
+                        exact_polynomial_status,
                     };
                 }
             }
@@ -319,9 +386,10 @@ fn infer_symmetry_numeric_with_profile(
         evidence: None,
         search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
         numeric_profile: profile,
+        exact_polynomial_profile,
+        exact_polynomial_status,
     }
 }
-
 /// Collect free variable names referenced by `expr`, first-seen order, deduplicated.
 fn collect_var_names(expr: &Expr, out: &mut Vec<String>) {
     match expr {
