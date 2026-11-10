@@ -68,7 +68,15 @@ Each pair holds constant:
 - evidence packet and its SHA-256;
 - condition and all other declared scenario fields.
 
-Only the target speaker's binding changes between the minimum- and maximum-normalized-betweenness nodes. The realized graph and selected node IDs must be committed in a future execution receipt. Graph generation remains owned by [#11248](https://github.com/Luminous-Dynamics/symthaea/issues/11248).
+Only the target speaker's binding changes between the minimum- and maximum-normalized-betweenness nodes. The realized graph and selected node IDs must be committed in a future execution receipt. Communication-graph generation and delivery semantics are owned by [#11337](https://github.com/Luminous-Dynamics/symthaea/issues/11337). Delegation graphs remain separately owned by [#11248](https://github.com/Luminous-Dynamics/symthaea/issues/11248); those edges are never treated as message channels.
+
+## Graph-semantic boundary
+
+The scenario matrix uses `CommunicationGraph` profiles from [#11337](https://github.com/Luminous-Dynamics/symthaea/issues/11337), not delegation graphs from [#11248](https://github.com/Luminous-Dynamics/symthaea/issues/11248).
+
+A delegation edge describes mandate/vote-share flow between principals. A message channel describes possible communication between agent instances. Neither implies the other. Each delivered message must have an event record; graph reachability alone is not delivery.
+
+The five centrality counterfactuals use `normalized_betweenness_v1`: strongly connected reciprocal directed graphs, unweighted hop-count shortest paths, explicit minimum/maximum tie sets, and lexicographic stable AgentInstanceId tie-break. Exact graph and selected-node identities remain future run-receipt commitments. A topology not meeting preconditions is Unsupported, not silently assigned a centrality score.
 
 ## Frozen synthetic persuasion content
 
@@ -98,6 +106,9 @@ There is no aggregate contagion, alignment, influence or governance score.
 - **Beyond Correctness (ICML 2026 / PMLR):** measures direction and distance of answer revisions relative to a known answer, beyond final correctness alone. [Paper](https://proceedings.mlr.press/v306/ha26a.html)
 - **BeliefShift (2026 preprint):** longitudinal temporal consistency, contradiction resolution and evidence-driven revision. [Preprint](https://arxiv.org/abs/2603.23848)
 - **Persuasion-driven adversarial debate (Scientific Reports 2026):** motivates persuasion attacks beyond prompt injection, including confident misleading argument and source/authority cues. Its numerical effects are specific to its tested setup. [Paper](https://www.nature.com/articles/s41598-026-42705-7)
+- **MADBench (2026 preprint):** six security-attack families across 356 source tasks and 3,958 test cases, including colluding/compromised agents and orchestrator attacks. Use its attack taxonomy as a security comparator; the current 50-case matrix is not a reproduction of MADBench. [Paper](https://arxiv.org/abs/2609.39146)
+- **Demystifying Multi-Agent Debate (Findings ACL 2026):** evaluates diversity-aware initial answer sets and confidence-modulated updates across six reasoning benchmarks. Confidence remains calibrated descriptive metadata, never authority or proof. [Paper](https://aclanthology.org/2026.findings-acl.1694/)
+- **Free-MAD (Findings ACL 2026):** removes consensus as a requirement, scores debate trajectories rather than only the last round, and uses anti-conformity; compare accuracy and token/round cost under matched conditions. [Paper](https://aclanthology.org/2026.findings-acl.1600/)
 
 The programme's differentiation target is not more rounds or more consensus. It is a verifiable account of which revisions were evidence-supported, how social topology changed exposure, where persuasion bypassed evidence, and where no single normative answer exists.
 
