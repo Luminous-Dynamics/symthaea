@@ -97,6 +97,7 @@ impl FamilyGuardrailPlan {
             if family.minimum_observations == 0
                 || family.minimum_observations > family.maximum_observations
                 || family.maximum_observations > MAX_EPISODES_PER_FAMILY as u64
+                || family.episode_ids.len() > MAX_EPISODES_PER_FAMILY
             {
                 return Err(FamilyGuardrailError::InvalidObservationLimits {
                     family_id: family.family_id.clone(),
@@ -339,6 +340,8 @@ pub enum FamilyGuardrailError {
     ReportSerialization,
     #[error("family-guardrail report digest does not match its contents")]
     ReportDigestMismatch,
+    #[error("family-guardrail report is bound to a different candidate session")]
+    ReportBindingMismatch,
 }
 
 /// Mutable candidate-local evidence collector. It cannot mutate a model or sign
@@ -629,6 +632,26 @@ pub fn validate_family_guardrail_report(
     let expected_digest = family_guardrail_report_digest(report)?;
     if expected_digest != report.report_digest {
         return Err(FamilyGuardrailError::ReportDigestMismatch);
+    }
+    Ok(())
+}
+
+/// Validate the report's internal digest and its exact binding to an expected candidate session.
+///
+/// This must be called with identities obtained independently from the campaign
+/// ledger and immutable candidate session. A content digest is not a signature.
+pub fn validate_family_guardrail_report_for_candidate(
+    report: &FamilyGuardrailReport,
+    expected_binding: &FamilyGuardrailBinding,
+    expected_candidate_index: u64,
+    expected_plan_digest: &str,
+) -> Result<(), FamilyGuardrailError> {
+    validate_family_guardrail_report(report)?;
+    if report.binding != *expected_binding
+        || report.candidate_index != expected_candidate_index
+        || report.plan_digest != expected_plan_digest
+    {
+        return Err(FamilyGuardrailError::ReportBindingMismatch);
     }
     Ok(())
 }
@@ -935,6 +958,49 @@ mod tests {
         assert!(matches!(
             FamilyNonInferiorityGate::new(plan, 0.05, 1, binding),
             Err(FamilyGuardrailError::CandidateObservationBudgetMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn family_report_must_match_the_exact_external_candidate_binding() {
+        let plan = plan();
+        let expected_binding = test_binding(&plan);
+        let plan_digest = plan.plan_digest().to_owned();
+        let gate = FamilyNonInferiorityGate::new(
+            plan,
+            0.05,
+            1,
+            expected_binding.clone(),
+        )
+        .unwrap();
+        let report = gate.report().unwrap();
+        validate_family_guardrail_report_for_candidate(
+            &report,
+            &expected_binding,
+            1,
+            &plan_digest,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            validate_family_guardrail_report_for_candidate(
+                &report,
+                &expected_binding,
+                2,
+                &plan_digest
+            ),
+            Err(FamilyGuardrailError::ReportBindingMismatch)
+        ));
+        let mut wrong_binding = expected_binding;
+        wrong_binding.candidate_model_digest = "e".repeat(64);
+        assert!(matches!(
+            validate_family_guardrail_report_for_candidate(
+                &report,
+                &wrong_binding,
+                1,
+                &plan_digest
+            ),
+            Err(FamilyGuardrailError::ReportBindingMismatch)
         ));
     }
 
