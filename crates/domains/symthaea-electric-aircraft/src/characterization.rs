@@ -34,6 +34,7 @@ impl EvidenceRecord {
         if self.id.trim().is_empty()
             || self.uri.trim().is_empty()
             || self.description.trim().is_empty()
+            || !self.uri.contains("://")
         {
             return Err(CharacterizationError::InvalidEvidence(
                 "evidence ID, URI, and description must be nonempty".into(),
@@ -223,6 +224,17 @@ impl PropulsionCharacterization {
         self.motor_efficiency_by_load.validate()?;
         self.inverter_efficiency_by_load.validate()?;
         self.propeller_efficiency_by_advance_ratio.validate()?;
+        if self.motor_efficiency_by_load.x_axis != "shaft_load_fraction"
+            || self.motor_efficiency_by_load.x_unit != "1"
+            || self.inverter_efficiency_by_load.x_axis != "input_load_fraction"
+            || self.inverter_efficiency_by_load.x_unit != "1"
+            || self.propeller_efficiency_by_advance_ratio.x_axis != "advance_ratio"
+            || self.propeller_efficiency_by_advance_ratio.x_unit != "1"
+        {
+            return Err(CharacterizationError::InvalidCurve(
+                "propulsion maps must use dimensionless shaft load, input load, and advance-ratio axes".into(),
+            ));
+        }
         let positive = [
             self.motor_rated_shaft_power_w,
             self.inverter_rated_input_power_w,
