@@ -14,7 +14,10 @@
     "evaluator_error_correlation": "https://github.com/Luminous-Dynamics/symthaea/issues/9431",
     "human_group_deliberation": "https://github.com/Luminous-Dynamics/mycelix/issues/5999",
     "participant_conditioned_summary": "https://github.com/Luminous-Dynamics/mycelix/issues/6011",
-    "delegation_topology_taxonomy": "https://github.com/Luminous-Dynamics/symthaea/issues/11248"
+    "delegation_topology_taxonomy": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+    "revision_ledger": "https://github.com/Luminous-Dynamics/symthaea/issues/11340",
+    "confidence_calibration": "https://github.com/Luminous-Dynamics/symthaea/issues/11367",
+    "debate_security": "https://github.com/Luminous-Dynamics/symthaea/issues/11434"
   },
   "evidence_classes": [
     "SyntheticFixture",
@@ -178,7 +181,11 @@
     "role_symmetry_control",
     "human_grounded_judge_alignment",
     "debate_collapse_uncertainty_diagnostics",
-    "cascading_agent_injection_security"
+    "cascading_agent_injection_security",
+    "posterior_guided_communication_graph",
+    "structured_argument_and_rebuttal",
+    "verbal_internal_confidence_divergence",
+    "epistemic_aleatoric_uncertainty_decomposition"
   ],
   "metrics": [
     {
@@ -330,6 +337,55 @@
         "benign_false_block_rate"
       ],
       "interpretation": "Security is measured at the capability/effect boundary under explicit attack objectives. Distinguish attempted attack, blocked attempt, partial success without effect, unauthorized effect, infrastructure failure and inconclusive attacker capability."
+    },
+    {
+      "id": "argumentation_and_rebuttal_quality",
+      "measures": [
+        "rebuttal_engagement_score",
+        "belief_governance_score",
+        "argument_response_coverage",
+        "unsupported_rebuttal_rate",
+        "claim_retraction_quality",
+        "evidence_linked_concession_rate"
+      ],
+      "interpretation": "RES/BGS-style measures are reported only when published definitions and annotation procedures are faithfully reproduced. They remain argument-quality metrics, not factual or security oracles."
+    },
+    {
+      "id": "confidence_channel_divergence",
+      "measures": [
+        "verbal_internal_rank_association",
+        "verbal_internal_magnitude_agreement",
+        "verbal_confidence_calibration",
+        "logit_confidence_calibration",
+        "semantic_entropy_association",
+        "prompt_induced_confidence_inflation",
+        "confidence_channel_missingness"
+      ],
+      "interpretation": "Verbal confidence, logits-derived confidence and semantic-entropy uncertainty are separate observed channels. Association, magnitude agreement and probabilistic calibration are distinct; unavailable internals are Unsupported, never imputed from verbal claims."
+    },
+    {
+      "id": "epistemic_aleatoric_uncertainty_decomposition",
+      "measures": [
+        "within_agent_epistemic_uncertainty",
+        "within_agent_aleatoric_uncertainty",
+        "between_agent_disagreement",
+        "system_output_uncertainty",
+        "uncertainty_decomposition_residual",
+        "evidence_reducible_uncertainty"
+      ],
+      "interpretation": "Decompose model/task uncertainty only under a declared estimator and known task semantics. Do not label normative disagreement as aleatoric noise or reward variance minimization."
+    },
+    {
+      "id": "adaptive_debate_routing_efficiency",
+      "measures": [
+        "posterior_routing_token_savings",
+        "answer_quality_at_equal_token_budget",
+        "minority_evidence_exclusion_rate",
+        "challenge_survival_calibration",
+        "adaptive_graph_change_rate",
+        "routing_under_miscalibrated_confidence"
+      ],
+      "interpretation": "Compare SVR-MAD-style posterior-guided graph construction under matched total cost and task quality. Confidence and survival are fallible signals; routing cannot suppress protected dissent or create authority."
     }
   ],
   "minimum_fixture_requirements": {
@@ -347,7 +403,12 @@
     "communication_graph_semantics_separate_from_delegation": true,
     "centrality_preconditions_and_tie_breaks_explicit": true,
     "include_confidence_and_diversity_controls": true,
-    "include_consensus_free_trajectory_baseline": true
+    "include_consensus_free_trajectory_baseline": true,
+    "include_separate_verbal_internal_confidence_channels": true,
+    "include_argumentation_and_rebuttal_quality_comparator": true,
+    "include_epistemic_aleatoric_uncertainty_decomposition": true,
+    "include_posterior_guided_routing_under_equal_budget": true,
+    "confidence_never_grants_voice_or_authority": true
   },
   "statistical_protocol": {
     "preregister_hypotheses_before_confirmatory_runs": true,
@@ -396,7 +457,14 @@
       "role_assignment_and_rubric_profile_sha256",
       "uncertainty_estimator_profile_sha256",
       "attack_harness_revision_and_scenario_sha256",
-      "capability_read_write_effect_transcript_sha256"
+      "capability_read_write_effect_transcript_sha256",
+      "verbal_confidence_prompt_digest",
+      "internal_confidence_extraction_profile_digest",
+      "semantic_entropy_estimator_profile_digest",
+      "calibration_profile_and_holdout_digest",
+      "uncertainty_decomposition_profile_digest",
+      "adaptive_routing_profile_digest",
+      "argumentation_metric_definition_digest"
     ],
     "statuses": [
       "Pass",
@@ -526,6 +594,30 @@
       "venue": "UK AI Security Institute research, 2026",
       "url": "https://www.aisi.gov.uk/research/security-challenges-in-ai-agent-deployment-insights-from-a-large-scale-public-competition",
       "use": "ART reports 22 frontier agents across 44 deployment scenarios, 1.8 million submitted attacks and over 60,000 elicited policy violations in the competition; motivates operational read/write effect testing and repeated adaptive attack budgets, not direct score comparisons."
+    },
+    {
+      "title": "SVR-MAD: A Bayesian-Inspired Framework for Posterior-Guided Multi-Agent Debate",
+      "venue": "Findings of EMNLP 2026",
+      "url": "https://aclanthology.org/2026.findings-emnlp.483/",
+      "use": "Matched adaptive communication-graph and token-efficiency baseline; the paper reports up to 61% token-cost reduction in its tested setup. Evaluate minority-evidence exclusion, confidence miscalibration and equal-budget quality, not token savings alone."
+    },
+    {
+      "title": "Debate-aware Learning Makes LLMs Genuine Debaters",
+      "venue": "EMNLP 2026",
+      "url": "https://aclanthology.org/2026.emnlp-main.1907/",
+      "use": "Argument-structuring and debate-quality comparator; RES and BGS can be reproduced as separate metrics only after verifying exact definitions and annotation procedures. They are not independent factual or security oracles."
+    },
+    {
+      "title": "When Linguistic and Internal Confidence Diverge in Large Language Models",
+      "venue": "Findings of EMNLP 2026",
+      "url": "https://aclanthology.org/2026.findings-emnlp.1300/",
+      "use": "Confidence-channel diagnostic across verbal, logits-based and semantic-entropy signals; separately measure rank association, magnitude agreement and probabilistic calibration, and test prompt-induced inflation."
+    },
+    {
+      "title": "Epistemic Gain, Aleatoric Cost: Uncertainty Decomposition in Multi-Agent Debate for Math Reasoning",
+      "venue": "ICML 2026, PMLR 306",
+      "url": "https://proceedings.mlr.press/v306/qiao26a.html",
+      "use": "Uncertainty-decomposition comparator separating epistemic information gain from aleatoric cost; use only where task semantics justify the decomposition and do not penalize legitimate pluralism."
     }
   ],
   "paired_content_artifact": {
