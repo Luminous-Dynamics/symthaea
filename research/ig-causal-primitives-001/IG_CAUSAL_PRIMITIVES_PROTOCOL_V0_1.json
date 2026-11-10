@@ -1,0 +1,135 @@
+{
+  "protocol_id": "IG-CAUSAL-PRIMITIVES-001",
+  "version": "0.1.0",
+  "status": "protocol_and_synthetic_fixtures_unexecuted",
+  "objective": "Qualify the task and independent truth-oracle contract for causal-prior recovery, forward intervention tracing, evidence-driven hypothesis updating, and invariance to non-causal agency framing.",
+  "ownership": {
+    "owning_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11505",
+    "parent_contagion": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
+    "revision_ledger": "https://github.com/Luminous-Dynamics/symthaea/issues/11340",
+    "communication_graph": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
+    "confidence_calibration": "https://github.com/Luminous-Dynamics/symthaea/issues/11367",
+    "budget_and_transcript": "https://github.com/Luminous-Dynamics/symthaea/issues/11415"
+  },
+  "primitives": [
+    {
+      "id": "causal_prior",
+      "tasks": 12,
+      "metric_families": [
+        "directed_edge_precision",
+        "directed_edge_recall",
+        "structural_hamming_distance",
+        "motif_identification",
+        "abstention_under_non_identifiability",
+        "domain_slice_error"
+      ]
+    },
+    {
+      "id": "forward_state_tracing",
+      "tasks": 12,
+      "metric_families": [
+        "complete_state_exact_match",
+        "intervention_consistency",
+        "equation_trace_validity",
+        "observation_vs_do_distinction"
+      ]
+    },
+    {
+      "id": "belief_updating",
+      "tasks": 12,
+      "metric_families": [
+        "posterior_exact_or_log_score_when_defined",
+        "warranted_update_rate",
+        "false_update_rate",
+        "over_rejection_rate",
+        "evidence_sensitivity",
+        "underdetermination_preservation"
+      ]
+    },
+    {
+      "id": "agency_sensitivity",
+      "tasks": 12,
+      "metric_families": [
+        "paired_graph_consistency",
+        "paired_prediction_consistency",
+        "framing_effect_size",
+        "legitimate_mechanism_sensitivity"
+      ]
+    }
+  ],
+  "domains": [
+    "mechanical_infrastructure",
+    "institutional_resource",
+    "abstract_synthetic"
+  ],
+  "design": {
+    "fixture_count": 48,
+    "balance": "12 tasks per primitive; 4 per primitive x domain cell; 6 paired agency-framing blocks (2 per domain).",
+    "scm_profile": "Deterministic binary SCM v0.1: exogenous input values plus input/constant/copy/not/and/or/xor equations in declared topological node order.",
+    "intervention_semantics": "do(X=x) overrides the structural equation for X; downstream equations are recomputed in topological order. Observational evidence conditions on realized values without replacing an equation.",
+    "belief_update_semantics": "Finite deterministic hypothesis set with positive integer prior weights and hard-evidence likelihood 0/1. Matching hypotheses retain their prior mass; posterior numerators and denominator are exact integers. No noisy likelihood or continuous posterior is claimed.",
+    "agency_pair_semantics": "Each pair shares byte-equivalent SCM, prompt, intervention and oracle state; only the narrative agency/status framing changes. The qualifier checks this pair contract, not a model's behavioral invariance.",
+    "independence": "The fixture oracle is recomputed from declared SCM equations by the Rust qualifier. Candidate model rationales are never consulted by the oracle."
+  },
+  "required_controls": [
+    "do-intervention overrides the target structural equation",
+    "observation is not rewritten as intervention",
+    "topological order and parent references are valid",
+    "edge direction is not reversed",
+    "collider and common-cause fork are distinguished",
+    "mediated and direct-plus-mediated paths are preserved",
+    "observationally underdetermined hypotheses remain jointly supported",
+    "interventional evidence selects only models that predict the observation",
+    "agency framing pair changes narrative but not SCM or intervention",
+    "unsupported or zero-mass posterior fails closed",
+    "duplicate task/hypothesis IDs fail",
+    "all primitives and domains retain declared balance"
+  ],
+  "external_comparators": [
+    {
+      "name": "CausalPrism",
+      "venue": "Findings EMNLP 2026",
+      "role": "primary component-level causal reasoning comparator",
+      "url": "https://aclanthology.org/2026.findings-emnlp.1294/"
+    },
+    {
+      "name": "Can LLMs Reliably Identify Causal Conclusions in Scientific Literature?",
+      "venue": "Findings EMNLP 2026",
+      "role": "adjacent domain-general causal claim identification; not task-equivalent",
+      "url": "https://aclanthology.org/2026.findings-emnlp.597/"
+    },
+    {
+      "name": "SVR-MAD",
+      "venue": "Findings EMNLP 2026",
+      "role": "posterior-guided communication/routing comparator for later equal-budget multi-agent arms",
+      "url": "https://aclanthology.org/2026.findings-emnlp.483/"
+    },
+    {
+      "name": "Free-MAD",
+      "venue": "Findings ACL 2026",
+      "role": "consensus-free trajectory-scoring comparator for later multi-agent arms",
+      "url": "https://aclanthology.org/2026.findings-acl.1600/"
+    },
+    {
+      "name": "Misalignment Contagion",
+      "venue": "COLM 2026",
+      "role": "public/private stance persistence and topology comparator",
+      "url": "https://proceedings.colm.cc/paper_files/paper/2026/hash/871ed095b734818cfba48db6aeb25a62-Abstract-Conference.html"
+    }
+  ],
+  "evaluation_rules": [
+    "Report all four primitives independently; no aggregate causal-reasoning score.",
+    "Separate task accuracy, edge recovery, intervention propagation, posterior update, and framing consistency.",
+    "Keep open-world/non-identifiable and normative-pluralism results out of binary causal accuracy denominators unless a task has a justified oracle.",
+    "Use multiple seeds, paired task instances, task/domain/model clustering and confidence intervals in executed model trials.",
+    "Keep candidate model generation separate from independent SCM truth-oracle computation.",
+    "Compose model/prompt/evidence/revision identities with the revision ledger and token/context/cost accounting with IG-BUDGET-FAIR."
+  ],
+  "staged_targets": {
+    "structural_v0_1": "100% deterministic oracle replay, 100% task/domain balance, zero schema or digest mismatches, all negative controls rejected.",
+    "exploratory_v0_2": "At least 3 distinct model families; publish full per-primitive and per-domain results, invalid-run rates and cost/latency.",
+    "confirmatory_v1": "Preregister frozen prompts/models/analysis, held-out SCM families and multiple seeds; report paired effect estimates and confidence intervals.",
+    "research_ambition": "Improve Belief Updating without increasing false updates, over-rejection or agency-framing effects; outperform matched baselines on the full primitive vector, not one aggregate score."
+  },
+  "claim_ceiling": "A structural PASS establishes fixture and deterministic oracle consistency only. It does not demonstrate model causal competence, causality understanding, scientific discovery, human cognition, policy quality, infrastructure safety or superiority over any benchmark."
+}
