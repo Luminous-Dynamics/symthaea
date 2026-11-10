@@ -741,6 +741,11 @@ mod tests {
             vec!["inverter-evidence", "motor-evidence", "propeller-evidence"]
         );
         assert!(mapped.mission_terminal_energy_wh > scalar.mission_terminal_energy_wh);
+        // Independent numerical oracle for this synthetic map fixture.
+        assert!((mapped.mission_terminal_energy_wh - 14_922.574_361_978_19).abs() < 1e-5);
+        assert!((mapped.mission_chemical_energy_wh - 15_052.058_448_099_895).abs() < 1e-5);
+        assert!((mapped.energy_margin_wh - 10_437.529_862_280_127).abs() < 1e-5);
+        assert!((mapped.segments[0].propeller_efficiency_used - 0.794_687_5).abs() < 1e-12);
         assert!(mapped.segments.iter().all(|segment| {
             segment.motor_efficiency_used > 0.0
                 && segment.motor_efficiency_used < 1.0
