@@ -342,3 +342,12 @@ No new general CFD solver, weather router, grid solver, optimizer, ledger or app
 A schema-valid case establishes only that the case conforms to a declared data structure. A deterministic arithmetic pass establishes only the specified arithmetic. A published-source reproduction establishes only the reproduced study boundary. A solver validation score establishes only the exact observables and tested domain. None independently establishes seaworthiness, structural integrity, stability, fire safety, class/flag approval, insurance, environmental compliance, physical reliability, or permission to operate.
 
 Every public result must state the exact vessel/configuration, mission, environment, model revision, data rights, evidence stage, uncertainty and limitations.
+
+## 13. Artifacts and current execution state
+
+- [Machine-readable case schema](./marine-propulsion-case.schema.json)
+- [Source-attributed reference baseline registry](./marine-propulsion-reference-baselines-2026-11-10.json)
+- [Synthetic schema smoke fixture](./fixtures/synthetic-waps-case-0001.json)
+
+The schema and registry parse as JSON. The synthetic fixture passes the hand-authored structural smoke checks recorded in the work session. Full JSON Schema meta-schema validation, a dedicated semantic validator, Rust tests, source-study reproduction, specialist solver validation and physical trials remain pending. The fixture contains invented illustrative numbers and placeholder hashes; it is not a proposed vessel configuration or source of engineering values.
+
