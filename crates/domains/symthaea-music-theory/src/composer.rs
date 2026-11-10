@@ -645,7 +645,13 @@ fn compose_with_spec_and_form_and_grammar_impl(
         );
     }
     if tx.counter_melody {
-        realize_counter_melody(&mut score, GENERAL_COUNTERMELODY_PART_V1, &form, meter_beats, intent);
+        realize_counter_melody_for_part(
+            &mut score,
+            GENERAL_COUNTERMELODY_PART_V1,
+            &form,
+            meter_beats,
+            intent,
+        );
         if tx.held_arrivals && tx.hook_cell {
             apply_counter_hook_echoes(
                 &mut score,
@@ -4415,6 +4421,17 @@ pub(crate) fn realize_harmony_for_part(
 /// sounding at this tone's onset; the next-nearest chord tone is taken
 /// instead). Classical practice: the reprise earns new interest.
 pub(crate) fn realize_counter_melody(
+    score: &mut Score,
+    form: &Form,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+) {
+    realize_counter_melody_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent);
+}
+
+/// Explicit-ID variant used by composer owners that author a persistent
+/// counterline. A call/response transformation remains on this same PartId.
+pub(crate) fn realize_counter_melody_for_part(
     score: &mut Score,
     part_id: PartId,
     form: &Form,
