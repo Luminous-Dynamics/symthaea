@@ -207,6 +207,10 @@ pub enum OracleError {
         temperature_k: f64,
         discriminant_v2: f64,
     },
+    ElectroThermalNoEquilibrium {
+        maximum_electrically_feasible_temperature_k: f64,
+        thermal_residual_w: f64,
+    },
     PowerLimitExceeded {
         requested_power_w: f64,
         maximum_power_w: f64,
@@ -389,14 +393,63 @@ pub fn solve_substep_bisection(
     let mut lower_k = config.minimum_temperature_k;
     let mut upper_k = config.maximum_temperature_k;
     let (mut lower_residual_w, _) = residual_at(lower_k)?;
-    let (mut upper_residual_w, _) = residual_at(upper_k)?;
-
     if lower_residual_w > 0.0 {
         return Err(OracleError::TemperatureBelowDomain {
             lower_temperature_k: lower_k,
             thermal_residual_w: lower_residual_w,
         });
     }
+
+    let mut iterations = 0;
+    let upper_evaluation = residual_at(upper_k);
+    let mut upper_residual_w = match upper_evaluation {
+        Ok((residual_w, _)) => residual_w,
+        Err(OracleError::ElectricalInfeasible { .. }) => {
+            // The electrical power domain can close before the configured
+            // thermal ceiling. Find its highest admissible temperature rather
+            // than rejecting a mission whose thermal equilibrium lies below it.
+            let mut electrically_feasible_k = lower_k;
+            let mut electrically_infeasible_k = upper_k;
+            while electrically_infeasible_k - electrically_feasible_k
+                > config.temperature_tolerance_k
+                && iterations < config.maximum_iterations
+            {
+                let midpoint_k =
+                    0.5 * (electrically_feasible_k + electrically_infeasible_k);
+                let resistance_ohm = config.resistance_ohm(midpoint_k);
+                let discriminant = ocv_v * ocv_v
+                    - 4.0 * resistance_ohm * input.terminal_power_w;
+                iterations += 1;
+                if discriminant.is_finite() && discriminant >= 0.0 {
+                    electrically_feasible_k = midpoint_k;
+                } else {
+                    electrically_infeasible_k = midpoint_k;
+                }
+            }
+            if electrically_infeasible_k - electrically_feasible_k
+                > config.temperature_tolerance_k
+            {
+                let (residual_w, _) = residual_at(electrically_feasible_k)?;
+                return Err(OracleError::IterationLimit {
+                    maximum_iterations: config.maximum_iterations,
+                    bracket_width_k: electrically_infeasible_k - electrically_feasible_k,
+                    thermal_residual_w: residual_w,
+                });
+            }
+
+            upper_k = electrically_feasible_k;
+            let (residual_w, _) = residual_at(upper_k)?;
+            if residual_w < 0.0 {
+                return Err(OracleError::ElectroThermalNoEquilibrium {
+                    maximum_electrically_feasible_temperature_k: upper_k,
+                    thermal_residual_w: residual_w,
+                });
+            }
+            residual_w
+        }
+        Err(other) => return Err(other),
+    };
+
     if upper_residual_w < 0.0 {
         return Err(OracleError::ThermalLimitExceeded {
             maximum_temperature_k: upper_k,
@@ -404,13 +457,13 @@ pub fn solve_substep_bisection(
         });
     }
 
-    let mut iterations = 0;
+    let mut thermal_iterations = 0;
     while upper_k - lower_k > config.temperature_tolerance_k
-        && iterations < config.maximum_iterations
+        && thermal_iterations < config.maximum_iterations
     {
         let midpoint_k = 0.5 * (lower_k + upper_k);
         let (midpoint_residual_w, _) = residual_at(midpoint_k)?;
-        iterations += 1;
+        thermal_iterations += 1;
         if midpoint_residual_w > 0.0 {
             upper_k = midpoint_k;
             upper_residual_w = midpoint_residual_w;
@@ -419,6 +472,7 @@ pub fn solve_substep_bisection(
             lower_residual_w = midpoint_residual_w;
         }
     }
+    iterations += thermal_iterations;
 
     let bracket_width_k = upper_k - lower_k;
     if bracket_width_k > config.temperature_tolerance_k {
@@ -727,6 +781,40 @@ mod tests {
                 SubstepInput { terminal_power_w: 120_000.0, duration_s: 10.0 }
             ),
             Err(OracleError::ElectricalInfeasible { .. })
+        ));
+    }
+
+    #[test]
+    fn lower_temperature_equilibrium_survives_an_invalid_hot_domain_tail() {
+        let mut model = config();
+        model.resistance_reference_ohm = 0.10;
+        model.resistance_temperature_coefficient_per_k = 0.035;
+        let report = solve_substep_bisection(
+            &model,
+            initial_state(),
+            SubstepInput { terminal_power_w: 140_000.0, duration_s: 10.0 },
+        )
+        .unwrap();
+
+        assert!(report.next_state.temperature_k > initial_state().temperature_k);
+        assert!(report.next_state.temperature_k < model.maximum_temperature_k);
+        assert!(report.operating_point.terminal_voltage_v > 0.0);
+    }
+
+    #[test]
+    fn no_equilibrium_before_electrical_power_domain_closes_is_distinct() {
+        let mut model = config();
+        model.resistance_reference_ohm = 0.10;
+        model.resistance_temperature_coefficient_per_k = 0.035;
+        model.thermal_capacity_j_per_k = 1_000.0;
+        model.thermal_conductance_w_per_k = 0.0;
+        assert!(matches!(
+            solve_substep_bisection(
+                &model,
+                initial_state(),
+                SubstepInput { terminal_power_w: 140_000.0, duration_s: 600.0 }
+            ),
+            Err(OracleError::ElectroThermalNoEquilibrium { .. })
         ));
     }
 
