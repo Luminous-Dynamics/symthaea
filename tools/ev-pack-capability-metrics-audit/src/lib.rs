@@ -338,9 +338,7 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         }
         _ => errors.push("unknown topology status".to_owned()),
     }
-    if !nonempty(&profile.topology.topology_ref)
-        || !is_digest(&profile.topology.topology_digest)
-    {
+    if !nonempty(&profile.topology.topology_ref) || !is_digest(&profile.topology.topology_digest) {
         errors.push("topology reference or digest is invalid".to_owned());
     }
 
@@ -375,10 +373,16 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
     let mut unit_ids = BTreeSet::new();
     for unit in &profile.units {
         if !nonempty(&unit.unit_ref) || !unit_ids.insert(unit.unit_ref.clone()) {
-            errors.push(format!("unit identity is empty or duplicated: {}", unit.unit_ref));
+            errors.push(format!(
+                "unit identity is empty or duplicated: {}",
+                unit.unit_ref
+            ));
         }
         if !unit.nominal_capacity_ah.is_finite() || unit.nominal_capacity_ah <= 0.0 {
-            errors.push(format!("unit {} has invalid nominal capacity", unit.unit_ref));
+            errors.push(format!(
+                "unit {} has invalid nominal capacity",
+                unit.unit_ref
+            ));
         }
         if !unit.capacity.value_ah.is_finite()
             || unit.capacity.value_ah <= 0.0
@@ -389,19 +393,28 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
             || !unit.resistance.uncertainty_mohm.is_finite()
             || unit.resistance.uncertainty_mohm < 0.0
         {
-            errors.push(format!("unit {} has invalid capacity or resistance", unit.unit_ref));
+            errors.push(format!(
+                "unit {} has invalid capacity or resistance",
+                unit.unit_ref
+            ));
         }
         if unit.capacity.condition_ref != capacity.condition_ref
             || unit.resistance.condition_ref != resistance.condition_ref
         {
-            errors.push(format!("unit {} has mismatched reference conditions", unit.unit_ref));
+            errors.push(format!(
+                "unit {} has mismatched reference conditions",
+                unit.unit_ref
+            ));
         }
         if !is_digest(&unit.capacity.evidence_digest)
             || !is_digest(&unit.resistance.evidence_digest)
             || !nonempty(&unit.capacity.method)
             || !nonempty(&unit.resistance.method)
         {
-            errors.push(format!("unit {} has invalid measurement provenance", unit.unit_ref));
+            errors.push(format!(
+                "unit {} has invalid measurement provenance",
+                unit.unit_ref
+            ));
         }
         for class in [
             unit.capacity.evidence_class.as_str(),
@@ -416,7 +429,10 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
                     | "synthetic_fixture"
                     | "vendor_claim"
             ) {
-                errors.push(format!("unit {} has an unknown evidence class", unit.unit_ref));
+                errors.push(format!(
+                    "unit {} has an unknown evidence class",
+                    unit.unit_ref
+                ));
             }
         }
     }
@@ -429,13 +445,18 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
             || !nonempty(&snapshot.condition_ref)
             || snapshot.maximum_sample_skew_ms == 0
         {
-            errors.push("SOC snapshot identity, configuration or event context is invalid".to_owned());
+            errors.push(
+                "SOC snapshot identity, configuration or event context is invalid".to_owned(),
+            );
         }
         let mut observed = BTreeSet::new();
         let mut times = Vec::new();
         for row in &snapshot.observations {
             if !unit_ids.contains(&row.unit_ref) || !observed.insert(row.unit_ref.clone()) {
-                errors.push(format!("SOC snapshot has unknown or duplicate unit: {}", row.unit_ref));
+                errors.push(format!(
+                    "SOC snapshot has unknown or duplicate unit: {}",
+                    row.unit_ref
+                ));
             }
             if !row.soc_fraction.is_finite()
                 || !(0.0..=1.0).contains(&row.soc_fraction)
@@ -447,7 +468,8 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         }
         if let (Some(minimum), Some(maximum)) = (times.iter().min(), times.iter().max()) {
             if maximum - minimum > snapshot.maximum_sample_skew_ms {
-                errors.push("SOC observations exceed the declared synchronization window".to_owned());
+                errors
+                    .push("SOC observations exceed the declared synchronization window".to_owned());
             }
         }
     }
@@ -464,26 +486,53 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         let mut lifetime_ids = BTreeSet::new();
         for row in &lifetime.units {
             if !unit_ids.contains(&row.unit_ref) || !lifetime_ids.insert(row.unit_ref.clone()) {
-                errors.push(format!("lifetime evidence has unknown or duplicate unit: {}", row.unit_ref));
+                errors.push(format!(
+                    "lifetime evidence has unknown or duplicate unit: {}",
+                    row.unit_ref
+                ));
             }
             match row.status.as_str() {
                 "observed_eol" => {
-                    if row.efc_to_eol.is_none_or(|value| !value.is_finite() || value <= 0.0)
-                        || row.eol_event_ref.as_deref().is_none_or(|value| !nonempty(value))
-                        || row.evidence_digest.as_deref().is_none_or(|value| !is_digest(value))
+                    if row
+                        .efc_to_eol
+                        .is_none_or(|value| !value.is_finite() || value <= 0.0)
+                        || row
+                            .eol_event_ref
+                            .as_deref()
+                            .is_none_or(|value| !nonempty(value))
+                        || row
+                            .evidence_digest
+                            .as_deref()
+                            .is_none_or(|value| !is_digest(value))
                     {
-                        errors.push(format!("observed EOL evidence for {} is incomplete", row.unit_ref));
+                        errors.push(format!(
+                            "observed EOL evidence for {} is incomplete",
+                            row.unit_ref
+                        ));
                     }
                 }
                 "right_censored" | "unknown" => {
                     if row.efc_to_eol.is_some() || row.eol_event_ref.is_some() {
-                        errors.push(format!("censored/unknown EOL row {} contains a fabricated EOL result", row.unit_ref));
+                        errors.push(format!(
+                            "censored/unknown EOL row {} contains a fabricated EOL result",
+                            row.unit_ref
+                        ));
                     }
-                    if row.evidence_digest.as_deref().is_none_or(|value| !is_digest(value)) {
-                        errors.push(format!("censored/unknown EOL row {} lacks evidence digest", row.unit_ref));
+                    if row
+                        .evidence_digest
+                        .as_deref()
+                        .is_none_or(|value| !is_digest(value))
+                    {
+                        errors.push(format!(
+                            "censored/unknown EOL row {} lacks evidence digest",
+                            row.unit_ref
+                        ));
                     }
                 }
-                _ => errors.push(format!("lifetime evidence for {} has unknown status", row.unit_ref)),
+                _ => errors.push(format!(
+                    "lifetime evidence for {} has unknown status",
+                    row.unit_ref
+                )),
             }
         }
     }
@@ -499,7 +548,10 @@ fn nearest_rank(values: &[f64], percentile: f64) -> f64 {
 
 fn distribution(values: &[f64]) -> DistributionSummary {
     let mean = values.iter().sum::<f64>() / values.len() as f64;
-    let variance = values.iter().map(|value| (value - mean).powi(2)).sum::<f64>()
+    let variance = values
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
         / values.len() as f64;
     let standard_deviation = variance.sqrt();
     DistributionSummary {
@@ -561,10 +613,16 @@ fn series_cell_gate(profile: &Profile) -> Result<(), &'static str> {
     Ok(())
 }
 
-fn calculate_metrics(profile: &Profile, soh: &[f64], soh_distribution: &DistributionSummary) -> InconsistencyMetrics {
+fn calculate_metrics(
+    profile: &Profile,
+    soh: &[f64],
+    soh_distribution: &DistributionSummary,
+) -> InconsistencyMetrics {
     let population_scope = scope(profile);
     let source_digest = profile.provenance.source_batch_digest.clone();
-    let soh_digests: Vec<String> = profile.units.iter()
+    let soh_digests: Vec<String> = profile
+        .units
+        .iter()
         .map(|unit| unit.capacity.evidence_digest.clone())
         .chain(std::iter::once(source_digest.clone()))
         .collect();
@@ -579,7 +637,12 @@ fn calculate_metrics(profile: &Profile, soh: &[f64], soh_distribution: &Distribu
         Ok(()) => {
             let mean = soh.iter().sum::<f64>() / soh.len() as f64;
             let minimum = soh.iter().copied().fold(f64::INFINITY, f64::min);
-            computed(minimum / mean, "ratio", &population_scope, soh_digests.clone())
+            computed(
+                minimum / mean,
+                "ratio",
+                &population_scope,
+                soh_digests.clone(),
+            )
         }
         Err(reason) => not_computable("ratio", &population_scope, reason),
     };
@@ -589,24 +652,45 @@ fn calculate_metrics(profile: &Profile, soh: &[f64], soh_distribution: &Distribu
         Ok(()) => match &profile.lifetime_evidence {
             None => not_computable("ratio", &population_scope, "EOL_EFC_EVIDENCE_ABSENT"),
             Some(lifetime) if lifetime.units.len() != profile.population.declared_unit_count => {
-                not_computable("ratio", &population_scope, "COMPLETE_EOL_EFC_RECORDS_REQUIRED")
+                not_computable(
+                    "ratio",
+                    &population_scope,
+                    "COMPLETE_EOL_EFC_RECORDS_REQUIRED",
+                )
             }
-            Some(lifetime) if lifetime.units.iter().any(|row| row.status != "observed_eol") => {
-                not_computable("ratio", &population_scope, "RIGHT_CENSORED_OR_UNKNOWN_EOL_UNIT")
+            Some(lifetime)
+                if lifetime
+                    .units
+                    .iter()
+                    .any(|row| row.status != "observed_eol") =>
+            {
+                not_computable(
+                    "ratio",
+                    &population_scope,
+                    "RIGHT_CENSORED_OR_UNKNOWN_EOL_UNIT",
+                )
             }
             Some(lifetime) => {
-                let efcs: Vec<f64> = lifetime.units.iter()
+                let efcs: Vec<f64> = lifetime
+                    .units
+                    .iter()
                     .filter_map(|row| row.efc_to_eol)
                     .collect();
                 if efcs.len() != profile.population.declared_unit_count
                     || efcs.iter().any(|value| !value.is_finite() || *value <= 0.0)
                     || efcs.iter().sum::<f64>() <= 0.0
                 {
-                    not_computable("ratio", &population_scope, "VALID_EFC_TO_EOL_REQUIRED_FOR_EVERY_CELL")
+                    not_computable(
+                        "ratio",
+                        &population_scope,
+                        "VALID_EFC_TO_EOL_REQUIRED_FOR_EVERY_CELL",
+                    )
                 } else {
                     let minimum = efcs.iter().copied().fold(f64::INFINITY, f64::min);
                     let value = efcs.len() as f64 * minimum / efcs.iter().sum::<f64>();
-                    let digests = lifetime.units.iter()
+                    let digests = lifetime
+                        .units
+                        .iter()
                         .filter_map(|row| row.evidence_digest.clone())
                         .chain(std::iter::once(lifetime.evidence_digest.clone()))
                         .chain(std::iter::once(source_digest.clone()))
@@ -614,43 +698,73 @@ fn calculate_metrics(profile: &Profile, soh: &[f64], soh_distribution: &Distribu
                     computed(value, "ratio", &population_scope, digests)
                 }
             }
-        }
+        },
     };
 
     let beta_soc = match series_cell_gate(profile) {
         Err(reason) => not_computable("ratio", &population_scope, reason),
         Ok(()) => match &profile.soc_snapshot {
-            None => not_computable("ratio", &population_scope, "SYNCHRONIZED_END_OF_CHARGE_SOC_SNAPSHOT_ABSENT"),
-            Some(snapshot) if snapshot.observations.len() != profile.population.declared_unit_count => {
-                not_computable("ratio", &population_scope, "FULL_CELL_SOC_SNAPSHOT_REQUIRED")
+            None => not_computable(
+                "ratio",
+                &population_scope,
+                "SYNCHRONIZED_END_OF_CHARGE_SOC_SNAPSHOT_ABSENT",
+            ),
+            Some(snapshot)
+                if snapshot.observations.len() != profile.population.declared_unit_count =>
+            {
+                not_computable(
+                    "ratio",
+                    &population_scope,
+                    "FULL_CELL_SOC_SNAPSHOT_REQUIRED",
+                )
             }
             Some(snapshot) => {
-                let soh_by_unit: BTreeMap<&str, f64> = profile.units.iter()
+                let soh_by_unit: BTreeMap<&str, f64> = profile
+                    .units
+                    .iter()
                     .zip(soh.iter())
                     .map(|(unit, value)| (unit.unit_ref.as_str(), *value))
                     .collect();
-                let soc_max = snapshot.observations.iter()
+                let soc_max = snapshot
+                    .observations
+                    .iter()
                     .map(|row| row.soc_fraction)
                     .fold(f64::NEG_INFINITY, f64::max);
                 let total_soh: f64 = soh.iter().sum();
-                let weighted_gap: f64 = snapshot.observations.iter()
+                let weighted_gap: f64 = snapshot
+                    .observations
+                    .iter()
                     .map(|row| {
-                        let unit_soh = soh_by_unit.get(row.unit_ref.as_str()).copied().unwrap_or(0.0);
+                        let unit_soh = soh_by_unit
+                            .get(row.unit_ref.as_str())
+                            .copied()
+                            .unwrap_or(0.0);
                         (soc_max - row.soc_fraction) * unit_soh
                     })
                     .sum();
                 if total_soh <= 0.0 || !total_soh.is_finite() {
-                    not_computable("ratio", &population_scope, "POSITIVE_COMPARABLE_SOH_WEIGHT_REQUIRED")
+                    not_computable(
+                        "ratio",
+                        &population_scope,
+                        "POSITIVE_COMPARABLE_SOH_WEIGHT_REQUIRED",
+                    )
                 } else {
-                    let digests = snapshot.observations.iter()
+                    let digests = snapshot
+                        .observations
+                        .iter()
                         .map(|row| row.evidence_digest.clone())
                         .chain(std::iter::once(snapshot.snapshot_digest.clone()))
                         .chain(soh_digests.clone())
                         .collect();
-                    computed(1.0 - weighted_gap / total_soh, "ratio", &population_scope, digests)
+                    computed(
+                        1.0 - weighted_gap / total_soh,
+                        "ratio",
+                        &population_scope,
+                        digests,
+                    )
                 }
             }
-        }
+        },
     };
 
     let beta_power = not_computable(
@@ -675,10 +789,14 @@ fn calculate_metrics(profile: &Profile, soh: &[f64], soh_distribution: &Distribu
 }
 
 fn summarize(profile: &Profile) -> ProfileSummary {
-    let soh: Vec<f64> = profile.units.iter()
+    let soh: Vec<f64> = profile
+        .units
+        .iter()
         .map(|unit| unit.capacity.value_ah / unit.nominal_capacity_ah)
         .collect();
-    let resistance: Vec<f64> = profile.units.iter()
+    let resistance: Vec<f64> = profile
+        .units
+        .iter()
         .map(|unit| unit.resistance.value_mohm)
         .collect();
     let soh_summary = distribution(&soh);
@@ -708,32 +826,38 @@ fn summarize(profile: &Profile) -> ProfileSummary {
 fn canonicalize_corpus(value: &mut Value) {
     if let Some(cases) = value.get_mut("cases").and_then(Value::as_array_mut) {
         cases.sort_by(|left, right| {
-            left.get("case_id").and_then(Value::as_str)
+            left.get("case_id")
+                .and_then(Value::as_str)
                 .cmp(&right.get("case_id").and_then(Value::as_str))
         });
         for case in cases {
             if let Some(profile) = case.get_mut("profile") {
                 if let Some(units) = profile.get_mut("units").and_then(Value::as_array_mut) {
                     units.sort_by(|left, right| {
-                        left.get("unit_ref").and_then(Value::as_str)
+                        left.get("unit_ref")
+                            .and_then(Value::as_str)
                             .cmp(&right.get("unit_ref").and_then(Value::as_str))
                     });
                 }
-                if let Some(observations) = profile.get_mut("soc_snapshot")
+                if let Some(observations) = profile
+                    .get_mut("soc_snapshot")
                     .and_then(|value| value.get_mut("observations"))
                     .and_then(Value::as_array_mut)
                 {
                     observations.sort_by(|left, right| {
-                        left.get("unit_ref").and_then(Value::as_str)
+                        left.get("unit_ref")
+                            .and_then(Value::as_str)
                             .cmp(&right.get("unit_ref").and_then(Value::as_str))
                     });
                 }
-                if let Some(units) = profile.get_mut("lifetime_evidence")
+                if let Some(units) = profile
+                    .get_mut("lifetime_evidence")
                     .and_then(|value| value.get_mut("units"))
                     .and_then(Value::as_array_mut)
                 {
                     units.sort_by(|left, right| {
-                        left.get("unit_ref").and_then(Value::as_str)
+                        left.get("unit_ref")
+                            .and_then(Value::as_str)
                             .cmp(&right.get("unit_ref").and_then(Value::as_str))
                     });
                 }
@@ -744,8 +868,8 @@ fn canonicalize_corpus(value: &mut Value) {
 
 pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusReport, String> {
     let validator = schema_validator(schema_bytes)?;
-    let mut corpus_value: Value = serde_json::from_slice(corpus_bytes)
-        .map_err(|error| format!("corpus JSON: {error}"))?;
+    let mut corpus_value: Value =
+        serde_json::from_slice(corpus_bytes).map_err(|error| format!("corpus JSON: {error}"))?;
     canonicalize_corpus(&mut corpus_value);
     let canonical_corpus = serde_json::to_vec(&corpus_value)
         .map_err(|error| format!("canonical corpus serialization: {error}"))?;
@@ -762,12 +886,16 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
 
     for case in corpus.cases {
         if !nonempty(&case.case_id) || !seen.insert(case.case_id.clone()) {
-            return Err(format!("case identity is empty or duplicated: {}", case.case_id));
+            return Err(format!(
+                "case identity is empty or duplicated: {}",
+                case.case_id
+            ));
         }
         if !matches!(case.expectation.as_str(), "accept" | "reject") {
             return Err(format!("case {} has unknown expectation", case.case_id));
         }
-        let schema_errors: Vec<String> = validator.iter_errors(&case.profile)
+        let schema_errors: Vec<String> = validator
+            .iter_errors(&case.profile)
             .map(|error| error.to_string())
             .collect();
         let outcome = if schema_errors.is_empty() {
@@ -825,8 +953,8 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
         rejected_count,
         cases,
     };
-    let report_bytes = serde_json::to_vec(&payload)
-        .map_err(|error| format!("report serialization: {error}"))?;
+    let report_bytes =
+        serde_json::to_vec(&payload).map_err(|error| format!("report serialization: {error}"))?;
     Ok(CorpusReport {
         payload,
         report_sha256: sha256(&report_bytes),
@@ -858,7 +986,10 @@ mod tests {
     #[test]
     fn all_six_metrics_have_explicit_status() {
         let report = report();
-        let complete = report.payload.cases.iter()
+        let complete = report
+            .payload
+            .cases
+            .iter()
             .find(|case| case.case_id == "complete-qualified-series-pack")
             .and_then(|case| case.summary.as_ref())
             .expect("complete pack summary");
@@ -875,10 +1006,15 @@ mod tests {
 
     #[test]
     fn censored_eol_never_gets_dropped_from_beta_life() {
-        let row = report().payload.cases.iter()
+        let row = report()
+            .payload
+            .cases
+            .iter()
             .find(|case| case.case_id == "censored-eol-explicit")
             .unwrap()
-            .summary.as_ref().unwrap();
+            .summary
+            .as_ref()
+            .unwrap();
         assert_eq!(row.inconsistency_metrics.beta_life.status, "NOT_COMPUTABLE");
         assert_eq!(
             row.inconsistency_metrics.beta_life.reason.as_deref(),
@@ -888,22 +1024,35 @@ mod tests {
 
     #[test]
     fn partial_coverage_computes_sigma_only_for_observed_subset() {
-        let row = report().payload.cases.iter()
+        let row = report()
+            .payload
+            .cases
+            .iter()
             .find(|case| case.case_id == "partial-population-explicit")
             .unwrap()
-            .summary.as_ref().unwrap();
+            .summary
+            .as_ref()
+            .unwrap();
         assert_eq!(row.inconsistency_metrics.sigma_soh.status, "COMPUTED");
-        assert_eq!(row.inconsistency_metrics.sigma_soh.population_scope, "observed_subset_only");
+        assert_eq!(
+            row.inconsistency_metrics.sigma_soh.population_scope,
+            "observed_subset_only"
+        );
         assert_eq!(row.inconsistency_metrics.beta_soh.status, "NOT_COMPUTABLE");
         assert_eq!(row.inconsistency_metrics.beta_soc.status, "NOT_COMPUTABLE");
     }
 
     #[test]
     fn module_resolution_never_uses_cell_specific_beta_metrics() {
-        let row = report().payload.cases.iter()
+        let row = report()
+            .payload
+            .cases
+            .iter()
             .find(|case| case.case_id == "module-resolution-explicit")
             .unwrap()
-            .summary.as_ref().unwrap();
+            .summary
+            .as_ref()
+            .unwrap();
         assert_eq!(row.inconsistency_metrics.sigma_soh.status, "COMPUTED");
         assert_eq!(row.inconsistency_metrics.beta_soh.status, "NOT_COMPUTABLE");
         assert_eq!(row.inconsistency_metrics.beta_life.status, "NOT_COMPUTABLE");
@@ -919,7 +1068,9 @@ mod tests {
             case["profile"]["units"].as_array_mut().unwrap().reverse();
             if case["profile"]["soc_snapshot"].is_object() {
                 case["profile"]["soc_snapshot"]["observations"]
-                    .as_array_mut().unwrap().reverse();
+                    .as_array_mut()
+                    .unwrap()
+                    .reverse();
             }
             if case["profile"]["lifetime_evidence"].is_object() {
                 case["profile"]["lifetime_evidence"]["units"]
