@@ -31,6 +31,20 @@ Before these paths are represented as one coherent platform, resolve the followi
 
 These are audit findings, not claims that the newer candidate gates have been independently re-run in this proposal.
 
+### Compose with the existing mobility and safety workstreams
+
+This document is an exoskeleton-specific integration/benchmark map, not a replacement for existing issue-owned implementations. Reuse these open tracks and their receipts/interfaces; do not create parallel APIs, optimizers or benchmark harnesses:
+
+- [MOBILITY-ASSIST-001 #7766](https://github.com/Luminous-Dynamics/symthaea/issues/7766): disability-first, task-centered assistive mobility benchmark and Universal Embodiment composition.
+- [MOBILITY-ASSIST-004 #7784](https://github.com/Luminous-Dynamics/symthaea/issues/7784): deterministic dual-lane effort-policy evaluator, scenario corpus and receipts.
+- [MOBILITY-ASSIST-005 #7832](https://github.com/Luminous-Dynamics/symthaea/issues/7832): intent-probability calibration and agency-budget evidence.
+- [MOBILITY-ASSIST-006 #7850](https://github.com/Luminous-Dynamics/symthaea/issues/7850): comfort, fit, independent donning/doffing and lifecycle reliability.
+- [MOBILITY-ASSIST-008 #7880](https://github.com/Luminous-Dynamics/symthaea/issues/7880) and [MOBILITY-ASSIST-009 #7890](https://github.com/Luminous-Dynamics/symthaea/issues/7890): mass/energy/complexity Pareto screening and uncertainty-aware comparison.
+- [MOBILITY-ASSIST-010 #7904](https://github.com/Luminous-Dynamics/symthaea/issues/7904) and [MOBILITY-ASSIST-011 #7921](https://github.com/Luminous-Dynamics/symthaea/issues/7921): decision-critical measurement triage, wearer-preference drift and held-out task transfer.
+- [Symthaea #1276](https://github.com/Luminous-Dynamics/symthaea/issues/1276) and [Symtropy #3904](https://github.com/Luminous-Dynamics/symtropy/issues/3904): separate cognitive readiness/experimental Phi coupling from plant safety and physical actuator authority.
+
+The implementation owner for each item remains its existing issue/PR. This document contributes the task-oriented exosuit matrix and proposed cross-system contracts, then points to those owner tracks for executable work. Open issue status is not evidence that a feature is implemented or passed.
+
 ## 3. Target system architecture
 
 Separate fast physical safety from adaptive cognition. The cognitive system may request a bounded assistance intent; it must not be the final authority over a motor. The subsystem roles below are proposed contracts, not claims that the four repositories are already integrated or that every interface is implemented.
@@ -161,6 +175,7 @@ The applicable path depends on intended use and jurisdiction. Do not assume that
 
 Starting references:
 
+- [ISO 18646-6:2026 — Performance criteria and related test methods for lower-limb wearable robots](https://www.iso.org/standard/88497.html) uses an anthropomorphic test dummy and explicitly excludes lower-limb wearable robots operated using biosignals such as EMG. Treat this as a mechanical repeatability lane, not as validation of biosignal-driven user interaction. Keep the complementary user-in-the-loop lane separate, as laid out in MOBILITY-ASSIST-004 #7784.
 - [ISO 14971:2019 — Medical device risk management](https://www.iso.org/standard/72704.html), reviewed and confirmed current in 2025.
 - [ASTM F3474-25 — Functional ergonomic parameters and test metrics for exoskeletons](https://store.astm.org/f3474-25.html).
 - [FDA 21 CFR 890.3480 — Powered lower-extremity exoskeleton](https://www.ecfr.gov/current/title-21/section-890.3480). FDA identifies this as a Class II prescription-device category for medical-purpose powered lower-extremity exoskeletons.
