@@ -721,7 +721,11 @@ pub(crate) fn performance_drum_hits(
     // The SAME dialect-scaled rubato as the pitched voices — a drum grid
     // on the unscaled map would drift against a DanceLocked ensemble.
     let timeline = Timeline {
-        rubato: Rubato::from_score_with_dialect(score, dialect_for_spec(spec)),
+        rubato: Rubato::from_score_with_dialect_and_swing(
+            score,
+            dialect_for_spec(spec),
+            spec.texture.swing as f64,
+        ),
         swing: spec.texture.swing as f64,
     };
     drum_hits(score, spec.texture.drums, &timeline, state, seed)
@@ -926,7 +930,7 @@ fn pan_for_role(role: VoiceRole) -> f32 {
 /// A shared list keyed by beat keeps every voice on ONE timeline, so the
 /// expressive stretches never desynchronize melody, harmony, and bass.
 struct Rubato {
-    events: Vec<(f64, f64)>, // (beat, extra seconds inserted from here on)
+    events: Vec<(f64, f64)>, // (warped beat, extra seconds inserted from here on)
     spb: f64,                // seconds per beat (60 / tempo)
 }
 
@@ -942,6 +946,16 @@ impl Rubato {
     /// every scale is exactly 1.0, so the events are bit-identical to the
     /// pre-dialect map.
     fn from_score_with_dialect(score: &TheoryScore, dialect: PerformanceDialect) -> Self {
+        Self::from_score_with_dialect_and_swing(score, dialect, 0.5)
+    }
+
+    /// Structural pause thresholds are stored in the same warped-beat
+    /// coordinate that Timeline.seconds passes to Rubato.seconds.
+    fn from_score_with_dialect_and_swing(
+        score: &TheoryScore,
+        dialect: PerformanceDialect,
+        swing: f64,
+    ) -> Self {
         let spb = 60.0 / score.tempo_bpm as f64;
         let mut events = Vec::new();
         let melody = score.voice(TheoryRole::Melody);
@@ -951,18 +965,18 @@ impl Rubato {
             let end = (n.onset + n.duration).beats();
             match n.emphasis {
                 // A breath BEFORE a new phrase begins.
-                Emphasis::PhraseStart => events.push((onset, 0.10 * spb * dialect.breath_scale())),
+                Emphasis::PhraseStart => events.push((swing_beat(onset, swing), 0.10 * spb * dialect.breath_scale())),
                 // Dwell ON the climax (agogic accent) — pause just after it.
-                Emphasis::Climax => events.push((end, 0.18 * spb * dialect.climax_scale())),
+                Emphasis::Climax => events.push((swing_beat(end, swing), 0.18 * spb * dialect.climax_scale())),
                 // Ritardando INTO a cadence; the final cadence relaxes more.
                 Emphasis::Cadential => {
                     let amount = if i == last_idx { 0.9 } else { 0.35 };
-                    events.push((end, amount * spb * dialect.cadence_scale()));
+                    events.push((swing_beat(end, swing), amount * spb * dialect.cadence_scale()));
                 }
                 Emphasis::Normal => {}
             }
         }
-        events.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        events.sort_by(|a, b| a.0.total_cmp(&b.0));
         Rubato { events, spb }
     }
 
@@ -1248,7 +1262,7 @@ pub(crate) fn performance_voices_with_dialect(
     dialect: PerformanceDialect,
 ) -> Vec<PerformanceVoice> {
     let timeline = Timeline {
-        rubato: Rubato::from_score_with_dialect(score, dialect),
+        rubato: Rubato::from_score_with_dialect_and_swing(score, dialect, swing),
         swing,
     };
     let (melody_instrument, harmony_instrument, bass_instrument, counter_instrument) = ensemble;
@@ -2289,6 +2303,78 @@ mod tests {
                 "duration {} out of the ioi*1.3 envelope",
                 n.duration
             );
+        }
+    }
+
+    fn rubato_score_with_phrase_start(at_beat: f64) -> TheoryScore {
+        let mut score = TheoryScore::new(
+            symthaea_music_theory::harmony::Key::major(PitchClass::C),
+            120.0,
+            4,
+        );
+        score.push(symthaea_music_theory::score::ScoreNote {
+            part: symthaea_music_theory::score::PartId(0),
+            pitch: symthaea_music_theory::pitch::Pitch::new(PitchClass::C, 4),
+            onset: symthaea_music_theory::rhythm::Duration::new(
+                (at_beat * 2.0).round() as i64,
+                2,
+            ),
+            duration: symthaea_music_theory::rhythm::Duration::quarter(),
+            velocity: 0.7,
+            role: TheoryRole::Melody,
+            emphasis: Emphasis::PhraseStart,
+            section_intensity: 1.0,
+        });
+        score
+    }
+
+    #[test]
+    fn swung_rubato_pause_begins_at_its_authored_score_boundary() {
+        let score = rubato_score_with_phrase_start(1.5);
+        let swing = 2.0 / 3.0;
+        let timeline = Timeline {
+            rubato: Rubato::from_score_with_dialect_and_swing(
+                &score,
+                PerformanceDialect::ClassicalRubato,
+                swing,
+            ),
+            swing,
+        };
+        let spb = 60.0 / score.tempo_bpm as f64;
+
+        // At score beat 1.25 the swung coordinate reaches 1.5, but the
+        // authored phrase boundary is 1.5 and must not activate early.
+        let before_boundary = timeline.seconds(1.25) as f64;
+        let expected_before = swing_beat(1.25, swing) * spb;
+        assert!(
+            (before_boundary - expected_before).abs() < 1e-6,
+            "pause activated before its authored score beat: got {before_boundary}, expected {expected_before}"
+        );
+
+        // At the exact phrase boundary, the structural breath is applied.
+        let at_boundary = timeline.seconds(1.5) as f64;
+        let expected_at = swing_beat(1.5, swing) * spb + 0.10 * spb;
+        assert!(
+            (at_boundary - expected_at).abs() < 1e-6,
+            "phrase pause missing or mistimed: got {at_boundary}, expected {expected_at}"
+        );
+    }
+
+    #[test]
+    fn straight_swing_preserves_legacy_rubato_coordinates() {
+        let score = rubato_score_with_phrase_start(1.5);
+        let legacy = Rubato::from_score_with_dialect(
+            &score,
+            PerformanceDialect::ClassicalRubato,
+        );
+        let straight = Rubato::from_score_with_dialect_and_swing(
+            &score,
+            PerformanceDialect::ClassicalRubato,
+            0.5,
+        );
+        assert_eq!(legacy.events, straight.events);
+        for beat in [0.0, 0.5, 1.25, 1.5, 2.0, 4.0] {
+            assert_eq!(legacy.seconds(beat), straight.seconds(beat));
         }
     }
 
