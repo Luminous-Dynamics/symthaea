@@ -210,6 +210,49 @@ impl LinearActionPolynomialReportV1 {
     }
 }
 
+/// Failure from exact polynomial equivariance checks for a declared linear action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LinearActionVectorFieldErrorV1 {
+    InvalidProfile,
+    ComponentCountMismatch { expected: usize, actual: usize },
+    UnsupportedExpression,
+    ResourceLimitExceeded,
+}
+
+/// Exact component-wise infinitesimal equivariance result for one generator.
+///
+/// Zero residual terms in every component establish
+/// D F(x) A x - A F(x) = 0 as an exact polynomial identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LinearActionVectorFieldGeneratorResultV1 {
+    pub generator_id: String,
+    pub component_residual_term_counts: Vec<usize>,
+}
+
+/// Exact polynomial vector-field equivariance report for a supplied action.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LinearActionVectorFieldEquivarianceReportV1 {
+    pub action_id: String,
+    pub coordinate_basis_id: String,
+    pub coordinate_names: Vec<String>,
+    pub expression_variables: Vec<String>,
+    pub profile: ExactPolynomialLieProfileV1,
+    pub generator_results: Vec<LinearActionVectorFieldGeneratorResultV1>,
+}
+
+impl LinearActionVectorFieldEquivarianceReportV1 {
+    /// True only when every component residual is identically zero for every generator.
+    pub fn equivariant_under_every_generator(&self) -> bool {
+        !self.generator_results.is_empty()
+            && self.generator_results.iter().all(|generator| {
+                generator
+                    .component_residual_term_counts
+                    .iter()
+                    .all(|term_count| *term_count == 0)
+            })
+    }
+}
+
 /// Outcome of the bounded exact-polynomial parser and Lie-derivative search.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExactPolynomialSearchStatus {
@@ -1128,6 +1171,191 @@ pub fn check_exact_linear_action_invariance(
         coordinate_names: declaration.coordinate_names.clone(),
         expression_variables: variable_names,
         constant_expression,
+        profile,
+        generator_results,
+    })
+}
+
+fn exact_polynomial_vector_field_generator_residual(
+    components: &[ExactPolynomial],
+    variable_names: &[String],
+    coordinate_names: &[String],
+    generator: &crate::linear_group_action::LinearGeneratorV1,
+    profile: ExactPolynomialLieProfileV1,
+    operation_count: &mut usize,
+) -> Result<Vec<ExactPolynomial>, ExactPolynomialError> {
+    let mut component_residuals = Vec::with_capacity(coordinate_names.len());
+
+    for (output_index, output_component) in components.iter().enumerate() {
+        let mut residual = ExactPolynomial::new();
+
+        // First term: D F(x) * (A x).
+        for (action_row, coordinate_name) in coordinate_names.iter().enumerate() {
+            let coordinate_index = variable_names
+                .iter()
+                .position(|name| name == coordinate_name)
+                .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+            charge_exact_polynomial_operations(operation_count, output_component.len(), profile)?;
+            let derivative =
+                polynomial_derivative(output_component, coordinate_index, profile)?;
+
+            for (state_column, matrix_entry) in
+                generator.matrix[action_row].iter().enumerate()
+            {
+                let coefficient = ExactRational::from_f64(
+                    *matrix_entry,
+                    profile.maximum_dyadic_denominator_power,
+                )
+                .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+                if coefficient.is_zero() {
+                    continue;
+                }
+
+                let term = polynomial_multiply_variable(&derivative, state_column, profile)?;
+                charge_exact_polynomial_operations(operation_count, term.len(), profile)?;
+                for (monomial, term_coefficient) in &term {
+                    let scaled_coefficient = term_coefficient
+                        .checked_mul(coefficient)
+                        .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+                    polynomial_add_term(
+                        &mut residual,
+                        monomial.clone(),
+                        scaled_coefficient,
+                        profile,
+                    )?;
+                }
+            }
+        }
+
+        // Second term: subtract (A F(x))_output_index.
+        for (field_index, matrix_entry) in
+            generator.matrix[output_index].iter().enumerate()
+        {
+            let coefficient = ExactRational::from_f64(
+                *matrix_entry,
+                profile.maximum_dyadic_denominator_power,
+            )
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+            if coefficient.is_zero() {
+                continue;
+            }
+            charge_exact_polynomial_operations(
+                operation_count,
+                components[field_index].len(),
+                profile,
+            )?;
+            for (monomial, term_coefficient) in &components[field_index] {
+                let scaled_coefficient = term_coefficient
+                    .checked_mul(coefficient)
+                    .and_then(ExactRational::checked_neg)
+                    .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+                polynomial_add_term(
+                    &mut residual,
+                    monomial.clone(),
+                    scaled_coefficient,
+                    profile,
+                )?;
+            }
+        }
+
+        component_residuals.push(residual);
+    }
+
+    Ok(component_residuals)
+}
+
+/// Check exact polynomial vector-field equivariance under every admitted generator.
+///
+/// For a linear action generated by A, the exact infinitesimal condition is
+/// D F(x) A x - A F(x) = 0 component-wise. Vector-field components are ordered
+/// exactly as the action's coordinate_names. Additional expression variables
+/// are held fixed as parameters.
+pub fn check_exact_linear_action_vector_field_equivariance(
+    vector_field_components: &[Expr],
+    action: &AdmittedLinearGroupActionV1,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<
+    LinearActionVectorFieldEquivarianceReportV1,
+    LinearActionVectorFieldErrorV1,
+> {
+    if profile.maximum_variables == 0
+        || profile.maximum_terms == 0
+        || profile.maximum_term_products == 0
+        || profile.maximum_total_degree == 0
+        || profile.maximum_power == 0
+        || profile.maximum_dyadic_denominator_power > 126
+    {
+        return Err(LinearActionVectorFieldErrorV1::InvalidProfile);
+    }
+
+    let declaration = action.action();
+    let dimension = declaration.coordinate_names.len();
+    if vector_field_components.len() != dimension {
+        return Err(LinearActionVectorFieldErrorV1::ComponentCountMismatch {
+            expected: dimension,
+            actual: vector_field_components.len(),
+        });
+    }
+
+    let mut variable_names = Vec::new();
+    for component in vector_field_components {
+        collect_var_names(component, &mut variable_names);
+    }
+    for coordinate_name in &declaration.coordinate_names {
+        if !variable_names.contains(coordinate_name) {
+            variable_names.push(coordinate_name.clone());
+        }
+    }
+    if variable_names.len() > profile.maximum_variables {
+        return Err(LinearActionVectorFieldErrorV1::ResourceLimitExceeded);
+    }
+
+    let components = vector_field_components
+        .iter()
+        .map(|component| parse_exact_polynomial(component, &variable_names, profile))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| match error {
+            ExactPolynomialError::UnsupportedExpression => {
+                LinearActionVectorFieldErrorV1::UnsupportedExpression
+            }
+            ExactPolynomialError::ResourceLimitExceeded => {
+                LinearActionVectorFieldErrorV1::ResourceLimitExceeded
+            }
+        })?;
+
+    let mut operation_count = 0usize;
+    let mut generator_results = Vec::with_capacity(declaration.generators.len());
+    for generator in &declaration.generators {
+        let component_residuals = exact_polynomial_vector_field_generator_residual(
+            &components,
+            &variable_names,
+            &declaration.coordinate_names,
+            generator,
+            profile,
+            &mut operation_count,
+        )
+        .map_err(|error| match error {
+            ExactPolynomialError::UnsupportedExpression => {
+                LinearActionVectorFieldErrorV1::UnsupportedExpression
+            }
+            ExactPolynomialError::ResourceLimitExceeded => {
+                LinearActionVectorFieldErrorV1::ResourceLimitExceeded
+            }
+        })?;
+        generator_results.push(LinearActionVectorFieldGeneratorResultV1 {
+            generator_id: generator.id.clone(),
+            component_residual_term_counts: component_residuals
+                .iter()
+                .map(ExactPolynomial::len)
+                .collect(),
+        });
+    }
+
+    Ok(LinearActionVectorFieldEquivarianceReportV1 {
+        action_id: declaration.action_id.clone(),
+        coordinate_basis_id: declaration.coordinate_basis_id.clone(),
+        coordinate_names: declaration.coordinate_names.clone(),
+        expression_variables: variable_names,
         profile,
         generator_results,
     })
