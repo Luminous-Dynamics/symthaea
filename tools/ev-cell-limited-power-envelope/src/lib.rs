@@ -716,11 +716,10 @@ fn compute(profile: &Profile) -> PowerEnvelope {
     }
     cells.sort_by(|left, right| left.cell_ref.cmp(&right.cell_ref));
 
-    let beta_power = power_lower / individual_power_sum;
-    let beta_status = if individual_power_sum <= EPSILON {
-        "NOT_COMPUTABLE_ZERO_INDIVIDUAL_CELL_POWER_DENOMINATOR"
+    let (beta_power, beta_status) = if individual_power_sum <= EPSILON {
+        (None, "NOT_COMPUTABLE_ZERO_INDIVIDUAL_CELL_POWER_DENOMINATOR")
     } else {
-        "COMPUTED"
+        (Some(power_lower / individual_power_sum), "COMPUTED")
     };
     PowerEnvelope {
         profile_id: profile.profile_id.clone(),
@@ -731,11 +730,7 @@ fn compute(profile: &Profile) -> PowerEnvelope {
         pack_terminal_voltage_lower_v: Some(pack_voltage_lower),
         conservative_terminal_power_lower_w: Some(power_lower),
         sum_individual_cell_maximum_power_w: Some(individual_power_sum),
-        beta_power_model_estimate: if beta_status == "COMPUTED" {
-            Some(beta_power)
-        } else {
-            None
-        },
+        beta_power_model_estimate: beta_power,
         beta_power_status: beta_status.to_owned(),
         beta_power_method_ref:
             "matched_constant_current_thevenin_lumped_thermal_v0.2".to_owned(),
