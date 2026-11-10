@@ -548,6 +548,36 @@
           }
         ]
       }
+    },
+    {
+      "case_id": "no-admissible-terminal-action-abstains",
+      "expectation": "plan",
+      "expected_root_choice": "NO_TEST",
+      "expected_root_test_id": null,
+      "expected_net_value": 0,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.1",
+        "scenario_id": "no-admissible-terminal-action-abstains",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 0,
+        "abstain_loss": 12,
+        "hypotheses": [
+          {
+            "id": "faulty",
+            "prior": 1
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": false,
+            "loss_by_hypothesis": {
+              "faulty": 0
+            }
+          }
+        ],
+        "tests": []
+      }
     }
   ]
 }
