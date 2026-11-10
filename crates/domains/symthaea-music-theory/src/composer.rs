@@ -4931,7 +4931,7 @@ mod tests {
             seed: 41,
             ..MusicalIntent::default()
         };
-        let spec = crate::spec::CompositionSpec::default();
+        let spec = crate::style::Style::Classical.spec();
         let score = compose_with_spec(&intent, &spec);
 
         assert!(
@@ -4959,7 +4959,7 @@ mod tests {
             seed: 43,
             ..MusicalIntent::default()
         };
-        let mut spec = crate::spec::CompositionSpec::default();
+        let mut spec = crate::style::Style::Classical.spec();
         spec.attitude = Some(crate::spec::Attitude::Grief);
         let score = compose_with_spec(&intent, &spec);
 
