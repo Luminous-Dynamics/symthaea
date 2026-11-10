@@ -1348,20 +1348,37 @@
       ]
     },
     {
-      "source_id": "EU-ETS-TARGETED-REVISION-PROPOSAL-2026",
-      "title": "European Commission proposal for targeted revision of EU ETS, including maritime provisions",
-      "publisher": "European Commission",
+      "source_id": "EU-ETS-DIRECTIVE-REVISION-2026-0212",
+      "title": "COM(2026) 616 final — EU ETS Directive and Market Stability Reserve targeted revision proposal",
+      "publisher": "European Commission / European Parliament",
       "publication_date": "2026-07-17",
-      "url": "https://climate.ec.europa.eu/areas-action/transport-decarbonisation/reducing-emissions-shipping-sector_en",
-      "evidence_class": "official_legislative_proposal",
+      "url": "https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2026%2F0212%28COD%29",
+      "evidence_class": "official_legislative_proposal_and_procedure_status",
       "scope": {
-        "status": "Proposal announced on 17 July 2026; not adopted as of the 10 November 2026 snapshot.",
-        "maritime_scope": "Includes proposed changes to ETS and maritime monitoring/reporting provisions.",
-        "role": "Versioned future-policy scenario and regulatory delta monitoring."
+        "procedure": "2026/0212(COD)",
+        "status_as_of": "2026-11-10: awaiting committee decision",
+        "proposal": "Targeted revision of Directive 2003/87/EC and Decision (EU) 2015/1814, including additional maritime scope and offshore anti-evasion provisions."
       },
       "limitations": [
-        "Do not model proposal provisions as current binding obligations.",
-        "Use linked legislative proposal text and final adopted law before updating effective rule calculations."
+        "Pending proposal, not adopted/applicable law.",
+        "Final maritime scope and effective dates may change."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-FUELEU-REVISION-2026-0210",
+      "title": "COM(2026) 620 final — maritime MRV and FuelEU streamlining proposal",
+      "publisher": "European Commission / European Parliament",
+      "publication_date": "2026-07-17",
+      "url": "https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2026%2F0210%28COD%29",
+      "evidence_class": "official_legislative_proposal_and_procedure_status",
+      "scope": {
+        "procedure": "2026/0210(COD)",
+        "status_as_of": "2026-11-10: awaiting committee decision",
+        "proposal": "Amends Regulations (EU) 2015/757 and (EU) 2023/1805; proposes unified monitoring/reporting of GHG and onboard energy, including wind assistance, with future standards/certification for wind energy."
+      },
+      "limitations": [
+        "Pending proposal, not adopted/applicable law.",
+        "Wind-energy standards/certification are future Commission implementing acts and not specified by this proposal."
       ]
     }
   ]
