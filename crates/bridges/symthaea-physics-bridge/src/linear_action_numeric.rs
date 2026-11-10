@@ -314,7 +314,7 @@ fn multiply_lower_transpose(lower: &[Vec<f64>], vector: &[f64]) -> Vec<f64> {
     let mut result = Vec::with_capacity(vector.len());
     for (column_index, _) in vector.iter().enumerate() {
         let value = lower.iter().zip(vector.iter())
-            .map(|(row, component)| row[column_index] * component)
+            .map(|(row, component)| row[column_index] * *component)
             .sum::<f64>();
         result.push(value);
     }
