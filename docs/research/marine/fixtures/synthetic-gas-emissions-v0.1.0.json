@@ -1,0 +1,79 @@
+{
+  "schema_version": "0.1.0",
+  "record_id": "SYNTHETIC-GAS-EMISSIONS-0001",
+  "record_status": "synthetic",
+  "vessel_configuration_id": "SYNTHETIC-VESSEL-CONFIG-001",
+  "engine": {
+    "engine_id": "SYNTHETIC-MAIN-ENGINE-001",
+    "engine_revision": "rev-a",
+    "rated_power_kw": 3000,
+    "fuel_type": "marine_gas_oil",
+    "average_load_percent": 72.5
+  },
+  "measurement_method": "cems",
+  "method_revision": "synthetic-cems-protocol-v1",
+  "source_resolution_ids": [
+    "MEPC.414(84)",
+    "MEPC.416(84)"
+  ],
+  "measurement_window": {
+    "start": "2026-10-14T10:00:00Z",
+    "end": "2026-10-14T10:10:00Z",
+    "timebase_id": "SYNTHETIC-UTC-TB-001",
+    "sample_rate_hz": 0.1,
+    "expected_sample_count": 60,
+    "observed_sample_count": 60,
+    "missing_sample_count": 0,
+    "minimum_observed_fraction": 0.95,
+    "time_alignment_uncertainty_seconds": 0.002
+  },
+  "expected_gases": [
+    "CH4",
+    "N2O"
+  ],
+  "gas_observations": [
+    {
+      "observation_id": "SYNTHETIC-CH4-001",
+      "gas": "CH4",
+      "mass_rate_kg_per_hour": 0.42,
+      "uncertainty": {
+        "status": "quantified",
+        "standard_uncertainty_kg_per_hour": 0.02,
+        "coverage_factor": 2
+      },
+      "evidence": {
+        "mode": "measured",
+        "instrument_id": "SYNTHETIC-FTIR-001",
+        "calibration_record_id": "SYNTHETIC-CAL-CH4-001",
+        "calibration_status": "in_tolerance",
+        "timebase_id": "SYNTHETIC-UTC-TB-001",
+        "trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "rights_status": "not_applicable"
+      }
+    },
+    {
+      "observation_id": "SYNTHETIC-N2O-001",
+      "gas": "N2O",
+      "mass_rate_kg_per_hour": 0.07,
+      "uncertainty": {
+        "status": "unknown",
+        "reason": "Synthetic fixture intentionally does not claim an independently established N2O uncertainty."
+      },
+      "evidence": {
+        "mode": "measured",
+        "instrument_id": "SYNTHETIC-FTIR-001",
+        "calibration_record_id": "SYNTHETIC-CAL-N2O-001",
+        "calibration_status": "in_tolerance",
+        "timebase_id": "SYNTHETIC-UTC-TB-001",
+        "trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "rights_status": "not_applicable"
+      }
+    }
+  ],
+  "unmeasured_gases": [],
+  "limitations": [
+    "Synthetic software fixture only; not a measured vessel record.",
+    "The trace digests and calibration IDs are placeholders and do not establish sensor authenticity or traceability.",
+    "No CO2e conversion is calculated; a declared GWP edition and legal/accounting boundary are required before conversion."
+  ]
+}
