@@ -376,7 +376,16 @@ fn check_lineage(case: &Value, f: &mut Findings) {
         .filter_map(|v| v.get("model_id").and_then(Value::as_str).map(str::to_owned))
         .collect();
     let mut model_refs = BTreeSet::new();
-    collect_string_refs(case, "model_id", &mut model_refs);
+    for key in [
+        "model_id",
+        "resistance_model_id",
+        "propulsion_model_id",
+        "control_model_id",
+        "degradation_model_id",
+        "environmental_correction_method_id",
+    ] {
+        collect_string_refs(case, key, &mut model_refs);
+    }
     for model in model_refs.difference(&model_ids) {
         f.push(
             "/evidence/model_identities",
@@ -583,6 +592,21 @@ fn check_gates(case: &Value, f: &mut Findings) {
     }
 }
 
+fn compare_quantity(left: &Value, right: &Value, pointer: &str, label: &str, f: &mut Findings) {
+    let left_quantity = left.pointer(pointer);
+    let right_quantity = right.pointer(pointer);
+    let compact = |value: Option<&Value>| {
+        value.map(|q| (q.get("value").cloned(), q.get("unit").cloned()))
+    };
+    if compact(left_quantity) != compact(right_quantity) {
+        f.push(
+            pointer,
+            "INCOMPARABLE",
+            format!("paired cases differ in {label} value or unit"),
+        );
+    }
+}
+
 fn compare_pointer(
     left: &Value,
     right: &Value,
@@ -668,15 +692,20 @@ fn check_pair(left: &Value, right: &Value, f: &mut Findings) {
     }
 
     for pointer in [
-        "/service/cargo_class",
-        "/service/functional_unit",
-        "/service/service_contract_id",
         "/service/annual_delivered_work",
         "/service/annual_delivered_cargo_mass",
         "/service/annual_delivered_teu",
         "/service/service_availability_target",
-        "/service/arrival_policy",
         "/service/required_arrival_window_hours",
+    ] {
+        compare_quantity(left, right, pointer, pointer, f);
+    }
+
+    for pointer in [
+        "/service/cargo_class",
+        "/service/functional_unit",
+        "/service/service_contract_id",
+        "/service/arrival_policy",
         "/vessel/loading_condition",
         "/route/route_id",
         "/route/route_revision",
