@@ -12,4 +12,4 @@ cargo test --locked -p symthaea-vehicle --lib option_preservation
 cargo clippy --locked -p symthaea-vehicle --lib -- -D warnings
 ```
 
-This module is an offline finite-envelope evaluator. It does not simulate, predict, perform reachability analysis, or authorize commands. Upstream receipt identities are retained but not cryptographically verified by this evaluator.
+This module is an offline finite-envelope evaluator. It does not simulate, predict, perform reachability analysis, or authorize commands. The expected-cell manifest is canonically re-digested with BLAKE3 and duplicate cell/execution receipts are rejected. Upstream qualification and execution receipt identities are still not authenticated by this evaluator.
