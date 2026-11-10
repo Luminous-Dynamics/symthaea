@@ -14,7 +14,8 @@ This package therefore implements a deliberately small one-node reference proble
 - an implicit backward-Euler thermal balance;
 - a safeguarded scalar bisection root solve rather than the production RC network solver;
 - explicit SOC, current, power, temperature and energy-balance checks;
-- piecewise-constant mission segments with retained substep history.
+- piecewise-constant mission segments with retained substep history;
+- separate propulsion and thermal-management electrical loads, including the thermal-management share of total battery-terminal mission energy.
 
 The crate has no third-party dependencies and is not a member of the main Symthaea workspace. It can be tested independently from the workspace root:
 
@@ -57,6 +58,8 @@ C * (T_next - T_now) / dt + G * (T_next - T_ambient) = I(T_next)^2 * R(T_next)
 
 Bisection solves the implicit end temperature. Chemical energy then updates SOC. A substep is returned only after reserve, power, current, thermal-domain and energy-balance checks pass.
 
+At mission level, each segment declares propulsion terminal power and thermal-management terminal power separately. Both are charged to the pack-terminal requirement and energy total. The report exposes propulsion energy, thermal-management energy and the TMS fraction of total terminal energy. TMS electricity is not silently reclassified as pack I²R heat: its component heat, pump/fan/compressor losses, mass, volume, pressure loss and cooling boundary still need explicit subsystem models and measurements.
+
 ## What this oracle does not model
 
 This deliberately small reference plant:
@@ -71,7 +74,7 @@ The oracle is useful precisely because it has a small, inspectable boundary. It 
 
 ## Frozen synthetic tests
 
-The current reference crate contains 11 deterministic Rust tests:
+The current reference crate contains 12 deterministic Rust tests:
 
 | Test | Purpose |
 |---|---|
@@ -84,6 +87,7 @@ The current reference crate contains 11 deterministic Rust tests:
 | Power/current limits | Preserve electrical constraints as separate typed outcomes |
 | Initial state OOD | Reject an uncharacterized starting temperature |
 | Mission replay | Retain segment identities and all substep results |
+| TMS energy attribution | Keep a 20% synthetic thermal-management electrical load visible in the mission energy report |
 | Time-step refinement | Compare 10 s and 1 s mission integrations |
 | Failed substep rollback | Return the segment/substep failure and no partial mission PASS |
 
@@ -91,7 +95,7 @@ Synthetic tests prove only the reference implementation's bounded arithmetic and
 
 ## Research state of the art — what we must not overclaim
 
-Mission-level electro-thermal modelling is already active research, not a new claim for Luminous. An August 2026 eVTOL study reports an integrated electrical/thermal mission simulation and finds thermal-management energy exceeding 20% of total mission energy in its study cases. Another 2026 eVTOL thermal-system framework models interactions among battery, power electronics, cabin and avionics thermal zones, and reports large simulated system-energy savings for a best-case parameter configuration. NASA's 2026 battery-module thermal-fluid work measures component temperatures, coolant flow and pressure drop under 0.5C–2.5C discharge. SAE AIR5744, reaffirmed January 2026, encourages platform-level aircraft thermal-management engineering rather than separately optimized thermal subsystems.
+Mission-level electro-thermal modelling is already active research, not a new claim for Luminous. An August 2026 eVTOL study reports an integrated electrical/thermal mission simulation and finds thermal-management energy exceeding 20% of total mission energy in its study cases. This directly motivates separately metering propulsion and thermal-management electrical loads in our mission contract. A 2026 framework for the whole eVTOL thermal system models interactions among battery, power electronics, cabin and avionics thermal zones, and reports up to 95% lower thermal-management energy in its best-case simulated configuration; this is a model result, not a fleet or flight-test achievement. A 2026 topology-optimized phase-change battery cooling study reports keeping the modeled battery below 41 °C at 30 °C ambient while its thermal-management mass remains below 33.3% of pack mass, with CFD predictions within 1 K of the topology-optimization result in the study's selected cases. NASA's 2026 battery-module thermal-fluid work measures component temperatures, coolant flow and pressure drop under 0.5C–2.5C discharge. SAE AIR5744, reaffirmed January 2026, encourages platform-level aircraft thermal-management engineering rather than separately optimized thermal subsystems.
 
 These sources change our research strategy:
 1. Do not claim novelty for simply coupling mission energy and temperature.
