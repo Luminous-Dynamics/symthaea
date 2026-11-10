@@ -393,12 +393,14 @@ mod tests {
     #[test]
     fn known_answer_total_excludes_generator_battery_and_shaft_outputs() {
         let mut value = fixture();
+        value["record_status"] = serde_json::json!("research_record");
         value["energy_sources"][2]["energy"]["value_micro_gj"] = serde_json::json!(10_000_000);
         value["energy_sources"][2]["energy"].as_object_mut().unwrap().remove("unknown_reason");
         let result = calculate(&value);
         assert_eq!(result.known_subtotal_micro_gj, 112_000_000);
         assert_eq!(result.total_source_input_micro_gj, Some(112_000_000));
         assert_eq!(result.non_additive_flow_ids.len(), 4);
+        assert_eq!(result.findings.disposition(), "SOURCE_INPUT_TOTAL_VALID");
         assert!(!result.findings.invalid);
     }
 
