@@ -18,6 +18,14 @@ use crate::rhythm::Duration;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
+// Persistent identities owned by the general composer. VoiceRole remains a
+// local function; these IDs identify the continuing source-authored lines.
+const GENERAL_MELODY_PART_V1: PartId = PartId(0);
+const GENERAL_BASS_PART_V1: PartId = PartId(1);
+const GENERAL_HARMONY_PART_V1: PartId = PartId(2);
+const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
+const GENERAL_GRIEF_SUSPENSION_PART_V1: PartId = PartId(4);
+
 /// A muse-independent expressive intent. muse maps its cognitive state onto
 /// this; the composer maps this onto structure.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -576,8 +584,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
         spec.accompaniment(intent.seed)
     };
     let tx = &spec.texture;
-    realize_melody(
+    realize_melody_for_part(
         &mut score,
+        GENERAL_MELODY_PART_V1,
         &form,
         intent,
         Duration::zero(),
@@ -603,8 +612,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
     // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
     // and never read each other's state, so the emitted NOTES are unchanged.
-    realize_bass(
+    realize_bass_for_part(
         &mut score,
+        GENERAL_BASS_PART_V1,
         &form,
         meter_beats,
         intent,
@@ -613,8 +623,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
         tx.cadential_harmonic_rhythm,
         spec.development != crate::spec::DevelopmentDna::Classic,
     );
-    realize_harmony(
+    realize_harmony_for_part(
         &mut score,
+        GENERAL_HARMONY_PART_V1,
         &form,
         meter_beats,
         intent,
@@ -627,6 +638,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.hook_cell {
         apply_hidden_bass_quote(
             &mut score,
+            GENERAL_BASS_PART_V1,
             &form,
             meter_beats,
             intent,
@@ -634,10 +646,17 @@ fn compose_with_spec_and_form_and_grammar_impl(
         );
     }
     if tx.counter_melody {
-        realize_counter_melody(&mut score, &form, meter_beats, intent);
+        realize_counter_melody_for_part(
+            &mut score,
+            GENERAL_COUNTERMELODY_PART_V1,
+            &form,
+            meter_beats,
+            intent,
+        );
         if tx.held_arrivals && tx.hook_cell {
             apply_counter_hook_echoes(
                 &mut score,
+                GENERAL_COUNTERMELODY_PART_V1,
                 &form,
                 meter_beats,
                 intent,
@@ -647,6 +666,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     }
     apply_development_style(
         &mut score,
+        GENERAL_MELODY_PART_V1,
         &form,
         spec.development,
         &motif,
@@ -657,6 +677,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.additive_process {
         apply_additive_process(
             &mut score,
+            GENERAL_MELODY_PART_V1,
             &form,
             intent.bars.max(1) as i64,
             meter_beats,
@@ -666,7 +687,14 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.deceptive_close {
         apply_deceptive_first_close(&mut score, key, intent.bars.max(1) as i64, meter_beats);
     }
-    apply_pivot_modulations(&mut score, &form, intent.bars.max(1) as i64, meter_beats);
+    apply_pivot_modulations(
+        &mut score,
+        GENERAL_BASS_PART_V1,
+        GENERAL_HARMONY_PART_V1,
+        &form,
+        intent.bars.max(1) as i64,
+        meter_beats,
+    );
     if tx.deceptive_close {
         // The evasion travels with the deception: styles that deny their
         // first close also let their LAST mid-piece close slip past, so
@@ -708,7 +736,13 @@ fn compose_with_spec_and_form_and_grammar_impl(
     }
     match attitude {
         Some(crate::spec::Attitude::Grief) => {
-            apply_grief_suspensions(&mut score, &form, meter_beats, intent);
+            apply_grief_suspensions(
+                &mut score,
+                GENERAL_GRIEF_SUSPENSION_PART_V1,
+                &form,
+                meter_beats,
+                intent,
+            );
         }
         Some(crate::spec::Attitude::Defiance) => {
             apply_defiant_syncopation(&mut score, meter_beats);
@@ -726,6 +760,8 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.intro_bars > 0 {
         prepend_intro(
             &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
             key,
             meter_beats,
             intent,
@@ -736,6 +772,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.coda_bars > 0 {
         append_coda(
             &mut score,
+            GENERAL_MELODY_PART_V1,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
             key,
             meter_beats,
             intent,
@@ -756,12 +795,17 @@ fn compose_with_spec_and_form_and_grammar_impl(
         // Supersedes the plain drone below (it calls `apply_drone_pedal`
         // itself internally, then replaces Harmony too) — after intro/coda
         // so the pad covers the FULL span they extend.
-        apply_full_drone(&mut score, key);
+        apply_full_drone(
+            &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            key,
+        );
     } else if tx.drone {
         // After intro/coda so the pedal covers the FULL span they extend
         // — a drone that dropped out for the intro or coda would stop
         // being a drone.
-        apply_drone_pedal(&mut score, key);
+        apply_drone_pedal(&mut score, GENERAL_BASS_PART_V1, key);
     }
     // LAST, so intro shifts and the coda's own cadence are included: the
     // style's phrase rhetoric — the conversational layer the second
@@ -3836,6 +3880,28 @@ pub(crate) fn realize_melody(
     meter_beats: f64,
     climax_grace: bool,
 ) {
+    realize_melody_for_part(
+        score,
+        PartId::UNASSIGNED,
+        form,
+        intent,
+        start_beat,
+        meter_beats,
+        climax_grace,
+    );
+}
+
+/// Source-authored variant. All notes and the optional climax grace belong
+/// to the continuing melody part supplied by the composition owner.
+pub(crate) fn realize_melody_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    intent: &MusicalIntent,
+    start_beat: Duration,
+    meter_beats: f64,
+    climax_grace: bool,
+) {
     let melody_octave = 5;
     let base_vel = 0.35 + intent.energy.clamp(0.0, 1.0) * 0.45; // 0.35–0.8
 
@@ -4024,7 +4090,7 @@ pub(crate) fn realize_melody(
                     *dur
                 };
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part,
                     pitch: *p,
                     onset,
                     duration: sounded,
@@ -4087,7 +4153,7 @@ pub(crate) fn realize_melody(
                 score.notes.insert(
                     ci,
                     ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part,
                         pitch: below,
                         onset: climax_onset.saturating_sub(grace),
                         duration: grace,
@@ -4367,6 +4433,17 @@ pub(crate) fn realize_counter_melody(
     meter_beats: f64,
     intent: &MusicalIntent,
 ) {
+    realize_counter_melody_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent);
+}
+
+/// Source-authored variant for the general composer's independent counterline.
+pub(crate) fn realize_counter_melody_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+) {
     let counter_octave = 4;
     let base_vel = (0.28 + intent.energy.clamp(0.0, 1.0) * 0.28).clamp(0.12, 0.58);
     let bar = Duration::new(meter_beats as i64, 1);
@@ -4439,7 +4516,7 @@ pub(crate) fn realize_counter_melody(
                         1.1 - 0.3 * ((pos - 0.65) / 0.35)
                     };
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: part_id,
                         pitch: p,
                         onset,
                         duration: tone_dur,
