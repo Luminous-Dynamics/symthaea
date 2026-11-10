@@ -7,7 +7,7 @@ use std::{
 
 const LEDGER_ID: &str = "IG-REVISION-LEDGER-001";
 const MANIFEST_SCHEMA_VERSION: &str = "ig-revision-ledger-fixtures-v0.1";
-const EXPECTED_FIXTURES: usize = 16;
+const EXPECTED_FIXTURES: usize = 17;
 
 #[derive(Debug, PartialEq, Eq)]
 struct Report {
@@ -302,6 +302,71 @@ fn validate_record(record: &Value) -> Vec<String> {
                     "causal_pair_runs_must_be_distinct",
                 );
             }
+            let matched_inputs = &causal["matched_inputs"];
+            let required_dimensions = [
+                "task_instance",
+                "model_profile",
+                "system_prompt",
+                "elicitation_prompt",
+                "evidence_packet",
+                "communication_graph",
+                "budget_profile",
+                "decoding_profile",
+                "rng_stream",
+                "evaluator_profile",
+            ];
+            for dimension in required_dimensions {
+                let treatment = field(&matched_inputs[dimension], "treatment_sha256");
+                let control = field(&matched_inputs[dimension], "control_sha256");
+                if treatment.is_none_or(|value| !is_sha256(value))
+                    || control.is_none_or(|value| !is_sha256(value))
+                {
+                    add(
+                        &mut errors,
+                        &context,
+                        "causal_estimate_missing_matched_pair",
+                    );
+                    break;
+                }
+                if treatment != control {
+                    add(
+                        &mut errors,
+                        &context,
+                        "causal_pair_shared_input_mismatch",
+                    );
+                    break;
+                }
+            }
+            let varied_factor = &causal["varied_factor"];
+            let treatment_factor = field(varied_factor, "treatment_sha256");
+            let control_factor = field(varied_factor, "control_sha256");
+            if field(varied_factor, "id").is_none()
+                || treatment_factor.is_none_or(|value| !is_sha256(value))
+                || control_factor.is_none_or(|value| !is_sha256(value))
+            {
+                add(
+                    &mut errors,
+                    &context,
+                    "causal_estimate_missing_matched_pair",
+                );
+            } else if treatment_factor == control_factor {
+                add(
+                    &mut errors,
+                    &context,
+                    "causal_pair_has_no_distinct_intervention_factor",
+                );
+            }
+            if field(causal, "pair_validator_id").is_none()
+                || !is_sha256(
+                    field(causal, "pair_validation_receipt_sha256").unwrap_or_default(),
+                )
+            {
+                add(
+                    &mut errors,
+                    &context,
+                    "causal_estimate_missing_matched_pair",
+                );
+            }
         }
         Some("NotEstimated" | "InsufficientEvidence") => {
             for key in [
@@ -310,6 +375,9 @@ fn validate_record(record: &Value) -> Vec<String> {
                 "control_run_id",
                 "analysis_plan_sha256",
                 "effect_estimate_sha256",
+                "matched_inputs",
+                "varied_factor",
+                "pair_validation_receipt_sha256",
             ] {
                 if !causal[key].is_null() {
                     add(
@@ -564,9 +632,9 @@ mod tests {
             &parsed(RECORD_SCHEMA),
         )
         .expect("manifest and event fixtures must validate");
-        assert_eq!(report.fixtures, 16);
+        assert_eq!(report.fixtures, 17);
         assert_eq!(report.valid_controls, 8);
-        assert_eq!(report.negative_controls, 8);
+        assert_eq!(report.negative_controls, 9);
     }
 
     #[test]
@@ -591,6 +659,24 @@ mod tests {
         assert!(errors.contains(
             &"causal_pair_runs_must_be_distinct".to_string()
         ));
+    }
+
+    #[test]
+    fn matched_pair_requires_identical_common_input_commitments() {
+        let mut record = parsed(MANIFEST)["fixtures"][9]["record"].clone();
+        record["causal_attribution"]["matched_inputs"]["communication_graph"]["control_sha256"] =
+            Value::String("f".repeat(64));
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"causal_pair_shared_input_mismatch".to_string()));
+    }
+
+    #[test]
+    fn matched_pair_requires_a_distinct_intervention_factor() {
+        let mut record = parsed(MANIFEST)["fixtures"][9]["record"].clone();
+        record["causal_attribution"]["varied_factor"]["control_sha256"] =
+            record["causal_attribution"]["varied_factor"]["treatment_sha256"].clone();
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"causal_pair_has_no_distinct_intervention_factor".to_string()));
     }
 
     #[test]
