@@ -1,0 +1,46 @@
+name: MMAE submission manifest exporter
+
+on:
+  pull_request:
+    paths:
+      - "tools/mmae-export-manifest/**"
+      - "docs/research/MMAE_EXPORT_MANIFEST_V1.md"
+      - ".github/workflows/mmae-export-manifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mmae-manifest-exporter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MMAE_EXPORT_MANIFEST_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check exporter
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mmae-export-manifest/Cargo.toml
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mmae-export-manifest/Cargo.toml
+
+      - name: Run ID, path, symlink, hash and manifest controls
+        run: cargo +1.96.0 test --locked --manifest-path tools/mmae-export-manifest/Cargo.toml
