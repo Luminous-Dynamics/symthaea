@@ -44,9 +44,11 @@ pub struct SelectiveRiskSample {
     /// Forecast emitted before the episode outcome is known.
     pub predicted_unsafe_event_probability: f64,
     /// Official full-task outcome. Invalid/interrupted runs must be false.
-    pub observed_success: bool,
-    /// Independently adjudicated unsafe event outcome.
-    pub observed_unsafe_event: bool,
+    /// None means the official task outcome was not obtained for a valid run.
+    /// An invalid run is still counted as a task failure.
+    pub observed_success: Option<bool>,
+    /// None means the unsafe-event outcome was not completely observed.
+    pub observed_unsafe_event: Option<bool>,
     /// False runs remain in the accepted set and count as task failures.
     pub valid_run: bool,
 }
@@ -62,7 +64,7 @@ impl SelectiveRiskSample {
         {
             return Err(RiskCertificateError::InvalidProbability);
         }
-        if self.observed_success && !self.valid_run {
+        if self.observed_success == Some(true) && !self.valid_run {
             return Err(RiskCertificateError::SuccessOnInvalidRun);
         }
         Ok(())
@@ -124,11 +126,13 @@ pub enum RiskCertificateError {
     InvalidRuntimeContext,
     RuntimeContextMismatch,
     ScoreOutsideAcceptedRegion,
+    RiskNotQualified,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RiskQualificationStatus {
     InsufficientAcceptedSamples,
+    IncompleteOutcomeEvidence,
     FailureRiskExceedsLimit,
     UnsafeRiskExceedsLimit,
     BothRiskLimitsExceed,
@@ -137,19 +141,21 @@ pub enum RiskQualificationStatus {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectiveRiskCertificate {
-    pub context: RiskContext,
+    context: RiskContext,
     /// Digest of the immutable calibration dataset/manifest. The caller
     /// supplies this; this module does not hash or authenticate the file.
-    pub calibration_dataset_sha256: String,
-    pub policy: SelectiveRiskPolicy,
-    pub total_samples: usize,
-    pub accepted_samples: usize,
-    pub rejected_samples: usize,
-    pub accepted_valid_runs: usize,
-    pub accepted_task_failures: usize,
-    pub accepted_unsafe_events: usize,
-    pub empirical_failure_rate: Option<f64>,
-    pub empirical_unsafe_event_rate: Option<f64>,
+    calibration_dataset_sha256: String,
+    policy: SelectiveRiskPolicy,
+    total_samples: usize,
+    accepted_samples: usize,
+    rejected_samples: usize,
+    accepted_valid_runs: usize,
+    accepted_task_failures: usize,
+    accepted_unsafe_events: usize,
+    accepted_task_outcomes_unmeasured: usize,
+    accepted_unsafe_event_outcomes_unmeasured: usize,
+    empirical_failure_rate: Option<f64>,
+    empirical_unsafe_event_rate: Option<f64>,
     /// Exact one-sided Clopper-Pearson upper bounds. Each uses delta/2 so the
     /// pair of claims has at least 1-delta simultaneous confidence.
     pub failure_rate_upper_bound: Option<f64>,
@@ -160,6 +166,23 @@ pub struct SelectiveRiskCertificate {
 }
 
 impl SelectiveRiskCertificate {
+    pub fn context(&self) -> &RiskContext { &self.context }
+    pub fn calibration_dataset_sha256(&self) -> &str { &self.calibration_dataset_sha256 }
+    pub fn policy(&self) -> SelectiveRiskPolicy { self.policy }
+    pub fn status(&self) -> RiskQualificationStatus { self.status }
+    pub fn total_samples(&self) -> usize { self.total_samples }
+    pub fn accepted_samples(&self) -> usize { self.accepted_samples }
+    pub fn rejected_samples(&self) -> usize { self.rejected_samples }
+    pub fn accepted_valid_runs(&self) -> usize { self.accepted_valid_runs }
+    pub fn accepted_task_failures(&self) -> usize { self.accepted_task_failures }
+    pub fn accepted_unsafe_events(&self) -> usize { self.accepted_unsafe_events }
+    pub fn accepted_task_outcomes_unmeasured(&self) -> usize { self.accepted_task_outcomes_unmeasured }
+    pub fn accepted_unsafe_event_outcomes_unmeasured(&self) -> usize { self.accepted_unsafe_event_outcomes_unmeasured }
+    pub fn empirical_failure_rate(&self) -> Option<f64> { self.empirical_failure_rate }
+    pub fn empirical_unsafe_event_rate(&self) -> Option<f64> { self.empirical_unsafe_event_rate }
+    pub fn failure_rate_upper_bound(&self) -> Option<f64> { self.failure_rate_upper_bound }
+    pub fn unsafe_event_rate_upper_bound(&self) -> Option<f64> { self.unsafe_event_rate_upper_bound }
+
     /// This checks whether a new score belongs to the certified selective
     /// region. It does not authorize an actuator command or establish safety.
     pub fn check_runtime_score(
@@ -185,7 +208,7 @@ impl SelectiveRiskCertificate {
             return Err(RiskCertificateError::ScoreOutsideAcceptedRegion);
         }
         if self.status != RiskQualificationStatus::QualifiedForDeclaredContext {
-            return Err(RiskCertificateError::InvalidPolicy);
+            return Err(RiskCertificateError::RiskNotQualified);
         }
         Ok(())
     }
@@ -221,6 +244,8 @@ pub fn certify_selective_risk(
     let mut accepted_valid_runs = 0usize;
     let mut accepted_task_failures = 0usize;
     let mut accepted_unsafe_events = 0usize;
+    let mut accepted_task_outcomes_unmeasured = 0usize;
+    let mut accepted_unsafe_event_outcomes_unmeasured = 0usize;
 
     for sample in samples {
         sample.validate()?;
@@ -235,17 +260,26 @@ pub fn certify_selective_risk(
         }
         accepted_samples += 1;
         accepted_valid_runs += usize::from(sample.valid_run);
-        if !sample.observed_success || !sample.valid_run {
+        if !sample.valid_run {
             accepted_task_failures += 1;
+        } else if let Some(success) = sample.observed_success {
+            if !success { accepted_task_failures += 1; }
+        } else {
+            accepted_task_outcomes_unmeasured += 1;
         }
-        accepted_unsafe_events += usize::from(sample.observed_unsafe_event);
+        match sample.observed_unsafe_event {
+            Some(true) => accepted_unsafe_events += 1,
+            Some(false) => {}
+            None => accepted_unsafe_event_outcomes_unmeasured += 1,
+        }
     }
 
     let rejected_samples = samples.len() - accepted_samples;
     let alpha_per_bound = policy.confidence_delta / 2.0;
-    let (empirical_failure_rate, failure_rate_upper_bound) = if accepted_samples == 0 {
-        (None, None)
-    } else {
+    let (empirical_failure_rate, failure_rate_upper_bound) =
+        if accepted_samples == 0 || accepted_task_outcomes_unmeasured > 0 {
+            (None, None)
+        } else {
         let empirical = accepted_task_failures as f64 / accepted_samples as f64;
         (
             Some(empirical),
@@ -257,7 +291,7 @@ pub fn certify_selective_risk(
         )
     };
     let (empirical_unsafe_event_rate, unsafe_event_rate_upper_bound) =
-        if accepted_samples == 0 {
+        if accepted_samples == 0 || accepted_unsafe_event_outcomes_unmeasured > 0 {
             (None, None)
         } else {
             let empirical = accepted_unsafe_events as f64 / accepted_samples as f64;
@@ -276,8 +310,12 @@ pub fn certify_selective_risk(
         .is_some_and(|upper| upper > policy.maximum_accepted_failure_rate);
     let unsafe_exceeds = unsafe_event_rate_upper_bound
         .is_some_and(|upper| upper > policy.maximum_accepted_unsafe_event_rate);
+    let has_unmeasured_outcomes = accepted_task_outcomes_unmeasured > 0
+        || accepted_unsafe_event_outcomes_unmeasured > 0;
     let status = if !enough_samples {
         RiskQualificationStatus::InsufficientAcceptedSamples
+    } else if has_unmeasured_outcomes {
+        RiskQualificationStatus::IncompleteOutcomeEvidence
     } else {
         match (failure_exceeds, unsafe_exceeds) {
             (true, true) => RiskQualificationStatus::BothRiskLimitsExceed,
@@ -297,6 +335,8 @@ pub fn certify_selective_risk(
         accepted_valid_runs,
         accepted_task_failures,
         accepted_unsafe_events,
+        accepted_task_outcomes_unmeasured,
+        accepted_unsafe_event_outcomes_unmeasured,
         empirical_failure_rate,
         empirical_unsafe_event_rate,
         failure_rate_upper_bound,
@@ -352,8 +392,7 @@ fn log_binomial_lower_tail(k: usize, n: usize, p: f64) -> f64 {
     let mut log_total = log_mass;
 
     for index in 0..k {
-        log_mass += (n - index) as f64
-            .ln()
+        log_mass += ((n - index) as f64).ln()
             - ((index + 1) as f64).ln()
             + log_p
             - log_q;
@@ -411,8 +450,8 @@ mod tests {
             context: context("2"),
             predicted_success_probability: 0.95,
             predicted_unsafe_event_probability: 0.01,
-            observed_success: success,
-            observed_unsafe_event: unsafe_event,
+            observed_success: Some(success),
+            observed_unsafe_event: Some(unsafe_event),
             valid_run: true,
         }
     }
@@ -431,9 +470,9 @@ mod tests {
         let expected = 1.0 - 0.025_f64.powf(1.0 / 100.0);
         assert!((certificate.failure_rate_upper_bound.unwrap() - expected).abs() < 1e-12);
         assert!((certificate.unsafe_event_rate_upper_bound.unwrap() - expected).abs() < 1e-12);
-        assert_eq!(certificate.status, RiskQualificationStatus::QualifiedForDeclaredContext);
-        assert_eq!(certificate.accepted_samples, 100);
-        assert_eq!(certificate.rejected_samples, 0);
+        assert_eq!(certificate.status(), RiskQualificationStatus::QualifiedForDeclaredContext);
+        assert_eq!(certificate.accepted_samples(), 100);
+        assert_eq!(certificate.rejected_samples(), 0);
     }
 
     #[test]
@@ -443,10 +482,10 @@ mod tests {
         samples[0].observed_success = false;
         let certificate =
             certify_selective_risk(&samples, policy(), "4".repeat(64)).unwrap();
-        assert_eq!(certificate.accepted_samples, 100);
-        assert_eq!(certificate.accepted_valid_runs, 99);
-        assert_eq!(certificate.accepted_task_failures, 1);
-        assert_eq!(certificate.empirical_failure_rate, Some(0.01));
+        assert_eq!(certificate.accepted_samples(), 100);
+        assert_eq!(certificate.accepted_valid_runs(), 99);
+        assert_eq!(certificate.accepted_task_failures(), 1);
+        assert_eq!(certificate.empirical_failure_rate(), Some(0.01));
     }
 
     #[test]
@@ -455,10 +494,10 @@ mod tests {
         samples[0].observed_unsafe_event = true;
         let certificate =
             certify_selective_risk(&samples, policy(), "4".repeat(64)).unwrap();
-        assert_eq!(certificate.accepted_task_failures, 0);
-        assert_eq!(certificate.accepted_unsafe_events, 1);
-        assert_eq!(certificate.empirical_unsafe_event_rate, Some(0.01));
-        assert_eq!(certificate.status, RiskQualificationStatus::QualifiedForDeclaredContext);
+        assert_eq!(certificate.accepted_task_failures(), 0);
+        assert_eq!(certificate.accepted_unsafe_events(), 1);
+        assert_eq!(certificate.empirical_unsafe_event_rate(), Some(0.01));
+        assert_eq!(certificate.status(), RiskQualificationStatus::QualifiedForDeclaredContext);
     }
 
     #[test]
@@ -467,7 +506,7 @@ mod tests {
         let certificate =
             certify_selective_risk(&samples, policy(), "4".repeat(64)).unwrap();
         assert_eq!(
-            certificate.status,
+            certificate.status(),
             RiskQualificationStatus::InsufficientAcceptedSamples
         );
         assert!(certificate.check_runtime_score(&context("2"), 0.95, 0.01).is_err());
@@ -480,8 +519,8 @@ mod tests {
         samples[1].predicted_unsafe_event_probability = 0.06;
         let certificate =
             certify_selective_risk(&samples, policy(), "4".repeat(64)).unwrap();
-        assert_eq!(certificate.accepted_samples, 98);
-        assert_eq!(certificate.rejected_samples, 2);
+        assert_eq!(certificate.accepted_samples(), 98);
+        assert_eq!(certificate.rejected_samples(), 2);
     }
 
     #[test]
@@ -528,7 +567,7 @@ mod tests {
         let certificate =
             certify_selective_risk(&samples, policy(), "4".repeat(64)).unwrap();
         assert_eq!(
-            certificate.status,
+            certificate.status(),
             RiskQualificationStatus::BothRiskLimitsExceed
         );
         assert!(certificate.check_runtime_score(&context("2"), 0.95, 0.01).is_err());
@@ -556,6 +595,26 @@ mod tests {
             certify_selective_risk(&invalid, policy(), "4".repeat(64)),
             Err(RiskCertificateError::InvalidDigest)
         );
+    }
+
+    #[test]
+    fn missing_success_or_safety_labels_never_become_zero_risk() {
+        let mut samples = safe_samples(100);
+        samples[0].observed_success = None;
+        samples[1].observed_unsafe_event = None;
+        let certificate =
+            certify_selective_risk(&samples, policy(), "4".repeat(64)).unwrap();
+        assert_eq!(
+            certificate.status(),
+            RiskQualificationStatus::IncompleteOutcomeEvidence
+        );
+        assert_eq!(certificate.accepted_task_outcomes_unmeasured(), 1);
+        assert_eq!(certificate.accepted_unsafe_event_outcomes_unmeasured(), 1);
+        assert!(certificate.failure_rate_upper_bound().is_none());
+        assert!(certificate.unsafe_event_rate_upper_bound().is_none());
+        assert!(certificate
+            .check_runtime_score(&context("2"), 0.95, 0.01)
+            .is_err());
     }
 
     #[test]
@@ -589,9 +648,9 @@ mod tests {
             .collect();
         let certificate =
             certify_selective_risk(&all_rejected, policy(), "4".repeat(64)).unwrap();
-        assert_eq!(certificate.accepted_samples, 0);
-        assert_eq!(certificate.status, RiskQualificationStatus::InsufficientAcceptedSamples);
-        assert!(certificate.failure_rate_upper_bound.is_none());
+        assert_eq!(certificate.accepted_samples(), 0);
+        assert_eq!(certificate.status(), RiskQualificationStatus::InsufficientAcceptedSamples);
+        assert!(certificate.failure_rate_upper_bound().is_none());
     }
 
     #[test]
