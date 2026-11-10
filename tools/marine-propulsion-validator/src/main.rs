@@ -133,6 +133,7 @@ fn unit_dimension(unit: &str) -> Option<&'static str> {
         "USD/year" | "EUR/year" | "ZAR/year" => Some("currency_per_time"),
         "USD/kW" | "EUR/kW" => Some("currency_per_power"),
         "USD/kWh" | "EUR/kWh" => Some("currency_per_energy"),
+        "ppm" => Some("dimensionless_ratio"),
         "TEU" => Some("cargo_capacity"),
         "TEU-nautical_mile" => Some("teu_transport_work"),
         "tonne-nautical_mile" => Some("mass_transport_work"),
@@ -677,7 +678,8 @@ fn check_trial(case: &Value, f: &mut Findings) {
         .pointer("/sample_completeness_policy/minimum_observed_fraction")
         .and_then(Value::as_f64);
     let schema_version = case.get("schema_version").and_then(Value::as_str).unwrap_or("");
-    let is_v3 = schema_version.starts_with("0.3.");
+    let is_v3 = schema_version.starts_with("0.3.") || schema_version.starts_with("0.4.");
+    let is_v4 = schema_version.starts_with("0.4.");
     let source_ids: BTreeSet<String> = case
         .pointer("/evidence/sources")
         .and_then(Value::as_array)
@@ -869,6 +871,72 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         "/trial_evidence/calibration_records/{}",
                         calibration_records.iter().position(|r| r.get("calibration_record_id").and_then(Value::as_str)==Some(calibration_id)).unwrap_or(0)
                     );
+                    if is_v4 {
+                        let reference_epoch = record
+                            .get("reference_epoch")
+                            .and_then(Value::as_str)
+                            .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+                        match reference_epoch.as_ref() {
+                            Some(epoch) => {
+                                let valid_from = record.get("valid_from").and_then(Value::as_str)
+                                    .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+                                let valid_until = record.get("valid_until").and_then(Value::as_str)
+                                    .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+                                match (valid_from, valid_until) {
+                                    (Some(from), Some(until)) if epoch < &from || epoch > &until => f.push(
+                                        pointer_child(record_path.clone(), "reference_epoch"),
+                                        "INVALID",
+                                        "timebase reference_epoch must lie within the timebase validity interval",
+                                    ),
+                                    (Some(_), Some(_)) => {}
+                                    _ => f.push(
+                                        pointer_child(record_path.clone(), "reference_epoch"),
+                                        "INCOMPLETE",
+                                        "timebase reference epoch cannot be checked because validity dates are unresolved",
+                                    ),
+                                }
+                            }
+                            None => f.push(
+                                pointer_child(record_path.clone(), "reference_epoch"),
+                                "INVALID",
+                                "v0.4 timebase must declare a valid RFC3339 reference_epoch",
+                            ),
+                        }
+                        if record.get("drift_semantics").and_then(Value::as_str)
+                            != Some("residual_rate_uncertainty_after_correction")
+                        {
+                            f.push(
+                                pointer_child(record_path.clone(), "drift_semantics"),
+                                "INVALID",
+                                "v0.4 drift uncertainty must be declared as residual rate uncertainty after correction",
+                            );
+                        }
+                        let drift_unit = record.pointer("/drift_uncertainty_ppm/unit").and_then(Value::as_str);
+                        if drift_unit != Some("ppm") {
+                            f.push(
+                                pointer_child(record_path.clone(), "drift_uncertainty_ppm"),
+                                "INVALID",
+                                "residual timebase rate uncertainty must use the reviewed ppm unit",
+                            );
+                        }
+                        if record.pointer("/drift_uncertainty_ppm/value").and_then(Value::as_f64)
+                            .is_some_and(|value| value < 0.0)
+                        {
+                            f.push(
+                                pointer_child(record_path.clone(), "drift_uncertainty_ppm"),
+                                "INVALID",
+                                "residual drift-rate uncertainty cannot be negative",
+                            );
+                        }
+                        if record.pointer("/drift_uncertainty_ppm/value").and_then(Value::as_f64).is_none() {
+                            f.push(
+                                pointer_child(record_path.clone(), "drift_uncertainty_ppm"),
+                                "INCOMPLETE",
+                                "residual drift-rate uncertainty is unknown; it cannot be treated as zero",
+                            );
+                        }
+                    }
+
                     if is_v3 {
                         match record.get("evidence_source_id").and_then(Value::as_str) {
                             Some(source_id) if source_ids.contains(source_id) => {}
@@ -1065,14 +1133,58 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         (channel_uncertainty, channel_unit, clock_uncertainty, clock_unit)
                     {
                         let channel_seconds = time_to_seconds(channel_unit).map(|scale| channel_value * scale);
-                        let clock_seconds = time_to_seconds(clock_unit).map(|scale| clock_value * scale);
-                        match (channel_seconds, clock_seconds) {
-                            (Some(channel_seconds), Some(clock_seconds))
-                                if channel_seconds + f64::EPSILON >= clock_seconds => {}
+                        let base_clock_seconds = time_to_seconds(clock_unit).map(|scale| clock_value * scale);
+                        let required_clock_seconds = if is_v4 {
+                            match (
+                                base_clock_seconds,
+                                record.pointer("/drift_uncertainty_ppm/value").and_then(Value::as_f64),
+                                record.get("reference_epoch").and_then(Value::as_str)
+                                    .and_then(|value| DateTime::parse_from_rfc3339(value).ok()),
+                                window.as_ref(),
+                            ) {
+                                (Some(base), Some(drift_ppm), Some(epoch), Some((sample_start, sample_end))) => {
+                                    let start_elapsed = sample_start.clone()
+                                        .signed_duration_since(epoch.clone())
+                                        .num_nanoseconds()
+                                        .map(|value| (value as f64).abs() / 1_000_000_000.0);
+                                    let end_elapsed = sample_end.clone()
+                                        .signed_duration_since(epoch)
+                                        .num_nanoseconds()
+                                        .map(|value| (value as f64).abs() / 1_000_000_000.0);
+                                    match (start_elapsed, end_elapsed) {
+                                        (Some(start), Some(end)) => {
+                                            let elapsed_max = start.max(end);
+                                            Some(base + drift_ppm * 1.0e-6 * elapsed_max)
+                                        }
+                                        _ => {
+                                            f.push(
+                                                pointer_child(path.clone(), "time_alignment_uncertainty"),
+                                                "INCOMPLETE",
+                                                "cannot calculate accumulated drift uncertainty for this sample window",
+                                            );
+                                            None
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    f.push(
+                                        pointer_child(path.clone(), "time_alignment_uncertainty"),
+                                        "INCOMPLETE",
+                                        "v0.4 timing check requires known base uncertainty, residual drift uncertainty, reference epoch and sample window",
+                                    );
+                                    None
+                                }
+                            }
+                        } else {
+                            base_clock_seconds
+                        };
+                        match (channel_seconds, required_clock_seconds) {
+                            (Some(channel_bound), Some(required_bound))
+                                if channel_bound + f64::EPSILON >= required_bound => {}
                             (Some(_), Some(_)) => f.push(
                                 pointer_child(path.clone(), "time_alignment_uncertainty"),
                                 "INVALID",
-                                "channel alignment uncertainty must not understate the referenced timebase uncertainty",
+                                "channel alignment uncertainty understates the timebase reference uncertainty plus accumulated residual drift bound",
                             ),
                             _ => f.push(
                                 pointer_child(path.clone(), "time_alignment_uncertainty"),
@@ -1513,6 +1625,10 @@ mod tests {
         include_str!("../../../docs/research/marine/marine-propulsion-case-v0.3.0.schema.json");
     const SYNTHETIC_CASE_V3: &str =
         include_str!("../../../docs/research/marine/fixtures/synthetic-waps-case-v0.3.0.json");
+    const MARINE_SCHEMA_V4: &str =
+        include_str!("../../../docs/research/marine/marine-propulsion-case-v0.4.0.schema.json");
+    const SYNTHETIC_CASE_V4: &str =
+        include_str!("../../../docs/research/marine/fixtures/synthetic-waps-case-v0.4.0.json");
     const SERVICE_FINGERPRINT_VECTOR_V1: &str =
         include_str!("../../../docs/research/marine/fixtures/service-fingerprint-v1-vector-0001.json");
 
@@ -1697,6 +1813,75 @@ mod tests {
         check_trial(&fixture, &mut findings);
         assert!(!findings.invalid, "{:?}", findings.diagnostics);
         assert!(findings.incomplete); // synthetic evidence and rights remain non-qualifying
+    }
+
+    #[test]
+    fn v0_4_schema_and_fixture_validate_reference_epoch_and_drift_contract() {
+        let schema: Value = serde_json::from_str(MARINE_SCHEMA_V4).expect("v0.4 schema JSON");
+        let fixture: Value = serde_json::from_str(SYNTHETIC_CASE_V4).expect("v0.4 fixture JSON");
+        assert!(jsonschema::draft202012::meta::is_valid(&schema));
+        let validator = jsonschema::draft202012::options()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("v0.4 schema compiles");
+        assert!(validator.is_valid(&fixture));
+        let mut findings = Findings::default();
+        check_trial(&fixture, &mut findings);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+        assert!(findings.incomplete);
+    }
+
+    #[test]
+    fn v0_4_longer_elapsed_time_increases_required_alignment_bound() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V4).expect("v0.4 fixture JSON");
+        fixture["trial_evidence"]["timebases"][0]["reference_epoch"] =
+            serde_json::json!("2026-11-10T11:00:00Z");
+        fixture["trial_evidence"]["timebases"][0]["drift_uncertainty_ppm"]["value"] =
+            serde_json::json!(100);
+        let mut findings = Findings::default();
+        check_trial(&fixture, &mut findings);
+        assert!(findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn v0_4_channel_bound_covering_accumulated_drift_is_not_invalid() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V4).expect("v0.4 fixture JSON");
+        fixture["trial_evidence"]["timebases"][0]["reference_epoch"] =
+            serde_json::json!("2026-11-10T11:00:00Z");
+        fixture["trial_evidence"]["timebases"][0]["drift_uncertainty_ppm"]["value"] =
+            serde_json::json!(100);
+        fixture["trial_evidence"]["channels"][0]["time_alignment_uncertainty"]["value"] =
+            serde_json::json!(0.008);
+        let mut findings = Findings::default();
+        check_trial(&fixture, &mut findings);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn v0_4_unknown_drift_uncertainty_is_incomplete_not_zero() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V4).expect("v0.4 fixture JSON");
+        fixture["trial_evidence"]["timebases"][0]["drift_uncertainty_ppm"]["value"] =
+            Value::Null;
+        fixture["trial_evidence"]["timebases"][0]["drift_uncertainty_ppm"]["unknown_reason"] =
+            serde_json::json!("Residual clock-rate uncertainty is not measured.");
+        let mut findings = Findings::default();
+        check_trial(&fixture, &mut findings);
+        assert!(findings.incomplete);
+        assert!(!findings.invalid);
+    }
+
+    #[test]
+    fn v0_4_reference_epoch_must_be_inside_validity_window() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V4).expect("v0.4 fixture JSON");
+        fixture["trial_evidence"]["timebases"][0]["reference_epoch"] =
+            serde_json::json!("2025-01-01T00:00:00Z");
+        let mut findings = Findings::default();
+        check_trial(&fixture, &mut findings);
+        assert!(findings.invalid);
     }
 
     #[test]
