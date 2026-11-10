@@ -16,6 +16,7 @@
 use std::fmt;
 
 pub mod characterization;
+pub mod uncertainty;
 
 use characterization::{
     BatteryCharacterization, BatteryOperatingPoint, CharacterizationError,
