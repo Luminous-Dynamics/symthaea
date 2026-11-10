@@ -2899,16 +2899,6 @@ fn plan_damage(
 ///
 /// The piece-final cadence is exempt (the transformed coda already quotes
 /// the hook there; two quotations at once would smear both).
-fn apply_counter_hook_echoes(
-    score: &mut Score,
-    form: &Form,
-    meter_beats: f64,
-    intent: &MusicalIntent,
-    hook: &crate::hook::HookCell,
-) {
-    apply_counter_hook_echoes_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent, hook);
-}
-
 fn apply_counter_hook_echoes_for_part(
     score: &mut Score,
     part_id: PartId,
@@ -4330,15 +4320,6 @@ pub(crate) fn realize_harmony(
 /// avoidance against the MELODY (never the same or adjacent semitone
 /// sounding at this tone's onset; the next-nearest chord tone is taken
 /// instead). Classical practice: the reprise earns new interest.
-pub(crate) fn realize_counter_melody(
-    score: &mut Score,
-    form: &Form,
-    meter_beats: f64,
-    intent: &MusicalIntent,
-) {
-    realize_counter_melody_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent);
-}
-
 /// Source-authored variant: the counterline is a genuinely independent
 /// continuing part, so its identity must be supplied by the composer owner.
 pub(crate) fn realize_counter_melody_for_part(
