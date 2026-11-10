@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use super::decision_relevant_information::DiagnosticAction;
+use super::decision_relevant_information::{DecisionHypothesis, DiagnosticAction};
 
 /// How a measurement's possible perturbation of the measured system is handled.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +125,127 @@ pub enum CausalDiagnosticActionError {
     InvalidIdentifier(&'static str),
     #[error("digest is not a 64-character lowercase hexadecimal SHA-256 value: {0}")]
     InvalidDigest(&'static str),
+    #[error("decision hypothesis set is empty or malformed")]
+    InvalidHypothesisSet,
+    #[error("action index {action_index} is outside 0..{action_count}")]
+    InvalidActionIndex {
+        action_index: usize,
+        action_count: usize,
+    },
+    #[error("hypothesis {hypothesis_id} has an invalid action-likelihood distribution")]
+    InvalidLikelihoodDistribution { hypothesis_id: String },
+    #[error("action-likelihood digest does not match the decision-kernel input for action {0}")]
+    ActionLikelihoodDigestMismatch(String),
+}
+
+/// Compute a canonical digest of one action's complete predictive-likelihood table.
+///
+/// The table binds sorted hypothesis identifiers, normalized hypothesis priors,
+/// outcome-category order, and each P(outcome | hypothesis, action) value. This
+/// is the concrete digest a production adapter must compare with the descriptor
+/// before passing the matching action to the EVSI kernel.
+pub fn compute_action_likelihood_table_digest(
+    hypotheses: &[DecisionHypothesis],
+    action_index: usize,
+) -> Result<String, CausalDiagnosticActionError> {
+    if hypotheses.is_empty() {
+        return Err(CausalDiagnosticActionError::InvalidHypothesisSet);
+    }
+
+    let action_count = hypotheses[0].outcome_probabilities_by_action.len();
+    if action_index >= action_count {
+        return Err(CausalDiagnosticActionError::InvalidActionIndex {
+            action_index,
+            action_count,
+        });
+    }
+
+    let prior_sum: f64 = hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.prior_probability)
+        .sum();
+    if !prior_sum.is_finite() || (prior_sum - 1.0).abs() > 1e-9 {
+        return Err(CausalDiagnosticActionError::InvalidHypothesisSet);
+    }
+
+    let outcome_count = hypotheses[0].outcome_probabilities_by_action[action_index].len();
+    if outcome_count == 0 {
+        return Err(CausalDiagnosticActionError::InvalidHypothesisSet);
+    }
+
+    let mut seen_ids = BTreeSet::new();
+    let mut ordered: Vec<&DecisionHypothesis> = hypotheses.iter().collect();
+    for hypothesis in &ordered {
+        if hypothesis.id.trim().is_empty()
+            || !seen_ids.insert(hypothesis.id.as_str())
+            || !hypothesis.prior_probability.is_finite()
+            || !(0.0..=1.0).contains(&hypothesis.prior_probability)
+            || hypothesis.outcome_probabilities_by_action.len() != action_count
+        {
+            return Err(CausalDiagnosticActionError::InvalidHypothesisSet);
+        }
+
+        let distribution = &hypothesis.outcome_probabilities_by_action[action_index];
+        let mass: f64 = distribution.iter().sum();
+        if distribution.len() != outcome_count
+            || distribution
+                .iter()
+                .any(|probability| !probability.is_finite() || !(0.0..=1.0).contains(probability))
+            || !mass.is_finite()
+            || (mass - 1.0).abs() > 1e-9
+        {
+            return Err(CausalDiagnosticActionError::InvalidLikelihoodDistribution {
+                hypothesis_id: hypothesis.id.clone(),
+            });
+        }
+    }
+    ordered.sort_by(|left, right| left.id.cmp(&right.id));
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-action-likelihood-table-v1\\0");
+    hasher.update(&(ordered.len() as u64).to_le_bytes());
+    hasher.update(&(outcome_count as u64).to_le_bytes());
+    for hypothesis in ordered {
+        hash_field(&mut hasher, "hypothesis_id", &hypothesis.id);
+        hasher.update(&hypothesis.prior_probability.to_bits().to_le_bytes());
+        for probability in &hypothesis.outcome_probabilities_by_action[action_index] {
+            hasher.update(&probability.to_bits().to_le_bytes());
+        }
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Validate the action descriptors and recompute every action-likelihood
+/// digest from the exact decision-kernel hypothesis tensor.
+///
+/// This closes the shape/identity gap between an action's causal descriptor
+/// and the predictive distributions actually evaluated by EVSI. It still
+/// cannot prove that an upstream causal model generated those distributions
+/// from valid observational or interventional assumptions.
+pub fn validate_causal_diagnostic_action_likelihood_bindings(
+    actions: &[DiagnosticAction],
+    descriptors: &[CausalDiagnosticActionDescriptor],
+    hypotheses: &[DecisionHypothesis],
+) -> Result<CausalDiagnosticActionSetReceipt, CausalDiagnosticActionError> {
+    let receipt = validate_causal_diagnostic_action_set(actions, descriptors)?;
+    let descriptors_by_id: BTreeMap<&str, &CausalDiagnosticActionDescriptor> = descriptors
+        .iter()
+        .map(|descriptor| (descriptor.action_id.as_str(), descriptor))
+        .collect();
+
+    for (action_index, action) in actions.iter().enumerate() {
+        let descriptor = descriptors_by_id
+            .get(action.id.as_str())
+            .ok_or_else(|| CausalDiagnosticActionError::MissingDescriptor(action.id.clone()))?;
+        let expected_digest =
+            compute_action_likelihood_table_digest(hypotheses, action_index)?;
+        if descriptor.action_likelihood_table_digest != expected_digest {
+            return Err(CausalDiagnosticActionError::ActionLikelihoodDigestMismatch(
+                action.id.clone(),
+            ));
+        }
+    }
+    Ok(receipt)
 }
 
 /// Validate a one-to-one typed causal descriptor set and produce its digest.
@@ -602,6 +723,97 @@ mod tests {
                 )]
             ),
             Err(CausalDiagnosticActionError::InvalidSafetyRisk { .. })
+        ));
+    }
+
+    fn hypothesis_fixture() -> Vec<DecisionHypothesis> {
+        vec![
+            DecisionHypothesis {
+                id: "fault-a".into(),
+                prior_probability: 0.4,
+                outcome_probabilities_by_action: vec![
+                    vec![0.8, 0.2],
+                    vec![0.3, 0.7],
+                    vec![0.6, 0.4],
+                    vec![0.5, 0.5],
+                ],
+                loss_by_final_decision: vec![0.0, 1.0],
+            },
+            DecisionHypothesis {
+                id: "fault-b".into(),
+                prior_probability: 0.6,
+                outcome_probabilities_by_action: vec![
+                    vec![0.1, 0.9],
+                    vec![0.6, 0.4],
+                    vec![0.2, 0.8],
+                    vec![0.7, 0.3],
+                ],
+                loss_by_final_decision: vec![1.0, 0.0],
+            },
+        ]
+    }
+
+    fn bind_fixture_likelihood_digests(
+        hypotheses: &[DecisionHypothesis],
+        descriptors: &mut [CausalDiagnosticActionDescriptor],
+    ) {
+        for (action_index, descriptor) in descriptors.iter_mut().enumerate() {
+            descriptor.action_likelihood_table_digest =
+                compute_action_likelihood_table_digest(hypotheses, action_index)
+                    .expect("canonical action-likelihood digest");
+        }
+    }
+
+    #[test]
+    fn recomputes_and_validates_action_likelihood_table_digests() {
+        let (actions, mut descriptors) = four_kind_fixture();
+        let hypotheses = hypothesis_fixture();
+        bind_fixture_likelihood_digests(&hypotheses, &mut descriptors);
+        validate_causal_diagnostic_action_likelihood_bindings(
+            &actions,
+            &descriptors,
+            &hypotheses,
+        )
+        .expect("likelihood digests match the EVSI input table");
+
+        let mut altered_hypotheses = hypotheses.clone();
+        altered_hypotheses[0].outcome_probabilities_by_action[2] = vec![0.9, 0.1];
+        assert!(matches!(
+            validate_causal_diagnostic_action_likelihood_bindings(
+                &actions,
+                &descriptors,
+                &altered_hypotheses,
+            ),
+            Err(CausalDiagnosticActionError::ActionLikelihoodDigestMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn likelihood_table_digest_is_hypothesis_order_independent() {
+        let hypotheses = hypothesis_fixture();
+        let original =
+            compute_action_likelihood_table_digest(&hypotheses, 0).expect("original digest");
+        let mut reversed = hypotheses;
+        reversed.reverse();
+        let reordered =
+            compute_action_likelihood_table_digest(&reversed, 0).expect("reordered digest");
+        assert_eq!(original, reordered);
+    }
+
+    #[test]
+    fn invalid_hypothesis_priors_or_likelihoods_fail_closed() {
+        let mut invalid_prior = hypothesis_fixture();
+        invalid_prior[0].prior_probability = 0.9;
+        assert!(matches!(
+            compute_action_likelihood_table_digest(&invalid_prior, 0),
+            Err(CausalDiagnosticActionError::InvalidHypothesisSet)
+        ));
+
+        let mut invalid_likelihood = hypothesis_fixture();
+        invalid_likelihood[1].outcome_probabilities_by_action[0] = vec![0.2, 0.2];
+        assert!(matches!(
+            compute_action_likelihood_table_digest(&invalid_likelihood, 0),
+            Err(CausalDiagnosticActionError::InvalidLikelihoodDistribution { .. })
         ));
     }
 
