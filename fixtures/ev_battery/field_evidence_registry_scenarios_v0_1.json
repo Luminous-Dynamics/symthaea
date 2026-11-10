@@ -2496,7 +2496,7 @@
     },
     {
       "case_id": "pack-capability-supported-without-topology-rejected",
-      "expectation": "accept",
+      "expectation": "reject",
       "manifest": {
         "protocol_version": "ev-field-evidence-registry-entry/0.1",
         "registry_snapshot": {
@@ -2674,7 +2674,7 @@
     },
     {
       "case_id": "intervention-supported-without-followup-rejected",
-      "expectation": "accept",
+      "expectation": "reject",
       "manifest": {
         "protocol_version": "ev-field-evidence-registry-entry/0.1",
         "registry_snapshot": {
@@ -2852,7 +2852,7 @@
     },
     {
       "case_id": "unmapped-sentinel-with-supported-task-rejected",
-      "expectation": "accept",
+      "expectation": "reject",
       "manifest": {
         "protocol_version": "ev-field-evidence-registry-entry/0.1",
         "registry_snapshot": {
@@ -3030,7 +3030,7 @@
     },
     {
       "case_id": "unknown-timezone-with-fault-support-rejected",
-      "expectation": "accept",
+      "expectation": "reject",
       "manifest": {
         "protocol_version": "ev-field-evidence-registry-entry/0.1",
         "registry_snapshot": {
