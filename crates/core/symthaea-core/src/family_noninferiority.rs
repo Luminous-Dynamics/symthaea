@@ -159,6 +159,32 @@ impl FamilyGuardrailPlan {
         &self.plan_digest
     }
 
+    /// Reproduce the parent sequential-verifier episode-manifest digest.
+    ///
+    /// Every ID in the parent manifest must appear in exactly one family manifest.
+    pub fn confirmatory_episode_manifest_digest(&self) -> String {
+        let episode_ids = self
+            .families
+            .iter()
+            .flat_map(|family| family.episode_ids.iter())
+            .collect::<BTreeSet<_>>();
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-confirmatory-episode-manifest-v1\\0");
+        hasher.update(&1_u32.to_le_bytes());
+        hasher.update(&(episode_ids.len() as u64).to_le_bytes());
+        for episode_id in episode_ids {
+            let bytes = episode_id.as_bytes();
+            hasher.update(&(bytes.len() as u64).to_le_bytes());
+            hasher.update(bytes);
+        }
+        hasher.finalize().to_hex().to_string()
+    }
+
+    /// Sum of preregistered per-family maximum observation counts.
+    pub fn maximum_total_observations(&self) -> u64 {
+        self.families.iter().map(|family| family.maximum_observations).sum()
+    }
+
     /// Revalidate deserialized or externally restored plan state.
     pub fn validate(&self) -> Result<(), FamilyGuardrailError> {
         let reconstructed = Self::new(self.families.clone())?;
@@ -167,6 +193,23 @@ impl FamilyGuardrailPlan {
         }
         Ok(())
     }
+}
+
+/// Exact candidate/evaluation identity inherited from the sequential campaign ledger.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FamilyGuardrailBinding {
+    /// Baseline model digest reserved by the candidate session.
+    pub baseline_model_digest: String,
+    /// Frozen candidate model digest reserved by the candidate session.
+    pub candidate_model_digest: String,
+    /// Frozen task, split and loss protocol digest.
+    pub evaluation_protocol_digest: String,
+    /// Exact parent ConfirmatoryEpisodeManifest digest.
+    pub confirmatory_episode_manifest_digest: String,
+    /// Existing open-world/model-adequacy precondition digest.
+    pub precondition_gate_digest: String,
+    /// Must equal the sum of the per-family maximum observation counts.
+    pub maximum_total_observations: u64,
 }
 
 /// One paired loss observation assigned to exactly one frozen family.
@@ -232,6 +275,7 @@ pub struct FamilyGuardrailReport {
     pub candidate_index: u64,
     pub campaign_alpha: f64,
     pub candidate_alpha_all_families: f64,
+    pub binding: FamilyGuardrailBinding,
     pub family_count: usize,
     pub total_observation_count: u64,
     pub plan_digest: String,
@@ -273,6 +317,12 @@ pub enum FamilyGuardrailError {
     InvalidCampaignAlpha,
     #[error("candidate ordinal must be positive")]
     InvalidCandidateIndex,
+    #[error("candidate binding digest is invalid: {0}")]
+    InvalidBindingDigest(&'static str),
+    #[error("family episode union does not match the parent candidate confirmatory manifest")]
+    ConfirmatoryManifestMismatch,
+    #[error("candidate observation budget must equal the sum of family maximums: expected {expected}, received {actual}")]
+    CandidateObservationBudgetMismatch { expected: u64, actual: u64 },
     #[error("unknown family identifier: {0}")]
     UnknownFamily(String),
     #[error("episode {episode_id} is not in the frozen manifest for family {family_id}")]
@@ -319,6 +369,7 @@ impl FamilyNonInferiorityGate {
         plan: FamilyGuardrailPlan,
         campaign_alpha: f64,
         candidate_index: u64,
+        binding: FamilyGuardrailBinding,
     ) -> Result<Self, FamilyGuardrailError> {
         plan.validate()?;
         if !campaign_alpha.is_finite() || campaign_alpha <= 0.0 || campaign_alpha >= 1.0 {
@@ -326,6 +377,27 @@ impl FamilyNonInferiorityGate {
         }
         if candidate_index == 0 {
             return Err(FamilyGuardrailError::InvalidCandidateIndex);
+        }
+        for (field, digest) in [
+            ("baseline_model_digest", &binding.baseline_model_digest),
+            ("candidate_model_digest", &binding.candidate_model_digest),
+            ("evaluation_protocol_digest", &binding.evaluation_protocol_digest),
+            ("confirmatory_episode_manifest_digest", &binding.confirmatory_episode_manifest_digest),
+            ("precondition_gate_digest", &binding.precondition_gate_digest),
+        ] {
+            if !is_lowercase_hex_digest(digest) {
+                return Err(FamilyGuardrailError::InvalidBindingDigest(field));
+            }
+        }
+        if binding.confirmatory_episode_manifest_digest != plan.confirmatory_episode_manifest_digest() {
+            return Err(FamilyGuardrailError::ConfirmatoryManifestMismatch);
+        }
+        let expected_budget = plan.maximum_total_observations();
+        if binding.maximum_total_observations != expected_budget {
+            return Err(FamilyGuardrailError::CandidateObservationBudgetMismatch {
+                expected: expected_budget,
+                actual: binding.maximum_total_observations,
+            });
         }
         let family_state = plan
             .families
@@ -336,6 +408,7 @@ impl FamilyNonInferiorityGate {
             plan,
             candidate_index,
             campaign_alpha,
+            binding,
             family_state,
             seen_episode_ids: BTreeSet::new(),
             total_observations: 0,
@@ -510,6 +583,7 @@ impl FamilyNonInferiorityGate {
             candidate_index: self.candidate_index,
             campaign_alpha: self.campaign_alpha,
             candidate_alpha_all_families: candidate_alpha,
+            binding: self.binding.clone(),
             family_count: self.plan.families.len(),
             total_observation_count: self.total_observations,
             plan_digest: self.plan.plan_digest.clone(),
@@ -536,7 +610,13 @@ pub fn validate_family_guardrail_report(
         || !report.candidate_alpha_all_families.is_finite()
         || !report.simultaneous_family_bounds
         || !is_lowercase_hex_digest(&report.report_digest)
-        || !is_lowercase_sha256_or_blake3(&report.plan_digest)
+        || !is_lowercase_hex_digest(&report.plan_digest)
+        || !is_lowercase_hex_digest(&report.binding.baseline_model_digest)
+        || !is_lowercase_hex_digest(&report.binding.candidate_model_digest)
+        || !is_lowercase_hex_digest(&report.binding.evaluation_protocol_digest)
+        || !is_lowercase_hex_digest(&report.binding.confirmatory_episode_manifest_digest)
+        || !is_lowercase_hex_digest(&report.binding.precondition_gate_digest)
+        || report.binding.maximum_total_observations == 0
     {
         return Err(FamilyGuardrailError::ReportDigestMismatch);
     }
@@ -562,6 +642,7 @@ fn family_guardrail_report_digest(
         candidate_index: u64,
         campaign_alpha: f64,
         candidate_alpha_all_families: f64,
+        binding: &'a FamilyGuardrailBinding,
         family_count: usize,
         total_observation_count: u64,
         plan_digest: &'a str,
@@ -574,6 +655,7 @@ fn family_guardrail_report_digest(
         candidate_index: report.candidate_index,
         campaign_alpha: report.campaign_alpha,
         candidate_alpha_all_families: report.candidate_alpha_all_families,
+        binding: &report.binding,
         family_count: report.family_count,
         total_observation_count: report.total_observation_count,
         plan_digest: &report.plan_digest,
@@ -590,7 +672,7 @@ fn family_guardrail_report_digest(
     Ok(hasher.finalize().to_hex().to_string())
 }
 
-fn is_lowercase_sha256_or_blake3(value: &str) -> bool {
+fn is_lowercase_hex_digest(value: &str) -> bool {
     value.len() == DIGEST_LENGTH
         && value
             .bytes()
@@ -621,6 +703,22 @@ mod tests {
         .unwrap()
     }
 
+    fn test_binding(plan: &FamilyGuardrailPlan) -> FamilyGuardrailBinding {
+        FamilyGuardrailBinding {
+            baseline_model_digest: "a".repeat(64),
+            candidate_model_digest: "b".repeat(64),
+            evaluation_protocol_digest: "c".repeat(64),
+            confirmatory_episode_manifest_digest: plan.confirmatory_episode_manifest_digest(),
+            precondition_gate_digest: "d".repeat(64),
+            maximum_total_observations: plan.maximum_total_observations(),
+        }
+    }
+
+    fn gate(plan: FamilyGuardrailPlan, candidate_index: u64) -> FamilyNonInferiorityGate {
+        let binding = test_binding(&plan);
+        FamilyNonInferiorityGate::new(plan, 0.05, candidate_index, binding).unwrap()
+    }
+
     fn observe_family(
         gate: &mut FamilyNonInferiorityGate,
         family_id: &str,
@@ -645,7 +743,7 @@ mod tests {
 
     #[test]
     fn all_families_must_clear_the_noninferiority_margin() {
-        let mut gate = FamilyNonInferiorityGate::new(plan(), 0.05, 1).unwrap();
+        let mut gate = gate(plan(), 1);
         observe_family(&mut gate, "family-a", "family-a", 180, 0.9, 0.1);
         let report = observe_family(&mut gate, "family-b", "family-b", 180, 0.9, 0.1);
         assert_eq!(report.status, FamilyGuardrailStatus::AllFamiliesNonInferior);
@@ -663,7 +761,7 @@ mod tests {
 
     #[test]
     fn aggregate_benefit_cannot_hide_a_critical_family_regression() {
-        let mut gate = FamilyNonInferiorityGate::new(plan(), 0.05, 1).unwrap();
+        let mut gate = gate(plan(), 1);
         observe_family(&mut gate, "family-a", "family-a", 180, 0.95, 0.05);
         let report = observe_family(&mut gate, "family-b", "family-b", 180, 0.0, 0.9);
         assert_eq!(report.status, FamilyGuardrailStatus::RegressionDetected);
@@ -688,7 +786,7 @@ mod tests {
         }
         assert!(sum <= 0.05);
         assert!(sum > 0.0499);
-        let gate = FamilyNonInferiorityGate::new(plan(), 0.05, 2).unwrap();
+        let gate = gate(plan(), 2);
         let report = gate.report().unwrap();
         assert!((report.candidate_alpha_all_families - 0.05 / 6.0).abs() < 1e-15);
         assert!(report.families.iter().all(|family| family.alpha_spent_at_current_look.is_none()));
@@ -725,7 +823,7 @@ mod tests {
 
     #[test]
     fn duplicate_unknown_or_misassigned_episodes_fail_closed() {
-        let mut gate = FamilyNonInferiorityGate::new(plan(), 0.05, 1).unwrap();
+        let mut gate = gate(plan(), 1);
         let observation = FamilyGuardrailObservation {
             episode_id: "family-a-episode-0000".to_owned(),
             family_id: "family-a".to_owned(),
@@ -759,7 +857,7 @@ mod tests {
 
     #[test]
     fn maximum_budget_without_decisive_evidence_is_inconclusive() {
-        let mut gate = FamilyNonInferiorityGate::new(plan(), 0.05, 1).unwrap();
+        let mut gate = gate(plan(), 1);
         observe_family(&mut gate, "family-a", "family-a", 200, 0.5, 0.5);
         let report = observe_family(&mut gate, "family-b", "family-b", 200, 0.5, 0.5);
         assert_eq!(report.status, FamilyGuardrailStatus::InconclusiveAtBudget);
@@ -771,7 +869,7 @@ mod tests {
 
     #[test]
     fn loss_validation_and_post_terminal_observation_fail_closed() {
-        let mut gate = FamilyNonInferiorityGate::new(plan(), 0.05, 1).unwrap();
+        let mut gate = gate(plan(), 1);
         assert!(matches!(
             gate.observe(FamilyGuardrailObservation {
                 episode_id: "family-a-episode-0000".to_owned(),
@@ -781,7 +879,7 @@ mod tests {
             }),
             Err(FamilyGuardrailError::InvalidLoss)
         ));
-        let mut gate = FamilyNonInferiorityGate::new(plan(), 0.05, 1).unwrap();
+        let mut gate = gate(plan(), 1);
         observe_family(&mut gate, "family-a", "family-a", 180, 0.9, 0.1);
         let report = observe_family(&mut gate, "family-b", "family-b", 180, 0.9, 0.1);
         assert_eq!(report.status, FamilyGuardrailStatus::AllFamiliesNonInferior);
@@ -798,7 +896,7 @@ mod tests {
 
     #[test]
     fn tampered_family_report_and_plan_are_rejected() {
-        let mut gate = FamilyNonInferiorityGate::new(plan(), 0.05, 1).unwrap();
+        let mut gate = gate(plan(), 1);
         let report = gate.report().unwrap();
         let mut tampered = report.clone();
         tampered.families[0].family_id = "tampered".to_owned();
@@ -812,6 +910,31 @@ mod tests {
         assert!(matches!(
             tampered_plan.validate(),
             Err(FamilyGuardrailError::PlanDigestMismatch)
+        ));
+    }
+
+    #[test]
+    fn candidate_and_parent_manifest_bindings_are_mandatory() {
+        let plan = plan();
+        let mut binding = test_binding(&plan);
+        binding.candidate_model_digest = "not-a-digest".to_owned();
+        assert!(matches!(
+            FamilyNonInferiorityGate::new(plan.clone(), 0.05, 1, binding),
+            Err(FamilyGuardrailError::InvalidBindingDigest("candidate_model_digest"))
+        ));
+
+        let mut binding = test_binding(&plan);
+        binding.confirmatory_episode_manifest_digest = "e".repeat(64);
+        assert!(matches!(
+            FamilyNonInferiorityGate::new(plan.clone(), 0.05, 1, binding),
+            Err(FamilyGuardrailError::ConfirmatoryManifestMismatch)
+        ));
+
+        let mut binding = test_binding(&plan);
+        binding.maximum_total_observations -= 1;
+        assert!(matches!(
+            FamilyNonInferiorityGate::new(plan, 0.05, 1, binding),
+            Err(FamilyGuardrailError::CandidateObservationBudgetMismatch { .. })
         ));
     }
 
