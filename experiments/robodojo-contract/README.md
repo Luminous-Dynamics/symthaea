@@ -113,7 +113,7 @@ The audit prints per-arm valid-run/completion/progress/calibration/resource metr
 
 ## Distributionally robust active sensing (stacked research module)
 
-The additive module `src/robust_active_sensing.rs` extends the point-estimate `active_sensing.rs` rule without changing its v0 API. It requires calibrated probability intervals for current and post-sensing success/risk forecasts, plus upper-bound energy and latency costs. Every forecast is bound to a non-empty calibration profile, model, task protocol, evaluation domain, calibration split and separate evaluation split.
+The additive module `src/robust_active_sensing.rs` extends the point-estimate `active_sensing.rs` rule without changing its v0 API. It requires calibrated probability intervals for current and post-sensing success/risk forecasts, plus upper-bound energy and latency costs. Every forecast is bound to a non-empty calibration profile, model, task protocol, evaluation domain, nominal interval coverage level (basis points), calibration split and separate evaluation split.
 
 The robust objective is:
 
