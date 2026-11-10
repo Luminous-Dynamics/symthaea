@@ -1210,3 +1210,6 @@ mod tests {
         assert_eq!(secs_to_ticks(1.0, 120.0), 960);
     }
 }
+
+#[cfg(feature = "theory")]
+pub mod part_aware_v1;
