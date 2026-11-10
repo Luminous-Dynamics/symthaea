@@ -74,10 +74,10 @@ fn validate_schema_header(
 }
 
 
-const SUPPORTED_SCHEMA_KEYWORDS: [&str; 17] = [
+const SUPPORTED_SCHEMA_KEYWORDS: [&str; 18] = [
     "$schema", "$id", "title", "description", "type", "additionalProperties",
     "required", "properties", "minLength", "enum", "pattern", "uniqueItems",
-    "items", "minimum", "maximum", "const", "minItems",
+    "items", "minimum", "maximum", "const", "minItems", "format",
 ];
 
 fn validate_schema_definition(schema: &Value, context: &str, errors: &mut Vec<String>) {
@@ -104,6 +104,11 @@ fn validate_schema_definition(schema: &Value, context: &str, errors: &mut Vec<St
     if let Some(pattern) = schema.get("pattern").and_then(Value::as_str) {
         if pattern != "^[a-f0-9]{64}$" {
             add(errors, context, format!("unsupported schema pattern '{pattern}'"));
+        }
+    }
+    if let Some(format) = schema.get("format").and_then(Value::as_str) {
+        if format != "uri" {
+            add(errors, context, format!("unsupported schema format '{format}'"));
         }
     }
     if let Some(properties) = schema.get("properties") {
@@ -164,6 +169,11 @@ fn validate_json_schema(value: &Value, schema: &Value, context: &str, errors: &m
         }
         if schema.get("pattern").is_some() && !is_sha256(text) {
             add(errors, context, "schema pattern violation");
+        }
+        if schema.get("format").and_then(Value::as_str) == Some("uri")
+            && !(text.starts_with("https://") || text.starts_with("http://"))
+        {
+            add(errors, context, "schema URI format violation");
         }
     }
     if let Some(number) = value.as_f64() {
