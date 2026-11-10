@@ -49,6 +49,7 @@ pub mod dimensional_inference;
 pub mod discovery;
 pub mod equation_ast;
 pub mod integrated_discovery;
+pub mod linear_group_action;
 pub mod lyapunov;
 pub mod noise_robustness;
 pub mod pde_wave_stage_a;
@@ -68,6 +69,11 @@ pub use dimensional::DimensionalEncoder;
 pub use dimensional_inference::{InferenceResult, UnitMap, infer_dimensions};
 pub use equation_ast::EquationEncoder;
 pub use query::{PhysicsSearchEngine, SearchWeights};
+pub use linear_group_action::{
+    AdmittedLinearGroupActionV1, GeneratorMetricSkewDiagnosticV1, LinearGeneratorV1,
+    LinearGroupActionAdmissionDiagnosticsV1, LinearGroupActionAdmissionError,
+    LinearGroupActionAdmissionProfileV1, LinearGroupActionV1,
+};
 pub use recognize::{
     RecognitionReport, expr_to_equation_node, recognize_expr, recognize_expr_with_units,
 };
