@@ -84,6 +84,7 @@ pub mod plugin;
 pub mod reward;
 pub mod road;
 pub mod scenarios;
+pub mod scene_follow;
 pub mod simulator;
 pub mod subterranean;
 pub mod subterranean_navigation;

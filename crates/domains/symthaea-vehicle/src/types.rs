@@ -775,6 +775,10 @@ pub enum FollowEvidenceError {
     InvalidNumericValue,
     MissingProvenance,
     ExcessiveDistanceErrorBound,
+    /// A serialized/self-asserted local-track claim is not an admitted scene capability.
+    SceneAdmissionReceiptRequired,
+    /// The opaque scene receipt is stale, ambiguous, unsupported or otherwise inadmissible.
+    SceneAdmissionRejected,
 }
 
 fn validate_follow_numeric(
@@ -837,59 +841,12 @@ pub fn admit_follow_target(
                 relative_speed_mps: *relative_speed_mps,
             })
         }
-        (
-            FollowTargetEvidence::LocalTrackedActor {
-                scene_snapshot_id,
-                track_lineage_id,
-                source_ids,
-                frame_id,
-                observation_age_s,
-                gap_m,
-                relative_speed_mps,
-                distance_error_bound_m,
-            },
-            FollowConsumerProfile::LocalPerception {
-                scene_snapshot_id: expected_snapshot,
-                frame_id: expected_frame,
-                max_age_s,
-                max_distance_error_bound_m,
-            }
-            | FollowConsumerProfile::Deployment {
-                scene_snapshot_id: expected_snapshot,
-                frame_id: expected_frame,
-                max_age_s,
-                max_distance_error_bound_m,
-            },
-        ) => {
-            if scene_snapshot_id.is_empty()
-                || track_lineage_id.is_empty()
-                || source_ids.is_empty()
-                || source_ids.iter().any(String::is_empty)
-            {
-                return Err(FollowEvidenceError::MissingProvenance);
-            }
-            let mut unique_sources = std::collections::BTreeSet::new();
-            if source_ids.iter().any(|source| !unique_sources.insert(source)) {
-                return Err(FollowEvidenceError::MissingProvenance);
-            }
-            if scene_snapshot_id != expected_snapshot || frame_id != expected_frame {
-                return Err(FollowEvidenceError::ContextMismatch);
-            }
-            validate_follow_numeric(*observation_age_s, *max_age_s, *gap_m, *relative_speed_mps)?;
-            if !distance_error_bound_m.is_finite()
-                || *distance_error_bound_m < 0.0
-                || !max_distance_error_bound_m.is_finite()
-                || *max_distance_error_bound_m < 0.0
-            {
-                return Err(FollowEvidenceError::InvalidNumericValue);
-            }
-            if distance_error_bound_m > max_distance_error_bound_m {
-                return Err(FollowEvidenceError::ExcessiveDistanceErrorBound);
-            }
-            Ok(AdmittedFollowTarget {
-                gap_lower_bound_m: (*gap_m - *distance_error_bound_m).max(0.0),
-                relative_speed_mps: *relative_speed_mps,
-            })
+        // This serialized variant is retained for wire compatibility only.
+        // Provenance strings and caller-supplied scalar geometry do not constitute a
+        // capability. Local/deployment consumers must use the opaque scene receipt API
+        // in scene_follow.rs, which derives geometry from one admitted scene snapshot.
+        (FollowTargetEvidence::LocalTrackedActor { .. }, _) => {
+            Err(FollowEvidenceError::SceneAdmissionReceiptRequired)
         }
         (FollowTargetEvidence::CooperativeAdvisory { .. }, _) => {
             Err(FollowEvidenceError::RemoteAdvisoryNotAuthority)
@@ -1378,19 +1335,23 @@ mod tests {
     }
 
     #[test]
-    fn test_local_follow_uses_conservative_gap_lower_bound() {
-        let target = local_follow_target(2.0);
-        let admitted = admit_follow_target(Some(&target), &local_follow_profile())
-            .expect("valid local track should be admitted");
-        assert!((admitted.gap_lower_bound_m - 13.0).abs() < 1e-10);
+    fn test_self_asserted_local_follow_claim_requires_scene_receipt() {
+        let target = local_follow_target(0.5);
+        assert_eq!(
+            admit_follow_target(Some(&target), &local_follow_profile()),
+            Err(FollowEvidenceError::SceneAdmissionReceiptRequired)
+        );
     }
 
     #[test]
-    fn test_local_follow_rejects_excessive_distance_error_bound() {
-        let target = local_follow_target(2.1);
+    fn test_serialized_local_follow_claim_cannot_restore_admission() {
+        let target = local_follow_target(0.5);
+        let serialized = serde_json::to_string(&target).expect("raw claim serializes");
+        let decoded: FollowTargetEvidence =
+            serde_json::from_str(&serialized).expect("raw claim deserializes");
         assert_eq!(
-            admit_follow_target(Some(&target), &local_follow_profile()),
-            Err(FollowEvidenceError::ExcessiveDistanceErrorBound)
+            admit_follow_target(Some(&decoded), &local_follow_profile()),
+            Err(FollowEvidenceError::SceneAdmissionReceiptRequired)
         );
     }
 

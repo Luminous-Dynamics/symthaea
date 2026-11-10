@@ -1,0 +1,44 @@
+name: SAM Follow Scene Capability
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-vehicle/src/scene_follow.rs"
+      - "crates/domains/symthaea-vehicle/src/types.rs"
+      - "crates/domains/symthaea-vehicle/src/lib.rs"
+      - "docs/autonomy/SAM_FOLLOW_SCENE_CAPABILITY_V0_1.md"
+      - ".github/workflows/sam-follow-scene-capability.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-vehicle/src/scene_follow.rs"
+      - "crates/domains/symthaea-vehicle/src/types.rs"
+      - "crates/domains/symthaea-vehicle/src/lib.rs"
+      - "docs/autonomy/SAM_FOLLOW_SCENE_CAPABILITY_V0_1.md"
+      - ".github/workflows/sam-follow-scene-capability.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Scene-derived Follow capability (Rust)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+      - name: Format
+        run: |
+          rustfmt --edition 2024 --check crates/domains/symthaea-vehicle/src/scene_follow.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-vehicle/src/types.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-vehicle/src/lib.rs
+      - name: Vehicle crate unit tests
+        run: cargo test --manifest-path crates/domains/symthaea-vehicle/Cargo.toml --lib
+      - name: Vehicle crate Clippy
+        run: cargo clippy --manifest-path crates/domains/symthaea-vehicle/Cargo.toml --lib -- -D warnings
