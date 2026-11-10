@@ -606,4 +606,34 @@ mod tests {
         let b = evaluate_mission(&high).unwrap();
         assert!(b.energy_required_with_uncertainty_wh > a.energy_required_with_uncertainty_wh);
     }
+
+    #[test]
+    fn conservative_mission_changes_do_not_improve_energy_margin() {
+        let base = evaluate_mission(&baseline()).unwrap();
+
+        let mut faster = baseline();
+        for segment in &mut faster.segments {
+            segment.true_airspeed_mps *= 1.10;
+        }
+        let faster_report = evaluate_mission(&faster).unwrap();
+        assert!(faster_report.energy_required_with_uncertainty_wh
+            > base.energy_required_with_uncertainty_wh);
+
+        let mut lower_soh = baseline();
+        lower_soh.battery.state_of_health = 0.85;
+        let lower_soh_report = evaluate_mission(&lower_soh).unwrap();
+        assert!(lower_soh_report.energy_margin_wh < base.energy_margin_wh);
+
+        let mut higher_reserve = baseline();
+        higher_reserve.battery.reserve_state_of_charge = 0.30;
+        let higher_reserve_report = evaluate_mission(&higher_reserve).unwrap();
+        assert!(higher_reserve_report.energy_margin_wh < base.energy_margin_wh);
+
+        let mut lower_efficiency = baseline();
+        lower_efficiency.propulsion.motor_efficiency = 0.90;
+        let lower_efficiency_report = evaluate_mission(&lower_efficiency).unwrap();
+        assert!(lower_efficiency_report.energy_required_with_uncertainty_wh
+            > base.energy_required_with_uncertainty_wh);
+    }
+
 }
