@@ -696,6 +696,45 @@ mod tests {
         };
         let metrics = analyze_vocal_stem(&performance, &stem);
         assert!(metrics.median_pitch_error_cents < 15.0, "{:?}", metrics);
+        assert_eq!(metrics.score_independent_pitch_audit_pass, Some(true), "{metrics:?}");
+        assert_eq!(metrics.yin_pitch_audit_pass, Some(true), "{metrics:?}");
+        assert!(metrics.score_independent_median_pitch_error_cents < 15.0, "{metrics:?}");
+        assert!(metrics.yin_median_pitch_error_cents < 15.0, "{metrics:?}");
+    }
+
+    #[test]
+    fn score_and_waveform_transposition_together_preserve_pitch_audits() {
+        let rate = 24_000;
+        for frequency in [110.0f32, 220.0, 440.0, 880.0] {
+            let note = symthaea_muse::Note {
+                frequency,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.8,
+            };
+            let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+            let samples: Vec<_> = (0..rate / 2)
+                .map(|index| {
+                    (std::f32::consts::TAU * frequency * index as f32 / rate as f32).sin() * 0.2
+                })
+                .collect();
+            let stem = VocalStem {
+                samples,
+                sample_rate: rate,
+                backend: "transposition-metamorphic-control".into(),
+            };
+            let metrics = analyze_vocal_stem(&performance, &stem);
+            assert_eq!(
+                metrics.score_independent_pitch_audit_pass,
+                Some(true),
+                "frequency={frequency}, metrics={metrics:?}"
+            );
+            assert_eq!(
+                metrics.yin_pitch_audit_pass,
+                Some(true),
+                "frequency={frequency}, metrics={metrics:?}"
+            );
+        }
     }
 
     /// `estimate_f0_near`'s octave-safety window is fixed at +/-300 cents
