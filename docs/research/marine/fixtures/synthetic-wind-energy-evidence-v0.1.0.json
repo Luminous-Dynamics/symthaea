@@ -163,5 +163,6 @@
   ],
   "evidence_source_ids": [
     "SYNTHETIC-ONLY"
-  ]
+  ],
+  "trial_evidence_id": "SYNTHETIC-TRIAL-0001"
 }
