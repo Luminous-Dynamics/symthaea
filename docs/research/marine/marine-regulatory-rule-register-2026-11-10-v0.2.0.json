@@ -219,6 +219,72 @@
       ]
     },
     {
+      "rule_id": "EU-MRV-MARITIME",
+      "title": "EU Monitoring, Reporting and Verification of maritime transport emissions",
+      "authority": "European Union",
+      "instrument": "Regulation (EU) 2015/757 as amended, including Regulation (EU) 2023/957",
+      "revision_or_resolution": "Consolidated EU MRV Maritime Regulation and applicable implementing acts",
+      "rule_status": "in_force",
+      "legal_character": "binding_regulation",
+      "dates": {
+        "applies_from": "2018-01-01"
+      },
+      "applicability": {
+        "ship_scope": "From 2024: cargo and passenger ships ≥5,000 GT; from 2025 reporting period: offshore ships ≥5,000 GT and offshore/general cargo ships ≥400 GT and <5,000 GT, subject to detailed legal scope and exclusions.",
+        "geographic_scope": "Voyages to, from and between EU/EEA ports and emissions within ports under the MRV Maritime Regulation's scope.",
+        "voyage_scope": "Monitoring, reporting and verification of gas-specific ship emissions and related activity data for each reporting period; do not confuse the MRV scope with EU ETS allowance coverage.",
+        "conditions": [
+          "CO2 has been monitored/reported under EU MRV since 2018.",
+          "CH4 and N2O are within EU MRV monitoring/reporting from emissions year 2024.",
+          "Annual reporting follows the statutory reporting period and voyage/port definitions."
+        ],
+        "exclusions_or_unknowns": [
+          "Exact ship scope, monitoring plan, port-call definition, exclusions and verifier requirements must be resolved under the consolidated regulation and implementing acts.",
+          "MRV reporting coverage does not mean all reported gases are in EU ETS surrender scope in the same year."
+        ]
+      },
+      "output_scope": [
+        "annual gas-resolved CO2/CH4/N2O emissions",
+        "fuel and energy monitoring",
+        "annual voyage and port activity",
+        "verified MRV report"
+      ],
+      "calculation_contract": {
+        "metric_id": "eu_mrv_monitored_emissions",
+        "formula_or_method": "Monitor and aggregate ship emissions and activity data using the prescribed MRV monitoring plan and approved method. Preserve CO2, CH4 and N2O as separate gases and bind to the relevant reporting year and verifier status.",
+        "gas_scope": [
+          {
+            "gas": "CO2",
+            "included_from_emissions_year": 2018,
+            "limitations": [
+              "Subject to ship and reporting scope under the regulation."
+            ]
+          },
+          {
+            "gas": "CH4",
+            "included_from_emissions_year": 2024,
+            "limitations": [
+              "Gas included in the MRV monitoring/reporting scope from 2024."
+            ]
+          },
+          {
+            "gas": "N2O",
+            "included_from_emissions_year": 2024,
+            "limitations": [
+              "Gas included in the MRV monitoring/reporting scope from 2024."
+            ]
+          }
+        ]
+      },
+      "source_ids": [
+        "EU-MRV-MARITIME-REG2015-757"
+      ],
+      "limitations": [
+        "MRV is a monitoring/reporting/verification obligation, not an allowance surrender requirement.",
+        "MRV gas coverage and EU ETS gas coverage have different start years; do not reuse one rule for both."
+      ]
+    },
+    {
       "rule_id": "FUELEU-MARITIME",
       "title": "FuelEU Maritime annual well-to-wake GHG intensity requirement",
       "authority": "European Union",
@@ -439,6 +505,18 @@
       "evidence_class": "dated_official_status_snapshot",
       "limitations": [
         "Pending proposals are not binding requirements; refresh after MEPC 85."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-MARITIME-REG2015-757",
+      "title": "Regulation (EU) 2015/757 on monitoring, reporting and verification of maritime transport emissions, as amended",
+      "publisher": "European Union",
+      "uri": "https://eur-lex.europa.eu/eli/reg/2015/757/oj/eng",
+      "publication_date": "2015-04-29",
+      "evidence_class": "binding_eu_regulation",
+      "limitations": [
+        "Use the current consolidated version and implementing acts for reporting determinations.",
+        "The legal MRV scope and gas reporting years differ from EU ETS surrender scope."
       ]
     }
   ]
