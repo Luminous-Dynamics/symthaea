@@ -55,7 +55,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.35,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -69,7 +68,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "FinalizeSupported",
       "expected_agreement_baseline_stop": false,
@@ -85,7 +88,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": false,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -99,7 +101,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Incomplete",
+        "evidence_closure_receipt_sha256": null,
+        "evidence_closure_validator_id": null,
+        "evidence_closure_validator_version": null
       },
       "expected_action": "RequestEvidence",
       "expected_agreement_baseline_stop": false,
@@ -115,7 +121,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 1,
         "hypothesis_diversity_count": 3,
@@ -129,7 +134,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "VerifyClaim",
       "expected_agreement_baseline_stop": false,
@@ -145,7 +154,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 1,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -159,7 +167,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "VerifyClaim",
       "expected_agreement_baseline_stop": false,
@@ -175,7 +187,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.95,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -189,7 +200,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "PreserveMinority",
       "expected_agreement_baseline_stop": true,
@@ -205,7 +220,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.99,
-        "evidence_complete": false,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -219,7 +233,11 @@
           "probability_correct": 0.64,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Incomplete",
+        "evidence_closure_receipt_sha256": null,
+        "evidence_closure_validator_id": null,
+        "evidence_closure_validator_version": null
       },
       "expected_action": "RequestEvidence",
       "expected_agreement_baseline_stop": true,
@@ -235,7 +253,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.98,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -249,7 +266,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "AdversarialChallenge",
       "expected_agreement_baseline_stop": true,
@@ -265,7 +286,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.99,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 2,
         "hypothesis_diversity_count": 3,
@@ -279,7 +299,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "VerifyClaim",
       "expected_agreement_baseline_stop": true,
@@ -295,7 +319,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.99,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 1,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -309,7 +332,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "VerifyClaim",
       "expected_agreement_baseline_stop": true,
@@ -325,7 +352,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.88,
-        "evidence_complete": false,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -339,7 +365,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Incomplete",
+        "evidence_closure_receipt_sha256": null,
+        "evidence_closure_validator_id": null,
+        "evidence_closure_validator_version": null
       },
       "expected_action": "RequestEvidence",
       "expected_agreement_baseline_stop": true,
@@ -355,7 +385,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.2,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -369,7 +398,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "PreserveMinority",
       "expected_agreement_baseline_stop": false,
@@ -385,7 +418,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.1,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -399,7 +431,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "PreserveMinority",
       "expected_agreement_baseline_stop": false,
@@ -415,7 +451,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.3,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -429,7 +464,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "FinalizeSupported",
       "expected_agreement_baseline_stop": false,
@@ -445,7 +484,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.15,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -459,7 +497,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "PreserveMinority",
       "expected_agreement_baseline_stop": false,
@@ -475,7 +517,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -489,7 +530,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "FinalizeSupported",
       "expected_agreement_baseline_stop": false,
@@ -505,7 +550,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 1,
         "hypothesis_diversity_count": 3,
@@ -519,7 +563,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "OpenWorldIndeterminate"
+        "task_truth_profile": "OpenWorldIndeterminate",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "VerifyClaim",
       "expected_agreement_baseline_stop": false,
@@ -535,7 +583,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": false,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -549,7 +596,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "OpenWorldIndeterminate"
+        "task_truth_profile": "OpenWorldIndeterminate",
+        "evidence_closure_status": "Incomplete",
+        "evidence_closure_receipt_sha256": null,
+        "evidence_closure_validator_id": null,
+        "evidence_closure_validator_version": null
       },
       "expected_action": "RequestEvidence",
       "expected_agreement_baseline_stop": false,
@@ -565,7 +616,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.95,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -579,7 +629,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "OpenWorldIndeterminate"
+        "task_truth_profile": "OpenWorldIndeterminate",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "FinalizeIndeterminate",
       "expected_agreement_baseline_stop": true,
@@ -595,7 +649,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 2,
         "hypothesis_diversity_count": 3,
@@ -609,7 +662,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "OpenWorldIndeterminate"
+        "task_truth_profile": "OpenWorldIndeterminate",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "StopBudgetExhausted",
       "expected_agreement_baseline_stop": false,
@@ -625,7 +682,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.1,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -639,7 +695,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "OpenWorldIndeterminate"
+        "task_truth_profile": "OpenWorldIndeterminate",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "FinalizeIndeterminate",
       "expected_agreement_baseline_stop": false,
@@ -655,7 +715,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -669,7 +728,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "NormativePluralism"
+        "task_truth_profile": "NormativePluralism",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "PreserveMinority",
       "expected_agreement_baseline_stop": false,
@@ -685,7 +748,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -699,7 +761,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "NormativePluralism"
+        "task_truth_profile": "NormativePluralism",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "PluralisticMultiplePositions",
       "expected_agreement_baseline_stop": false,
@@ -715,7 +781,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": false,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -729,7 +794,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "NormativePluralism"
+        "task_truth_profile": "NormativePluralism",
+        "evidence_closure_status": "Incomplete",
+        "evidence_closure_receipt_sha256": null,
+        "evidence_closure_validator_id": null,
+        "evidence_closure_validator_version": null
       },
       "expected_action": "RequestEvidence",
       "expected_agreement_baseline_stop": false,
@@ -745,7 +814,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 1,
         "hypothesis_diversity_count": 3,
@@ -759,7 +827,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "NormativePluralism"
+        "task_truth_profile": "NormativePluralism",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "VerifyClaim",
       "expected_agreement_baseline_stop": false,
@@ -775,7 +847,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.99,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -789,7 +860,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "NormativePluralism"
+        "task_truth_profile": "NormativePluralism",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "PluralisticMultiplePositions",
       "expected_agreement_baseline_stop": true,
@@ -805,7 +880,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -819,7 +893,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "IndependentAdjudication",
       "expected_agreement_baseline_stop": false,
@@ -835,7 +913,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -849,7 +926,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "IndependentAdjudication",
       "expected_agreement_baseline_stop": false,
@@ -865,7 +946,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -879,7 +959,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "AdversarialChallenge",
       "expected_agreement_baseline_stop": false,
@@ -895,7 +979,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -909,7 +992,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "StopInvalid",
       "expected_agreement_baseline_stop": false,
@@ -925,7 +1012,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -939,7 +1025,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "StopInvalid",
       "expected_agreement_baseline_stop": false,
@@ -955,7 +1045,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -969,7 +1058,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "StopBudgetExhausted",
       "expected_agreement_baseline_stop": false,
@@ -985,7 +1078,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": false,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -999,7 +1091,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Incomplete",
+        "evidence_closure_receipt_sha256": null,
+        "evidence_closure_validator_id": null,
+        "evidence_closure_validator_version": null
       },
       "expected_action": "RequestEvidence",
       "expected_agreement_baseline_stop": false,
@@ -1015,7 +1111,6 @@
         "rounds_used": 1,
         "round_limit": 8,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -1029,7 +1124,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "FinalizeSupported",
       "expected_agreement_baseline_stop": false,
@@ -1045,7 +1144,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": false,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 1,
@@ -1059,7 +1157,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Incomplete",
+        "evidence_closure_receipt_sha256": null,
+        "evidence_closure_validator_id": null,
+        "evidence_closure_validator_version": null
       },
       "expected_action": "DiversifyHypotheses",
       "expected_agreement_baseline_stop": false,
@@ -1075,7 +1177,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 1,
         "hypothesis_diversity_count": 3,
@@ -1089,7 +1190,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "VerifyClaim",
       "expected_agreement_baseline_stop": false,
@@ -1105,7 +1210,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.9,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -1119,7 +1223,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "PreserveMinority",
       "expected_agreement_baseline_stop": true,
@@ -1135,7 +1243,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.2,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 1,
         "hypothesis_diversity_count": 3,
@@ -1149,7 +1256,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "VerifyClaim",
       "expected_agreement_baseline_stop": false,
@@ -1165,7 +1276,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.45,
-        "evidence_complete": false,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 0,
@@ -1179,7 +1289,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Incomplete",
+        "evidence_closure_receipt_sha256": null,
+        "evidence_closure_validator_id": null,
+        "evidence_closure_validator_version": null
       },
       "expected_action": "DiversifyHypotheses",
       "expected_agreement_baseline_stop": false,
@@ -1195,7 +1309,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0.95,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -1209,7 +1322,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "OpenWorldIndeterminate"
+        "task_truth_profile": "OpenWorldIndeterminate",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "FinalizeIndeterminate",
       "expected_agreement_baseline_stop": true,
@@ -1225,7 +1342,6 @@
         "rounds_used": 1,
         "round_limit": 4,
         "agent_agreement": 0,
-        "evidence_complete": true,
         "high_impact_unresolved_count": 0,
         "contradictory_source_count": 0,
         "hypothesis_diversity_count": 3,
@@ -1239,7 +1355,11 @@
           "probability_correct": null,
           "calibration_profile_sha256": null
         },
-        "task_truth_profile": "SyntheticKnownAnswer"
+        "task_truth_profile": "SyntheticKnownAnswer",
+        "evidence_closure_status": "Verified",
+        "evidence_closure_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_closure_validator_id": "synthetic-independent-evidence-validator",
+        "evidence_closure_validator_version": "0.1.0"
       },
       "expected_action": "PreserveMinority",
       "expected_agreement_baseline_stop": false,
