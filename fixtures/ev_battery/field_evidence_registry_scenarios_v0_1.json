@@ -1,0 +1,2255 @@
+{
+  "corpus_version": "ev-field-evidence-corpus/0.1",
+  "schema_id": "https://luminousdynamics.io/schemas/transport/ev-field-evidence-registry-entry/0.1",
+  "cases": [
+    {
+      "case_id": "field-open-verified",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "field-open-verified",
+          "title": "Synthetic field release field-open-verified",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/field-open-verified",
+          "publication_uri": "https://doi.org/10.0000/field-open-verified",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "open_license",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:field-open-verified:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:field-open-verified:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:field-open-verified:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "permitted",
+            "evidence_ref": "terms:field-open-verified:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "permitted",
+            "evidence_ref": "terms:field-open-verified:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "permitted",
+            "evidence_ref": "terms:field-open-verified:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "permitted",
+            "evidence_ref": "terms:field-open-verified:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:reference-capacity",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference capacity labels exist only for a subset"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "noncommercial-controlled",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "noncommercial-controlled",
+          "title": "Synthetic field release noncommercial-controlled",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/noncommercial-controlled",
+          "publication_uri": "https://doi.org/10.0000/noncommercial-controlled",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "terms_of_use",
+          "license_ref": "research-use-terms-v1",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:noncommercial-controlled:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:noncommercial-controlled:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:noncommercial-controlled:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "permitted",
+            "evidence_ref": "terms:noncommercial-controlled:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "prohibited",
+            "evidence_ref": "terms:noncommercial-controlled:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "prohibited",
+            "evidence_ref": "terms:noncommercial-controlled:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "prohibited",
+            "evidence_ref": "terms:noncommercial-controlled:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:reference-capacity",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference capacity labels exist only for a subset"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "metadata-only-no-data-rights",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "metadata-only-no-data-rights",
+          "title": "Synthetic field release metadata-only-no-data-rights",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/metadata-only-no-data-rights",
+          "publication_uri": "https://doi.org/10.0000/metadata-only-no-data-rights",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "unknown",
+          "license_ref": "no-data-licence-stated",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "metadata_only"
+        },
+        "rights": {
+          "access": {
+            "status": "unknown",
+            "evidence_ref": "terms:metadata-only-no-data-rights:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "unknown",
+            "evidence_ref": "terms:metadata-only-no-data-rights:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "unknown",
+            "evidence_ref": "terms:metadata-only-no-data-rights:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "unknown",
+            "evidence_ref": "terms:metadata-only-no-data-rights:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "unknown",
+            "evidence_ref": "terms:metadata-only-no-data-rights:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "unknown",
+            "evidence_ref": "terms:metadata-only-no-data-rights:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "unknown",
+            "evidence_ref": "terms:metadata-only-no-data-rights:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": false,
+          "derived_data_publish": false,
+          "model_training": false,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "metadata only; no raw observations"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "metadata only; no raw observations"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "metadata only; no raw observations"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "metadata only; no raw observations"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "metadata only; no raw observations"
+          },
+          {
+            "task": "pack_capability",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "metadata only; no raw observations"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "commercially-permitted-open",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "commercially-permitted-open",
+          "title": "Synthetic field release commercially-permitted-open",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/commercially-permitted-open",
+          "publication_uri": "https://doi.org/10.0000/commercially-permitted-open",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "open_license",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercially-permitted-open:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercially-permitted-open:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercially-permitted-open:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercially-permitted-open:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercially-permitted-open:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercially-permitted-open:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercially-permitted-open:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": true,
+          "model_training": true,
+          "model_weights_release": true,
+          "commercial_use": true,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:reference-capacity",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference capacity labels exist only for a subset"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "unknown-rights-training-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "unknown-rights-training-rejected",
+          "title": "Synthetic field release unknown-rights-training-rejected",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/unknown-rights-training-rejected",
+          "publication_uri": "https://doi.org/10.0000/unknown-rights-training-rejected",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "unknown",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "unknown",
+            "evidence_ref": "terms:unknown-rights-training-rejected:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "unknown",
+            "evidence_ref": "terms:unknown-rights-training-rejected:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "unknown",
+            "evidence_ref": "terms:unknown-rights-training-rejected:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "unknown",
+            "evidence_ref": "terms:unknown-rights-training-rejected:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "unknown",
+            "evidence_ref": "terms:unknown-rights-training-rejected:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "unknown",
+            "evidence_ref": "terms:unknown-rights-training-rejected:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "unknown",
+            "evidence_ref": "terms:unknown-rights-training-rejected:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:reference-capacity",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference capacity labels exist only for a subset"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "commercial-not-permitted-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "commercial-not-permitted-rejected",
+          "title": "Synthetic field release commercial-not-permitted-rejected",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/commercial-not-permitted-rejected",
+          "publication_uri": "https://doi.org/10.0000/commercial-not-permitted-rejected",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "terms_of_use",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercial-not-permitted-rejected:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercial-not-permitted-rejected:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercial-not-permitted-rejected:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercial-not-permitted-rejected:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercial-not-permitted-rejected:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "prohibited",
+            "evidence_ref": "terms:commercial-not-permitted-rejected:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "permitted",
+            "evidence_ref": "terms:commercial-not-permitted-rejected:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": true,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:reference-capacity",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference capacity labels exist only for a subset"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "raw-redistribution-prohibited-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "raw-redistribution-prohibited-rejected",
+          "title": "Synthetic field release raw-redistribution-prohibited-rejected",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/raw-redistribution-prohibited-rejected",
+          "publication_uri": "https://doi.org/10.0000/raw-redistribution-prohibited-rejected",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "terms_of_use",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:raw-redistribution-prohibited-rejected:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:raw-redistribution-prohibited-rejected:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:raw-redistribution-prohibited-rejected:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "permitted",
+            "evidence_ref": "terms:raw-redistribution-prohibited-rejected:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "permitted",
+            "evidence_ref": "terms:raw-redistribution-prohibited-rejected:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "permitted",
+            "evidence_ref": "terms:raw-redistribution-prohibited-rejected:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "prohibited",
+            "evidence_ref": "terms:raw-redistribution-prohibited-rejected:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": true
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:reference-capacity",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference capacity labels exist only for a subset"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "unlabeled-periods-as-negative-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "unlabeled-periods-as-negative-rejected",
+          "title": "Synthetic field release unlabeled-periods-as-negative-rejected",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/unlabeled-periods-as-negative-rejected",
+          "publication_uri": "https://doi.org/10.0000/unlabeled-periods-as-negative-rejected",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "open_license",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:unlabeled-periods-as-negative-rejected:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:unlabeled-periods-as-negative-rejected:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:unlabeled-periods-as-negative-rejected:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "permitted",
+            "evidence_ref": "terms:unlabeled-periods-as-negative-rejected:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "permitted",
+            "evidence_ref": "terms:unlabeled-periods-as-negative-rejected:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "permitted",
+            "evidence_ref": "terms:unlabeled-periods-as-negative-rejected:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "permitted",
+            "evidence_ref": "terms:unlabeled-periods-as-negative-rejected:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": true,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:reference-capacity",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference capacity labels exist only for a subset"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "sentinel-collapsed-to-zero-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "sentinel-collapsed-to-zero-rejected",
+          "title": "Synthetic field release sentinel-collapsed-to-zero-rejected",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/sentinel-collapsed-to-zero-rejected",
+          "publication_uri": "https://doi.org/10.0000/sentinel-collapsed-to-zero-rejected",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "open_license",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:sentinel-collapsed-to-zero-rejected:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:sentinel-collapsed-to-zero-rejected:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:sentinel-collapsed-to-zero-rejected:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "permitted",
+            "evidence_ref": "terms:sentinel-collapsed-to-zero-rejected:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "permitted",
+            "evidence_ref": "terms:sentinel-collapsed-to-zero-rejected:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "permitted",
+            "evidence_ref": "terms:sentinel-collapsed-to-zero-rejected:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "permitted",
+            "evidence_ref": "terms:sentinel-collapsed-to-zero-rejected:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "collapsed_to_zero",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:reference-capacity",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference capacity labels exist only for a subset"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "soh-supported-without-reference-label-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "soh-supported-without-reference-label-rejected",
+          "title": "Synthetic field release soh-supported-without-reference-label-rejected",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/soh-supported-without-reference-label-rejected",
+          "publication_uri": "https://doi.org/10.0000/soh-supported-without-reference-label-rejected",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "open_license",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:soh-supported-without-reference-label-rejected:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:soh-supported-without-reference-label-rejected:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:soh-supported-without-reference-label-rejected:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "permitted",
+            "evidence_ref": "terms:soh-supported-without-reference-label-rejected:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "permitted",
+            "evidence_ref": "terms:soh-supported-without-reference-label-rejected:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "permitted",
+            "evidence_ref": "terms:soh-supported-without-reference-label-rejected:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "permitted",
+            "evidence_ref": "terms:soh-supported-without-reference-label-rejected:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "declares SOH but has no reference capacity protocol"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "fault-detection-without-event-time-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "fault-detection-without-event-time-rejected",
+          "title": "Synthetic field release fault-detection-without-event-time-rejected",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/fault-detection-without-event-time-rejected",
+          "publication_uri": "https://doi.org/10.0000/fault-detection-without-event-time-rejected",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "open_license",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:fault-detection-without-event-time-rejected:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:fault-detection-without-event-time-rejected:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:fault-detection-without-event-time-rejected:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "permitted",
+            "evidence_ref": "terms:fault-detection-without-event-time-rejected:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "permitted",
+            "evidence_ref": "terms:fault-detection-without-event-time-rejected:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "permitted",
+            "evidence_ref": "terms:fault-detection-without-event-time-rejected:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "permitted",
+            "evidence_ref": "terms:fault-detection-without-event-time-rejected:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": false,
+          "receive_time_available": false,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:reference-capacity",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference capacity labels exist only for a subset"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "conditional-rights-used-without-clearance-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "conditional-rights-used-without-clearance-rejected",
+          "title": "Synthetic field release conditional-rights-used-without-clearance-rejected",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/conditional-rights-used-without-clearance-rejected",
+          "publication_uri": "https://doi.org/10.0000/conditional-rights-used-without-clearance-rejected",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "open_license",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:conditional-rights-used-without-clearance-rejected:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:conditional-rights-used-without-clearance-rejected:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:conditional-rights-used-without-clearance-rejected:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "conditional",
+            "evidence_ref": "terms:conditional-rights-used-without-clearance-rejected:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "permitted",
+            "evidence_ref": "terms:conditional-rights-used-without-clearance-rejected:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "permitted",
+            "evidence_ref": "terms:conditional-rights-used-without-clearance-rejected:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "permitted",
+            "evidence_ref": "terms:conditional-rights-used-without-clearance-rejected:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "validated"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:reference-capacity",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000386",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference capacity labels exist only for a subset"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    },
+    {
+      "case_id": "partial-adapter-declared-partial",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-field-evidence-registry-entry/0.1",
+        "registry_snapshot": {
+          "registry_ref": "Battery Data Commons / public field catalogue",
+          "snapshot_version": "2026-11-10",
+          "snapshot_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+          "snapshot_at_ms": 1794316800000
+        },
+        "source": {
+          "dataset_id": "partial-adapter-declared-partial",
+          "title": "Synthetic field release partial-adapter-declared-partial",
+          "release_version": "1.0",
+          "publisher": "Synthetic Research Group",
+          "source_uri": "https://example.org/datasets/partial-adapter-declared-partial",
+          "publication_uri": "https://doi.org/10.0000/partial-adapter-declared-partial",
+          "accessed_at_ms": 1794316900000,
+          "source_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+          "license_class": "open_license",
+          "license_ref": "CC-BY-4.0",
+          "license_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+          "access_mode": "public_download"
+        },
+        "rights": {
+          "access": {
+            "status": "permitted",
+            "evidence_ref": "terms:partial-adapter-declared-partial:access",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          },
+          "local_processing": {
+            "status": "permitted",
+            "evidence_ref": "terms:partial-adapter-declared-partial:local_processing",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000065"
+          },
+          "derived_data_publish": {
+            "status": "permitted",
+            "evidence_ref": "terms:partial-adapter-declared-partial:derived_data_publish",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000066"
+          },
+          "model_training": {
+            "status": "permitted",
+            "evidence_ref": "terms:partial-adapter-declared-partial:model_training",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000067"
+          },
+          "model_weights_release": {
+            "status": "permitted",
+            "evidence_ref": "terms:partial-adapter-declared-partial:model_weights_release",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000068"
+          },
+          "commercial_use": {
+            "status": "permitted",
+            "evidence_ref": "terms:partial-adapter-declared-partial:commercial_use",
+            "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000069"
+          },
+          "raw_data_redistribution": {
+            "status": "permitted",
+            "evidence_ref": "terms:partial-adapter-declared-partial:raw_data_redistribution",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000006a"
+          }
+        },
+        "intended_use": {
+          "local_processing": true,
+          "derived_data_publish": false,
+          "model_training": true,
+          "model_weights_release": false,
+          "commercial_use": false,
+          "raw_data_redistribution": false
+        },
+        "dataset": {
+          "application_types": [
+            "passenger_ev",
+            "bus"
+          ],
+          "chemistries": [
+            "NMC",
+            "LFP"
+          ],
+          "observation_start_ms": 1609459200000,
+          "observation_end_ms": 1767225600000,
+          "system_count": 12,
+          "unit_count": 420,
+          "reported_fault_count": 14,
+          "hierarchy_levels": [
+            "system",
+            "vehicle",
+            "pack",
+            "module",
+            "cell"
+          ],
+          "measurement_time_available": true,
+          "receive_time_available": true,
+          "timezone_basis": "UTC",
+          "timestamp_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "unit_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "missingness_fraction": 0.08,
+          "missingness_mapping_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "sentinel_handling": "preserved_and_mapped",
+          "unlabeled_periods_are_negative": false,
+          "censoring_supported": true
+        },
+        "adapter": {
+          "adapter_ref": "ev-field-adapter",
+          "adapter_version": "0.1",
+          "source_schema_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+          "mapping_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+          "validation_report_digest": "0000000000000000000000000000000000000000000000000000000000000009",
+          "validation_status": "partial"
+        },
+        "tasks": [
+          {
+            "task": "sensor_data_integrity",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:telemetry-labels",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000384",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038e",
+            "reason": "labeled sensor checks and timestamps present"
+          },
+          {
+            "task": "operational_fault_detection",
+            "status": "SUPPORTED",
+            "evidence_class": "physical_observation",
+            "label_source_ref": "source:fault-events",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000385",
+            "eligibility_evidence_digest": "000000000000000000000000000000000000000000000000000000000000038f",
+            "reason": "fault event taxonomy and timestamps available"
+          },
+          {
+            "task": "soh_estimation",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000390",
+            "reason": "reference-test target unavailable in this release"
+          },
+          {
+            "task": "remaining_life",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000391",
+            "reason": "no complete lifetime endpoint or censoring contract"
+          },
+          {
+            "task": "intervention_outcomes",
+            "status": "NOT_SUPPORTED",
+            "evidence_class": "none",
+            "label_source_ref": null,
+            "target_definition_digest": null,
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000392",
+            "reason": "no verified service completion and matched follow-up"
+          },
+          {
+            "task": "pack_capability",
+            "status": "PARTIAL",
+            "evidence_class": "derived_from_physical",
+            "label_source_ref": "source:pack-topology",
+            "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000387",
+            "eligibility_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000393",
+            "reason": "unit hierarchy exists but complete electrical topology is incomplete"
+          }
+        ],
+        "artifact_policy": {
+          "registry_hosts_raw_data": false,
+          "raw_data_copied_into_registry": false,
+          "rights_lineage_required_for_derivatives": true
+        }
+      }
+    }
+  ]
+}
