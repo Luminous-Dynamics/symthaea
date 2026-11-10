@@ -20160,6 +20160,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "approx",
+ "blake3",
  "proptest",
  "rand 0.8.6",
  "serde",
