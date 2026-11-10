@@ -52,7 +52,13 @@ use crate::motif::Motif;
 use crate::phrase::Period;
 use crate::pitch::Pitch;
 use crate::rhythm::Duration;
-use crate::score::Score;
+use crate::score::{PartId, Score, VoiceRole};
+
+// These score-local identities persist through all four sections and the
+// 4/7/5/4 meter changes. Meter and role changes are not new performers.
+const PROG_LEAD_PART: PartId = PartId(0);
+const PROG_BASS_PART: PartId = PartId(1);
+const PROG_HARMONY_PART: PartId = PartId(2);
 
 /// One section's plan: which key, which meter, and which motif
 /// transformation (`None` = the theme unaltered).
@@ -140,8 +146,9 @@ pub(crate) fn realize_prog_suite(
         };
 
         let mut phrase_score = Score::new(key, tempo, sec.meter as u8);
-        crate::composer::realize_melody(
+        crate::composer::realize_melody_for_part(
             &mut phrase_score,
+            PROG_LEAD_PART,
             &form,
             intent,
             Duration::zero(),
@@ -153,8 +160,9 @@ pub(crate) fn realize_prog_suite(
         // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
         // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
         // and never read each other's state, so the emitted NOTES are unchanged.
-        crate::composer::realize_bass(
+        crate::composer::realize_bass_for_part(
             &mut phrase_score,
+            PROG_BASS_PART,
             &form,
             sec.meter,
             intent,
@@ -163,8 +171,9 @@ pub(crate) fn realize_prog_suite(
             true,
             false,
         );
-        crate::composer::realize_harmony(
+        crate::composer::realize_harmony_for_part(
             &mut phrase_score,
+            PROG_HARMONY_PART,
             &form,
             sec.meter,
             intent,
@@ -188,6 +197,55 @@ pub(crate) fn realize_prog_suite(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::pitch::PitchClass;
+
+    #[test]
+    fn prog_suite_keeps_three_part_identities_across_all_meter_changes() {
+        let intent = MusicalIntent {
+            bars: 4,
+            seed: 17,
+            tonic: PitchClass::C,
+            ..MusicalIntent::default()
+        };
+        let spec = crate::style::Style::ProgFolk.spec();
+        let home = Key::major(PitchClass::C);
+        let motif = spec.motif(intent.arousal, intent.seed);
+        let score = realize_prog_suite(home, spec.tempo(intent.arousal), &motif, intent.seed, &intent, &spec);
+
+        assert!(score.has_part_identity());
+        let actual: std::collections::BTreeSet<u16> =
+            score.parts().into_iter().map(|part| part.0).collect();
+        let expected: std::collections::BTreeSet<u16> =
+            [PROG_LEAD_PART.0, PROG_BASS_PART.0, PROG_HARMONY_PART.0]
+                .into_iter()
+                .collect();
+        assert_eq!(actual, expected);
+        assert!(score.notes.iter().all(|note| match note.part {
+            PROG_LEAD_PART => note.role == VoiceRole::Melody,
+            PROG_BASS_PART => note.role == VoiceRole::Bass,
+            PROG_HARMONY_PART => note.role == VoiceRole::Harmony,
+            _ => false,
+        }));
+
+        // The continuing lead and accompaniment identities survive all
+        // four section splices, including the foreign-meter bridge.
+        for (section_start, section_end) in [
+            (0.0, 16.0),  // A: 4 bars x 4 beats
+            (16.0, 44.0), // B: 4 bars x 7 beats
+            (44.0, 64.0), // C: 4 bars x 5 beats
+            (64.0, 80.0), // ReturnA: 4 bars x 4 beats
+        ] {
+            for part in [PROG_LEAD_PART, PROG_BASS_PART, PROG_HARMONY_PART] {
+                assert!(score.notes.iter().any(|note| {
+                    note.part == part
+                        && note.onset.beats() >= section_start
+                        && note.onset.beats() < section_end
+                }), "PartId {:?} missing from section [{section_start}, {section_end})", part);
+            }
+        }
+    }
+
     use super::*;
     use crate::motif::Motif;
     use crate::pitch::PitchClass;
