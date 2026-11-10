@@ -167,6 +167,51 @@ Track:
 
 NotaGen is a useful symbolic-composition comparator: its 2025 work reports pretraining on 1.6M ABC pieces, fine-tuning on about 9K classical compositions, and subjective A/B assessment involving 92 music-college participants. It evaluates musical and orchestral properties such as melody, harmony, orchestral balance, counterpoint and structure. Melothaea should include those human dimensions rather than substituting a single embedding similarity score.
 
+### 5.5 A Melothaea-native Musical Digital Thread benchmark
+
+Build a benchmark that tests the differentiating claim directly: can the system execute a musical intention while preserving identity and proving what changed?
+
+**Corpus design**
+
+| Cohort | Starting material | Purpose |
+|---|---|---|
+| Contract-generated | Programmatically generated scores, PartIds, relationship graphs, capability profiles and timelines | Exhaustive deterministic positive and negative controls |
+| Symbolic works | Licensed/consented MusicXML and MIDI with human-verified part and motif annotations | Generalization beyond Melothaea-generated scores |
+| Realized performances | Score-aligned stems, full mixes, renderer/patch manifests and, where available, performer/performance metadata | Cross-modal score-to-audio realization and edit preservation |
+
+Start with at least 300 contract-generated cases spanning all supported constraints and 100 adjudicated human-authored works. Expand toward 500–1,000 edit instructions after the annotation and scorer pipeline is stable. These are proposed dataset sizes, not existing results.
+
+**Each benchmark record should carry**
+
+- Immutable source score and score digest.
+- Persistent PartIds and source EventIds where the originating format actually supplies them; otherwise clearly marked digest-scoped ordinals.
+- Motif/theme lineage and relationship-graph version.
+- Explicit orchestration timeline, capability evidence references and renderer/patch qualifications.
+- Natural-language intent plus a normalized edit operation/plan.
+- Protected parts, events, time windows, relationships and audio stems.
+- Expected changed-event set, event-remap lineage and before/after symbolic constraints.
+- MIDI bytes and receipt, and—when rendered—stem/mix bytes, renderer build, patch/asset digests and render receipt.
+- Rights, consent, attribution and permitted-use metadata.
+
+**Splits must prevent leakage.** Partition by composition/work and composer/arranger, not by randomly sampled bars or fragments. Hold out selected instrument combinations, renderer/patch versions and styles to test transfer. Keep all variants of one source work in a single split. Keep private rubrics and challenge test data out of training and prompt-ranking loops.
+
+**Adversarial and negative-control families**
+
+1. Two independent parts share the same VoiceRole, pitch range or rhythmic pattern.
+2. One PartId changes function, instrument or register without becoming a new part.
+3. An imitation/canon relationship is structurally authored; a similar-looking passage is not.
+4. Planned silence versus missing/incomplete notation.
+5. Conflicting capability claims, stale evidence, unqualified renderer fallback or wrong patch mapping.
+6. Edit boundary lies on a rational subdivision, at a handoff, or just inside a protected region.
+7. Source note overlap is hidden by MIDI tick rounding; two different handoffs quantize to one tick.
+8. An edit changes one motif occurrence while all other occurrences must remain untouched.
+9. Multi-turn requests depend on prior receipts, undo, redo or changed preconditions.
+10. Audio edit requests alter a target stem while protected stems and their musical timing remain stable.
+
+**Report selective-risk curves.** For requests that cannot be grounded, cannot be realized by the qualified renderer, or conflict with protected constraints, measure both coverage and false-accept rate. A correct abstention is preferable to a fabricated success. Report acceptance coverage at fixed risk thresholds, not just raw success rate.
+
+**Ablations are mandatory.** Compare the full system against variants without (a) persistent PartIds, (b) relationship graph, (c) time-indexed orchestration/capability evidence, (d) digest-bound edit preconditions/event remaps, and (e) independent MIDI parsing/receipt checks. This will show whether each architectural layer produces measurable gains rather than merely adding metadata.
+
 ## 6. Fair comparison protocol
 
 For every model and pipeline, record:
