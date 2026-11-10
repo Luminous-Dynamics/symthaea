@@ -69,6 +69,10 @@ pub struct PitchSegmentMetadataV1 {
     pub song_id: String,
     pub recording_session_id: String,
     pub recording_condition_id: String,
+    pub language_id: String,
+    pub register_id: String,
+    pub technique_id: String,
+    pub snr_stratum_id: String,
     pub source_audio_sha256: String,
 }
 
@@ -321,6 +325,10 @@ fn validate_metadata(metadata: &PitchSegmentMetadataV1) -> Result<(), PitchBench
         &metadata.recording_condition_id,
         "recording_condition_id",
     )?;
+    require_non_empty(&metadata.language_id, "language_id")?;
+    require_non_empty(&metadata.register_id, "register_id")?;
+    require_non_empty(&metadata.technique_id, "technique_id")?;
+    require_non_empty(&metadata.snr_stratum_id, "snr_stratum_id")?;
     require_digest(&metadata.source_audio_sha256, "source_audio_sha256")?;
     Ok(())
 }
@@ -380,12 +388,12 @@ fn evaluate_segment(
         }
     }
 
-    segment_result(
+    Ok(segment_result(
         segment.metadata.clone(),
         counts,
         signed_errors,
         absolute_errors,
-    )
+    ))
 }
 
 fn segment_result(
@@ -393,7 +401,7 @@ fn segment_result(
     counts: PitchCountsV1,
     mut signed_errors: Vec<f64>,
     mut absolute_errors: Vec<f64>,
-) -> Result<PitchSegmentResultV1, PitchBenchmarkError> {
+) -> PitchSegmentResultV1 {
     signed_errors.sort_by(f64::total_cmp);
     absolute_errors.sort_by(f64::total_cmp);
     let signed_median = (!signed_errors.is_empty()).then(|| percentile_sorted(&signed_errors, 0.5));
@@ -404,7 +412,7 @@ fn segment_result(
     let absolute_max = absolute_errors.last().copied();
 
     let rates = derive_rates(&counts);
-    Ok(PitchSegmentResultV1 {
+    PitchSegmentResultV1 {
         metadata,
         counts,
         rates,
@@ -412,7 +420,7 @@ fn segment_result(
         median_absolute_cents_error: absolute_median,
         p95_absolute_cents_error: absolute_p95,
         maximum_absolute_cents_error: absolute_max,
-    })
+    }
 }
 
 fn validate_f0(
@@ -553,6 +561,10 @@ mod tests {
             song_id: format!("song-{segment}"),
             recording_session_id: format!("session-{segment}"),
             recording_condition_id: condition.to_owned(),
+            language_id: "en".to_owned(),
+            register_id: "middle".to_owned(),
+            technique_id: "straight-tone".to_owned(),
+            snr_stratum_id: "dry-clean".to_owned(),
             source_audio_sha256: digest('d'),
         }
     }
