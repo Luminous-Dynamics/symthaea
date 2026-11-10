@@ -21,7 +21,10 @@ fn field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
 }
 
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn add(errors: &mut Vec<String>, context: &str, message: impl AsRef<str>) {
