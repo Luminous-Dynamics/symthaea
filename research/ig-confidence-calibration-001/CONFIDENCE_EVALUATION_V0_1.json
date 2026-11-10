@@ -1,0 +1,353 @@
+{
+  "schema_version": "ig-confidence-evaluation-v0.1",
+  "benchmark_id": "IG-CONFIDENCE-CALIBRATION-001",
+  "status": "synthetic_known_answer_unexecuted",
+  "evaluation_identity": {
+    "provider": "synthetic-provider",
+    "model": "fixture-model",
+    "revision": "fixture-revision-0.1",
+    "prompt_family_sha256": "0000000000000000000000000000000000000000000000000000000000000067",
+    "task_scope": "factual_qa_binary_correctness",
+    "task_truth_profile": "SyntheticKnownAnswer"
+  },
+  "evaluation_dataset_sha256": "29d16aaf0d664240c932e4137b65b51de43947afd37a9c8d98e7fa836a701eca",
+  "minimum_observations": 20,
+  "calibration_profile": {
+    "status": "Calibrated",
+    "calibration_profile_sha256": "0000000000000000000000000000000000000000000000000000000000000065",
+    "calibration_report_sha256": "0000000000000000000000000000000000000000000000000000000000000066",
+    "method": "PlattScaling",
+    "model_identity": {
+      "provider": "synthetic-provider",
+      "model": "fixture-model",
+      "revision": "fixture-revision-0.1"
+    },
+    "prompt_family_sha256": "0000000000000000000000000000000000000000000000000000000000000067",
+    "task_scope": "factual_qa_binary_correctness",
+    "scale_id": "probability_of_correctness_v1",
+    "calibration_data": {
+      "fit_dataset_sha256": "00000000000000000000000000000000000000000000000000000000000000c9",
+      "validation_dataset_sha256": "00000000000000000000000000000000000000000000000000000000000000ca",
+      "sample_count": 1200,
+      "fit_group_ids": [
+        "fit-domain-a",
+        "fit-domain-b"
+      ],
+      "validation_group_ids": [
+        "validation-domain-a",
+        "validation-domain-b"
+      ],
+      "evaluation_group_ids": [
+        "test-high-confidence",
+        "test-low-confidence"
+      ]
+    },
+    "validator": {
+      "identity": "synthetic-independent-calibration-validator",
+      "version": "0.1.0"
+    }
+  },
+  "observations": [
+    {
+      "sample_id": "TEST-HIGH-01",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-02",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-03",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-04",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-05",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-06",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-07",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-08",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-09",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-10",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-11",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-12",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-13",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-14",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-15",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-16",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-17",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-18",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-19",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-20",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-HIGH-21",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-HIGH-22",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-HIGH-23",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-HIGH-24",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-HIGH-25",
+      "task_group_id": "test-high-confidence",
+      "probability_correct": 0.8,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-01",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-LOW-02",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-LOW-03",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-LOW-04",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-LOW-05",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": true
+    },
+    {
+      "sample_id": "TEST-LOW-06",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-07",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-08",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-09",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-10",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-11",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-12",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-13",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-14",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-15",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-16",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-17",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-18",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-19",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-20",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-21",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-22",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-23",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-24",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    },
+    {
+      "sample_id": "TEST-LOW-25",
+      "task_group_id": "test-low-confidence",
+      "probability_correct": 0.2,
+      "outcome_correct": false
+    }
+  ],
+  "claim_ceiling": "These synthetic known-answer forecasts validate metric code and profile binding only. They do not show real-model calibration, transfer, causal benefit, human calibration, or civic legitimacy."
+}
