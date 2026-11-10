@@ -42,7 +42,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003a98"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -157,7 +158,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003a99",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003a9a"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
@@ -237,7 +240,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003a9b"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -334,7 +338,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003a9c"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -449,7 +454,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003a9d",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003a9e"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
@@ -529,7 +536,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003a9f"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -644,7 +652,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003aa0",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003aa1"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
@@ -724,7 +734,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003aa2"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -839,7 +850,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003aa3",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003aa4"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
@@ -919,7 +932,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003aa5"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -1034,7 +1048,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003aa6",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003aa7"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
@@ -1114,7 +1130,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003aa8"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -1229,7 +1246,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003aa9",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003aaa"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
@@ -1309,7 +1328,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003aab"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -1424,7 +1444,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003aac",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003aad"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
@@ -1504,7 +1526,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003aae"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -1619,7 +1642,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003aaf",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003ab0"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
@@ -1699,7 +1724,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003ab1"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -1814,7 +1840,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003ab2",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003ab3"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
@@ -1894,7 +1922,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003ab4"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -2009,7 +2038,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003ab5",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003ab6"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
@@ -2089,7 +2120,8 @@
             "upper_cutoff_voltage_v": 4.2,
             "protocol_ref": "capacity-v1",
             "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000005",
-            "maximum_measurement_skew_ms": 1000
+            "maximum_measurement_skew_ms": 1000,
+            "condition_digest": "0000000000000000000000000000000000000000000000000000000000003ab7"
           },
           "resistance": {
             "condition_ref": "resistance-ref-25c-50soc",
@@ -2204,7 +2236,9 @@
               "soh_measurement_digest": "0000000000000000000000000000000000000000000000000000000000000067"
             }
           ],
-          "maximum_soh_measurement_age_ms": 5000
+          "maximum_soh_measurement_age_ms": 5000,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000003ab8",
+          "condition_digest": "0000000000000000000000000000000000000000000000000000000000003ab9"
         },
         "lifetime_evidence": {
           "eol_rule_ref": "synthetic-eol-rule-soh-0.85",
