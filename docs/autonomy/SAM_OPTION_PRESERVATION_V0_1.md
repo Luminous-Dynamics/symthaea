@@ -2,6 +2,7 @@
 
 Status: research evaluator / finite-envelope synthetic contract  
 Implementation: `symthaea_vehicle::option_preservation`  
+Canonical analytic conformance fixture: `fixtures/SAM_OPTION_PRESERVATION_CLAIRVOYANCE_TRAP_V0_1.json`  
 Owner: Symthaea; consumes Symtropy execution and upstream qualification receipts  
 Issue: #11291
 
@@ -84,6 +85,16 @@ The qualification receipt fields are passed through as upstream evidence identit
 - No probabilities are inferred from counts of references, hidden states, cells or actions.
 
 The expected-cell manifest is the finite universe being measured. Its BLAKE3 digest is recomputed from canonical serialized entries (sorted by complete cell key) to detect mutation and ordering ambiguity. This does not prove that the upstream manifest is exhaustive; completeness remains the responsibility of its owning scenario, action-domain, observation-partition and reference-qualification systems.
+
+### Persistent clairvoyance-trap fixture
+
+The canonical fixture at `fixtures/SAM_OPTION_PRESERVATION_CLAIRVOYANCE_TRAP_V0_1.json` encodes two hidden successor states with the same delivered observation:
+
+- Hidden state A: `brake` feasible, `coast` infeasible.
+- Hidden state B: `brake` infeasible, `coast` feasible.
+- Both cells share one observation-equivalence receipt and one class ID.
+
+The expected policy-level result is an empty robust lower set and empty possible upper set, while the clairvoyant union contains both actions; the clairvoyance gap is 2. The Rust test loads this persistent fixture, derives its canonical BLAKE3 manifest digest, and checks the result against the declared expected values. The fixture is analytic/synthetic only.
 
 ## 6. Benchmark plan
 
