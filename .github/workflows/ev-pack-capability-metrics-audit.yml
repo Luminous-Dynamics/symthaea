@@ -37,9 +37,9 @@ jobs:
             --corpus fixtures/ev_battery/pack_capability_metrics_v0_2.json \
             > "$RUNNER_TEMP/ev-pack-capability-metrics-report.json"
           jq -e '
-            .case_count == 8 and
+            .case_count == 11 and
             .accepted_count == 6 and
-            .rejected_count == 2 and
+            .rejected_count == 5 and
             (.report_sha256 | test("^[a-f0-9]{64}$")) and
             any(.cases[]; .case_id == "complete-qualified-series-pack" and
               .summary.inconsistency_metrics.sigma_soh.status == "COMPUTED")
