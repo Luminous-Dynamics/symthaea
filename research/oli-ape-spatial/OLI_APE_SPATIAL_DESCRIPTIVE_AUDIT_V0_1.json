@@ -1,0 +1,101 @@
+{
+  "schema_version": "oli-ape-spatial-descriptive-audit-v0.1",
+  "audit_id": "OLI-APE-SPATIAL-001-DESCRIPTIVE-001",
+  "source_manifest": "OLI-APE-SPATIAL-001-SOURCE-001",
+  "source_trial_file_git_blob_sha": "92499810019fb631fffb508dbacc1de2e550797b",
+  "method": {
+    "input_rows": 375,
+    "subjects": 25,
+    "trials_per_subject_per_condition": 3,
+    "conditions": 5,
+    "outcome": "correct / incorrect",
+    "uncertainty_method": "paired subject-cluster bootstrap",
+    "bootstrap_replicates": 12000,
+    "bootstrap_seed": 20261110,
+    "interval": "95% percentile interval",
+    "notes": [
+      "Participant names and demographic fields were not emitted.",
+      "Subjects, not trial rows, were resampled.",
+      "Each subject's three trials in a condition were retained together.",
+      "Intervals are descriptive bootstrap intervals, not a pre-registered confirmatory analysis."
+    ]
+  },
+  "condition_results": [
+    {
+      "condition": "no_displacement",
+      "subjects": 25,
+      "trials": 75,
+      "accuracy": 0.92,
+      "cluster_bootstrap_95": [0.8533, 0.9733]
+    },
+    {
+      "condition": "rotate",
+      "subjects": 25,
+      "trials": 75,
+      "accuracy": 0.6267,
+      "cluster_bootstrap_95": [0.5067, 0.7333]
+    },
+    {
+      "condition": "slide",
+      "subjects": 25,
+      "trials": 75,
+      "accuracy": 0.6133,
+      "cluster_bootstrap_95": [0.48, 0.7467]
+    },
+    {
+      "condition": "rotate-slide",
+      "subjects": 25,
+      "trials": 75,
+      "accuracy": 0.4933,
+      "cluster_bootstrap_95": [0.3867, 0.6]
+    },
+    {
+      "condition": "slide-rotate",
+      "subjects": 25,
+      "trials": 75,
+      "accuracy": 0.4933,
+      "cluster_bootstrap_95": [0.4, 0.5867]
+    }
+  ],
+  "paired_subject_differences": [
+    {
+      "contrast": "no_displacement - rotate",
+      "mean_difference": 0.2933,
+      "cluster_bootstrap_95": [0.16, 0.4267]
+    },
+    {
+      "contrast": "no_displacement - slide",
+      "mean_difference": 0.3067,
+      "cluster_bootstrap_95": [0.1467, 0.4667]
+    },
+    {
+      "contrast": "rotate - rotate-slide",
+      "mean_difference": 0.1333,
+      "cluster_bootstrap_95": [0.0133, 0.24]
+    },
+    {
+      "contrast": "slide - slide-rotate",
+      "mean_difference": 0.12,
+      "cluster_bootstrap_95": [0.0133, 0.24]
+    },
+    {
+      "contrast": "no_displacement - rotate-slide",
+      "mean_difference": 0.4267,
+      "cluster_bootstrap_95": [0.2933, 0.5467]
+    }
+  ],
+  "claim_ceiling": {
+    "supports": [
+      "A descriptive audit of one standardized study file.",
+      "A source-specific replication check of the expected condition-difficulty ordering.",
+      "The need to retain subject-level repeated-measures structure."
+    ],
+    "does_not_support": [
+      "A pooled or universal intelligence score.",
+      "A ranking of ape species.",
+      "A claim about consciousness, sentience or moral status.",
+      "Generalization to other species, studies, laboratories or cognitive domains.",
+      "A confirmatory inferential result."
+    ]
+  }
+}
