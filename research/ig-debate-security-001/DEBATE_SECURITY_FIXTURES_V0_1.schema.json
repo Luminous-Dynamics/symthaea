@@ -1,0 +1,389 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-debate-security-001/DEBATE_SECURITY_FIXTURES_V0_1.schema.json",
+  "title": "IG-DEBATE-SECURITY-001 fixture manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "owning_issue",
+    "parent_hostile_agent_bench",
+    "stance_shift_benchmark",
+    "communication_graph_owner",
+    "delegation_graph_owner",
+    "fixture_count",
+    "family_count",
+    "families",
+    "fixtures",
+    "terminal_outcomes",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-debate-security-fixtures-v0.1"
+    },
+    "benchmark_id": {
+      "const": "IG-DEBATE-SECURITY-001"
+    },
+    "status": {
+      "enum": [
+        "synthetic_fixture_design_unexecuted",
+        "synthetic_fixture_design_frozen"
+      ]
+    },
+    "owning_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "parent_hostile_agent_bench": {
+      "type": "string",
+      "format": "uri"
+    },
+    "stance_shift_benchmark": {
+      "type": "string",
+      "format": "uri"
+    },
+    "communication_graph_owner": {
+      "type": "string",
+      "format": "uri"
+    },
+    "delegation_graph_owner": {
+      "type": "string",
+      "format": "uri"
+    },
+    "fixture_count": {
+      "type": "integer",
+      "minimum": 30
+    },
+    "family_count": {
+      "type": "integer",
+      "minimum": 6
+    },
+    "families": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "effect_type",
+          "objective"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "effect_type": {
+            "enum": [
+              "Read",
+              "Write",
+              "CapabilityChange",
+              "StateTransition"
+            ]
+          },
+          "objective": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 30,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "family_id",
+          "variant_id",
+          "class",
+          "scenario_ref",
+          "environment",
+          "actor_instance_ids",
+          "principal_refs",
+          "communication_graph_ref",
+          "communication_event_ids",
+          "delegation_graph_ref",
+          "attack_objective",
+          "attempted_action",
+          "target_ref",
+          "organism_positive_control",
+          "organism_attempt_observed",
+          "answer_status",
+          "action_attempted",
+          "effect_record",
+          "expected_terminal_classification",
+          "claim_ceiling"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "pattern": "^DEBSEC-[0-9]{3}$"
+          },
+          "family_id": {
+            "type": "string"
+          },
+          "variant_id": {
+            "type": "string"
+          },
+          "class": {
+            "enum": [
+              "organism_positive_control",
+              "benign_control",
+              "trace_integrity_negative_control",
+              "collusion_control",
+              "defense_control"
+            ]
+          },
+          "scenario_ref": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "network_access",
+              "real_data_access",
+              "external_tools",
+              "synthetic_workspace",
+              "seed"
+            ],
+            "properties": {
+              "mode": {
+                "enum": [
+                  "PermissiveControl",
+                  "KernelEnforced",
+                  "BenignControl",
+                  "Collusive",
+                  "MissingTrace"
+                ]
+              },
+              "network_access": {
+                "const": "none"
+              },
+              "real_data_access": {
+                "const": "none"
+              },
+              "external_tools": {
+                "const": "none"
+              },
+              "synthetic_workspace": {
+                "const": true
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "actor_instance_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "principal_refs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "communication_graph_ref": {
+            "type": "string"
+          },
+          "communication_event_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "delegation_graph_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attack_objective": {
+            "type": "string"
+          },
+          "attempted_action": {
+            "enum": [
+              "ReadObject",
+              "WriteObject",
+              "AcquireCapability",
+              "ChangeState",
+              "None"
+            ]
+          },
+          "target_ref": {
+            "type": "string"
+          },
+          "organism_positive_control": {
+            "type": "boolean"
+          },
+          "organism_attempt_observed": {
+            "type": "boolean"
+          },
+          "answer_status": {
+            "enum": [
+              "Correct",
+              "Incorrect",
+              "NotScored"
+            ]
+          },
+          "action_attempted": {
+            "type": "boolean"
+          },
+          "effect_record": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "effect_type",
+              "authorization_status",
+              "actor_instance_id",
+              "target_ref",
+              "before_state_sha256",
+              "after_state_sha256",
+              "read_payload_sha256",
+              "action_receipt_sha256",
+              "effect_receipt_sha256",
+              "observer_receipt_sha256",
+              "observer_id",
+              "observer_version"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "Occurred",
+                  "Blocked",
+                  "None",
+                  "Unknown"
+                ]
+              },
+              "effect_type": {
+                "enum": [
+                  "Read",
+                  "Write",
+                  "CapabilityChange",
+                  "StateTransition",
+                  "None"
+                ]
+              },
+              "authorization_status": {
+                "enum": [
+                  "Denied",
+                  "Allowed",
+                  "NotApplicable",
+                  "Unknown"
+                ]
+              },
+              "actor_instance_id": {
+                "type": "string"
+              },
+              "target_ref": {
+                "type": "string"
+              },
+              "before_state_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "after_state_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "read_payload_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "action_receipt_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "effect_receipt_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "observer_receipt_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "observer_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "observer_version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "expected_terminal_classification": {
+            "enum": [
+              "NoAttackAttempted",
+              "AttackAttemptedBlocked",
+              "AttackPartiallySucceededNoEffect",
+              "UnauthorizedReadOccurred",
+              "UnauthorizedWriteOccurred",
+              "UnauthorizedCapabilityOrPermitAcquired",
+              "UnauthorizedStateTransitionOccurred",
+              "EvaluatorInfrastructureFailure",
+              "InconclusiveOrganism",
+              "InvalidOrIncompleteTrace"
+            ]
+          },
+          "claim_ceiling": {
+            "type": "string",
+            "minLength": 40
+          }
+        }
+      }
+    },
+    "terminal_outcomes": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 60
+    }
+  }
+}
