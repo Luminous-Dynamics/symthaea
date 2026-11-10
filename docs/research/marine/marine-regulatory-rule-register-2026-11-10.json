@@ -240,36 +240,63 @@
       "rule_id": "NE-ATLANTIC-ECA-2026",
       "title": "North-East Atlantic Emission Control Area",
       "authority": "International Maritime Organization",
-      "instrument": "MARPOL Annex VI amendment adopted at MEPC 84",
-      "revision_or_resolution": "MEPC 84, 27 April–1 May 2026",
+      "instrument": "MARPOL Annex VI amendment adopted by MEPC 84",
+      "revision_or_resolution": "Resolution MEPC.407(84)",
       "rule_status": "adopted",
       "legal_character": "adopted_amendment_future_application",
       "dates": {
         "adopted_on": "2026-05-01",
-        "applies_from_year": 2028
+        "entry_into_force_on": "2027-09-01",
+        "applies_from": "2027-09-01",
+        "applies_through": ""
       },
       "applicability": {
         "ship_scope": "Ships subject to MARPOL Annex VI sulphur requirements while operating within the designated ECA.",
-        "geographic_scope": "North-East Atlantic ECA; use the adopted boundary charts/coordinates rather than a hand-drawn approximation.",
+        "geographic_scope": "North-East Atlantic ECA, covering designated EEZs and territorial seas extending up to 200 nautical miles from the baselines of Greenland, Iceland, the Faroe Islands, Ireland, the United Kingdom, France, Spain and Portugal; apply the official adopted coordinates.",
         "voyage_scope": "Voyage legs and port/operational segments within the ECA after the effective application date.",
         "conditions": [
-          "0.10% sulphur limit applies within the ECA from the applicable date in 2028."
+          "The amendment enters into force on 1 September 2027.",
+          "SOx/PM ECA fuel-sulphur requirements (0.10% m/m) apply from 1 September 2028, following the one-year delay under MARPOL Annex VI regulation 14.6.",
+          "NOx Tier III applies to relevant marine diesel engines over 130 kW on ships operating in the ECA where the building contract is placed on or after 1 January 2027; if no building contract, keel laid/on similar stage on or after 1 July 2027; or delivered on or after 1 January 2031.",
+          "Ship design/build milestones and route entry date must both be resolved; a single ECA effective date is not sufficient for NOx applicability."
         ],
         "exclusions_or_unknowns": [
-          "Exact implementation date and charted coordinates must be read from the adopted MARPOL amendment and official charts.",
-          "This is a local air-pollution requirement, not a WtW GHG factor."
+          "Exact legal scope and coordinates must be read from Resolution MEPC.407(84), its certification/entry-into-force status and charted geographic boundary.",
+          "SOx/PM operational sulphur requirements start 1 September 2028, not on the general 1 September 2027 entry-into-force date.",
+          "NOx Tier III is construction-date dependent and applies only to relevant engines/ships under MARPOL Annex VI.",
+          "This is a local air-pollution requirement, not a lifecycle-GHG factor."
         ]
       },
       "output_scope": [
-        "fuel sulphur limit",
-        "ECA geographic segment classification"
+        "ECA geographic segment classification",
+        "SOx/PM sulphur 0.10% limit from 1 September 2028",
+        "NOx Tier III ship-construction-date applicability from ECA entry into force",
+        "versioned rule and coordinate provenance"
       ],
       "source_ids": [
         "IMO-NE-ATLANTIC-ECA-2026"
       ],
       "limitations": [
         "Adoption is distinct from application; route geometry alone does not establish fuel compliance."
-      ]
+      ],
+      "calculation_contract": {
+        "metric_id": "nea_eca_applicability",
+        "formula_or_method": "Evaluate route-segment intersection with the official MEPC.407(84) polygon and the voyage date. Evaluate SOx/PM fuel sulphur requirements from 2028-09-01. Separately evaluate NOx Tier III engine/ship applicability against building contract, keel-laying/similar-stage and delivery dates, engine power threshold, and operation in the ECA.",
+        "phase_in": [
+          {
+            "year": 2027,
+            "value": 1,
+            "unit": "date",
+            "meaning": "ECA amendment enters into force 1 September 2027; NOx Tier III applies for eligible new ships with build contract from 1 January 2027, keel from 1 July 2027 or delivery from 1 January 2031."
+          },
+          {
+            "year": 2028,
+            "value": 0.1,
+            "unit": "percent_sulphur_mass",
+            "meaning": "SOx/PM fuel sulphur ceiling 0.10% m/m from 1 September 2028."
+          }
+        ]
+      }
     },
     {
       "rule_id": "IMO-NETZERO-FRAMEWORK-STATUS-2026-11-10",
