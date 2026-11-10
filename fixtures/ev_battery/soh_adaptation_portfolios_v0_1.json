@@ -51,7 +51,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -59,7 +60,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -210,7 +212,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -218,7 +221,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -369,7 +373,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -377,7 +382,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -528,7 +534,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -536,7 +543,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -687,7 +695,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -695,7 +704,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -774,7 +784,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -782,7 +793,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -933,7 +945,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -941,7 +954,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -1092,7 +1106,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -1100,7 +1115,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -1251,7 +1267,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -1259,7 +1276,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -1410,7 +1428,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -1418,7 +1437,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -1569,7 +1589,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -1577,7 +1598,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -1728,7 +1750,8 @@
               "available_at_ms": 1001,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -1736,7 +1759,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -1887,7 +1911,8 @@
               "available_at_ms": 900,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             },
             {
               "feature_id": "early_prefix_slope",
@@ -1895,7 +1920,8 @@
               "available_at_ms": 950,
               "requires_target_labels": false,
               "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
-              "evidence_class": "synthetic_fixture"
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
             }
           ]
         },
@@ -1994,6 +2020,417 @@
           }
         ],
         "selected_expert_id": "zero"
+      }
+    },
+    {
+      "case_id": "router-feature-derived-from-target-labels",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "router-feature-derived-from-target-labels",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": true
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142",
+            "adaptation_completed_at_ms": 1000
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "adaptation_completed_at_ms": 1100
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
+            "adaptation_completed_at_ms": 1100
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc",
+            "adaptation_completed_at_ms": 1100
+          }
+        ],
+        "selected_expert_id": "zero"
+      }
+    },
+    {
+      "case_id": "expert-adaptation-completes-after-test-access",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "expert-adaptation-completes-after-test-access",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "zero",
+            "strategy": "zero_shot",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000de",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000142",
+            "adaptation_completed_at_ms": 1000
+          },
+          {
+            "expert_id": "tta",
+            "strategy": "unlabeled_tta",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d8",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 2,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 20,
+            "wall_time_ms": 12000,
+            "peak_memory_bytes": 100000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "adaptation_completed_at_ms": 1300
+          },
+          {
+            "expert_id": "ft",
+            "strategy": "supervised_finetune",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "minimum_support_group_count": 0,
+            "max_updates": 50,
+            "wall_time_ms": 20000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
+            "adaptation_completed_at_ms": 1100
+          },
+          {
+            "expert_id": "maml",
+            "strategy": "few_shot_maml",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+            "target_adaptation_group_identity_digests": [
+              "0000000000000000000000000000000000000000000000000000000000000014",
+              "0000000000000000000000000000000000000000000000000000000000000015"
+            ],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 2,
+            "labeled_target_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "minimum_support_group_count": 2,
+            "max_updates": 100,
+            "wall_time_ms": 30000,
+            "peak_memory_bytes": 200000000,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "not_selected",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000000cc",
+            "adaptation_completed_at_ms": 1100
+          }
+        ],
+        "selected_expert_id": "tta"
+      }
+    },
+    {
+      "case_id": "abstain-expert-claims-prediction-result",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-adaptation-portfolio/0.1",
+        "portfolio_id": "abstain-expert-claims-prediction-result",
+        "parent_benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "evaluation_mode": "unseen_domain",
+        "split_frozen_at_ms": 800,
+        "test_accessed_at_ms": 1200,
+        "source_domain_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "target_domain": {
+          "domain_id": "target-domain-1",
+          "adaptation_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015",
+            "0000000000000000000000000000000000000000000000000000000000000016"
+          ],
+          "evaluation_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000001e",
+            "000000000000000000000000000000000000000000000000000000000000001f"
+          ]
+        },
+        "router": {
+          "router_ref": "source-domain-adaptation-gate-v1",
+          "router_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000005",
+          "training_group_identity_digests": [
+            "000000000000000000000000000000000000000000000000000000000000000a",
+            "000000000000000000000000000000000000000000000000000000000000000b",
+            "000000000000000000000000000000000000000000000000000000000000000c"
+          ],
+          "fit_scope": "source_domains_only",
+          "uses_target_evaluation_labels": false,
+          "selection_time_ms": 1000,
+          "selection_receipt_digest": "0000000000000000000000000000000000000000000000000000000000000006",
+          "features": [
+            {
+              "feature_id": "target_cell_count",
+              "feature_scope": "fleet_metadata",
+              "available_at_ms": 900,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000007",
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
+            },
+            {
+              "feature_id": "early_prefix_slope",
+              "feature_scope": "sensor_prefix",
+              "available_at_ms": 950,
+              "requires_target_labels": false,
+              "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000008",
+              "evidence_class": "synthetic_fixture",
+              "derived_from_target_labels": false
+            }
+          ]
+        },
+        "experts": [
+          {
+            "expert_id": "abstain",
+            "strategy": "abstain",
+            "model_digest": "00000000000000000000000000000000000000000000000000000000000000c5",
+            "target_adaptation_group_identity_digests": [],
+            "unlabeled_target_group_budget": 0,
+            "labeled_target_group_budget": 0,
+            "labeled_target_evidence_digest": null,
+            "minimum_support_group_count": 0,
+            "max_updates": 0,
+            "wall_time_ms": 0,
+            "peak_memory_bytes": 0,
+            "energy_wh": null,
+            "evaluation_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000001e",
+              "000000000000000000000000000000000000000000000000000000000000001f"
+            ],
+            "selection_status": "abstain",
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000003e7",
+            "adaptation_completed_at_ms": 1000
+          }
+        ],
+        "selected_expert_id": "abstain"
       }
     }
   ]
