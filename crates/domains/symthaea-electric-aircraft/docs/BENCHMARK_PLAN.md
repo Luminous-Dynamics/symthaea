@@ -85,3 +85,17 @@ These are internal research goals, not industry-standard thresholds or demonstra
 A stretch goal is not an acceptance criterion until its measurement protocol and baseline are preregistered and independently reviewed.
 
 Do not adopt a generic motor kW/kg target from a different mass boundary. NASA's HEMM >16 kW/kg electromagnetic design objective is a higher motor-design reference but excludes the complete installed-system boundary needed for an aircraft comparison. BETA's H500B lists 6.0 kW/kg maximum and 4.2 kW/kg continuous, alongside 640 kW maximum, 300 kW continuous and 75 kg installed including inverters; because those stated values do not reconcile exactly to one denominator, preserve the published values and mark the specific-power comparison unresolved. First establish a common motor-only and motor+inverter+cooling+mounts boundary, at both peak and thermally steady continuous duty, before setting a Luminous numerical target.
+
+## Mission thermal derating overlay (v0.1)
+
+The `mission_thermal` module adds a thermal feasibility overlay between mission reports and the multi-node RC network. It reconstructs battery I²R, inverter and motor losses; applies temperature-dependent power capability curves at battery-terminal, inverter-DC-input and motor-shaft-output boundaries; and advances the thermal network with bounded substeps. Cold-side and hot-side capability behaviour can both be represented. Out-of-domain temperatures, segment/profile mismatch, component power exceedance and node ceiling exceedance fail closed. See [MISSION_THERMAL_DERATING.md](MISSION_THERMAL_DERATING.md).
+
+Internal validation targets after instrumentation and physical correlation (not achieved):
+- Component temperature RMSE <2 K, with empirical 95% prediction-interval coverage on an independent holdout.
+- Peak-temperature absolute error <5 K and peak-time error <5% of segment duration.
+- Zero false-safe observations against independent held-out component power-limit tests under the declared test matrix; false derates reported separately.
+- Reconstructed component power-loss error <3% against instrumented battery, inverter and motor measurements under matched boundaries.
+- Mission energy bias within ±3% / RMSE <5% after integrated mission validation.
+- At least 100× faster-than-real-time execution for a frozen representative mission on a documented commodity CPU, with accuracy and failed cases disclosed.
+
+The overlay is not a fully iterated electro-thermal solution. Temperatures do not yet update OCV/resistance or propulsion-efficiency maps, and mission energy is not re-solved after derating. Passing it is not evidence of battery safety, flight performance or certification. Tier promotion still requires independent physical subsystem and integrated-rig data.
