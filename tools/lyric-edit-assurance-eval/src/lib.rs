@@ -1295,6 +1295,81 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_expected_groups_are_rejected() {
+        let mut spec = benchmark_spec();
+        spec.expected_groups.push(spec.expected_groups[0].clone());
+        assert!(evaluate_edit_benchmark(
+            &spec,
+            &[case_spec()],
+            &[produced_execution()],
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn general_audio_edit_can_use_a_non_lyric_rubric_profile() {
+        let mut spec = benchmark_spec();
+        spec.expected_groups[0].operation = EditOperationV1::GeneralAudioEdit;
+        spec.expected_groups[0].timbre_mode = TimbreModeV1::NotApplicable;
+
+        let mut case = case_spec();
+        case.operation = EditOperationV1::GeneralAudioEdit;
+        case.timbre_mode = TimbreModeV1::NotApplicable;
+        case.timbre_reference_sha256 = None;
+        case.original_lyrics_sha256 = None;
+        case.requested_lyrics_sha256 = None;
+
+        let report = evaluate_edit_benchmark(
+            &spec,
+            &[case],
+            &[produced_execution()],
+        )
+        .unwrap();
+        assert_eq!(report.exact_match_rate, 1.0);
+        assert_eq!(report.groups[0].group.operation, EditOperationV1::GeneralAudioEdit);
+    }
+
+    #[test]
+    fn produced_case_requires_output_digest_and_no_failure_receipt() {
+        let mut missing_output = produced_execution();
+        missing_output.output_audio_sha256 = None;
+        assert!(evaluate_one(case_spec(), missing_output).is_err());
+
+        let mut conflicting = produced_execution();
+        conflicting.failure_receipt_sha256 = Some(digest('8'));
+        assert!(evaluate_one(case_spec(), conflicting).is_err());
+    }
+
+    #[test]
+    fn nonproduced_case_requires_failure_receipt_and_no_observations() {
+        let missing_receipt = EditCaseExecutionV1 {
+            sample_id: "sample-001".to_owned(),
+            status: ExecutionStatusV1::Failed,
+            output_audio_sha256: None,
+            failure_receipt_sha256: None,
+            observations: Vec::new(),
+        };
+        assert!(evaluate_one(case_spec(), missing_receipt).is_err());
+
+        let mut has_observations = EditCaseExecutionV1 {
+            sample_id: "sample-001".to_owned(),
+            status: ExecutionStatusV1::Abstained,
+            output_audio_sha256: None,
+            failure_receipt_sha256: Some(digest('8')),
+            observations: Vec::new(),
+        };
+        has_observations.observations.push(observation(
+            "lyric-realization",
+            "phoneme-error-rate",
+            "ratio",
+            0.1,
+            0.1,
+            "singing-asr",
+        ));
+        assert!(evaluate_one(case_spec(), has_observations).is_err());
+    }
+
+    #[test]
     fn per_group_metrics_are_reported_without_collapsing_task_types() {
         let mut spec = benchmark_spec();
         spec.expected_groups.push(EditStratumKeyV1 {
