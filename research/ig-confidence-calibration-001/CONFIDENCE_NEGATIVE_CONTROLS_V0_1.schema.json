@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-confidence-calibration-001/CONFIDENCE_NEGATIVE_CONTROLS_V0_1.schema.json",
+  "title": "IG confidence calibration negative-control manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "evaluation_bundle_path",
+    "evaluation_schema_path",
+    "fixture_count",
+    "fixtures",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-confidence-negative-controls-v0.1"
+    },
+    "benchmark_id": {
+      "const": "IG-CONFIDENCE-CALIBRATION-001"
+    },
+    "status": {
+      "enum": [
+        "synthetic_negative_controls_unexecuted",
+        "synthetic_negative_controls_frozen"
+      ]
+    },
+    "evaluation_bundle_path": {
+      "type": "string",
+      "minLength": 10
+    },
+    "evaluation_schema_path": {
+      "type": "string",
+      "minLength": 10
+    },
+    "fixture_count": {
+      "type": "integer",
+      "minimum": 20
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "description",
+          "mutation",
+          "expected_violations"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20
+          },
+          "mutation": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "path",
+              "value"
+            ],
+            "properties": {
+              "operation": {
+                "enum": [
+                  "set",
+                  "remove"
+                ]
+              },
+              "path": {
+                "type": "string"
+              },
+              "value": {}
+            }
+          },
+          "expected_violations": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 60
+    }
+  }
+}
