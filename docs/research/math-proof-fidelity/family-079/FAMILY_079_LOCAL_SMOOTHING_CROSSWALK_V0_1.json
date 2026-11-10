@@ -184,8 +184,8 @@
           "paper_claim": "Bochner-Riesz uniform, maximal and convergence estimates",
           "paper_location": "introduction.tex, Theorem thm:bochner-riesz",
           "declarations": [
-            "OAI.Analysis.Fourier.BochnerRiesz.bo​​chner_riesz",
-            "OAI.Analysis.Fourier.BochnerRiesz.bo​​chner_riesz_schwartz",
+            "OAI.Analysis.Fourier.BochnerRiesz.bochner_riesz",
+            "OAI.Analysis.Fourier.BochnerRiesz.bochner_riesz_schwartz",
             "OAI.Analysis.Fourier.BochnerRiesz.BochnerRieszMainTheorem"
           ],
           "source_blobs": [
