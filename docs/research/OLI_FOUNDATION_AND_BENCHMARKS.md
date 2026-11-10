@@ -158,6 +158,16 @@ A claimed OLI advantage must be stated on a matched task:
 
 The strongest baseline must be allowed to win. A result on Avida is not a result on py-GC-MS; a simulated reaction–diffusion pattern is not a field observation; a NASA framework is not a product classifier. Publish per-domain failures and uncertainty, not a pooled leaderboard score that hides them.
 
+
+### Exact confidence-bound sample sizes
+
+For zero observed errors, the one-sided 95% Clopper–Pearson upper bound is (1-0.05^{1/n}). Therefore:
+- at least **299 independent abiotic negatives with zero false positives** are required to bound the false-positive rate below 1%;
+- at least **59 independent, adequately observable biological/digital positives with zero false negatives** are required to bound the false-negative rate below 5%;
+- at least **2,995 independent negatives with zero false positives** are required to bound the false-positive rate below 0.1%.
+
+These are per claimed population/stratum. A pooled count cannot substantiate a bound for each substrate, instrument, timescale, or abiotic generator family. Frames, pixels, time windows, rotations and repeated measurements from the same source system are not independent systems.
+
 ### Post-detection protocol extension for OLI
 
 Use the 2026 IAA SETI update as a governance comparator, while recognizing that its legal and institutional scope is not automatically transferable to non-human biological or ecological discoveries. An OLI candidate report should at minimum preserve:
