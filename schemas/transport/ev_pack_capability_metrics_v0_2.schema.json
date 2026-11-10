@@ -180,7 +180,8 @@
             "lower_cutoff_voltage_v",
             "upper_cutoff_voltage_v",
             "protocol_ref",
-            "protocol_digest"
+            "protocol_digest",
+            "maximum_measurement_skew_ms"
           ],
           "properties": {
             "condition_ref": {
@@ -209,6 +210,10 @@
             "protocol_digest": {
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
+            },
+            "maximum_measurement_skew_ms": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         },
@@ -310,7 +315,8 @@
               "evidence_class",
               "method",
               "evidence_digest",
-              "condition_ref"
+              "condition_ref",
+              "measurement_time_ms"
             ],
             "properties": {
               "value_ah": {
@@ -342,6 +348,10 @@
               "condition_ref": {
                 "type": "string",
                 "minLength": 1
+              },
+              "measurement_time_ms": {
+                "type": "integer",
+                "minimum": 0
               }
             }
           },
@@ -402,7 +412,8 @@
         "condition_ref",
         "maximum_sample_skew_ms",
         "snapshot_digest",
-        "observations"
+        "observations",
+        "maximum_soh_measurement_age_ms"
       ],
       "properties": {
         "event_type": {
@@ -439,7 +450,8 @@
               "soc_fraction",
               "sample_time_ms",
               "evidence_digest",
-              "evidence_class"
+              "evidence_class",
+              "soh_measurement_digest"
             ],
             "properties": {
               "unit_ref": {
@@ -468,9 +480,17 @@
                   "synthetic_fixture",
                   "vendor_claim"
                 ]
+              },
+              "soh_measurement_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
               }
             }
           }
+        },
+        "maximum_soh_measurement_age_ms": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
@@ -481,7 +501,12 @@
         "eol_rule_ref",
         "eol_threshold_soh_fraction",
         "evidence_digest",
-        "units"
+        "units",
+        "pack_configuration_digest",
+        "eol_rule_digest",
+        "service_history_digest",
+        "efc_method_ref",
+        "efc_method_digest"
       ],
       "properties": {
         "eol_rule_ref": {
@@ -554,6 +579,26 @@
               }
             }
           }
+        },
+        "pack_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "eol_rule_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "service_history_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "efc_method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "efc_method_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       }
     }
