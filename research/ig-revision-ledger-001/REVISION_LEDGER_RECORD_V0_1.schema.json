@@ -389,8 +389,7 @@
             "minLength": 1
           },
           "channel_event_id": {
-            "type": "string",
-            "minLength": 1
+            "type": "string"
           },
           "channel_event_sha256": {
             "type": "string",
