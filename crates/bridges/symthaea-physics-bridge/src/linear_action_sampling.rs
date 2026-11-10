@@ -212,7 +212,7 @@ fn finite_difference_gradient(
     action_coordinate_indices: &[usize],
     sample: &LinearActionSampleV1,
     profile: LinearActionSamplingProfileV1,
-) -> Result<(Vec<f64>, f64), LinearActionSamplingErrorV1> {
+) -> Result<(Vec<f64>, f64, f64), LinearActionSamplingErrorV1> {
     let dimension = action_coordinate_indices.len();
     let direction_scale = sample
         .direction_basis
