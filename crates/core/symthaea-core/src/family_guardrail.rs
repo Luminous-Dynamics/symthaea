@@ -676,8 +676,22 @@ mod tests {
         let two_families = manifest(1, 0.4);
         let mut one = FamilyGuardrailVerifier::new(one_family).unwrap();
         let mut two = FamilyGuardrailVerifier::new(two_families).unwrap();
-        let one_report = feed_family(&mut one, "only", "only", 0.5);
-        let two_report = feed_family(&mut two, "bearing", "bearing", 0.5);
+        let mut one_report = one.report().unwrap();
+        let mut two_report = two.report().unwrap();
+        for index in 0..256 {
+            one_report = one.observe(FamilyPairedLossObservation {
+                family_id: "only".to_owned(),
+                episode_id: format!("only-{index:04}"),
+                baseline_loss: 0.5,
+                candidate_loss: 0.5,
+            }).unwrap();
+            two_report = two.observe(FamilyPairedLossObservation {
+                family_id: "bearing".to_owned(),
+                episode_id: format!("bearing-{index:04}"),
+                baseline_loss: 0.5,
+                candidate_loss: 0.5,
+            }).unwrap();
+        }
         assert_eq!(
             one_report.family_results[0].lower_improvement_bound,
             two_report.family_results[0].lower_improvement_bound
