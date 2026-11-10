@@ -340,6 +340,23 @@ mod tests {
     }
 
     #[test]
+    fn adverse_capacity_corner_can_fail_reserve_while_nominal_passes() {
+        let input = baseline();
+        let budget = MissionUncertaintyBudget {
+            battery_capacity_fraction: 0.50,
+            ..MissionUncertaintyBudget::default()
+        };
+        let report = evaluate_mission_robust(&input, &budget).unwrap();
+
+        assert!(report.nominal.energy_margin_wh > 0.0);
+        assert!(matches!(
+            &report.adverse_corner_result,
+            Err(ModelError::ReserveInfringed { .. })
+        ));
+        assert!(!report.is_feasible_at_adverse_corner());
+    }
+
+    #[test]
     fn uncertainty_budget_rejects_non_finite_and_unit_fractions() {
         let input = baseline();
         let mut invalid = MissionUncertaintyBudget::default();
