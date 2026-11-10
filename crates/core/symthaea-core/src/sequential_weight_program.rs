@@ -13,9 +13,10 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::family_guardrail::{FamilyGuardrailStatus, FamilyGuardrailVerifier};
 use crate::sequential_weight_verification::{
-    SequentialWeightVerificationError, SequentialWeightVerificationReport,
-    validate_qualified_report,
+    ConfirmatoryEpisodeManifest, SequentialWeightVerificationError,
+    SequentialWeightVerificationReport, validate_qualified_report,
 };
 use crate::weight_space_program::{
     ValidatedWeightCandidate, WeightModelSnapshot, WeightProgram, WeightProgramError,
@@ -105,6 +106,10 @@ pub struct SequentialStepReceipt {
     pub precondition_gate_digest: String,
     /// Anytime-valid paired-loss report bound into the signed verifier claims.
     pub statistical_verification_report_digest: String,
+    /// All-preregistered-families non-inferiority report bound into the signed claims.
+    pub family_guardrail_report_digest: String,
+    /// Combined aggregate-plus-family alpha budget, stored as exact IEEE-754 bits.
+    pub combined_campaign_alpha_budget_bits: u64,
     pub previous_step_receipt_digest: Option<String>,
     pub cumulative_l2_path_after: f64,
     pub cumulative_parameter_change_events_after: usize,
@@ -138,12 +143,17 @@ pub struct SequentialVerifierAttestationClaims {
     pub precondition_gate_digest: String,
     /// Qualified anytime-valid paired-loss report digest.
     pub statistical_verification_report_digest: String,
+    /// Qualified all-families non-inferiority report digest.
+    pub family_guardrail_report_digest: String,
+    /// Preregistered combined alpha budget, stored as exact IEEE-754 bits.
+    pub combined_campaign_alpha_budget_bits: u64,
     /// False is a signed rejection. A verifier must never sign true before all
     /// required tests and negative controls have completed.
     pub accepted: bool,
 }
 
-/// Digest binding obtained only by validating a qualified statistical report.
+/// Digest binding obtained only after independent aggregate and family-level
+/// statistical reports have been recomputed and matched to one frozen candidate.
 ///
 /// Fields are private so callers cannot manufacture a binding from arbitrary
 /// digest strings; use [`bind_sequential_verification_evidence`] instead.
@@ -151,6 +161,8 @@ pub struct SequentialVerifierAttestationClaims {
 pub struct SequentialVerifierEvidenceBinding {
     precondition_gate_digest: String,
     statistical_verification_report_digest: String,
+    family_guardrail_report_digest: String,
+    combined_campaign_alpha_budget_bits: u64,
 }
 
 impl SequentialVerifierEvidenceBinding {
@@ -159,21 +171,35 @@ impl SequentialVerifierEvidenceBinding {
         &self.precondition_gate_digest
     }
 
-    /// Digest of the independently qualified sequential statistical report.
+    /// Digest of the independently qualified aggregate sequential report.
     pub fn statistical_verification_report_digest(&self) -> &str {
         &self.statistical_verification_report_digest
     }
+
+    /// Digest of the independently qualified all-family non-inferiority report.
+    pub fn family_guardrail_report_digest(&self) -> &str {
+        &self.family_guardrail_report_digest
+    }
+
+    /// Exact preregistered total alpha budget included in the verifier's signed claims.
+    pub fn combined_campaign_alpha_budget_bits(&self) -> u64 {
+        self.combined_campaign_alpha_budget_bits
+    }
 }
 
-/// Validate and bind a statistical report to the exact sequential edit candidate.
+/// Validate and bind aggregate benefit plus all-family retention evidence to
+/// the exact sequential edit candidate.
 ///
-/// The report must establish the preregistered improvement, pass its own
-/// confidence-sequence/digest recomputation, and refer to the session's current
-/// baseline and supplied native candidate digest.
+/// Both reports must be recomputable and terminally qualified. Their candidate
+/// ordinal, baseline/candidate identities, evaluation protocol and global
+/// confirmatory manifest must match. The two alpha allocations must fit inside
+/// the caller's preregistered combined campaign budget.
 pub fn bind_sequential_verification_evidence(
     session: &SequentialEditSession,
     candidate_native_model_digest: &str,
     report: &SequentialWeightVerificationReport,
+    family_verifier: &FamilyGuardrailVerifier,
+    combined_alpha_budget: f64,
 ) -> Result<SequentialVerifierEvidenceBinding, SequentialWeightProgramError> {
     validate_qualified_report(report)?;
     validate_digest(candidate_native_model_digest)?;
@@ -188,9 +214,85 @@ pub fn bind_sequential_verification_evidence(
         ));
     }
     validate_digest(&report.binding.precondition_gate_digest)?;
+
+    let family_report = family_verifier
+        .report()
+        .map_err(|_| SequentialWeightProgramError::FamilyGuardrailReportInvalid)?;
+    let family_manifest = family_verifier.manifest();
+    if family_report.status != FamilyGuardrailStatus::AllFamiliesNonInferior {
+        return Err(SequentialWeightProgramError::FamilyGuardrailNotQualified);
+    }
+    let family_episode_ids = family_manifest
+        .families
+        .iter()
+        .flat_map(|family| family.episode_ids.iter().cloned())
+        .collect::<Vec<_>>();
+    let reconstructed_confirmatory_manifest =
+        ConfirmatoryEpisodeManifest::new(family_episode_ids)?;
+    if reconstructed_confirmatory_manifest.manifest_digest
+        != report.binding.confirmatory_episode_manifest_digest
+        || reconstructed_confirmatory_manifest.manifest_digest
+            != family_manifest.confirmatory_manifest_digest
+    {
+        return Err(SequentialWeightProgramError::FamilyGuardrailEvidenceMismatch(
+            "confirmatory_manifest_membership",
+        ));
+    }
+
+    for (field, matches) in [
+        (
+            "candidate_index",
+            family_report.candidate_index == report.binding.candidate_index
+                && family_manifest.candidate_index == report.binding.candidate_index,
+        ),
+        (
+            "baseline_model_digest",
+            family_report.baseline_model_digest == session.latest_candidate_model_digest
+                && family_manifest.baseline_model_digest == session.latest_candidate_model_digest,
+        ),
+        (
+            "candidate_model_digest",
+            family_report.candidate_model_digest == candidate_native_model_digest
+                && family_manifest.candidate_model_digest == candidate_native_model_digest,
+        ),
+        (
+            "evaluation_protocol_digest",
+            family_report.evaluation_protocol_digest
+                == report.binding.evaluation_protocol_digest
+                && family_manifest.evaluation_protocol_digest
+                    == report.binding.evaluation_protocol_digest,
+        ),
+        (
+            "confirmatory_manifest_digest",
+            family_manifest.confirmatory_manifest_digest
+                == report.binding.confirmatory_episode_manifest_digest,
+        ),
+        (
+            "manifest_digest",
+            family_report.manifest_digest == family_manifest.manifest_digest,
+        ),
+    ] {
+        if !matches {
+            return Err(SequentialWeightProgramError::FamilyGuardrailEvidenceMismatch(field));
+        }
+    }
+    validate_digest(&family_report.report_digest)?;
+
+    let allocated_alpha =
+        report.config.campaign_alpha + family_manifest.campaign_alpha;
+    if !combined_alpha_budget.is_finite()
+        || !(0.0..1.0).contains(&combined_alpha_budget)
+        || !allocated_alpha.is_finite()
+        || allocated_alpha > combined_alpha_budget
+    {
+        return Err(SequentialWeightProgramError::CombinedAlphaBudgetExceeded);
+    }
+
     Ok(SequentialVerifierEvidenceBinding {
         precondition_gate_digest: report.binding.precondition_gate_digest.clone(),
         statistical_verification_report_digest: report.report_digest.clone(),
+        family_guardrail_report_digest: family_report.report_digest,
+        combined_campaign_alpha_budget_bits: combined_alpha_budget.to_bits(),
     })
 }
 
@@ -210,7 +312,7 @@ pub fn sequential_verifier_attestation_message(
         SequentialWeightProgramError::InvalidDigest("verifier claims serialization")
     })?;
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-sequential-verifier-attestation-v2\0");
+    hasher.update(b"symthaea-sequential-verifier-attestation-v3\0");
     hasher.update(&(encoded.len() as u64).to_le_bytes());
     hasher.update(&encoded);
     Ok(*hasher.finalize().as_bytes())
@@ -264,6 +366,14 @@ pub enum SequentialWeightProgramError {
     VerifierAttestationMismatch(&'static str),
     #[error("statistical verification evidence is not bound to this candidate: {0}")]
     StatisticalEvidenceMismatch(&'static str),
+    #[error("family-level non-inferiority evidence has not qualified every registered family")]
+    FamilyGuardrailNotQualified,
+    #[error("family guardrail report could not be independently recomputed")]
+    FamilyGuardrailReportInvalid,
+    #[error("family guardrail evidence does not match the aggregate candidate: {0}")]
+    FamilyGuardrailEvidenceMismatch(&'static str),
+    #[error("aggregate and family alpha allocations exceed the combined campaign budget")]
+    CombinedAlphaBudgetExceeded,
     #[error(transparent)]
     StatisticalVerification(#[from] SequentialWeightVerificationError),
     #[error("cumulative L2 edit path exceeds the session budget")]
@@ -421,7 +531,7 @@ pub fn accept_verified_sequential_candidate(
     }
     validate_digest(candidate_native_model_digest)?;
     let claims = &attestation.claims;
-    if claims.format_version != 2 {
+    if claims.format_version != 3 {
         return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
             "format_version",
         ));
@@ -469,6 +579,10 @@ pub fn accept_verified_sequential_candidate(
             "statistical_verification_report_digest",
             claims.statistical_verification_report_digest.as_str(),
         ),
+        (
+            "family_guardrail_report_digest",
+            claims.family_guardrail_report_digest.as_str(),
+        ),
     ] {
         validate_digest(value)?;
         if value.is_empty() {
@@ -476,6 +590,10 @@ pub fn accept_verified_sequential_candidate(
                 field,
             ));
         }
+    }
+    let claimed_alpha_budget = f64::from_bits(claims.combined_campaign_alpha_budget_bits);
+    if !claimed_alpha_budget.is_finite() || !(0.0..1.0).contains(&claimed_alpha_budget) {
+        return Err(SequentialWeightProgramError::CombinedAlphaBudgetExceeded);
     }
     if claims.verifier_id.trim().is_empty() {
         return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
@@ -550,12 +668,24 @@ pub fn accept_verified_sequential_candidate(
             claims.statistical_verification_report_digest.as_str(),
             evidence_binding.statistical_verification_report_digest(),
         ),
+        (
+            "family_guardrail_report_digest",
+            claims.family_guardrail_report_digest.as_str(),
+            evidence_binding.family_guardrail_report_digest(),
+        ),
     ] {
         if actual != expected {
             return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
                 field,
             ));
         }
+    }
+    if claims.combined_campaign_alpha_budget_bits
+        != evidence_binding.combined_campaign_alpha_budget_bits()
+    {
+        return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+            "combined_campaign_alpha_budget_bits",
+        ));
     }
     let message = sequential_verifier_attestation_message(claims)?;
     let signature = Signature::from_slice(&attestation.signature)
@@ -567,7 +697,7 @@ pub fn accept_verified_sequential_candidate(
         return Err(SequentialWeightProgramError::VerifierRejectedCandidate);
     }
     let verifier_receipt_digest =
-        hash_value(b"symthaea-sequential-verifier-envelope-v2\0", attestation)?;
+        hash_value(b"symthaea-sequential-verifier-envelope-v3\0", attestation)?;
     if candidate_native_model_digest == session.latest_candidate_model_digest {
         return Err(SequentialWeightProgramError::InvalidCandidateNativeDigest);
     }
@@ -600,7 +730,7 @@ pub fn accept_verified_sequential_candidate(
         .push(prepared.batch.evidence_batch_digest.clone());
 
     let mut receipt = SequentialStepReceipt {
-        format_version: 2,
+        format_version: 3,
         session_id: session.session_id.clone(),
         batch_index: prepared.batch.batch_index,
         template_digest: session.template_digest.clone(),
@@ -618,6 +748,8 @@ pub fn accept_verified_sequential_candidate(
         statistical_verification_report_digest: claims
             .statistical_verification_report_digest
             .clone(),
+        family_guardrail_report_digest: claims.family_guardrail_report_digest.clone(),
+        combined_campaign_alpha_budget_bits: claims.combined_campaign_alpha_budget_bits,
         previous_step_receipt_digest: session.previous_step_receipt_digest.clone(),
         cumulative_l2_path_after: cumulative_l2_path,
         cumulative_parameter_change_events_after: cumulative_parameter_change_events,
@@ -735,7 +867,7 @@ fn step_receipt_digest(
 ) -> Result<String, SequentialWeightProgramError> {
     let mut unsigned = receipt.clone();
     unsigned.step_receipt_digest.clear();
-    hash_value(b"symthaea-sequential-step-receipt-v2\0", &unsigned)
+    hash_value(b"symthaea-sequential-step-receipt-v3\0", &unsigned)
 }
 
 fn hash_value<T: Serialize>(
@@ -780,27 +912,34 @@ mod tests {
     fn statistical_evidence_binding(
         session: &SequentialEditSession,
         candidate_native_model_digest: &str,
-    ) -> SequentialVerifierEvidenceBinding {
+        combined_alpha_budget: f64,
+    ) -> Result<SequentialVerifierEvidenceBinding, SequentialWeightProgramError> {
         use crate::sequential_weight_verification::{
             ConfirmatoryEpisodeManifest, PairedLossObservation,
             SequentialWeightVerificationCampaign, SequentialWeightVerificationConfig,
         };
+        use crate::family_guardrail::{
+            FamilyGuardrailManifest, FamilyGuardrailSpec, FamilyPairedLossObservation,
+        };
+        let episode_ids = (0..256)
+            .map(|index| format!("bearing-{index:04}"))
+            .chain((0..256).map(|index| format!("gearbox-{index:04}")))
+            .collect::<Vec<_>>();
+        let confirmatory_episode_manifest =
+            ConfirmatoryEpisodeManifest::new(episode_ids.clone())
+                .expect("valid confirmatory episode manifest");
+        let confirmatory_manifest_digest = confirmatory_episode_manifest.manifest_digest.clone();
+
         let mut campaign = SequentialWeightVerificationCampaign::new(
             SequentialWeightVerificationConfig {
-                campaign_alpha: 0.05,
+                campaign_alpha: 0.025,
                 minimum_improvement: 0.05,
                 minimum_observations: 2,
-                maximum_observations: 600,
+                maximum_observations: 512,
             },
             digest('8'),
         )
         .expect("valid statistical campaign");
-        let confirmatory_episode_manifest = ConfirmatoryEpisodeManifest::new(
-            (0..600)
-                .map(|index| format!("confirmatory-{index}"))
-                .collect(),
-        )
-        .expect("valid confirmatory episode manifest");
         let mut verifier = campaign
             .start_candidate(
                 session.latest_candidate_model_digest.clone(),
@@ -811,10 +950,10 @@ mod tests {
             )
             .expect("fresh statistical candidate");
         let mut report = verifier.report().expect("initial statistical report");
-        for index in 0..600 {
+        for episode_id in &episode_ids {
             report = verifier
                 .observe(PairedLossObservation {
-                    episode_id: format!("confirmatory-{index}"),
+                    episode_id: episode_id.clone(),
                     baseline_loss: 0.9,
                     candidate_loss: 0.5,
                 })
@@ -823,8 +962,58 @@ mod tests {
                 break;
             }
         }
-        bind_sequential_verification_evidence(session, candidate_native_model_digest, &report)
-            .expect("statistical report bound to sequential edit candidate")
+
+        let family_manifest = FamilyGuardrailManifest::new(
+            report.binding.candidate_index,
+            session.latest_candidate_model_digest.clone(),
+            candidate_native_model_digest.to_owned(),
+            report.binding.evaluation_protocol_digest.clone(),
+            confirmatory_manifest_digest,
+            0.025,
+            vec![
+                FamilyGuardrailSpec {
+                    family_id: "bearing".into(),
+                    noninferiority_margin: 0.2,
+                    minimum_observations: 256,
+                    maximum_observations: 256,
+                    episode_ids: (0..256)
+                        .map(|index| format!("bearing-{index:04}"))
+                        .collect(),
+                },
+                FamilyGuardrailSpec {
+                    family_id: "gearbox".into(),
+                    noninferiority_margin: 0.2,
+                    minimum_observations: 256,
+                    maximum_observations: 256,
+                    episode_ids: (0..256)
+                        .map(|index| format!("gearbox-{index:04}"))
+                        .collect(),
+                },
+            ],
+        )
+        .expect("valid family guardrail manifest");
+        let mut family_verifier =
+            FamilyGuardrailVerifier::new(family_manifest).expect("family verifier");
+        for (family_id, prefix) in [("bearing", "bearing"), ("gearbox", "gearbox")] {
+            for index in 0..256 {
+                family_verifier
+                    .observe(FamilyPairedLossObservation {
+                        family_id: family_id.to_owned(),
+                        episode_id: format!("{prefix}-{index:04}"),
+                        baseline_loss: 0.9,
+                        candidate_loss: 0.5,
+                    })
+                    .expect("family paired confirmatory observation");
+            }
+        }
+
+        bind_sequential_verification_evidence(
+            session,
+            candidate_native_model_digest,
+            &report,
+            &family_verifier,
+            combined_alpha_budget,
+        )
     }
 
     fn signed_attestation(
@@ -836,7 +1025,7 @@ mod tests {
         signing_key: &SigningKey,
     ) -> SignedSequentialVerifierAttestation {
         let claims = SequentialVerifierAttestationClaims {
-            format_version: 2,
+            format_version: 3,
             verifier_id: "independent-test-verifier".into(),
             verification_protocol_digest: digest('8'),
             result_manifest_digest: digest('7'),
@@ -854,6 +1043,11 @@ mod tests {
             statistical_verification_report_digest: evidence_binding
                 .statistical_verification_report_digest()
                 .to_owned(),
+            family_guardrail_report_digest: evidence_binding
+                .family_guardrail_report_digest()
+                .to_owned(),
+            combined_campaign_alpha_budget_bits: evidence_binding
+                .combined_campaign_alpha_budget_bits(),
             accepted,
         };
         let message =
@@ -946,7 +1140,7 @@ mod tests {
         assert!(prepared.candidate.receipt.total_l2_delta > 0.0);
         let signing_key = SigningKey::from_bytes(&[42_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let evidence_binding = statistical_evidence_binding(&session, &digest('9'));
+        let evidence_binding = statistical_evidence_binding(&session, &digest('9'), 0.05).expect("qualified composite evidence");
         let rejected = signed_attestation(
             &session,
             &prepared,
@@ -1039,7 +1233,7 @@ mod tests {
         modified.batch.evidence_batch_digest = digest('2');
         let signing_key = SigningKey::from_bytes(&[43_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let evidence_binding = statistical_evidence_binding(&session, &digest('9'));
+        let evidence_binding = statistical_evidence_binding(&session, &digest('9'), 0.05).expect("qualified composite evidence");
         let attestation = signed_attestation(
             &session,
             &modified,
@@ -1078,7 +1272,7 @@ mod tests {
         .expect("prepare batch zero");
         let signing_key = SigningKey::from_bytes(&[44_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let evidence_binding0 = statistical_evidence_binding(&session, &digest('9'));
+        let evidence_binding0 = statistical_evidence_binding(&session, &digest('9'), 0.05).expect("qualified composite evidence");
         let attestation0 = signed_attestation(
             &session,
             &prepared0,
@@ -1108,7 +1302,7 @@ mod tests {
             &batch(&session_id, 1, &digest('9'), '2'),
         )
         .expect("prepare batch one");
-        let evidence_binding1 = statistical_evidence_binding(&advanced, &digest('7'));
+        let evidence_binding1 = statistical_evidence_binding(&advanced, &digest('7'), 0.05).expect("qualified second-step composite evidence");
         let attestation1 = signed_attestation(
             &advanced,
             &prepared1,
@@ -1147,8 +1341,8 @@ mod tests {
         .expect("prepare");
         let signing_key = SigningKey::from_bytes(&[45_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let evidence_binding = statistical_evidence_binding(&session, &digest('9'));
-        let wrong_candidate_binding = statistical_evidence_binding(&session, &digest('7'));
+        let evidence_binding = statistical_evidence_binding(&session, &digest('9'), 0.05).expect("qualified composite evidence");
+        let wrong_candidate_binding = statistical_evidence_binding(&session, &digest('7'), 0.05).expect("qualified alternate composite evidence");
         let correctly_bound = signed_attestation(
             &session,
             &prepared,
@@ -1217,6 +1411,46 @@ mod tests {
             ))
         ));
 
+        let mut wrong_family_report = correctly_bound.clone();
+        wrong_family_report.claims.family_guardrail_report_digest = digest('2');
+        let message = sequential_verifier_attestation_message(&wrong_family_report.claims)
+            .expect("message for re-signed mismatched family guardrail report");
+        wrong_family_report.signature = signing_key.sign(&message).to_bytes().to_vec();
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &evidence_binding,
+                &wrong_family_report,
+                &pinned_key,
+            ),
+            Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                "family_guardrail_report_digest"
+            ))
+        ));
+
+        let mut wrong_alpha_budget = correctly_bound.clone();
+        wrong_alpha_budget.claims.combined_campaign_alpha_budget_bits = 0.1_f64.to_bits();
+        let message = sequential_verifier_attestation_message(&wrong_alpha_budget.claims)
+            .expect("message for re-signed mismatched combined alpha budget");
+        wrong_alpha_budget.signature = signing_key.sign(&message).to_bytes().to_vec();
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &evidence_binding,
+                &wrong_alpha_budget,
+                &pinned_key,
+            ),
+            Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                "combined_campaign_alpha_budget_bits"
+            ))
+        ));
+
         let mut wrong_precondition = correctly_bound.clone();
         wrong_precondition.claims.precondition_gate_digest = digest('3');
         let message = sequential_verifier_attestation_message(&wrong_precondition.claims)
@@ -1249,6 +1483,21 @@ mod tests {
                 &untrusted_key,
             ),
             Err(SequentialWeightProgramError::VerifierKeyIdMismatch)
+        ));
+    }
+
+    #[test]
+    fn composite_acceptance_rejects_alpha_allocations_over_the_frozen_budget() {
+        let base = snapshot();
+        let template = template();
+        let session_id = digest('f');
+        let session =
+            begin_sequential_edit_session(session_id, &template, &base).expect("begin");
+
+        let result = statistical_evidence_binding(&session, &digest('9'), 0.049);
+        assert!(matches!(
+            result,
+            Err(SequentialWeightProgramError::CombinedAlphaBudgetExceeded)
         ));
     }
 
