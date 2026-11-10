@@ -421,7 +421,9 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
     {
         errors.push("capacity reference condition is invalid".to_owned());
     }
-    let capacity_times: Vec<u64> = profile.units.iter()
+    let capacity_times: Vec<u64> = profile
+        .units
+        .iter()
         .map(|unit| unit.capacity.measurement_time_ms)
         .collect();
     if let (Some(minimum), Some(maximum)) =
@@ -557,7 +559,10 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
             {
                 errors.push(format!("SOC observation for {} is invalid", row.unit_ref));
             }
-            let unit = profile.units.iter().find(|unit| unit.unit_ref == row.unit_ref);
+            let unit = profile
+                .units
+                .iter()
+                .find(|unit| unit.unit_ref == row.unit_ref);
             if let Some(unit) = unit {
                 if unit.capacity.evidence_digest != row.soh_measurement_digest {
                     errors.push(format!(
@@ -565,7 +570,9 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
                         row.unit_ref
                     ));
                 }
-                if row.sample_time_ms.abs_diff(unit.capacity.measurement_time_ms)
+                if row
+                    .sample_time_ms
+                    .abs_diff(unit.capacity.measurement_time_ms)
                     > snapshot.maximum_soh_measurement_age_ms
                 {
                     errors.push(format!(
@@ -751,10 +758,14 @@ fn metric_evidence(role: String, digest: String, evidence_class: Option<String>)
 
 fn beta_soh_gate(profile: &Profile) -> Result<(), &'static str> {
     series_cell_gate(profile)?;
-    let minimum = profile.units.iter()
+    let minimum = profile
+        .units
+        .iter()
         .map(|unit| unit.nominal_capacity_ah)
         .fold(f64::INFINITY, f64::min);
-    let maximum = profile.units.iter()
+    let maximum = profile
+        .units
+        .iter()
         .map(|unit| unit.nominal_capacity_ah)
         .fold(f64::NEG_INFINITY, f64::max);
     if !minimum.is_finite() || maximum - minimum > maximum * 1e-9 {
@@ -809,12 +820,20 @@ fn calculate_metrics(
         vec![
             metric_evidence(
                 "capacity_protocol".to_owned(),
-                profile.reference_conditions.capacity.protocol_digest.clone(),
+                profile
+                    .reference_conditions
+                    .capacity
+                    .protocol_digest
+                    .clone(),
                 None,
             ),
             metric_evidence(
                 "capacity_reference_condition".to_owned(),
-                profile.reference_conditions.capacity.condition_digest.clone(),
+                profile
+                    .reference_conditions
+                    .capacity
+                    .condition_digest
+                    .clone(),
                 None,
             ),
         ]
@@ -1045,7 +1064,9 @@ fn calculate_metrics(
                             None,
                         )))
                         .chain(snapshot.observations.iter().map(|row| {
-                            let unit = profile.units.iter()
+                            let unit = profile
+                                .units
+                                .iter()
                                 .find(|unit| unit.unit_ref == row.unit_ref)
                                 .expect("validated full cell population has matching SOH unit");
                             metric_evidence(
@@ -1346,7 +1367,10 @@ mod tests {
     #[test]
     fn computed_metrics_bind_asset_method_and_reference_protocol_evidence() {
         let audited = report();
-        let complete = audited.payload.cases.iter()
+        let complete = audited
+            .payload
+            .cases
+            .iter()
             .find(|case| case.case_id == "complete-qualified-series-pack")
             .and_then(|case| case.summary.as_ref())
             .expect("complete pack summary");
@@ -1356,27 +1380,64 @@ mod tests {
             &complete.inconsistency_metrics.beta_life,
             &complete.inconsistency_metrics.beta_soc,
         ] {
-            assert!(metric.evidence.iter().any(|item| item.role == "pack_configuration"));
-            assert!(metric.evidence.iter().any(|item| item.role == "vehicle_configuration"));
-            assert!(metric.evidence.iter().any(|item| item.role == "analysis_method"));
+            assert!(
+                metric
+                    .evidence
+                    .iter()
+                    .any(|item| item.role == "pack_configuration")
+            );
+            assert!(
+                metric
+                    .evidence
+                    .iter()
+                    .any(|item| item.role == "vehicle_configuration")
+            );
+            assert!(
+                metric
+                    .evidence
+                    .iter()
+                    .any(|item| item.role == "analysis_method")
+            );
         }
-        assert!(complete.inconsistency_metrics.sigma_soh.evidence.iter()
-            .any(|item| item.role == "capacity_protocol"));
-        assert!(complete.inconsistency_metrics.beta_soc.evidence.iter()
-            .any(|item| item.role == "soc_protocol"));
+        assert!(
+            complete
+                .inconsistency_metrics
+                .sigma_soh
+                .evidence
+                .iter()
+                .any(|item| item.role == "capacity_protocol")
+        );
+        assert!(
+            complete
+                .inconsistency_metrics
+                .beta_soc
+                .evidence
+                .iter()
+                .any(|item| item.role == "soc_protocol")
+        );
     }
 
     #[test]
     fn soc_metric_binds_exact_soh_digest_for_each_cell() {
         let audited = report();
-        let complete = audited.payload.cases.iter()
+        let complete = audited
+            .payload
+            .cases
+            .iter()
             .find(|case| case.case_id == "complete-qualified-series-pack")
             .and_then(|case| case.summary.as_ref())
             .expect("complete pack summary");
-        assert!(complete.inconsistency_metrics.beta_soc.evidence.iter().any(|item| {
-            item.role == "soc_soh_binding:cell-001"
-                && item.evidence_class.as_deref() == Some("synthetic_fixture")
-        }));
+        assert!(
+            complete
+                .inconsistency_metrics
+                .beta_soc
+                .evidence
+                .iter()
+                .any(|item| {
+                    item.role == "soc_soh_binding:cell-001"
+                        && item.evidence_class.as_deref() == Some("synthetic_fixture")
+                })
+        );
     }
 
     #[test]
@@ -1387,7 +1448,10 @@ mod tests {
             "stale-soh-reference-rejected",
             "lifetime-pack-configuration-drift-rejected",
         ] {
-            let case = audited.payload.cases.iter()
+            let case = audited
+                .payload
+                .cases
+                .iter()
                 .find(|case| case.case_id == case_id)
                 .expect("negative control case");
             assert!(!case.accepted);
@@ -1409,23 +1473,20 @@ mod tests {
     #[test]
     fn heterogeneous_nominal_capacity_keeps_beta_soh_not_computable() {
         let audited = report();
-        let case = audited.payload.cases.iter()
+        let case = audited
+            .payload
+            .cases
+            .iter()
             .find(|case| case.case_id == "heterogeneous-nominal-capacity-no-beta-soh")
             .and_then(|case| case.summary.as_ref())
             .expect("heterogeneous nominal capacity summary");
-        assert_eq!(
-            case.inconsistency_metrics.beta_soh.status,
-            "NOT_COMPUTABLE"
-        );
+        assert_eq!(case.inconsistency_metrics.beta_soh.status, "NOT_COMPUTABLE");
         assert_eq!(
             case.inconsistency_metrics.beta_soh.reason.as_deref(),
             Some("HOMOGENEOUS_NOMINAL_CELL_CAPACITY_REQUIRED")
         );
         assert_eq!(case.inconsistency_metrics.beta_life.status, "COMPUTED");
-        assert_eq!(
-            case.inconsistency_metrics.beta_soc.status,
-            "NOT_COMPUTABLE"
-        );
+        assert_eq!(case.inconsistency_metrics.beta_soc.status, "NOT_COMPUTABLE");
         assert_eq!(
             case.inconsistency_metrics.beta_soc.reason.as_deref(),
             Some("HOMOGENEOUS_NOMINAL_CELL_CAPACITY_REQUIRED")
@@ -1475,7 +1536,10 @@ mod tests {
     #[test]
     fn heterogeneous_nominal_capacity_keeps_beta_soh_uncomputed() {
         let audited = report();
-        let case = audited.payload.cases.iter()
+        let case = audited
+            .payload
+            .cases
+            .iter()
             .find(|case| case.case_id == "heterogeneous-nominal-capacity-no-beta-soh")
             .and_then(|case| case.summary.as_ref())
             .expect("heterogeneous nominal capacity profile");
@@ -1528,8 +1592,7 @@ mod tests {
         let reversed = serde_json::to_vec(&value).expect("reversed corpus");
         let replay = audit_corpus(SCHEMA, &reversed).expect("permuted corpus");
         assert_eq!(
-            original.payload.canonical_corpus_sha256,
-            replay.payload.canonical_corpus_sha256,
+            original.payload.canonical_corpus_sha256, replay.payload.canonical_corpus_sha256,
             "canonical input identity must ignore corpus and unit order"
         );
         assert_eq!(
