@@ -38,7 +38,7 @@ This measures **where the waveform changed**, not whether the new word/phone/not
 - MusicJudge-style block-level linguistic/musical review;
 - blinded human naturalness and identity judgments.
 
-The first synthetic test establishes that an edit confined to the target interval passes while both protected regions remain bit-identical. A negative control that modifies a protected phrase must fail.
+Seven synthetic tests establish that an edit confined to the target interval passes while both protected regions remain bit-identical. A negative control that modifies a protected phrase must fail.
 
 ## Research use
 
