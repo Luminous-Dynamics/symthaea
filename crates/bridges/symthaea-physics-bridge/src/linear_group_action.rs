@@ -206,9 +206,9 @@ impl LinearGroupActionV1 {
         if profile.maximum_dimension == 0
             || profile.maximum_generators == 0
             || !profile.metric_symmetry_relative_tolerance.is_finite()
-            || profile.metric_symmetry_relative_tolerance < 0.0
+            || !(0.0..=1.0).contains(&profile.metric_symmetry_relative_tolerance)
             || !profile.metric_skew_relative_tolerance.is_finite()
-            || profile.metric_skew_relative_tolerance < 0.0
+            || !(0.0..=1.0).contains(&profile.metric_skew_relative_tolerance)
         {
             return Err(LinearGroupActionAdmissionError::InvalidProfile);
         }
@@ -714,6 +714,13 @@ mod tests {
         negative.metric_symmetry_relative_tolerance = -1.0;
         assert!(matches!(
             canonical_so2().try_admit(negative),
+            Err(LinearGroupActionAdmissionError::InvalidProfile)
+        ));
+
+        let mut excessive = profile();
+        excessive.metric_skew_relative_tolerance = 1.01;
+        assert!(matches!(
+            canonical_so2().try_admit(excessive),
             Err(LinearGroupActionAdmissionError::InvalidProfile)
         ));
     }
