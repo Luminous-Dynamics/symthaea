@@ -4745,6 +4745,235 @@ mod tests {
     }
 
     #[test]
+    fn every_two_layer_s3_product_permutation_round_trips_through_canonicalization() {
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 3,
+            num_layers: 2,
+            output_dim: 2,
+            cell_config: CfCConfig {
+                input_dim: 2,
+                hidden_dim: 3,
+                use_backbone: false,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            ..Default::default()
+        };
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
+            "symthaea-swi-two-layer-product-orbit-v1",
+        );
+        let source = CfCNetwork::from_genesis(config, &genesis, "two-layer-product-orbit");
+        let task_digest = digest('d');
+        let snapshot =
+            cfc_weight_model_snapshot(&source, task_digest.clone()).expect("source snapshot");
+        let permutations = enumerate_hidden_unit_permutations(3);
+        assert_eq!(permutations.len(), 6, "each layer must cover its complete S3 orbit");
+
+        let get = |id: CfCWeightGroupId| {
+            snapshot
+                .groups
+                .iter()
+                .find(|group| group.target == WeightProgramTarget::CfC(id.clone()))
+                .expect("parameter group")
+                .values
+                .clone()
+        };
+        let probes = vec![
+            CfCFunctionalProbe {
+                input: vec![0.25, -0.75],
+                dt: 0.05,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.4, 0.6],
+                dt: 0.2,
+            },
+            CfCFunctionalProbe {
+                input: vec![0.9, 0.1],
+                dt: 0.1,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.2, -0.8],
+                dt: 0.15,
+            },
+        ];
+        let source_layer_signatures = (0..2)
+            .map(|layer_index| {
+                cfc_hidden_unit_activation_signatures(&source, layer_index, &probes)
+                    .expect("source layer signatures")
+            })
+            .collect::<Vec<_>>();
+        let source_digest = source
+            .fingerprint()
+            .expect("source fingerprint")
+            .model_digest;
+
+        let mut maximum_precanonical_function_error = 0.0_f64;
+        let mut maximum_canonical_function_error = 0.0_f64;
+        let mut verified_orbit_members = 0usize;
+
+        for (first_index, first_permutation) in permutations.iter().enumerate() {
+            for (second_index, second_permutation) in permutations.iter().enumerate() {
+                let layer_permutations = [first_permutation, second_permutation];
+                let mut replacements = Vec::with_capacity(9);
+
+                for layer_index in 0..2 {
+                    let permutation = layer_permutations[layer_index];
+                    let input_id = CfCWeightGroupId::CellInputProjection { cell: layer_index };
+                    let input = get(input_id.clone());
+                    let input_width = if layer_index == 0 { 2 } else { 3 };
+                    let mut permuted_input = permute_rows(&input, 3, input_width, permutation);
+                    if layer_index > 0 {
+                        permuted_input = permute_columns(
+                            &permuted_input,
+                            3,
+                            input_width,
+                            layer_permutations[layer_index - 1],
+                        );
+                    }
+                    replacements.push(CfCParameterGroupReplacement {
+                        id: native_group_id(&input_id),
+                        values: permuted_input,
+                    });
+
+                    let recurrent_id =
+                        CfCWeightGroupId::CellRecurrentProjection { cell: layer_index };
+                    replacements.push(CfCParameterGroupReplacement {
+                        id: native_group_id(&recurrent_id),
+                        values: permute_square(&get(recurrent_id.clone()), 3, permutation),
+                    });
+
+                    for group_id in [
+                        CfCWeightGroupId::CellHiddenBias { cell: layer_index },
+                        CfCWeightGroupId::CellTimeConstant { cell: layer_index },
+                    ] {
+                        let values = get(group_id.clone());
+                        replacements.push(CfCParameterGroupReplacement {
+                            id: native_group_id(&group_id),
+                            values: permutation.iter().map(|index| values[*index]).collect(),
+                        });
+                    }
+                }
+
+                let output_id = CfCWeightGroupId::OutputProjection;
+                replacements.push(CfCParameterGroupReplacement {
+                    id: native_group_id(&output_id),
+                    values: permute_columns(
+                        &get(output_id.clone()),
+                        2,
+                        3,
+                        second_permutation,
+                    ),
+                });
+
+                let mut permuted = source.clone();
+                let before_digest = permuted
+                    .fingerprint()
+                    .expect("permuted base fingerprint")
+                    .model_digest;
+                permuted
+                    .try_apply_parameter_group_replacements(&before_digest, &replacements)
+                    .expect("apply two-layer product-group symmetry");
+
+                let mut alignments = Vec::with_capacity(2);
+                for layer_index in 0..2 {
+                    let candidate_signatures = cfc_hidden_unit_activation_signatures(
+                        &permuted,
+                        layer_index,
+                        &probes,
+                    )
+                    .expect("candidate layer signatures");
+                    let alignment = align_cfc_hidden_unit_signatures(
+                        &source_layer_signatures[layer_index],
+                        &candidate_signatures,
+                    )
+                    .expect("layer alignment");
+                    let permutation = layer_permutations[layer_index];
+                    let mut expected_source_to_candidate = vec![0usize; 3];
+                    for (new_index, old_index) in permutation.iter().copied().enumerate() {
+                        expected_source_to_candidate[old_index] = new_index;
+                    }
+                    assert_eq!(
+                        alignment.source_to_candidate,
+                        expected_source_to_candidate,
+                        "orbit member ({first_index}, {second_index}), layer {layer_index}"
+                    );
+                    assert!(
+                        alignment.mean_squared_activation_error < 1e-10,
+                        "orbit member ({first_index}, {second_index}), layer {layer_index}, mse {}",
+                        alignment.mean_squared_activation_error
+                    );
+                    assert!(
+                        alignment.minimum_assignment_margin.is_some_and(|margin| margin > 0.0),
+                        "orbit member ({first_index}, {second_index}), layer {layer_index} must be uniquely aligned"
+                    );
+                    alignments.push(alignment);
+                }
+
+                let canonicalization = build_cfc_network_hidden_unit_canonicalization_program(
+                    &source,
+                    &permuted,
+                    task_digest.clone(),
+                    &alignments,
+                    CfCAlignmentAcceptancePolicy {
+                        max_mean_squared_activation_error: 1e-10,
+                        min_assignment_margin: 0.0,
+                    },
+                )
+                .expect("two-layer canonicalization program");
+                assert_eq!(canonicalization.operations.len(), 9);
+                let canonicalized = materialize_cfc_weight_program(
+                    &permuted,
+                    task_digest.clone(),
+                    &canonicalization,
+                )
+                .expect("canonicalized product-orbit member");
+                assert_eq!(
+                    canonicalized.candidate_native_model_digest,
+                    source_digest,
+                    "orbit member ({first_index}, {second_index}) must inverse-transport to the exact source fingerprint"
+                );
+
+                let mut source_eval = source.clone();
+                let mut permuted_eval = permuted.clone();
+                let mut canonical_eval = canonicalized.network;
+                for probe in &probes {
+                    let input = ndarray::Array1::from_vec(probe.input.clone());
+                    let expected = source_eval.forward(&input, probe.dt);
+                    let equivalent = permuted_eval.forward(&input, probe.dt);
+                    let restored = canonical_eval.forward(&input, probe.dt);
+                    for ((source_value, permuted_value), canonical_value) in
+                        expected.iter().zip(equivalent.iter()).zip(restored.iter())
+                    {
+                        maximum_precanonical_function_error = maximum_precanonical_function_error
+                            .max(f64::from((*source_value - *permuted_value).abs()));
+                        maximum_canonical_function_error = maximum_canonical_function_error
+                            .max(f64::from((*source_value - *canonical_value).abs()));
+                    }
+                }
+                verified_orbit_members += 1;
+            }
+        }
+
+        assert_eq!(verified_orbit_members, 36);
+        assert!(
+            maximum_precanonical_function_error < 1e-5,
+            "two-layer permutation function error {maximum_precanonical_function_error}"
+        );
+        assert!(
+            maximum_canonical_function_error < 1e-5,
+            "two-layer canonicalized function error {maximum_canonical_function_error}"
+        );
+        assert_eq!(
+            source.fingerprint().expect("source remains immutable").model_digest,
+            source_digest
+        );
+    }
+
+    #[test]
     fn invalid_target_specification_is_rejected_before_clone_edit() {
         let config = CfCNetworkConfig {
             input_dim: 2,
