@@ -45,6 +45,16 @@ service/route/environment/boundary equality:
 cargo run -- <schema.json> <baseline.json> <candidate.json>
 ~~~
 
+Audit the dated regulatory rule register:
+
+~~~sh
+cargo run --bin marine-regulatory-rule-audit -- \
+  ../../docs/research/marine/marine-regulatory-rule-register-v0.1.0.schema.json \
+  ../../docs/research/marine/marine-regulatory-rule-register-2026-11-10.json
+~~~
+
+The regulatory audit checks the register against Draft 2020-12, verifies source/rule identity uniqueness and source-reference resolution, and prevents under-review/proposed rules from carrying effective application dates. It also checks adoption/application date relationships and prevents negotiation proposals from being marked in force.
+
 ## Enforced checks
 
 - Draft 2020-12 schema meta-validation and instance validation with format checks.
