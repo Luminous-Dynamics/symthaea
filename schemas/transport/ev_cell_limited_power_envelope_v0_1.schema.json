@@ -309,7 +309,12 @@
           "maximum_temperature_lower_c",
           "cell_configuration_digest",
           "voltage_limit_evidence_class",
-          "current_limit_evidence_class"
+          "current_limit_evidence_class",
+          "ocv_soc_fraction",
+          "ocv_temperature_c",
+          "maximum_temperature_evidence_digest",
+          "ocv_condition_digest",
+          "maximum_temperature_evidence_class"
         ],
         "properties": {
           "cell_ref": {
@@ -465,6 +470,32 @@
             ]
           },
           "current_limit_evidence_class": {
+            "enum": [
+              "reference_test_measurement",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          },
+          "ocv_soc_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "ocv_temperature_c": {
+            "type": "number"
+          },
+          "ocv_condition_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "maximum_temperature_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "maximum_temperature_evidence_class": {
             "enum": [
               "reference_test_measurement",
               "derived_estimate",
