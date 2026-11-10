@@ -1301,6 +1301,19 @@ pub mod part_aware_v1 {
     }
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    pub struct PartAwareMidiProgramChangeReceiptV1 {
+        pub part_id: u16,
+        pub segment_id: String,
+        pub instrument_id: String,
+        pub track_index: u16,
+        pub channel: u8,
+        pub program: u8,
+        pub mapping_reference: String,
+        pub source_start: RationalBeatV1,
+        pub start_tick: u64,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     pub struct PartAwareMidiExportReceiptV1 {
         pub schema: String,
         pub score_digest_schema: String,
@@ -1313,6 +1326,7 @@ pub mod part_aware_v1 {
         pub note_count: usize,
         pub track_count: usize,
         pub tracks: Vec<PartAwareMidiTrackReceiptV1>,
+        pub program_changes: Vec<PartAwareMidiProgramChangeReceiptV1>,
         /// Entries retain input Score.notes order; ordinals are digest-scoped.
         pub event_map: Vec<PartAwareMidiEventMapV1>,
     }
@@ -1605,6 +1619,7 @@ pub mod part_aware_v1 {
         // A continuing PartId keeps its MIDI channel while its instrument
         // instance/patch changes explicitly at the handoff.
         let mut program_at_tick = BTreeMap::<(u16, u64), u8>::new();
+        let mut program_change_receipts = Vec::with_capacity(timeline.segments.len());
         for segment in &timeline.segments {
             let tick = rational_beat_to_tick(segment.start).ok_or(
                 PartAwareMidiExportErrorV1::InvalidRationalTime {
@@ -1637,6 +1652,19 @@ pub mod part_aware_v1 {
                     channel,
                     event_type: MidiEventType::ProgramChange(binding.program),
                 });
+            program_change_receipts.push(PartAwareMidiProgramChangeReceiptV1 {
+                part_id: segment.part_id,
+                segment_id: segment.id.clone(),
+                instrument_id: segment.instrument_id.clone(),
+                track_index: *track_index_by_part
+                    .get(&segment.part_id)
+                    .expect("validated score part has a MIDI track"),
+                channel,
+                program: binding.program,
+                mapping_reference: binding.mapping_reference.clone(),
+                source_start: segment.start,
+                start_tick: tick,
+            });
         }
 
         let mut event_map = Vec::with_capacity(score.notes.len());
@@ -1849,6 +1877,9 @@ pub mod part_aware_v1 {
             &timeline_bytes,
         );
 
+        program_change_receipts.sort_by_key(|item| {
+            (item.part_id, item.start_tick, item.segment_id.clone())
+        });
         let receipt = PartAwareMidiExportReceiptV1 {
             schema: PART_AWARE_MIDI_EXPORT_SCHEMA_V1.into(),
             score_digest_schema: ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
@@ -1861,6 +1892,7 @@ pub mod part_aware_v1 {
             note_count: event_map.len(),
             track_count: smf_tracks.len(),
             tracks: track_receipts,
+            program_changes: program_change_receipts,
             event_map,
         };
 
@@ -2109,6 +2141,10 @@ pub mod part_aware_v1 {
             assert_ne!(artifact.receipt.event_map[0].instrument_id, artifact.receipt.event_map[1].instrument_id);
             assert_eq!(artifact.receipt.event_map[1].onset_tick, 2 * u64::from(MIDI_TICKS_PER_QUARTER_V1));
             assert_eq!(artifact.receipt.tracks[0].instrument_ids.len(), 2);
+            assert_eq!(artifact.receipt.program_changes.len(), 2);
+            assert_eq!(artifact.receipt.program_changes[0].program, 42);
+            assert_eq!(artifact.receipt.program_changes[1].program, 73);
+            assert_eq!(artifact.receipt.program_changes[1].segment_id, "response");
         }
 
         #[test]
