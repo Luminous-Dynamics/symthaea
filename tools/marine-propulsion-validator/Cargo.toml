@@ -25,3 +25,7 @@ path = "src/main.rs"
 [[bin]]
 name = "marine-regulatory-rule-audit"
 path = "src/bin/marine_regulatory_rule_audit.rs"
+
+[[bin]]
+name = "marine-causal-protocol-audit"
+path = "src/bin/marine_causal_protocol_audit.rs"
