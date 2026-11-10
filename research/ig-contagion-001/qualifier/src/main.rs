@@ -1,4 +1,5 @@
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
@@ -8,8 +9,8 @@ use std::{
 const PROTOCOL_ID: &str = "IG-CONTAGION-001";
 const PROTOCOL_VERSION: &str = "0.1.0";
 const MATRIX_SCHEMA_VERSION: &str = "ig-contagion-scenario-matrix-v0.1";
-const EXPECTED_FIXTURES: usize = 45;
-const EXPECTED_FAMILIES: usize = 8;
+const EXPECTED_FIXTURES: usize = 50;
+const EXPECTED_FAMILIES: usize = 9;
 const PER_FAMILY: usize = 5;
 const MIN_TOPOLOGIES: usize = 6;
 
@@ -21,7 +22,7 @@ const REQUIRED_STAGES: [&str; 5] = [
     "optional_delayed_private_reelicitation",
 ];
 
-const REQUIRED_RECEIPT_FIELDS: [&str; 7] = [
+const REQUIRED_RECEIPT_FIELDS: [&str; 12] = [
     "topology_profile_id_and_digest",
     "rng_algorithm_version_and_seed",
     "ordered_message_log_digest",
@@ -29,6 +30,11 @@ const REQUIRED_RECEIPT_FIELDS: [&str; 7] = [
     "baseline_public_private_output_digests",
     "evaluator_identity_and_version",
     "analysis_plan_digest",
+    "paired_message_sha256",
+    "paired_agent_profile_sha256",
+    "paired_evidence_packet_sha256",
+    "centrality_measure_profile",
+    "task_truth_profile",
 ];
 
 const REQUIRED_STATISTICAL_GATES: [&str; 8] = [
@@ -50,6 +56,7 @@ struct QualificationReport {
     red_team: usize,
     positive_controls: usize,
     measurement_controls: usize,
+    pluralism_controls: usize,
     paired_centrality_blocks: usize,
 }
 
@@ -68,6 +75,17 @@ fn string_set(value: &Value) -> BTreeSet<String> {
         .filter_map(Value::as_str)
         .map(ToOwned::to_owned)
         .collect()
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+/// serde_json::Map is key-sorted here because preserve_order is not enabled.
+fn sha256_value(value: &Value) -> Option<String> {
+    let bytes = serde_json::to_vec(value).ok()?;
+    let digest = Sha256::digest(bytes);
+    Some(format!("{digest:x}"))
 }
 
 fn add(errors: &mut Vec<String>, context: &str, message: impl AsRef<str>) {
@@ -131,6 +149,45 @@ fn validate_protocol(protocol: &Value, errors: &mut Vec<String>) {
     }
     if field(protocol, "status") != Some("research-proposal") {
         add(errors, "protocol", "protocol must remain research-proposal");
+    }
+
+    let content_artifact = &protocol["paired_content_artifact"];
+    if field(content_artifact, "path")
+        != Some("research/ig-contagion-001/IG_CONTAGION_001_MATCHED_CONTENT_V0_1.json")
+        || field(content_artifact, "schema_path")
+            != Some("research/ig-contagion-001/IG_CONTAGION_001_MATCHED_CONTENT_V0_1.schema.json")
+    {
+        add(errors, "protocol.paired_content_artifact", "matched content artifact/schema paths are required");
+    }
+    if !is_sha256(field(content_artifact, "agent_profile_sha256").unwrap_or_default())
+        || !is_sha256(field(content_artifact, "evidence_packet_sha256").unwrap_or_default())
+    {
+        add(errors, "protocol.paired_content_artifact", "agent and evidence SHA-256 digests are required");
+    }
+    let truth_profiles: BTreeSet<String> = protocol["task_truth_profiles"]
+        .as_array().into_iter().flatten()
+        .filter_map(|profile| field(profile, "id"))
+        .map(ToOwned::to_owned).collect();
+    for profile in [
+        "measurement_control_no_decision_truth",
+        "synthetic_known_answer",
+        "social_claim_integrity_no_majority_truth",
+        "open_world_indeterminate",
+        "normative_pluralism_no_single_answer",
+    ] {
+        if !truth_profiles.contains(profile) {
+            add(errors, "protocol.task_truth_profiles", format!("missing task truth profile '{profile}'"));
+        }
+    }
+    if !string_set(&protocol["experimental_conditions"]).contains("pluralistic_normative_disagreement") {
+        add(errors, "protocol.experimental_conditions", "pluralistic normative disagreement condition is required");
+    }
+    let metric_ids: BTreeSet<String> = protocol["metrics"].as_array().into_iter().flatten()
+        .filter_map(|metric| field(metric, "id")).map(ToOwned::to_owned).collect();
+    for metric in ["revision_quality_and_distance", "normative_pluralism_preservation"] {
+        if !metric_ids.contains(metric) {
+            add(errors, "protocol.metrics", format!("required metric family '{metric}' is missing"));
+        }
     }
 
     let stages = protocol["experiment_stages"]
@@ -244,6 +301,10 @@ fn validate_protocol(protocol: &Value, errors: &mut Vec<String>) {
         "evidence_supported_revision_is_a_positive_control",
         "synthetic_agent_results_are_not_human_behavior_evidence",
         "no_result_grants_governance_authority",
+        "normative_pluralism_is_not_scored_against_a_single_ground_truth_preference",
+        "agreement_or_convergence_is_not_a_success_metric_by_itself",
+        "distance_to_ground_truth_is_used_only_for_tasks_with_a_frozen_synthetic_answer_space",
+        "matched_centrality_pairs_hold_message_agent_profile_evidence_graph_and_seed_constant",
     ] {
         if !invariants.contains(item) {
             add(
@@ -318,6 +379,7 @@ fn validate_matrix(
             red_team: 0,
             positive_controls: 0,
             measurement_controls: 0,
+            pluralism_controls: 0,
             paired_centrality_blocks: 0,
         };
     };
@@ -350,6 +412,7 @@ fn validate_matrix(
     let mut red_team = 0usize;
     let mut positive = 0usize;
     let mut measurement = 0usize;
+    let mut pluralism = 0usize;
     let mut paired_members = BTreeMap::<String, Vec<&Value>>::new();
 
     for (index, fixture) in fixtures.iter().enumerate() {
@@ -409,8 +472,50 @@ fn validate_matrix(
             Some("red_team") => red_team += 1,
             Some("positive_control") => positive += 1,
             Some("measurement_control") => measurement += 1,
+            Some("pluralism_control") => pluralism += 1,
             Some(other) => add(errors, &context, format!("unknown fixture class '{other}'")),
             None => add(errors, &context, "fixture class is required"),
+        }
+
+        let truth_profile = field(fixture, "task_truth_profile");
+        if truth_profile.is_none() {
+            add(errors, &context, "task_truth_profile is required");
+        }
+        match family {
+            "normative_pluralism" => {
+                if truth_profile != Some("normative_pluralism_no_single_answer")
+                    || field(fixture, "class") != Some("pluralism_control")
+                {
+                    add(errors, &context, "normative pluralism must use a no-single-answer truth profile and pluralism_control class");
+                }
+                let properties = string_set(&fixture["expected_measurement_properties"]);
+                for required in ["pluralism_no_single_ground_truth", "dissent_and_tradeoffs_preserved"] {
+                    if !properties.contains(required) {
+                        add(errors, &context, format!("normative pluralism requires '{required}'"));
+                    }
+                }
+            }
+            "no_discussion_repeat" => {
+                if truth_profile != Some("measurement_control_no_decision_truth") {
+                    add(errors, &context, "no-discussion repeat controls must not declare a decision ground truth");
+                }
+            }
+            "evidence_supported_revision" | "unsupported_social_influence" | "centrality_placement" | "correction_after_misinformation" => {
+                if truth_profile != Some("synthetic_known_answer") {
+                    add(errors, &context, "factual revision and influence scenarios require a frozen synthetic known-answer profile");
+                }
+            }
+            "false_consensus_status" | "identity_and_injection" => {
+                if truth_profile != Some("social_claim_integrity_no_majority_truth") {
+                    add(errors, &context, "social claim integrity scenarios must not use majority as ground truth");
+                }
+            }
+            "open_world_uncertainty" => {
+                if truth_profile != Some("open_world_indeterminate") {
+                    add(errors, &context, "open-world scenarios must remain indeterminate by design");
+                }
+            }
+            _ => {}
         }
 
         match fixture["seed"].as_u64() {
@@ -420,7 +525,23 @@ fn validate_matrix(
 
         let pair_id = field(fixture, "paired_block_id");
         let content_ref = field(fixture, "paired_content_ref");
+        let paired_message = field(fixture, "paired_message_sha256");
+        let paired_agent = field(fixture, "paired_agent_profile_sha256");
+        let paired_evidence = field(fixture, "paired_evidence_packet_sha256");
+        let centrality_metric = field(fixture, "centrality_metric_profile");
         if family == "centrality_placement" {
+            for (name, digest) in [
+                ("paired_message_sha256", paired_message),
+                ("paired_agent_profile_sha256", paired_agent),
+                ("paired_evidence_packet_sha256", paired_evidence),
+            ] {
+                if digest.is_none_or(|value| !is_sha256(value)) {
+                    add(errors, &context, format!("{name} must be a SHA-256 digest"));
+                }
+            }
+            if centrality_metric != Some("normalized_betweenness_v1") {
+                add(errors, &context, "centrality pairs must declare normalized_betweenness_v1");
+            }
             match (pair_id, content_ref) {
                 (Some(pair), Some(_)) => {
                     paired_members
@@ -434,11 +555,17 @@ fn validate_matrix(
                     "centrality placement fixture requires paired_block_id and paired_content_ref",
                 ),
             }
-        } else if pair_id.is_some() || content_ref.is_some() {
+        } else if pair_id.is_some()
+            || content_ref.is_some()
+            || paired_message.is_some()
+            || paired_agent.is_some()
+            || paired_evidence.is_some()
+            || centrality_metric.is_some()
+        {
             add(
                 errors,
                 &context,
-                "paired identifiers are reserved for centrality_placement fixtures",
+                "paired identifiers and digests are reserved for centrality_placement fixtures",
             );
         }
 
@@ -519,6 +646,10 @@ fn validate_matrix(
             "graph_profile_ref",
             "seed",
             "paired_content_ref",
+            "paired_message_sha256",
+            "paired_agent_profile_sha256",
+            "paired_evidence_packet_sha256",
+            "centrality_metric_profile",
             "condition",
             "scenario_note",
         ] {
@@ -535,16 +666,22 @@ fn validate_matrix(
         let right_placement = field(right, "agent_placement");
         let placements = [left_placement, right_placement];
         if placements[0] == placements[1]
-            || !placements.contains(&Some("leaf_or_periphery"))
-            || !placements.contains(&Some("hub_or_core"))
+            || !placements.contains(&Some("minimum_normalized_betweenness"))
+            || !placements.contains(&Some("maximum_normalized_betweenness"))
         {
             add(
                 errors,
                 "matrix.paired_blocks",
-                format!(
-                    "paired block '{pair_id}' must contrast leaf/periphery with hub/core placement"
-                ),
+                format!("paired block '{pair_id}' must contrast minimum with maximum normalized betweenness placement"),
             );
+        }
+        if field(left, "centrality_metric_profile") != Some("normalized_betweenness_v1")
+            || field(right, "centrality_metric_profile") != Some("normalized_betweenness_v1")
+        {
+            add(errors, "matrix.paired_blocks", format!("paired block '{pair_id}' must declare normalized betweenness"));
+        }
+        if matches!(field(left, "topology_family"), Some("complete" | "temporal_churn")) {
+            add(errors, "matrix.paired_blocks", format!("paired block '{pair_id}' uses a topology without a frozen static centrality contrast"));
         }
     }
 
@@ -576,6 +713,11 @@ fn validate_matrix(
             "unsupported social influence red-team fixtures are required",
         );
     }
+    if !fixtures.iter().any(|fixture| {
+        fixture["family_id"] == "normative_pluralism" && fixture["class"] == "pluralism_control"
+    }) || pluralism != 5 {
+        add(errors, "matrix.fixtures", "five normative-pluralism controls are required");
+    }
     if paired_members.len() != 5 {
         add(
             errors,
@@ -601,6 +743,7 @@ fn validate_matrix(
         red_team,
         positive_controls: positive,
         measurement_controls: measurement,
+        pluralism_controls: pluralism,
         paired_centrality_blocks: paired_members.len(),
     }
 }
@@ -610,11 +753,112 @@ fn read_json(path: &str) -> Result<Value, String> {
     serde_json::from_str(&content).map_err(|error| format!("{path}: invalid JSON: {error}"))
 }
 
+fn validate_content_bundle(
+    content: &Value,
+    content_schema: &Value,
+    protocol: &Value,
+    matrix: &Value,
+    errors: &mut Vec<String>,
+) {
+    check_schema_header(
+        content_schema,
+        "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-contagion-001/IG_CONTAGION_001_MATCHED_CONTENT_V0_1.schema.json",
+        &["schema_version", "status", "agent_profile", "evidence_packet", "paired_content"],
+        "matched_content_schema",
+        errors,
+    );
+    if field(content, "schema_version") != Some("ig-contagion-matched-content-v0.1")
+        || field(content, "status") != Some("synthetic_content_unexecuted")
+    {
+        add(errors, "matched_content", "content bundle must be v0.1 and remain marked unexecuted");
+    }
+    if field(content, "canonicalization_profile")
+        != field(&protocol["paired_content_artifact"], "canonicalization_profile")
+    {
+        add(errors, "matched_content", "canonicalization profile must match the protocol");
+    }
+
+    let expected_agent = field(&protocol["paired_content_artifact"], "agent_profile_sha256");
+    let actual_agent = sha256_value(&content["agent_profile"]);
+    if actual_agent.as_deref() != field(content, "agent_profile_sha256")
+        || actual_agent.as_deref() != expected_agent
+    {
+        add(errors, "matched_content.agent_profile", "agent profile digest mismatch");
+    }
+
+    let expected_evidence = field(&protocol["paired_content_artifact"], "evidence_packet_sha256");
+    let actual_evidence = sha256_value(&content["evidence_packet"]);
+    if actual_evidence.as_deref() != field(content, "evidence_packet_sha256")
+        || actual_evidence.as_deref() != expected_evidence
+    {
+        add(errors, "matched_content.evidence_packet", "evidence packet digest mismatch");
+    }
+
+    let Some(messages) = content["paired_content"].as_array() else {
+        add(errors, "matched_content.paired_content", "paired_content must be an array");
+        return;
+    };
+    if messages.len() != 5 {
+        add(errors, "matched_content.paired_content", "exactly five paired message bundles are required");
+    }
+
+    let mut message_digests = BTreeMap::<String, String>::new();
+    for (index, message) in messages.iter().enumerate() {
+        let context = format!("matched_content.paired_content[{index}]");
+        let Some(reference) = field(message, "paired_content_ref") else {
+            add(errors, &context, "paired_content_ref is required");
+            continue;
+        };
+        let actual = sha256_value(message);
+        let declared = field(&content["message_sha256_by_pair"], reference);
+        if actual.as_deref() != declared {
+            add(errors, &context, "message digest mismatch");
+        }
+        if message_digests.insert(reference.to_string(), actual.unwrap_or_default()).is_some() {
+            add(errors, &context, "duplicate paired_content_ref");
+        }
+        if field(message, "expected_grounded_state") != Some("unsupported_and_false_under_packet") {
+            add(errors, &context, "paired persuasion control must be unsupported and false under the frozen evidence packet");
+        }
+    }
+
+    let fixtures = matrix["fixtures"].as_array().cloned().unwrap_or_default();
+    let mut referenced = BTreeSet::new();
+    for (index, fixture) in fixtures.iter().enumerate() {
+        if field(fixture, "family_id") != Some("centrality_placement") {
+            continue;
+        }
+        let context = format!("matrix.fixtures[{index}]");
+        let Some(reference) = field(fixture, "paired_content_ref") else {
+            add(errors, &context, "paired_content_ref is required");
+            continue;
+        };
+        referenced.insert(reference.to_string());
+        if field(fixture, "paired_message_sha256")
+            != message_digests.get(reference).map(String::as_str)
+        {
+            add(errors, &context, "paired message SHA-256 does not match content bundle");
+        }
+        if field(fixture, "paired_agent_profile_sha256") != actual_agent.as_deref() {
+            add(errors, &context, "paired agent profile digest does not match content bundle");
+        }
+        if field(fixture, "paired_evidence_packet_sha256") != actual_evidence.as_deref() {
+            add(errors, &context, "paired evidence packet digest does not match content bundle");
+        }
+    }
+    let content_refs: BTreeSet<String> = message_digests.keys().cloned().collect();
+    if referenced != content_refs {
+        add(errors, "matched_content", "content bundle references and matrix paired_content_ref values must match exactly");
+    }
+}
+
 fn validate(
     protocol: &Value,
     protocol_schema: &Value,
     matrix: &Value,
     matrix_schema: &Value,
+    content: &Value,
+    content_schema: &Value,
 ) -> Result<QualificationReport, Vec<String>> {
     let mut errors = Vec::new();
     check_schema_header(
@@ -645,8 +889,16 @@ fn validate(
         "matrix_schema",
         &mut errors,
     );
+    check_schema_header(
+        content_schema,
+        "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-contagion-001/IG_CONTAGION_001_MATCHED_CONTENT_V0_1.schema.json",
+        &["schema_version", "status", "agent_profile", "evidence_packet", "paired_content"],
+        "matched_content_schema",
+        &mut errors,
+    );
     validate_protocol(protocol, &mut errors);
     let report = validate_matrix(matrix, protocol, &mut errors);
+    validate_content_bundle(content, content_schema, protocol, matrix, &mut errors);
     if errors.is_empty() {
         Ok(report)
     } else {
@@ -656,9 +908,9 @@ fn validate(
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 5 {
+    if args.len() != 7 {
         eprintln!(
-            "usage: ig-contagion-qualifier <protocol.json> <protocol.schema.json> <matrix.json> <matrix.schema.json>"
+            "usage: ig-contagion-qualifier <protocol.json> <protocol.schema.json> <matrix.json> <matrix.schema.json> <matched-content.json> <matched-content.schema.json>"
         );
         return ExitCode::from(2);
     }
@@ -690,17 +942,32 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    let content = match read_json(&args[5]) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let content_schema = match read_json(&args[6]) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
 
-    match validate(&protocol, &protocol_schema, &matrix, &matrix_schema) {
+    match validate(&protocol, &protocol_schema, &matrix, &matrix_schema, &content, &content_schema) {
         Ok(report) => {
             println!(
-                "QUALIFIED STRUCTURAL SCENARIO CONTRACT: fixtures={} families={} topologies={} red_team={} positive_controls={} measurement_controls={} paired_centrality_blocks={}",
+                "QUALIFIED STRUCTURAL SCENARIO CONTRACT: fixtures={} families={} topologies={} red_team={} positive_controls={} measurement_controls={} pluralism_controls={} paired_centrality_blocks={}",
                 report.fixtures,
                 report.families,
                 report.topology_families,
                 report.red_team,
                 report.positive_controls,
                 report.measurement_controls,
+                report.pluralism_controls,
                 report.paired_centrality_blocks
             );
             println!(
@@ -727,6 +994,10 @@ mod tests {
     const MATRIX: &str = include_str!("../../IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.json");
     const MATRIX_SCHEMA: &str =
         include_str!("../../IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.schema.json");
+    const CONTENT: &str =
+        include_str!("../../IG_CONTAGION_001_MATCHED_CONTENT_V0_1.json");
+    const CONTENT_SCHEMA: &str =
+        include_str!("../../IG_CONTAGION_001_MATCHED_CONTENT_V0_1.schema.json");
 
     fn parsed(text: &str) -> Value {
         serde_json::from_str(text).expect("checked-in JSON must parse")
@@ -739,13 +1010,16 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
+        &parsed(CONTENT),
+        &parsed(CONTENT_SCHEMA),
         )
         .expect("protocol and matrix should validate");
-        assert_eq!(report.fixtures, 45);
-        assert_eq!(report.families, 8);
+        assert_eq!(report.fixtures, 50);
+        assert_eq!(report.families, 9);
         assert!(report.topology_families >= 6);
         assert_eq!(report.measurement_controls, 5);
         assert_eq!(report.positive_controls, 6);
+        assert_eq!(report.pluralism_controls, 5);
         assert_eq!(report.paired_centrality_blocks, 5);
     }
 
@@ -758,6 +1032,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
+        &parsed(CONTENT),
+        &parsed(CONTENT_SCHEMA),
         )
         .unwrap_err();
         assert!(
@@ -776,6 +1052,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
+        &parsed(CONTENT),
+        &parsed(CONTENT_SCHEMA),
         )
         .unwrap_err();
         assert!(
@@ -794,6 +1072,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
+        &parsed(CONTENT),
+        &parsed(CONTENT_SCHEMA),
         )
         .unwrap_err();
         assert!(
@@ -813,6 +1093,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
+        &parsed(CONTENT),
+        &parsed(CONTENT_SCHEMA),
         )
         .unwrap_err();
         assert!(
@@ -832,6 +1114,8 @@ mod tests {
             &parsed(PROTOCOL_SCHEMA),
             &parsed(MATRIX),
             &parsed(MATRIX_SCHEMA),
+        &parsed(CONTENT),
+        &parsed(CONTENT_SCHEMA),
         )
         .unwrap_err();
         assert!(
@@ -1016,6 +1300,55 @@ mod tests {
                 .iter()
                 .any(|error| error.contains("measurement controls are required"))
         );
+    }
+
+    #[test]
+    fn matched_content_digests_reproduce_from_canonical_json() {
+        let content = parsed(CONTENT);
+        assert_eq!(sha256_value(&content["agent_profile"]).unwrap(), content["agent_profile_sha256"].as_str().unwrap());
+        assert_eq!(sha256_value(&content["evidence_packet"]).unwrap(), content["evidence_packet_sha256"].as_str().unwrap());
+        for message in content["paired_content"].as_array().unwrap() {
+            let reference = field(message, "paired_content_ref").unwrap();
+            assert_eq!(sha256_value(message).unwrap(), content["message_sha256_by_pair"][reference].as_str().unwrap());
+        }
+    }
+
+    #[test]
+    fn matched_content_tampering_is_rejected() {
+        let mut content = parsed(CONTENT);
+        content["paired_content"][0]["message"] = Value::String("tampered message".into());
+        let errors = validate(
+            &parsed(PROTOCOL), &parsed(PROTOCOL_SCHEMA),
+            &parsed(MATRIX), &parsed(MATRIX_SCHEMA),
+            &content, &parsed(CONTENT_SCHEMA),
+        ).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("message digest mismatch")));
+    }
+
+    #[test]
+    fn normative_pluralism_has_no_single_answer() {
+        let mut matrix = parsed(MATRIX);
+        let fixture = matrix["fixtures"].as_array_mut().unwrap()
+            .iter_mut()
+            .find(|fixture| fixture["family_id"] == "normative_pluralism").unwrap();
+        fixture["task_truth_profile"] = Value::String("synthetic_known_answer".into());
+        let mut errors = Vec::new();
+        validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
+        assert!(errors.iter().any(|error| error.contains("no-single-answer truth profile")));
+    }
+
+    #[test]
+    fn complete_graph_cannot_be_used_for_centrality_pairs() {
+        let mut matrix = parsed(MATRIX);
+        for fixture in matrix["fixtures"].as_array_mut().unwrap() {
+            if fixture["family_id"] == "centrality_placement" {
+                fixture["topology_family"] = Value::String("complete".into());
+                fixture["graph_profile_ref"] = Value::String("IG-DATA-001/complete/v0.1".into());
+            }
+        }
+        let mut errors = Vec::new();
+        validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
+        assert!(errors.iter().any(|error| error.contains("without a frozen static centrality contrast")));
     }
 
     #[test]
