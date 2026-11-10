@@ -34,7 +34,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -99,7 +100,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "train_only",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -119,11 +121,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "worst_domain",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -177,7 +195,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -242,7 +261,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "train_only",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -262,11 +282,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "worst_domain",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -320,7 +356,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -385,7 +422,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "train_only",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -405,11 +443,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "worst_domain",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -463,7 +517,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -528,7 +583,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "all_data",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -548,11 +604,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "worst_domain",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -606,7 +678,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -671,7 +744,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "train_only",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -691,11 +765,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "worst_domain",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -749,7 +839,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -814,7 +905,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "train_only",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -834,11 +926,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "worst_domain",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -892,7 +1000,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -957,7 +1066,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "train_only",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -977,11 +1087,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "sample_pooled",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -1035,7 +1161,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -1100,7 +1227,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "train_only",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -1120,11 +1248,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "worst_domain",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -1178,7 +1322,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -1243,7 +1388,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "train_only",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -1263,11 +1409,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "worst_domain",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -1321,7 +1483,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -1386,7 +1549,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "train_only",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -1406,11 +1570,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "worst_domain",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -1464,7 +1644,8 @@
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
           "train_partition": "train",
           "validation_partition": "validation",
-          "test_partition": "test"
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
         },
         "observations": [
           {
@@ -1529,7 +1710,8 @@
             "step_id": "scale-capacity-features",
             "transform_ref": "standard-scaler",
             "fit_scope": "train_only",
-            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053"
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": null
           }
         ],
         "model_selection": {
@@ -1549,11 +1731,27 @@
           },
           {
             "metric_name": "RMSE",
-            "aggregation": "worst_domain",
+            "aggregation": "macro_per_cell",
             "unit": "fraction",
             "value": 0.03,
             "sample_count": 4,
             "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
           }
         ],
         "uncertainty": {
@@ -1563,6 +1761,167 @@
           "observed_coverage": 0.91,
           "calibration_partition": "validation",
           "calibration_group_disjointness": false
+        },
+        "execution": {
+          "source_commit_digest": "0000000000000000000000000000000000000000000000000000000000000057",
+          "toolchain": "rustc-1.96.0",
+          "dependencies_digest": "0000000000000000000000000000000000000000000000000000000000000058",
+          "hardware": "synthetic-test-execution",
+          "training_wallclock_seconds": 12.3,
+          "peak_memory_bytes": 1024,
+          "energy_joules": 2.4
+        }
+      }
+    },
+    {
+      "case_id": "fixed-preprocessing-after-split-rejected",
+      "expectation": "reject",
+      "benchmark": {
+        "protocol_version": "ev-soh-benchmark-protocol/0.1",
+        "benchmark_id": "valid-unseen-cell",
+        "dataset_sources": [
+          {
+            "dataset_name": "synthetic-known-truth-battery-benchmark",
+            "version": "fixture-0.1",
+            "source_ref": "urn:synthetic:ev-soh-benchmark",
+            "license_ref": "synthetic-test-fixture",
+            "retrieved_on": "2026-11-10",
+            "source_digest": "0000000000000000000000000000000000000000000000000000000000000064"
+          }
+        ],
+        "target": {
+          "quantity": "soh_fraction",
+          "numerator_ref": "reference_capacity_measurement",
+          "denominator_basis": "nominal_capacity",
+          "denominator_ref": "rated_nominal_capacity",
+          "unit": "fraction",
+          "reference_protocol_ref": "capacity-reference-v1",
+          "reference_protocol_digest": "0000000000000000000000000000000000000000000000000000000000000050",
+          "target_definition_digest": "0000000000000000000000000000000000000000000000000000000000000051"
+        },
+        "evaluation": {
+          "relation": "unseen_cell",
+          "disjoint_key": "cell_identity_digest",
+          "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000052",
+          "train_partition": "train",
+          "validation_partition": "validation",
+          "test_partition": "test",
+          "split_frozen_on": "2026-10-01"
+        },
+        "observations": [
+          {
+            "observation_id": "0000000000000000000000000000000000000000000000000000000000001771",
+            "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "partition": "train",
+            "time_index": 1,
+            "physical_identities": {
+              "cell_identity_digest": "00000000000000000000000000000000000000000000000000000000000003e9",
+              "pack_identity_digest": "00000000000000000000000000000000000000000000000000000000000007d1",
+              "vehicle_identity_digest": "0000000000000000000000000000000000000000000000000000000000000bb9",
+              "lab_identity_digest": "0000000000000000000000000000000000000000000000000000000000000fa1",
+              "domain_identity_digest": "0000000000000000000000000000000000000000000000000000000000001389"
+            },
+            "target_digest": "0000000000000000000000000000000000000000000000000000000000001b59"
+          },
+          {
+            "observation_id": "0000000000000000000000000000000000000000000000000000000000001772",
+            "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "partition": "train",
+            "time_index": 2,
+            "physical_identities": {
+              "cell_identity_digest": "00000000000000000000000000000000000000000000000000000000000003ea",
+              "pack_identity_digest": "00000000000000000000000000000000000000000000000000000000000007d2",
+              "vehicle_identity_digest": "0000000000000000000000000000000000000000000000000000000000000bba",
+              "lab_identity_digest": "0000000000000000000000000000000000000000000000000000000000000fa2",
+              "domain_identity_digest": "000000000000000000000000000000000000000000000000000000000000138a"
+            },
+            "target_digest": "0000000000000000000000000000000000000000000000000000000000001b5a"
+          },
+          {
+            "observation_id": "0000000000000000000000000000000000000000000000000000000000001773",
+            "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "partition": "validation",
+            "time_index": 3,
+            "physical_identities": {
+              "cell_identity_digest": "00000000000000000000000000000000000000000000000000000000000003eb",
+              "pack_identity_digest": "00000000000000000000000000000000000000000000000000000000000007d3",
+              "vehicle_identity_digest": "0000000000000000000000000000000000000000000000000000000000000bbb",
+              "lab_identity_digest": "0000000000000000000000000000000000000000000000000000000000000fa3",
+              "domain_identity_digest": "000000000000000000000000000000000000000000000000000000000000138b"
+            },
+            "target_digest": "0000000000000000000000000000000000000000000000000000000000001b5b"
+          },
+          {
+            "observation_id": "0000000000000000000000000000000000000000000000000000000000001774",
+            "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "partition": "test",
+            "time_index": 4,
+            "physical_identities": {
+              "cell_identity_digest": "00000000000000000000000000000000000000000000000000000000000003ec",
+              "pack_identity_digest": "00000000000000000000000000000000000000000000000000000000000007d4",
+              "vehicle_identity_digest": "0000000000000000000000000000000000000000000000000000000000000bbc",
+              "lab_identity_digest": "0000000000000000000000000000000000000000000000000000000000000fa4",
+              "domain_identity_digest": "000000000000000000000000000000000000000000000000000000000000138c"
+            },
+            "target_digest": "0000000000000000000000000000000000000000000000000000000000001b5c"
+          }
+        ],
+        "preprocessing": [
+          {
+            "step_id": "scale-capacity-features",
+            "transform_ref": "standard-scaler",
+            "fit_scope": "fixed_predeclared",
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000053",
+            "predeclared_on": "2026-10-02"
+          }
+        ],
+        "model_selection": {
+          "tuning_partition": "validation",
+          "test_labels_used": false,
+          "configuration_digest": "0000000000000000000000000000000000000000000000000000000000000054",
+          "feature_selection_fit_scope": "train_only"
+        },
+        "metrics": [
+          {
+            "metric_name": "MAE",
+            "aggregation": "macro_per_cell",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000055"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "macro_per_cell",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000056"
+          },
+          {
+            "metric_name": "MAE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.02,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000089"
+          },
+          {
+            "metric_name": "RMSE",
+            "aggregation": "worst_domain",
+            "unit": "fraction",
+            "value": 0.03,
+            "sample_count": 4,
+            "result_digest": "0000000000000000000000000000000000000000000000000000000000000090"
+          }
+        ],
+        "uncertainty": {
+          "status": "reported",
+          "method_ref": "held-out-conformal-calibration",
+          "nominal_interval_level": 0.9,
+          "observed_coverage": 0.91,
+          "calibration_partition": "validation",
+          "calibration_group_disjointness": true
         },
         "execution": {
           "source_commit_digest": "0000000000000000000000000000000000000000000000000000000000000057",
