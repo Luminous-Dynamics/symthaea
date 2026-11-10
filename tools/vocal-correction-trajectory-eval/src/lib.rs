@@ -1203,6 +1203,17 @@ mod tests {
 
     #[test]
     fn returning_to_a_prior_output_is_stalled_even_if_metrics_appear_to_improve() {
+        let mut second = correction(
+            2,
+            'd',
+            'b',
+            (9.0, 11.0),
+            (-1.0, 1.0),
+            (0.0, 0.0),
+        );
+        // Make the control state new so this specifically exercises waveform
+        // digest repetition, not the separate control-state cycle guard.
+        second.control_state_digest = digest('e');
         let report = evaluate_trajectory(
             &spec(),
             &[
@@ -1215,19 +1226,13 @@ mod tests {
                     (3.0, 4.0),
                     (0.0, 0.0),
                 ),
-                correction(
-                    2,
-                    'd',
-                    'b',
-                    (9.0, 11.0),
-                    (-1.0, 1.0),
-                    (0.0, 0.0),
-                ),
+                second,
             ],
         )
         .unwrap();
         assert_eq!(report.outcome, TrajectoryOutcome::Stalled);
         assert_eq!(report.iterations[2].output_digest, digest('b'));
+        assert_eq!(report.iterations[2].control_state_digest, digest('e'));
     }
 
     #[test]
