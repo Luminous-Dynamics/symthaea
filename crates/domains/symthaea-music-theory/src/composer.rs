@@ -658,6 +658,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
             apply_counter_hook_echoes(
                 &mut score,
                 GENERAL_COUNTERMELODY_PART_V1,
+                GENERAL_MELODY_PART_V1,
                 &form,
                 meter_beats,
                 intent,
@@ -3139,7 +3140,8 @@ fn plan_damage(
 /// the hook there; two quotations at once would smear both).
 fn apply_counter_hook_echoes(
     score: &mut Score,
-    part_id: PartId,
+    counter_part_id: PartId,
+    melody_part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -3157,7 +3159,9 @@ fn apply_counter_hook_echoes(
     let final_onset = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Cadential)
+        .filter(|n| n.role == VoiceRole::Melody
+                && n.part == melody_part_id
+                && n.emphasis == Emphasis::Cadential)
         .map(|n| n.onset.beats())
         .fold(f64::MIN, f64::max);
     // Held cadence tones inside each ReturnA window.
@@ -3179,6 +3183,7 @@ fn apply_counter_hook_echoes(
             .iter()
             .filter(|n| {
                 n.role == VoiceRole::Melody
+                    && n.part == melody_part_id
                     && n.emphasis == Emphasis::Cadential
                     && n.duration.beats() >= 1.5
                     && n.onset.beats() >= w0 - 1e-9
@@ -3199,13 +3204,13 @@ fn apply_counter_hook_echoes(
             // notes: exact-duplicate onsets/pitches or straight overlap.
             score.notes.retain(|n| {
                 !(n.role == VoiceRole::CounterMelody
-                    && n.part == part_id
+                    && n.part == counter_part_id
                     && n.onset.beats() >= echo_start - 1e-9
                     && n.onset.beats() < echo_end - 1e-9)
             });
             for n in score.notes.iter_mut() {
                 if n.role == VoiceRole::CounterMelody
-                    && n.part == part_id
+                    && n.part == counter_part_id
                     && n.onset.beats() < echo_start - 1e-9
                     && (n.onset + n.duration).beats() > echo_start + 1e-9
                 {
@@ -3222,7 +3227,7 @@ fn apply_counter_hook_echoes(
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: part_id,
+                    part: counter_part_id,
                     pitch,
                     onset: Duration::new((t * 4.0).round() as i64, 4),
                     duration: halved,
@@ -5347,6 +5352,62 @@ mod tests {
         apply_roll_ornaments(&mut score, PartId(44), key, &dna, 13);
         assert_eq!(score.notes.len(), 5);
         assert!(score.notes.iter().all(|note| note.part == PartId(44)));
+    }
+
+    #[test]
+    fn counter_hook_echoes_only_the_authored_melody_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        let note = |part, midi, onset| ScoreNote {
+            part: PartId(part),
+            pitch: Pitch::from_midi(midi),
+            onset: Duration::new(onset, 1),
+            duration: Duration::new(2, 1),
+            velocity: 0.6,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Cadential,
+            section_intensity: 1.0,
+        };
+        score.push(note(1, 72, 0));
+        score.push(note(99, 84, 1));
+        score.push(note(1, 74, 6));
+
+        let phrase = crate::phrase::Phrase {
+            line: crate::motif::Motif::from_degrees(&[(1, Duration::quarter())]),
+            progression: vec![1],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![Section {
+                role: SectionRole::ReturnA,
+                key,
+                period: crate::phrase::Period {
+                    antecedent: phrase.clone(),
+                    consequent: phrase,
+                },
+            }],
+        };
+        let hook = crate::hook::HookCell {
+            notes: vec![
+                (1, Duration::quarter()),
+                (3, Duration::quarter()),
+                (2, Duration::quarter()),
+            ],
+        };
+        apply_counter_hook_echoes(
+            &mut score,
+            PartId(3),
+            PartId(1),
+            &form,
+            4.0,
+            &MusicalIntent::default(),
+            &hook,
+        );
+        let echoes: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.part == PartId(3) && note.role == VoiceRole::CounterMelody)
+            .collect();
+        assert_eq!(echoes.len(), 3, "only the authored main-melody hold should trigger an echo");
+        assert!(echoes.iter().all(|note| note.part == PartId(3)));
     }
 
     #[test]
