@@ -1,0 +1,37 @@
+name: EV SOH adaptation portfolio v0.1 audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_SOH_ADAPTATION_PORTFOLIO_V0_1.md"
+      - "schemas/transport/ev_soh_adaptation_portfolio_v0_1.schema.json"
+      - "fixtures/ev_battery/soh_adaptation_portfolios_v0_1.json"
+      - "tools/ev-soh-adaptation-portfolio-audit/**"
+      - ".github/workflows/ev-soh-adaptation-portfolio-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-soh-adaptation-portfolio-audit/Cargo.toml -- --check
+      - name: Run adaptation portfolio and mutation tests
+        run: cargo test --manifest-path tools/ev-soh-adaptation-portfolio-audit/Cargo.toml
+      - name: Audit frozen strategy portfolios
+        run: |
+          cargo run --manifest-path tools/ev-soh-adaptation-portfolio-audit/Cargo.toml -- --schema schemas/transport/ev_soh_adaptation_portfolio_v0_1.schema.json --corpus fixtures/ev_battery/soh_adaptation_portfolios_v0_1.json > "$RUNNER_TEMP/ev-soh-adaptation-portfolio-report.json"
+          jq -e '
+            .case_count == 13 and
+            .accepted_count == 5 and
+            .rejected_count == 8 and
+            (.report_sha256 | test("^[a-f0-9]{64}$"))
+          ' "$RUNNER_TEMP/ev-soh-adaptation-portfolio-report.json"
