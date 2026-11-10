@@ -51,8 +51,10 @@ pub struct VoiceDemand {
 pub struct ScoreDemandProfile {
     pub schema: String,
     pub input_digest_schema: String,
-    /// SHA-256 over a domain separator and the complete serialized symbolic
-    /// Score (including notes, key, tempo, meter and declared total span).
+    /// SHA-256 of the exact serde_json bytes for the complete symbolic Score
+    /// (including notes, key, tempo, meter and declared total span). The
+    /// input_digest_schema identifies this serialization/hash contract; it
+    /// is metadata and is not prepended to the hashed bytes.
     pub score_sha256: String,
     pub meter_beats: u8,
     pub tempo_bpm: f32,
@@ -235,8 +237,9 @@ pub fn analyze_score_demand(
 fn score_input_sha256(score: &Score) -> Result<String, ScoreDemandError> {
     // Use the canonical Muse score-artifact identity: SHA-256 over the exact
     // serde_json bytes, matching muse_studio::serialized_sha256(&score) and
-    // GenealogyManifest::score_sha256. Keep the schema/domain identifier
-    // alongside the digest so consumers cannot silently mix hash contracts.
+    // GenealogyManifest::score_sha256. The schema identifier is emitted
+    // alongside the digest to name this contract; it is not part of the
+    // hashed bytes.
     let bytes = serde_json::to_vec(score)
         .map_err(|error| ScoreDemandError::ScoreSerialization(error.to_string()))?;
     Ok(format!("{:x}", Sha256::digest(&bytes)))
