@@ -1,0 +1,604 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-soh-benchmark-manifest/0.1",
+  "title": "EV SOH benchmark evidence manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "benchmark_id",
+    "evidence_class",
+    "dataset",
+    "target",
+    "evaluation",
+    "splits",
+    "preprocessing",
+    "target_adaptation",
+    "metrics",
+    "uncertainty",
+    "execution"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "ev-soh-benchmark-manifest/0.1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_class": {
+      "enum": [
+        "physical_observation",
+        "derived_from_physical",
+        "simulation",
+        "synthetic_fixture",
+        "vendor_claim"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "version",
+        "source_ref",
+        "source_digest",
+        "license_ref",
+        "retrieved_at",
+        "selected_subset_digest"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "license_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retrieved_at": {
+          "type": "string",
+          "minLength": 10
+        },
+        "selected_subset_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "definition_digest",
+        "numerator",
+        "denominator",
+        "reference_protocol_digest",
+        "reference_condition_digest",
+        "unit",
+        "label_uncertainty"
+      ],
+      "properties": {
+        "metric": {
+          "enum": [
+            "capacity_soh",
+            "capacity_ah",
+            "resistance_growth",
+            "energy_soh",
+            "power_soh",
+            "task_specific"
+          ]
+        },
+        "definition_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "numerator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "denominator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_protocol_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reference_condition_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "unit": {
+          "enum": [
+            "fraction",
+            "percent",
+            "Ah",
+            "mOhm",
+            "Wh",
+            "W",
+            "custom"
+          ]
+        },
+        "label_uncertainty": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "standard_uncertainty",
+            "unit",
+            "evidence_digest"
+          ],
+          "properties": {
+            "method": {
+              "type": "string",
+              "minLength": 1
+            },
+            "standard_uncertainty": {
+              "type": "number",
+              "minimum": 0
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "group_level",
+        "generalization_claim",
+        "split_manifest_digest"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "same_cell_temporal",
+            "unseen_cell",
+            "unseen_module",
+            "unseen_pack",
+            "unseen_vehicle",
+            "unseen_lab",
+            "unseen_domain"
+          ]
+        },
+        "group_level": {
+          "enum": [
+            "cell",
+            "module",
+            "pack",
+            "vehicle",
+            "lab",
+            "domain"
+          ]
+        },
+        "generalization_claim": {
+          "enum": [
+            "future_within_seen_cell",
+            "unseen_cell_transfer",
+            "unseen_module_transfer",
+            "unseen_pack_transfer",
+            "unseen_vehicle_transfer",
+            "unseen_lab_transfer",
+            "unseen_domain_transfer"
+          ]
+        },
+        "split_manifest_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "splits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "train",
+        "validation",
+        "test"
+      ],
+      "properties": {
+        "train": {
+          "$ref": "#/$defs/split"
+        },
+        "validation": {
+          "$ref": "#/$defs/split"
+        },
+        "test": {
+          "$ref": "#/$defs/split"
+        }
+      }
+    },
+    "preprocessing": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "transform_id",
+          "method",
+          "fit_scope",
+          "uses_validation_or_test_labels",
+          "transform_digest"
+        ],
+        "properties": {
+          "transform_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fit_scope": {
+            "enum": [
+              "none",
+              "train_only",
+              "unlabeled_target"
+            ]
+          },
+          "uses_validation_or_test_labels": {
+            "type": "boolean"
+          },
+          "transform_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "target_adaptation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "unlabeled_target_budget",
+        "labeled_target_budget",
+        "protocol_digest"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "none",
+            "unlabeled_target"
+          ]
+        },
+        "unlabeled_target_budget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "labeled_target_budget": {
+          "const": 0
+        },
+        "protocol_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "formula",
+          "unit",
+          "aggregation",
+          "value",
+          "sample_count",
+          "result_digest",
+          "strata"
+        ],
+        "properties": {
+          "name": {
+            "enum": [
+              "mae",
+              "rmse",
+              "r2",
+              "interval_coverage_90",
+              "interval_coverage_95",
+              "mean_interval_score",
+              "p95_absolute_error"
+            ]
+          },
+          "formula": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "aggregation": {
+            "enum": [
+              "micro_sample",
+              "macro_cell",
+              "macro_pack",
+              "macro_vehicle",
+              "macro_domain",
+              "worst_domain",
+              "p95_cell"
+            ]
+          },
+          "value": {
+            "type": "number"
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "result_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "strata": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "identity_digest",
+                "value",
+                "sample_count"
+              ],
+              "properties": {
+                "identity_digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "value": {
+                  "type": "number"
+                },
+                "sample_count": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "method",
+        "nominal_levels",
+        "calibration_partition",
+        "domain_stratified"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "reported",
+            "not_reported",
+            "not_applicable"
+          ]
+        },
+        "method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nominal_levels": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 1
+          }
+        },
+        "calibration_partition": {
+          "enum": [
+            "validation_only",
+            "train_only",
+            "external_calibration",
+            "none"
+          ]
+        },
+        "domain_stratified": {
+          "type": "boolean"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_commit",
+        "dependency_lock_digest",
+        "toolchain",
+        "toolchain_digest",
+        "hardware",
+        "random_seeds",
+        "wall_time_ms",
+        "peak_memory_bytes",
+        "energy_wh",
+        "environment_digest"
+      ],
+      "properties": {
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "dependency_lock_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "toolchain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "toolchain_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "hardware": {
+          "type": "string",
+          "minLength": 1
+        },
+        "random_seeds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "wall_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "energy_wh": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "environment_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_digest",
+        "window_start_ms",
+        "window_end_ms",
+        "entities"
+      ],
+      "properties": {
+        "split_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "window_start_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "window_end_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "entities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sample_digest",
+              "group_identity_digest",
+              "cell_digest",
+              "module_digest",
+              "pack_digest",
+              "vehicle_digest",
+              "lab_digest",
+              "domain_digest",
+              "observation_start_ms",
+              "observation_end_ms"
+            ],
+            "properties": {
+              "sample_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "group_identity_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "cell_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "module_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "pack_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "vehicle_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "lab_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "domain_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "observation_start_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "observation_end_ms": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
