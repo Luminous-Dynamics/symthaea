@@ -5,6 +5,7 @@ on:
     paths:
       - "tools/nuclear-tea/**"
       - "research/nuclear/port-reference-evidence-sa-2025.json"
+      - "research/nuclear/marine-economic-reference-cases-2026.json"
       - ".github/workflows/nuclear-tea-reference.yml"
   workflow_dispatch:
 
