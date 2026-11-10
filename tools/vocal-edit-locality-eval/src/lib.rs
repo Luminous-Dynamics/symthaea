@@ -396,10 +396,10 @@ mod tests {
     }
 
     #[test]
-    fn silent_protected_region_has_defined_absolute_delta_and_no_correlation() {
+    fn silent_protected_region_collateral_is_detected_without_correlation() {
         let before = vec![0.0f32; 12];
         let mut after = before.clone();
-        after[4] = 0.2;
+        after[0] = 0.2;
         let report =
             score_edit_locality(48_000, &before, &after, &regions(), thresholds(0.01, 0.0))
                 .unwrap();
