@@ -930,7 +930,8 @@ mod tests {
                     .observe(family_observation)
                     .expect("paired family guardrail observation");
             }
-            if report.status == crate::sequential_weight_verification::SequentialWeightVerificationStatus::BenefitEstablished
+            if report.status
+                == crate::sequential_weight_verification::SequentialWeightVerificationStatus::BenefitEstablished
                 && family_report.status == crate::family_noninferiority::FamilyGuardrailStatus::AllFamiliesNonInferior
             {
                 break;
