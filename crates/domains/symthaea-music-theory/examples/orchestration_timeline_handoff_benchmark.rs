@@ -62,6 +62,7 @@ fn main() {
     // emitted by the score-demand/provenance layer.
     let plan = OrchestrationTimelineV1 {
         schema: ORCHESTRATION_TIMELINE_SCHEMA_V1.into(),
+        score_digest_schema: ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
         score_sha256: "a".repeat(64),
         segments: vec![
             OrchestrationSegmentV1 {
