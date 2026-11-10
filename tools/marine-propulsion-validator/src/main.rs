@@ -116,7 +116,7 @@ fn unit_dimension(unit: &str) -> Option<&'static str> {
         "m2" | "m^2" => Some("area"),
         "m3" | "m^3" => Some("volume"),
         "kg" | "tonne" | "t" => Some("mass"),
-        "s" | "sec" | "min" | "h" | "day" => Some("time"),
+        "s" | "sec" | "ms" | "us" | "min" | "h" | "day" => Some("time"),
         "Hz" | "1/s" => Some("frequency"),
         "m/s" | "knot" | "kn" => Some("velocity"),
         "m/s2" | "m/s^2" => Some("acceleration"),
@@ -606,6 +606,25 @@ fn check_service_fingerprint(case: &Value, f: &mut Findings) {
     }
 }
 
+fn time_to_seconds(unit: &str) -> Option<f64> {
+    match unit {
+        "s" | "sec" => Some(1.0),
+        "ms" => Some(1.0e-3),
+        "us" => Some(1.0e-6),
+        "min" => Some(60.0),
+        "h" => Some(3600.0),
+        "day" => Some(86400.0),
+        _ => None,
+    }
+}
+
+fn frequency_to_hz(unit: &str) -> Option<f64> {
+    match unit {
+        "Hz" | "1/s" => Some(1.0),
+        _ => None,
+    }
+}
+
 fn check_trial(case: &Value, f: &mut Findings) {
     let Some(trial) = case.get("trial_evidence") else {
         return;
@@ -656,6 +675,18 @@ fn check_trial(case: &Value, f: &mut Findings) {
         .collect();
     let minimum_observed_fraction = trial
         .pointer("/sample_completeness_policy/minimum_observed_fraction")
+        .and_then(Value::as_f64);
+    let schema_version = case.get("schema_version").and_then(Value::as_str).unwrap_or("");
+    let is_v3 = schema_version.starts_with("0.3.");
+    let source_ids: BTreeSet<String> = case
+        .pointer("/evidence/sources")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|value| value.get("source_id").and_then(Value::as_str).map(str::to_owned))
+        .collect();
+    let rate_count_tolerance = trial
+        .pointer("/sample_completeness_policy/rate_count_tolerance_samples")
         .and_then(Value::as_f64);
 
     if minimum_observed_fraction.is_some_and(|v| v <= 0.0 || v > 1.0) {
@@ -770,6 +801,49 @@ fn check_trial(case: &Value, f: &mut Findings) {
             _ => None,
         };
 
+        if is_v3 {
+            if let (Some((window_start, window_end)), Some(expected), Some(tolerance)) =
+                (window.as_ref(), expected_samples, rate_count_tolerance)
+            {
+                let sample_rate = channel
+                    .pointer("/sample_rate_hz/value")
+                    .and_then(Value::as_f64);
+                let sample_rate_unit = channel
+                    .pointer("/sample_rate_hz/unit")
+                    .and_then(Value::as_str);
+                match (sample_rate, sample_rate_unit.and_then(frequency_to_hz)) {
+                    (Some(rate), Some(scale)) if rate > 0.0 => {
+                        let duration_ns = window_end.signed_duration_since(*window_start).num_nanoseconds();
+                        match duration_ns {
+                            Some(duration_ns) if duration_ns > 0 => {
+                                let expected_from_rate = duration_ns as f64 / 1_000_000_000.0 * rate * scale;
+                                let difference = (expected as f64 - expected_from_rate).abs();
+                                if difference > tolerance {
+                                    f.push(
+                                        pointer_child(path.clone(), "expected_sample_count"),
+                                        "INVALID",
+                                        format!(
+                                            "declared expected sample count {expected} differs from rate/window estimate {expected_from_rate:.6} by more than the policy tolerance {tolerance:.6} samples"
+                                        ),
+                                    );
+                                }
+                            }
+                            _ => f.push(
+                                pointer_child(path.clone(), "sample_window_end"),
+                                "INVALID",
+                                "sample window duration cannot be represented as a positive nanosecond interval",
+                            ),
+                        }
+                    }
+                    _ => f.push(
+                        pointer_child(path.clone(), "sample_rate_hz"),
+                        "INVALID",
+                        "v0.3 sample-count validation requires a known positive sample rate in Hz or 1/s",
+                    ),
+                }
+            }
+        }
+
         if let Some(calibration_id) = channel.get("calibration_record_id").and_then(Value::as_str) {
             match calibration_by_id.get(calibration_id) {
                 None if !calibration_records.is_empty() => f.push(
@@ -787,6 +861,37 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         "/trial_evidence/calibration_records/{}",
                         calibration_records.iter().position(|r| r.get("calibration_record_id").and_then(Value::as_str)==Some(calibration_id)).unwrap_or(0)
                     );
+                    if is_v3 {
+                        match record.get("evidence_source_id").and_then(Value::as_str) {
+                            Some(source_id) if source_ids.contains(source_id) => {}
+                            Some(source_id) => f.push(
+                                pointer_child(record_path.clone(), "evidence_source_id"),
+                                "INVALID",
+                                format!("calibration evidence source '{source_id}' does not resolve in /evidence/sources"),
+                            ),
+                            None => f.push(
+                                pointer_child(record_path.clone(), "evidence_source_id"),
+                                "INVALID",
+                                "v0.3 calibration record must identify its evidence source",
+                            ),
+                        }
+                        match record.get("rights_status").and_then(Value::as_str) {
+                            Some("public") | Some("permissioned") | Some("restricted") => {}
+                            Some("unknown") | Some("not_applicable") | None => f.push(
+                                pointer_child(record_path.clone(), "rights_status"),
+                                "INCOMPLETE",
+                                "calibration certificate rights/access status is unknown or not applicable",
+                            ),
+                            _ => {}
+                        }
+                        if record.get("certificate_sha256").and_then(Value::as_str).is_none() {
+                            f.push(
+                                pointer_child(record_path.clone(), "certificate_sha256"),
+                                "INCOMPLETE",
+                                "calibration certificate digest is absent",
+                            );
+                        }
+                    }
                     if record.get("physical_quantity") != channel.get("physical_quantity")
                         || record.get("unit") != channel.get("unit")
                     {
@@ -892,6 +997,30 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         "/trial_evidence/timebases/{}",
                         timebases.iter().position(|r| r.get("timebase_id").and_then(Value::as_str)==Some(timebase_id)).unwrap_or(0)
                     );
+                    if is_v3 {
+                        match record.get("evidence_source_id").and_then(Value::as_str) {
+                            Some(source_id) if source_ids.contains(source_id) => {}
+                            Some(source_id) => f.push(
+                                pointer_child(record_path.clone(), "evidence_source_id"),
+                                "INVALID",
+                                format!("timebase evidence source '{source_id}' does not resolve in /evidence/sources"),
+                            ),
+                            None => f.push(
+                                pointer_child(record_path.clone(), "evidence_source_id"),
+                                "INVALID",
+                                "v0.3 timebase record must identify its evidence source",
+                            ),
+                        }
+                        match record.get("rights_status").and_then(Value::as_str) {
+                            Some("public") | Some("permissioned") | Some("restricted") => {}
+                            Some("unknown") | Some("not_applicable") | None => f.push(
+                                pointer_child(record_path.clone(), "rights_status"),
+                                "INCOMPLETE",
+                                "timebase evidence rights/access status is unknown or not applicable",
+                            ),
+                            _ => {}
+                        }
+                    }
                     if let Some((sample_start, sample_end)) = window.clone() {
                         let valid_from = record.get("valid_from").and_then(Value::as_str)
                             .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
@@ -927,12 +1056,21 @@ fn check_trial(case: &Value, f: &mut Findings) {
                     if let (Some(channel_value), Some(channel_unit), Some(clock_value), Some(clock_unit)) =
                         (channel_uncertainty, channel_unit, clock_uncertainty, clock_unit)
                     {
-                        if channel_unit != clock_unit || channel_value < clock_value {
-                            f.push(
+                        let channel_seconds = time_to_seconds(channel_unit).map(|scale| channel_value * scale);
+                        let clock_seconds = time_to_seconds(clock_unit).map(|scale| clock_value * scale);
+                        match (channel_seconds, clock_seconds) {
+                            (Some(channel_seconds), Some(clock_seconds))
+                                if channel_seconds + f64::EPSILON >= clock_seconds => {}
+                            (Some(_), Some(_)) => f.push(
                                 pointer_child(path.clone(), "time_alignment_uncertainty"),
                                 "INVALID",
-                                "channel alignment uncertainty must use the timebase uncertainty unit and must not understate it",
-                            );
+                                "channel alignment uncertainty must not understate the referenced timebase uncertainty",
+                            ),
+                            _ => f.push(
+                                pointer_child(path.clone(), "time_alignment_uncertainty"),
+                                "INVALID",
+                                "time alignment uncertainty units must be convertible using the reviewed time vocabulary",
+                            ),
                         }
                     } else {
                         f.push(
