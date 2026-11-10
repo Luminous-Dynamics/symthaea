@@ -27,7 +27,7 @@ This is still an equivalent-circuit screening model. It does not model cell-leve
 
 The uncertainty module applies one-sided fractional bounds to mass, airspeed, lift-to-drag ratio, climb rate, auxiliary demand, battery capacity, voltage, resistance, power/current limits, thermal capacitance/conductance/headroom, and scalar propulsion efficiencies. It returns both nominal and adverse-corner results and retains the exact adjusted input and budget.
 
-The current adverse-corner evaluator wraps the scalar mission evaluator. It does not yet propagate uncertainty through the characterized propulsion curves or battery grids. Its simultaneous corner assumes only the declared one-sided parameter directions; it does not model covariance, correlation, distributions, likelihood, or every nonlinear parameter interaction. It must not be called a probabilistic interval or certified worst-case proof. See ROBUST_UNCERTAINTY.md.
+The adverse-corner evaluator supports both scalar and fully characterized mission paths. On the characterized path, the declared map-specific uncertainty is used for propulsion efficiency and battery OCV/resistance; scalar perturbations to those mapped fields are rejected to prevent double counting. Its simultaneous corner assumes only the declared one-sided parameter directions; it does not model covariance, correlation, distributions, likelihood, or every nonlinear parameter interaction. It must not be called a probabilistic interval or certified worst-case proof. See ROBUST_UNCERTAINTY.md.
 
 ## Current reduced-order equations
 
