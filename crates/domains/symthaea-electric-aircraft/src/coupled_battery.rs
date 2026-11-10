@@ -137,7 +137,7 @@ pub fn solve_coupled_battery_substep(
         .ok_or_else(|| CoupledBatteryStepError::BatteryNodeMissing(config.battery_node_id.clone()))?;
 
     let mut candidate_temperature_k = initial_thermal_state.temperatures_k[battery_node_index];
-    let mut last_temperature_residual_k = f64::INFINITY;
+    let mut last_temperature_residual_k = 0.0;
 
     for iteration in 1..=config.maximum_iterations {
         if candidate_temperature_k > battery.maximum_temperature_k {
@@ -415,12 +415,6 @@ fn validate_inputs(
             "non-battery heat sources must be finite and nonnegative",
         ));
     }
-    if !initial_thermal_state.temperatures_k.iter().any(|temperature| {
-        *temperature > battery.maximum_temperature_k
-    }) {
-        // The per-node check below also bounds the battery node once its ID is resolved.
-    }
-
     Ok(())
 }
 
@@ -737,7 +731,7 @@ mod tests {
     fn impossible_power_root_is_not_repaired_by_reducing_demand() {
         let result = solve_coupled_battery_substep(
             &battery(),
-            &characterization([[0.4, 0.4], [0.4, 0.4]], 360.0),
+            &characterization([[0.5, 0.5], [0.5, 0.5]], 360.0),
             &network(360.0, 100_000.0),
             &ThermalState { temperatures_k: vec![298.15] },
             0.8,
