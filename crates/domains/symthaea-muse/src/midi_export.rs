@@ -1379,6 +1379,11 @@ pub mod part_aware_v1 {
             first_score_note_ordinal: usize,
             second_score_note_ordinal: usize,
         },
+        ScoreSerialization(String),
+        ScoreDigestMismatch {
+            expected: String,
+            actual: String,
+        },
         TimelineSerialization(String),
         MidiWrite(String),
     }
@@ -1502,6 +1507,24 @@ pub mod part_aware_v1 {
         program_bindings: &[MidiProgramBindingV1],
         expected_score_sha256: &str,
     ) -> Result<PartAwareMidiArtifactV1, PartAwareMidiExportErrorV1> {
+        // Recompute the exact score-demand digest from the score being
+        // serialized. The timeline validator checks agreement with the
+        // caller-supplied expected digest; this extra check prevents a stale
+        // trusted digest from being paired with a changed Score.
+        let serialized_score = serde_json::to_vec(score).map_err(|error| {
+            PartAwareMidiExportErrorV1::ScoreSerialization(error.to_string())
+        })?;
+        let actual_score_sha256 = domain_separated_sha256(
+            ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1,
+            &serialized_score,
+        );
+        if actual_score_sha256 != expected_score_sha256 {
+            return Err(PartAwareMidiExportErrorV1::ScoreDigestMismatch {
+                expected: expected_score_sha256.to_owned(),
+                actual: actual_score_sha256,
+            });
+        }
+
         let timeline_report = validate_orchestration_timeline(
             score,
             timeline,
@@ -1618,7 +1641,8 @@ pub mod part_aware_v1 {
         // Program changes are emitted at every timeline-segment boundary.
         // A continuing PartId keeps its MIDI channel while its instrument
         // instance/patch changes explicitly at the handoff.
-        let mut program_at_tick = BTreeMap::<(u16, u64), u8>::new();
+        let mut program_at_tick =
+            BTreeMap::<(u16, u64), (u8, String)>::new();
         let mut program_change_receipts = Vec::with_capacity(timeline.segments.len());
         for segment in &timeline.segments {
             let tick = rational_beat_to_tick(segment.start).ok_or(
@@ -1632,10 +1656,17 @@ pub mod part_aware_v1 {
             let channel = *channel_by_part
                 .get(&segment.part_id)
                 .expect("validated score part has a MIDI channel");
-            if let Some(previous) =
-                program_at_tick.insert((segment.part_id, tick), binding.program)
+            if let Some((previous_program, previous_instrument_id)) =
+                program_at_tick.insert(
+                    (segment.part_id, tick),
+                    (binding.program, segment.instrument_id.clone()),
+                )
             {
-                if previous != binding.program {
+                // Even identical GM program numbers cannot distinguish two
+                // different concrete instrument instances on the same channel.
+                if previous_program != binding.program
+                    || previous_instrument_id != segment.instrument_id
+                {
                     return Err(
                         PartAwareMidiExportErrorV1::ProgramHandoffQuantizationCollision {
                             part_id: segment.part_id,
@@ -1965,8 +1996,9 @@ pub mod part_aware_v1 {
             ORCHESTRATION_TIMELINE_SCHEMA_V1,
         };
 
-        fn sha(ch: char) -> String {
-            std::iter::repeat(ch).take(64).collect()
+        fn score_digest(score: &Score) -> String {
+            let bytes = serde_json::to_vec(score).expect("test score serializes");
+            domain_separated_sha256(ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1, &bytes)
         }
 
         fn note(part: u16, midi: u8, onset: Duration, duration: Duration) -> ScoreNote {
@@ -2047,12 +2079,86 @@ pub mod part_aware_v1 {
         }
 
         #[test]
+        fn changed_score_is_rejected_when_caller_reuses_a_stale_digest() {
+            let source = score(vec![note(1, 60, Duration::zero(), Duration::quarter())]);
+            let digest = score_digest(&source);
+            let timeline = plan(
+                &digest,
+                vec![segment("p1", 1, "cello-1", 0, 1, 2, 1, None)],
+            );
+            let instruments = vec![cap("cello-1", InstrumentKindV1::Cello, 36, 84, 1)];
+            let bindings = vec![binding("cello-1", 42)];
+            let mut changed_score = source.clone();
+            changed_score.notes[0].velocity = 0.93;
+
+            let result = encode_score_midi_part_aware_v1(
+                &changed_score,
+                &timeline,
+                &instruments,
+                &bindings,
+                &digest,
+            );
+            assert!(matches!(
+                result,
+                Err(PartAwareMidiExportErrorV1::ScoreDigestMismatch { .. })
+            ));
+        }
+
+        #[test]
+        fn different_instruments_cannot_share_a_quantized_handoff_tick() {
+            let source = score(vec![note(
+                7,
+                60,
+                Duration::zero(),
+                Duration::new(1, 2),
+            )]);
+            let digest = score_digest(&source);
+            // These rational boundaries differ but both quantize to tick 0.
+            let timeline = plan(
+                &digest,
+                vec![
+                    segment("opening", 7, "cello-1", 0, 1, 1, 1, None),
+                    segment(
+                        "response",
+                        7,
+                        "flute-1",
+                        1,
+                        10_000,
+                        2,
+                        1,
+                        Some(SegmentHandoffV1 {
+                            from_segment_id: "opening".into(),
+                            kind: HandoffKindV1::Reattack,
+                        }),
+                    ),
+                ],
+            );
+            let instruments = vec![
+                cap("cello-1", InstrumentKindV1::Cello, 36, 84, 1),
+                cap("flute-1", InstrumentKindV1::Flute, 60, 96, 1),
+            ];
+            let bindings = vec![binding("cello-1", 42), binding("flute-1", 42)];
+
+            let result = encode_score_midi_part_aware_v1(
+                &source,
+                &timeline,
+                &instruments,
+                &bindings,
+                &digest,
+            );
+            assert!(matches!(
+                result,
+                Err(PartAwareMidiExportErrorV1::ProgramHandoffQuantizationCollision { .. })
+            ));
+        }
+
+        #[test]
         fn independent_parts_with_the_same_voice_role_get_separate_midi_tracks() {
             let source = score(vec![
                 note(1, 60, Duration::zero(), Duration::quarter()),
                 note(2, 64, Duration::zero(), Duration::quarter()),
             ]);
-            let digest = sha('a');
+            let digest = score_digest(&source);
             let timeline = plan(
                 &digest,
                 vec![
@@ -2101,7 +2207,7 @@ pub mod part_aware_v1 {
                 note(7, 60, Duration::zero(), Duration::quarter()),
                 note(7, 62, Duration::new(2, 1), Duration::quarter()),
             ]);
-            let digest = sha('b');
+            let digest = score_digest(&source);
             let timeline = plan(
                 &digest,
                 vec![
@@ -2150,7 +2256,7 @@ pub mod part_aware_v1 {
         #[test]
         fn missing_program_binding_is_rejected() {
             let source = score(vec![note(1, 60, Duration::zero(), Duration::quarter())]);
-            let digest = sha('c');
+            let digest = score_digest(&source);
             let timeline = plan(
                 &digest,
                 vec![segment("p1", 1, "cello-1", 0, 1, 2, 1, None)],
@@ -2174,7 +2280,7 @@ pub mod part_aware_v1 {
         fn missing_part_identity_is_rejected_instead_of_grouped_by_role() {
             let mut source = score(vec![note(1, 60, Duration::zero(), Duration::quarter())]);
             source.notes[0].part = PartId::UNASSIGNED;
-            let digest = sha('d');
+            let digest = score_digest(&source);
             let timeline = plan(
                 &digest,
                 vec![segment("p1", 1, "cello-1", 0, 1, 2, 1, None)],
@@ -2201,7 +2307,7 @@ pub mod part_aware_v1 {
                 note(1, 60, Duration::zero(), Duration::new(2, 1)),
                 note(1, 60, Duration::quarter(), Duration::new(2, 1)),
             ]);
-            let digest = sha('e');
+            let digest = score_digest(&source);
             let timeline = plan(
                 &digest,
                 vec![segment("p1", 1, "cello-1", 0, 1, 4, 1, None)],
@@ -2238,7 +2344,7 @@ pub mod part_aware_v1 {
                 Duration::zero(),
                 Duration::new(1, 10_000),
             )]);
-            let digest = sha('f');
+            let digest = score_digest(&source);
             let timeline = plan(
                 &digest,
                 vec![segment("p1", 1, "cello-1", 0, 1, 1, 1, None)],
@@ -2267,7 +2373,7 @@ pub mod part_aware_v1 {
                 Duration::new(0x1000_0000, 1),
                 Duration::quarter(),
             )]);
-            let digest = sha('2');
+            let digest = score_digest(&source);
             let timeline = plan(
                 &digest,
                 vec![segment("p1", 1, "cello-1", 0, 1, 1_000_000_000, 1, None)],
@@ -2294,7 +2400,7 @@ pub mod part_aware_v1 {
                 note(1, 60, Duration::zero(), Duration::quarter()),
                 note(2, 67, Duration::zero(), Duration::quarter()),
             ]);
-            let digest = sha('1');
+            let digest = score_digest(&source);
             let timeline = plan(
                 &digest,
                 vec![
