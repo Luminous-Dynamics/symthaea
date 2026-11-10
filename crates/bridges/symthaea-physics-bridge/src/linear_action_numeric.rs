@@ -341,3 +341,287 @@ fn fingerprint_samples(samples: &[Vec<f64>]) -> u64 {
     }
     hash
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::linear_group_action::{
+        LinearGeneratorV1, LinearGroupActionAdmissionProfileV1, LinearGroupActionV1,
+    };
+    use symthaea_core::hdc::conjecture_engine::BinOp;
+
+    fn var(name: &str) -> Expr {
+        Expr::Var(name.to_string())
+    }
+
+    fn pow2(name: &str) -> Expr {
+        Expr::BinOp(BinOp::Pow, Box::new(var(name)), Box::new(Expr::Const(2.0)))
+    }
+
+    fn add(left: Expr, right: Expr) -> Expr {
+        Expr::BinOp(BinOp::Add, Box::new(left), Box::new(right))
+    }
+
+    fn sub(left: Expr, right: Expr) -> Expr {
+        Expr::BinOp(BinOp::Sub, Box::new(left), Box::new(right))
+    }
+
+    fn mul(left: Expr, right: Expr) -> Expr {
+        Expr::BinOp(BinOp::Mul, Box::new(left), Box::new(right))
+    }
+
+    fn so2_action() -> AdmittedLinearGroupActionV1 {
+        LinearGroupActionV1 {
+            action_id: "so2".to_string(),
+            coordinate_basis_id: "xy".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: vec![LinearGeneratorV1 {
+                id: "J".to_string(),
+                matrix: vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+            }],
+        }
+        .try_admit(LinearGroupActionAdmissionProfileV1::default())
+        .unwrap()
+    }
+
+    fn sheared_so2_action() -> AdmittedLinearGroupActionV1 {
+        LinearGroupActionV1 {
+            action_id: "so2-sheared".to_string(),
+            coordinate_basis_id: "XY".to_string(),
+            coordinate_names: vec!["X".to_string(), "Y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, -1.0], vec![-1.0, 2.0]],
+            generators: vec![LinearGeneratorV1 {
+                id: "J-sheared".to_string(),
+                matrix: vec![vec![1.0, -2.0], vec![1.0, -1.0]],
+            }],
+        }
+        .try_admit(LinearGroupActionAdmissionProfileV1::default())
+        .unwrap()
+    }
+
+    fn profile(sample_count: usize) -> LinearActionNumericProfileV1 {
+        LinearActionNumericProfileV1 {
+            sample_count,
+            maximum_samples: 64,
+            maximum_variables: 8,
+            minimum_informative_samples_per_generator: sample_count,
+            absolute_finite_difference_step: 1.0e-5,
+            relative_finite_difference_step: 0.0,
+            squared_cosine_tolerance: 1.0e-10,
+        }
+    }
+
+    fn base_samples() -> Vec<Vec<f64>> {
+        vec![
+            vec![0.5, 0.75],
+            vec![0.8, 1.3],
+            vec![1.1, 0.6],
+            vec![1.4, 1.7],
+            vec![2.0, 0.9],
+            vec![2.3, 1.8],
+        ]
+    }
+
+    fn sheared_samples(samples: &[Vec<f64>]) -> Vec<Vec<f64>> {
+        samples.iter().map(|sample| vec![sample[0] + sample[1], sample[1]]).collect()
+    }
+
+    #[test]
+    fn radial_quadratic_qualifies_in_euclidean_coordinates() {
+        let samples = base_samples();
+        let report = check_linear_action_numeric_invariance(
+            &add(pow2("x"), pow2("y")),
+            &so2_action(),
+            &samples,
+            profile(samples.len()),
+        )
+        .unwrap();
+
+        assert!(report.qualifies_under_profile());
+        assert_eq!(report.generator_statistics[0].informative_sample_count, samples.len());
+        assert!(report.generator_statistics[0].maximum_normalized_squared_residual < 1.0e-12);
+    }
+
+    #[test]
+    fn metric_residual_is_covariant_under_sheared_coordinate_representation() {
+        let samples = base_samples();
+        let transformed_samples = sheared_samples(&samples);
+        let canonical_expr = add(pow2("x"), pow2("y"));
+        // D = [[1,1],[0,1]], so x = X-Y and y = Y.
+        let sheared_expr = add(
+            sub(pow2("X"), mul(Expr::Const(2.0), mul(var("X"), var("Y")))),
+            mul(Expr::Const(2.0), pow2("Y")),
+        );
+
+        let canonical = check_linear_action_numeric_invariance(
+            &canonical_expr,
+            &so2_action(),
+            &samples,
+            profile(samples.len()),
+        )
+        .unwrap();
+        let sheared = check_linear_action_numeric_invariance(
+            &sheared_expr,
+            &sheared_so2_action(),
+            &transformed_samples,
+            profile(samples.len()),
+        )
+        .unwrap();
+
+        assert!(canonical.qualifies_under_profile());
+        assert!(sheared.qualifies_under_profile());
+        let canonical_residual =
+            canonical.generator_statistics[0].maximum_normalized_squared_residual;
+        let sheared_residual =
+            sheared.generator_statistics[0].maximum_normalized_squared_residual;
+        assert!(
+            (canonical_residual - sheared_residual).abs() < 1.0e-10,
+            "canonical residual {canonical_residual}, sheared residual {sheared_residual}"
+        );
+        assert_ne!(
+            canonical.sample_fingerprint_fnv1a64,
+            sheared.sample_fingerprint_fnv1a64
+        );
+    }
+
+    #[test]
+    fn anisotropic_quadratic_is_rejected_in_both_representations() {
+        let samples = base_samples();
+        let transformed_samples = sheared_samples(&samples);
+        let canonical_expr = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
+        // Transform x^2+2y^2 to (X-Y)^2+2Y^2.
+        let sheared_expr = add(
+            sub(pow2("X"), mul(Expr::Const(2.0), mul(var("X"), var("Y")))),
+            mul(Expr::Const(3.0), pow2("Y")),
+        );
+
+        let canonical = check_linear_action_numeric_invariance(
+            &canonical_expr,
+            &so2_action(),
+            &samples,
+            profile(samples.len()),
+        )
+        .unwrap();
+        let sheared = check_linear_action_numeric_invariance(
+            &sheared_expr,
+            &sheared_so2_action(),
+            &transformed_samples,
+            profile(samples.len()),
+        )
+        .unwrap();
+
+        assert!(!canonical.qualifies_under_profile());
+        assert!(!sheared.qualifies_under_profile());
+        assert!(
+            (canonical.generator_statistics[0].maximum_normalized_squared_residual
+                - sheared.generator_statistics[0].maximum_normalized_squared_residual)
+                .abs()
+                < 1.0e-10
+        );
+    }
+
+    #[test]
+    fn zero_gradient_and_zero_tangent_samples_fail_closed_by_coverage() {
+        let gradient_zero_samples = vec![vec![0.0, 0.0], vec![1.0, 1.0], vec![2.0, 2.0]];
+        let radial = add(pow2("x"), pow2("y"));
+        let mut radial_profile = profile(gradient_zero_samples.len());
+        radial_profile.minimum_informative_samples_per_generator = 3;
+        let radial_report = check_linear_action_numeric_invariance(
+            &radial,
+            &so2_action(),
+            &gradient_zero_samples,
+            radial_profile,
+        )
+        .unwrap();
+        assert_eq!(radial_report.generator_statistics[0].skipped_zero_gradient_count, 1);
+        assert!(!radial_report.qualifies_under_profile());
+
+        let tangent_zero_samples = vec![vec![0.0, 0.0], vec![1.0, 0.5], vec![1.5, 0.75]];
+        let mut tangent_profile = profile(tangent_zero_samples.len());
+        tangent_profile.minimum_informative_samples_per_generator = 3;
+        let tangent_report = check_linear_action_numeric_invariance(
+            &var("x"),
+            &so2_action(),
+            &tangent_zero_samples,
+            tangent_profile,
+        )
+        .unwrap();
+        assert_eq!(
+            tangent_report.generator_statistics[0].skipped_zero_orbit_tangent_count,
+            1
+        );
+        assert!(!tangent_report.qualifies_under_profile());
+    }
+
+    #[test]
+    fn unacted_parameters_are_retained_but_not_part_of_action_metric() {
+        let samples = vec![
+            vec![1.0, 0.5, 0.75],
+            vec![2.0, 0.8, 1.3],
+            vec![3.0, 1.1, 0.6],
+            vec![4.0, 1.4, 1.7],
+            vec![5.0, 2.0, 0.9],
+            vec![6.0, 2.3, 1.8],
+        ];
+        let expression = mul(var("z"), add(pow2("x"), pow2("y")));
+        let report = check_linear_action_numeric_invariance(
+            &expression,
+            &so2_action(),
+            &samples,
+            profile(samples.len()),
+        )
+        .unwrap();
+
+        assert!(report.qualifies_under_profile());
+        assert_eq!(
+            report.expression_variables,
+            vec!["z".to_string(), "x".to_string(), "y".to_string()]
+        );
+    }
+
+    #[test]
+    fn sample_inputs_and_resource_profiles_are_checked() {
+        let expression = add(pow2("x"), pow2("y"));
+        let samples = base_samples();
+
+        let mut too_small = profile(samples.len());
+        too_small.maximum_samples = 2;
+        assert!(matches!(
+            check_linear_action_numeric_invariance(&expression, &so2_action(), &samples, too_small),
+            Err(LinearActionNumericErrorV1::InvalidProfile)
+        ));
+
+        let wrong_count = profile(samples.len() - 1);
+        assert!(matches!(
+            check_linear_action_numeric_invariance(&expression, &so2_action(), &samples, wrong_count),
+            Err(LinearActionNumericErrorV1::SampleCountMismatch { .. })
+        ));
+
+        let mut wrong_dimension = samples.clone();
+        wrong_dimension[0].pop();
+        assert!(matches!(
+            check_linear_action_numeric_invariance(
+                &expression,
+                &so2_action(),
+                &wrong_dimension,
+                profile(samples.len())
+            ),
+            Err(LinearActionNumericErrorV1::SampleDimensionMismatch { .. })
+        ));
+
+        let mut invalid_profile = profile(samples.len());
+        invalid_profile.squared_cosine_tolerance = 1.01;
+        assert!(matches!(
+            check_linear_action_numeric_invariance(
+                &expression,
+                &so2_action(),
+                &samples,
+                invalid_profile
+            ),
+            Err(LinearActionNumericErrorV1::InvalidProfile)
+        ));
+    }
+}
