@@ -306,7 +306,7 @@ mod tests {
         let cases = [
             (vec![1.0, 0.0], vec![-1.0, 1.0]),
             (vec![2.0, 1.0], vec![-1.0, 2.0]),
-            (vec![0.5, -2.0, 1.0], vec![-1.0, 0.25, 2.0]),
+            (vec![0.5, -2.0, 1.0], vec![-1.0, 0.25, -0.5]),
         ];
         for (phoneme, pitch) in cases {
             let report = evaluate(input(phoneme.clone(), pitch.clone())).unwrap();
