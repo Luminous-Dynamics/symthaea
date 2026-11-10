@@ -160,20 +160,16 @@ pub fn generate_topology(
             for (start, end) in [(0, split), (split, node_count)] {
                 for sender in start..end {
                     let recipient = if sender + 1 == end { start } else { sender + 1 };
-                    add_channel(&mut channels, "BLOCK-RING", sender, recipient, 1, None);
+                    add_reciprocal(&mut channels, "BLOCK-RING", sender, recipient, 1, None);
                 }
             }
-            add_channel(&mut channels, "BLOCK-BRIDGE", split - 1, split, 1, None);
-            add_channel(&mut channels, "BLOCK-BRIDGE", split, 0, 1, None);
+            add_reciprocal(&mut channels, "BLOCK-BRIDGE", split - 1, split, 1, None);
 
             for (start, end) in [(0, split), (split, node_count)] {
                 for sender in start..end {
-                    for recipient in start..end {
-                        if sender != recipient
-                            && recipient != if sender + 1 == end { start } else { sender + 1 }
-                            && rng.chance_per_mille(220)
-                        {
-                            add_channel(&mut channels, "BLOCK-RANDOM", sender, recipient, 1, None);
+                    for recipient in (sender + 1)..end {
+                        if rng.chance_per_mille(220) {
+                            add_reciprocal(&mut channels, "BLOCK-RANDOM", sender, recipient, 1, None);
                         }
                     }
                 }
@@ -182,7 +178,7 @@ pub fn generate_topology(
         TopologyFamily::CorePeriphery => {
             let core_size = (node_count / 3).max(2);
             parameters.insert("core_size".to_string(), core_size as u64);
-            parameters.insert("periphery_extra_probability_per_mille".to_string(), 100);
+            parameters.insert("periphery_directed_ring".to_string(), 1);
             for sender in 0..core_size {
                 for recipient in 0..core_size {
                     if sender != recipient {
@@ -193,13 +189,12 @@ pub fn generate_topology(
             for peripheral in core_size..node_count {
                 let hub = peripheral % core_size;
                 add_reciprocal(&mut channels, "PERIPHERY-LINK", hub, peripheral, 1, None);
-            }
-            for sender in core_size..node_count {
-                for recipient in core_size..node_count {
-                    if sender != recipient && rng.chance_per_mille(100) {
-                        add_channel(&mut channels, "PERIPHERY-RANDOM", sender, recipient, 1, None);
-                    }
-                }
+                let next_peripheral = if peripheral + 1 == node_count {
+                    core_size
+                } else {
+                    peripheral + 1
+                };
+                add_channel(&mut channels, "PERIPHERY-RING", peripheral, next_peripheral, 1, None);
             }
         }
         TopologyFamily::TemporalChurn => {
@@ -401,7 +396,7 @@ mod tests {
             (TopologyFamily::BalancedTree, true, true),
             (TopologyFamily::CompleteDirected, true, true),
             (TopologyFamily::SparseRandomDirected, true, false),
-            (TopologyFamily::StochasticBlock, true, false),
+            (TopologyFamily::StochasticBlock, true, true),
             (TopologyFamily::CorePeriphery, true, false),
             (TopologyFamily::TemporalChurn, true, true),
         ];
