@@ -172,9 +172,7 @@ impl PolicyCallLedger {
                 Ok(())
             }
             RequestState::ResponseCached(existing) if existing == response_digest => Ok(()),
-            RequestState::ResponseCached(_) => {
-                Err(CallLifecycleError::ConflictingCachedResponse)
-            }
+            RequestState::ResponseCached(_) => Err(CallLifecycleError::ConflictingCachedResponse),
         }
     }
 
@@ -268,7 +266,10 @@ mod tests {
     fn reconnect_reuses_same_request_identity_while_in_flight() {
         let mut state = ledger();
         let request = identity("request-1", 1);
-        assert_eq!(state.begin(request.clone()), Ok(BeginDisposition::DispatchNew));
+        assert_eq!(
+            state.begin(request.clone()),
+            Ok(BeginDisposition::DispatchNew)
+        );
         assert_eq!(
             state.begin(request),
             Ok(BeginDisposition::ReplaySameInFlightRequest)
