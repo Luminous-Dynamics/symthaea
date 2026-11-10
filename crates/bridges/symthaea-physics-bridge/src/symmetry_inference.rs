@@ -266,6 +266,101 @@ impl SymmetryInferenceReport {
         self.candidate.clone().unwrap_or_else(SymmetryDescriptor::none)
     }
 }
+
+/// Numerical policy for replayable metric-aware linear-action sampling.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct MetricAwareLinearActionSampleProfileV1 {
+    pub maximum_samples: usize,
+    pub maximum_expression_nodes: usize,
+    pub maximum_total_gradient_work: usize,
+    pub minimum_informative_samples_per_generator: usize,
+    /// Maximum squared cosine in metric-whitened coordinates.
+    pub squared_cosine_tolerance: f64,
+}
+
+impl Default for MetricAwareLinearActionSampleProfileV1 {
+    fn default() -> Self {
+        Self {
+            maximum_samples: 4096,
+            maximum_expression_nodes: 16_384,
+            maximum_total_gradient_work: 20_000_000,
+            minimum_informative_samples_per_generator: 1,
+            squared_cosine_tolerance: 1e-8,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MetricAwareLinearActionSampleErrorV1 {
+    InvalidProfile,
+    TooManySamples { actual: usize, maximum: usize },
+    EmptySampleSet,
+    SampleDimensionMismatch { sample_index: usize, expected: usize, actual: usize },
+    NonFiniteSampleCoordinate { sample_index: usize, coordinate_index: usize },
+    ExpressionTooComplex { actual: usize, maximum: usize },
+    TotalGradientWorkExceeded { actual: usize, maximum: usize },
+    EmptyFixedBindingName { index: usize },
+    DuplicateFixedBinding { name: String },
+    FixedBindingConflictsWithActionCoordinate { name: String },
+    NonFiniteFixedBinding { name: String },
+    MissingFixedBinding { name: String },
+    UnsupportedExpression,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MetricAwareGeneratorSampleResultV1 {
+    pub generator_id: String,
+    pub sample_count: usize,
+    pub informative_sample_count: usize,
+    pub uninformative_sample_count: usize,
+    pub invalid_sample_count: usize,
+    pub maximum_squared_residual: f64,
+    pub mean_squared_residual: f64,
+}
+
+/// Replayable sampled evidence for a declared action and scalar expression.
+/// The exact states and fixed parameters are retained in the receipt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MetricAwareLinearActionSampleReportV1 {
+    pub action_id: String,
+    pub coordinate_basis_id: String,
+    pub coordinate_names: Vec<String>,
+    pub expression_display: String,
+    pub expression_complexity: usize,
+    pub profile: MetricAwareLinearActionSampleProfileV1,
+    pub fixed_bindings: Vec<(String, f64)>,
+    pub sample_states: Vec<Vec<f64>>,
+    pub generator_results: Vec<MetricAwareGeneratorSampleResultV1>,
+}
+
+impl MetricAwareLinearActionSampleReportV1 {
+    /// True only when every generator has enough informative samples, no invalid
+    /// evaluations, and a maximum residual within the declared threshold.
+    pub fn invariant_under_every_generator(&self) -> bool {
+        !self.generator_results.is_empty()
+            && self.generator_results.iter().all(|result| {
+                result.invalid_sample_count == 0
+                    && result.informative_sample_count
+                        >= self.profile.minimum_informative_samples_per_generator
+                    && result.maximum_squared_residual
+                        <= self.profile.squared_cosine_tolerance
+            })
+    }
+
+    pub fn total_invalid_evaluations(&self) -> usize {
+        self.generator_results
+            .iter()
+            .map(|result| result.invalid_sample_count)
+            .sum()
+    }
+
+    pub fn total_informative_evaluations(&self) -> usize {
+        self.generator_results
+            .iter()
+            .map(|result| result.informative_sample_count)
+            .sum()
+    }
+}
 /// Infer a best-effort symmetry descriptor from a discovered expression.
 ///
 /// This compatibility API intentionally discards evidence provenance. New
@@ -1009,6 +1104,474 @@ fn exact_polynomial_symmetry_candidate(
 /// binding order as `state`). Mirrors
 /// `conjecture_engine::gp_support::fd_gradient`, reimplemented locally since
 /// that helper is `pub(crate)` to symthaea-core.
+#[derive(Debug, Clone)]
+struct DualValue {
+    value: f64,
+    gradient: Vec<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DualEvaluationError {
+    Unsupported,
+    Nondifferentiable,
+    InvalidDomain,
+    NonFinite,
+}
+
+fn checked_dual(value: f64, gradient: Vec<f64>) -> Result<DualValue, DualEvaluationError> {
+    if !value.is_finite() || gradient.iter().any(|entry| !entry.is_finite()) {
+        return Err(DualEvaluationError::NonFinite);
+    }
+    Ok(DualValue { value, gradient })
+}
+
+/// Forward-mode differentiation for the smooth, supported expression fragment.
+/// Abs, Floor and Sum abstain rather than receiving an unjustified derivative.
+fn eval_expression_with_gradient(
+    expr: &Expr,
+    variable_names: &[String],
+    values: &[f64],
+) -> Result<DualValue, DualEvaluationError> {
+    let dimension = variable_names.len();
+    match expr {
+        Expr::Var(name) => {
+            let index = variable_names
+                .iter()
+                .position(|candidate| candidate == name)
+                .ok_or(DualEvaluationError::Unsupported)?;
+            let mut gradient = vec![0.0; dimension];
+            gradient[index] = 1.0;
+            checked_dual(values[index], gradient)
+        }
+        Expr::Const(value) => checked_dual(*value, vec![0.0; dimension]),
+        Expr::BinOp(operation, left_expr, right_expr) => {
+            let left = eval_expression_with_gradient(left_expr, variable_names, values)?;
+            let right = eval_expression_with_gradient(right_expr, variable_names, values)?;
+            let mut gradient = vec![0.0; dimension];
+            let value = match operation {
+                BinOp::Add => {
+                    for (out, (left_gradient, right_gradient)) in gradient
+                        .iter_mut()
+                        .zip(left.gradient.iter().zip(&right.gradient))
+                    {
+                        *out = left_gradient + right_gradient;
+                    }
+                    left.value + right.value
+                }
+                BinOp::Sub => {
+                    for (out, (left_gradient, right_gradient)) in gradient
+                        .iter_mut()
+                        .zip(left.gradient.iter().zip(&right.gradient))
+                    {
+                        *out = left_gradient - right_gradient;
+                    }
+                    left.value - right.value
+                }
+                BinOp::Mul => {
+                    for (out, (left_gradient, right_gradient)) in gradient
+                        .iter_mut()
+                        .zip(left.gradient.iter().zip(&right.gradient))
+                    {
+                        *out = left_gradient * right.value + left.value * right_gradient;
+                    }
+                    left.value * right.value
+                }
+                BinOp::Div => {
+                    if right.value.abs() <= 1e-15 {
+                        return Err(DualEvaluationError::InvalidDomain);
+                    }
+                    let denominator = right.value * right.value;
+                    for (out, (left_gradient, right_gradient)) in gradient
+                        .iter_mut()
+                        .zip(left.gradient.iter().zip(&right.gradient))
+                    {
+                        *out = (left_gradient * right.value - left.value * right_gradient)
+                            / denominator;
+                    }
+                    left.value / right.value
+                }
+                BinOp::Pow => {
+                    let exponent_is_constant = right.gradient.iter().all(|entry| *entry == 0.0);
+                    if left.value > 0.0 {
+                        let value = left.value.powf(right.value);
+                        let log_base = left.value.ln();
+                        for (out, (left_gradient, right_gradient)) in gradient
+                            .iter_mut()
+                            .zip(left.gradient.iter().zip(&right.gradient))
+                        {
+                            *out = value
+                                * (right.value * left_gradient / left.value
+                                    + log_base * right_gradient);
+                        }
+                        value
+                    } else if left.value < 0.0
+                        && exponent_is_constant
+                        && right.value.fract() == 0.0
+                    {
+                        let value = left.value.powf(right.value);
+                        let derivative = right.value * left.value.powf(right.value - 1.0);
+                        for (out, left_gradient) in gradient.iter_mut().zip(&left.gradient) {
+                            *out = derivative * left_gradient;
+                        }
+                        value
+                    } else if left.value == 0.0 && exponent_is_constant && right.value > 0.0 {
+                        if right.value == 1.0 {
+                            gradient.clone_from(&left.gradient);
+                        } else if right.value > 1.0 {
+                            gradient.fill(0.0);
+                        } else {
+                            return Err(DualEvaluationError::Nondifferentiable);
+                        }
+                        0.0_f64.powf(right.value)
+                    } else {
+                        return Err(DualEvaluationError::InvalidDomain);
+                    }
+                }
+            };
+            checked_dual(value, gradient)
+        }
+        Expr::Func(function, argument) => {
+            let argument = eval_expression_with_gradient(argument, variable_names, values)?;
+            let mut gradient = vec![0.0; dimension];
+            let value = match function {
+                UnaryFn::Sqrt => {
+                    if argument.value < 0.0 {
+                        return Err(DualEvaluationError::InvalidDomain);
+                    }
+                    if argument.value == 0.0 {
+                        return Err(DualEvaluationError::Nondifferentiable);
+                    }
+                    let value = argument.value.sqrt();
+                    let derivative = 0.5 / value;
+                    for (out, input) in gradient.iter_mut().zip(&argument.gradient) {
+                        *out = derivative * input;
+                    }
+                    value
+                }
+                UnaryFn::Log => {
+                    if argument.value <= 0.0 {
+                        return Err(DualEvaluationError::InvalidDomain);
+                    }
+                    for (out, input) in gradient.iter_mut().zip(&argument.gradient) {
+                        *out = input / argument.value;
+                    }
+                    argument.value.ln()
+                }
+                UnaryFn::Exp => {
+                    let value = argument.value.exp();
+                    for (out, input) in gradient.iter_mut().zip(&argument.gradient) {
+                        *out = value * input;
+                    }
+                    value
+                }
+                UnaryFn::Sin => {
+                    let derivative = argument.value.cos();
+                    for (out, input) in gradient.iter_mut().zip(&argument.gradient) {
+                        *out = derivative * input;
+                    }
+                    argument.value.sin()
+                }
+                UnaryFn::Cos => {
+                    let derivative = -argument.value.sin();
+                    for (out, input) in gradient.iter_mut().zip(&argument.gradient) {
+                        *out = derivative * input;
+                    }
+                    argument.value.cos()
+                }
+                UnaryFn::Abs | UnaryFn::Floor => return Err(DualEvaluationError::Unsupported),
+            };
+            checked_dual(value, gradient)
+        }
+        Expr::Sum(_, _) => Err(DualEvaluationError::Unsupported),
+    }
+}
+
+/// Solve L * result = rhs for a lower-triangular L using forward substitution.
+fn solve_lower_triangular(lower: &[Vec<f64>], rhs: &[f64]) -> Option<Vec<f64>> {
+    let mut result = Vec::with_capacity(rhs.len());
+    for (row_index, rhs_value) in rhs.iter().enumerate() {
+        let correction = result
+            .iter()
+            .zip(lower[row_index].iter())
+            .map(|(value, coefficient)| *value * *coefficient)
+            .sum::<f64>();
+        let pivot = lower[row_index][row_index];
+        if !pivot.is_finite() || pivot <= 0.0 {
+            return None;
+        }
+        let value = (*rhs_value - correction) / pivot;
+        if !value.is_finite() {
+            return None;
+        }
+        result.push(value);
+    }
+    Some(result)
+}
+
+fn stable_vector_norm(values: &[f64]) -> f64 {
+    values
+        .iter()
+        .fold(0.0_f64, |norm, value| norm.hypot(*value))
+}
+
+/// Evaluate replayable metric-aware residuals for arbitrary admitted linear actions.
+///
+/// The derivative is computed analytically by forward-mode AD on the supported
+/// smooth AST fragment. For G = s L L^T, this evaluates the Euclidean cosine
+/// between L^-1 grad(f) and L^T A x, exactly the metric-aware dual/primal cosine.
+/// No explicit inverse of G or finite-difference step is used.
+pub fn evaluate_metric_aware_linear_action_samples(
+    expr: &Expr,
+    action: &AdmittedLinearGroupActionV1,
+    sample_states: &[Vec<f64>],
+    fixed_bindings: &[(&str, f64)],
+    profile: MetricAwareLinearActionSampleProfileV1,
+) -> Result<MetricAwareLinearActionSampleReportV1, MetricAwareLinearActionSampleErrorV1> {
+    if profile.maximum_samples == 0
+        || profile.maximum_expression_nodes == 0
+        || profile.maximum_total_gradient_work == 0
+        || profile.minimum_informative_samples_per_generator == 0
+        || profile.minimum_informative_samples_per_generator > profile.maximum_samples
+        || !profile.squared_cosine_tolerance.is_finite()
+        || !(0.0..=1.0).contains(&profile.squared_cosine_tolerance)
+    {
+        return Err(MetricAwareLinearActionSampleErrorV1::InvalidProfile);
+    }
+    if sample_states.is_empty() {
+        return Err(MetricAwareLinearActionSampleErrorV1::EmptySampleSet);
+    }
+    if sample_states.len() > profile.maximum_samples {
+        return Err(MetricAwareLinearActionSampleErrorV1::TooManySamples {
+            actual: sample_states.len(),
+            maximum: profile.maximum_samples,
+        });
+    }
+
+    let declaration = action.action();
+    let dimension = declaration.coordinate_names.len();
+    let complexity = expr.complexity();
+    if complexity > profile.maximum_expression_nodes {
+        return Err(MetricAwareLinearActionSampleErrorV1::ExpressionTooComplex {
+            actual: complexity,
+            maximum: profile.maximum_expression_nodes,
+        });
+    }
+
+    for (sample_index, sample) in sample_states.iter().enumerate() {
+        if sample.len() != dimension {
+            return Err(MetricAwareLinearActionSampleErrorV1::SampleDimensionMismatch {
+                sample_index,
+                expected: dimension,
+                actual: sample.len(),
+            });
+        }
+        for (coordinate_index, value) in sample.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(MetricAwareLinearActionSampleErrorV1::NonFiniteSampleCoordinate {
+                    sample_index,
+                    coordinate_index,
+                });
+            }
+        }
+    }
+
+    let mut fixed_values = BTreeMap::new();
+    for (index, (raw_name, value)) in fixed_bindings.iter().enumerate() {
+        let name = *raw_name;
+        if name.trim().is_empty() {
+            return Err(MetricAwareLinearActionSampleErrorV1::EmptyFixedBindingName { index });
+        }
+        if declaration.coordinate_names.iter().any(|coordinate| coordinate == name) {
+            return Err(
+                MetricAwareLinearActionSampleErrorV1::FixedBindingConflictsWithActionCoordinate {
+                    name: name.to_string(),
+                },
+            );
+        }
+        if !value.is_finite() {
+            return Err(MetricAwareLinearActionSampleErrorV1::NonFiniteFixedBinding {
+                name: name.to_string(),
+            });
+        }
+        if fixed_values.insert(name.to_string(), *value).is_some() {
+            return Err(MetricAwareLinearActionSampleErrorV1::DuplicateFixedBinding {
+                name: name.to_string(),
+            });
+        }
+    }
+
+    let mut variable_names = Vec::new();
+    collect_var_names(expr, &mut variable_names);
+    for coordinate_name in &declaration.coordinate_names {
+        if !variable_names.contains(coordinate_name) {
+            variable_names.push(coordinate_name.clone());
+        }
+    }
+    for name in &variable_names {
+        if !declaration.coordinate_names.contains(name)
+            && !fixed_values.contains_key(name)
+        {
+            return Err(MetricAwareLinearActionSampleErrorV1::MissingFixedBinding {
+                name: name.clone(),
+            });
+        }
+    }
+    let coordinate_indices: Vec<usize> = declaration
+        .coordinate_names
+        .iter()
+        .map(|name| {
+            variable_names
+                .iter()
+                .position(|candidate| candidate == name)
+                .expect("action coordinates appended to variable order")
+        })
+        .collect();
+
+    let total_work = sample_states
+        .len()
+        .checked_mul(declaration.generators.len())
+        .and_then(|count| count.checked_mul(complexity))
+        .and_then(|count| count.checked_mul(variable_names.len()))
+        .ok_or(MetricAwareLinearActionSampleErrorV1::InvalidProfile)?;
+    if total_work > profile.maximum_total_gradient_work {
+        return Err(
+            MetricAwareLinearActionSampleErrorV1::TotalGradientWorkExceeded {
+                actual: total_work,
+                maximum: profile.maximum_total_gradient_work,
+            },
+        );
+    }
+
+    let fixed_bindings_owned: Vec<(String, f64)> = fixed_bindings
+        .iter()
+        .map(|(name, value)| ((*name).to_string(), *value))
+        .collect();
+    let lower = action.scaled_metric_cholesky_lower();
+    let mut generator_results = Vec::with_capacity(declaration.generators.len());
+
+    for generator in &declaration.generators {
+        let mut informative_sample_count = 0usize;
+        let mut uninformative_sample_count = 0usize;
+        let mut invalid_sample_count = 0usize;
+        let mut maximum_squared_residual = 0.0_f64;
+        let mut residual_sum = 0.0_f64;
+
+        for sample in sample_states {
+            let mut values = vec![0.0_f64; variable_names.len()];
+            for (coordinate_index, variable_index) in coordinate_indices.iter().enumerate() {
+                values[*variable_index] = sample[coordinate_index];
+            }
+            for (name, value) in &fixed_values {
+                let variable_index = variable_names
+                    .iter()
+                    .position(|candidate| candidate == name)
+                    .expect("fixed expression variable retained in AST variable order");
+                values[variable_index] = *value;
+            }
+
+            let dual = match eval_expression_with_gradient(expr, &variable_names, &values) {
+                Ok(result) => result,
+                Err(DualEvaluationError::Unsupported) => {
+                    return Err(MetricAwareLinearActionSampleErrorV1::UnsupportedExpression);
+                }
+                Err(
+                    DualEvaluationError::Nondifferentiable
+                    | DualEvaluationError::InvalidDomain
+                    | DualEvaluationError::NonFinite,
+                ) => {
+                    invalid_sample_count = invalid_sample_count.saturating_add(1);
+                    continue;
+                }
+            };
+
+            let mut gradient = vec![0.0_f64; dimension];
+            for (coordinate_index, variable_index) in coordinate_indices.iter().enumerate() {
+                gradient[coordinate_index] = dual.gradient[*variable_index];
+            }
+
+            let mut flow = vec![0.0_f64; dimension];
+            for (row_index, row) in generator.matrix.iter().enumerate() {
+                for (column_index, coefficient) in row.iter().enumerate() {
+                    flow[row_index] += coefficient * sample[column_index];
+                }
+            }
+            if flow.iter().any(|value| !value.is_finite()) {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            }
+
+            let Some(whitened_gradient) = solve_lower_triangular(lower, &gradient) else {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            };
+            let mut whitened_flow = vec![0.0_f64; dimension];
+            for (column_index, output) in whitened_flow.iter_mut().enumerate() {
+                for (row_index, flow_value) in flow.iter().enumerate() {
+                    *output += lower[row_index][column_index] * *flow_value;
+                }
+            }
+            if whitened_flow.iter().any(|value| !value.is_finite()) {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            }
+
+            let gradient_norm = stable_vector_norm(&whitened_gradient);
+            let flow_norm = stable_vector_norm(&whitened_flow);
+            if !gradient_norm.is_finite() || !flow_norm.is_finite() {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            }
+            if gradient_norm == 0.0 || flow_norm == 0.0 {
+                uninformative_sample_count = uninformative_sample_count.saturating_add(1);
+                continue;
+            }
+
+            let directional_cosine = whitened_gradient
+                .iter()
+                .zip(&whitened_flow)
+                .map(|(gradient_value, flow_value)| {
+                    (gradient_value / gradient_norm) * (flow_value / flow_norm)
+                })
+                .sum::<f64>();
+            if !directional_cosine.is_finite() {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            }
+            let squared_residual = (directional_cosine * directional_cosine).clamp(0.0, 1.0);
+            informative_sample_count = informative_sample_count.saturating_add(1);
+            maximum_squared_residual = maximum_squared_residual.max(squared_residual);
+            residual_sum += squared_residual;
+        }
+
+        let mean_squared_residual = if informative_sample_count == 0 {
+            0.0
+        } else {
+            residual_sum / informative_sample_count as f64
+        };
+        generator_results.push(MetricAwareGeneratorSampleResultV1 {
+            generator_id: generator.id.clone(),
+            sample_count: sample_states.len(),
+            informative_sample_count,
+            uninformative_sample_count,
+            invalid_sample_count,
+            maximum_squared_residual,
+            mean_squared_residual,
+        });
+    }
+
+    Ok(MetricAwareLinearActionSampleReportV1 {
+        action_id: declaration.action_id.clone(),
+        coordinate_basis_id: declaration.coordinate_basis_id.clone(),
+        coordinate_names: declaration.coordinate_names.clone(),
+        expression_display: expr.to_string(),
+        expression_complexity: complexity,
+        profile,
+        fixed_bindings: fixed_bindings_owned,
+        sample_states: sample_states.to_vec(),
+        generator_results,
+    })
+}
+
 fn fd_gradient(
     expr: &Expr,
     state: &[f64],
