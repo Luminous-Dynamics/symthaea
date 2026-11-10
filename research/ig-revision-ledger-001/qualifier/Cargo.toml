@@ -7,6 +7,7 @@ description = "Structural and evidence-boundary qualifier for IG-REVISION-LEDGER
 
 [dependencies]
 serde_json = "1"
+sha2 = "0.10"
 
 [workspace]
 members = ["."]
