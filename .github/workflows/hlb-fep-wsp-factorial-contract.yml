@@ -2,7 +2,7 @@ name: HLB FEP-WSP Factorial Contract
 
 on:
   pull_request:
-    branches: [main, research/swi-001-weight-space-introspection]
+    branches: [main, research/swi-001-weight-space-introspection, research/hlb-fep-wsp-factorial-v2]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
@@ -37,6 +37,8 @@ on:
       - "crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs"
       - "crates/core/symthaea-fep/Cargo.toml"
       - "crates/core/symthaea-fep/src/lib.rs"
+      - "crates/core/symthaea-fep/src/factor_covariance.rs"
+      - "crates/core/symthaea-fep/examples/hlb_factor_covariance_known_answers.rs"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
@@ -48,7 +50,7 @@ on:
       - "src/dynamics/cfc/mod.rs"
       - "src/dynamics/cfc/network.rs"
   push:
-    branches: [research/hlb-fep-wsp-factorial-v2]
+    branches: [research/hlb-fep-wsp-factorial-v2, research/hlb-factor-covariance-woodbury-v0]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - ".github/scripts/assert-hlb-test-discovery.sh"
@@ -82,6 +84,8 @@ on:
       - "crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs"
       - "crates/core/symthaea-fep/Cargo.toml"
       - "crates/core/symthaea-fep/src/lib.rs"
+      - "crates/core/symthaea-fep/src/factor_covariance.rs"
+      - "crates/core/symthaea-fep/examples/hlb_factor_covariance_known_answers.rs"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
@@ -162,6 +166,8 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/open_world_weight_program_gate.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/static_model_diagnostic.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/factor_covariance.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_factor_covariance_known_answers.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs
@@ -218,6 +224,8 @@ jobs:
           cargo test --locked --release -p symthaea-fep --lib sequential_diagnostic_planning::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib sequential_diagnostic_benchmark::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib static_model_diagnostic::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib factor_covariance::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --example hlb_factor_covariance_known_answers -- --nocapture
           cargo test --locked --release -p symthaea-fep --example hlb_static_model_diagnostic -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib decision_diagnostic_benchmark::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --example hlb_decision_diagnostic_benchmark -- --nocapture
@@ -235,6 +243,23 @@ jobs:
           cargo test --locked --release -p symthaea-core --lib hdc::structured_mixer::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_structured_mixer_benchmark -- --nocapture
 
+
+      - name: Run low-rank factor covariance known-answer fixture
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-fep --example hlb_factor_covariance_known_answers > research-results/hlb-factor-covariance-known-answers.json
+          jq -e --arg source_sha "$SYMTHAEA_SOURCE_SHA" '
+            .schema_version == "hlb-factor-covariance-known-answers-v1" and
+            .status == "synthetic_known_answer_fixture_only" and
+            .source_sha == $source_sha and
+            (.cases | length == 6) and
+            (.maximum_absolute_error < 2e-10) and
+            all(.cases[]; .absolute_error < 2e-10)
+          ' research-results/hlb-factor-covariance-known-answers.json >/dev/null
+          cat research-results/hlb-factor-covariance-known-answers.json
 
       - name: Run decision-focused diagnostic policy benchmark
         env:
