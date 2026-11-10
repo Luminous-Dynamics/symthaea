@@ -23,6 +23,7 @@
 //!
 //! Neither claim is about consciousness or Φ — see the plan doc's Non-goals.
 
+pub mod adversarial_confidence;
 pub mod agent_id;
 pub mod coalition;
 pub mod earth_forcing;
