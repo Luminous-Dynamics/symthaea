@@ -5,7 +5,7 @@
 
 ## Why this exists
 
-A single efficiency constant (for example, "motor efficiency = 94%") hides operating-point dependence and offers no defensible way to handle a point outside the measured region. v0.2 introduces evidence-bound, piecewise-linear efficiency curves and rejects extrapolation.
+A single efficiency constant (for example, "motor efficiency = 94%") hides operating-point dependence and offers no defensible way to handle a point outside the measured region. v0.2 introduced evidence-bound, piecewise-linear efficiency curves and rejects extrapolation.
 
 The evaluator uses:
 
