@@ -1,0 +1,199 @@
+{
+  "registry_id": "NUCL-MAR-ECONOMIC-REFERENCE-CASES",
+  "schema_version": "1.0.0",
+  "prepared_at": "2026-11-10",
+  "status": "LITERATURE_RECONCILIATION_REGISTER_NOT_A_NUMERICAL_TCO_MODEL",
+  "purpose": "Preserve distinct published economic, regulatory, insurability and port-readiness claims as separate evidence-bounded benchmark anchors. No result is generalized beyond its stated scope.",
+  "anchors": [
+    {
+      "anchor_id": "UCL-MERCHANT-TCO-2026",
+      "source_class": "PUBLISHED_TCO_FINDING",
+      "published_at": "2026-11-05",
+      "title": "Nuclear Reactors for Merchant Shipping: A Total Cost of Ownership Assessment of a Low-Carbon Pathway",
+      "publisher": "UCL Energy Institute",
+      "source_url": "https://www.ucl.ac.uk/bartlett/publications/2026/nov/nuclear-reactors-merchant-shipping-total-cost-ownership-assessment-low-carbon-pathway",
+      "public_summary_findings": [
+        "Without the IMO Net-Zero Framework, no nuclear-powered vessel in the study is cheaper than conventional vessels, even at the lowest assumed reactor costs.",
+        "Under the IMO Net-Zero Framework, nuclear propulsion could become the least-cost option from 2040 if reactor costs fall significantly.",
+        "The reactor-cost reductions required for that result have not yet been demonstrated.",
+        "Insurance, liability and regulation remain important barriers."
+      ],
+      "model_admission": "QUALITATIVE_RESULT_ONLY_UNTIL_DETAILED_ASSUMPTIONS_AND_DATA_ARE_ADMITTED",
+      "expected_benchmark_role": "NEGATIVE_CONTROL_WITHOUT_POLICY_AND_CONDITIONAL_FUTURE_CASE_WITH_POLICY",
+      "missing_for_full_reproduction": [
+        "Vessel classes, routes, operating profiles and comparator definitions",
+        "Reactor CAPEX and learning assumptions",
+        "Financing and construction assumptions",
+        "Fuel-cycle, staffing, maintenance and outage assumptions",
+        "Insurance, liability, port access and regulatory treatment",
+        "IMO Net-Zero Framework policy and carbon-cost assumptions",
+        "Lifecycle GHG accounting boundaries",
+        "Sensitivity ranges and source data"
+      ],
+      "inference_limits": [
+        "Does not prove nuclear shipping is uneconomic in every route, time period or policy regime.",
+        "Does not establish that nuclear becomes least-cost in 2040; that result is explicitly conditional.",
+        "Does not provide a license, class approval, insurance quote or operating demonstration."
+      ]
+    },
+    {
+      "anchor_id": "LR-LUCID-CONTAINERSHIP-2026",
+      "source_class": "INDUSTRY_MODELED_CASE",
+      "published_at": "2026-07-14",
+      "title": "Power Shift: Nuclear Power Pathways for Future Containership Fleets",
+      "publisher": "Lloyd's Register / LucidCatalyst",
+      "source_url": "https://www.lr.org/en/knowledge/case-studies/power-shift-nuclear-power-pathways-for-future-containership-fleets/",
+      "declared_reference_case": {
+        "vessel_capacity_teu": 15000,
+        "modeled_speed_knots": 25
+      },
+      "public_summary_findings": [
+        "The study estimates up to 38% greater annual cargo capacity for the scenario relative to its conventional reference.",
+        "Eliminating conventional fuel tanks is estimated to free up to 5% additional container space."
+      ],
+      "model_admission": "SCENARIO_SPECIFIC_MODELED_RESULTS_REPRODUCE_ASSUMPTIONS_BEFORE_VARIATION",
+      "expected_benchmark_role": "HIGH_SPEED_HIGH_UTILIZATION_INDUSTRY_SCENARIO_TO_REPRODUCE_AND_STRESS_TEST",
+      "missing_for_full_reproduction": [
+        "Exact ship power and propulsion assumptions",
+        "Hull and machinery mass/volume deltas",
+        "Route, speed, weather, port dwell and voyage schedule",
+        "Maintenance, refuelling and drydock assumptions",
+        "Nuclear CAPEX, financing and lifecycle-cost assumptions",
+        "Port-access and insurance assumptions",
+        "Comparator vessel and lifecycle emissions assumptions"
+      ],
+      "inference_limits": [
+        "Modeled maximum gains are not achieved fleet performance.",
+        "The case cannot be generalized to all containership sizes, speeds or routes.",
+        "The result must not be treated as directly inconsistent with UCL until system boundaries and assumptions are reconciled."
+      ]
+    },
+    {
+      "anchor_id": "PNEN-CONTAINERSHIP-ECON-2026",
+      "source_class": "PEER_REVIEWED_SCENARIO_MODEL",
+      "published_at": "2026-06",
+      "title": "The economics of nuclear propulsion for containerships",
+      "publisher": "Progress in Nuclear Energy",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0149197026000776",
+      "public_summary_findings": [
+        "The study uses levelized cost of transport to compare nuclear propulsion with conventional and alternative-fuel systems.",
+        "The abstract reports potential competitiveness in specific scenarios involving high cruising speeds and favorable nuclear-reactor CAPEX.",
+        "It identifies learning from building and operating containerships as a potential contributor to scale economics."
+      ],
+      "model_admission": "SCENARIO_SPECIFIC_ABSTRACT_RESULT_WITH_DATA_AVAILABLE_ON_REQUEST",
+      "expected_benchmark_role": "THIRD_INDEPENDENT_ECONOMIC_SCENARIO_FOR_RECONCILIATION",
+      "missing_for_full_reproduction": [
+        "Underlying numerical data",
+        "Detailed model assumptions and sensitivity ranges",
+        "Exact route, speed and utilization comparison",
+        "Reactor CAPEX, financing, fuel-cycle, port and insurance assumptions"
+      ],
+      "inference_limits": [
+        "A positive scenario is not a fleet-wide commercial result.",
+        "Do not assume its model is numerically comparable with UCL or LR without reconstructing all boundaries."
+      ]
+    },
+    {
+      "anchor_id": "IUMI-NUCLEAR-INSURANCE-2026",
+      "source_class": "INDUSTRY_POLICY_POSITION",
+      "published_at": "2026-05-07",
+      "title": "Nuclear Propulsion",
+      "publisher": "International Union of Marine Insurance",
+      "source_url": "https://iumi.com/policy/nuclear-propulsion/",
+      "public_summary_findings": [
+        "Conventional marine insurance excludes nuclear risks.",
+        "Existing maritime liability conventions and the IMO framework were not designed for nuclear-powered merchant ships.",
+        "Repair, decommissioning and port-access concerns remain."
+      ],
+      "expected_benchmark_role": "HARD_FEASIBILITY_GATE_NOT_A_SMALL_COST_PREMIUM",
+      "inference_limits": [
+        "This is an industry policy position; project-specific legal and insurance structures still require direct analysis.",
+        "Do not infer that a future insurance or liability arrangement is impossible."
+      ]
+    },
+    {
+      "anchor_id": "WTW-PORT-INSURABILITY-2026",
+      "source_class": "INSURANCE_RISK_ANALYSIS",
+      "published_at": "2026-10-22",
+      "title": "Nuclear shipping's second act",
+      "publisher": "WTW",
+      "source_url": "https://www.wtwco.com/en-us/insights/2026/10/nuclear-shippings-second-act",
+      "public_summary_findings": [
+        "Port exclusion in key markets could undermine commercial viability.",
+        "Insurers need clarity on realistic loss scenarios and responsibility allocation among shipowner, reactor operator, technology provider and government.",
+        "Insurance and reinsurer engagement should begin during design and contracting, not after construction."
+      ],
+      "expected_benchmark_role": "PORT_NETWORK_AND_INSURANCE_GATE_WITH_EARLY_STAKEHOLDER_REVIEW",
+      "inference_limits": [
+        "The publication identifies questions and barriers; it does not provide an insurer quote or a universal insurability determination."
+      ]
+    },
+    {
+      "anchor_id": "LR-BPA-PORT-READINESS-2026",
+      "source_class": "INDUSTRY_READINESS_GUIDANCE",
+      "published_at": "2026-10-22",
+      "title": "Advanced Nuclear Technology Use Within Port Environments",
+      "publisher": "Lloyd's Register / British Ports Association",
+      "source_url": "https://www.lr.org/en/knowledge/press-room/press-listing/press-release/2026/ports-encouraged-to-prepare-now-for-advanced-nuclear-in-maritime-and-clean-energy/",
+      "public_summary_findings": [
+        "Ports should prepare before procurement through stakeholder mapping, demand and grid assessment, regulator engagement, workforce capability and evidence-led community communication.",
+        "Applications include nuclear ship calls, floating power units and land-based SMRs.",
+        "The report describes a staged readiness pathway from nuclear-aware through nuclear-ready and nuclear-enabled to a nuclear energy hub.",
+        "Nuclear will not be appropriate for every port."
+      ],
+      "expected_benchmark_role": "PORT_READINESS_REFERENCE_TO_EXTEND_WITH_TYPED_EVIDENCE_AND_NO_GO_RULES",
+      "inference_limits": [
+        "Readiness labels are not licensing or deployment approval.",
+        "No port is declared suitable by this registry."
+      ]
+    },
+    {
+      "anchor_id": "IMO-NUCLEAR-SHIP-CODE-2026",
+      "source_class": "REGULATORY_WORKPLAN",
+      "published_at": "2026",
+      "title": "IMO Nuclear Code and SOLAS Chapter VIII revision work",
+      "publisher": "International Maritime Organization",
+      "source_url": "https://www.imo.org/en/mediacentre/pages/whatsnew-2419.aspx",
+      "public_summary_findings": [
+        "The workplan targets future revision milestones through 2030."
+      ],
+      "expected_benchmark_role": "JURISDICTION_AND_TIME_DEPENDENT_REGULATORY_GATE",
+      "inference_limits": [
+        "Planned milestones are not adopted requirements in force.",
+        "The workplan does not grant vessel or port authorization."
+      ]
+    },
+    {
+      "anchor_id": "NEA-SMR-DASHBOARD-ED4-2026",
+      "source_class": "INDUSTRY_PROJECT_READINESS_DATABASE",
+      "published_at": "2026-09-28",
+      "title": "NEA Small Modular Reactor Digital Dashboard — Fourth Edition",
+      "publisher": "OECD Nuclear Energy Agency",
+      "source_url": "https://www.cms.oecd-nea.org/jcms/pl_122015/release-of-the-nea-small-modular-reactor-digital-dashboard-fourth-edition",
+      "public_summary_findings": [
+        "The dashboard tracks 156 SMR and micro-modular reactor projects, with 95 included in the assessed dashboard.",
+        "Readiness dimensions include licensing, siting, financing, supply chain, engagement and fuel."
+      ],
+      "expected_benchmark_role": "REACTOR_SUPPLIER_MATURITY_SCREEN_NOT_TECHNOLOGY_WINNER_SCORE",
+      "inference_limits": [
+        "Project counts are not the same as operating units or demonstrated cost competitiveness.",
+        "A technology's readiness must be assessed per project and jurisdiction."
+      ]
+    }
+  ],
+  "comparison_rules": [
+    "Never average study conclusions or merge numerical results before matching vessel class, route, service level, speed, utilization, CAPEX, financing, fuel, maintenance, insurance, port access, policy and lifecycle boundaries.",
+    "Preserve each published claim as a separate evidence object with its date, scope, maturity and missing assumptions.",
+    "Do not hard-code published conclusions into the economic calculator.",
+    "A scenario may be technically possible but commercially infeasible because mandatory port, insurance, liability, emergency, fuel-cycle or licensing gates fail.",
+    "Use UNKNOWN where evidence is missing; do not turn missing data into a favorable assumption.",
+    "Separate model outputs, industry estimates, regulator decisions, insurer decisions and observed vessel/plant performance."
+  ],
+  "prohibited_inferences": [
+    "Do not claim that commercial nuclear shipping is already generally cost competitive.",
+    "Do not claim the UCL conditional 2040 result is guaranteed.",
+    "Do not claim the LR 38% annual cargo capacity estimate is realized or universally applicable.",
+    "Do not claim the academic scenario result demonstrates a commercial fleet.",
+    "Do not equate the number of SMR projects with qualified, financeable or operating designs."
+  ]
+}
