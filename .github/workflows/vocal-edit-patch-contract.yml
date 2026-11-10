@@ -1,0 +1,48 @@
+name: Vocal edit patch contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-edit-patch-contract/**"
+      - ".github/workflows/vocal-edit-patch-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vocal-edit-patch-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_EDIT_PATCH_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check isolated patch contract
+        run: cargo +1.96.0 fmt --check --manifest-path tools/vocal-edit-patch-contract/Cargo.toml
+
+      - name: Resolve exactly pinned standalone dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/vocal-edit-patch-contract/Cargo.toml
+
+      - name: Test stale-base, dependency-cone and receipt contracts
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-edit-patch-contract/Cargo.toml
+
+      - name: Confirm exact source revision remained checked out
+        run: test "$(git rev-parse HEAD)" = "$VOCAL_EDIT_PATCH_REVISION"
