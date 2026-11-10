@@ -257,37 +257,59 @@ pub enum FamilyNonInferiorityStatus {
 /// Sequential confidence-bound report for one preregistered family.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FamilyNonInferiorityResult {
+    /// Stable family identity from the frozen plan.
     pub family_id: String,
+    /// Maximum tolerated degradation in normalized loss units.
     pub non_inferiority_margin: f64,
+    /// Number of paired episodes consumed for this family.
     pub observation_count: u64,
+    /// Minimum sample count before a decision can pass or fail.
     pub minimum_observations: u64,
+    /// Maximum sample count allowed by the plan.
     pub maximum_observations: u64,
+    /// Mean baseline-minus-candidate loss, when at least one episode was observed.
     pub mean_improvement: Option<f64>,
+    /// Simultaneous lower confidence bound for mean improvement.
     pub lower_confidence_bound: Option<f64>,
+    /// Simultaneous upper confidence bound for mean improvement.
     pub upper_confidence_bound: Option<f64>,
+    /// Candidate/family/look alpha allocation used at this observation count.
     pub alpha_spent_at_current_look: Option<f64>,
+    /// Family-specific non-inferiority decision state.
     pub status: FamilyNonInferiorityStatus,
 }
 
 /// Full report for one candidate's fixed family roster.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FamilyGuardrailReport {
+    /// Version of the serialized report schema.
     pub format_version: u32,
+    /// One-based candidate ordinal assigned by the parent campaign ledger.
     pub candidate_index: u64,
+    /// Campaign-wide family-wise error budget.
     pub campaign_alpha: f64,
+    /// Candidate-level alpha allocation before family/look Bonferroni allocation.
     pub candidate_alpha_all_families: f64,
+    /// Baseline, candidate, protocol, manifest and precondition identity binding.
     pub binding: FamilyGuardrailBinding,
+    /// Number of fixed families in the preregistered roster.
     pub family_count: usize,
+    /// Total paired episodes consumed across the family roster.
     pub total_observation_count: u64,
+    /// Digest of family definitions, margins and episode assignments.
     pub plan_digest: String,
     /// True: the alpha allocation covers candidates, families and interim looks.
     pub simultaneous_family_bounds: bool,
+    /// Overall intersection decision across all registered families.
     pub status: FamilyGuardrailStatus,
+    /// Ordered family-specific confidence results.
     pub families: Vec<FamilyNonInferiorityResult>,
+    /// Integrity digest over the complete report claims; not a signature.
     pub report_digest: String,
 }
 
 /// Fail-closed validation and sequential-evaluation errors.
+#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum FamilyGuardrailError {
     #[error("family count must be in 1..={maximum}, received {actual}")]
