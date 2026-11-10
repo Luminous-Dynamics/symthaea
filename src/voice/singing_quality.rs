@@ -15,20 +15,24 @@ pub struct VocalQualityMetrics {
     pub stable_pitch_p95_cents: f32,
     pub transition_pitch_p95_cents: f32,
     /// Error from a broad 40-1200 Hz search that does not use the score pitch.
+    /// Absolute error from the broad 40-1200 Hz observation.
     pub score_independent_median_pitch_error_cents: f32,
     pub score_independent_p95_pitch_error_cents: f32,
-    /// Independent F0 support divided by frames accepted by the score-conditioned tracker.
+    /// Broad-estimator support divided by frames accepted by the score tracker.
     pub score_independent_valid_fraction: f32,
     /// Count of matched frames whose broad-search pitch differs by more than 300 cents.
     pub prior_mismatch_frames: usize,
     pub prior_mismatch_fraction: f32,
-    /// None means insufficient independent coverage; Some(false) means a material mismatch.
+    /// None means insufficient broad-estimator support; Some(false) means a mismatch.
     pub score_independent_pitch_audit_pass: Option<bool>,
-    /// Second-family YIN difference-function estimate; not conditioned on score pitch.
+    /// YIN absolute error, without a score-conditioned frequency window.
     pub yin_median_pitch_error_cents: f32,
     pub yin_p95_pitch_error_cents: f32,
+    /// YIN support divided by frames accepted by the score tracker.
     pub yin_valid_fraction: f32,
+    /// Median 1-CMNDF heuristic; a periodicity indicator, not calibrated probability.
     pub yin_median_confidence: f32,
+    /// None means insufficient YIN support; Some(false) means a mismatch.
     pub yin_pitch_audit_pass: Option<bool>,
     pub median_onset_error_ms: f32,
     pub duration_error_ms: f32,
