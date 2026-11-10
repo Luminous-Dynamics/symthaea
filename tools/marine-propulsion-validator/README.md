@@ -7,8 +7,8 @@ A small, standalone Rust CLI for the MARINE-WAPS-CO-DESIGN-001 case contract.
 From this directory:
 
 ~~~sh
-cargo test --locked
-cargo run --locked -- \
+cargo test
+cargo run -- \
   ../../docs/research/marine/marine-propulsion-case.schema.json \
   ../../docs/research/marine/fixtures/synthetic-waps-case-0001.json
 ~~~
@@ -21,7 +21,7 @@ Supply a paired case as the third argument to evaluate reciprocal pairing and
 service/route/environment/boundary equality:
 
 ~~~sh
-cargo run --locked -- <schema.json> <baseline.json> <candidate.json>
+cargo run -- <schema.json> <baseline.json> <candidate.json>
 ~~~
 
 ## Enforced checks in this first increment
