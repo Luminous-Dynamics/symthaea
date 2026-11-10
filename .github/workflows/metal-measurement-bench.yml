@@ -1,0 +1,32 @@
+name: Metal Measurement Evidence Adapter
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/metal-measurement-bench.yml"
+      - "tools/metal-measurement-bench/**"
+      - "docs/tech/METAL_MEASUREMENT_ADAPTER_V0_1.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/metal-measurement-bench.yml"
+      - "tools/metal-measurement-bench/**"
+      - "docs/tech/METAL_MEASUREMENT_ADAPTER_V0_1.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-measurement-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run adapter tests against the committed dependency graph
+        run: cargo test --locked --manifest-path tools/metal-measurement-bench/Cargo.toml
+      - name: Validate committed NIST source manifest
+        run: cargo run --locked --manifest-path tools/metal-measurement-bench/Cargo.toml -- validate-manifest tools/metal-measurement-bench/schemas/amb2025-02-source-manifest-v0.1.json

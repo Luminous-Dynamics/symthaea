@@ -1,0 +1,23 @@
+[package]
+name = "metal-measurement-bench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+description = "Source-bound measurement manifest and held-out split integrity validator"
+
+# This is a deliberately isolated CLI crate. The parent repository workspace
+# has unrelated glob members that may be absent in narrow PR checkouts; keep
+# this validation tool independently buildable without changing root workspace gates.
+[workspace]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+csv = "1.3"
+zip = { version = "2.4", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"
