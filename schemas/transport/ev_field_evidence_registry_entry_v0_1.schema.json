@@ -1,0 +1,629 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-field-evidence-registry-entry/0.1",
+  "title": "Rights-aware battery field evidence registry entry v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "registry_snapshot",
+    "source",
+    "rights",
+    "intended_use",
+    "dataset",
+    "adapter",
+    "tasks",
+    "artifact_policy"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "ev-field-evidence-registry-entry/0.1"
+    },
+    "registry_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry_ref",
+        "snapshot_version",
+        "snapshot_digest",
+        "snapshot_at_ms"
+      ],
+      "properties": {
+        "registry_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshot_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshot_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "snapshot_at_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "title",
+        "release_version",
+        "publisher",
+        "source_uri",
+        "publication_uri",
+        "accessed_at_ms",
+        "source_digest",
+        "license_class",
+        "license_ref",
+        "license_digest",
+        "access_mode"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "release_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "publication_uri": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "accessed_at_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "license_class": {
+          "enum": [
+            "open_license",
+            "terms_of_use",
+            "restricted",
+            "no_explicit_license",
+            "unknown"
+          ]
+        },
+        "license_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "license_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "access_mode": {
+          "enum": [
+            "public_download",
+            "controlled_access",
+            "metadata_only",
+            "licensed_delivery"
+          ]
+        }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "access",
+        "local_processing",
+        "derived_data_publish",
+        "model_training",
+        "model_weights_release",
+        "commercial_use",
+        "raw_data_redistribution"
+      ],
+      "properties": {
+        "access": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "evidence_ref",
+            "evidence_digest"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "permitted",
+                "prohibited",
+                "conditional",
+                "unknown"
+              ]
+            },
+            "evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "local_processing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "evidence_ref",
+            "evidence_digest"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "permitted",
+                "prohibited",
+                "conditional",
+                "unknown"
+              ]
+            },
+            "evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "derived_data_publish": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "evidence_ref",
+            "evidence_digest"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "permitted",
+                "prohibited",
+                "conditional",
+                "unknown"
+              ]
+            },
+            "evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "model_training": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "evidence_ref",
+            "evidence_digest"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "permitted",
+                "prohibited",
+                "conditional",
+                "unknown"
+              ]
+            },
+            "evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "model_weights_release": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "evidence_ref",
+            "evidence_digest"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "permitted",
+                "prohibited",
+                "conditional",
+                "unknown"
+              ]
+            },
+            "evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "commercial_use": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "evidence_ref",
+            "evidence_digest"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "permitted",
+                "prohibited",
+                "conditional",
+                "unknown"
+              ]
+            },
+            "evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "raw_data_redistribution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "evidence_ref",
+            "evidence_digest"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "permitted",
+                "prohibited",
+                "conditional",
+                "unknown"
+              ]
+            },
+            "evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "intended_use": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "local_processing",
+        "derived_data_publish",
+        "model_training",
+        "model_weights_release",
+        "commercial_use",
+        "raw_data_redistribution"
+      ],
+      "properties": {
+        "local_processing": {
+          "type": "boolean"
+        },
+        "derived_data_publish": {
+          "type": "boolean"
+        },
+        "model_training": {
+          "type": "boolean"
+        },
+        "model_weights_release": {
+          "type": "boolean"
+        },
+        "commercial_use": {
+          "type": "boolean"
+        },
+        "raw_data_redistribution": {
+          "type": "boolean"
+        }
+      }
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "application_types",
+        "chemistries",
+        "observation_start_ms",
+        "observation_end_ms",
+        "system_count",
+        "unit_count",
+        "reported_fault_count",
+        "hierarchy_levels",
+        "measurement_time_available",
+        "receive_time_available",
+        "timezone_basis",
+        "timestamp_mapping_digest",
+        "unit_mapping_digest",
+        "missingness_fraction",
+        "missingness_mapping_digest",
+        "sentinel_handling",
+        "unlabeled_periods_are_negative",
+        "censoring_supported"
+      ],
+      "properties": {
+        "application_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "passenger_ev",
+              "bus",
+              "light_mobility",
+              "grid_storage",
+              "distributed_storage",
+              "consumer_electronics",
+              "industrial_robotics",
+              "other"
+            ]
+          }
+        },
+        "chemistries": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "observation_start_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observation_end_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "system_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unit_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reported_fault_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hierarchy_levels": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "system",
+              "vehicle",
+              "pack",
+              "module",
+              "cell",
+              "rack",
+              "site"
+            ]
+          }
+        },
+        "measurement_time_available": {
+          "type": "boolean"
+        },
+        "receive_time_available": {
+          "type": "boolean"
+        },
+        "timezone_basis": {
+          "enum": [
+            "UTC",
+            "source_offset_preserved",
+            "unknown"
+          ]
+        },
+        "timestamp_mapping_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "unit_mapping_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "missingness_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "missingness_mapping_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sentinel_handling": {
+          "enum": [
+            "preserved_and_mapped",
+            "source_native",
+            "unmapped",
+            "collapsed_to_zero"
+          ]
+        },
+        "unlabeled_periods_are_negative": {
+          "type": "boolean"
+        },
+        "censoring_supported": {
+          "type": "boolean"
+        }
+      }
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter_ref",
+        "adapter_version",
+        "source_schema_digest",
+        "mapping_digest",
+        "validation_report_digest",
+        "validation_status"
+      ],
+      "properties": {
+        "adapter_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_schema_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "mapping_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "validation_report_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "validation_status": {
+          "enum": [
+            "validated",
+            "partial",
+            "unvalidated"
+          ]
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task",
+          "status",
+          "evidence_class",
+          "label_source_ref",
+          "target_definition_digest",
+          "eligibility_evidence_digest",
+          "reason"
+        ],
+        "properties": {
+          "task": {
+            "enum": [
+              "sensor_data_integrity",
+              "operational_fault_detection",
+              "soh_estimation",
+              "remaining_life",
+              "intervention_outcomes",
+              "pack_capability"
+            ]
+          },
+          "status": {
+            "enum": [
+              "SUPPORTED",
+              "PARTIAL",
+              "NOT_SUPPORTED"
+            ]
+          },
+          "evidence_class": {
+            "enum": [
+              "physical_observation",
+              "derived_from_physical",
+              "simulation",
+              "synthetic_fixture",
+              "vendor_claim",
+              "none"
+            ]
+          },
+          "label_source_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_definition_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "eligibility_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "artifact_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry_hosts_raw_data",
+        "raw_data_copied_into_registry",
+        "rights_lineage_required_for_derivatives"
+      ],
+      "properties": {
+        "registry_hosts_raw_data": {
+          "const": false
+        },
+        "raw_data_copied_into_registry": {
+          "const": false
+        },
+        "rights_lineage_required_for_derivatives": {
+          "const": true
+        }
+      }
+    }
+  }
+}
