@@ -337,6 +337,11 @@ fn validate_spec(spec: &PitchBenchmarkSpecV1) -> Result<(), PitchBenchmarkError>
     }
     require_digest(&spec.calibration_manifest_sha256, "calibration_manifest_sha256")?;
     require_digest(&spec.evaluation_manifest_sha256, "evaluation_manifest_sha256")?;
+    if spec.calibration_manifest_sha256 == spec.evaluation_manifest_sha256 {
+        return Err(PitchBenchmarkError::new(
+            "calibration and evaluation manifests must have different digests",
+        ));
+    }
     require_digest(
         &spec.voicing_calibration_receipt_sha256,
         "voicing_calibration_receipt_sha256",
@@ -822,6 +827,17 @@ mod tests {
     fn voicing_calibration_and_evaluation_splits_must_be_disjoint() {
         let mut spec = spec();
         spec.calibration_split_id = spec.evaluation_split_id.clone();
+        let segment = PitchSegmentInputV1 {
+            metadata: metadata("clip-01", "corpus-a", "clean"),
+            frames: vec![frame(0, Some(220.0), Some(220.0))],
+        };
+        assert!(evaluate_pitch_benchmark(&spec, &[segment]).is_err());
+    }
+
+    #[test]
+    fn calibration_and_evaluation_manifest_digests_must_differ() {
+        let mut spec = spec();
+        spec.evaluation_manifest_sha256 = spec.calibration_manifest_sha256.clone();
         let segment = PitchSegmentInputV1 {
             metadata: metadata("clip-01", "corpus-a", "clean"),
             frames: vec![frame(0, Some(220.0), Some(220.0))],
