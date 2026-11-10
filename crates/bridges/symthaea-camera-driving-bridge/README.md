@@ -18,7 +18,8 @@ It deliberately does not call `VehicleController`, command an actuator, or claim
 
 - Input channels are grayscale (1), RGB (3) or RGBA (4).
 - Frame dimensions, byte lengths and maximum allocation are checked before mutation.
-- Capture timestamps and sequence numbers must strictly increase.
+- Capture timestamps, capture sequence numbers and vehicle-state timestamps must each strictly increase.
+- Camera/vehicle timestamp skew is bounded.
 - The first timestep is supplied as a configuration constant; subsequent timesteps are derived from capture timestamps.
 - A configured maximum inter-frame gap and maximum camera/vehicle timestamp skew are enforced.
 - Vehicle channels and timestamp must be finite.
@@ -40,6 +41,9 @@ The visual weight is fixed-point parts-per-million in the receipt. This is repre
 
 The receipt contains:
 - raw frame SHA-256;
+- serialized VisionConfig SHA-256;
+- vehicle encoder seed-phrase SHA-256 (the phrase itself is never placed in the receipt);
+- HDC dimension and vehicle encoder level count;
 - visual scene-state SHA-256;
 - proprioceptive-state SHA-256;
 - proprioceptive HDC SHA-256;
