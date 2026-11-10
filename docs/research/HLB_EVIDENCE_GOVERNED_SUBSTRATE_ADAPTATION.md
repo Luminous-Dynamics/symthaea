@@ -177,6 +177,8 @@ These are proposed targets, not measured Symthaea results:
 | Data isolation | Zero confirmatory-shard reuse and zero cross-candidate episode-ID overlap within a campaign; independently authenticated source-record identity required |
 | Capability preservation | No protected task family exceeds its preregistered non-inferiority margin |
 | Decision efficiency | Fewer probes or lower regret than matched EIG, greedy, always-inspect, and RL baselines where decision-relevant information is available |
+| Path-wise safety compliance | 100% of generated policy branches satisfy the declared cumulative risk bound under the supplied conditional risk upper bounds |
+| Risk calibration | On held-out trials, the one-sided 95% confidence bound on realized adverse-event rates must remain within the declared calibrated bounds; report coverage and abstention separately |
 | Compute efficiency | Report latency, memory, allocations and energy at matched outcome quality |
 
 Report confidence intervals, power, episodes-to-decision, candidate count, observation cost, subgroup regression, false qualification, and inconclusive rate. Synthetic fixture results must be labeled as such and must not be presented as deployment error rates.
