@@ -1,5 +1,5 @@
 use jsonschema::{Validator, draft202012};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -7,15 +7,6 @@ const SCHEMA_ID: &str =
     "https://luminousdynamics.io/schemas/transport/ev-soh-benchmark-protocol/0.1";
 const CORPUS_VERSION: &str = "ev-soh-benchmark-corpus/0.1";
 const PROTOCOL_VERSION: &str = "ev-soh-benchmark-protocol/0.1";
-
-#[derive(Debug)]
-struct CaseResult {
-    case_id: String,
-    expectation: String,
-    accepted: bool,
-    errors: Vec<String>,
-    summary: Option<BenchmarkSummary>,
-}
 
 #[derive(Debug, serde::Serialize)]
 pub struct BenchmarkSummary {
@@ -338,6 +329,19 @@ fn check_preprocessing(benchmark: &Value) -> Result<usize, String> {
             ));
         }
         required_digest(step, "transform_digest")?;
+        let frozen_on = string_at(
+            benchmark.get("evaluation").ok_or_else(|| "evaluation protocol is missing".to_owned())?,
+            "split_frozen_on",
+        )?;
+        if scope == "fixed_predeclared" {
+            let declared_on = string_at(step, "predeclared_on")?;
+            if declared_on > frozen_on {
+                return Err(format!(
+                    "fixed preprocessing step {} was declared after the split was frozen",
+                    string_at(step, "step_id")?
+                ));
+            }
+        }
         if !nonempty(string_at(step, "transform_ref")?) {
             return Err("preprocessing transform reference is empty".to_owned());
         }
@@ -397,8 +401,23 @@ fn check_metrics(benchmark: &Value) -> Result<usize, String> {
     if !names.contains("MAE") || !names.contains("RMSE") {
         return Err("benchmark must report both MAE and RMSE".to_owned());
     }
-    if !aggregations.contains("macro_per_cell") || !aggregations.contains("worst_domain") {
-        return Err("benchmark must report macro-per-cell and worst-domain aggregation".to_owned());
+    let has_pair = |name: &str, aggregation: &str| {
+        metrics.iter().any(|metric| {
+            metric.get("metric_name").and_then(Value::as_str) == Some(name)
+                && metric.get("aggregation").and_then(Value::as_str) == Some(aggregation)
+        })
+    };
+    if !aggregations.contains("macro_per_cell")
+        || !aggregations.contains("worst_domain")
+        || !has_pair("MAE", "macro_per_cell")
+        || !has_pair("RMSE", "macro_per_cell")
+        || !has_pair("MAE", "worst_domain")
+        || !has_pair("RMSE", "worst_domain")
+    {
+        return Err(
+            "benchmark must report MAE and RMSE for both macro-per-cell and worst-domain aggregation"
+                .to_owned(),
+        );
     }
     Ok(metrics.len())
 }
@@ -430,12 +449,20 @@ fn check_uncertainty(benchmark: &Value) -> Result<String, String> {
             ) {
                 return Err("uncertainty calibration must be tied to validation data".to_owned());
             }
+            let relation = string_at(
+                benchmark.get("evaluation").ok_or_else(|| "evaluation protocol is missing".to_owned())?,
+                "relation",
+            )?;
+            let expected_group_disjoint = relation != "same_cell_temporal";
             if uncertainty
                 .get("calibration_group_disjointness")
                 .and_then(Value::as_bool)
-                != Some(true)
+                != Some(expected_group_disjoint)
             {
-                return Err("uncertainty calibration group disjointness is unproven".to_owned());
+                return Err(
+                    "uncertainty calibration group-disjointness flag contradicts the physical evaluation relation"
+                        .to_owned(),
+                );
             }
             Ok("reported_with_calibration_receipt".to_owned())
         }
