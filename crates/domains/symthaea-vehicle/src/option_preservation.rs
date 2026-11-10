@@ -923,6 +923,54 @@ mod tests {
     }
 
     #[test]
+    fn persistent_clairvoyance_trap_fixture_reproduces_observation_constrained_dead_end() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../docs/autonomy/fixtures/SAM_OPTION_PRESERVATION_CLAIRVOYANCE_TRAP_V0_1.json"
+        ))
+        .expect("canonical clairvoyance fixture must be valid JSON");
+        let mut input: OptionPreservationInput =
+            serde_json::from_value(fixture["input"].clone())
+                .expect("fixture input must deserialize");
+
+        // The manifest digest is deliberately derived from the frozen expected
+        // cells by the loader, not accepted from a fixture-supplied string.
+        input.expected_cell_manifest_digest =
+            compute_expected_cell_manifest_digest(&input.expected_cells)
+                .expect("fixture expected-cell manifest must hash");
+
+        let report =
+            evaluate_option_preservation(&input).expect("canonical fixture must evaluate");
+        let parent = report
+            .parent_actions
+            .iter()
+            .find(|action| action.parent_action_id == fixture["expected"]["parent_action_id"])
+            .expect("expected parent action report");
+        let class = parent
+            .observation_classes
+            .iter()
+            .find(|class| class.observation_class_id == fixture["expected"]["observation_class_id"])
+            .expect("expected observation class report");
+
+        assert_eq!(
+            format!("{:?}", parent.status),
+            "NoContinuationForAtLeastOneObservationClass"
+        );
+        assert_eq!(
+            format!("{:?}", class.status),
+            "NoPossibleOptions"
+        );
+        assert_eq!(class.robust_option_ids, Some(vec![]));
+        assert_eq!(class.possible_option_ids, Some(vec![]));
+        assert_eq!(
+            class.clairvoyant_union_option_ids,
+            Some(vec!["brake".into(), "coast".into()])
+        );
+        assert_eq!(class.robust_option_width, Some(0));
+        assert_eq!(class.possible_option_width, Some(0));
+        assert_eq!(class.clairvoyance_gap, Some(2));
+    }
+
+    #[test]
     fn common_continuation_is_robustly_recoverable() {
         let cells = vec![
             cell(
