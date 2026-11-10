@@ -1780,6 +1780,7 @@ mod tests {
                 for (index, note) in realized.score.voice(role).into_iter().enumerate() {
                     notes.push(SymbolicNoteEvent {
                         id: format!("score-{role_slug}-{index}"),
+                        part_id: note.part.is_assigned().then_some(note.part.0),
                         midi: note.pitch.midi(),
                         pitch_name: format!("{:?}", note.pitch),
                         onset: time(note.onset.beats()),
