@@ -91,7 +91,10 @@ fn main() -> ExitCode {
                 conversion_checks: report.conversion_checks,
                 claim_ceiling: "Validates source structure and declared unit conversion only; does not establish metered load, grid capacity, site suitability, nuclear safety, licensing or economic feasibility.",
             };
-            println!("{}", serde_json::to_string_pretty(&receipt).expect("receipt serializes"));
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&receipt).expect("receipt serializes")
+            );
             ExitCode::SUCCESS
         }
         Err(validation_errors) => {
@@ -105,7 +108,10 @@ fn main() -> ExitCode {
                 errors: validation_errors.iter().map(ToString::to_string).collect(),
                 claim_ceiling: "Source structure and arithmetic only; no engineering or licensing claim.",
             };
-            println!("{}", serde_json::to_string_pretty(&receipt).expect("receipt serializes"));
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&receipt).expect("receipt serializes")
+            );
             ExitCode::FAILURE
         }
     }
