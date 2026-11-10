@@ -976,6 +976,58 @@ mod tests {
     }
 
     #[test]
+    fn independent_verifier_binds_receipts_to_public_task_and_registered_specs() {
+        let mut environment = VssiMechanicalEnvironment::new(
+            "vssi-independent-receipt-verifier-control",
+            VssiFixtureCase::HealthyControl,
+        )
+        .unwrap();
+        let public_task = environment.public_task().clone();
+        let first = environment
+            .observe_experiment_with_receipt(VssiExperimentKind::PassiveObservation)
+            .unwrap();
+        let second = environment
+            .observe_experiment_with_receipt(VssiExperimentKind::ThermalImpulse)
+            .unwrap();
+        let results = vec![first, second];
+
+        validate_vssi_experiment_results(&public_task, &results).unwrap();
+
+        let mut wrong_task = public_task.clone();
+        wrong_task.observation_budget += 0.1;
+        assert_eq!(
+            validate_vssi_experiment_results(&wrong_task, &results),
+            Err(VssiFixtureError::ReceiptTaskMismatch)
+        );
+
+        let mut wrong_spec_cost = results.clone();
+        wrong_spec_cost[0].receipt.observation_cost += 0.01;
+        wrong_spec_cost[0].receipt.budget_after -= 0.01;
+        let claims = VssiExperimentReceiptClaims {
+            schema_version: "vssi-experiment-receipt-v1",
+            scenario_id: &wrong_spec_cost[0].receipt.scenario_id,
+            public_task_digest: &wrong_spec_cost[0].receipt.public_task_digest,
+            experiment_index: wrong_spec_cost[0].receipt.experiment_index,
+            kind: wrong_spec_cost[0].receipt.kind,
+            experiment_spec_digest: &wrong_spec_cost[0].receipt.experiment_spec_digest,
+            observation_cost: wrong_spec_cost[0].receipt.observation_cost,
+            budget_before: wrong_spec_cost[0].receipt.budget_before,
+            budget_after: wrong_spec_cost[0].receipt.budget_after,
+            observations_digest: &wrong_spec_cost[0].receipt.observations_digest,
+            previous_receipt_digest: wrong_spec_cost[0]
+                .receipt
+                .previous_receipt_digest
+                .as_deref(),
+        };
+        wrong_spec_cost[0].receipt.receipt_digest =
+            sha256_serializable(b"symthaea-vssi-experiment-receipt-v1\0", &claims).unwrap();
+        assert_eq!(
+            validate_vssi_experiment_results(&public_task, &wrong_spec_cost),
+            Err(VssiFixtureError::ReceiptSpecMismatch)
+        );
+    }
+
+    #[test]
     fn experiment_result_detects_observation_and_receipt_tampering() {
         let mut environment = VssiMechanicalEnvironment::new(
             "vssi-receipt-tamper-control",
