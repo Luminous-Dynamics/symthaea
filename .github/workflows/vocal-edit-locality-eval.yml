@@ -18,7 +18,7 @@ jobs:
       - name: Check out exact pull request revision
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Verify exact source revision
@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
           echo "VOCAL_EDIT_LOCALITY_REVISION=$actual" >> "$GITHUB_ENV"
 
