@@ -64,7 +64,11 @@ pub struct BaselineScore {
     pub baseline: String,
     pub held_out_subjects: usize,
     pub predictions: usize,
-    pub accuracy_at_0_5: f64,
+    /// Accuracy after thresholding the probability of a correct trial at 0.5.
+    /// This is not the behavioural success probability of a random-choice policy.
+    pub threshold_accuracy_at_0_5: f64,
+    pub mean_predicted_success_probability: f64,
+    pub observed_success_rate: f64,
     pub brier_score: f64,
     pub mean_log_loss: f64,
 }
@@ -96,8 +100,10 @@ struct SubjectProfile {
 
 #[derive(Debug, Default)]
 struct ScoreAccumulator {
-    correct: usize,
+    threshold_correct: usize,
+    observed_correct: usize,
     predictions: usize,
+    probability_sum: f64,
     brier_sum: f64,
     log_loss_sum: f64,
 }
@@ -108,8 +114,12 @@ impl ScoreAccumulator {
         let observed = if outcome_correct { 1.0 } else { 0.0 };
         self.predictions += 1;
         if (probability >= 0.5) == outcome_correct {
-            self.correct += 1;
+            self.threshold_correct += 1;
         }
+        if outcome_correct {
+            self.observed_correct += 1;
+        }
+        self.probability_sum += probability;
         self.brier_sum += (probability - observed).powi(2);
         self.log_loss_sum += if outcome_correct {
             -probability.ln()
@@ -124,7 +134,9 @@ impl ScoreAccumulator {
             baseline: baseline.to_owned(),
             held_out_subjects,
             predictions: self.predictions,
-            accuracy_at_0_5: self.correct as f64 / denominator,
+            threshold_accuracy_at_0_5: self.threshold_correct as f64 / denominator,
+            mean_predicted_success_probability: self.probability_sum / denominator,
+            observed_success_rate: self.observed_correct as f64 / denominator,
             brier_score: self.brier_sum / denominator,
             mean_log_loss: self.log_loss_sum / denominator,
         }
@@ -592,12 +604,20 @@ mod tests {
     fn every_baseline_uses_all_subjects_as_held_out_folds() {
         let report = audit_csv(FIXTURE).expect("audit should succeed");
         assert_eq!(report.leave_one_subject_out_baselines.len(), 3);
-        for baseline in report.leave_one_subject_out_baselines {
+        for baseline in &report.leave_one_subject_out_baselines {
             assert_eq!(baseline.held_out_subjects, 25);
             assert_eq!(baseline.predictions, 375);
             assert!(baseline.brier_score.is_finite());
             assert!(baseline.mean_log_loss.is_finite());
+            assert!((baseline.observed_success_rate - 236.0 / 375.0).abs() < 1.0e-12);
         }
+        let random_choice = report
+            .leave_one_subject_out_baselines
+            .iter()
+            .find(|baseline| baseline.baseline == "random_choice_p_1_over_3")
+            .expect("random-choice baseline should be present");
+        assert!((random_choice.mean_predicted_success_probability - 1.0 / 3.0).abs() < 1.0e-12);
+
         let condition_only = report
             .leave_one_subject_out_baselines
             .iter()
