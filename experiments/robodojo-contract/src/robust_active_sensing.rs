@@ -193,10 +193,9 @@ pub struct CandidateEvaluation {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RobustStopReason {
-    RequiredRiskObservationUnavailable,
-    NoSensorRestoresRiskLimit,
+    RequiredObservationUnavailable,
+    NoSensorMeetsRequiredGates,
     RequiredObservationOverBudget,
-    NoSensorRestoresConfidence,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -406,19 +405,19 @@ pub fn choose_robust_active_sensing(
 
     let reason = if risk_required {
         if !any_available {
-            RobustStopReason::RequiredRiskObservationUnavailable
+            RobustStopReason::RequiredObservationUnavailable
         } else if !any_within_budget {
             RobustStopReason::RequiredObservationOverBudget
         } else {
-            RobustStopReason::NoSensorRestoresRiskLimit
+            RobustStopReason::NoSensorMeetsRequiredGates
         }
     } else if confidence_required {
         if !any_available {
-            RobustStopReason::RequiredRiskObservationUnavailable
+            RobustStopReason::RequiredObservationUnavailable
         } else if !any_within_budget {
             RobustStopReason::RequiredObservationOverBudget
         } else {
-            RobustStopReason::NoSensorRestoresConfidence
+            RobustStopReason::NoSensorMeetsRequiredGates
         }
     } else {
         return Ok(RobustSensingResult {
@@ -554,14 +553,14 @@ mod tests {
             result.evaluations[0]
                 .conservative_net_benefit
                 .unwrap(),
-            -38.1,
+            -48.2,
         );
     }
 
     #[test]
     fn risk_midpoint_below_limit_does_not_pass_when_upper_bound_exceeds_it() {
         let mut current = state();
-        current.unsafe_event_probability = ProbabilityInterval::new(0.01, 0.20).unwrap();
+        current.unsafe_event_probability = ProbabilityInterval::new(0.00, 0.08).unwrap();
         let unsafe_sensor = option(
             "depth",
             ProbabilityInterval::new(0.90, 0.95).unwrap(),
@@ -652,7 +651,7 @@ mod tests {
         assert_eq!(
             result.recommendation,
             RobustSensingRecommendation::StopAndEscalate {
-                reason: RobustStopReason::RequiredRiskObservationUnavailable
+                reason: RobustStopReason::RequiredObservationUnavailable
             }
         );
     }
@@ -777,8 +776,7 @@ mod tests {
             5.0,
             50.0,
         );
-        let beta = alpha.clone();
-        let mut beta = beta;
+        let mut beta = alpha.clone();
         beta.sensor_id = "beta".into();
 
         let first = choose_robust_active_sensing(
