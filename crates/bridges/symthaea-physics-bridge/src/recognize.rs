@@ -430,6 +430,32 @@ mod tests {
         }
     }
 
+    /// Recognition must preserve whether a symmetry came from an exact-shape
+    /// structural pattern or a sampled numeric fallback.
+    #[test]
+    fn recognition_report_preserves_structural_symmetry_evidence() {
+        let engine = PhysicsSearchEngine::new();
+        let expr = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("y".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let report = recognize_expr(&engine, &expr, "radial_quadratic_test");
+        assert!(matches!(
+            report.symmetry_inference.evidence,
+            Some(crate::symmetry_inference::SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: crate::symmetry_inference::StructuralSymmetryPattern::EqualCoefficientSumOfSquares,
+            })
+        ));
+    }
     /// End-to-end recognition: convert a Kepler energy skeleton and search the catalog.
     /// Does not assert a specific match — the catalog may or may not contain an
     /// exact Kepler entry — but asserts the search returns results without panicking.
