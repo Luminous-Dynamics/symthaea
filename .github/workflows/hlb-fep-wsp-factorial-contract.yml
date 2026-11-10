@@ -2,7 +2,7 @@ name: HLB FEP-WSP Factorial Contract
 
 on:
   pull_request:
-    branches: [main, research/swi-001-weight-space-introspection, research/hlb-fep-wsp-factorial-v2]
+    branches: [main, research/swi-001-weight-space-introspection, research/hlb-fep-wsp-factorial-v2, research/hlb-family-guardrail-v0]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
@@ -49,7 +49,7 @@ on:
       - "src/dynamics/cfc/mod.rs"
       - "src/dynamics/cfc/network.rs"
   push:
-    branches: [research/hlb-fep-wsp-factorial-v2, research/hlb-family-guardrail-v0]
+    branches: [research/hlb-fep-wsp-factorial-v2, research/hlb-family-guardrail-v0, research/hlb-composite-family-acceptance-v0]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - ".github/scripts/assert-hlb-test-discovery.sh"
