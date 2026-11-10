@@ -23,7 +23,7 @@ It checks three power boundaries against explicit temperature-dependent derating
 
 Each curve is tied to a thermal-network node. The network is advanced with backward-Euler RC steps no larger than the configured maximum step. Component limits are checked before and after every step. A modelled node ceiling, derating violation, uncharacterized temperature, malformed curve, or mission/report mismatch rejects the overlay.
 
-The overlay verifies segment IDs, flight phases, all-up mass, drag, propulsion-chain power, terminal energy and resistive heat against the supplied mission input. It does not silently apply a thermal profile to a report from a different segment sequence or duration.
+The overlay first runs the mission-input validator, then verifies segment IDs/phases, all-up mass, pack specific energy, available reserve, drag, propulsion-chain and battery power, current/OCV/resistance/terminal-voltage identity, terminal and chemical energy, I²R heat, per-segment SOC transitions, reserve/current/power/temperature limits, and aggregate mission totals. Characterization IDs must match their evidence records; records are syntax-validated and copied into the thermal report. The upstream digest-verification flag is preserved as a source-report claim only—the overlay does not re-hash source bytes or authenticate publishers/signatures. These checks prevent a simple mismatched or internally inconsistent report from being replayed, but they do not authenticate an arbitrary caller-created report.
 
 ## Why this is a meaningful increment
 
@@ -51,7 +51,7 @@ The present API accepts numerical points but does not authenticate a source, fet
 ## Numerical / software properties
 
 - Derating points are sorted by strictly increasing temperature.
-- Available power must be non-increasing with temperature.
+- Power may be non-monotonic over temperature so cold-side and hot-side limits can both be represented; every point must be finite/nonnegative and temperature order strictly increasing.
 - Linear interpolation is used only between measured points.
 - Temperatures outside the characterized curve domain are rejected, never extrapolated. Power curves may be non-monotonic so battery cold-side limits and hot-side derating can both be represented from measured points.
 - Mission durations are subdivided to a declared maximum integration step.
@@ -63,6 +63,7 @@ The present API accepts numerical points but does not authenticate a source, fet
 
 This increment does not model:
 
+- source-map byte verification or publisher/signature authentication by the thermal overlay (upstream report status is preserved as a claim, not re-established);
 - temperature feedback into OCV, internal resistance, SOC, or available battery energy;
 - thermal feedback into motor/inverter efficiency maps;
 - electrical control response, power allocation, thrust reduction or mission re-planning;
