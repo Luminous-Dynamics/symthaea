@@ -1,0 +1,79 @@
+name: Marine Evidence Validation
+
+on:
+  pull_request:
+    paths:
+      - "tools/marine-propulsion-validator/**"
+      - "docs/research/marine/**"
+      - ".github/workflows/marine-evidence-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marine-evidence-validation-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  standalone-rust-audits:
+    name: Standalone marine Rust audits
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            tools/marine-propulsion-validator -> target
+
+      - name: Record toolchain
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Run complete Rust unit-test suite
+        run: cargo test --manifest-path tools/marine-propulsion-validator/Cargo.toml
+
+      - name: Audit v0.1.0 regulatory rule register
+        run: |
+          cargo run --quiet --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-regulatory-rule-audit -- \
+            docs/research/marine/marine-regulatory-rule-register-v0.1.0.schema.json \
+            docs/research/marine/marine-regulatory-rule-register-2026-11-10.json
+
+      - name: Audit v0.2.0 regulatory rule register
+        run: |
+          cargo run --quiet --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-regulatory-rule-audit -- \
+            docs/research/marine/marine-regulatory-rule-register-v0.2.0.schema.json \
+            docs/research/marine/marine-regulatory-rule-register-2026-11-10-v0.2.0.json
+
+      - name: Audit synthetic CH4/N2O evidence fixture (INCOMPLETE expected)
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-emissions-evidence-audit -- \
+            docs/research/marine/marine-emissions-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-gas-emissions-v0.1.0.json
+          status=$?
+          set -e
+          if [ "$status" -ne 2 ]; then
+            echo "Expected synthetic emissions evidence to exit 2 (INCOMPLETE); observed $status"
+            exit 1
+          fi
+
+      - name: Preserve generated Cargo lockfile for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marine-validator-cargo-lock
+          path: tools/marine-propulsion-validator/Cargo.lock
+          if-no-files-found: warn
