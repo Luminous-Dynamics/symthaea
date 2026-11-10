@@ -1259,7 +1259,7 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
         note.duration = note.duration.saturating_sub(Duration::new(lean_480, 480));
         note.velocity *= 0.92; // the resolution releases
         additions.push(ScoreNote {
-            part: part_id,
+            part,
             pitch: lean_pitch,
             onset,
             duration: Duration::new(lean_480, 480),
@@ -1324,12 +1324,12 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
         let total = n.duration.beats();
         let cut_beats: f64 = 0.25_f64.min(total * 0.2);
         let cut_480 = ((cut_beats * 480.0).round() as i64).max(1);
-        let (onset, velocity, si) = (n.onset, n.velocity, n.section_intensity);
+        let (onset, velocity, si, part) = (n.onset, n.velocity, n.section_intensity, n.part);
         let note = &mut score.notes[i];
         note.onset = onset + Duration::new(cut_480, 480);
         note.duration = note.duration.saturating_sub(Duration::new(cut_480, 480));
         additions.push(ScoreNote {
-            part: part_id,
+            part,
             pitch: cut_pitch,
             onset,
             duration: Duration::new(cut_480, 480),
@@ -1427,7 +1427,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
                 dur
             };
             chain.push(ScoreNote {
-                part: part_id,
+                part: n.part,
                 pitch,
                 onset: t,
                 duration: this_dur,
@@ -1575,7 +1575,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
         let hold = Duration::new((hold_beats * 480.0).round() as i64, 480);
         resolved_indices.push(j_idx);
         additions.push(ScoreNote {
-            part: part_id,
+            part,
             pitch: suspended_pitch,
             onset: onset2,
             duration: hold,
@@ -1585,7 +1585,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             section_intensity: si2,
         });
         additions.push(ScoreNote {
-            part: part_id,
+            part,
             pitch: resolved_pitch,
             onset: onset2 + hold,
             duration: dur2.saturating_sub(hold),
@@ -1792,7 +1792,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: part_id,
+                    part: GENERAL_MELODY_PART_V1,
                     pitch,
                     onset: Duration::new((t * 480.0).round() as i64, 480),
                     duration: Duration::new((this_dur * 480.0).round().max(1.0) as i64, 480),
