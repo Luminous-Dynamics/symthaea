@@ -596,7 +596,7 @@ mod tests {
 
     #[test]
     fn rejects_dimension_over_profile_budget() {
-        let mut action = canonical_so2();
+        let action = canonical_so2();
         let mut bounded = profile();
         bounded.maximum_dimension = 1;
         assert!(matches!(
