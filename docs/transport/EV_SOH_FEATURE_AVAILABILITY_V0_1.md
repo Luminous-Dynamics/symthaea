@@ -30,7 +30,7 @@ Every feature definition binds its schema, implementation, transform and fit sco
 ## Strict-online rules
 
 - Every feature declared by the model must appear exactly once in every prediction receipt.
-- Measurement, receive, reference and feature-computation times must be no later than decision time.
+- Measurement, receive, reference and feature-computation times must be no later than decision time; a receive timestamp cannot precede its measurement timestamp, and feature computation cannot precede input arrival.
 - Same-asset prefix references must bind the exact prediction asset identity.
 - Peer references must use a distinct development/training asset, never a held-out test asset.
 - Training-population transforms must be fit only on development assets.
@@ -43,7 +43,7 @@ The audit reports an explicit claim ceiling: STRICT_ONLINE_ELIGIBLE or OFFLINE_O
 
 ## Frozen synthetic corpus
 
-Fourteen cases: three accepted and eleven rejected. Accepted cases cover a valid same-cell prefix, an offline full-history oracle explicitly labelled offline-only, and a preregistered peer reference with randomized derangements. Negative controls cover full-life normalization online, delayed receipt, held-out peer references, test-label dependence, future references, test-asset-fitted transforms, late fixed predeclaration, missing feature receipts, missing peer randomization, feature computation after decision, and mismatched same-cell identity.
+Seventeen cases: three accepted and fourteen rejected. Accepted cases cover a valid same-cell prefix, an offline full-history oracle explicitly labelled offline-only, and a preregistered peer reference with randomized derangements. Negative controls cover full-life normalization online, delayed receipt, impossible timestamp orderings, held-out peer references, test-label dependence, future references, test-asset-fitted transforms, late fixed predeclaration, missing feature receipts, missing peer randomization, feature computation after decision, and mismatched same-cell identity.
 
 These cases are synthetic software controls, not physical battery evidence.
 
