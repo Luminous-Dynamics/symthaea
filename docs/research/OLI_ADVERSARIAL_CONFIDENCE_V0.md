@@ -62,6 +62,21 @@ For 300 proposed mutations plus the initial baseline score, use `max_model_queri
 
 These remain work under #11451. A toy model in a unit test verifies the attack API only; it is not evidence of a reproduced scientific result.
 
+
+## Avida ground-truth identity trap: circular code rotations
+
+The underlying complete-map paper (C G & Adami, 2021) explicitly notes a distinction between 30,547 replicator representatives when circular code rotations are treated as equivalent and 36,171 raw length-9 sequences when rotation variants are counted. The 2026 adversarial study uses 36,171 unique lower-case length-9 strings in its classification split.
+
+Sources:
+- 2021 genotype-phenotype map: https://arxiv.org/abs/2107.03522
+- 2026 adversarial study: https://arxiv.org/abs/2604.11915
+
+The reproduction adapter must not silently canonicalize away this distinction. Preserve both:
+- the raw length-9 sequence identifier used by the classifier and its split;
+- a circular-rotation canonical identifier for functional equivalence analysis, if the Avida execution semantics and source oracle confirm that equivalence.
+
+Ground-truth validation must use the original colony-forming criterion, not merely string membership or a model label. Report both raw-sequence and rotation-aware distances when analyzing spoof endpoints. This is a benchmark reproducibility requirement, not an assumption that all rotations are functionally equivalent in every Avida configuration.
+
 ## Minimum next benchmark increment
 
 1. Acquire or reconstruct the 9-mer ground-truth set from a source with reproducible provenance and permission to use it. The paper points to the complete genotype–phenotype map, but exact artifact/version and license must be confirmed before ingestion.
