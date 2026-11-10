@@ -392,7 +392,7 @@ impl SourceEpochReplayGuard {
             .active_epochs
             .get(&stream)
             .ok_or(SourceEpochReplayError::UnknownStream)?;
-        if active != previous_epoch_ref {
+        if active.as_str() != previous_epoch_ref {
             return Err(SourceEpochReplayError::UnexpectedPreviousEpoch);
         }
         let next_key = (
