@@ -760,6 +760,9 @@ mod tests {
                     candidate_loss,
                 })
                 .unwrap();
+            if gate.is_terminal() {
+                break;
+            }
         }
         report
     }
