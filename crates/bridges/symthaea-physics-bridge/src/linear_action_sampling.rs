@@ -440,6 +440,7 @@ fn evaluate_expression_node(expr: &Expr, variables: &[(&str, f64)]) -> f64 {
         Expr::Sum(body, variable) => {
             let upper = variables
                 .iter()
+                .rev()
                 .find(|(name, _)| *name == "n")
                 .map(|(_, value)| *value as usize)
                 .unwrap_or(0)
@@ -494,21 +495,38 @@ fn collect_variable_names_scoped(
     }
 }
 
-/// Reconstruct the action-coordinate gradient from directional finite differences.
+/// Reconstruct the metric-whitened action-coordinate gradient from directional differences.
 ///
-/// If V contains the supplied direction vectors as columns, then the observed
-/// directional derivatives satisfy q = V^T p. We solve this system by SVD after
-/// scale-normalizing V, and reject bases above the declared condition budget.
+/// If V contains the supplied direction vectors as columns, then q = V^T p.
+/// With G = s L L^T, define V_w = L^T V and p_w = L^-1 p. Then
+/// q = V_w^T p_w. The SVD condition number is therefore measured in the
+/// intrinsic metric geometry. Under x' = D x and G' = D^-T G D^-1,
+/// L'^T D differs from L^T only by an orthogonal factor, so the condition
+/// number is invariant to valid non-orthogonal coordinate re-representations.
 fn finite_difference_gradient(
     expr: &Expr,
     variable_names: &[String],
     action_coordinate_indices: &[usize],
     sample: &LinearActionSampleV1,
+    lower: &[Vec<f64>],
     profile: LinearActionSamplingProfileV1,
 ) -> Result<(Vec<f64>, f64, f64), LinearActionSamplingErrorV1> {
     let dimension = action_coordinate_indices.len();
-    let direction_scale = sample
+    let whitened_directions: Vec<Vec<f64>> = sample
         .direction_basis
+        .iter()
+        .map(|direction| multiply_lower_transpose(lower, direction))
+        .collect();
+    if whitened_directions
+        .iter()
+        .flatten()
+        .any(|value| !value.is_finite())
+    {
+        return Err(LinearActionSamplingErrorV1::ZeroDirectionBasis {
+            sample_id: sample.sample_id.clone(),
+        });
+    }
+    let direction_scale = whitened_directions
         .iter()
         .flatten()
         .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
@@ -519,7 +537,7 @@ fn finite_difference_gradient(
     }
 
     let direction_matrix = DMatrix::from_fn(dimension, dimension, |row, column| {
-        sample.direction_basis[column][row] / direction_scale
+        whitened_directions[column][row] / direction_scale
     });
     let transpose = direction_matrix.transpose();
     let decomposition = transpose.clone().svd(true, true);
@@ -621,10 +639,10 @@ fn finite_difference_gradient(
         observed.iter().map(|value| value / observed_scale).collect()
     };
 
-    // The direction matrix is normalized by direction_scale and the observed
-    // directional differences are normalized by one common positive scale.
-    // The recovered vector is therefore a positive scalar multiple of df,
-    // which is exactly what the metric cosine consumes.
+    // The direction matrix is normalized in metric-whitened coordinates and
+    // the observed directional differences are normalized by one common
+    // positive scale. The recovered vector is therefore a positive scalar
+    // multiple of L^-1 df, exactly the dual-whitened covector needed below.
     let observed_vector = DVector::from_vec(normalized_observed);
     let solution = decomposition
         .solve(&observed_vector, f64::EPSILON * dimension as f64)
@@ -705,23 +723,18 @@ fn stable_norm(vector: &[f64]) -> f64 {
         .fold(0.0_f64, |norm, value| norm.hypot(*value))
 }
 
-/// Compute the squared metric cosine between covector p and tangent vector v.
+/// Compute squared Euclidean cosine between already metric-whitened vectors.
 ///
-/// With G = s L L^T, the dual and tangent whitenings are L^-1 p and L^T v.
-/// Their ordinary Euclidean cosine equals the metric/dual-metric cosine, and
-/// the common positive metric scale cancels.
-fn metric_squared_cosine(
-    gradient: &[f64],
-    tangent: &[f64],
-    lower: &[Vec<f64>],
+/// The finite-difference path reconstructs L^-1 df directly, while the orbit
+/// tangent is transformed by L^T. Thus no second whitening is required here.
+fn whitened_squared_cosine(
+    whitened_gradient: &[f64],
+    whitened_tangent: &[f64],
 ) -> Option<f64> {
-    // Both vector magnitudes cancel from the cosine. Normalize before
-    // whitening to avoid overflowing products for large finite gradients or
-    // orbit tangents while preserving their direction.
-    let gradient_scale = gradient
+    let gradient_scale = whitened_gradient
         .iter()
         .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
-    let tangent_scale = tangent
+    let tangent_scale = whitened_tangent
         .iter()
         .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
     if !gradient_scale.is_finite() || !tangent_scale.is_finite() {
@@ -730,30 +743,25 @@ fn metric_squared_cosine(
     if gradient_scale == 0.0 || tangent_scale == 0.0 {
         return Some(f64::NAN);
     }
-    let normalized_gradient: Vec<f64> = gradient
+    let normalized_gradient: Vec<f64> = whitened_gradient
         .iter()
         .map(|value| *value / gradient_scale)
         .collect();
-    let normalized_tangent: Vec<f64> = tangent
+    let normalized_tangent: Vec<f64> = whitened_tangent
         .iter()
         .map(|value| *value / tangent_scale)
         .collect();
-    let whitened_gradient = solve_lower_triangular(lower, &normalized_gradient)?;
-    let whitened_tangent = multiply_lower_transpose(lower, &normalized_tangent);
-    if whitened_tangent.iter().any(|value| !value.is_finite()) {
-        return None;
-    }
-    let gradient_norm = stable_norm(&whitened_gradient);
-    let tangent_norm = stable_norm(&whitened_tangent);
+    let gradient_norm = stable_norm(&normalized_gradient);
+    let tangent_norm = stable_norm(&normalized_tangent);
     if !gradient_norm.is_finite() || !tangent_norm.is_finite() {
         return None;
     }
     if gradient_norm == 0.0 || tangent_norm == 0.0 {
         return Some(f64::NAN);
     }
-    let cosine = whitened_gradient
+    let cosine = normalized_gradient
         .iter()
-        .zip(whitened_tangent.iter())
+        .zip(normalized_tangent.iter())
         .map(|(left, right)| (left / gradient_norm) * (right / tangent_norm))
         .sum::<f64>();
     if !cosine.is_finite() {
@@ -957,6 +965,7 @@ pub fn evaluate_linear_action_samples(
             &variable_names,
             &action_coordinate_indices,
             sample,
+            action.scaled_metric_cholesky_lower(),
             profile,
         )?;
         sample_gradients.push(gradient);
@@ -994,11 +1003,11 @@ pub fn evaluate_linear_action_samples(
                 });
             }
 
-            let residual = metric_squared_cosine(
-                gradient,
-                &tangent,
+            let whitened_tangent = multiply_lower_transpose(
                 action.scaled_metric_cholesky_lower(),
-            )
+                &tangent,
+            );
+            let residual = whitened_squared_cosine(gradient, &whitened_tangent)
             .ok_or_else(|| LinearActionSamplingErrorV1::NonFiniteMetricWhitening {
                 sample_id: sample.sample_id.clone(),
                 generator_id: generator.id.clone(),
