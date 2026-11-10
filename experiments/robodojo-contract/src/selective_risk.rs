@@ -13,6 +13,8 @@ use std::collections::BTreeSet;
 pub struct RiskContext {
     pub task_id: String,
     pub policy_artifact_sha256: String,
+    /// Digest of the forecast/risk estimator and output post-processing path.
+    pub forecast_pipeline_sha256: String,
     pub environment_condition_sha256: String,
     pub evaluator_sha256: String,
 }
@@ -24,6 +26,7 @@ impl RiskContext {
         }
         for digest in [
             self.policy_artifact_sha256.as_str(),
+            self.forecast_pipeline_sha256.as_str(),
             self.environment_condition_sha256.as_str(),
             self.evaluator_sha256.as_str(),
         ] {
@@ -432,6 +435,7 @@ mod tests {
         RiskContext {
             task_id: "wash_lettuce".to_owned(),
             policy_artifact_sha256: "1".repeat(64),
+            forecast_pipeline_sha256: "5".repeat(64),
             environment_condition_sha256: condition.repeat(64),
             evaluator_sha256: "3".repeat(64),
         }
@@ -543,6 +547,13 @@ mod tests {
         other_policy.policy_artifact_sha256 = "9".repeat(64);
         assert_eq!(
             certificate.check_runtime_score(&other_policy, 0.95, 0.01),
+            Err(RiskCertificateError::RuntimeContextMismatch)
+        );
+
+        let mut other_forecast_pipeline = context("2");
+        other_forecast_pipeline.forecast_pipeline_sha256 = "8".repeat(64);
+        assert_eq!(
+            certificate.check_runtime_score(&other_forecast_pipeline, 0.95, 0.01),
             Err(RiskCertificateError::RuntimeContextMismatch)
         );
     }
