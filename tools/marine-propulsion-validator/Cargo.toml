@@ -21,3 +21,7 @@ sha2 = "=0.10.9"
 [[bin]]
 name = "marine-propulsion-validator"
 path = "src/main.rs"
+
+[[bin]]
+name = "marine-regulatory-rule-audit"
+path = "src/bin/marine_regulatory_rule_audit.rs"
