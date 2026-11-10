@@ -8,10 +8,10 @@
 //! replicators, alive, adaptive, intelligent, or conscious. Ground truth must be evaluated
 //! separately after the search has ended.
 //!
-//! The first strategy reproduces the *shape* of the greedy single-site mutation attack in
-//! Gupta & Adami (2026), arXiv:2604.11915: propose one symbol substitution, query the model,
-//! and accept only a confidence-increasing proposal. A caller must supply the model and the
-//! independently held-out ground-truth evaluator. No model score is treated as truth.
+//! The initial strategy reproduces the *shape* of the greedy single-site mutation attack in
+//! Gupta & Adami (2026), arXiv:2604.11915. The module now also exposes random-walk,
+//! Metropolis-style, and population-search controls. A caller supplies the model and a
+//! separate, independently held-out ground-truth evaluator; no model score is treated as truth.
 //!
 //! The query budget in this API counts every model evaluation, including the initial
 //! candidate evaluation. This convention is explicit so benchmark adapters can translate
@@ -242,10 +242,9 @@ impl Error for AttackError {}
 /// changes exactly one position to a different symbol. The model is queried once per proposal.
 /// The initial score consumes one query from the configured budget.
 ///
-/// Greedy ascent and random walk are included as the first paired red-team/control policies.
-/// Stochastic acceptance and population methods belong in a later benchmark increment so
-/// their temperature, population size, generation count, and query accounting can be frozen
-/// independently instead of hidden behind a generic "evolutionary" option.
+/// Greedy ascent and random walk share this single-candidate interface. Stochastic
+/// acceptance and population policies have separate config/result types so their temperature,
+/// population size, parent-selection rule, and query accounting remain explicit.
 pub fn run_confidence_attack<M: ConfidenceModel>(
     model: &M,
     initial_candidate: &[u8],
@@ -872,6 +871,43 @@ mod tests {
             assert_eq!(first.final_population.len(), 6);
             assert!(first.best_confidence >= 0.0);
         }
+    }
+
+    #[test]
+    fn population_attack_rejects_budget_below_initial_population_and_mixed_lengths() {
+        let initial = vec![vec![0; 9]; 4];
+        let base = PopulationAttackConfig {
+            max_model_queries: 3,
+            seed: 1,
+            population_size: 4,
+            tournament_size: 2,
+            truncation_fraction: 0.25,
+        };
+        assert!(matches!(
+            run_population_attack(
+                &MeanSymbolConfidence,
+                &initial,
+                26,
+                PopulationSelection::Tournament,
+                base
+            ),
+            Err(AttackError::QueryBudgetBelowPopulation { .. })
+        ));
+
+        let mixed = vec![vec![0; 9], vec![0; 8], vec![0; 9], vec![0; 9]];
+        assert!(matches!(
+            run_population_attack(
+                &MeanSymbolConfidence,
+                &mixed,
+                26,
+                PopulationSelection::Tournament,
+                PopulationAttackConfig {
+                    max_model_queries: 4,
+                    ..base
+                }
+            ),
+            Err(AttackError::CandidateLengthMismatch { .. })
+        ));
     }
 
     #[test]
