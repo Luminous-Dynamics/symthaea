@@ -728,6 +728,11 @@ fn calculate_metrics(
             profile.provenance.source_batch_digest.clone(),
             None,
         )))
+        .chain(std::iter::once(metric_evidence(
+            "unit_inventory_and_nominal_capacity".to_owned(),
+            profile.population.inventory_digest.clone(),
+            None,
+        )))
         .collect();
 
     let topology_evidence = || {
