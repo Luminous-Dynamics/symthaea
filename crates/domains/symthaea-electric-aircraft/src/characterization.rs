@@ -337,14 +337,22 @@ impl PropulsionCharacterization {
     }
 
     pub fn evidence_ids(&self) -> Vec<String> {
-        let mut ids = vec![
-            self.motor_efficiency_by_load.evidence.id.clone(),
-            self.inverter_efficiency_by_load.evidence.id.clone(),
-            self.propeller_efficiency_by_advance_ratio.evidence.id.clone(),
-        ];
+        let mut ids = self.evidence_records().into_iter().map(|record| record.id).collect::<Vec<_>>();
         ids.sort();
         ids.dedup();
         ids
+    }
+
+    /// Return complete, sorted evidence records so downstream reports preserve
+    /// the source URI, evidence class, dataset ID and content digest used.
+    pub fn evidence_records(&self) -> Vec<EvidenceRecord> {
+        let mut records = vec![
+            self.motor_efficiency_by_load.evidence.clone(),
+            self.inverter_efficiency_by_load.evidence.clone(),
+            self.propeller_efficiency_by_advance_ratio.evidence.clone(),
+        ];
+        records.sort_by(|a, b| a.id.cmp(&b.id));
+        records
     }
 
     /// Verify every curve against the exact caller-supplied artifact bytes.
@@ -575,13 +583,20 @@ impl BatteryCharacterization {
     }
 
     pub fn evidence_ids(&self) -> Vec<String> {
-        let mut ids = vec![
-            self.open_circuit_voltage.evidence.id.clone(),
-            self.internal_resistance.evidence.id.clone(),
-        ];
+        let mut ids = self.evidence_records().into_iter().map(|record| record.id).collect::<Vec<_>>();
         ids.sort();
         ids.dedup();
         ids
+    }
+
+    /// Return complete, sorted battery evidence records for mission reports.
+    pub fn evidence_records(&self) -> Vec<EvidenceRecord> {
+        let mut records = vec![
+            self.open_circuit_voltage.evidence.clone(),
+            self.internal_resistance.evidence.clone(),
+        ];
+        records.sort_by(|a, b| a.id.cmp(&b.id));
+        records
     }
 
     /// Verify both battery grids against the exact caller-supplied artifact
