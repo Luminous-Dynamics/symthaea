@@ -95,6 +95,16 @@ cargo run --bin marine-regulatory-rule-audit -- \
 
 The regulatory audit checks the register against Draft 2020-12, verifies source/rule identity uniqueness and source-reference resolution, and prevents under-review/proposed rules from carrying effective application dates. It also checks adoption/application date relationships and prevents negotiation proposals from being marked in force.
 
+Audit engine-resolved CH4/N2O emissions evidence:
+
+~~~sh
+cargo run --bin marine-emissions-evidence-audit -- \
+  ../../docs/research/marine/marine-emissions-evidence-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-gas-emissions-v0.1.0.json
+~~~
+
+The emissions audit validates the Draft 2020-12 evidence contract, method-to-IMO-resolution mapping, measured-vs-engine-load-calculated evidence mode, gas completeness, calibration disposition, rights, sample counts, timebase binding and sample-rate/window consistency. A synthetic or incomplete record cannot qualify as physical performance evidence.
+
 ## Enforced checks
 
 - Draft 2020-12 schema meta-validation and instance validation with format checks.
@@ -169,3 +179,10 @@ A Cargo.lock has not yet been generated for this standalone crate. Generate and 
 after running cargo test with the repository's approved toolchain. As of the current work
 session, the v0.3.0 source and tests are committed but have not been compiled or executed;
 the documentation does not imply a test pass.
+
+## Gas-resolved emissions evidence
+
+- `marine-emissions-evidence-v0.1.0.schema.json` and its synthetic fixture define CH4/N2O per-engine evidence.
+- `marine-emissions-evidence-audit` keeps MEPC.414 test-bed/onboard measurement, MEPC.415 engine-load calculation and MEPC.416 CEMS paths distinct.
+- Expected gases must be observed or explicitly declared unmeasured with a reason. Missing is not zero.
+- Gas mass-rate uncertainty remains quantified or explicitly unknown. No CO2e conversion is performed without a declared GWP and accounting boundary.
