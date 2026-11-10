@@ -637,7 +637,7 @@
             },
             "minimum_observed_fraction": {
               "type": "number",
-              "minimum": 0,
+              "exclusiveMinimum": 0,
               "maximum": 1
             },
             "method": {
