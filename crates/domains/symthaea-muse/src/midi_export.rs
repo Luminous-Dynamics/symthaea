@@ -1342,6 +1342,10 @@ pub mod part_aware_v1 {
         MidiTickOverflow {
             score_note_ordinal: usize,
         },
+        MidiDeltaExceedsStandardMaximum {
+            track_index: u16,
+            delta_ticks: u64,
+        },
         UnrepresentableNoteDuration {
             score_note_ordinal: usize,
         },
@@ -1752,8 +1756,8 @@ pub mod part_aware_v1 {
             intervals.sort_by_key(|interval| (interval.0, interval.1, interval.2));
             let mut previous: Option<(u64, usize)> = None;
             for (onset, offset, ordinal) in intervals.iter().copied() {
-                if let Some((previous_offset, previous_ordinal)) = previous {
-                    if onset < previous_offset {
+                if let Some((previous_max_offset, previous_ordinal)) = previous {
+                    if onset < previous_max_offset {
                         return Err(
                             PartAwareMidiExportErrorV1::OverlappingSamePitchNotes {
                                 part_id: *part_id,
@@ -1763,8 +1767,12 @@ pub mod part_aware_v1 {
                             },
                         );
                     }
+                    if offset > previous_max_offset {
+                        previous = Some((offset, ordinal));
+                    }
+                } else {
+                    previous = Some((offset, ordinal));
                 }
-                previous = Some((offset, ordinal));
             }
         }
 
@@ -1773,6 +1781,19 @@ pub mod part_aware_v1 {
             let channel = channel_by_part[part_id];
             let mut events = events_by_part.remove(part_id).unwrap_or_default();
             events.sort_by_key(event_ordering_key);
+            let mut previous_tick = 0_u64;
+            for event in &events {
+                let delta = event.tick.saturating_sub(previous_tick);
+                if delta > 0x0fff_ffff {
+                    return Err(
+                        PartAwareMidiExportErrorV1::MidiDeltaExceedsStandardMaximum {
+                            track_index: (tracks.len() + 1) as u16,
+                            delta_ticks: delta,
+                        },
+                    );
+                }
+                previous_tick = event.tick;
+            }
             tracks.push(Track {
                 name: format!("Part-{}", part_id),
                 channel,
@@ -2191,6 +2212,35 @@ pub mod part_aware_v1 {
             assert!(matches!(
                 result,
                 Err(PartAwareMidiExportErrorV1::UnrepresentableNoteDuration { .. })
+            ));
+        }
+
+        #[test]
+        fn midi_delta_beyond_standard_vlq_limit_is_rejected() {
+            let source = score(vec![note(
+                1,
+                60,
+                Duration::new(0x1000_0000, 1),
+                Duration::quarter(),
+            )]);
+            let digest = sha('2');
+            let timeline = plan(
+                &digest,
+                vec![segment("p1", 1, "cello-1", 0, 1, 1_000_000_000, 1, None)],
+            );
+            let instruments = vec![cap("cello-1", InstrumentKindV1::Cello, 36, 84, 1)];
+            let bindings = vec![binding("cello-1", 42)];
+
+            let result = encode_score_midi_part_aware_v1(
+                &source,
+                &timeline,
+                &instruments,
+                &bindings,
+                &digest,
+            );
+            assert!(matches!(
+                result,
+                Err(PartAwareMidiExportErrorV1::MidiDeltaExceedsStandardMaximum { .. })
             ));
         }
 
