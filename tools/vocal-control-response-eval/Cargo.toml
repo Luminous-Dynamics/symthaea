@@ -1,0 +1,11 @@
+[package]
+name = "vocal-control-response-eval"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Dependency-free evaluation of intended vocal-control response and acoustic cross-coupling"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
