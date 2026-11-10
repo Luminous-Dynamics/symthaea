@@ -170,7 +170,8 @@
         "mode",
         "group_level",
         "generalization_claim",
-        "split_manifest_digest"
+        "split_manifest_digest",
+        "split_frozen_at_ms"
       ],
       "properties": {
         "mode": {
@@ -208,6 +209,10 @@
         "split_manifest_digest": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "split_frozen_at_ms": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
@@ -241,7 +246,9 @@
           "method",
           "fit_scope",
           "uses_validation_or_test_labels",
-          "transform_digest"
+          "transform_digest",
+          "predeclared_at_ms",
+          "predeclaration_digest"
         ],
         "properties": {
           "transform_id": {
@@ -256,7 +263,8 @@
             "enum": [
               "none",
               "train_only",
-              "unlabeled_target"
+              "unlabeled_target",
+              "fixed_predeclared"
             ]
           },
           "uses_validation_or_test_labels": {
@@ -264,6 +272,20 @@
           },
           "transform_digest": {
             "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "predeclared_at_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "predeclaration_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
             "pattern": "^[a-f0-9]{64}$"
           }
         }
@@ -392,7 +414,8 @@
         "method",
         "nominal_levels",
         "calibration_partition",
-        "domain_stratified"
+        "domain_stratified",
+        "calibration_source_digest"
       ],
       "properties": {
         "status": {
@@ -419,13 +442,19 @@
         "calibration_partition": {
           "enum": [
             "validation_only",
-            "train_only",
             "external_calibration",
             "none"
           ]
         },
         "domain_stratified": {
           "type": "boolean"
+        },
+        "calibration_source_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
         }
       }
     },
