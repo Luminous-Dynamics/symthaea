@@ -30,8 +30,8 @@ jobs:
         run: |
           cargo run --manifest-path tools/ev-soh-benchmark-audit/Cargo.toml -- --schema schemas/transport/ev_soh_benchmark_manifest_v0_1.schema.json --corpus fixtures/ev_battery/soh_benchmark_manifest_scenarios_v0_1.json > "$RUNNER_TEMP/ev-soh-benchmark-report.json"
           jq -e '
-            .case_count == 8 and
-            .accepted_count == 3 and
-            .rejected_count == 5 and
+            .case_count == 15 and
+            .accepted_count == 4 and
+            .rejected_count == 11 and
             (.report_sha256 | test("^[a-f0-9]{64}$"))
           ' "$RUNNER_TEMP/ev-soh-benchmark-report.json"
