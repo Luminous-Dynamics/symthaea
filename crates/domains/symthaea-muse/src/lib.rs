@@ -1034,6 +1034,8 @@ pub mod dramatic;
 pub mod emotional_gestures;
 pub mod genre_presets;
 pub mod instruments;
+#[cfg(feature = "theory")]
+pub mod instrument_capability_evidence;
 pub mod learned_melody;
 pub mod melodic_grammar;
 pub mod midi_export;
