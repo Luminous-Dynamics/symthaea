@@ -91,6 +91,7 @@ pub struct GripForceAssessment {
     pub preferred_upper_newtons: f32,
     pub maximum_allowed_newtons: f32,
     pub task_envelope_ref: String,
+    pub task_envelope_provenance: ProvenanceDisposition,
     pub origin: ObservationOrigin,
 }
 
@@ -99,6 +100,7 @@ pub struct GripForceAssessment {
 pub struct SlipEstimate {
     pub probability: f32,
     pub estimator_profile_ref: String,
+    pub estimator_profile_provenance: ProvenanceDisposition,
 }
 
 /// A single provenance-bound tactile observation frame.
@@ -274,6 +276,8 @@ pub enum FeedbackUnavailableReason {
     MissingProvenanceReceipt,
     ProvenanceNotVerified,
     CalibrationNotCurrent,
+    TaskEnvelopeNotVerified,
+    SlipEstimatorNotVerified,
     StaleReceiveTimestamp,
     FutureReceiveTimestamp,
     ReplayOrOutOfOrder,
@@ -298,6 +302,8 @@ pub struct ProstheticFeedbackFrameV1 {
     pub provenance_receipt_ref: Option<String>,
     pub provenance: ProvenanceDisposition,
     pub calibration_ref: Option<String>,
+    pub task_envelope_ref: Option<String>,
+    pub slip_estimator_profile_ref: Option<String>,
     pub source_clock_profile_ref: String,
     pub source_timestamp_ns: u64,
     pub received_monotonic_ns: u64,
@@ -412,6 +418,26 @@ impl ProstheticFeedbackEncoder {
             return Ok(self.unavailable(
                 observation,
                 FeedbackUnavailableReason::CalibrationNotCurrent,
+            ));
+        }
+
+        if observation.grip.as_ref().is_some_and(|grip| {
+            grip.task_envelope_provenance != ProvenanceDisposition::Verified
+                || grip.task_envelope_ref.trim().is_empty()
+        }) {
+            return Ok(self.unavailable(
+                observation,
+                FeedbackUnavailableReason::TaskEnvelopeNotVerified,
+            ));
+        }
+
+        if observation.slip.as_ref().is_some_and(|slip| {
+            slip.estimator_profile_provenance != ProvenanceDisposition::Verified
+                || slip.estimator_profile_ref.trim().is_empty()
+        }) {
+            return Ok(self.unavailable(
+                observation,
+                FeedbackUnavailableReason::SlipEstimatorNotVerified,
             ));
         }
 
@@ -551,6 +577,14 @@ impl ProstheticFeedbackEncoder {
             provenance_receipt_ref: observation.provenance_receipt_ref.clone(),
             provenance: observation.provenance,
             calibration_ref: observation.calibration_ref.clone(),
+            task_envelope_ref: observation
+                .grip
+                .as_ref()
+                .map(|grip| grip.task_envelope_ref.clone()),
+            slip_estimator_profile_ref: observation
+                .slip
+                .as_ref()
+                .map(|slip| slip.estimator_profile_ref.clone()),
             source_clock_profile_ref: observation.source_clock_profile_ref.clone(),
             source_timestamp_ns: observation.source_timestamp_ns,
             received_monotonic_ns: observation.received_monotonic_ns,
@@ -639,11 +673,26 @@ mod tests {
             in_contact: true,
             origin: ObservationOrigin::DirectMeasurement,
         });
+        sample.grip = Some(GripForceAssessment {
+            force_newtons: 8.0,
+            preferred_upper_newtons: 5.0,
+            maximum_allowed_newtons: 10.0,
+            task_envelope_ref: "task-envelope:glass-v2".into(),
+            task_envelope_provenance: ProvenanceDisposition::Verified,
+            origin: ObservationOrigin::DirectMeasurement,
+        });
+        sample.slip = Some(SlipEstimate {
+            probability: 0.9,
+            estimator_profile_ref: "slip-estimator:v3".into(),
+            estimator_profile_provenance: ProvenanceDisposition::Verified,
+        });
 
         let frame = encoder.encode(&sample, 150).unwrap();
         assert_eq!(frame.source_sensor_id, sample.sensor_id);
         assert_eq!(frame.provenance_receipt_ref, sample.provenance_receipt_ref);
         assert_eq!(frame.calibration_ref, sample.calibration_ref);
+        assert_eq!(frame.task_envelope_ref.as_deref(), Some("task-envelope:glass-v2"));
+        assert_eq!(frame.slip_estimator_profile_ref.as_deref(), Some("slip-estimator:v3"));
         assert_eq!(frame.source_clock_profile_ref, sample.source_clock_profile_ref);
         assert_eq!(frame.source_timestamp_ns, sample.source_timestamp_ns);
         assert_eq!(frame.received_monotonic_ns, sample.received_monotonic_ns);
@@ -659,6 +708,7 @@ mod tests {
             preferred_upper_newtons: 5.0,
             maximum_allowed_newtons: 10.0,
             task_envelope_ref: "task-envelope:glass-v2".into(),
+            task_envelope_provenance: ProvenanceDisposition::Verified,
             origin: ObservationOrigin::DirectMeasurement,
         });
 
@@ -671,12 +721,52 @@ mod tests {
     }
 
     #[test]
+    fn unverified_task_envelope_suppresses_grip_feedback() {
+        let mut encoder = encoder();
+        let mut sample = observation(1);
+        sample.grip = Some(GripForceAssessment {
+            force_newtons: 8.0,
+            preferred_upper_newtons: 5.0,
+            maximum_allowed_newtons: 10.0,
+            task_envelope_ref: "task-envelope:unreviewed".into(),
+            task_envelope_provenance: ProvenanceDisposition::Indeterminate,
+            origin: ObservationOrigin::DirectMeasurement,
+        });
+        let frame = encoder.encode(&sample, 150).unwrap();
+        assert_eq!(
+            frame.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::TaskEnvelopeNotVerified
+            )
+        );
+    }
+
+    #[test]
+    fn unverified_slip_estimator_suppresses_slip_feedback() {
+        let mut encoder = encoder();
+        let mut sample = observation(1);
+        sample.slip = Some(SlipEstimate {
+            probability: 0.95,
+            estimator_profile_ref: "slip-estimator:unreviewed".into(),
+            estimator_profile_provenance: ProvenanceDisposition::Indeterminate,
+        });
+        let frame = encoder.encode(&sample, 150).unwrap();
+        assert_eq!(
+            frame.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::SlipEstimatorNotVerified
+            )
+        );
+    }
+
+    #[test]
     fn slip_alert_retains_derived_estimate_origin() {
         let mut encoder = encoder();
         let mut sample = observation(1);
         sample.slip = Some(SlipEstimate {
             probability: 0.9,
             estimator_profile_ref: "slip-estimator:v3".into(),
+            estimator_profile_provenance: ProvenanceDisposition::Verified,
         });
 
         let frame = encoder.encode(&sample, 150).unwrap();
@@ -994,6 +1084,7 @@ mod tests {
             preferred_upper_newtons: 5.0,
             maximum_allowed_newtons: 10.0,
             task_envelope_ref: "task-envelope:glass-v2".into(),
+            task_envelope_provenance: ProvenanceDisposition::Verified,
             origin: ObservationOrigin::DirectMeasurement,
         });
         assert_eq!(
