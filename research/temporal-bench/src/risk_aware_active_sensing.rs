@@ -793,6 +793,8 @@ mod tests {
             }],
             100,
         );
+        let mut feasible = feasible;
+        feasible.resource_cost.compute_cycles = 20;
         let mut expensive = action(
             "too-expensive",
             vec![ObservationOutcomeEstimate {
