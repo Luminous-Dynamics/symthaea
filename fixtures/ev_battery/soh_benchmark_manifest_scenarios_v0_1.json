@@ -495,7 +495,8 @@
             0.95
           ],
           "calibration_partition": "validation_only",
-          "domain_stratified": true
+          "domain_stratified": true,
+          "calibration_source_digest": null
         },
         "execution": {
           "source_commit": "0123456789abcdef0123456789abcdef01234567",
@@ -671,7 +672,8 @@
             0.95
           ],
           "calibration_partition": "validation_only",
-          "domain_stratified": true
+          "domain_stratified": true,
+          "calibration_source_digest": null
         },
         "execution": {
           "source_commit": "0123456789abcdef0123456789abcdef01234567",
@@ -1195,7 +1197,8 @@
             0.95
           ],
           "calibration_partition": "validation_only",
-          "domain_stratified": true
+          "domain_stratified": true,
+          "calibration_source_digest": null
         },
         "execution": {
           "source_commit": "0123456789abcdef0123456789abcdef01234567",
@@ -1371,7 +1374,8 @@
             0.95
           ],
           "calibration_partition": "validation_only",
-          "domain_stratified": true
+          "domain_stratified": true,
+          "calibration_source_digest": null
         },
         "execution": {
           "source_commit": "0123456789abcdef0123456789abcdef01234567",
@@ -1547,7 +1551,8 @@
             0.95
           ],
           "calibration_partition": "validation_only",
-          "domain_stratified": true
+          "domain_stratified": true,
+          "calibration_source_digest": null
         },
         "execution": {
           "source_commit": "0123456789abcdef0123456789abcdef01234567",
@@ -1723,7 +1728,8 @@
             0.95
           ],
           "calibration_partition": "validation_only",
-          "domain_stratified": true
+          "domain_stratified": true,
+          "calibration_source_digest": null
         },
         "execution": {
           "source_commit": "0123456789abcdef0123456789abcdef01234567",
