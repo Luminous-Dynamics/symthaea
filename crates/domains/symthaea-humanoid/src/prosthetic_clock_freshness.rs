@@ -13,6 +13,12 @@
 //! sensor, verify calibration, establish physical clock quality, persist replay
 //! state, render haptics, issue motor commands, or grant actuation authority.
 //! Indeterminate assessments must not be admitted as fresh.
+//!
+//! The structs here are narrow algorithm inputs/projections, not a replacement
+//! observation envelope or clock-profile registry. Production integration must
+//! project the canonical SE-OBS / ROB-EXP observation and independently
+//! qualified clock-correlation evidence into these inputs; do not persist a
+//! competing observation ontology or mint a clock-quality claim here.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
