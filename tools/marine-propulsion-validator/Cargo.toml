@@ -1,0 +1,22 @@
+[package]
+name = "marine-propulsion-validator"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Fail-closed schema and semantic validator for Luminous marine propulsion evidence cases"
+
+# Kept outside the monorepo workspace so this focused validator does not expand
+# unrelated workspace resolution or weaken existing workspace gates.
+[workspace]
+resolver = "2"
+
+[dependencies]
+chrono = "0.4"
+jsonschema = { version = "=0.59.0", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[[bin]]
+name = "marine-propulsion-validator"
+path = "src/main.rs"
