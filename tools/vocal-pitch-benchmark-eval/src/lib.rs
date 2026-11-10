@@ -42,8 +42,8 @@ pub struct PitchBenchmarkSpecV1 {
     pub tracker_id: String,
     pub tracker_version: String,
     pub tracker_artifact_sha256: String,
-    pub reference_corpus_id: String,
-    pub reference_corpus_version: String,
+    pub reference_suite_id: String,
+    pub reference_suite_version: String,
     pub reference_manifest_sha256: String,
     pub evaluation_split_id: String,
     pub preprocessing_manifest_sha256: String,
@@ -272,8 +272,8 @@ fn validate_spec(spec: &PitchBenchmarkSpecV1) -> Result<(), PitchBenchmarkError>
     require_non_empty(&spec.tracker_id, "tracker_id")?;
     require_non_empty(&spec.tracker_version, "tracker_version")?;
     require_digest(&spec.tracker_artifact_sha256, "tracker_artifact_sha256")?;
-    require_non_empty(&spec.reference_corpus_id, "reference_corpus_id")?;
-    require_non_empty(&spec.reference_corpus_version, "reference_corpus_version")?;
+    require_non_empty(&spec.reference_suite_id, "reference_suite_id")?;
+    require_non_empty(&spec.reference_suite_version, "reference_suite_version")?;
     require_digest(&spec.reference_manifest_sha256, "reference_manifest_sha256")?;
     require_non_empty(&spec.evaluation_split_id, "evaluation_split_id")?;
     require_digest(
@@ -367,7 +367,7 @@ fn evaluate_segment(
                 let absolute = signed.abs();
                 signed_errors.push(signed);
                 absolute_errors.push(absolute);
-                if absolute > spec.gross_pitch_error_threshold_cents {
+                if absolute > spec.gross_pitch_error_threshold_cents + 1e-9 {
                     counts.gross_pitch_error_frames += 1;
                 }
                 if (absolute - 1200.0).abs() <= spec.octave_error_tolerance_cents {
@@ -403,7 +403,7 @@ fn segment_result(
         (!absolute_errors.is_empty()).then(|| percentile_sorted(&absolute_errors, 0.95));
     let absolute_max = absolute_errors.last().copied();
 
-    let rates = derive_rates(&counts, 50.0);
+    let rates = derive_rates(&counts);
     Ok(PitchSegmentResultV1 {
         metadata,
         counts,
@@ -430,7 +430,7 @@ fn validate_f0(
     Ok(())
 }
 
-fn derive_rates(counts: &PitchCountsV1, gpe_threshold_cents: f64) -> PitchRatesV1 {
+fn derive_rates(counts: &PitchCountsV1) -> PitchRatesV1 {
     let vuv_errors = counts.false_negative_voicing_frames + counts.false_positive_voicing_frames;
     let frame_errors = vuv_errors + counts.gross_pitch_error_frames;
     PitchRatesV1 {
@@ -531,8 +531,8 @@ mod tests {
             tracker_id: "swiftf0".to_owned(),
             tracker_version: "pinned-v1".to_owned(),
             tracker_artifact_sha256: digest('a'),
-            reference_corpus_id: "licensed-vocal-pilot".to_owned(),
-            reference_corpus_version: "v1".to_owned(),
+            reference_suite_id: "licensed-vocal-pilot".to_owned(),
+            reference_suite_version: "v1".to_owned(),
             reference_manifest_sha256: digest('b'),
             evaluation_split_id: "singer-song-session-heldout".to_owned(),
             preprocessing_manifest_sha256: digest('c'),
@@ -614,6 +614,27 @@ mod tests {
         assert_eq!(result.counts.gross_pitch_error_frames, 1);
         assert_eq!(result.rates.frame_error_rate, 1.0);
         assert_eq!(result.rates.voicing_decision_error_rate, 0.0);
+    }
+
+    #[test]
+    fn configured_gross_pitch_threshold_is_used_for_every_metric() {
+        let mut spec = spec();
+        spec.gross_pitch_error_threshold_cents = 100.0;
+        let report = evaluate_pitch_benchmark(
+            &spec,
+            &[PitchSegmentInputV1 {
+                metadata: metadata("clip-01", "corpus-a", "clean"),
+                frames: vec![frame(
+                    0,
+                    Some(220.0),
+                    Some(220.0 * 2.0_f64.powf(75.0 / 1200.0)),
+                )],
+            }],
+        )
+        .unwrap();
+        assert_eq!(report.segments[0].counts.gross_pitch_error_frames, 0);
+        assert_eq!(report.segments[0].rates.frame_error_rate, 0.0);
+        assert_eq!(report.segments[0].rates.gross_pitch_error_rate, Some(0.0));
     }
 
     #[test]
