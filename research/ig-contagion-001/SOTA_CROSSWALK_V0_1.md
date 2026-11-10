@@ -287,3 +287,67 @@ Paper:
 | A12 — adaptive evidence-aware routing | SVR-MAD | Reproduce token savings only at matched output quality and measure minority-evidence exclusion |
 
 A12 should also be compared with Free-MAD's trajectory scoring, standard MAD and static topologies. Communication graph adaptation is not delegation or authority assignment.
+
+
+## Budget fairness and transcript-integrity baseline (10 November 2026)
+
+Recent studies make budget matching and context integrity mandatory controls, not secondary reporting.
+
+### Beyond Symmetric Agents: matched-budget debate controls
+
+**Ferreira et al., *Beyond Symmetric Agents: Cognitive Diversity and Multi-Agent Debate in Small Language Models* (arXiv:2609.35875, September 2026).** The authors report 23 models across 11 vendor families, five tasks and 5,500+ debate/control runs. Their design pairs debate settings with generation-budget-matched self-consistency/majority controls. They report that debate can tie or lose to self-consistency under matched generation budgets in tested conditions, while persona prompting can reduce accuracy. They also identify silent context-window overflow as a measurement hazard; correcting overflow changed a reported debate-vs-sampling comparison from -1.8 points to parity. These are paper-specific empirical findings, not a universal verdict on debate.
+
+Required adaptation:
+- pair every multi-agent arm with generation-budget-matched self-consistency and a single-agent/control baseline;
+- test actual transcript completeness and exact retained context, not just client-side token estimates;
+- count system prompts, agent-to-agent messages, retries, tool output, retrieval, judges and output tokens;
+- stratify by model family and measured initial answer diversity rather than assuming persona diversity is useful.
+
+Paper: https://arxiv.org/abs/2609.35875
+
+### Pareto-optimal test-time scaling
+
+**Wunderlich et al., *Multi-Agent Reasoning Improves Compute Efficiency: Pareto-Optimal Test-Time Scaling* (arXiv:2605.01566 / ACL SRW 2026).** The authors compare self-consistency, self-refinement, debate and mixture-of-agents under matched inference budgets. Their findings motivate reporting accuracy/cost Pareto frontiers across methods rather than one arbitrary compute budget or one selected point.
+
+Required adaptation:
+- report quality versus input+output tokens, provider cost, wall-clock latency and tool/judge overhead;
+- include the best baseline selected on a validation split, then evaluate the frozen choice on held-out tasks;
+- report all method configurations on the same budgets, not compare an expensive debate against an underfunded single sample.
+
+Papers:
+- https://arxiv.org/abs/2605.01566
+- https://aclanthology.org/2026.acl-srw.1/
+
+### Debate traces as training data: AbCD
+
+**Verma et al., *Alignment by Confident Debate: Preference Learning from Multi-Agent Debate* (arXiv:2611.09568, submitted 6 November 2026).** The authors turn confidence-weighted, semantically clustered debate traces into preference data, then evaluate post-training on verifiable math, quantitative QA and executable code tasks. They report improvements across five model families, with a maximum gain of 21.5 percentage points in their tested setup. This is a post-training/data-generation intervention, not an inference-only debate baseline, and it is a recent preprint.
+
+Required adaptation:
+- keep AbCD trace generation and post-training as a separate experimental arm;
+- never use debate agreement or verbal confidence as the final oracle;
+- use independent answer keys/executable checkers only for held-out evaluation, not to relabel preference traces after the fact;
+- test correlation, majority capture, false preference labels and transfer to open-world tasks separately;
+- prohibit applying answer-equivalence preference labels to normative-pluralism tasks with no canonical answer.
+
+Paper: https://arxiv.org/abs/2611.09568
+
+### Confidence is a lossy channel
+
+**Zhang et al., *When Linguistic and Internal Confidence Diverge in Large Language Models* (Findings EMNLP 2026).** The authors report 30 models over eight classification and two generation tasks, distinguishing instance-level association, magnitude agreement and probabilistic calibration between verbal and internal confidence signals. They find these axes frequently diverge and that prompt design can inflate verbal confidence.
+
+This complements #11367: expose verbal confidence, logits-based confidence and semantic-entropy uncertainty as different observable channels when available. Never silently substitute one for another; missing logits or entropy is Unsupported, not an invitation to invent calibrated values.
+
+Paper: https://aclanthology.org/2026.findings-emnlp.1300/
+
+### New mandatory comparison arm
+
+**A13 — budget-matched, transcript-integrity tournament.** Owned by [IG-BUDGET-FAIR-001 #11415](https://github.com/Luminous-Dynamics/symthaea/issues/11415). Compare single-agent direct/CoT, self-consistency, self-refinement, standard MAD, mixture-of-agents, Free-MAD, diversity/confidence interventions and Symthaea evidence-gated debate under:
+- generation-token-matched budgets;
+- end-to-end cost-matched budgets;
+- latency-constrained budgets.
+
+A run with unknown server-side context/truncation state cannot count as a clean comparison. A serving context overflow, omitted prompt/tool accounting or hidden retry makes the arm Invalid/Indeterminate, not a quiet lower-cost win.
+
+**A14 — trace-to-preference post-training.** AbCD-style preference extraction is evaluated separately from inference-only debate. Its metric is independent held-out task performance and transfer, with label-corruption, correlated-judge and consensus-capture controls. It must not be scored as an inference improvement.
+
+The new comparison criteria are therefore two-stage: first qualify transcript/budget integrity; only then compare method quality on the resulting clean run set.
