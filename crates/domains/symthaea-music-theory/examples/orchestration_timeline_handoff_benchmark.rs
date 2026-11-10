@@ -11,7 +11,8 @@ use symthaea_music_theory::orchestration::{
 };
 use symthaea_music_theory::orchestration_timeline::{
     HandoffKindV1, OrchestrationSegmentV1, OrchestrationTimelineV1,
-    ORCHESTRATION_TIMELINE_SCHEMA_V1, RationalBeatV1, SegmentHandoffV1,
+    ORCHESTRATION_TIMELINE_SCHEMA_V1, ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1,
+    RationalBeatV1, SegmentHandoffV1,
     OrchestrationTimelineIssueCodeV1, validate_orchestration_timeline,
 };
 use symthaea_music_theory::pitch::{Pitch, PitchClass};
