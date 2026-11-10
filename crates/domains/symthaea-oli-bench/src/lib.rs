@@ -445,13 +445,13 @@ fn paired_differences(
 }
 
 fn subject_accuracy(subject: &SubjectProfile, condition: &str) -> f64 {
-    subject
-        .conditions
-        .get(condition)
-        .map(|outcomes| {
-            outcomes.iter().filter(|value| **value).count() as f64 / outcomes.len().max(1) as f64
-        })
-        .unwrap_or(0.0)
+    match subject.conditions.get(condition) {
+        Some(outcomes) => {
+            outcomes.iter().filter(|value| **value).count() as f64
+                / outcomes.len().max(1) as f64
+        }
+        None => 0.0,
+    }
 }
 
 fn mean(values: &[f64]) -> f64 {
