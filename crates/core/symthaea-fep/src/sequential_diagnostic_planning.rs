@@ -29,6 +29,28 @@ const MAX_DIAGNOSTIC_ACTIONS: usize = 64;
 const MAX_HYPOTHESES: usize = 1024;
 const MAX_OUTCOMES_PER_ACTION: usize = 256;
 
+/// Provenance-bound cumulative safety budget for one adaptive diagnostic path.
+///
+/// Each action's safety_risk must be an externally calibrated upper bound on
+/// the conditional probability of an adverse safety event if that action is
+/// taken after any reachable observation history. The union bound then makes
+/// the sum of these per-action bounds a conservative upper bound on the
+/// probability of at least one adverse event along a path, without assuming
+/// independence. The digest identifies the external risk semantics/calibration;
+/// it does not authenticate the issuer or prove the calibration is correct.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequentialDiagnosticSafetyBudget {
+    pub maximum_cumulative_risk: f64,
+    pub risk_semantics_digest: String,
+}
+
+/// Evaluation returned when a path-wise safety budget is enabled.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BudgetedSequentialDiagnosticEvaluation {
+    pub safety_budget: SequentialDiagnosticSafetyBudget,
+    pub evaluation: SequentialDiagnosticEvaluation,
+}
+
 /// Finite-horizon search limits.
 ///
 /// The expansion budget counts belief-state nodes in the search tree. In
@@ -123,6 +145,10 @@ pub enum SequentialDiagnosticError {
     InvalidPredictiveOutcomeMass { action_index: usize },
     #[error("decision-risk calculation produced a non-finite value")]
     NonFiniteRisk,
+    #[error("cumulative safety-risk budget must be finite and in [0, 1]")]
+    InvalidCumulativeSafetyRiskBudget,
+    #[error("risk-semantics digest must be 64 lowercase hexadecimal characters")]
+    InvalidRiskSemanticsDigest,
 }
 
 /// Evaluate an adaptive diagnostic policy up to the requested horizon.
@@ -138,6 +164,73 @@ pub fn evaluate_sequential_decision_diagnostics(
     actions: &[DiagnosticAction],
     decision_config: DecisionDiagnosticConfig,
     planning_config: SequentialDiagnosticConfig,
+) -> Result<SequentialDiagnosticEvaluation, SequentialDiagnosticError> {
+    evaluate_sequential_decision_diagnostics_internal(
+        hypotheses,
+        actions,
+        decision_config,
+        planning_config,
+        None,
+    )
+}
+
+/// Evaluate a sequential diagnostic policy with a hard cumulative safety bound.
+///
+/// Unlike DecisionDiagnosticConfig::maximum_safety_risk, which applies to
+/// each individual probe, this budget constrains the sum of conditional
+/// per-action adverse-event probability upper bounds on every possible path.
+/// A probe that is individually admissible can therefore become ineligible
+/// after another probe has consumed part of the path budget. The risk-semantics
+/// digest must identify the external calibration/meaning of safety_risk.
+///
+/// This is a conservative union-bound control, not an independence assumption
+/// and not proof that the supplied per-action bounds are valid.
+pub fn evaluate_sequential_decision_diagnostics_with_safety_budget(
+    hypotheses: &[DecisionHypothesis],
+    actions: &[DiagnosticAction],
+    decision_config: DecisionDiagnosticConfig,
+    planning_config: SequentialDiagnosticConfig,
+    safety_budget: SequentialDiagnosticSafetyBudget,
+) -> Result<BudgetedSequentialDiagnosticEvaluation, SequentialDiagnosticError> {
+    validate_safety_budget(&safety_budget)?;
+    let evaluation = evaluate_sequential_decision_diagnostics_internal(
+        hypotheses,
+        actions,
+        decision_config,
+        planning_config,
+        Some(safety_budget.maximum_cumulative_risk),
+    )?;
+    Ok(BudgetedSequentialDiagnosticEvaluation {
+        safety_budget,
+        evaluation,
+    })
+}
+
+fn validate_safety_budget(
+    safety_budget: &SequentialDiagnosticSafetyBudget,
+) -> Result<(), SequentialDiagnosticError> {
+    if !safety_budget.maximum_cumulative_risk.is_finite()
+        || !(0.0..=1.0).contains(&safety_budget.maximum_cumulative_risk)
+    {
+        return Err(SequentialDiagnosticError::InvalidCumulativeSafetyRiskBudget);
+    }
+    if safety_budget.risk_semantics_digest.len() != 64
+        || !safety_budget
+            .risk_semantics_digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(SequentialDiagnosticError::InvalidRiskSemanticsDigest);
+    }
+    Ok(())
+}
+
+fn evaluate_sequential_decision_diagnostics_internal(
+    hypotheses: &[DecisionHypothesis],
+    actions: &[DiagnosticAction],
+    decision_config: DecisionDiagnosticConfig,
+    planning_config: SequentialDiagnosticConfig,
+    maximum_cumulative_safety_risk: Option<f64>,
 ) -> Result<SequentialDiagnosticEvaluation, SequentialDiagnosticError> {
     if actions.len() > MAX_DIAGNOSTIC_ACTIONS {
         return Err(SequentialDiagnosticError::TooManyActions {
@@ -194,6 +287,7 @@ pub fn evaluate_sequential_decision_diagnostics(
         &prior,
         planning_config.horizon,
         remaining_actions,
+        maximum_cumulative_safety_risk,
         &mut expansions,
     )?;
 
@@ -216,6 +310,7 @@ fn solve_node(
     posterior: &[f64],
     remaining_steps: usize,
     remaining_actions: u64,
+    remaining_cumulative_safety_risk: Option<f64>,
     expansions: &mut usize,
 ) -> Result<
     (
@@ -244,7 +339,10 @@ fn solve_node(
         if remaining_actions & action_bit == 0 {
             continue;
         }
-        let eligible = action.safety_risk <= decision_config.maximum_safety_risk;
+        let eligible = action.safety_risk <= decision_config.maximum_safety_risk
+            && remaining_cumulative_safety_risk.is_none_or(|remaining| {
+                action.safety_risk <= remaining + RISK_TOLERANCE
+            });
         if !eligible {
             first_action_values.push(SequentialDiagnosticActionValue {
                 action_index,
@@ -267,6 +365,7 @@ fn solve_node(
             action_index,
             remaining_steps - 1,
             remaining_actions & !action_bit,
+            remaining_cumulative_safety_risk,
             expansions,
         )?;
 
@@ -299,6 +398,7 @@ fn plan_after_action(
     action_index: usize,
     remaining_steps: usize,
     remaining_actions: u64,
+    remaining_cumulative_safety_risk: Option<f64>,
     expansions: &mut usize,
 ) -> Result<SequentialDiagnosticPlanNode, SequentialDiagnosticError> {
     let action = &actions[action_index];
@@ -310,6 +410,9 @@ fn plan_after_action(
     let mut expected_observation_cost = action.observation_cost;
     let mut expected_safety_penalty = decision_config.safety_risk_weight * action.safety_risk;
     let mut predictive_mass = 0.0;
+    let remaining_after_action = remaining_cumulative_safety_risk.map(|remaining| {
+        (remaining - action.safety_risk).max(0.0)
+    });
 
     for outcome_index in 0..outcome_count {
         let outcome_probability = hypotheses
@@ -347,6 +450,7 @@ fn plan_after_action(
             &next_posterior,
             remaining_steps,
             remaining_actions,
+            remaining_after_action,
             expansions,
         )?;
 
@@ -519,6 +623,107 @@ mod tests {
                 assert_eq!(terminal.continuation.selected_action_index, None);
             }
         }
+    }
+
+    #[test]
+    fn cumulative_safety_budget_blocks_individually_safe_but_jointly_unsafe_probes() {
+        let (hypotheses, mut actions) = xor_complementary_probes();
+        for action in &mut actions {
+            action.safety_risk = 0.35;
+        }
+        let decision_config = DecisionDiagnosticConfig {
+            safety_risk_weight: 0.1,
+            maximum_safety_risk: 0.5,
+            ..decision_config()
+        };
+        let result = evaluate_sequential_decision_diagnostics_with_safety_budget(
+            &hypotheses,
+            &actions,
+            decision_config,
+            SequentialDiagnosticConfig {
+                horizon: 2,
+                max_policy_expansions: 64,
+            },
+            SequentialDiagnosticSafetyBudget {
+                maximum_cumulative_risk: 0.6,
+                risk_semantics_digest: "a".repeat(64),
+            },
+        )
+        .expect("valid pathwise safety budget");
+
+        // Each probe is individually below 0.5, but two probes would consume
+        // 0.7 of a 0.6 path budget. One probe has no decision value in this XOR
+        // fixture, so the optimal policy is to stop without probing.
+        assert_eq!(result.evaluation.selected_action_index, None);
+        assert!((result.evaluation.expected_total_cost - 0.5).abs() < 1e-12);
+        assert!(result.evaluation.first_action_values.iter().all(|value| value.eligible));
+    }
+
+    #[test]
+    fn cumulative_safety_budget_allows_sequence_at_the_declared_path_bound() {
+        let (hypotheses, mut actions) = xor_complementary_probes();
+        for action in &mut actions {
+            action.safety_risk = 0.35;
+        }
+        let decision_config = DecisionDiagnosticConfig {
+            safety_risk_weight: 0.1,
+            maximum_safety_risk: 0.5,
+            ..decision_config()
+        };
+        let result = evaluate_sequential_decision_diagnostics_with_safety_budget(
+            &hypotheses,
+            &actions,
+            decision_config,
+            SequentialDiagnosticConfig {
+                horizon: 2,
+                max_policy_expansions: 64,
+            },
+            SequentialDiagnosticSafetyBudget {
+                maximum_cumulative_risk: 0.7,
+                risk_semantics_digest: "b".repeat(64),
+            },
+        )
+        .expect("sequence exactly consumes the declared path budget");
+
+        assert!(result.evaluation.selected_action_index.is_some());
+        assert!(result.evaluation.plan.expected_terminal_bayes_risk < 1e-12);
+        assert!((result.evaluation.plan.expected_safety_penalty - 0.07).abs() < 1e-10);
+        assert!(result.evaluation.expected_total_cost < 0.1);
+        assert_eq!(result.safety_budget.maximum_cumulative_risk, 0.7);
+    }
+
+    #[test]
+    fn malformed_cumulative_safety_budget_fails_closed() {
+        let (hypotheses, actions) = xor_complementary_probes();
+        let invalid_digest = SequentialDiagnosticSafetyBudget {
+            maximum_cumulative_risk: 0.5,
+            risk_semantics_digest: "not-a-digest".into(),
+        };
+        assert!(matches!(
+            evaluate_sequential_decision_diagnostics_with_safety_budget(
+                &hypotheses,
+                &actions,
+                decision_config(),
+                SequentialDiagnosticConfig::default(),
+                invalid_digest
+            ),
+            Err(SequentialDiagnosticError::InvalidRiskSemanticsDigest)
+        ));
+
+        let invalid_bound = SequentialDiagnosticSafetyBudget {
+            maximum_cumulative_risk: f64::NAN,
+            risk_semantics_digest: "c".repeat(64),
+        };
+        assert!(matches!(
+            evaluate_sequential_decision_diagnostics_with_safety_budget(
+                &hypotheses,
+                &actions,
+                decision_config(),
+                SequentialDiagnosticConfig::default(),
+                invalid_bound
+            ),
+            Err(SequentialDiagnosticError::InvalidCumulativeSafetyRiskBudget)
+        ));
     }
 
     #[test]
