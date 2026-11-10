@@ -1346,6 +1346,23 @@
         "Use current consolidated Regulation and applicable implementation acts for reporting determinations.",
         "EU MRV gas coverage and ship scope are not identical to EU ETS coverage/surrender scope."
       ]
+    },
+    {
+      "source_id": "EU-ETS-TARGETED-REVISION-PROPOSAL-2026",
+      "title": "European Commission proposal for targeted revision of EU ETS, including maritime provisions",
+      "publisher": "European Commission",
+      "publication_date": "2026-07-17",
+      "url": "https://climate.ec.europa.eu/areas-action/transport-decarbonisation/reducing-emissions-shipping-sector_en",
+      "evidence_class": "official_legislative_proposal",
+      "scope": {
+        "status": "Proposal announced on 17 July 2026; not adopted as of the 10 November 2026 snapshot.",
+        "maritime_scope": "Includes proposed changes to ETS and maritime monitoring/reporting provisions.",
+        "role": "Versioned future-policy scenario and regulatory delta monitoring."
+      },
+      "limitations": [
+        "Do not model proposal provisions as current binding obligations.",
+        "Use linked legislative proposal text and final adopted law before updating effective rule calculations."
+      ]
     }
   ]
 }
