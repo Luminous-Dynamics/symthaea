@@ -58,6 +58,63 @@ The Rust evaluator reports independent measures:
 
 No single combined confidence score is produced. ECE depends on binning; v0.2 should add pre-registered equal-mass ECE and reliability slope/intercept with interval estimates. Calibration performance should be reported with sample counts and confidence intervals on real held-out tasks.
 
+The Rust qualifier can be run from the repository root:
+
+```bash
+cargo fmt --manifest-path research/ig-confidence-calibration-001/qualifier/Cargo.toml --check
+cargo test --manifest-path research/ig-confidence-calibration-001/qualifier/Cargo.toml
+cargo run --manifest-path research/ig-confidence-calibration-001/qualifier/Cargo.toml -- \
+  research/ig-confidence-calibration-001/CONFIDENCE_EVALUATION_V0_1.json \
+  research/ig-confidence-calibration-001/CONFIDENCE_NEGATIVE_CONTROLS_V0_1.json \
+  research/ig-confidence-calibration-001/CONFIDENCE_EVALUATION_V0_1.schema.json \
+  research/ig-confidence-calibration-001/CONFIDENCE_NEGATIVE_CONTROLS_V0_1.schema.json
+```
+
+## Executable schema contract
+
+The Rust CLI takes both data artifacts and both schema files. It recursively audits the schema trees for unsupported keywords (including optional, currently absent properties), then applies the declared bounded schema subset to the evaluation bundle and negative-control manifest before running the metric and negative-control logic. Additional data fields are rejected where the schema closes the object.
+
+The negative-control mutations are then checked against the semantic validator's expected violation codes. A mutated test case is not reclassified as a valid evaluation; the mutation is only testing that the semantic gate emits the declared failure. The implementation is a bounded subset, not a complete JSON Schema engine.
+
+## Twenty-four deterministic controls
+
+The fixture manifest exercises:
+- self-report versus calibrated status;
+- malformed/missing profile and report commitments;
+- model revision, provider, prompt-family and task-scope mismatch;
+- fit/validation/test overlap and dataset digest reuse;
+- insufficient sample count;
+- unsupported calibration method or scale;
+- missing validator identity/version;
+- duplicate sample IDs and out-of-range probabilities;
+- missing correctness outcomes and unknown test groups;
+- normative-pluralism misuse;
+- altered test-data digest and single-outcome-class evaluation.
+
+## Benchmark arms to add next
+
+On matched task instances, agent count, model/token/tool budget and communication topology compare:
+1. no confidence message;
+2. raw self-reported confidence;
+3. externally calibrated confidence;
+4. shuffled confidence labels (negative control);
+5. adversarial confidence inflation / strategic overclaim;
+6. confidence hidden from peers;
+7. diversity-aware versus homogeneous initial answer sets;
+8. confidence-aware updates versus evidence-only updates.
+
+Confidence-based updates must be compared against evidence-only baselines. A calibrated value is valid only within its registered model/prompt/task scope; out-of-scope requests return NotCalibrated/Unknown.
+
+## Claim ceiling and civic boundary
+
+A PASS means only that the synthetic held-out scoring/provenance implementation meets this bounded contract. It does not demonstrate calibration of any production model, calibration transfer, human confidence calibration, causal improvement in debate, or safe use in real decision-making.
+
+Neither self-reported nor calibrated confidence changes civic base vote weight, rights, eligibility, authority, mandate, credibility or moderation priority. Normative-pluralism tasks are excluded from binary correctness calibration.
+
+The Rust CLI takes both data artifacts and both schema files. It recursively audits the schema trees for unsupported keywords (including optional, currently absent properties), then applies the declared bounded schema subset to the evaluation bundle and negative-control manifest before running the metric and negative-control logic. Additional data fields are rejected where the schema closes the object.
+
+The negative-control mutations are then checked against the semantic validator's expected violation codes. A mutated test case is not reclassified as a valid evaluation; the mutation is only testing that the semantic gate emits the declared failure. The implementation is a bounded subset, not a complete JSON Schema engine.
+
 ## Twenty-four deterministic controls
 
 The fixture manifest exercises:
