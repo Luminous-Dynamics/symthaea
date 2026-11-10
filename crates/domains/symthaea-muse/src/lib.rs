@@ -204,6 +204,8 @@ pub mod synth;
 #[cfg(feature = "theory")]
 pub mod temporal_confirmatory;
 #[cfg(feature = "theory")]
+pub mod midi_performance;
+#[cfg(feature = "theory")]
 pub mod theory_realize;
 pub mod training;
 pub mod training_pairs;
