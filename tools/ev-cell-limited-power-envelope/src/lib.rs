@@ -908,11 +908,16 @@ mod tests {
             .find(|case| case.case_id == "thermal-limited")
             .expect("thermal-limited case");
         let envelope = case.envelope.as_ref().expect("computed envelope");
-        let profile: Profile = serde_json::from_slice(
-            &serde_json::to_vec(
-                &serde_json::from_slice::<Value>(CORPUS).unwrap()["cases"][2]["profile"]
-            ).unwrap()
-        ).unwrap();
+        let corpus_value: Value = serde_json::from_slice(CORPUS).expect("corpus JSON");
+        let thermal_profile = corpus_value["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["case_id"] == "thermal-limited")
+            .expect("thermal-limited fixture")["profile"]
+            .clone();
+        let profile: Profile =
+            serde_json::from_value(thermal_profile).expect("thermal profile");
         for cell in &envelope.cells {
             assert!(envelope.maximum_admissible_current_a
                 <= cell.voltage_limited_current_a + EPSILON);
