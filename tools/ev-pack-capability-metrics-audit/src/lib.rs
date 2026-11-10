@@ -1218,8 +1218,8 @@ mod tests {
     #[test]
     fn frozen_corpus_accepts_six_cases_and_rejects_two_controls() {
         let report = report();
-        assert_eq!(report.payload.case_count, 11);
-        assert_eq!(report.payload.accepted_count, 6);
+        assert_eq!(report.payload.case_count, 12);
+        assert_eq!(report.payload.accepted_count, 7);
         assert_eq!(report.payload.rejected_count, 5);
     }
 
@@ -1318,6 +1318,25 @@ mod tests {
             .remove("qualification");
         let bytes = serde_json::to_vec(&value).expect("mutated corpus");
         assert!(audit_corpus(SCHEMA, &bytes).is_err());
+    }
+
+    #[test]
+    fn heterogeneous_nominal_capacity_keeps_beta_soh_not_computable() {
+        let audited = report();
+        let case = audited.payload.cases.iter()
+            .find(|case| case.case_id == "heterogeneous-nominal-capacity-no-beta-soh")
+            .and_then(|case| case.summary.as_ref())
+            .expect("heterogeneous nominal capacity summary");
+        assert_eq!(
+            case.inconsistency_metrics.beta_soh.status,
+            "NOT_COMPUTABLE"
+        );
+        assert_eq!(
+            case.inconsistency_metrics.beta_soh.reason.as_deref(),
+            Some("HOMOGENEOUS_NOMINAL_CELL_CAPACITY_REQUIRED")
+        );
+        assert_eq!(case.inconsistency_metrics.beta_life.status, "COMPUTED");
+        assert_eq!(case.inconsistency_metrics.beta_soc.status, "COMPUTED");
     }
 
     #[test]
