@@ -15,6 +15,10 @@
 
 use std::fmt;
 
+pub mod characterization;
+
+use characterization::{CharacterizationError, PropulsionCharacterization, PropulsionOperatingPoint};
+
 const STANDARD_GRAVITY_MPS2: f64 = 9.806_65;
 const SECONDS_PER_HOUR: f64 = 3_600.0;
 
@@ -92,7 +96,11 @@ pub struct SegmentResult {
     pub id: String,
     pub phase: FlightPhase,
     pub aerodynamic_drag_n: f64,
+    /// Mechanical shaft power delivered to the propeller after propeller losses.
     pub propulsive_shaft_power_w: f64,
+    pub motor_efficiency_used: f64,
+    pub inverter_efficiency_used: f64,
+    pub propeller_efficiency_used: f64,
     pub battery_power_w: f64,
     pub battery_current_a: f64,
     pub terminal_voltage_v: f64,
@@ -118,6 +126,8 @@ pub struct MissionReport {
     pub minimum_terminal_voltage_v: f64,
     pub maximum_pack_temperature_k: f64,
     pub final_state_of_charge: f64,
+    /// Evidence dataset IDs used by calibrated propulsion maps; empty for scalar mode.
+    pub characterization_evidence_ids: Vec<String>,
     pub segments: Vec<SegmentResult>,
 }
 
@@ -126,6 +136,7 @@ pub enum ModelError {
     InvalidAircraftConfig(&'static str),
     InvalidBatteryConfig(&'static str),
     InvalidPropulsionConfig(&'static str),
+    Characterization(CharacterizationError),
     InvalidMission(&'static str),
     DuplicateSegmentId(String),
     MaximumTakeoffMassExceeded { actual_kg: f64, maximum_kg: f64 },
@@ -145,6 +156,48 @@ impl fmt::Display for ModelError {
 impl std::error::Error for ModelError {}
 
 pub fn evaluate_mission(input: &MissionInput) -> Result<MissionReport, ModelError> {
+    let scalar = PropulsionOperatingPoint {
+        motor_efficiency_used: input.propulsion.motor_efficiency,
+        inverter_efficiency_used: input.propulsion.inverter_efficiency,
+        propeller_efficiency_used: input.propulsion.propeller_efficiency,
+        motor_load_fraction: 0.0,
+        inverter_load_fraction: 0.0,
+        propeller_advance_ratio: 0.0,
+    };
+    evaluate_mission_with_provider(input, |_, _| Ok(scalar), Vec::new())
+}
+
+/// Evaluate a mission using evidence-bound component efficiency maps.
+///
+/// Each map is sampled only inside its characterized domain. Its nominal
+/// efficiency minus the supplied absolute uncertainty bound is used for
+/// energy sizing. This is a conservative screening convention, not a
+/// statistical confidence interval or certification method.
+pub fn evaluate_mission_characterized(
+    input: &MissionInput,
+    characterization: &PropulsionCharacterization,
+) -> Result<MissionReport, ModelError> {
+    characterization.validate().map_err(ModelError::Characterization)?;
+    let evidence_ids = characterization.evidence_ids();
+    evaluate_mission_with_provider(
+        input,
+        |segment, useful_power_w| {
+            characterization
+                .operating_point(segment.true_airspeed_mps, useful_power_w)
+                .map_err(ModelError::Characterization)
+        },
+        evidence_ids,
+    )
+}
+
+fn evaluate_mission_with_provider<F>(
+    input: &MissionInput,
+    mut efficiency_provider: F,
+    characterization_evidence_ids: Vec<String>,
+) -> Result<MissionReport, ModelError>
+where
+    F: FnMut(&MissionSegment, f64) -> Result<PropulsionOperatingPoint, ModelError>,
+{
     validate_input(input)?;
 
     let mass_kg = input.aircraft.empty_mass_kg
@@ -178,10 +231,6 @@ pub fn evaluate_mission(input: &MissionInput) -> Result<MissionReport, ModelErro
     let mut maximum_temperature_k = temperature_k;
     let mut results = Vec::with_capacity(input.segments.len());
 
-    let chain_efficiency = input.propulsion.motor_efficiency
-        * input.propulsion.inverter_efficiency
-        * input.propulsion.propeller_efficiency;
-
     for segment in &input.segments {
         let weight_n = mass_kg * STANDARD_GRAVITY_MPS2;
         // Reduced-order, steady-flight approximation: lift ~= weight and
@@ -191,9 +240,22 @@ pub fn evaluate_mission(input: &MissionInput) -> Result<MissionReport, ModelErro
         let climb_power_w = mass_kg
             * STANDARD_GRAVITY_MPS2
             * segment.climb_rate_mps.max(0.0);
-        let shaft_power_w = aerodynamic_power_w + climb_power_w;
-        let battery_power_w = shaft_power_w / chain_efficiency + segment.auxiliary_power_w;
-        if !battery_power_w.is_finite() {
+        let useful_propulsive_power_w = aerodynamic_power_w + climb_power_w;
+        let operating_point = efficiency_provider(segment, useful_propulsive_power_w)?;
+        let chain_efficiency = operating_point.motor_efficiency_used
+            * operating_point.inverter_efficiency_used
+            * operating_point.propeller_efficiency_used;
+        if !chain_efficiency.is_finite() || chain_efficiency <= 0.0 {
+            return Err(ModelError::InvalidPropulsionConfig(
+                "resolved propulsion efficiency must be finite and positive",
+            ));
+        }
+        let propeller_shaft_power_w =
+            useful_propulsive_power_w / operating_point.propeller_efficiency_used;
+        let battery_power_w = propeller_shaft_power_w
+            / (operating_point.motor_efficiency_used * operating_point.inverter_efficiency_used)
+            + segment.auxiliary_power_w;
+        if !battery_power_w.is_finite() || !propeller_shaft_power_w.is_finite() {
             return Err(ModelError::InvalidMission("computed segment power overflowed"));
         }
 
@@ -273,7 +335,10 @@ pub fn evaluate_mission(input: &MissionInput) -> Result<MissionReport, ModelErro
             id: segment.id.clone(),
             phase: segment.phase,
             aerodynamic_drag_n: drag_n,
-            propulsive_shaft_power_w: shaft_power_w,
+            propulsive_shaft_power_w: propeller_shaft_power_w,
+            motor_efficiency_used: operating_point.motor_efficiency_used,
+            inverter_efficiency_used: operating_point.inverter_efficiency_used,
+            propeller_efficiency_used: operating_point.propeller_efficiency_used,
             battery_power_w,
             battery_current_a: current_a,
             terminal_voltage_v,
@@ -299,7 +364,7 @@ pub fn evaluate_mission(input: &MissionInput) -> Result<MissionReport, ModelErro
     }
 
     Ok(MissionReport {
-        model_version: "electric-fixed-wing-energy-v0.1.0",
+        model_version: "electric-fixed-wing-energy-v0.2.0",
         all_up_mass_kg: mass_kg,
         battery_specific_energy_wh_per_kg: battery.nominal_energy_wh / battery.pack_mass_kg,
         available_energy_to_reserve_wh: available_energy_wh,
@@ -312,6 +377,7 @@ pub fn evaluate_mission(input: &MissionInput) -> Result<MissionReport, ModelErro
         minimum_terminal_voltage_v: minimum_voltage_v,
         maximum_pack_temperature_k,
         final_state_of_charge: soc,
+        characterization_evidence_ids,
         segments: results,
     })
 }
@@ -611,6 +677,90 @@ mod tests {
         let a = evaluate_mission(&low).unwrap();
         let b = evaluate_mission(&high).unwrap();
         assert!(b.energy_required_with_uncertainty_wh > a.energy_required_with_uncertainty_wh);
+    }
+
+    fn propulsion_characterization() -> PropulsionCharacterization {
+        use characterization::{EfficiencyCurve, EfficiencyPoint, EvidenceClass, EvidenceRecord};
+
+        let evidence = |id: &str| EvidenceRecord {
+            id: id.into(),
+            uri: format!("artifact://test/{id}"),
+            sha256: "b".repeat(64),
+            class: EvidenceClass::PhysicalMeasurement,
+            description: "Synthetic unit-test fixture; not physical evidence".into(),
+        };
+        let curve = |id: &str, axis: &str, points: Vec<EfficiencyPoint>| EfficiencyCurve {
+            id: id.into(),
+            x_axis: axis.into(),
+            evidence: evidence(&format!("{id}-evidence")),
+            points,
+        };
+        PropulsionCharacterization {
+            motor_efficiency_by_load: curve(
+                "motor",
+                "shaft_load_fraction",
+                vec![
+                    EfficiencyPoint { x: 0.1, efficiency: 0.92, absolute_uncertainty: 0.01 },
+                    EfficiencyPoint { x: 1.0, efficiency: 0.96, absolute_uncertainty: 0.01 },
+                ],
+            ),
+            inverter_efficiency_by_load: curve(
+                "inverter",
+                "input_load_fraction",
+                vec![
+                    EfficiencyPoint { x: 0.1, efficiency: 0.97, absolute_uncertainty: 0.005 },
+                    EfficiencyPoint { x: 1.0, efficiency: 0.985, absolute_uncertainty: 0.005 },
+                ],
+            ),
+            propeller_efficiency_by_advance_ratio: curve(
+                "propeller",
+                "advance_ratio",
+                vec![
+                    EfficiencyPoint { x: 0.4, efficiency: 0.80, absolute_uncertainty: 0.02 },
+                    EfficiencyPoint { x: 1.0, efficiency: 0.86, absolute_uncertainty: 0.02 },
+                ],
+            ),
+            motor_rated_shaft_power_w: 80_000.0,
+            inverter_rated_input_power_w: 90_000.0,
+            propeller_diameter_m: 1.6,
+            propeller_rpm: 2_400.0,
+        }
+    }
+
+    #[test]
+    fn characterized_mission_uses_conservative_efficiency_bounds_and_records_evidence() {
+        let input = baseline();
+        let characterization = propulsion_characterization();
+        let scalar = evaluate_mission(&input).unwrap();
+        let mapped = evaluate_mission_characterized(&input, &characterization).unwrap();
+
+        assert_eq!(mapped.model_version, "electric-fixed-wing-energy-v0.2.0");
+        assert_eq!(
+            mapped.characterization_evidence_ids,
+            vec!["inverter-evidence", "motor-evidence", "propeller-evidence"]
+        );
+        assert!(mapped.mission_terminal_energy_wh > scalar.mission_terminal_energy_wh);
+        assert!(mapped.segments.iter().all(|segment| {
+            segment.motor_efficiency_used > 0.0
+                && segment.motor_efficiency_used < 1.0
+                && segment.inverter_efficiency_used > 0.0
+                && segment.inverter_efficiency_used < 1.0
+                && segment.propeller_efficiency_used > 0.0
+                && segment.propeller_efficiency_used < 1.0
+        }));
+    }
+
+    #[test]
+    fn characterized_mission_rejects_unmeasured_operating_region() {
+        let input = baseline();
+        let mut characterization = propulsion_characterization();
+        characterization.propeller_rpm = 4_000.0;
+        assert!(matches!(
+            evaluate_mission_characterized(&input, &characterization),
+            Err(ModelError::Characterization(
+                CharacterizationError::OutsideCalibrationDomain { .. }
+            ))
+        ));
     }
 
     #[test]
