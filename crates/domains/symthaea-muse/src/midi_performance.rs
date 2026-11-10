@@ -1073,4 +1073,58 @@ mod tests {
             vec![0, 1, 2]
         );
     }
+
+    #[test]
+    fn rejects_general_midi_program_outside_zero_to_127() {
+        let score = score(vec![note(1, 60, 0, 1, 1, 1, 0.8)]);
+        let timeline = timeline(
+            &score,
+            vec![segment("p1", 1, "inst-a", (0, 1), (1, 1), None)],
+        );
+        let error = export(
+            &score,
+            &timeline,
+            &[capability("inst-a", InstrumentKindV1::Violin)],
+            &[binding("inst-a", 200)],
+        )
+        .expect_err("invalid GM program must fail");
+        assert_eq!(
+            error,
+            MidiPerformanceErrorV1::InvalidInstrumentBinding("inst-a".into())
+        );
+    }
+
+    #[test]
+    fn refuses_more_than_fifteen_simultaneous_pitched_instrument_instances() {
+        let mut notes = Vec::new();
+        let mut segments = Vec::new();
+        let mut instruments = Vec::new();
+        let mut bindings = Vec::new();
+        for index in 0..16u16 {
+            let id = format!("instrument-{index:02}");
+            notes.push(note(index, 60, 0, 1, 1, 1, 0.8));
+            segments.push(segment(
+                &format!("part-{index:02}"),
+                index,
+                &id,
+                (0, 1),
+                (1, 1),
+                None,
+            ));
+            instruments.push(capability(&id, InstrumentKindV1::Violin));
+            bindings.push(binding(&id, index as u8));
+        }
+        let score = score(notes);
+        let timeline = timeline(&score, segments);
+        let error = export(&score, &timeline, &instruments, &bindings)
+            .expect_err("MIDI 1.0 channel capacity must be explicit");
+        assert_eq!(
+            error,
+            MidiPerformanceErrorV1::MidiChannelCapacityExceeded {
+                instrument_count: 16,
+                capacity: 15,
+            }
+        );
+    }
+
 }
