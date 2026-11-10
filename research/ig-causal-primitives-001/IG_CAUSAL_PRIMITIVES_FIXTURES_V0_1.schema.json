@@ -1,0 +1,376 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-causal-primitives-001/IG_CAUSAL_PRIMITIVES_FIXTURES_V0_1.schema.json",
+  "title": "IG-CAUSAL-PRIMITIVES-001 fixture manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "owning_issue",
+    "fixture_count",
+    "primitive_counts",
+    "domain_counts",
+    "tasks",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-causal-primitives-fixtures-v0.1"
+    },
+    "benchmark_id": {
+      "const": "IG-CAUSAL-PRIMITIVES-001"
+    },
+    "status": {
+      "const": "synthetic_known_answer_fixture_bundle_unexecuted"
+    },
+    "owning_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "parent_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "revision_ledger_owner": {
+      "type": "string",
+      "format": "uri"
+    },
+    "communication_graph_owner": {
+      "type": "string",
+      "format": "uri"
+    },
+    "confidence_owner": {
+      "type": "string",
+      "format": "uri"
+    },
+    "budget_owner": {
+      "type": "string",
+      "format": "uri"
+    },
+    "fixture_count": {
+      "const": 48
+    },
+    "primitive_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "causal_prior",
+        "forward_state_tracing",
+        "belief_updating",
+        "agency_sensitivity"
+      ],
+      "properties": {
+        "causal_prior": {
+          "const": 12
+        },
+        "forward_state_tracing": {
+          "const": 12
+        },
+        "belief_updating": {
+          "const": 12
+        },
+        "agency_sensitivity": {
+          "const": 12
+        }
+      }
+    },
+    "domain_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanical_infrastructure",
+        "institutional_resource",
+        "abstract_synthetic"
+      ],
+      "properties": {
+        "mechanical_infrastructure": {
+          "const": 16
+        },
+        "institutional_resource": {
+          "const": 16
+        },
+        "abstract_synthetic": {
+          "const": 16
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 48,
+      "maxItems": 48,
+      "items": {
+        "$ref": "#/$defs/task"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 80
+    }
+  },
+  "$defs": {
+    "scm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scm_id",
+        "nodes"
+      ],
+      "properties": {
+        "scm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "equation"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "equation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "inputs"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "input",
+                "constant",
+                "copy",
+                "not",
+                "and",
+                "or",
+                "xor"
+              ]
+            },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "value": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "prior_weight",
+        "scm"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prior_weight": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scm": {
+          "$ref": "#/$defs/scm"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "interventions",
+        "observed"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "observational",
+            "interventional"
+          ]
+        },
+        "interventions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "observed": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "primitive",
+        "domain",
+        "pair_id",
+        "task_input",
+        "oracle"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primitive": {
+          "enum": [
+            "causal_prior",
+            "forward_state_tracing",
+            "belief_updating",
+            "agency_sensitivity"
+          ]
+        },
+        "domain": {
+          "enum": [
+            "mechanical_infrastructure",
+            "institutional_resource",
+            "abstract_synthetic"
+          ]
+        },
+        "pair_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "task_input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "prompt",
+            "narrative"
+          ],
+          "properties": {
+            "prompt": {
+              "type": "string",
+              "minLength": 20
+            },
+            "narrative": {
+              "type": "string",
+              "minLength": 20
+            },
+            "scm": {
+              "$ref": "#/$defs/scm"
+            },
+            "interventions": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "hypotheses": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "items": {
+                "$ref": "#/$defs/hypothesis"
+              }
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/evidence"
+              }
+            },
+            "framing_variant": {
+              "type": "string"
+            }
+          }
+        },
+        "oracle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scm",
+            "scm_sha256"
+          ],
+          "properties": {
+            "scm": {
+              "$ref": "#/$defs/scm"
+            },
+            "scm_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "expected_edges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "expected_motifs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "expected_state": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "posterior_numerators": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "posterior_denominator": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}
