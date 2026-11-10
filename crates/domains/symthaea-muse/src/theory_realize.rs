@@ -2306,7 +2306,11 @@ mod tests {
         }
     }
 
-    fn rubato_score_with_phrase_start(at_beat: f64) -> TheoryScore {
+    fn rubato_score_with_event(
+        onset_beats: f64,
+        duration_beats: f64,
+        emphasis: Emphasis,
+    ) -> TheoryScore {
         let mut score = TheoryScore::new(
             symthaea_music_theory::harmony::Key::major(PitchClass::C),
             120.0,
@@ -2316,53 +2320,67 @@ mod tests {
             part: symthaea_music_theory::score::PartId(0),
             pitch: symthaea_music_theory::pitch::Pitch::new(PitchClass::C, 4),
             onset: symthaea_music_theory::rhythm::Duration::new(
-                (at_beat * 2.0).round() as i64,
+                (onset_beats * 2.0).round() as i64,
                 2,
             ),
-            duration: symthaea_music_theory::rhythm::Duration::quarter(),
+            duration: symthaea_music_theory::rhythm::Duration::new(
+                (duration_beats * 2.0).round() as i64,
+                2,
+            ),
             velocity: 0.7,
             role: TheoryRole::Melody,
-            emphasis: Emphasis::PhraseStart,
+            emphasis,
             section_intensity: 1.0,
         });
         score
     }
 
     #[test]
-    fn swung_rubato_pause_begins_at_its_authored_score_boundary() {
-        let score = rubato_score_with_phrase_start(1.5);
+    fn swung_rubato_pauses_begin_at_their_authored_score_boundaries() {
         let swing = 2.0 / 3.0;
-        let timeline = Timeline {
-            rubato: Rubato::from_score_with_dialect_and_swing(
-                &score,
-                PerformanceDialect::ClassicalRubato,
+        let cases = [
+            (1.5, 0.5, Emphasis::PhraseStart, 0.10),
+            (1.0, 0.5, Emphasis::Climax, 0.18),
+            (1.0, 0.5, Emphasis::Cadential, 0.9),
+        ];
+        for (onset, duration, emphasis, delay_in_beats) in cases {
+            let score = rubato_score_with_event(onset, duration, emphasis);
+            let boundary = if emphasis == Emphasis::PhraseStart {
+                onset
+            } else {
+                onset + duration
+            };
+            let timeline = Timeline {
+                rubato: Rubato::from_score_with_dialect_and_swing(
+                    &score,
+                    PerformanceDialect::ClassicalRubato,
+                    swing,
+                ),
                 swing,
-            ),
-            swing,
-        };
-        let spb = 60.0 / score.tempo_bpm as f64;
+            };
+            let spb = 60.0 / score.tempo_bpm as f64;
 
-        // At score beat 1.25 the swung coordinate reaches 1.5, but the
-        // authored phrase boundary is 1.5 and must not activate early.
-        let before_boundary = timeline.seconds(1.25) as f64;
-        let expected_before = swing_beat(1.25, swing) * spb;
-        assert!(
-            (before_boundary - expected_before).abs() < 1e-6,
-            "pause activated before its authored score beat: got {before_boundary}, expected {expected_before}"
-        );
+            // At 1.25, the old code's pre-swing pause threshold (1.5)
+            // would already have fired. The corrected map must not.
+            let before_boundary = timeline.seconds(1.25) as f64;
+            let expected_before = swing_beat(1.25, swing) * spb;
+            assert!(
+                (before_boundary - expected_before).abs() < 1e-6,
+                "{emphasis:?} pause activated before its authored score beat: got {before_boundary}, expected {expected_before}"
+            );
 
-        // At the exact phrase boundary, the structural breath is applied.
-        let at_boundary = timeline.seconds(1.5) as f64;
-        let expected_at = swing_beat(1.5, swing) * spb + 0.10 * spb;
-        assert!(
-            (at_boundary - expected_at).abs() < 1e-6,
-            "phrase pause missing or mistimed: got {at_boundary}, expected {expected_at}"
-        );
+            let at_boundary = timeline.seconds(boundary) as f64;
+            let expected_at = swing_beat(boundary, swing) * spb + delay_in_beats * spb;
+            assert!(
+                (at_boundary - expected_at).abs() < 1e-6,
+                "{emphasis:?} pause missing or mistimed: got {at_boundary}, expected {expected_at}"
+            );
+        }
     }
 
     #[test]
     fn straight_swing_preserves_legacy_rubato_coordinates() {
-        let score = rubato_score_with_phrase_start(1.5);
+        let score = rubato_score_with_event(1.5, 0.5, Emphasis::PhraseStart);
         let legacy = Rubato::from_score_with_dialect(
             &score,
             PerformanceDialect::ClassicalRubato,
