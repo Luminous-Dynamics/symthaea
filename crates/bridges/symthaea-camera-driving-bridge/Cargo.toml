@@ -13,3 +13,7 @@ sha2 = { workspace = true }
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-vehicle = { path = "../../domains/symthaea-vehicle" }
 symthaea-vision-manifold = { path = "../../domains/symthaea-vision-manifold" }
+
+[[bin]]
+name = "camera-driving-bridge"
+path = "src/bin/camera_driving_bridge.rs"
