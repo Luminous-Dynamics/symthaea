@@ -151,6 +151,54 @@ impl Default for ExactPolynomialLieProfileV1 {
     }
 }
 
+/// Typed failure from exact polynomial checking against an admitted linear action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LinearActionPolynomialErrorV1 {
+    InvalidProfile,
+    UnsupportedExpression,
+    ResourceLimitExceeded,
+}
+
+/// Exact Lie-derivative result for one declared infinitesimal generator.
+///
+/// A residual term count of zero means the exact polynomial derivative is
+/// identically zero under the declared IEEE-754-dyadic coefficient policy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LinearActionGeneratorLieResultV1 {
+    pub generator_id: String,
+    pub residual_term_count: usize,
+}
+
+/// Exact polynomial invariance report for a supplied, metric-admitted linear action.
+///
+/// This qualifies invariance under each declared infinitesimal generator. It does
+/// not prove that the generators are independent, form a closed Lie algebra,
+/// integrate to a globally defined subgroup, or describe a physical symmetry.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LinearActionPolynomialReportV1 {
+    pub action_id: String,
+    pub coordinate_basis_id: String,
+    pub coordinate_names: Vec<String>,
+    /// Variables present in the expression, followed by any declared action
+    /// coordinates absent from the expression.
+    pub expression_variables: Vec<String>,
+    /// True when the parsed expression is constant in all included variables.
+    pub constant_expression: bool,
+    pub profile: ExactPolynomialLieProfileV1,
+    pub generator_results: Vec<LinearActionGeneratorLieResultV1>,
+}
+
+impl LinearActionPolynomialReportV1 {
+    /// Whether the exact Lie derivative is zero for every declared generator.
+    pub fn invariant_under_every_generator(&self) -> bool {
+        !self.generator_results.is_empty()
+            && self
+                .generator_results
+                .iter()
+                .all(|result| result.residual_term_count == 0)
+    }
+}
+
 /// Outcome of the bounded exact-polynomial parser and Lie-derivative search.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExactPolynomialSearchStatus {
@@ -927,6 +975,134 @@ fn polynomial_depends_on_variable(polynomial: &ExactPolynomial, variable_index: 
         .keys()
         .any(|monomial| monomial.get(variable_index).is_some_and(|power| *power > 0))
 }
+fn exact_polynomial_linear_action_lie_derivative(
+    polynomial: &ExactPolynomial,
+    variable_names: &[String],
+    coordinate_names: &[String],
+    generator: &crate::linear_group_action::LinearGeneratorV1,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut residual = ExactPolynomial::new();
+
+    for (row_index, generator_row) in generator.matrix.iter().enumerate() {
+        let row_variable = variable_names
+            .iter()
+            .position(|name| name == &coordinate_names[row_index])
+            .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+        let derivative = polynomial_derivative(polynomial, row_variable, profile)?;
+
+        for (column_index, matrix_entry) in generator_row.iter().enumerate() {
+            let coefficient = ExactRational::from_f64(
+                *matrix_entry,
+                profile.maximum_dyadic_denominator_power,
+            )
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+            if coefficient.is_zero() {
+                continue;
+            }
+            let column_variable = variable_names
+                .iter()
+                .position(|name| name == &coordinate_names[column_index])
+                .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+            let term = polynomial_multiply_variable(&derivative, column_variable, profile)?;
+            for (monomial, term_coefficient) in &term {
+                let scaled_coefficient = term_coefficient
+                    .checked_mul(coefficient)
+                    .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+                polynomial_add_term(
+                    &mut residual,
+                    monomial.clone(),
+                    scaled_coefficient,
+                    profile,
+                )?;
+            }
+        }
+    }
+
+    Ok(residual)
+}
+
+/// Check exact polynomial invariance under every generator of an already admitted action.
+///
+/// The expression variables are collected in first-seen order. Declared action
+/// coordinates not referenced by the expression are appended, so the matrix
+/// representation and polynomial exponent vectors always share one explicit
+/// variable ordering. Other expression variables remain fixed parameters.
+pub fn check_exact_linear_action_invariance(
+    expr: &Expr,
+    action: &AdmittedLinearGroupActionV1,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<LinearActionPolynomialReportV1, LinearActionPolynomialErrorV1> {
+    if profile.maximum_variables == 0
+        || profile.maximum_terms == 0
+        || profile.maximum_term_products == 0
+        || profile.maximum_total_degree == 0
+        || profile.maximum_power == 0
+        || profile.maximum_dyadic_denominator_power > 126
+    {
+        return Err(LinearActionPolynomialErrorV1::InvalidProfile);
+    }
+
+    let declaration = action.action();
+    let mut variable_names = Vec::new();
+    collect_var_names(expr, &mut variable_names);
+    for coordinate_name in &declaration.coordinate_names {
+        if !variable_names.contains(coordinate_name) {
+            variable_names.push(coordinate_name.clone());
+        }
+    }
+    if variable_names.len() > profile.maximum_variables {
+        return Err(LinearActionPolynomialErrorV1::ResourceLimitExceeded);
+    }
+
+    let polynomial = parse_exact_polynomial(expr, &variable_names, profile).map_err(|error| {
+        match error {
+            ExactPolynomialError::UnsupportedExpression => {
+                LinearActionPolynomialErrorV1::UnsupportedExpression
+            }
+            ExactPolynomialError::ResourceLimitExceeded => {
+                LinearActionPolynomialErrorV1::ResourceLimitExceeded
+            }
+        }
+    })?;
+    let constant_expression = polynomial
+        .keys()
+        .all(|monomial| monomial.iter().all(|exponent| *exponent == 0));
+
+    let mut generator_results = Vec::with_capacity(declaration.generators.len());
+    for generator in &declaration.generators {
+        let residual = exact_polynomial_linear_action_lie_derivative(
+            &polynomial,
+            &variable_names,
+            &declaration.coordinate_names,
+            generator,
+            profile,
+        )
+        .map_err(|error| match error {
+            ExactPolynomialError::UnsupportedExpression => {
+                LinearActionPolynomialErrorV1::UnsupportedExpression
+            }
+            ExactPolynomialError::ResourceLimitExceeded => {
+                LinearActionPolynomialErrorV1::ResourceLimitExceeded
+            }
+        })?;
+        generator_results.push(LinearActionGeneratorLieResultV1 {
+            generator_id: generator.id.clone(),
+            residual_term_count: residual.len(),
+        });
+    }
+
+    Ok(LinearActionPolynomialReportV1 {
+        action_id: declaration.action_id.clone(),
+        coordinate_basis_id: declaration.coordinate_basis_id.clone(),
+        coordinate_names: declaration.coordinate_names.clone(),
+        expression_variables: variable_names,
+        constant_expression,
+        profile,
+        generator_results,
+    })
+}
+
 /// Exact Lie derivative for the SO(n) generator with δx_i=-x_j, δx_j=x_i.
 fn exact_polynomial_lie_derivative_is_zero(
     polynomial: &ExactPolynomial,
