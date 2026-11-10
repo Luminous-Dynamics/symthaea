@@ -24,6 +24,7 @@ The three methods are not interchangeable. CEMS/test-bed/onboard observations ca
 The initial v0.1.0 contract is committed at:
 - `marine-emissions-evidence-v0.1.0.schema.json`
 - `fixtures/synthetic-gas-emissions-v0.1.0.json`
+- `marine-emissions-evidence-v0.2.0.schema.json` and `fixtures/synthetic-gas-emissions-v0.2.0.json`
 
 It requires:
 - vessel configuration and engine identity/revision/rated power/fuel;
@@ -37,6 +38,10 @@ It requires:
 An unmeasured gas is not a numeric zero. Unknown uncertainty remains unknown. Digests identify supplied bytes; they do not establish measurement authenticity.
 
 The first Rust audit binary is `marine-emissions-evidence-audit` under the standalone validator crate. It performs schema validation, method/resolution mapping, measured-vs-calculated evidence compatibility, engine identity/load domain checks, sample/timebase consistency, calibration disposition and expected-gas completeness checks. Its disposition ceiling is evidence-contract integrity only.
+
+### 2.1 v0.2.0: matched WAPS operating context
+
+The backwards-compatible v0.2.0 schema/fixture adds service fingerprint, case/voyage/route-segment identity, propulsion and loading state, vessel speed through water, true/apparent wind, waves/current, WAPS installation state and per-device commanded versus achieved state. This connects gas-specific observations to the causal treatment definition without inferring achieved state from a controller command. If command and achieved state differ, the record remains visible as non-adherence; intention-to-treat and treatment-on-treated analyses must remain distinct. The operating context is a source-linked observation, not a substitute for the causal protocol in [#11493](https://github.com/Luminous-Dynamics/symthaea/issues/11493).
 
 ## 3. Falsifiable programme
 
