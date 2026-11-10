@@ -110,3 +110,26 @@ scenario_id scenario_family task_id trial_id seed split evidence_class arm progr
 The fields are tab-separated, in the exact order above. Numeric measurements may use `NA` only when unmeasured; the audit leaves them missing rather than treating them as zero. Every scenario/seed/split/evidence group must contain exactly one row for all five arms. Progress and completion must agree; acquisitions cannot exceed requests; probabilities and measurements are validated for finite ranges. Any declared safety violation produces a failed qualification result but remains in the printed ledger.
 
 The audit prints per-arm valid-run/completion/progress/calibration/resource metrics and paired candidate-minus-fixed-rate comparisons. Progress uncertainty is bootstrapped by scenario family, not individual rows. Fewer than five families or fewer than 100 replicates suppresses the interval; this is a screening limitation, not evidence of equivalence. The included 30-row example is synthetic arithmetic smoke data only. It demonstrates parsing, pairing, missing-cost handling and report formatting; it is not a RoboDojo score.
+
+## Distributionally robust active sensing (stacked research module)
+
+The additive module `src/robust_active_sensing.rs` extends the point-estimate `active_sensing.rs` rule without changing its v0 API. It requires calibrated probability intervals for current and post-sensing success/risk forecasts, plus upper-bound energy and latency costs. Every forecast is bound to a non-empty calibration profile, model, task protocol, evaluation domain, calibration split and separate evaluation split.
+
+The robust objective is:
+
+```text
+LCB(VOI) = min utility after sensing
+          - max utility before sensing
+          - upper-bound sensing resource cost
+```
+
+For the monotone declared utility, the minimum after-sensing utility uses the lower success bound and upper unsafe-event bound; maximum before-sensing utility uses the upper success bound and lower unsafe-event bound. The hard risk gate uses the upper unsafe-event bound, never the midpoint. If the current lower success bound or upper risk bound violates a declared continuation gate, only a candidate that restores the bound and fits the resource budget can be selected; otherwise the result is StopAndEscalate. Optional sensing is selected only when its conservative LCB meets the frozen benefit threshold. Multiple sensor options are compared under the same budget and ties are broken deterministically by sensor ID.
+
+Run after the stacked PR is composed with this branch:
+
+```sh
+cargo test --locked --manifest-path experiments/robodojo-contract/Cargo.toml robust_active_sensing
+cargo clippy --locked --manifest-path experiments/robodojo-contract/Cargo.toml --all-targets -- -D warnings
+```
+
+These intervals are structural inputs, not evidence that calibration coverage is valid. Calibration coverage, domain-shift performance and resource bounds must be measured on disjoint data and preserved in the experiment ledger. The robust module emits a sensing recommendation only; it cannot issue movement commands or grant controller authority. See [ROB-SENSE-ROBUST-001](https://github.com/Luminous-Dynamics/symthaea/issues/11338). The module is developed in a stacked draft PR and does not replace this PR's point-estimate implementation.
