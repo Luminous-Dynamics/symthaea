@@ -41,6 +41,8 @@ pub struct LinearActionSamplingProfileV1 {
     pub squared_cosine_tolerance: f64,
     /// Maximum number of frozen sample states in one evaluation.
     pub maximum_samples: usize,
+    /// Maximum number of expression variables, including action coordinates.
+    pub maximum_expression_variables: usize,
     /// Minimum informative samples required for every generator.
     pub minimum_informative_samples: usize,
     /// Maximum allowed spectral condition number of each direction basis.
@@ -50,6 +52,8 @@ pub struct LinearActionSamplingProfileV1 {
 /// Hard ceiling independent of caller configuration. This prevents a profile
 /// from accidentally removing the sampling resource bound entirely.
 const HARD_MAX_LINEAR_ACTION_SAMPLES: usize = 4096;
+const HARD_MAX_LINEAR_ACTION_EXPRESSION_VARIABLES: usize = 512;
+const HARD_MAX_DIRECTION_BASIS_CONDITION: f64 = 1e12;
 
 impl Default for LinearActionSamplingProfileV1 {
     fn default() -> Self {
@@ -57,6 +61,7 @@ impl Default for LinearActionSamplingProfileV1 {
             finite_difference_step: 1e-5,
             squared_cosine_tolerance: 1e-6,
             maximum_samples: 256,
+            maximum_expression_variables: 64,
             minimum_informative_samples: 8,
             maximum_direction_basis_condition: 1e8,
         }
@@ -400,10 +405,13 @@ pub fn evaluate_linear_action_samples(
         || !(0.0..=1.0).contains(&profile.squared_cosine_tolerance)
         || profile.maximum_samples == 0
         || profile.maximum_samples > HARD_MAX_LINEAR_ACTION_SAMPLES
+        || profile.maximum_expression_variables == 0
+        || profile.maximum_expression_variables > HARD_MAX_LINEAR_ACTION_EXPRESSION_VARIABLES
         || profile.minimum_informative_samples == 0
         || profile.minimum_informative_samples > profile.maximum_samples
         || !profile.maximum_direction_basis_condition.is_finite()
         || profile.maximum_direction_basis_condition < 1.0
+        || profile.maximum_direction_basis_condition > HARD_MAX_DIRECTION_BASIS_CONDITION
     {
         return Err(LinearActionSamplingErrorV1::InvalidProfile);
     }
@@ -425,6 +433,9 @@ pub fn evaluate_linear_action_samples(
         if !variable_names.contains(coordinate_name) {
             variable_names.push(coordinate_name.clone());
         }
+    }
+    if variable_names.len() > profile.maximum_expression_variables {
+        return Err(LinearActionSamplingErrorV1::InvalidProfile);
     }
     let mut action_coordinate_indices = Vec::with_capacity(dimension);
     for coordinate_name in &declaration.coordinate_names {
@@ -599,10 +610,6 @@ mod tests {
 
     fn add(left: Expr, right: Expr) -> Expr {
         Expr::BinOp(BinOp::Add, Box::new(left), Box::new(right))
-    }
-
-    fn sub(left: Expr, right: Expr) -> Expr {
-        Expr::BinOp(BinOp::Sub, Box::new(left), Box::new(right))
     }
 
     fn mul(left: Expr, right: Expr) -> Expr {
@@ -882,6 +889,25 @@ mod tests {
                 sampling_profile()
             ),
             Err(LinearActionSamplingErrorV1::InsufficientInformativeSamples { .. })
+        ));
+    }
+
+    #[test]
+    fn sampled_linear_action_rejects_expression_variable_budget_excess() {
+        let states = [[0.7, 1.1], [1.2, 0.8], [1.7, 2.1], [2.3, 1.4]];
+        let profile = LinearActionSamplingProfileV1 {
+            maximum_expression_variables: 1,
+            minimum_informative_samples: 1,
+            ..sampling_profile()
+        };
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &add(square("x"), square("y")),
+                &canonical_action(),
+                &samples(&states, [[1.0, 0.0], [0.0, 1.0]]),
+                profile
+            ),
+            Err(LinearActionSamplingErrorV1::InvalidProfile)
         ));
     }
 
