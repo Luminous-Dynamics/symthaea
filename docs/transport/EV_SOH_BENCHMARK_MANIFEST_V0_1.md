@@ -51,7 +51,7 @@ Bind source commit, dependency-lock digest, toolchain and digest, hardware, seed
 
 ## Frozen corpus
 
-Six synthetic software cases: clean unseen-cell; shared-cell leakage in unseen-cell; validation/test-label preprocessing leakage; valid same-cell temporal; duplicate sample identity across splits; explicit label-free target adaptation. These fixtures test protocol gates only and are not physical battery evidence.
+Fifteen synthetic software cases: clean unseen-cell; shared-cell leakage in unseen-cell; validation/test-label preprocessing leakage; valid same-cell temporal; duplicate sample identity across splits; explicit label-free target adaptation; zero-budget target adaptation; aggregation/group-level mismatch; valid fixed predeclared transform; late predeclaration; metric strata outside the test groups; metric stratum count mismatch; incorrect aggregate value; train-only uncertainty calibration; and reported uncertainty without held-out domain coverage. Four manifests are accepted and eleven adversarial controls rejected. These fixtures test protocol gates only and are not physical battery evidence.
 
 ## Benchmark tournament
 
