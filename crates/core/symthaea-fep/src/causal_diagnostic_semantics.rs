@@ -202,7 +202,7 @@ pub fn compute_action_likelihood_table_digest(
     ordered.sort_by(|left, right| left.id.cmp(&right.id));
 
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea-action-likelihood-table-v1\\0");
+    hasher.update(b"symthaea-action-likelihood-table-v1\0");
     hasher.update(&(ordered.len() as u64).to_le_bytes());
     hasher.update(&(outcome_count as u64).to_le_bytes());
     for hypothesis in ordered {
