@@ -1186,11 +1186,13 @@ fn exact_polynomial_vector_field_generator_residual(
 ) -> Result<Vec<ExactPolynomial>, ExactPolynomialError> {
     let mut component_residuals = Vec::with_capacity(coordinate_names.len());
 
-    for (output_index, output_component) in components.iter().enumerate() {
+    for ((output_index, output_component), generator_row) in
+        components.iter().enumerate().zip(generator.matrix.iter())
+    {
         let mut residual = ExactPolynomial::new();
 
         // First term: D F(x) * (A x).
-        for (action_row, coordinate_name) in coordinate_names.iter().enumerate() {
+        for (coordinate_name, action_row) in coordinate_names.iter().zip(generator.matrix.iter()) {
             let coordinate_index = variable_names
                 .iter()
                 .position(|name| name == coordinate_name)
@@ -1199,9 +1201,7 @@ fn exact_polynomial_vector_field_generator_residual(
             let derivative =
                 polynomial_derivative(output_component, coordinate_index, profile)?;
 
-            for (state_column, matrix_entry) in
-                generator.matrix[action_row].iter().enumerate()
-            {
+            for (state_column, matrix_entry) in action_row.iter().enumerate() {
                 let coefficient = ExactRational::from_f64(
                     *matrix_entry,
                     profile.maximum_dyadic_denominator_power,
@@ -1233,9 +1233,7 @@ fn exact_polynomial_vector_field_generator_residual(
         }
 
         // Second term: subtract (A F(x))_output_index.
-        for (field_index, matrix_entry) in
-            generator.matrix[output_index].iter().enumerate()
-        {
+        for (field_component, matrix_entry) in components.iter().zip(generator_row.iter()) {
             let coefficient = ExactRational::from_f64(
                 *matrix_entry,
                 profile.maximum_dyadic_denominator_power,
@@ -1246,10 +1244,10 @@ fn exact_polynomial_vector_field_generator_residual(
             }
             charge_exact_polynomial_operations(
                 operation_count,
-                components[field_index].len(),
+                field_component.len(),
                 profile,
             )?;
-            for (monomial, term_coefficient) in &components[field_index] {
+            for (monomial, term_coefficient) in field_component {
                 let scaled_coefficient = term_coefficient
                     .checked_mul(coefficient)
                     .and_then(ExactRational::checked_neg)
@@ -1263,7 +1261,7 @@ fn exact_polynomial_vector_field_generator_residual(
             }
         }
 
-        component_residuals.push(residual);
+            component_residuals.push(residual);
     }
 
     Ok(component_residuals)
