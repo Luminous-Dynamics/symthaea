@@ -5864,6 +5864,45 @@ mod tests {
         );
     }
 
+    #[test]
+    fn period_form_part_identity_is_complete_across_all_builtin_style_specs() {
+        // Hold the form family constant so every style is exercised through
+        // the same general period-form composer. This isolates style-DNA
+        // transformations from dedicated grammar engines, which qualify
+        // their own source-part identity in separate work.
+        for style in crate::style::Style::ALL {
+            let mut spec = style.spec();
+            spec.form_pool = vec![crate::spec::FormKind::Ternary];
+            spec.validate().expect("each built-in style spec must accept a ternary period form");
+
+            for seed in [0u64, 41u64] {
+                let intent = MusicalIntent {
+                    seed,
+                    ..MusicalIntent::default()
+                };
+                let score = compose_with_spec(&intent, &spec);
+                assert!(
+                    score.has_part_identity(),
+                    "{style:?} seed {seed} emitted a note without source identity"
+                );
+                assert!(
+                    score.notes.iter().all(|note| match note.role {
+                        VoiceRole::Melody => note.part == GENERAL_MELODY_PART_V1,
+                        VoiceRole::Bass => note.part == GENERAL_BASS_PART_V1,
+                        VoiceRole::Harmony => {
+                            note.part == GENERAL_HARMONY_PART_V1
+                                || note.part == GENERAL_GRIEF_SUSPENSION_PART_V1
+                        }
+                        VoiceRole::CounterMelody => {
+                            note.part == GENERAL_COUNTERMELODY_PART_V1
+                        }
+                    }),
+                    "{style:?} seed {seed} changed the declared PartId-to-VoiceRole mapping"
+                );
+            }
+        }
+    }
+
     /// Regression test for the counter-melody overlap bugs fixed in
     /// `apply_counter_hook_echoes` and `DamageDevice::CounterShift`: a
     /// 300-seed sweep of `Style::Classical`'s default composition — the
