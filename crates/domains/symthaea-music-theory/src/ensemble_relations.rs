@@ -560,6 +560,57 @@ mod tests {
     }
 
     #[test]
+    fn exact_half_open_boundary_allows_silence_after_a_note_ends() {
+        let score = score();
+        let mut silence = relation(EnsembleRelationKindV1::PlannedSilence);
+        silence.part_a = 1;
+        silence.start = RelationBeatV1 { numerator: 2, denominator: 1 };
+        silence.end = RelationBeatV1 { numerator: 4, denominator: 1 };
+        let report = validate_ensemble_relations(&score, &timeline(vec![silence]), &digest());
+        assert!(report.valid, "{:?}", report.issues);
+    }
+
+    #[test]
+    fn rejects_missing_partner_and_self_relationships() {
+        let score = score();
+        let mut missing = relation(EnsembleRelationKindV1::Counterpoint);
+        missing.part_b = None;
+        let mut self_edge = relation(EnsembleRelationKindV1::Imitation);
+        self_edge.part_b = Some(self_edge.part_a);
+        self_edge.id = "self-edge".into();
+        let report = validate_ensemble_relations(
+            &score,
+            &timeline(vec![missing, self_edge]),
+            &digest(),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == EnsembleRelationIssueCodeV1::MissingSecondPart
+        }));
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == EnsembleRelationIssueCodeV1::SelfRelation
+        }));
+    }
+
+    #[test]
+    fn rejects_duplicate_relation_ids_and_empty_material_ids() {
+        let score = score();
+        let first = relation(EnsembleRelationKindV1::Doubling);
+        let mut second = relation(EnsembleRelationKindV1::Canon);
+        second.material_id = Some("   ".into());
+        let report = validate_ensemble_relations(
+            &score,
+            &timeline(vec![first, second]),
+            &digest(),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == EnsembleRelationIssueCodeV1::DuplicateRelationId
+        }));
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == EnsembleRelationIssueCodeV1::EmptyMaterialId
+        }));
+    }
+
+    #[test]
     fn rejects_a_relationship_that_claims_a_second_part_for_silence() {
         let mut silence = relation(EnsembleRelationKindV1::PlannedSilence);
         silence.part_b = Some(2);
