@@ -73,7 +73,7 @@ As of 10 November 2026, the IMO Net-Zero Framework had not yet completed formal 
 
 ## 3. Core architecture: a versioned regulatory evidence graph
 
-A first machine-readable snapshot is committed at [`marine-regulatory-rule-register-2026-11-10.json`](./marine-regulatory-rule-register-2026-11-10.json), with the Draft 2020-12 contract at [`marine-regulatory-rule-register-v0.1.0.schema.json`](./marine-regulatory-rule-register-v0.1.0.schema.json). The standalone `marine-regulatory-rule-audit` Rust binary checks the snapshot's schema, date/status consistency, unique identities and source-reference resolution. This is a register integrity check, not a legal applicability engine.
+A first machine-readable snapshot is retained at [`marine-regulatory-rule-register-2026-11-10.json`](./marine-regulatory-rule-register-2026-11-10.json), with its v0.1.0 Draft 2020-12 contract. The corrected current snapshot is [`marine-regulatory-rule-register-2026-11-10-v0.2.0.json`](./marine-regulatory-rule-register-2026-11-10-v0.2.0.json), with schema [`marine-regulatory-rule-register-v0.2.0.schema.json`](./marine-regulatory-rule-register-v0.2.0.schema.json). The standalone `marine-regulatory-rule-audit` checks date/status consistency and source references. This is a register integrity check, not a legal applicability engine.
 
 Each rule record should bind:
 
