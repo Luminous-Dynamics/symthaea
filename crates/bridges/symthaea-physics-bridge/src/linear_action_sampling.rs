@@ -43,6 +43,8 @@ pub struct LinearActionSamplingProfileV1 {
     pub maximum_samples: usize,
     /// Maximum number of expression variables, including action coordinates.
     pub maximum_expression_variables: usize,
+    /// Maximum estimated AST node evaluations across the complete sample batch.
+    pub maximum_expression_evaluation_cost: usize,
     /// Minimum informative samples required for every generator.
     pub minimum_informative_samples: usize,
     /// Maximum allowed spectral condition number of each direction basis.
@@ -55,6 +57,8 @@ pub struct LinearActionSamplingProfileV1 {
 /// from accidentally removing the sampling resource bound entirely.
 const HARD_MAX_LINEAR_ACTION_SAMPLES: usize = 4096;
 const HARD_MAX_LINEAR_ACTION_EXPRESSION_VARIABLES: usize = 512;
+const HARD_MAX_LINEAR_ACTION_DIMENSION: usize = 32;
+const HARD_MAX_EXPRESSION_EVALUATION_COST: usize = 50_000_000;
 const HARD_MAX_DIRECTION_BASIS_CONDITION: f64 = 1e12;
 
 impl Default for LinearActionSamplingProfileV1 {
@@ -64,6 +68,7 @@ impl Default for LinearActionSamplingProfileV1 {
             squared_cosine_tolerance: 1e-6,
             maximum_samples: 256,
             maximum_expression_variables: 64,
+            maximum_expression_evaluation_cost: 10_000_000,
             minimum_informative_samples: 8,
             maximum_direction_basis_condition: 1e8,
             maximum_directional_reconstruction_relative_residual: 1e-8,
@@ -79,6 +84,9 @@ pub struct LinearActionGeneratorSampleStatisticsV1 {
     pub informative_sample_count: usize,
     pub skipped_sample_count: usize,
     pub mean_normalized_squared_residual: f64,
+    pub median_normalized_squared_residual: f64,
+    pub p95_normalized_squared_residual: f64,
+    pub standard_deviation_normalized_squared_residual: f64,
     pub maximum_normalized_squared_residual: f64,
     pub within_tolerance: bool,
     pub sample_residuals: Vec<LinearActionSampleResidualV1>,
@@ -106,6 +114,16 @@ pub struct LinearActionSampledInvarianceReportV1 {
     pub action_id: String,
     pub coordinate_basis_id: String,
     pub profile: LinearActionSamplingProfileV1,
+    /// BLAKE3 of the canonical expression AST encoding; identifier, not a signature.
+    pub expression_blake3: String,
+    /// BLAKE3 of the exact action declaration, including metric and generators.
+    pub declared_action_blake3: String,
+    /// BLAKE3 of ordered sample IDs, states and finite-difference directions.
+    pub sample_batch_blake3: String,
+    /// BLAKE3 of the complete sampling profile.
+    pub sampling_profile_blake3: String,
+    /// Conservative upper bound on AST node evaluations for this batch.
+    pub estimated_expression_evaluation_cost: usize,
     pub sample_ids: Vec<String>,
     pub direction_basis_diagnostics: Vec<LinearActionSampleConditionDiagnosticV1>,
     pub generator_statistics: Vec<LinearActionGeneratorSampleStatisticsV1>,
@@ -135,6 +153,8 @@ pub enum LinearActionSamplingErrorV1 {
         expected: usize,
         actual: usize,
     },
+    ActionDimensionLimitExceeded { actual: usize, maximum: usize },
+    ExpressionEvaluationBudgetExceeded { estimated: usize, maximum: usize },
     NonFiniteState { sample_id: String, index: usize },
     DirectionBasisDimensionMismatch {
         sample_id: String,
@@ -152,6 +172,12 @@ pub enum LinearActionSamplingErrorV1 {
         direction_index: usize,
         coordinate_index: usize,
     },
+    NonFinitePerturbation {
+        sample_id: String,
+        direction_index: usize,
+        coordinate_index: usize,
+    },
+    ZeroDisplacementDirection { sample_id: String, direction_index: usize },
     ZeroDirectionBasis { sample_id: String },
     DirectionBasisIllConditioned {
         sample_id: String,
