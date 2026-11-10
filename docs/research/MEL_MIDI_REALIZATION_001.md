@@ -106,7 +106,7 @@ For intent-directed edits, score the *requested transformation* separately from 
 - **Edit locality precision/recall:** changed source events that were intended to change, and intended changes that were actually applied.
 - **Abstention precision:** fraction of rejected requests that were genuinely unsupported or contradictory.
 
-The public MMAE development set contains 2,000 examples and 17,741 atomic rubrics. The Audio Editing Challenge announced a held-out challenge set of 500 examples each for its Single Model and Agent tracks, with submissions opening November 10, 2026. Its primary ranking metric is EMR, with IFR then CR as tie-breakers. Use the challenge's official test split and SDK for any leaderboard claim; do not report development-set scores as held-out results.
+The public MMAE development set contains 2,000 examples and 17,741 atomic rubrics. The Audio Editing Challenge released its held-out challenge set and SDK on November 10, 2026; each of its Single Model and Agent tracks has 500 examples. Its primary ranking metric is EMR, with IFR then CR as tie-breakers. The published schedule lists November 25, 2026 as the submission deadline. Registration closed October 8, and the Agent Track requires model-component versions and weights to have been public before November 1. Therefore, treat official participation as conditional on an already registered team and confirmation that newly written orchestration/tooling is permitted under the model cutoff; the public development benchmark remains useful regardless. Use the official test split and SDK for any leaderboard claim; do not report development-set scores as held-out results.
 
 Separate the constrained music-native domain from general-purpose audio editing. The official AEC/MMAE overview reports existing systems below 5% overall EMR, with complex mixed-modality tasks reaching 0% in its reported evaluations. These figures describe the broad benchmark, not Melothaea's music-only slice.
 
@@ -214,6 +214,7 @@ The paradigm shift is from “generate a plausible recording” to “execute a 
 - [YuE2 project and technical updates](https://github.com/elvisxu/yue)
 - [YuE2 project results and benchmark overview](https://map-yue2.github.io/)
 - [WildSongBench results, September 12, 2026 snapshot](https://huggingface.co/datasets/m-a-p/WildSongBench/blob/main/benchmark/results.md)
+- [Audio Editing Challenge timeline, tracks and model release rules](https://audio-editing-challenge.github.io/)
 - [Audio Editing Challenge leaderboard and evaluation protocol](https://audio-editing-challenge.github.io/leaderboard/)
 - [MMAE / MAGE paper](https://arxiv.org/abs/2604.09803)
 - [NotaGen, IJCAI 2025](https://ijcai.org/proceedings/2025/1134)
