@@ -3,10 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Engineering reasoning facade for Symthaea.
 
+#![deny(unsafe_code)]
+
 /// Deterministic provenance graph slicing shared by engineering fixtures and adapters.
 pub mod provenance_graph;
-
-#![deny(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
