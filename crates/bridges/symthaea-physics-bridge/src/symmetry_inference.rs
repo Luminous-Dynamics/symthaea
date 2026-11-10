@@ -97,7 +97,7 @@ impl Default for NumericLieDerivativeProfileV1 {
 }
 
 /// Structural pattern that produced a symmetry candidate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum StructuralSymmetryPattern {
     /// A sum of distinct squared variables with one shared finite nonzero coefficient.
     EqualCoefficientSumOfSquares {
@@ -165,7 +165,7 @@ pub fn infer_symmetry(expr: &Expr) -> SymmetryDescriptor {
 pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
     let numeric_profile = NumericLieDerivativeProfileV1::default();
 
-    if let Some(n) = detect_sum_of_squares(expr)
+    if let Some((n, shared_coefficient)) = detect_sum_of_squares_with_coefficient(expr)
         && (2..=10).contains(&n)
     {
         return SymmetryInferenceReport {
@@ -173,9 +173,7 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
             evidence: Some(SymmetryInferenceEvidence::StructuralPatternMatch {
                 pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares {
                     variable_count: n,
-                    shared_coefficient: detect_sum_of_squares_with_coefficient(expr)
-                        .map(|(_, coefficient)| coefficient)
-                        .unwrap_or(1.0),
+                    shared_coefficient,
                 },
             }),
             search_status: SymmetryInferenceSearchStatus::StructuralMatchShortCircuit,
@@ -241,22 +239,24 @@ fn infer_symmetry_numeric_with_profile(
         };
     }
 
-    // Pairwise SO(2) search over every distinct variable pair.
-    let so2 = lie_theory::so_n(2);
-    for i in 0..var_names.len() {
-        for j in (i + 1)..var_names.len() {
-            if is_lie_invariant(expr, &var_names, &[i, j], &so2, profile) {
-                let group = LieGroup::SO(2);
-                return SymmetryInferenceReport {
-                    candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
-                    evidence: Some(SymmetryInferenceEvidence::SampledLieDerivative {
-                        profile,
-                        acted_on_variables: vec![var_names[i].clone(), var_names[j].clone()],
-                        group,
-                    }),
-                    search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
-                    numeric_profile: profile,
-                };
+    // Pairwise SO(2) search over every distinct variable pair when enabled.
+    if profile.pairwise_so2_search {
+        let so2 = lie_theory::so_n(2);
+        for i in 0..var_names.len() {
+            for j in (i + 1)..var_names.len() {
+                if is_lie_invariant(expr, &var_names, &[i, j], &so2, profile) {
+                    let group = LieGroup::SO(2);
+                    return SymmetryInferenceReport {
+                        candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
+                        evidence: Some(SymmetryInferenceEvidence::SampledLieDerivative {
+                            profile,
+                            acted_on_variables: vec![var_names[i].clone(), var_names[j].clone()],
+                            group,
+                        }),
+                        search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
+                        numeric_profile: profile,
+                    };
+                }
             }
         }
     }
