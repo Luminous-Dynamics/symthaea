@@ -47,6 +47,8 @@ pub struct LinearActionSamplingProfileV1 {
     pub minimum_informative_samples: usize,
     /// Maximum allowed spectral condition number of each direction basis.
     pub maximum_direction_basis_condition: f64,
+    /// Maximum relative residual when reconstructing the gradient from directional differences.
+    pub maximum_directional_reconstruction_relative_residual: f64,
 }
 
 /// Hard ceiling independent of caller configuration. This prevents a profile
@@ -64,6 +66,7 @@ impl Default for LinearActionSamplingProfileV1 {
             maximum_expression_variables: 64,
             minimum_informative_samples: 8,
             maximum_direction_basis_condition: 1e8,
+            maximum_directional_reconstruction_relative_residual: 1e-8,
         }
     }
 }
@@ -156,6 +159,11 @@ pub enum LinearActionSamplingErrorV1 {
     },
     NonFiniteExpressionEvaluation { sample_id: String },
     GradientReconstructionFailed { sample_id: String },
+    GradientReconstructionResidualExceeded {
+        sample_id: String,
+        relative_residual: f64,
+        maximum: f64,
+    },
     NonFiniteOrbitTangent {
         sample_id: String,
         generator_id: String,
@@ -310,6 +318,15 @@ fn finite_difference_gradient(
             sample_id: sample.sample_id.clone(),
         });
     }
+    if relative_reconstruction_residual
+        > profile.maximum_directional_reconstruction_relative_residual
+    {
+        return Err(LinearActionSamplingErrorV1::GradientReconstructionResidualExceeded {
+            sample_id: sample.sample_id.clone(),
+            relative_residual: relative_reconstruction_residual,
+            maximum: profile.maximum_directional_reconstruction_relative_residual,
+        });
+    }
     Ok((gradient, condition_number, relative_reconstruction_residual))
 }
 
@@ -412,6 +429,12 @@ pub fn evaluate_linear_action_samples(
         || !profile.maximum_direction_basis_condition.is_finite()
         || profile.maximum_direction_basis_condition < 1.0
         || profile.maximum_direction_basis_condition > HARD_MAX_DIRECTION_BASIS_CONDITION
+        || !profile
+            .maximum_directional_reconstruction_relative_residual
+            .is_finite()
+        || !(0.0..=1.0).contains(
+            &profile.maximum_directional_reconstruction_relative_residual
+        )
     {
         return Err(LinearActionSamplingErrorV1::InvalidProfile);
     }
