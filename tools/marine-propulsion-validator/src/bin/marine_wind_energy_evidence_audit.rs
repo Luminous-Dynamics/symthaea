@@ -228,6 +228,22 @@ fn check_record(record: &Value, findings: &mut Findings) {
         _ => {}
     }
     let method_basis = wind.get("method_basis").and_then(Value::as_str).unwrap_or("");
+    if status == "method_derived" && !matches!(wind_status, "standard_derived" | "certified") {
+        findings.push("/record_status", "INVALID", "method_derived record status requires a standard-derived or certified wind-energy assessment");
+    }
+    if status == "research_record" && wind_status == "certified" {
+        findings.push("/record_status", "INVALID", "research_record cannot claim a certified wind-energy assessment");
+    }
+    if record.get("research_wind_contribution").is_some() {
+        let research = record.get("research_wind_contribution").unwrap();
+        check_energy_quantity(&research["energy_gj"], "/research_wind_contribution/energy_gj", &sources, findings);
+        findings.push(
+            "/research_wind_contribution",
+            "RESEARCH_ONLY",
+            "engineering wind-contribution estimate is distinct from any regulatory wind-energy quantity",
+        );
+    }
+
     let regulatory_quantity = wind.get("regulatory_energy_gj").unwrap_or(&Value::Null);
     check_energy_quantity(regulatory_quantity, "/wind_energy_assessment/regulatory_energy_gj", &sources, findings);
 
@@ -287,12 +303,8 @@ fn check_record(record: &Value, findings: &mut Findings) {
             {
                 findings.push("/wind_energy_assessment", "INVALID", "research estimate cannot carry standards/certification claims");
             }
-            match record.get("research_wind_contribution") {
-                Some(estimate) => {
-                    check_energy_quantity(&estimate["energy_gj"], "/research_wind_contribution/energy_gj", &sources, findings);
-                    findings.push("/research_wind_contribution", "RESEARCH_ONLY", "engineering wind-contribution estimate is not a regulatory wind-energy quantity");
-                }
-                None => findings.push("/research_wind_contribution", "INCOMPLETE", "research_estimate status requires a separate research_wind_contribution record"),
+            if record.get("research_wind_contribution").is_none() {
+                findings.push("/research_wind_contribution", "INCOMPLETE", "research_estimate status requires a separate research_wind_contribution record");
             }
             if regulatory_quantity.get("value").is_none_or(|value| !value.is_null()) {
                 findings.push("/wind_energy_assessment/regulatory_energy_gj", "INVALID", "research estimate must not populate the regulatory wind-energy field before a valid method applies");
