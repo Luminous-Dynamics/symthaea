@@ -162,7 +162,10 @@ fn process_episode(
         .into());
     }
 
-    let input_base = request_path.parent().unwrap_or_else(|| Path::new("."));
+    let input_base = request_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     let mut bridge = CameraDrivingBridge::try_new(
         request.bridge_config.clone(),
         request.vision_config,
@@ -304,5 +307,41 @@ fn main() {
     if let Err(error) = run() {
         eprintln!("camera-driving-bridge: {error}");
         std::process::exit(2);
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_pixel_path_traversal_and_absolute_paths() {
+        assert!(safe_relative_path("../outside.rgb").is_err());
+        assert!(safe_relative_path("/tmp/outside.rgb").is_err());
+        assert!(safe_relative_path("nested/../../outside.rgb").is_err());
+    }
+
+    #[test]
+    fn accepts_nested_relative_pixel_paths() {
+        assert_eq!(
+            safe_relative_path("frames/tick_0001.rgb").unwrap(),
+            PathBuf::from("frames/tick_0001.rgb")
+        );
+    }
+
+    #[test]
+    fn policy_hdc_artifact_has_dimension_header_and_little_endian_values() {
+        let encoded = encode_policy_hv(2, &[1.0, -0.5]).unwrap();
+        assert_eq!(&encoded[..8], &2_u64.to_le_bytes());
+        assert_eq!(&encoded[8..12], &1.0_f32.to_bits().to_le_bytes());
+        assert_eq!(&encoded[12..16], &(-0.5_f32).to_bits().to_le_bytes());
+        assert_eq!(sha256_hex(&encoded).len(), 64);
+    }
+
+    #[test]
+    fn rejects_non_finite_policy_vector_components() {
+        assert!(encode_policy_hv(2, &[1.0, f32::NAN]).is_err());
+        assert!(encode_policy_hv(2, &[1.0, f32::INFINITY]).is_err());
     }
 }
