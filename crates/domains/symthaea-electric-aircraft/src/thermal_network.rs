@@ -195,8 +195,7 @@ impl ThermalNetwork {
         let mut matrix = vec![vec![0.0_f64; n]; n];
         let mut rhs = vec![0.0_f64; n];
 
-        for i in 0..n {
-            let node = &self.nodes[i];
+        for (i, node) in self.nodes.iter().enumerate() {
             let storage_rate = node.heat_capacity_j_per_k / dt_s;
             let ambient_g = node.ambient_conductance_w_per_k;
             matrix[i][i] = storage_rate + ambient_g;
@@ -270,6 +269,7 @@ impl ThermalNetwork {
 }
 
 /// Deterministic Gaussian elimination with partial pivoting.
+#[allow(clippy::needless_range_loop)] // Matrix elimination requires stable row/column indices.
 fn solve_dense_system(mut matrix: Vec<Vec<f64>>, mut rhs: Vec<f64>) -> Option<Vec<f64>> {
     let n = rhs.len();
     if matrix.len() != n || matrix.iter().any(|row| row.len() != n) {
