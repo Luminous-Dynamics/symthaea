@@ -632,7 +632,10 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
             }
         };
     if computed_manifest_digest.as_deref() != Some(input.expected_cell_manifest_digest.as_str()) {
-        errors.push("expected_cell_manifest_digest does not match the canonical expected_cells manifest".into());
+        errors.push(
+            "expected_cell_manifest_digest does not match the canonical expected_cells manifest"
+                .into(),
+        );
     }
 
     let mut expected_by_key = BTreeSet::new();
@@ -928,9 +931,8 @@ mod tests {
             "../../../../docs/autonomy/fixtures/SAM_OPTION_PRESERVATION_CLAIRVOYANCE_TRAP_V0_1.json"
         ))
         .expect("canonical clairvoyance fixture must be valid JSON");
-        let mut input: OptionPreservationInput =
-            serde_json::from_value(fixture["input"].clone())
-                .expect("fixture input must deserialize");
+        let mut input: OptionPreservationInput = serde_json::from_value(fixture["input"].clone())
+            .expect("fixture input must deserialize");
 
         // The manifest digest is deliberately derived from the frozen expected
         // cells by the loader, not accepted from a fixture-supplied string.
@@ -938,8 +940,7 @@ mod tests {
             compute_expected_cell_manifest_digest(&input.expected_cells)
                 .expect("fixture expected-cell manifest must hash");
 
-        let report =
-            evaluate_option_preservation(&input).expect("canonical fixture must evaluate");
+        let report = evaluate_option_preservation(&input).expect("canonical fixture must evaluate");
         let expected_parent_id = fixture["expected"]["parent_action_id"]
             .as_str()
             .expect("fixture parent action ID");
@@ -961,10 +962,7 @@ mod tests {
             parent.status,
             ParentActionStatus::NoContinuationForAtLeastOneObservationClass
         );
-        assert_eq!(
-            class.status,
-            ObservationClassStatus::NoPossibleOptions
-        );
+        assert_eq!(class.status, ObservationClassStatus::NoPossibleOptions);
         assert_eq!(class.robust_option_ids, Some(vec![]));
         assert_eq!(class.possible_option_ids, Some(vec![]));
         assert_eq!(
