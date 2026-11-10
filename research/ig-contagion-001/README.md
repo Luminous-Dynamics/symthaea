@@ -28,14 +28,14 @@ This makes the operational state handoff visible and auditable. It does not esta
 
 - `IG_CONTAGION_001_PROTOCOL_V0_1.json` — stages, semantics, metrics, experiment controls, receipt contract and claim ceilings.
 - `IG_CONTAGION_001_PROTOCOL_V0_1.schema.json` — bounded structural contract for the protocol manifest.
-- `IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.json` — 40 unexecuted synthetic scenario descriptors across eight families.
+- `IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.json` — 45 unexecuted synthetic scenario descriptors across eight families.
 - `IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.schema.json` — bounded structural contract for the scenario matrix.
 
-The initial scenario matrix contains five descriptors each for:
+The initial scenario matrix contains five descriptors each for seven families and ten centrality-placement descriptors forming five matched pairs:
 - no-discussion repeat controls;
 - evidence-supported revision;
 - unsupported social influence;
-- centrality placement;
+- centrality placement: five same-content, same-topology, same-seed pairs that differ only by low- versus high-centrality placement;
 - correction after misinformation;
 - false consensus/status signals;
 - identity multiplicity and prompt injection;
@@ -55,7 +55,7 @@ A future run receipt must bind the protocol, scenario, graph profile, RNG, agent
 
 ## Validation and claim ceiling
 
-The two JSON files were fetched back from the branch and checked against their declared bounded schema subset. The scenario matrix has 40 unique fixture IDs and seeds, eight declared families, five cases per family, and five centrality-pair identifiers.
+The two JSON files were fetched back from the branch and checked against their declared bounded schema subset. The scenario matrix has 40 unique fixture IDs and seeds, eight declared families, five cases per family except centrality placement, which has ten descriptors forming five paired blocks, and five centrality-pair identifiers.
 
 These are structural checks of a scenario design, not executed simulations. No agent interaction, stance transition, benchmark performance or statistical result is claimed.
 
