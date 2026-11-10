@@ -1036,6 +1036,8 @@ pub mod genre_presets;
 pub mod instruments;
 #[cfg(feature = "theory")]
 pub mod instrument_capability_evidence;
+#[cfg(feature = "theory")]
+pub mod orchestration_planner;
 pub mod learned_melody;
 pub mod melodic_grammar;
 pub mod midi_export;
