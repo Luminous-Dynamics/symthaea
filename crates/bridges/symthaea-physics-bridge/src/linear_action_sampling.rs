@@ -1550,6 +1550,23 @@ mod tests {
                 canonical_report.invariant_within_tolerance(),
                 transformed_report.invariant_within_tolerance()
             );
+
+            for (canonical_diagnostic, transformed_diagnostic) in canonical_report
+                .direction_basis_diagnostics
+                .iter()
+                .zip(transformed_report.direction_basis_diagnostics.iter())
+            {
+                assert_eq!(canonical_diagnostic.sample_id, transformed_diagnostic.sample_id);
+                assert!(
+                    (canonical_diagnostic.direction_basis_condition_number
+                        - transformed_diagnostic.direction_basis_condition_number)
+                        .abs()
+                        < 2.0e-10,
+                    "metric-whitened direction-basis condition changed under basis {basis_index}: {} vs {}",
+                    canonical_diagnostic.direction_basis_condition_number,
+                    transformed_diagnostic.direction_basis_condition_number
+                );
+            }
             for (canonical_sample, transformed_sample) in canonical_statistics
                 .sample_residuals
                 .iter()
