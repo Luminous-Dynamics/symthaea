@@ -501,7 +501,10 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
     println!(
-        "QUALIFIED STRUCTURAL CONFIDENCE EVALUATOR: n={} independent_groups={} uncertainty_interval={}",
+        concat!(
+            "QUALIFIED STRUCTURAL CONFIDENCE EVALUATOR: n={} ",
+            "independent_groups={} uncertainty_interval={}"
+        ),
         metrics.sample_count,
         metrics.independent_group_count,
         metrics.uncertainty_interval_status
@@ -562,7 +565,10 @@ mod tests {
         let original_metrics = calculate_metrics(&original).unwrap();
         let reordered_metrics = calculate_metrics(&reordered).unwrap();
         assert!((original_metrics.aurc - reordered_metrics.aurc).abs() < 1e-12);
-        assert_eq!(original_metrics.risk_at_coverage.len(), reordered_metrics.risk_at_coverage.len());
+        assert_eq!(
+            original_metrics.risk_at_coverage.len(),
+            reordered_metrics.risk_at_coverage.len()
+        );
         for (left, right) in original_metrics
             .risk_at_coverage
             .iter()
