@@ -902,6 +902,52 @@ mod tests {
     }
 
     #[test]
+    fn every_cell_hard_limit_bounds_the_common_series_current() {
+        let audited = report();
+        let case = audited.payload.cases.iter()
+            .find(|case| case.case_id == "thermal-limited")
+            .expect("thermal-limited case");
+        let envelope = case.envelope.as_ref().expect("computed envelope");
+        let profile: Profile = serde_json::from_slice(
+            &serde_json::to_vec(
+                &serde_json::from_slice::<Value>(CORPUS).unwrap()["cases"][2]["profile"]
+            ).unwrap()
+        ).unwrap();
+        for cell in &envelope.cells {
+            assert!(envelope.maximum_admissible_current_a
+                <= cell.voltage_limited_current_a + EPSILON);
+            assert!(envelope.maximum_admissible_current_a
+                <= cell.current_rating_limit_a + EPSILON);
+            assert!(envelope.maximum_admissible_current_a
+                <= cell.thermal_limited_current_a + EPSILON);
+            assert!(cell.terminal_voltage_lower_v_at_selected_current.unwrap()
+                >= profile.cells.iter().find(|input| input.cell_ref == cell.cell_ref)
+                    .unwrap().minimum_voltage_v - EPSILON);
+            assert!(cell.temperature_upper_c_at_selected_current.unwrap()
+                <= profile.cells.iter().find(|input| input.cell_ref == cell.cell_ref)
+                    .unwrap().maximum_temperature_lower_c + EPSILON);
+        }
+    }
+
+    #[test]
+    fn power_receipt_preserves_model_calibration_domain_and_limit_evidence_classes() {
+        let audited = report();
+        let envelope = audited.payload.cases.iter()
+            .find(|case| case.case_id == "equal-series-reference")
+            .and_then(|case| case.envelope.as_ref())
+            .expect("reference envelope");
+        assert!(envelope.evidence.iter().any(|row| {
+            row.role == "calibration" && row.evidence_class.as_deref() == Some("synthetic_fixture")
+        }));
+        assert!(envelope.evidence.iter().any(|row| {
+            row.role == "voltage_limit:cell-001"
+                && row.evidence_class.as_deref() == Some("synthetic_fixture")
+        }));
+        assert!(envelope.evidence.iter().any(|row| row.role == "cell_inventory"));
+        assert_eq!(envelope.topology_authority_ref, "synthetic-authority");
+    }
+
+    #[test]
     fn cell_order_permutation_preserves_canonical_report_digest() {
         let original = report();
         let mut value: Value = serde_json::from_slice(CORPUS).expect("corpus JSON");
