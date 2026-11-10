@@ -1576,6 +1576,107 @@
         "Applying the +16/-31% range as a generic correction",
         "Generalizing to multi-screw or other hull forms without validation"
       ]
+    },
+    {
+      "source_id": "MARIN-SHIP-AFTERBODY-MULTIFIDELITY-2023",
+      "title": "Practical ship afterbody optimisation by multifidelity techniques",
+      "publisher": "MARIN / Ship Technology Research",
+      "publication_date": "2023-11-21",
+      "url": "https://doi.org/10.1080/09377255.2023.2275371",
+      "evidence_class": "industrial_ship_hull_multifidelity_methodology",
+      "scope": {
+        "method": "Surrogate-based multi-objective optimization combining relatively few high-fidelity free-surface RANS simulations with many lower-fidelity evaluations.",
+        "lower_fidelity_methods": [
+          "Potential-flow solver for slender hulls where wave-resistance variations dominate",
+          "Coarse-grid RANS for designs with viscous and wave resistance variation"
+        ],
+        "high_fidelity_method": "Fine-grid/free-surface RANS",
+        "reported_cost_ratio": "Coarse-grid RANS evaluations reported about 20 times cheaper than fine-grid in the cited application."
+      },
+      "limitations": [
+        "Examples cover ship afterbody optimization, not complete WAPS propulsion or cargo-service qualification.",
+        "Lower-fidelity suitability depends on hull family and dominant resistance physics."
+      ],
+      "eligible_use": [
+        "Industry comparator for multi-fidelity ship design",
+        "Cost-aware model-fidelity allocation research"
+      ],
+      "ineligible_use": [
+        "Claiming a WAPS optimizer outperforms MARIN without matched validation"
+      ]
+    },
+    {
+      "source_id": "GERAD-MF-CONSTRAINED-BO-AIRCRAFT-2026",
+      "title": "Multi-fidelity approaches for general constrained Bayesian optimization with application to aircraft design",
+      "publisher": "GERAD",
+      "publication_date": "2026-04",
+      "url": "https://www.gerad.ca/en/papers/G-2026-17",
+      "evidence_class": "peer_reviewed_or_institute_report_multifidelity_constrained_optimization",
+      "scope": {
+        "method": "Multi-fidelity selection strategies using information from both objective and constraints.",
+        "application": "Aircraft aerodynamic/structural design with low-/high-fidelity analysis.",
+        "reported_result": "86% to 200% more constraint-compliant solutions than comparison state-of-the-art approach given limited budget in reported application."
+      },
+      "limitations": [
+        "Aircraft application and specific comparison setup; not direct maritime evidence.",
+        "Reported gain is not transferable to a WAPS benchmark without matched baselines."
+      ],
+      "eligible_use": [
+        "Constraint-aware multi-fidelity algorithm methodology comparison"
+      ],
+      "ineligible_use": [
+        "Direct ship performance or fuel-saving claim"
+      ]
+    },
+    {
+      "source_id": "CONSEQUENTIAL-IMPROVEMENT-MFBO-2026",
+      "title": "Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization",
+      "publisher": "Optimization and Engineering",
+      "publication_date": "2026-03-27",
+      "url": "https://doi.org/10.1007/s11081-026-10078-5",
+      "evidence_class": "peer_reviewed_multifidelity_optimization_method",
+      "scope": {
+        "method": "Consequential-improvement acquisition function with validation-aware cost treatment.",
+        "insight": "Low-fidelity selections carry deferred high-fidelity validation cost; expected objective gain at low fidelity is not yet validated improvement.",
+        "intended_use": "Acquisition policy for expensive experiments and simulations where the selected optimum must ultimately be validated."
+      },
+      "limitations": [
+        "General engineering and simulation examples, not a ship-specific benchmark.",
+        "Algorithm must be independently implemented/reproduced before comparative claims."
+      ],
+      "eligible_use": [
+        "Validation-cost-aware acquisition baseline",
+        "Decision regret and true validated improvement accounting"
+      ],
+      "ineligible_use": [
+        "Assuming method gives a fixed cost reduction on ship design"
+      ]
+    },
+    {
+      "source_id": "OCEANENG-MFBO-HYDROFOIL-2026",
+      "title": "Ensemble adaptive gated multi-fidelity neural network for Bayesian optimization: Application to hydrofoil design",
+      "publisher": "Ocean Engineering",
+      "publication_date": "2026-01-15",
+      "url": "https://doi.org/10.1016/j.oceaneng.2025.123314",
+      "evidence_class": "peer_reviewed_marine_multifidelity_surrogate_method",
+      "scope": {
+        "method": "Deep ensemble adaptive-gated multi-fidelity neural network coupled to Bayesian optimization.",
+        "application": "Hydrofoil design with CFD simulations.",
+        "reported_highlights": [
+          "Limited high-fidelity observations",
+          "Faster convergence than co-Kriging and multi-fidelity neural network on benchmark functions"
+        ]
+      },
+      "limitations": [
+        "Hydrofoil design does not validate whole-vessel wind-assisted propulsion.",
+        "Reported superiority needs independent matched reproduction."
+      ],
+      "eligible_use": [
+        "Marine multi-fidelity surrogate-method comparator"
+      ],
+      "ineligible_use": [
+        "Whole ship WAPS/fuel/cargo service performance claim"
+      ]
     }
   ]
 }
