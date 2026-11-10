@@ -5,7 +5,8 @@
 **Created:** 2026-11-10  
 **Owner:** Symthaea research coordination; physical solvers and qualification stay with their existing owners  
 **Parent issue:** [#11406](https://github.com/Luminous-Dynamics/symthaea/issues/11406)  
-**Case schema:** [marine-propulsion-case.schema.json](./marine-propulsion-case.schema.json)
+**Case schema:** [marine-propulsion-case.schema.json](./marine-propulsion-case.schema.json)  
+**Reference corpus:** [marine-propulsion-reference-baselines-2026-11-10.json](./marine-propulsion-reference-baselines-2026-11-10.json)
 
 > This document defines a research and evidence programme. It does not describe a completed ship design, validated CFD result, physical test, class approval, or construction-ready specification.
 
@@ -304,13 +305,14 @@ No new general CFD solver, weather router, grid solver, optimizer, ledger or app
 ## 11. Execution sequence
 
 1. Use the case schema as the first contract; validate and adversarially test it before populating real cases.
-2. Build a source registry that keeps UCL and Lloyd's Register published cases separate and records the coastal hybrid paper and windship fleet review with their limits.
-3. Freeze the service fingerprints and architecture matrix.
-4. Implement independent arithmetic for service work, primary energy boundaries and net counterfactual differences.
-5. Reproduce published references before attempting design optimization.
-6. Add per-condition held-out validation and matched-trial eligibility.
-7. Only then compare new candidate designs using a specialist qualified solver or research partner.
-8. Plan physical trials with qualified naval architects, hydrodynamicists, operators, electrical engineers, shipyards and class/flag stakeholders.
+2. Freeze the reference baseline register as a source-attributed corpus. Preserve per-source metrics, scope, evidence class, eligible uses and inference limits; never average unlike studies.
+3. Use the existing Symthaea nuclear merchant-shipping reference registry to keep UCL and Lloyd's Register cases separate; link those source records into the marine propulsion comparison without conflating economics.
+4. Freeze the service fingerprints and architecture matrix.
+5. Implement independent arithmetic for service work, primary energy boundaries and net counterfactual differences.
+6. Reproduce published references before attempting design optimization.
+7. Add per-condition held-out validation and matched-trial eligibility.
+8. Only then compare new candidate designs using a specialist qualified solver or research partner.
+9. Plan physical trials with qualified naval architects, hydrodynamicists, operators, electrical engineers, shipyards and class/flag stakeholders.
 
 ## 12. Claim ceiling
 
