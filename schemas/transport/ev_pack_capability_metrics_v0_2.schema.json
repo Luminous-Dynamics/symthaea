@@ -125,6 +125,39 @@
         "topology_digest": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "qualification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "qualification_ref",
+            "authority_ref",
+            "evidence_digest",
+            "evidence_class"
+          ],
+          "properties": {
+            "qualification_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "authority_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "$ref": "#/$defs/digest"
+            },
+            "evidence_class": {
+              "enum": [
+                "reference_test_measurement",
+                "derived_estimate",
+                "model_prediction",
+                "simulation_output",
+                "synthetic_fixture",
+                "vendor_claim"
+              ]
+            }
+          }
         }
       }
     },
@@ -404,7 +437,8 @@
               "unit_ref",
               "soc_fraction",
               "sample_time_ms",
-              "evidence_digest"
+              "evidence_digest",
+              "evidence_class"
             ],
             "properties": {
               "unit_ref": {
@@ -423,6 +457,16 @@
               "evidence_digest": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
+              },
+              "evidence_class": {
+                "enum": [
+                  "reference_test_measurement",
+                  "derived_estimate",
+                  "model_prediction",
+                  "simulation_output",
+                  "synthetic_fixture",
+                  "vendor_claim"
+                ]
               }
             }
           }
@@ -463,7 +507,8 @@
               "status",
               "efc_to_eol",
               "eol_event_ref",
-              "evidence_digest"
+              "evidence_digest",
+              "evidence_class"
             ],
             "properties": {
               "unit_ref": {
@@ -494,6 +539,16 @@
                 "type": [
                   "string",
                   "null"
+                ]
+              },
+              "evidence_class": {
+                "enum": [
+                  "reference_test_measurement",
+                  "derived_estimate",
+                  "model_prediction",
+                  "simulation_output",
+                  "synthetic_fixture",
+                  "vendor_claim"
                 ]
               }
             }
