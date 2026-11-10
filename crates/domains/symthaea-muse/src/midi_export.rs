@@ -1211,6 +1211,5 @@ mod tests {
     }
 }
 
-
 #[cfg(feature = "theory")]
 pub mod part_aware_v1;
