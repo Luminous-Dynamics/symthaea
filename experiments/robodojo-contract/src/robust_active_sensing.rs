@@ -176,8 +176,9 @@ pub enum CandidateDisposition {
     CannotRestoreRiskLimit,
     CannotRestoreConfidence,
     RobustValueBelowThreshold,
-    Selected,
+    EligibleOptional,
     EligibleForRequiredSensing,
+    Selected,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -374,7 +375,7 @@ pub fn choose_robust_active_sensing(
                 confidence_required,
             ));
         } else if lower_bound >= policy.minimum_net_benefit {
-            evaluation.disposition = CandidateDisposition::Selected;
+            evaluation.disposition = CandidateDisposition::EligibleOptional;
             selectable.push((option.sensor_id.clone(), lower_bound, false, false));
         } else {
             evaluation.disposition = CandidateDisposition::RobustValueBelowThreshold;
@@ -389,6 +390,12 @@ pub fn choose_robust_active_sensing(
                 .then_with(|| right.0.cmp(&left.0))
         })
     {
+        if let Some(selected) = evaluations
+            .iter_mut()
+            .find(|evaluation| evaluation.sensor_id == sensor_id)
+        {
+            selected.disposition = CandidateDisposition::Selected;
+        }
         return Ok(RobustSensingResult {
             recommendation: RobustSensingRecommendation::AcquireObservation {
                 sensor_id,
@@ -597,6 +604,24 @@ mod tests {
         let result =
             choose_robust_active_sensing(&state(), &[optimistic, conservative], policy()).unwrap();
 
+        assert_eq!(
+            result
+                .evaluations
+                .iter()
+                .find(|item| item.sensor_id == "a-conservative")
+                .unwrap()
+                .disposition,
+            CandidateDisposition::Selected
+        );
+        assert_eq!(
+            result
+                .evaluations
+                .iter()
+                .find(|item| item.sensor_id == "z-optimistic")
+                .unwrap()
+                .disposition,
+            CandidateDisposition::RobustValueBelowThreshold
+        );
         assert_eq!(
             result.recommendation,
             RobustSensingRecommendation::AcquireObservation {
