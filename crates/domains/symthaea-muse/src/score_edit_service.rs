@@ -183,11 +183,12 @@ mod tests {
         score
     }
 
-    fn plan() -> ScoreEditPlanV1 {
+    fn plan(source: &Score) -> ScoreEditPlanV1 {
+        let source_demand = analyze_score_demand(source).expect("test source Score is valid");
         ScoreEditPlanV1 {
             schema: SCORE_EDIT_SCHEMA_V1.into(),
             input_digest_schema: SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1.into(),
-            input_score_sha256: "a".repeat(64),
+            input_score_sha256: source_demand.score_sha256,
             operations: vec![ScalePartVelocityV1 {
                 id: "soften-lead".into(),
                 part_id: 10,
@@ -208,7 +209,7 @@ mod tests {
     #[test]
     fn derives_source_and_candidate_digests_and_validates_event_map() {
         let source = source_score();
-        let preview = preview_score_edit(&source, &plan()).expect("valid localized edit");
+        let preview = preview_score_edit(&source, &plan(&source)).expect("valid localized edit");
         assert_ne!(preview.source_demand.score_sha256, preview.candidate_demand.score_sha256);
         assert_eq!(preview.event_remap.source_score_sha256, preview.source_demand.score_sha256);
         assert_eq!(preview.event_remap.candidate_score_sha256, preview.candidate_demand.score_sha256);
@@ -229,14 +230,14 @@ mod tests {
     fn preview_never_mutates_source_score() {
         let source = source_score();
         let before = source.clone();
-        let _preview = preview_score_edit(&source, &plan()).expect("valid localized edit");
+        let _preview = preview_score_edit(&source, &plan(&source)).expect("valid localized edit");
         assert_eq!(source, before);
     }
 
     #[test]
     fn candidate_demand_metrics_are_unchanged_except_for_exact_score_digest() {
         let source = source_score();
-        let preview = preview_score_edit(&source, &plan()).expect("valid localized edit");
+        let preview = preview_score_edit(&source, &plan(&source)).expect("valid localized edit");
         let mut source_profile = preview.source_demand.clone();
         source_profile.score_sha256 = preview.candidate_demand.score_sha256.clone();
         assert_eq!(source_profile, preview.candidate_demand);
@@ -244,8 +245,8 @@ mod tests {
 
     #[test]
     fn plan_digest_is_deterministic_and_changes_with_plan_content() {
-        let mut first = plan();
-        first.input_score_sha256 = "c".repeat(64);
+        let source = source_score();
+        let mut first = plan(&source);
         let mut second = first.clone();
         let digest = score_edit_plan_sha256_v1(&first).unwrap();
         assert_eq!(digest, score_edit_plan_sha256_v1(&second).unwrap());
@@ -255,9 +256,10 @@ mod tests {
 
     #[test]
     fn mismatched_input_digest_is_rejected_before_candidate_output() {
-        let mut invalid = plan();
+        let source = source_score();
+        let mut invalid = plan(&source);
         invalid.input_score_sha256 = "b".repeat(64);
-        let result = preview_score_edit(&source_score(), &invalid);
+        let result = preview_score_edit(&source, &invalid);
         assert!(matches!(
             result,
             Err(ScoreEditServiceErrorV1::LowLevelEditRejected(_))
@@ -277,9 +279,10 @@ mod tests {
 
     #[test]
     fn invalid_candidate_edit_returns_no_partial_preview() {
-        let mut invalid = plan();
+        let source = source_score();
+        let mut invalid = plan(&source);
         invalid.operations[0].numerator = 2;
-        let result = preview_score_edit(&source_score(), &invalid);
+        let result = preview_score_edit(&source, &invalid);
         assert!(matches!(
             result,
             Err(ScoreEditServiceErrorV1::LowLevelEditRejected(_))
@@ -289,8 +292,8 @@ mod tests {
     #[test]
     fn frozen_source_and_plan_produce_identical_preview_artifacts() {
         let source = source_score();
-        let first = preview_score_edit(&source, &plan()).unwrap();
-        let second = preview_score_edit(&source, &plan()).unwrap();
+        let first = preview_score_edit(&source, &plan(&source)).unwrap();
+        let second = preview_score_edit(&source, &plan(&source)).unwrap();
         assert_eq!(first, second);
     }
 }
