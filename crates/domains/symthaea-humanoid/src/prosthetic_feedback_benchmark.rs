@@ -46,6 +46,20 @@ pub struct FeedbackRecognitionTrialV1 {
     pub response_latency_ms: Option<f64>,
 }
 
+/// One cell in the full confusion matrix, including no-cue responses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FeedbackResponseClass {
+    NoCue,
+    Cue(HapticCueSemantic),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CueConfusionCell {
+    pub expected: FeedbackResponseClass,
+    pub reported: FeedbackResponseClass,
+    pub count: u64,
+}
+
 /// Binary one-vs-rest measures for one semantic class.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CueClassMetrics {
@@ -77,6 +91,7 @@ pub struct FeedbackRecognitionSummaryV1 {
     pub cue_substitutions: u64,
     pub median_correct_response_latency_ms: Option<f64>,
     pub macro_f1: Option<f64>,
+    pub confusion_matrix: Vec<CueConfusionCell>,
     pub per_semantic_class: Vec<CueClassMetrics>,
 }
 
@@ -173,6 +188,33 @@ pub fn evaluate_feedback_recognition(
         });
     }
 
+    // Preserve the full cue-to-cue substitution structure. One-vs-rest
+    // metrics alone reveal false positives/negatives but not which two
+    // semantic codes the participant confuses.
+    let mut response_classes = vec![FeedbackResponseClass::NoCue];
+    response_classes.extend(
+        all_semantic_classes()
+            .into_iter()
+            .map(FeedbackResponseClass::Cue),
+    );
+    let mut confusion_matrix = Vec::with_capacity(
+        response_classes.len() * response_classes.len(),
+    );
+    for expected in &response_classes {
+        for reported in &response_classes {
+            let count = trials
+                .iter()
+                .filter(|trial| response_class(trial.expected) == *expected
+                    && response_class(trial.reported) == *reported)
+                .count() as u64;
+            confusion_matrix.push(CueConfusionCell {
+                expected: *expected,
+                reported: *reported,
+                count,
+            });
+        }
+    }
+
     let exact_matches = trials
         .iter()
         .filter(|trial| trial.expected == trial.reported)
@@ -230,6 +272,7 @@ pub fn evaluate_feedback_recognition(
         cue_substitutions,
         median_correct_response_latency_ms,
         macro_f1,
+        confusion_matrix,
         per_semantic_class,
     })
 }
@@ -249,6 +292,12 @@ fn all_semantic_classes() -> Vec<HapticCueSemantic> {
         HapticCueSemantic::SlipRisk,
         HapticCueSemantic::DataUnavailable,
     ]
+}
+
+fn response_class(value: Option<HapticCueSemantic>) -> FeedbackResponseClass {
+    value
+        .map(FeedbackResponseClass::Cue)
+        .unwrap_or(FeedbackResponseClass::NoCue)
 }
 
 fn ratio(numerator: u64, denominator: u64) -> Option<f64> {
@@ -346,6 +395,37 @@ mod tests {
             .find(|metrics| metrics.semantic == index)
             .unwrap();
         assert_eq!(index_metrics.false_positive, 2);
+
+        let confusion = |expected, reported| {
+            summary
+                .confusion_matrix
+                .iter()
+                .find(|cell| cell.expected == expected && cell.reported == reported)
+                .map(|cell| cell.count)
+                .unwrap()
+        };
+        assert_eq!(
+            confusion(
+                FeedbackResponseClass::Cue(thumb),
+                FeedbackResponseClass::NoCue
+            ),
+            1
+        );
+        assert_eq!(
+            confusion(
+                FeedbackResponseClass::NoCue,
+                FeedbackResponseClass::Cue(index)
+            ),
+            1
+        );
+        assert_eq!(
+            confusion(
+                FeedbackResponseClass::Cue(thumb),
+                FeedbackResponseClass::Cue(index)
+            ),
+            1
+        );
+        assert_eq!(summary.confusion_matrix.len(), 121);
     }
 
     #[test]
