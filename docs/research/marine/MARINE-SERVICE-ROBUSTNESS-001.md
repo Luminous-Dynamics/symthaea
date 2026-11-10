@@ -315,6 +315,14 @@ The benchmark should compare fidelity-selection/acquisition strategies by the **
 
 See [#11513 — validation-aware multi-fidelity design](https://github.com/Luminous-Dynamics/symthaea/issues/11513) and [MARINE-VALIDATED-MULTIFIDELITY-DESIGN-001](./MARINE-VALIDATED-MULTIFIDELITY-DESIGN-001.md).
 
+### 14.9 Dynamic manoeuvrability is a hard service constraint
+
+Steady leeway/rudder equilibrium does not prove that a WAPS vessel can keep course or manoeuvre through gusts, turns, device failures and low-speed harbour operation. The 2025 WAPS MMG/VCT study for wPCC and Optiwise highlights that virtual-captive identification can be corrupted by assumptions about waves and roll, and that inverse-dynamics comparison with free-running tests is important.
+
+Track dynamic manoeuvrability separately from propulsion efficiency: turning circle, zig-zag, stopping, course-keeping, rudder authority, yaw/roll excursions, gust rejection, WAPS stow/feather transitions and degraded recovery. MSC.137(76) is a conventional reference where applicable; WAPS-specific criteria require Administration/class/owner review.
+
+See [#11521 — WAPS manoeuvrability qualification](https://github.com/Luminous-Dynamics/symthaea/issues/11521) and [MARINE-WAPS-MANOEUVRABILITY-001](./MARINE-WAPS-MANOEUVRABILITY-001.md).
+
 ## 15. Sources
 
 - Liu et al., 2026 wind-propelled ship deployment and technology review, International Journal of Naval Architecture and Ocean Engineering 18, 100785. https://doi.org/10.1016/j.ijnaoe.2026.100785
