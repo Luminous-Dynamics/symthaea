@@ -56,7 +56,14 @@ use crate::obligation::{
 use crate::phrase::Period;
 use crate::pitch::{Pitch, PitchClass};
 use crate::rhythm::Duration;
-use crate::score::{Emphasis, Score, ScoreNote, VoiceRole};
+use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
+
+// Persistent source identities across the five sonata sections. The P/S
+// thematic regions and development change key/material treatment, not the
+// identity of the three continuing performed lines.
+const SONATA_MELODY_PART: PartId = PartId(0);
+const SONATA_BASS_PART: PartId = PartId(1);
+const SONATA_HARMONY_PART: PartId = PartId(2);
 use crate::spelling::AlteredDegree;
 use serde::{Deserialize, Serialize};
 
@@ -380,8 +387,9 @@ pub fn realize_sonata_with_plan(
         };
 
         let mut phrase_score = Score::new(section.key, tempo, opening_meter);
-        crate::composer::realize_melody(
+        crate::composer::realize_melody_for_part(
             &mut phrase_score,
+            SONATA_MELODY_PART,
             &form,
             intent,
             Duration::zero(),
@@ -393,8 +401,9 @@ pub fn realize_sonata_with_plan(
         // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
         // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
         // and never read each other's state, so the emitted NOTES are unchanged.
-        crate::composer::realize_bass(
+        crate::composer::realize_bass_for_part(
             &mut phrase_score,
+            SONATA_BASS_PART,
             &form,
             meter,
             intent,
@@ -403,8 +412,9 @@ pub fn realize_sonata_with_plan(
             true,
             false,
         );
-        crate::composer::realize_harmony(
+        crate::composer::realize_harmony_for_part(
             &mut phrase_score,
+            SONATA_HARMONY_PART,
             &form,
             meter,
             intent,
@@ -795,6 +805,40 @@ mod tests {
             score.melody_is_monophonic(),
             "the melody voice must stay monophonic across every splice"
         );
+    }
+
+    #[test]
+    fn sonata_preserves_three_source_parts_across_all_five_sections() {
+        let home = Key::major(PitchClass::C);
+        let realized = realize_sonata_with_plan(home, 100.0, 4.0, &theme(), 29, &intent());
+        let score = &realized.score;
+
+        assert!(score.has_part_identity());
+        let actual: std::collections::BTreeSet<u16> =
+            score.parts().into_iter().map(|part| part.0).collect();
+        let expected: std::collections::BTreeSet<u16> =
+            [SONATA_MELODY_PART.0, SONATA_BASS_PART.0, SONATA_HARMONY_PART.0]
+                .into_iter()
+                .collect();
+        assert_eq!(actual, expected);
+        assert!(score.notes.iter().all(|note| match note.part {
+            SONATA_MELODY_PART => note.role == VoiceRole::Melody,
+            SONATA_BASS_PART => note.role == VoiceRole::Bass,
+            SONATA_HARMONY_PART => note.role == VoiceRole::Harmony,
+            _ => false,
+        }));
+
+        for section in &realized.plan.sections {
+            let start = section.start.beats();
+            let end = section.end.beats();
+            for part in [SONATA_MELODY_PART, SONATA_BASS_PART, SONATA_HARMONY_PART] {
+                assert!(score.notes.iter().any(|note| {
+                    note.part == part
+                        && note.onset.beats() >= start - 1e-9
+                        && note.onset.beats() < end - 1e-9
+                }), "PartId {:?} missing from sonata section {:?}", part, section.kind);
+            }
+        }
     }
 
     #[test]
