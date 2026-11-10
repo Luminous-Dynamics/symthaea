@@ -4070,6 +4070,16 @@ fn source_part_id_for_role(score: &Score, role: VoiceRole) -> Option<u16> {
     found_note.then_some(source_part).flatten()
 }
 
+fn exact_source_part_for_role(
+    score: &Score,
+    role: VoiceRole,
+    rendered_note_count: usize,
+) -> Option<u16> {
+    (score.voice(role).len() == rendered_note_count)
+        .then(|| source_part_id_for_role(score, role))
+        .flatten()
+}
+
 fn performance_bundle_payload(
     score: &Score,
     spec: &CompositionSpec,
@@ -4101,7 +4111,8 @@ fn performance_bundle_payload(
             _ => None,
         };
         let expected_count = source_role.map(|role| score.voice(role).len());
-        let source_part_id = source_role.and_then(|role| source_part_id_for_role(score, role));
+        let source_part_id = source_role
+            .and_then(|role| exact_source_part_for_role(score, role, voice.notes.len()));
         let exact_source_mapping = source_part_id.is_some()
             && expected_count == Some(voice.notes.len());
 
@@ -4191,7 +4202,7 @@ fn title_recipe_summary(
 mod piece_bundle_tests {
     use super::{
         cadence_events, orchestration_regions, section_regions, sonority_regions,
-        source_part_id_for_role, symbolic_notes,
+        exact_source_part_for_role, source_part_id_for_role, symbolic_notes,
     };
     use symthaea_music_theory::{
         Duration, Emphasis, FormKind, Key, PartId, Pitch, PitchClass, Score, ScoreNote, VoiceRole,
@@ -4326,6 +4337,32 @@ mod piece_bundle_tests {
         let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
         score.push(note(0, 0.8, Emphasis::Normal));
         assert_eq!(source_part_id_for_role(&score, VoiceRole::Melody), None);
+    }
+
+    #[test]
+    fn role_to_part_mapping_abstains_when_rendered_event_count_differs() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for onset in [0, 1, 2] {
+            score.push(ScoreNote {
+                part: PartId(42),
+                pitch: Pitch::from_midi(60 + onset as u8),
+                onset: Duration::new(onset, 1),
+                duration: Duration::quarter(),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        assert_eq!(
+            exact_source_part_for_role(&score, VoiceRole::Melody, 2),
+            None,
+            "event-count mismatch makes ordinal source mapping unsafe"
+        );
+        assert_eq!(
+            exact_source_part_for_role(&score, VoiceRole::Melody, 3),
+            Some(42)
+        );
     }
 
     #[test]
