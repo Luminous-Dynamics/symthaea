@@ -1,0 +1,242 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_id": "ROB-FEP-THERMO-001",
+  "status": "synthetic_known_answers_only",
+  "cases": [
+    {
+      "case_id": "FT01_CURRENT_EPISTEMIC_ACTION_INVARIANCE",
+      "description": "Two actions produce different predicted means but the same precision and mode probabilities; entropy-based epistemic value is identical.",
+      "current_precision": [
+        2,
+        4
+      ],
+      "transition_precision": 10,
+      "mode_probabilities": [
+        0.6,
+        0.4
+      ],
+      "actions": [
+        {
+          "action_id": "turn-left",
+          "predicted_mean": [
+            0.1,
+            0.9
+          ]
+        },
+        {
+          "action_id": "turn-right",
+          "predicted_mean": [
+            0.9,
+            0.1
+          ]
+        }
+      ],
+      "expected": {
+        "next_precision": [
+          1.6666666667,
+          2.8571428571
+        ],
+        "action_dependent_mean_changes": true,
+        "precision_same_across_actions": true,
+        "mode_probabilities_same_across_actions": true,
+        "entropy_based_epistemic_term_action_invariant": true,
+        "expected_information_gain_status": "not_established_by_this_entropy_delta"
+      }
+    },
+    {
+      "case_id": "FT02_HIGH_EIG_ZERO_EVSI",
+      "description": "A sensor perfectly identifies which of two equally likely states holds, but the optimal downstream action is identical in both states.",
+      "hypotheses": [
+        {
+          "id": "surface-A",
+          "prior": 0.5
+        },
+        {
+          "id": "surface-B",
+          "prior": 0.5
+        }
+      ],
+      "observations": {
+        "surface-A": {
+          "A": 1,
+          "B": 0
+        },
+        "surface-B": {
+          "A": 0,
+          "B": 1
+        }
+      },
+      "decisions": {
+        "continue": {
+          "surface-A": 0,
+          "surface-B": 0
+        },
+        "pause": {
+          "surface-A": 1,
+          "surface-B": 1
+        }
+      },
+      "probe_cost": {
+        "decision_loss_units": 0.2,
+        "physical_energy_j": 1.5
+      },
+      "expected": {
+        "eig_bits": 1,
+        "prior_optimal_decision": "continue",
+        "prior_bayes_risk": 0,
+        "posterior_expected_bayes_risk": 0,
+        "evsi_decision_loss_units": 0,
+        "select_probe": false,
+        "reason": "information does not change downstream decision; nonzero cost"
+      }
+    },
+    {
+      "case_id": "FT03_LOW_EIG_HIGH_EVSI",
+      "description": "A low-probability but costly actuator fault is detected by a modest-information probe; the observation changes the best downstream decision.",
+      "hypotheses": [
+        {
+          "id": "healthy",
+          "prior": 0.9
+        },
+        {
+          "id": "actuator-fault",
+          "prior": 0.1
+        }
+      ],
+      "observations": {
+        "healthy": {
+          "alarm": 0.05,
+          "clear": 0.95
+        },
+        "actuator-fault": {
+          "alarm": 0.8,
+          "clear": 0.2
+        }
+      },
+      "decisions": {
+        "continue": {
+          "healthy": 0,
+          "actuator-fault": 100
+        },
+        "stop": {
+          "healthy": 12,
+          "actuator-fault": 12
+        }
+      },
+      "probe_cost": {
+        "decision_loss_units": 0.5,
+        "physical_energy_j": 2
+      },
+      "expected": {
+        "prior_optimal_decision": "continue",
+        "prior_bayes_risk": 10,
+        "observation_probability": {
+          "alarm": 0.125,
+          "clear": 0.875
+        },
+        "posterior_fault_probability": {
+          "alarm": 0.64,
+          "clear": 0.022857142857
+        },
+        "posterior_optimal_decision": {
+          "alarm": "stop",
+          "clear": "continue"
+        },
+        "posterior_expected_bayes_risk": 3.5,
+        "eig_bits": 0.2136,
+        "evsi_decision_loss_units": 6.5,
+        "net_evsi_decision_loss_units": 6,
+        "select_probe": true
+      }
+    },
+    {
+      "case_id": "FT04_THERMAL_HARD_LIMIT_OVERRIDES_LOW_FEP_SCORE",
+      "description": "The candidate has the best expected-free-energy score but predicts a motor node above its hard limit.",
+      "candidate": {
+        "action_id": "high-torque-turn",
+        "expected_free_energy_score": -0.9,
+        "predicted_thermal_nodes": [
+          {
+            "node_id": "motor-A",
+            "source_class": "estimated",
+            "temperature_c": 93,
+            "hard_limit_c": 100
+          },
+          {
+            "node_id": "motor-B",
+            "source_class": "estimated",
+            "temperature_c": 101,
+            "hard_limit_c": 100
+          },
+          {
+            "node_id": "compute",
+            "source_class": "estimated",
+            "temperature_c": 54,
+            "hard_limit_c": 105
+          }
+        ]
+      },
+      "expected": {
+        "physical_disposition": "Invalid",
+        "violating_nodes": [
+          "motor-B"
+        ],
+        "action_admitted": false,
+        "efe_score_cannot_override_thermal_gate": true
+      }
+    },
+    {
+      "case_id": "FT05_VARIATIONAL_VS_PHYSICAL_UNIT_SEPARATION",
+      "description": "An attempted scalar addition of a variational-free-energy score and measured electrical energy is dimensionally invalid.",
+      "terms": [
+        {
+          "name": "variational_free_energy",
+          "value": 1.3,
+          "unit": "nat",
+          "kind": "information_theoretic"
+        },
+        {
+          "name": "battery_energy",
+          "value": 4,
+          "unit": "J",
+          "kind": "physical"
+        }
+      ],
+      "expected": {
+        "direct_addition_allowed": false,
+        "combined_scalar_allowed_without_explicit_mapping": false,
+        "preserve_as_separate_dimensions": true
+      }
+    },
+    {
+      "case_id": "FT06_MISSING_THERMAL_NODE_EVIDENCE",
+      "description": "One required thermal node has no fresh observation or qualified state estimate; the evaluator must not assign ambient temperature or drop the node.",
+      "thermal_manifest": [
+        "motor-A",
+        "motor-B",
+        "driver-A"
+      ],
+      "thermal_evidence": [
+        {
+          "node_id": "motor-A",
+          "source_class": "measured",
+          "fresh": true,
+          "temperature_c": 72
+        },
+        {
+          "node_id": "motor-B",
+          "source_class": "measured",
+          "fresh": true,
+          "temperature_c": 74
+        }
+      ],
+      "expected": {
+        "physical_disposition": "Unknown",
+        "missing_nodes": [
+          "driver-A"
+        ],
+        "positive_thermal_feasibility_claim": false
+      }
+    }
+  ]
+}
