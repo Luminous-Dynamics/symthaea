@@ -75,6 +75,7 @@ pub mod rhythmic_identity;
 pub mod scale;
 pub mod score;
 pub mod score_edit;
+pub mod score_event_remap;
 pub mod score_validation;
 pub mod sonata;
 pub mod spec;
