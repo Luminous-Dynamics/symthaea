@@ -2,7 +2,7 @@ use jsonschema::{Validator, draft202012};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 const SCHEMA_ID: &str = "https://luminousdynamics.io/schemas/transport/ev-soh-benchmark-manifest/0.1";
 const CORPUS_VERSION: &str = "ev-soh-benchmark-manifest-corpus/0.1";
@@ -424,7 +424,6 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
 
     let mut metric_keys = BTreeSet::new();
     let mut seen_metrics = BTreeMap::<String, BTreeSet<String>>::new();
-    let mut required_coverage_levels = BTreeSet::new();
     let mut test_group_cache = BTreeMap::<String, BTreeSet<String>>::new();
     for metric in &m.metrics {
         if !matches!(
@@ -559,10 +558,8 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
             ));
         }
         if metric.name == "interval_coverage_90" {
-            required_coverage_levels.insert(0.90f64.to_bits());
         }
         if metric.name == "interval_coverage_95" {
-            required_coverage_levels.insert(0.95f64.to_bits());
         }
         seen_metrics
             .entry(metric.name.clone())
@@ -762,8 +759,8 @@ mod tests {
     fn report()->CorpusReport{audit_corpus(SCHEMA,CORPUS).expect("frozen SOH benchmark manifest corpus")}
 
     #[test]
-    fn frozen_corpus_accepts_three_and_rejects_three_controls(){
-        let report=report();assert_eq!(report.payload.case_count,6);assert_eq!(report.payload.accepted_count,3);assert_eq!(report.payload.rejected_count,3);
+    fn frozen_corpus_accepts_four_and_rejects_eleven_controls(){
+        let report=report();assert_eq!(report.payload.case_count,15);assert_eq!(report.payload.accepted_count,4);assert_eq!(report.payload.rejected_count,11);
     }
     #[test]
     fn metric_strata_are_bound_to_test_physical_groups_and_aggregate_values() {
