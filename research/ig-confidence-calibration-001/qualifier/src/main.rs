@@ -34,7 +34,10 @@ struct CalibrationMetrics {
 }
 
 fn field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
-    value.get(key)?.as_str().filter(|value| !value.trim().is_empty())
+    value
+        .get(key)?
+        .as_str()
+        .filter(|value| !value.trim().is_empty())
 }
 
 fn string_set(value: &Value) -> BTreeSet<String> {
@@ -70,10 +73,12 @@ fn set_at_path(root: &mut Value, path: &str, replacement: Value) -> bool {
                 Some(value) => value,
                 None => return false,
             },
-            Value::Array(items) => match part.parse::<usize>().ok().and_then(|i| items.get_mut(i)) {
-                Some(value) => value,
-                None => return false,
-            },
+            Value::Array(items) => {
+                match part.parse::<usize>().ok().and_then(|i| items.get_mut(i)) {
+                    Some(value) => value,
+                    None => return false,
+                }
+            }
             _ => return false,
         };
     }
@@ -109,10 +114,12 @@ fn remove_at_path(root: &mut Value, path: &str) -> bool {
                 Some(value) => value,
                 None => return false,
             },
-            Value::Array(items) => match part.parse::<usize>().ok().and_then(|i| items.get_mut(i)) {
-                Some(value) => value,
-                None => return false,
-            },
+            Value::Array(items) => {
+                match part.parse::<usize>().ok().and_then(|i| items.get_mut(i)) {
+                    Some(value) => value,
+                    None => return false,
+                }
+            }
             _ => return false,
         };
     }
@@ -156,11 +163,23 @@ fn digest_json(value: &Value) -> Option<String> {
     Some(format!("{hash:x}"))
 }
 
-
 const SUPPORTED_SCHEMA_KEYWORDS: [&str; 16] = [
-    "$schema", "$id", "title", "type", "additionalProperties", "required",
-    "properties", "const", "enum", "minLength", "pattern", "minimum",
-    "minItems", "uniqueItems", "items", "maximum",
+    "$schema",
+    "$id",
+    "title",
+    "type",
+    "additionalProperties",
+    "required",
+    "properties",
+    "const",
+    "enum",
+    "minLength",
+    "pattern",
+    "minimum",
+    "minItems",
+    "uniqueItems",
+    "items",
+    "maximum",
 ];
 
 fn validate_schema_definition(schema: &Value, context: &str, errors: &mut Vec<String>) {
@@ -170,11 +189,16 @@ fn validate_schema_definition(schema: &Value, context: &str, errors: &mut Vec<St
     };
     for keyword in object.keys() {
         if !SUPPORTED_SCHEMA_KEYWORDS.contains(&keyword.as_str()) {
-            add(errors, &format!("{context}:unsupported_schema_keyword:{keyword}"));
+            add(
+                errors,
+                &format!("{context}:unsupported_schema_keyword:{keyword}"),
+            );
         }
     }
     if let Some(kind) = schema.get("type") {
-        let supported = ["object", "array", "string", "number", "integer", "boolean", "null"];
+        let supported = [
+            "object", "array", "string", "number", "integer", "boolean", "null",
+        ];
         let types: Vec<&str> = if let Some(single) = kind.as_str() {
             vec![single]
         } else {
@@ -275,8 +299,7 @@ fn validate_json_schema(value: &Value, schema: &Value, context: &str, errors: &m
             }
         }
         if schema.get("uniqueItems").and_then(Value::as_bool) == Some(true) {
-            let serialized: BTreeSet<String> =
-                items.iter().map(Value::to_string).collect();
+            let serialized: BTreeSet<String> = items.iter().map(Value::to_string).collect();
             if serialized.len() != items.len() {
                 add(errors, &format!("{context}:schema_unique_items"));
             }
@@ -291,7 +314,10 @@ fn validate_json_schema(value: &Value, schema: &Value, context: &str, errors: &m
         if let Some(required) = schema.get("required").and_then(Value::as_array) {
             for property in required.iter().filter_map(Value::as_str) {
                 if !object.contains_key(property) {
-                    add(errors, &format!("{context}:schema_required_missing:{property}"));
+                    add(
+                        errors,
+                        &format!("{context}:schema_required_missing:{property}"),
+                    );
                 }
             }
         }
@@ -299,7 +325,10 @@ fn validate_json_schema(value: &Value, schema: &Value, context: &str, errors: &m
         if schema.get("additionalProperties").and_then(Value::as_bool) == Some(false) {
             for property in object.keys() {
                 if !properties.is_some_and(|known| known.contains_key(property)) {
-                    add(errors, &format!("{context}:schema_additional_property:{property}"));
+                    add(
+                        errors,
+                        &format!("{context}:schema_additional_property:{property}"),
+                    );
                 }
             }
         }
@@ -324,9 +353,7 @@ fn validate_schema_header(
     context: &str,
     errors: &mut Vec<String>,
 ) {
-    if schema["$schema"].as_str()
-        != Some("https://json-schema.org/draft/2020-12/schema")
-    {
+    if schema["$schema"].as_str() != Some("https://json-schema.org/draft/2020-12/schema") {
         add(errors, &format!("{context}:schema_dialect_invalid"));
     }
     if schema["$id"].as_str() != Some(expected_id) {
@@ -407,8 +434,7 @@ fn validate_bundle(bundle: &Value) -> Vec<String> {
     {
         add(&mut errors, "model_identity_mismatch");
     }
-    if field(profile, "prompt_family_sha256")
-        != field(evaluation, "prompt_family_sha256")
+    if field(profile, "prompt_family_sha256") != field(evaluation, "prompt_family_sha256")
         || !is_sha256(field(profile, "prompt_family_sha256").unwrap_or_default())
     {
         add(&mut errors, "prompt_family_mismatch");
@@ -437,14 +463,26 @@ fn validate_bundle(bundle: &Value) -> Vec<String> {
     }
 
     let fit_groups: BTreeSet<String> = calibration_data["fit_group_ids"]
-        .as_array().into_iter().flatten().filter_map(Value::as_str)
-        .map(ToOwned::to_owned).collect();
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(ToOwned::to_owned)
+        .collect();
     let validation_groups: BTreeSet<String> = calibration_data["validation_group_ids"]
-        .as_array().into_iter().flatten().filter_map(Value::as_str)
-        .map(ToOwned::to_owned).collect();
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(ToOwned::to_owned)
+        .collect();
     let evaluation_groups: BTreeSet<String> = calibration_data["evaluation_group_ids"]
-        .as_array().into_iter().flatten().filter_map(Value::as_str)
-        .map(ToOwned::to_owned).collect();
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(ToOwned::to_owned)
+        .collect();
     if !fit_groups.is_disjoint(&validation_groups) {
         add(&mut errors, "fit_validation_group_overlap");
     }
@@ -471,7 +509,9 @@ fn validate_bundle(bundle: &Value) -> Vec<String> {
         errors.dedup();
         return errors;
     };
-    let minimum = bundle["minimum_observations"].as_u64().unwrap_or(MINIMUM_SAMPLE_COUNT as u64);
+    let minimum = bundle["minimum_observations"]
+        .as_u64()
+        .unwrap_or(MINIMUM_SAMPLE_COUNT as u64);
     if observations.len() < minimum as usize || observations.len() < MINIMUM_SAMPLE_COUNT {
         add(&mut errors, "evaluation_observation_count_insufficient");
     }
@@ -545,8 +585,7 @@ fn calculate_metrics(bundle: &Value) -> Option<CalibrationMetrics> {
             .iter()
             .copied()
             .filter(|(probability, _)| {
-                let bucket = ((*probability * ECE_BINS as f64).floor() as usize)
-                    .min(ECE_BINS - 1);
+                let bucket = ((*probability * ECE_BINS as f64).floor() as usize).min(ECE_BINS - 1);
                 bucket == index
             })
             .collect();
@@ -554,8 +593,11 @@ fn calculate_metrics(bundle: &Value) -> Option<CalibrationMetrics> {
             continue;
         }
         let count = members.len();
-        let mean_probability =
-            members.iter().map(|(probability, _)| *probability).sum::<f64>() / count as f64;
+        let mean_probability = members
+            .iter()
+            .map(|(probability, _)| *probability)
+            .sum::<f64>()
+            / count as f64;
         let observed_frequency =
             members.iter().map(|(_, outcome)| *outcome).sum::<f64>() / count as f64;
         ece += (count as f64 / n) * (mean_probability - observed_frequency).abs();
@@ -650,8 +692,12 @@ fn read_json(path: &str) -> Result<Value, String> {
 }
 
 fn apply_fixture(bundle: &mut Value, fixture: &Value) -> bool {
-    let Some(mutation) = fixture.get("mutation") else { return true; };
-    if mutation.is_null() { return true; }
+    let Some(mutation) = fixture.get("mutation") else {
+        return true;
+    };
+    if mutation.is_null() {
+        return true;
+    }
     let path = field(mutation, "path").unwrap_or_default();
     match field(mutation, "operation") {
         Some("set") => set_at_path(bundle, path, mutation["value"].clone()),
@@ -671,19 +717,31 @@ fn main() -> ExitCode {
     }
     let bundle = match read_json(&args[1]) {
         Ok(value) => value,
-        Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
     };
     let controls = match read_json(&args[2]) {
         Ok(value) => value,
-        Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
     };
     let evaluation_schema = match read_json(&args[3]) {
         Ok(value) => value,
-        Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
     };
     let controls_schema = match read_json(&args[4]) {
         Ok(value) => value,
-        Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
     };
 
     let mut findings =
@@ -716,7 +774,9 @@ fn main() -> ExitCode {
         findings.sort();
         findings.dedup();
         eprintln!("CONFIDENCE CALIBRATION QUALIFICATION FAILED:");
-        for finding in findings { eprintln!(" - {finding}"); }
+        for finding in findings {
+            eprintln!(" - {finding}");
+        }
         return ExitCode::FAILURE;
     }
     let Some(metrics) = calculate_metrics(&bundle) else {
@@ -728,9 +788,7 @@ fn main() -> ExitCode {
             "QUALIFIED STRUCTURAL CONFIDENCE EVALUATOR: n={} ",
             "independent_groups={} uncertainty_interval={}"
         ),
-        metrics.sample_count,
-        metrics.independent_group_count,
-        metrics.uncertainty_interval_status
+        metrics.sample_count, metrics.independent_group_count, metrics.uncertainty_interval_status
     );
     println!(
         "Brier={:.8} log_loss={:.8} ECE10={:.8} tie_aware_AURC={:.8}",
@@ -740,9 +798,7 @@ fn main() -> ExitCode {
         println!("risk@coverage[{:.0}%]={:.8}", coverage * 100.0, risk);
     }
     println!("NOT A CALIBRATOR: no calibration map was fitted by this evaluator.");
-    println!(
-        "NOT AUTHORITY: confidence does not create rights, voice, vote weight, or authority."
-    );
+    println!("NOT AUTHORITY: confidence does not create rights, voice, vote weight, or authority.");
     println!("SYNTHETIC ONLY: the checked-in outcomes are fictional known-answer controls.");
     ExitCode::SUCCESS
 }
@@ -753,8 +809,7 @@ mod tests {
 
     const BUNDLE: &str = include_str!("../../CONFIDENCE_EVALUATION_V0_1.json");
     const CONTROLS: &str = include_str!("../../CONFIDENCE_NEGATIVE_CONTROLS_V0_1.json");
-    const BUNDLE_SCHEMA: &str =
-        include_str!("../../CONFIDENCE_EVALUATION_V0_1.schema.json");
+    const BUNDLE_SCHEMA: &str = include_str!("../../CONFIDENCE_EVALUATION_V0_1.schema.json");
     const CONTROLS_SCHEMA: &str =
         include_str!("../../CONFIDENCE_NEGATIVE_CONTROLS_V0_1.schema.json");
 
@@ -784,7 +839,11 @@ mod tests {
             &parsed(CONTROLS),
             &parsed(CONTROLS_SCHEMA),
         );
-        assert!(errors.iter().any(|error| error.contains("unsupported_schema_keyword:maxLength")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("unsupported_schema_keyword:maxLength"))
+        );
     }
 
     #[test]
@@ -797,7 +856,11 @@ mod tests {
             &parsed(CONTROLS),
             &parsed(CONTROLS_SCHEMA),
         );
-        assert!(errors.iter().any(|error| error.contains("schema_additional_property:undeclared_field")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("schema_additional_property:undeclared_field"))
+        );
     }
 
     #[test]
@@ -810,7 +873,11 @@ mod tests {
             &controls,
             &parsed(CONTROLS_SCHEMA),
         );
-        assert!(errors.iter().any(|error| error.contains("schema_additional_property:unregistered")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("schema_additional_property:unregistered"))
+        );
     }
 
     #[test]
@@ -881,7 +948,12 @@ mod tests {
             assert!(apply_fixture(&mut changed, fixture));
             let actual: BTreeSet<String> = validate_bundle(&changed).into_iter().collect();
             let expected = string_set(&fixture["expected_violations"]);
-            assert_eq!(actual, expected, "fixture {}", field(fixture, "fixture_id").unwrap());
+            assert_eq!(
+                actual,
+                expected,
+                "fixture {}",
+                field(fixture, "fixture_id").unwrap()
+            );
         }
     }
 
