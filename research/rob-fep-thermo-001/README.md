@@ -243,3 +243,8 @@ The entropy/exergy analytical controls are also machine-readable:
 - [fixtures/entropy_exergy_v0_1.schema.json](./fixtures/entropy_exergy_v0_1.schema.json)
 
 They are seven synthetic known-answer cases, not empirical or physical-model qualification. The physical-accounting implementation owner is [Symtropy #4631](https://github.com/Luminous-Dynamics/symtropy/issues/4631).
+
+
+## Competitive landscape and proposed targets
+
+The November 2026 comparator matrix, ablations, sequential-mission design and proposed (not achieved) targets are in [competitive_landscape_2026-11.md](./competitive_landscape_2026-11.md). The comparison keeps RAIBO2, A1, ANYmal, manipulator and simulation results in separate strata and introduces GenAIF and test-time physical-diagnosis papers as additional active-inference comparators.
