@@ -1738,3 +1738,49 @@ jobs:
           sudo mv gitleaks /usr/local/bin/
       - name: Run gitleaks
         run: gitleaks detect --source . --config .gitleaks.toml --verbose --exit-code 1
+
+
+  test-oli-ape-spatial:
+    name: OLI (source-aware ape spatial cognition)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: \${{ runner.os }}-cargo-oli-bench-\${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            \${{ runner.os }}-cargo-oli-bench-
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-oli-bench -- --check
+
+      - name: Run source and split-law tests
+        run: cargo test -p symthaea-oli-bench --locked
+
+      - name: Strict Clippy
+        run: cargo clippy -p symthaea-oli-bench --all-targets --locked -- -D warnings
+
+      - name: Emit descriptive audit receipt
+        run: cargo run -p symthaea-oli-bench --locked > oli-ape-spatial-audit.json
+
+      - name: Upload audit receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oli-ape-spatial-audit-\${{ github.sha }}
+          path: oli-ape-spatial-audit.json
+          retention-days: 30
