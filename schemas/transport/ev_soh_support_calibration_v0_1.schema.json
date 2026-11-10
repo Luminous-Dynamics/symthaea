@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-soh-support-calibration/0.1",
+  "title": "SOH support-conditioned calibration manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "manifest_id",
+    "benchmark_manifest_digest",
+    "dataset_digest",
+    "split_manifest_digest",
+    "model_digest",
+    "evaluation_mode",
+    "split_frozen_at_ms",
+    "train_group_identity_digests",
+    "validation_group_identity_digests",
+    "support_scoring",
+    "calibration",
+    "test_entries"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "ev-soh-support-calibration/0.1"
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_manifest_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "dataset_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "split_manifest_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "model_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_mode": {
+      "enum": [
+        "unseen_cell",
+        "unseen_module",
+        "unseen_pack",
+        "unseen_vehicle",
+        "unseen_lab",
+        "unseen_domain"
+      ]
+    },
+    "split_frozen_at_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "train_group_identity_digests": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "validation_group_identity_digests": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "support_scoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_ref",
+        "method_digest",
+        "feature_schema_digest",
+        "fit_scope",
+        "reference_partition",
+        "uses_validation_or_test_labels",
+        "score_definition",
+        "score_direction",
+        "in_support_max_score",
+        "extrapolation_min_score",
+        "thresholds_frozen_at_ms",
+        "risk_coverage_cutoffs",
+        "threshold_evidence_digest"
+      ],
+      "properties": {
+        "method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "feature_schema_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fit_scope": {
+          "const": "train_only"
+        },
+        "reference_partition": {
+          "const": "train"
+        },
+        "uses_validation_or_test_labels": {
+          "const": false
+        },
+        "score_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score_direction": {
+          "const": "higher_is_less_supported"
+        },
+        "in_support_max_score": {
+          "type": "number",
+          "minimum": 0
+        },
+        "extrapolation_min_score": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "thresholds_frozen_at_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "risk_coverage_cutoffs": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "uniqueItems": true
+        },
+        "threshold_evidence_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_ref",
+        "method_digest",
+        "partition",
+        "calibration_group_identity_digests",
+        "calibration_split_digest",
+        "external_source_digest",
+        "fitted_at_ms"
+      ],
+      "properties": {
+        "method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "partition": {
+          "enum": [
+            "validation_only",
+            "external_calibration"
+          ]
+        },
+        "calibration_group_identity_digests": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "calibration_split_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "external_source_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fitted_at_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "test_entries": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_digest",
+          "group_identity_digest",
+          "support_score",
+          "support_score_evidence_digest",
+          "support_score_evidence_class",
+          "target_value",
+          "target_evidence_digest",
+          "target_evidence_class",
+          "predicted_mean",
+          "lower_90",
+          "upper_90",
+          "lower_95",
+          "upper_95",
+          "prediction_digest"
+        ],
+        "properties": {
+          "sample_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "group_identity_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "support_score": {
+            "type": "number",
+            "minimum": 0
+          },
+          "support_score_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "support_score_evidence_class": {
+            "enum": [
+              "physical_observation",
+              "derived_from_physical",
+              "simulation",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          },
+          "target_value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "target_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "target_evidence_class": {
+            "enum": [
+              "physical_observation",
+              "derived_from_physical",
+              "simulation",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          },
+          "predicted_mean": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "lower_90": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "upper_90": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "lower_95": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "upper_95": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "prediction_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  }
+}
