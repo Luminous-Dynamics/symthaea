@@ -609,6 +609,24 @@ mod tests {
         let r=report();let c=r.payload.cases.iter().find(|c|c.case_id=="unlabeled-target-adaptation-explicit").unwrap();assert!(c.accepted);
     }
     #[test]
+    fn target_adaptation_requires_nonzero_unlabeled_budget_and_zero_labels() {
+        let r = report();
+        let c = r.payload.cases.iter()
+            .find(|c| c.case_id == "zero-budget-target-adaptation-rejected")
+            .expect("zero budget adaptation control");
+        assert!(!c.accepted);
+    }
+
+    #[test]
+    fn metric_aggregation_must_match_declared_physical_group() {
+        let r = report();
+        let c = r.payload.cases.iter()
+            .find(|c| c.case_id == "aggregation-must-match-physical-group-rejected")
+            .expect("aggregation mismatch control");
+        assert!(!c.accepted);
+    }
+
+    #[test]
     fn duplicate_sample_digest_across_partitions_is_rejected(){
         let r=report();let c=r.payload.cases.iter().find(|c|c.case_id=="duplicate-sample-cross-split").unwrap();assert!(!c.accepted);
     }
@@ -618,6 +636,7 @@ mod tests {
         for case in value["cases"].as_array_mut().unwrap(){
             for partition in ["train","validation","test"]{case["manifest"]["splits"][partition]["entities"].as_array_mut().unwrap().reverse();}
             case["manifest"]["metrics"].as_array_mut().unwrap().reverse();
+            case["manifest"]["execution"]["random_seeds"].as_array_mut().unwrap().reverse();
             for metric in case["manifest"]["metrics"].as_array_mut().unwrap(){metric["strata"].as_array_mut().unwrap().reverse();}
         }
         let reversed=serde_json::to_vec(&value).unwrap();let replay=audit_corpus(SCHEMA,&reversed).unwrap();assert_eq!(original.report_sha256,replay.report_sha256);
