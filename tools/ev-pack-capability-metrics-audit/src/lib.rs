@@ -191,13 +191,19 @@ struct LifetimeUnit {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct MetricEvidence {
+    pub role: String,
+    pub digest: String,
+    pub evidence_class: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct MetricResult {
     pub status: String,
     pub value: Option<f64>,
     pub unit: String,
     pub population_scope: String,
-    pub evidence_digests: Vec<String>,
-    pub evidence_classes: Vec<String>,
+    pub evidence: Vec<MetricEvidence>,
     pub reason: Option<String>,
 }
 
@@ -644,8 +650,7 @@ fn not_computable(unit: &str, scope: &str, reason: &str) -> MetricResult {
         value: None,
         unit: unit.to_owned(),
         population_scope: scope.to_owned(),
-        evidence_digests: Vec::new(),
-        evidence_classes: Vec::new(),
+        evidence: Vec::new(),
         reason: Some(reason.to_owned()),
     }
 }
@@ -654,23 +659,36 @@ fn computed(
     value: f64,
     unit: &str,
     scope: &str,
-    digests: Vec<String>,
-    evidence_classes: Vec<String>,
+    mut evidence: Vec<MetricEvidence>,
 ) -> MetricResult {
-    let mut sorted_digests = digests;
-    sorted_digests.sort();
-    sorted_digests.dedup();
-    let mut sorted_classes = evidence_classes;
-    sorted_classes.sort();
-    sorted_classes.dedup();
+    evidence.sort_by(|left, right| {
+        (&left.role, &left.digest, &left.evidence_class)
+            .cmp(&(&right.role, &right.digest, &right.evidence_class))
+    });
+    evidence.dedup_by(|left, right| {
+        left.role == right.role
+            && left.digest == right.digest
+            && left.evidence_class == right.evidence_class
+    });
     MetricResult {
         status: "COMPUTED".to_owned(),
         value: Some(value),
         unit: unit.to_owned(),
         population_scope: scope.to_owned(),
-        evidence_digests: sorted_digests,
-        evidence_classes: sorted_classes,
+        evidence,
         reason: None,
+    }
+}
+
+fn metric_evidence(
+    role: String,
+    digest: String,
+    evidence_class: Option<String>,
+) -> MetricEvidence {
+    MetricEvidence {
+        role,
+        digest,
+        evidence_class,
     }
 }
 
@@ -695,41 +713,45 @@ fn calculate_metrics(
     soh_distribution: &DistributionSummary,
 ) -> InconsistencyMetrics {
     let population_scope = scope(profile);
-    let source_digest = profile.provenance.source_batch_digest.clone();
-    let soh_digests: Vec<String> = profile
+    let soh_evidence: Vec<MetricEvidence> = profile
         .units
         .iter()
-        .map(|unit| unit.capacity.evidence_digest.clone())
-        .chain(std::iter::once(source_digest.clone()))
+        .map(|unit| {
+            metric_evidence(
+                format!("capacity_soh:{}", unit.unit_ref),
+                unit.capacity.evidence_digest.clone(),
+                Some(unit.capacity.evidence_class.clone()),
+            )
+        })
+        .chain(std::iter::once(metric_evidence(
+            "source_batch".to_owned(),
+            profile.provenance.source_batch_digest.clone(),
+            None,
+        )))
         .collect();
-    let soh_classes: Vec<String> = profile
-        .units
-        .iter()
-        .map(|unit| unit.capacity.evidence_class.clone())
-        .collect();
+
+    let topology_evidence = || {
+        let mut evidence = vec![metric_evidence(
+            "topology_descriptor".to_owned(),
+            profile.topology.topology_digest.clone(),
+            None,
+        )];
+        if let Some(qualification) = &profile.topology.qualification {
+            evidence.push(metric_evidence(
+                "topology_qualification".to_owned(),
+                qualification.evidence_digest.clone(),
+                Some(qualification.evidence_class.clone()),
+            ));
+        }
+        evidence
+    };
+
     let sigma_soh = computed(
         soh_distribution.population_standard_deviation,
         "SOH_fraction",
         &population_scope,
-        soh_digests.clone(),
-        soh_classes.clone(),
+        soh_evidence.clone(),
     );
-
-    let topology_digests = || {
-        let mut digests = vec![profile.topology.topology_digest.clone()];
-        if let Some(qualification) = &profile.topology.qualification {
-            digests.push(qualification.evidence_digest.clone());
-        }
-        digests
-    };
-    let topology_classes = || {
-        profile
-            .topology
-            .qualification
-            .as_ref()
-            .map(|qualification| vec![qualification.evidence_class.clone()])
-            .unwrap_or_default()
-    };
 
     let beta_soh = match series_cell_gate(profile) {
         Ok(()) => {
@@ -739,15 +761,10 @@ fn calculate_metrics(
                 minimum / mean,
                 "ratio",
                 &population_scope,
-                soh_digests
+                soh_evidence
                     .iter()
                     .cloned()
-                    .chain(topology_digests())
-                    .collect(),
-                soh_classes
-                    .iter()
-                    .cloned()
-                    .chain(topology_classes())
+                    .chain(topology_evidence())
                     .collect(),
             )
         }
@@ -792,21 +809,24 @@ fn calculate_metrics(
                 } else {
                     let minimum = efcs.iter().copied().fold(f64::INFINITY, f64::min);
                     let value = efcs.len() as f64 * minimum / efcs.iter().sum::<f64>();
-                    let digests = lifetime
+                    let lifetime_evidence: Vec<MetricEvidence> = lifetime
                         .units
                         .iter()
-                        .filter_map(|row| row.evidence_digest.clone())
-                        .chain(std::iter::once(lifetime.evidence_digest.clone()))
-                        .chain(std::iter::once(source_digest.clone()))
-                        .chain(topology_digests())
+                        .map(|row| {
+                            metric_evidence(
+                                format!("efc_to_eol:{}", row.unit_ref),
+                                row.evidence_digest.clone().unwrap_or_default(),
+                                Some(row.evidence_class.clone()),
+                            )
+                        })
+                        .chain(std::iter::once(metric_evidence(
+                            "eol_evidence_batch".to_owned(),
+                            lifetime.evidence_digest.clone(),
+                            None,
+                        )))
+                        .chain(topology_evidence())
                         .collect();
-                    let classes = lifetime
-                        .units
-                        .iter()
-                        .map(|row| row.evidence_class.clone())
-                        .chain(topology_classes())
-                        .collect();
-                    computed(value, "ratio", &population_scope, digests, classes)
+                    computed(value, "ratio", &population_scope, lifetime_evidence)
                 }
             }
         },
@@ -846,7 +866,10 @@ fn calculate_metrics(
                     .observations
                     .iter()
                     .map(|row| {
-                        let unit_soh = soh_by_unit.get(row.unit_ref.as_str()).copied().unwrap_or(0.0);
+                        let unit_soh = soh_by_unit
+                            .get(row.unit_ref.as_str())
+                            .copied()
+                            .unwrap_or(0.0);
                         (soc_max - row.soc_fraction) * unit_soh
                     })
                     .sum();
@@ -857,27 +880,29 @@ fn calculate_metrics(
                         "POSITIVE_COMPARABLE_SOH_WEIGHT_REQUIRED",
                     )
                 } else {
-                    let digests = snapshot
+                    let soc_evidence: Vec<MetricEvidence> = snapshot
                         .observations
                         .iter()
-                        .map(|row| row.evidence_digest.clone())
-                        .chain(std::iter::once(snapshot.snapshot_digest.clone()))
-                        .chain(soh_digests.clone())
-                        .chain(topology_digests())
-                        .collect();
-                    let classes = snapshot
-                        .observations
-                        .iter()
-                        .map(|row| row.evidence_class.clone())
-                        .chain(soh_classes.clone())
-                        .chain(topology_classes())
+                        .map(|row| {
+                            metric_evidence(
+                                format!("end_of_charge_soc:{}", row.unit_ref),
+                                row.evidence_digest.clone(),
+                                Some(row.evidence_class.clone()),
+                            )
+                        })
+                        .chain(std::iter::once(metric_evidence(
+                            "soc_snapshot".to_owned(),
+                            snapshot.snapshot_digest.clone(),
+                            None,
+                        )))
+                        .chain(soh_evidence.iter().cloned())
+                        .chain(topology_evidence())
                         .collect();
                     computed(
                         1.0 - weighted_gap / total_soh,
                         "ratio",
                         &population_scope,
-                        digests,
-                        classes,
+                        soc_evidence,
                     )
                 }
             }
@@ -1122,7 +1147,7 @@ mod tests {
     }
 
     #[test]
-    fn computed_metrics_preserve_input_evidence_classes_and_topology_authority() {
+    fn computed_metrics_preserve_digest_to_evidence_class_bindings() {
         let report = report();
         let complete = report
             .payload
@@ -1132,11 +1157,22 @@ mod tests {
             .and_then(|case| case.summary.as_ref())
             .expect("complete pack summary");
         let metrics = &complete.inconsistency_metrics;
-        assert_eq!(metrics.sigma_soh.evidence_classes, vec!["synthetic_fixture"]);
-        assert_eq!(metrics.beta_soh.evidence_classes, vec!["synthetic_fixture"]);
-        assert_eq!(metrics.beta_life.evidence_classes, vec!["synthetic_fixture"]);
-        assert_eq!(metrics.beta_soc.evidence_classes, vec!["synthetic_fixture"]);
-        assert!(metrics.beta_soh.evidence_digests.iter().any(|digest| digest == "0000000000000000000000000000000000000000000000000000000000001f48"));
+        assert!(metrics.sigma_soh.evidence.iter().any(|item| {
+            item.role == "capacity_soh:cell-001"
+                && item.evidence_class.as_deref() == Some("synthetic_fixture")
+        }));
+        assert!(metrics.beta_soh.evidence.iter().any(|item| {
+            item.role == "topology_qualification"
+                && item.evidence_class.as_deref() == Some("synthetic_fixture")
+        }));
+        assert!(metrics.beta_life.evidence.iter().any(|item| {
+            item.role == "efc_to_eol:cell-001"
+                && item.evidence_class.as_deref() == Some("synthetic_fixture")
+        }));
+        assert!(metrics.beta_soc.evidence.iter().any(|item| {
+            item.role == "end_of_charge_soc:cell-001"
+                && item.evidence_class.as_deref() == Some("synthetic_fixture")
+        }));
     }
 
     #[test]
