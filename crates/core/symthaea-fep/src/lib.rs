@@ -138,14 +138,31 @@
 //! - Sutton, R.S. & Barto, A.G. (2018). Reinforcement Learning: An Introduction (2nd ed.)
 
 mod agent;
+pub mod bayesian_model_reduction;
 mod bridge;
+pub mod decision_diagnostic_benchmark;
+pub mod decision_relevant_information;
+pub mod causal_diagnostic_semantics;
+pub mod gaussian_decision_diagnostic;
+pub mod sequential_diagnostic_planning;
+pub mod sequential_diagnostic_benchmark;
+pub mod static_model_diagnostic;
+pub mod dirichlet_model_reduction;
 pub mod free_energy;
+pub mod gaussian_model_information_gain;
 pub mod generative_model;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
+pub mod hierarchical_information_gain;
+pub mod open_world_robust_decision;
+pub mod sibson_alpha_information;
+pub mod open_world_weight_program_gate;
 pub mod markov_blanket;
 mod motor;
 mod td_learning;
+pub mod three_ball_partial_observation;
+pub mod three_ball_rule_space;
+pub mod three_ball_sequential_discovery;
 pub mod types;
 
 #[cfg(test)]
@@ -165,6 +182,28 @@ pub use td_learning::{
 };
 
 pub use generative_model::GenerativeModel;
+
+pub use gaussian_model_information_gain::{
+    GaussianModelInformationGain, GaussianModelInformationGainConfig,
+    GaussianModelInformationGainError, GaussianObservationAction, GaussianObservationHypothesis,
+    evaluate_gaussian_model_information_gains,
+};
+
+pub use dirichlet_model_reduction::{
+    DirichletActionPrediction, DirichletBayesianModelReductionError,
+    DirichletBayesianModelReductionResult, DirichletConcentrationTensor,
+    DirichletModelInformationGain, DirichletModelInformationGainError, DirichletOutcomeModelBelief,
+    DirichletPredictedOutcome, ReducedDirichletModelEvidence, ReducedDirichletModelHypothesis,
+    evaluate_dirichlet_model_information_gain,
+    evaluate_dirichlet_model_information_gain_spm_compatible, reduce_dirichlet_models,
+    reduce_dirichlet_models_spm_compatible,
+};
+
+pub use hierarchical_information_gain::{
+    EpistemicLevel, HierarchicalActionInformationGain, HierarchicalHypothesis,
+    HierarchicalInformationGainError, compute_hierarchical_information_gain,
+    compute_hierarchical_information_gains, most_informative_action_at_level,
+};
 
 pub use haptic_semantic_binder::HapticSemanticBinder;
 

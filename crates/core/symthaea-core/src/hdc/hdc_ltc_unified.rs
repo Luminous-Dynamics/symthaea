@@ -267,11 +267,7 @@ pub struct HdcLtcUnifiedNeuron {
 
 #[inline]
 fn sanitize_hdc_ltc_dt(dt: f32) -> f32 {
-    if dt.is_finite() {
-        dt.max(0.0)
-    } else {
-        0.0
-    }
+    if dt.is_finite() { dt.max(0.0) } else { 0.0 }
 }
 
 /// Fast rational approximation of `tanh(x)` that auto-vectorizes on AVX2.
@@ -570,16 +566,27 @@ pub enum HdcLtcParameterGroupId {
 /// Failure returned when a proposed HDC-LTC parameter-group edit is invalid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HdcLtcParameterEditError {
-    DimensionMismatch { expected: usize, actual: usize },
-    NonFiniteValue { index: usize },
-    NormExceeded { group: HdcLtcParameterGroupId, norm_micros: u64 },
+    DimensionMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteValue {
+        index: usize,
+    },
+    NormExceeded {
+        group: HdcLtcParameterGroupId,
+        norm_micros: u64,
+    },
 }
 
 impl std::fmt::Display for HdcLtcParameterEditError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::DimensionMismatch { expected, actual } => {
-                write!(f, "HDC-LTC parameter dimension mismatch: expected {expected}, received {actual}")
+                write!(
+                    f,
+                    "HDC-LTC parameter dimension mismatch: expected {expected}, received {actual}"
+                )
             }
             Self::NonFiniteValue { index } => {
                 write!(f, "HDC-LTC parameter value at index {index} is not finite")
@@ -629,7 +636,12 @@ fn profile_hypervector(
 ) -> HdcLtcParameterGroupProfile {
     let dimension = hv.values.len();
     let non_finite_count = hv.values.iter().filter(|value| !value.is_finite()).count();
-    let finite_values: Vec<f32> = hv.values.iter().copied().filter(|value| value.is_finite()).collect();
+    let finite_values: Vec<f32> = hv
+        .values
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .collect();
     let mean = if finite_values.is_empty() {
         0.0
     } else {
@@ -645,7 +657,10 @@ fn profile_hypervector(
             / finite_values.len() as f32
     };
     let min_value = finite_values.iter().copied().fold(f32::INFINITY, f32::min);
-    let max_value = finite_values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let max_value = finite_values
+        .iter()
+        .copied()
+        .fold(f32::NEG_INFINITY, f32::max);
 
     HdcLtcParameterGroupProfile {
         id,
@@ -654,10 +669,21 @@ fn profile_hypervector(
         norm: hv.norm(),
         mean,
         variance,
-        min_value: if finite_values.is_empty() { 0.0 } else { min_value },
-        max_value: if finite_values.is_empty() { 0.0 } else { max_value },
+        min_value: if finite_values.is_empty() {
+            0.0
+        } else {
+            min_value
+        },
+        max_value: if finite_values.is_empty() {
+            0.0
+        } else {
+            max_value
+        },
         non_finite_count,
-        saturated_count: finite_values.iter().filter(|value| value.abs() >= 0.99).count(),
+        saturated_count: finite_values
+            .iter()
+            .filter(|value| value.abs() >= 0.99)
+            .count(),
     }
 }
 
@@ -722,8 +748,8 @@ impl HdcLtcUnifiedNeuron {
         for index in 0..parameters.len() {
             for previous in 0..index {
                 let projection = parameters[index].dot(&parameters[previous]);
-                parameters[index] = parameters[index]
-                    .subtract(&parameters[previous].scale(projection));
+                parameters[index] =
+                    parameters[index].subtract(&parameters[previous].scale(projection));
             }
 
             let norm = parameters[index].norm();
@@ -734,6 +760,9 @@ impl HdcLtcUnifiedNeuron {
 
         Self {
             state: ContinuousHV::zero(dim),
+            pre_evolution_state: None,
+            pre_evolution_time: 0.0,
+            pre_evolution_dt: 0.0,
             weight_hv: parameters[0].clone(),
             input_mask: parameters[1].clone(),
             tau_modulator: parameters[2].clone(),
@@ -838,7 +867,9 @@ impl HdcLtcUnifiedNeuron {
     /// Compute the equilibrium state x_∞ for the current state and input.
     #[inline]
     fn compute_equilibrium(&self, input: &ContinuousHV) -> ContinuousHV {
-        self.config.activation.apply(&self.compute_pre_activation(input))
+        self.config
+            .activation
+            .apply(&self.compute_pre_activation(input))
     }
 
     /// Compute effective time constant τ(||x||, u)
@@ -886,7 +917,11 @@ impl HdcLtcUnifiedNeuron {
         }
 
         let denominator = (bundle_norm_sq * gate_norm_sq).sqrt();
-        let similarity = if denominator < 1e-10 { 0.0 } else { dot / denominator };
+        let similarity = if denominator < 1e-10 {
+            0.0
+        } else {
+            dot / denominator
+        };
         similarity + bias_sum / dim as f32
     }
 
@@ -1290,13 +1325,15 @@ impl HdcLtcUnifiedNeuron {
 
         for step in 0..n_steps {
             let step_time = start_time + (step as f64 * sub_dt as f64);
-            let equilibrium = self.config.activation.apply(
-                &self.compute_pre_activation_at(&self.state, input, step_time),
-            );
-            let tau = self.compute_tau_unclamped_at(&self.state, input).clamp(0.01, 10.0);
+            let equilibrium = self
+                .config
+                .activation
+                .apply(&self.compute_pre_activation_at(&self.state, input, step_time));
+            let tau = self
+                .compute_tau_unclamped_at(&self.state, input)
+                .clamp(0.01, 10.0);
             let gate_activation = self.compute_gate_activation_at(&self.state, input);
-            let gate_rate = 1.0
-                / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
+            let gate_rate = 1.0 / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
             let exponent = -sub_dt * gate_rate / tau;
             let sigma = (-exponent.exp_m1()).clamp(0.0, 1.0);
             self.state.lerp_in_place(&equilibrium, 1.0 - sigma, sigma);
@@ -1314,13 +1351,15 @@ impl HdcLtcUnifiedNeuron {
         state: &ContinuousHV,
         time: f64,
     ) -> ContinuousHV {
-        let equilibrium = self.config.activation.apply(
-            &self.compute_pre_activation_at(state, input, time),
-        );
-        let tau = self.compute_tau_unclamped_at(state, input).clamp(0.01, 10.0);
+        let equilibrium = self
+            .config
+            .activation
+            .apply(&self.compute_pre_activation_at(state, input, time));
+        let tau = self
+            .compute_tau_unclamped_at(state, input)
+            .clamp(0.01, 10.0);
         let gate_activation = self.compute_gate_activation_at(state, input);
-        let gate_rate = 1.0
-            / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
+        let gate_rate = 1.0 / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
 
         // dx/dt = gate_rate(state,input) * (equilibrium(state,input,time) - state) / tau(state,input)
         equilibrium.subtract(state).scale(gate_rate / tau)
@@ -1394,10 +1433,7 @@ impl HdcLtcUnifiedNeuron {
     }
 
     /// Return an immutable reference to one typed learnable parameter vector.
-    pub fn parameter_group(
-        &self,
-        id: HdcLtcParameterGroupId,
-    ) -> &ContinuousHV {
+    pub fn parameter_group(&self, id: HdcLtcParameterGroupId) -> &ContinuousHV {
         match id {
             HdcLtcParameterGroupId::WeightHypervector => &self.weight_hv,
             HdcLtcParameterGroupId::InputMask => &self.input_mask,
@@ -1858,15 +1894,12 @@ impl HdcLtcUnifiedNeuron {
         let tau = tau_unclamped.clamp(0.01, 10.0);
         let tau_gradient_active = tau_unclamped > 0.01 && tau_unclamped < 10.0;
         let gate_activation = self.compute_gate_activation_at(state, input);
-        let gate_base =
-            1.0 / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
+        let gate_base = 1.0 / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
         let dt = sanitize_hdc_ltc_dt(dt);
         let exponent = -dt * gate_base / tau;
         let decay = exponent.exp();
         let sigma = (-exponent.exp_m1()).clamp(0.0, 1.0);
-        let new_state = equilibrium
-            .scale(sigma)
-            .add(&state.scale(1.0 - sigma));
+        let new_state = equilibrium.scale(sigma).add(&state.scale(1.0 - sigma));
 
         // Mean-squared-error derivative at the one-step prediction.
         let dh = new_state.subtract(target).scale(2.0 / dim as f32);
@@ -1888,9 +1921,7 @@ impl HdcLtcUnifiedNeuron {
             dh.values
                 .iter()
                 .zip(z.values.iter())
-                .map(|(&error, &pre)| {
-                    error * sigma * activation.derivative(pre) / bundle_terms
-                })
+                .map(|(&error, &pre)| error * sigma * activation.derivative(pre) / bundle_terms)
                 .collect(),
         );
 
@@ -1917,9 +1948,8 @@ impl HdcLtcUnifiedNeuron {
             cosine_gradient_wrt_right(input, &self.tau_modulator).scale(tau_similarity_gradient);
         let d_input_tau =
             cosine_gradient_wrt_left(input, &self.tau_modulator).scale(tau_similarity_gradient);
-        let tau_state_coefficient = self.config.tau_base
-            * self.config.backbone_tau
-            * (1.0 + 0.2 * input_tau_similarity);
+        let tau_state_coefficient =
+            self.config.tau_base * self.config.backbone_tau * (1.0 + 0.2 * input_tau_similarity);
         let d_state_tau = if state_norm > 1e-10 {
             state
                 .scale(tau_state_coefficient / state_norm)
@@ -1930,28 +1960,19 @@ impl HdcLtcUnifiedNeuron {
 
         // The adaptive gate is based on cosine(bundle(state, input), gate_weight)
         // plus the mean gate bias. Differentiate this path as well.
-        let bundled_state_input =
-            state.add(input).scale(0.5);
+        let bundled_state_input = state.add(input).scale(0.5);
         let dloss_dgate_activation = dloss_dsigma
             * decay
             * (dt / tau)
             * self.config.gating_steepness
             * gate_base
             * (1.0 - gate_base);
-        let d_gate_weight = cosine_gradient_wrt_right(
-            &bundled_state_input,
-            &self.gate_weight,
-        )
-        .scale(dloss_dgate_activation);
-        let d_gate_bias = ContinuousHV::from_values(vec![
-            dloss_dgate_activation / dim as f32;
-            dim
-        ]);
-        let gate_bundle_gradient = cosine_gradient_wrt_left(
-            &bundled_state_input,
-            &self.gate_weight,
-        )
-        .scale(0.5 * dloss_dgate_activation);
+        let d_gate_weight = cosine_gradient_wrt_right(&bundled_state_input, &self.gate_weight)
+            .scale(dloss_dgate_activation);
+        let d_gate_bias = ContinuousHV::from_values(vec![dloss_dgate_activation / dim as f32; dim]);
+        let gate_bundle_gradient =
+            cosine_gradient_wrt_left(&bundled_state_input, &self.gate_weight)
+                .scale(0.5 * dloss_dgate_activation);
 
         // d_input and d_state include the direct equilibrium path, the gate path,
         // the tau path, and (for state) the residual interpolation branch.
@@ -2020,12 +2041,8 @@ impl HdcLtcUnifiedNeuron {
         self.tau_modulator = self
             .tau_modulator
             .subtract(&grads.d_tau_modulator.scale(lr));
-        self.gate_weight = self
-            .gate_weight
-            .subtract(&grads.d_gate_weight.scale(lr));
-        self.gate_bias = self
-            .gate_bias
-            .subtract(&grads.d_gate_bias.scale(lr));
+        self.gate_weight = self.gate_weight.subtract(&grads.d_gate_weight.scale(lr));
+        self.gate_bias = self.gate_bias.subtract(&grads.d_gate_bias.scale(lr));
 
         // Norm clip to 2.0 for all vector-valued parameter groups.
         if self.weight_hv.norm() > 2.0 {
@@ -2118,6 +2135,18 @@ impl HdcLtcUnifiedNeuron {
         self.input_momentum = ContinuousHV::zero(self.config.dimension);
     }
 
+    /// Reset all transient state tied to an earlier parameterization.
+    ///
+    /// Use on an isolated candidate after an external weight-space edit:
+    /// hidden state, temporal clock, update counter, momentum, and running
+    /// dynamical statistics must not be carried across a changed substrate.
+    pub fn reset_after_parameter_edit(&mut self) {
+        self.reset();
+        self.reset_momentum();
+        self.running_mean = 0.0;
+        self.running_var = 1.0;
+    }
+
     /// Get statistics
     pub fn stats(&self) -> UnifiedNeuronStats {
         UnifiedNeuronStats {
@@ -2167,8 +2196,7 @@ fn cosine_gradient_wrt_right(left: &ContinuousHV, right: &ContinuousHV) -> Conti
         return ContinuousHV::zero(right.dim());
     }
     let similarity = cosine_similarity_full(left, right);
-    left
-        .scale(1.0 / (left_norm * right_norm))
+    left.scale(1.0 / (left_norm * right_norm))
         .subtract(&right.scale(similarity / (right_norm * right_norm)))
 }
 
@@ -3401,7 +3429,11 @@ mod tests {
         assert_eq!(profile.dimension, 64);
         assert_eq!(profile.groups.len(), 5);
         assert_eq!(
-            profile.groups.iter().map(|group| group.id).collect::<Vec<_>>(),
+            profile
+                .groups
+                .iter()
+                .map(|group| group.id)
+                .collect::<Vec<_>>(),
             vec![
                 HdcLtcParameterGroupId::WeightHypervector,
                 HdcLtcParameterGroupId::InputMask,
@@ -3410,7 +3442,12 @@ mod tests {
                 HdcLtcParameterGroupId::GateBias,
             ]
         );
-        assert!(profile.groups.iter().all(|group| group.non_finite_count == 0));
+        assert!(
+            profile
+                .groups
+                .iter()
+                .all(|group| group.non_finite_count == 0)
+        );
     }
 
     #[test]
@@ -3426,18 +3463,16 @@ mod tests {
         neuron.input_momentum = ContinuousHV::random(64, 552);
 
         let weight = neuron.weight_hv_ref().values.clone();
-        neuron.try_replace_parameter_group(
-            HdcLtcParameterGroupId::WeightHypervector,
-            &weight,
-        ).unwrap();
+        neuron
+            .try_replace_parameter_group(HdcLtcParameterGroupId::WeightHypervector, &weight)
+            .unwrap();
         assert_eq!(neuron.weight_momentum.norm(), 0.0);
         assert!(neuron.input_momentum.norm() > 0.0);
 
         let input = neuron.input_mask_ref().values.clone();
-        neuron.try_replace_parameter_group(
-            HdcLtcParameterGroupId::InputMask,
-            &input,
-        ).unwrap();
+        neuron
+            .try_replace_parameter_group(HdcLtcParameterGroupId::InputMask, &input)
+            .unwrap();
         assert_eq!(neuron.input_momentum.norm(), 0.0);
     }
 
@@ -3472,10 +3507,8 @@ mod tests {
         let mut invalid = vec![0.0; 64];
         invalid[7] = f32::NAN;
         assert!(matches!(
-            neuron.try_replace_parameter_group(
-                HdcLtcParameterGroupId::WeightHypervector,
-                &invalid,
-            ),
+            neuron
+                .try_replace_parameter_group(HdcLtcParameterGroupId::WeightHypervector, &invalid,),
             Err(HdcLtcParameterEditError::NonFiniteValue { index: 7 })
         ));
         assert_eq!(neuron.weight_hv_ref().values, before);
@@ -3493,12 +3526,11 @@ mod tests {
         assert_eq!(neuron.weight_hv_ref().values, before);
 
         let valid = vec![0.01; 64];
-        assert!(neuron
-            .try_replace_parameter_group(
-                HdcLtcParameterGroupId::WeightHypervector,
-                &valid,
-            )
-            .is_ok());
+        assert!(
+            neuron
+                .try_replace_parameter_group(HdcLtcParameterGroupId::WeightHypervector, &valid,)
+                .is_ok()
+        );
         assert_eq!(neuron.weight_hv_ref().values, valid);
     }
 
@@ -3619,8 +3651,14 @@ mod tests {
 
         let explicit = neuron.backward_at_current(&input, &target, 0.01);
         let fallback = neuron.backward(&input, &target, 0.01);
-        assert!(explicit.dw.values.iter().zip(fallback.dw.values.iter())
-            .all(|(a, b)| (a - b).abs() < 1e-7));
+        assert!(
+            explicit
+                .dw
+                .values
+                .iter()
+                .zip(fallback.dw.values.iter())
+                .all(|(a, b)| (a - b).abs() < 1e-7)
+        );
     }
 
     #[test]
@@ -3751,8 +3789,7 @@ mod tests {
         }
 
         let finite_difference = |plus: HdcLtcUnifiedNeuron, minus: HdcLtcUnifiedNeuron| {
-            (loss(&plus, &input, &target, dt) - loss(&minus, &input, &target, dt))
-                / (2.0 * epsilon)
+            (loss(&plus, &input, &target, dt) - loss(&minus, &input, &target, dt)) / (2.0 * epsilon)
         };
 
         let mut plus = neuron.clone();

@@ -1,0 +1,1851 @@
+{
+  "schema_version": "hlb-fep-wsp-factorial-v1",
+  "status": "protocol_only",
+  "claim_ceiling": "Design-contract consistency only. No runtime activation, repair accuracy, model capability, efficiency, safety, SOTA, or consciousness claim is supported.",
+  "source_binding": {
+    "required_run_environment_variable": "SYMTHAEA_SOURCE_SHA",
+    "required_format": "40-character hexadecimal Git commit SHA",
+    "checkout_policy": "The benchmark must check out exactly the PR head SHA or dispatched commit SHA. Receipts must include source, manifest, task, profile, seed, and result digests."
+  },
+  "factors": [
+    {
+      "id": "native_hdc",
+      "enabled_mechanism": "Native Symthaea HDC/VSA and HRR associative representation with explicit algebra contract",
+      "disabled_control": "Fixed-seed random projection / conventional representation with matched width and downstream interface",
+      "adapter_status": "planned_not_implemented_or_verified"
+    },
+    {
+      "id": "cfc_ltc",
+      "enabled_mechanism": "Nominated active-core CfC/LTC liquid model with explicit elapsed-time intervals",
+      "disabled_control": "Parameter-matched GRU temporal model; include leaky-state and memoryless controls in temporal tasks",
+      "adapter_status": "planned_not_implemented_or_verified"
+    },
+    {
+      "id": "fep_epistemic_policy",
+      "enabled_mechanism": "FEP policy using prospective action-dependent model-hypothesis expected information gain",
+      "disabled_control": "Pragmatic-greedy policy with identical observation and world-model interface",
+      "adapter_status": "isolated_information_gain_primitive_exists_production_adapter_not_verified"
+    },
+    {
+      "id": "weight_space_programming",
+      "enabled_mechanism": "WSP agent proposes typed, bounded WeightProgram edits evaluated through SWI transactional candidate boundary",
+      "disabled_control": "No-edit and conventional/analytic repair comparators; SWI validation harness remains active in all profiles",
+      "adapter_status": "typed_swi_edit_foundation_exists_wsp_proposer_not_implemented_or_verified"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "H0-C0-F0-W0",
+      "native_hdc": false,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C0-F0-W1",
+      "native_hdc": false,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C0-F1-W0",
+      "native_hdc": false,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C0-F1-W1",
+      "native_hdc": false,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C1-F0-W0",
+      "native_hdc": false,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C1-F0-W1",
+      "native_hdc": false,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C1-F1-W0",
+      "native_hdc": false,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C1-F1-W1",
+      "native_hdc": false,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C0-F0-W0",
+      "native_hdc": true,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C0-F0-W1",
+      "native_hdc": true,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C0-F1-W0",
+      "native_hdc": true,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C0-F1-W1",
+      "native_hdc": true,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C1-F0-W0",
+      "native_hdc": true,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C1-F0-W1",
+      "native_hdc": true,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C1-F1-W0",
+      "native_hdc": true,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C1-F1-W1",
+      "native_hdc": true,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "information_selective_diagnosis",
+      "environment": "Seeded partially observable environment with multiple model/fault hypotheses and diagnostic probes that differ in observation distributions, cost, and downstream consequence; belief-side action-conditioned likelihoods are kept distinct from truth-side observation distributions, with paired per-episode hidden-model seeds, a one-shot probe/observe/final-decision loop, and explicit model-misspecification stress",
+      "primary_outcomes": [
+        "diagnosis_accuracy",
+        "normalized_regret",
+        "diagnostic_observation_cost",
+        "expected_value_of_sample_information",
+        "prior_bayes_risk",
+        "expected_posterior_bayes_risk",
+        "diagnostic_policy_regret",
+        "decision_cost_including_probe"
+      ],
+      "diagnostics": [
+        "prospective_expected_information_gain_nats",
+        "realized_posterior_entropy_reduction",
+        "posterior_brier_score",
+        "probes_to_diagnosis",
+        "decision_change_after_probe",
+        "model_information_gain_nats",
+        "expected_value_of_sample_information",
+        "prior_bayes_risk",
+        "expected_posterior_bayes_risk",
+        "information_gain_vs_decision_value_gap",
+        "realized_model_entropy_reduction_nats",
+        "multiclass_model_brier_score",
+        "agent_likelihood_misspecification",
+        "paired_policy_seed_identity",
+        "selected_diagnostic_action_counts",
+        "no_probe_selected_when_net_value_nonpositive"
+      ],
+      "negative_controls": [
+        "identical_outcome_distributions_across_hypotheses",
+        "information_channel_disabled_with_reward_cost_and_novelty_fixed",
+        "high_eig_zero_evsi_irrelevant_probe",
+        "lower_eig_higher_evsi_decision_relevant_probe",
+        "belief_vs_truth_likelihood_misspecification",
+        "truth_mass_outside_model_support_rejected",
+        "same_hidden_hypothesis_draw_across_paired_policies",
+        "all_diagnostic_costs_exceed_expected_decision_value",
+        "no_probe_option"
+      ]
+    },
+    {
+      "id": "injected_fault_repair_with_healthy_controls",
+      "environment": "Small fully specified CfC and HDC-LTC networks with planted faults in input, recurrent, tau/gate, mixing, and HDC-role groups plus untouched healthy models; hidden labels are withheld from the proposer",
+      "primary_outcomes": [
+        "fault_detection_precision",
+        "fault_detection_recall",
+        "repair_success_rate",
+        "collateral_regression_rate",
+        "healthy_model_false_edit_rate"
+      ],
+      "diagnostics": [
+        "fault_localization_precision",
+        "edit_parameter_count",
+        "edit_norm",
+        "candidate_evaluations",
+        "forward_pass_budget",
+        "verification_disagreement",
+        "rollback_rate"
+      ],
+      "negative_controls": [
+        "healthy_models_without_faults",
+        "sham_fault_metadata",
+        "random_matched_sparsity_edits",
+        "no_edit"
+      ]
+    },
+    {
+      "id": "compositional_associative_transfer",
+      "environment": "Seeded role-filler, nested relation, temporal order, and held-out composition tasks with controlled crosstalk, missing elements, role swaps, and corruption",
+      "primary_outcomes": [
+        "held_out_compositional_success",
+        "retrieval_precision",
+        "retrieval_recall",
+        "false_retrieval_rate"
+      ],
+      "diagnostics": [
+        "capacity_by_dimension_and_load",
+        "order_swap_sensitivity",
+        "calibration",
+        "memory_bytes",
+        "operations_per_query"
+      ]
+    },
+    {
+      "id": "irregular_time_dynamics_and_regime_change",
+      "environment": "Frozen synthetic and public time-series tasks with nonuniform elapsed time, missing observations, input interpolation, and controlled dynamics/reward regime changes",
+      "primary_outcomes": [
+        "forecast_error",
+        "rollout_stability",
+        "recovery_steps_after_shift"
+      ],
+      "diagnostics": [
+        "error_by_elapsed_interval",
+        "error_vs_high_accuracy_reference",
+        "uncertainty_calibration",
+        "p50_latency_ns",
+        "p95_latency_ns",
+        "peak_memory_bytes"
+      ]
+    },
+    {
+      "id": "permutation_equivalence_and_repair_transfer",
+      "environment": "Seeded CfC networks with function-preserving hidden-unit permutations at one and multiple layers, paired genuine faults, exact functional probes, and held-out permutations. One-layer/no-backbone and multi-layer/no-residual/no-backbone cases are separate registered strata. Each layer's alignment is measured from a frozen, source-bound functional probe sequence; the transform must propagate adjacent-layer input-column permutations, recurrent row/column permutations, layer-local bias/time-constant permutations, and final output-column permutations through the typed WeightProgram and candidate-only SWI adapter. Fault labels remain withheld from the proposer.",
+      "primary_outcomes": [
+        "function_equivalence_error",
+        "equivalent_healthy_false_edit_rate",
+        "cross_permutation_repair_success",
+        "probes_to_unambiguous_alignment",
+        "held_out_function_equivalence_after_probe_selection",
+        "assignment_margin_at_fixed_probe_budget",
+        "multilayer_function_equivalence_error",
+        "multilayer_alignment_transfer_success",
+        "multilayer_heldout_function_retention",
+        "permutation_posterior_brier_score",
+        "held_out_permutation_accuracy",
+        "alignment_abstention_precision",
+        "alignment_abstention_recall",
+        "probe_cost_to_accepted_alignment",
+        "posterior_predictive_calibration_by_width",
+        "finite_permutation_eig_gap_to_exact_oracle"
+      ],
+      "diagnostics": [
+        "permutation_alignment_precision",
+        "false_fault_rate_on_equivalent_models",
+        "functional_probe_budget",
+        "repair_transfer_rate",
+        "weight_distance_vs_function_distance",
+        "candidate_parameter_count",
+        "candidate_evaluation_cost",
+        "candidate_only_wsp_materialization",
+        "minimum_assignment_margin",
+        "activation_signature_alignment_error",
+        "alignment_abstention_rate",
+        "probe_selection_margin_gain",
+        "cumulative_assignment_margin_by_probe_count",
+        "functional_probe_candidate_evaluations",
+        "held_out_activation_signature_error",
+        "probe_selection_to_held_out_margin_transfer",
+        "symmetry_canonicalization_recovery_success",
+        "candidate_function_preservation_after_canonicalization",
+        "stale_alignment_canonicalization_rejection_rate",
+        "layerwise_alignment_receipt_count",
+        "adjacent_layer_permutation_consistency",
+        "multilayer_canonicalization_operation_count",
+        "multilayer_candidate_native_digest",
+        "source_to_candidate_permutation_accuracy",
+        "canonicalization_native_digest_recovery_rate",
+        "cross_layer_permutation_coupling_error",
+        "activation_margin_vs_alignment_error_pareto",
+        "alignment_cost_vs_hidden_dimension",
+        "probe_noise_sigma_calibration_error",
+        "permutation_posterior_entropy_nats",
+        "expected_information_gain_about_permutation_nats",
+        "held_out_probe_distribution_shift",
+        "soft_assignment_sinkhorn_residual",
+        "probe_selection_cost_per_candidate"
+      ],
+      "negative_controls": [
+        "function_preserving_hidden_unit_permutation",
+        "deliberately_inconsistent_permutation_that_changes_function",
+        "healthy_unpermuted_network",
+        "faulty_network_with_held_out_permutation",
+        "incomplete_hidden_unit_permutation_that_changes_function",
+        "ambiguous_duplicate_activation_signatures",
+        "duplicate_probe_candidate_pool",
+        "candidate_pool_order_permutation",
+        "all_candidate_probes_non_discriminating",
+        "held_out_probe_distribution_shift",
+        "same_width_architecture_mismatch",
+        "same_architecture_manifest_mismatch",
+        "missing_layer_alignment",
+        "duplicate_layer_alignment",
+        "residual_topology_rejected_until_supported",
+        "backbone_topology_rejected_until_supported",
+        "miscalibrated_observation_noise",
+        "zero_noise_model_must_not_claim_positive_eig",
+        "probe_order_permutation_invariance",
+        "exact_enumeration_width_limit_enforced"
+      ]
+    },
+    {
+      "id": "partial_observation_rule_discovery",
+      "environment": "Exact Friston et al. (2026) three-ball active structure-learning reproduction target: partially observed discrete POMDP with five latent factors (three ball-colour factors, each with red/green/blue states; one look-location factor with start/left/centre/right; one choice factor with no-choice/red/blue/green), two outcome modalities (vision: nothing/red/green/blue; feedback: no-feedback/correct/incorrect), action-controlled gaze and choice, random ball colours per trial, and six time points per trial (five moves). Relative log preferences for feedback are [0, 2, -6] nats in the order no-feedback/correct/incorrect. The hidden rule is a context-dependent mapping from centre-ball colour to the criterion location (red→left, green→centre, blue→right); the model family contains 81 possible mappings (79 unique after degeneracy), with rule 65 as the planted generating rule. The generative model is assumed known except for the feedback likelihood tensor. Any change to these factors, outcomes, time horizon, priors, rule family, or model-space construction is a separately labelled adaptation. Source qualification note: the pinned public SPM implementation reproduces 81 labelled mappings but exact feedback-likelihood tensor equality yields 75 semantic classes, while the paper reports 79 unique rules. This discrepancy remains unresolved; the public-source implementation is a source-pinned reconstruction/audit, not an exact reproduction, until archived source or the paper's uniqueness criterion reconciles it. A separate unit fixture evaluates feedback-only model EIG conditional on a known ball-colour state across 4 choices (including no-choice), and checks the 81-label vs 75-class quotient; it is not the full POMDP or gaze/vision EIG. The current executable feedback-only fixture conditions on a known ball-colour state and applies a shared count increment; it must remain labelled as a known-state unit fixture. A full POMDP reproduction additionally requires action/outcome-conditioned posterior expectations over hidden parent states, with provenance and the exact Bayesian-model-average or model-conditioned update convention declared. Do not reuse one shared known-state increment as evidence of full partially observed state inference.",
+      "primary_outcomes": [
+        "rule_identification_accuracy",
+        "trials_to_model_selection",
+        "model_choice_brier_score",
+        "decision_regret",
+        "observation_cost",
+        "trials_to_log_odds_threshold_16_nats"
+      ],
+      "diagnostics": [
+        "state_information_gain_nats",
+        "parameter_information_gain_nats",
+        "model_structure_information_gain_nats",
+        "realized_model_entropy_reduction_nats",
+        "bmr_log_evidence_ratio_nats",
+        "posterior_log_odds_of_selected_model",
+        "model_commitment_trial",
+        "exact_paper_rule_65_posterior_probability",
+        "occams_razor_log_odds_nats",
+        "trials_to_log_odds_threshold_16_nats",
+        "spm_pinned_demo_commit_28d1f103b021f729266cb7ea07baaf4d0285b22a",
+        "spm_rule_generator_commit_5852cadb300a81fd3f30e7056ee329bca20f0efe",
+        "spm_combinations_left_fastest_order",
+        "source_generated_hypothesis_count_81",
+        "exact_feedback_tensor_semantic_class_count_75",
+        "paper_reported_unique_rule_count_79",
+        "semantic_duplicate_groups_3_triplets",
+        "planted_rule_65_context_centre_red_left_green_centre_blue_right",
+        "source_labelled_rule_count",
+        "semantic_quotient_rule_count",
+        "model_posterior_aggregation_error_nats",
+        "quotient_action_ranking_invariance",
+        "label_redundancy_entropy_nats",
+        "known_state_feedback_score_decomposition_error_nats",
+        "known_state_feedback_pragmatic_risk_kl_nats",
+        "known_state_feedback_epistemic_value_nats",
+        "known_state_feedback_action_cost_nats",
+        "known_state_feedback_selected_action_id",
+        "known_state_feedback_posterior_support_size",
+        "known_state_feedback_zero_posterior_model_count",
+        "within_trial_policy_horizon",
+        "dirichlet_parameter_information_gain_nats"
+      ],
+      "negative_controls": [
+        "random_partial_observation_policy",
+        "reward_greedy_without_model_information",
+        "model_information_channel_disabled_with_preferences_and_costs_fixed",
+        "state_information_only",
+        "parameter_information_only",
+        "oracle_rule_label_for_analysis_only",
+        "public_spm_rule_generator_exact_tensor_semantic_deduplication",
+        "paper_reported_rule_count_79_vs_source_audit_count_75_discrepancy",
+        "constant_criterion_mapping_duplicate_across_context_factor_labels",
+        "feedback_only_known_state_quotient_fixture",
+        "source_labelled_81_vs_semantic_75_prospective_model_eig_invariance",
+        "no_choice_feedback_only_zero_information_control",
+        "common_log_preference_shift_policy_invariance"
+      ]
+    },
+    {
+      "id": "sequential_evidence_weight_space_programming",
+      "environment": "Sequential prediction-and-discovery environment with a frozen initial predictor, repeated assay/measurement batches, endpoint-budget constraints, optional task/regime shifts, and a fixed editable WeightProgram interface. The proposer receives only evidence available before each decision; hidden held-out endpoints and future batches remain sealed. Distinguish a fixed edit program authored once and executed repeatedly from an editor re-prompted on every batch.",
+      "primary_outcomes": [
+        "cumulative_ranking_utility",
+        "final_discovery_utility",
+        "held_out_prediction_loss",
+        "cumulative_decision_regret",
+        "endpoint_budget_efficiency"
+      ],
+      "diagnostics": [
+        "per_batch_utility_delta",
+        "sequential_repair_success",
+        "task_retention_after_update",
+        "edit_program_reuse_rate",
+        "llm_editor_call_count",
+        "candidate_evaluations_per_batch",
+        "cumulative_changed_parameter_count",
+        "cumulative_parameter_drift_l2",
+        "rollback_rate",
+        "time_to_detect_regime_shift",
+        "calibration_after_feedback",
+        "source_and_assay_batch_receipt_coverage",
+        "prepared_candidate_digest_validity",
+        "sequential_step_receipt_chain_integrity",
+        "evidence_batch_replay_rejection_rate",
+        "stale_parent_rejection_rate",
+        "verifier_gated_session_advancement",
+        "cumulative_l2_budget_violations",
+        "native_cfc_candidate_only_two_batch_execution",
+        "native_cfc_source_fingerprint_immutability",
+        "verifier_rejection_session_non_advancement",
+        "latest_native_candidate_parent_binding",
+        "cross_task_transfer_matrix",
+        "cross_task_regression_rate",
+        "trajectory_to_trajectory_repair_variance",
+        "qualified_no_op_retention_rate",
+        "accepted_edit_fraction_by_task",
+        "confirmatory_episode_manifest_digest",
+        "campaign_wide_unique_episode_id_reservation_count",
+        "cross_shard_episode_overlap_rejection_rate",
+        "out_of_manifest_observation_rejection_rate",
+        "manifest_episode_count_covers_maximum_observation_budget",
+        "manifest_to_immutable_shard_provenance_binding"
+      ],
+      "negative_controls": [
+        "no_edit",
+        "random_matched_norm_edit_each_batch",
+        "shuffled_assay_feedback",
+        "delayed_assay_feedback",
+        "editor_reprompted_each_batch",
+        "fixed_edit_program_without_measurement_feedback",
+        "stationary_task_without_regime_shift",
+        "held_out_future_batch_leakage_canary",
+        "native_cfc_sequential_batch_rejected_before_verifier_acceptance",
+        "native_cfc_sequential_verifier_rejection_does_not_advance_session",
+        "native_cfc_sequential_accepted_batches_advance_exactly_once",
+        "native_cfc_original_source_model_never_mutated",
+        "multi_trajectory_seeded_replicates",
+        "cross_task_holdout_tasks",
+        "retain_original_when_unqualified",
+        "edit_that_improves_source_task_but_regresses_protected_task",
+        "same_episode_ids_with_different_shard_digest_rejected",
+        "out_of_manifest_episode_id_fails_before_consuming_budget",
+        "too_short_episode_manifest_fails_before_candidate_ordinal_advances",
+        "episode_reservation_survives_campaign_snapshot_restore",
+        "tampered_manifest_fails_checkpoint_replay",
+        "manifest_uses_canonical_stable_source_record_ids"
+      ]
+    },
+    {
+      "id": "causal_weight_reading_under_semantic_interventions",
+      "environment": "Matched small-network families with identical architecture and input/output dimensions but different hidden task functions, generated labels, output-action semantics, and temporal behaviours. Include both public-task replicas and held-out procedurally generated tasks. The evaluator receives raw weights plus a frozen, budgeted probe set; task names, dataset names, class order, and training metadata are withheld. Interventions independently permute output labels, permute hidden coordinates, shuffle weights within shape/scale strata, and perturb selected parameter groups. A separate verifier can inspect exact function outputs and intervention outcomes.",
+      "primary_outcomes": [
+        "task_semantics_identification_accuracy",
+        "heldout_function_prediction_accuracy",
+        "label_mapping_recovery_accuracy",
+        "causal_intervention_prediction_accuracy",
+        "semantic_claim_false_positive_rate"
+      ],
+      "diagnostics": [
+        "calibration_brier_score",
+        "selective_accuracy_at_common_coverage",
+        "accuracy_after_output_label_permutation",
+        "accuracy_after_hidden_unit_permutation",
+        "accuracy_on_unseen_task_families",
+        "accuracy_with_architecture_only_context",
+        "functional_probe_budget",
+        "intervention_probe_budget",
+        "semantic_accuracy_vs_parameter_count",
+        "weight_oracle_holdout_accuracy",
+        "semantic_label_permutation_recovery",
+        "causal_intervention_prediction_accuracy_by_group",
+        "abstention_coverage_at_target_risk",
+        "probe_budget_vs_semantic_accuracy"
+      ],
+      "negative_controls": [
+        "architecture_only_prior_baseline",
+        "random_weight_shuffle_preserving_marginals",
+        "output_label_permutation_with_hidden_semantics_held_fixed",
+        "randomized_class_names_and_action_names",
+        "unseen_procedural_task_family",
+        "misleading_metadata_decoy",
+        "no_probe_weight_only_interpretation",
+        "all_label_names_randomized_per_network",
+        "class_index_permutation_not_disclosed",
+        "causal_intervention_holdout_groups",
+        "unseen_procedural_task_semantics"
+      ]
+    },
+    {
+      "id": "three_ball_joint_belief_active_perception",
+      "environment": "Finite-hypothesis three-ball task with a joint posterior over source or semantic-quotient rule identity and 27 hidden ball-colour configurations. Candidate policies compare immediate colour choice against one gaze observation, posterior conditioning, and a downstream choice. This is a two-step receding-horizon adapter, not the full SPM POMDP or a parameter-learning benchmark. A deterministic multi-trial finite-hypothesis evaluator now reuses the two-step policy across independent scenes, preserves semantic rule posterior mass, resets only hidden-state priors, records per-trial feedback/entropy/Brier/log-loss receipts, and switches from neutral discovery preferences to [0,2,-6] after a 16-nat semantic-class log-odds commitment. This is an adaptation: one gaze then one choice per trial, not the source's five moves per trial, and no continuous Dirichlet parameter posterior.",
+      "primary_outcomes": [
+        "correct_choice_after_observation",
+        "rule_identification_accuracy",
+        "trials_to_rule_identification",
+        "gaze_observation_cost",
+        "two_step_policy_regret",
+        "trials_to_correct_rule_commitment",
+        "mean_true_class_brier_score",
+        "mean_true_class_negative_log_probability",
+        "cumulative_reward"
+      ],
+      "diagnostics": [
+        "model_information_gain_nats",
+        "conditional_state_information_gain_nats",
+        "joint_information_gain_nats",
+        "information_chain_rule_error_nats",
+        "posterior_model_entropy",
+        "posterior_state_entropy",
+        "selected_gaze_location",
+        "contingent_choice_by_visual_outcome",
+        "immediate_choice_when_no_gaze",
+        "semantic_class_posterior_per_trial",
+        "model_entropy_trajectory",
+        "preference_phase_transition_trial",
+        "source_vs_quotient_posterior_equivalence",
+        "seeded_episode_receipt_replay",
+        "source_labelled_duplicate_partition_count",
+        "constant_criterion_context_irrelevance_proof",
+        "nonconstant_criterion_mapping_unique_tensor_proof"
+      ],
+      "negative_controls": [
+        "immediate_choice_without_gaze",
+        "uniform_random_gaze",
+        "constant_visual_sensor_independent_of_hidden_state",
+        "model_state_independent_prior",
+        "semantic_quotient_vs_source_labelled_hypotheses",
+        "impossible_gaze_feedback_observations_rejected",
+        "model_information_weight_zero",
+        "state_information_weight_zero",
+        "both_epistemic_weights_zero",
+        "source_labelled_vs_semantic_quotient_multi_trial_invariance",
+        "repeated_scene_without_state_prior_reset",
+        "constant_criterion_mapping_context_factor_duplicates",
+        "nonconstant_criterion_mapping_duplicate_negative_control"
+      ]
+    },
+    {
+      "id": "three_ball_sequential_finite_hypothesis_adaptation",
+      "environment": "Deterministic seeded multi-trial adaptation over the source-pinned three-ball rule family. Each trial independently samples a hidden left/centre/right colour configuration, runs the two-step finite-hypothesis gaze→observe→choice policy, receives feedback from planted rule 65, carries semantic model posterior mass forward, and resets only the hidden-state prior. Discovery uses neutral feedback preferences until semantic-class posterior log odds exceed 16 nats, then restores [0,2,-6]. It deliberately differs from the published SPM schedule (one gaze/choice pair per trial rather than five moves per trial) and does not maintain a continuous Dirichlet parameter posterior. A paired-seed policy matrix now runs full expected-free-energy selection, state-only EIG, model-only EIG, pragmatic-only, immediate-choice-only, fixed-centre-gaze, and uniform-random legal action arms. Environment RNG is domain-separated from policy RNG so all arms see identical hidden scenes for a given seed.",
+      "primary_outcomes": [
+        "trials_to_correct_rule_commitment",
+        "final_true_semantic_class_posterior",
+        "final_model_entropy_nats",
+        "mean_true_class_brier_score",
+        "mean_true_class_negative_log_probability",
+        "cumulative_reward"
+      ],
+      "diagnostics": [
+        "correct_feedback_count",
+        "incorrect_feedback_count",
+        "no_feedback_count",
+        "gaze_count",
+        "model_entropy_before_after_each_trial",
+        "winning_semantic_class_log_odds",
+        "source_labelled_vs_quotient_metric_delta",
+        "receipt_replay_exactness",
+        "trials_to_model_commitment",
+        "winning_semantic_class_posterior_by_trial",
+        "correct_semantic_class_commitment_rate",
+        "paired_environment_seed_identity",
+        "per_policy_episode_receipt",
+        "mean_delta_true_class_brier_by_paired_seed",
+        "mean_delta_correct_commitment_rate_by_paired_seed",
+        "mean_delta_cumulative_reward_by_paired_seed"
+      ],
+      "negative_controls": [
+        "no_model_information_gain",
+        "no_state_information_gain",
+        "no_epistemic_information_gain",
+        "source_labelled_vs_semantic_quotient",
+        "seed_change_replay_canary",
+        "one_trial_only",
+        "mislabelled_planted_rule"
+      ]
+    },
+    {
+      "id": "decision_relevant_diagnostic_policy_comparison",
+      "environment": "Deterministic synthetic finite-hypothesis diagnosis fixture with four competing models, an irrelevant high-information probe, a lower-information decision-relevant probe, explicit probe costs, and separate agent likelihoods vs truth-side outcome distributions. Paired per-episode seeds ensure all policies see identical hidden hypotheses and coupled observation quantiles. A model-misspecification stress arm reduces the true diagnostic reliability while leaving the agent likelihood unchanged.",
+      "primary_outcomes": [
+        "mean_decision_loss",
+        "mean_decision_regret",
+        "mean_total_cost",
+        "probes_taken",
+        "probe_cost"
+      ],
+      "diagnostics": [
+        "selected_action_counts",
+        "predicted_model_eig_nats",
+        "expected_value_of_sample_information",
+        "realized_model_entropy_reduction_nats",
+        "multiclass_model_brier_score",
+        "likelihood_misspecification_sensitivity",
+        "paired_episode_seed_identity",
+        "predicted_decision_information_gain_nats",
+        "posterior_optimal_decision_entropy",
+        "mean_predicted_decision_eig_nats",
+        "optimal_decision_posterior_entropy",
+        "paired_evsi_minus_baseline_task_loss_delta",
+        "paired_evsi_minus_baseline_decision_regret_delta",
+        "paired_evsi_minus_baseline_total_cost_delta",
+        "paired_normal_approximation_confidence_intervals",
+        "source_bound_diagnostic_result_digest",
+        "paired_task_loss_hoeffding_ci95",
+        "paired_decision_regret_hoeffding_ci95",
+        "paired_total_cost_hoeffding_ci95",
+        "total_cost_contrast_known_absolute_bound",
+        "paired_task_loss_hoeffding_familywise_ci95",
+        "paired_decision_regret_hoeffding_familywise_ci95",
+        "paired_total_cost_hoeffding_familywise_ci95",
+        "bonferroni_12_claim_family_95pct_coverage"
+      ],
+      "negative_controls": [
+        "high_eig_zero_evsi_irrelevant_probe",
+        "lower_eig_higher_evsi_decision_relevant_probe",
+        "no_probe_when_cost_exceeds_evsi",
+        "truth_outside_agent_likelihood_support_rejected",
+        "matched_vs_misspecified_likelihood",
+        "high_model_eig_zero_decision_information_gain",
+        "targeted_decision_information_vs_evsi_divergence",
+        "model_eig_vs_decision_eig_separation",
+        "targeted_decision_eig_ignores_cost_while_evsi_declines",
+        "decision_information_data_processing_inequality",
+        "paired_evsi_contrast_episode_seed_alignment",
+        "paired_evsi_confidence_interval_source_data_preserved",
+        "paired_hoeffding_interval_support_and_shrinking",
+        "bonferroni_familywise_interval_is_wider_than_per_comparison_interval"
+      ],
+      "scope_note": "Current executable implementation is a deterministic synthetic fixture and five-policy harness (no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, always-inspect); it is not a live ActiveInferenceAgent adapter, a trained RL comparison, or a measured environment study.",
+      "execution_artifact": {
+        "runner": "crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs",
+        "output": "research-results/hlb-decision-diagnostic.json",
+        "schema_version": "hlb-decision-diagnostic-result-v1",
+        "status": "synthetic_fixture_only",
+        "episodes": 10000,
+        "seed": 24301,
+        "source_binding": "SYMTHAEA_SOURCE_SHA",
+        "required_policy_arms": [
+          "NoProbe",
+          "PureModelInformationGain",
+          "OptimalDecisionInformationGain",
+          "CostAwareEvsi",
+          "AlwaysInspect"
+        ],
+        "paired_evsi_contrasts": 4,
+        "confidence_interval_method": "paired_normal_approximation_95"
+      }
+    },
+    {
+      "id": "packed_binaryhv_bundle_capacity_pilot",
+      "environment": "Fixed 16,384-bit packed Symthaea BinaryHV; majority-vote bundling at loads 1,3,7,15,31,63,127,255,511; 8 deterministic trials, 512 independent negative queries for threshold calibration, and a separate 512 held-out negative queries per load. The runner outputs mean member/non-member cosine similarity, pairwise AUC, TPR at the empirical 1% FPR threshold, and observed FPR. This pilot measures one implementation and one logical dimension only. The member-similarity curve is also compared against the independent-bit majority-bundle expectation C(2m,m)/4^m for load 2m+1.",
+      "primary_outcomes": [
+        "mean_member_cosine",
+        "mean_nonmember_cosine",
+        "pairwise_auc",
+        "tpr_at_empirical_one_percent_fpr",
+        "empirical_false_positive_rate"
+      ],
+      "diagnostics": [
+        "bundle_load",
+        "logical_dimension_bits",
+        "packed_bytes_per_vector",
+        "trial_count",
+        "negative_query_count",
+        "threshold_tie_behavior",
+        "negative_threshold_calibration_query_count",
+        "held_out_negative_query_count",
+        "held_out_fpr_at_calibrated_threshold",
+        "theoretical_member_cosine",
+        "empirical_member_cosine_minus_theory",
+        "majority_bundle_analytic_reference_error"
+      ],
+      "negative_controls": [
+        "single_item_bundle_exact_round_trip",
+        "independent_random_nonmember_queries",
+        "deterministic_seed_replay"
+      ],
+      "scope_note": "This is a source-bound packed-BinaryHV characterization pilot with a separate negative calibration set and held-out negative evaluation set; it is not a full VSA capacity comparison, IBM theoretical-bound reproduction, or SOTA claim."
+    },
+    {
+      "id": "parameterized_orthogonal_cross_dimensional_mixing",
+      "environment": "Standalone ContinuousHV operator characterization at dimensions 256, 1,024, 4,096, and 16,384. Compare identity, cyclic permutation, fixed normalized Walsh-Hadamard, and a caller-parameterized orthogonal butterfly made from log2(D) stages of disjoint Givens rotations. The butterfly has (D/2)*log2(D) angle parameters and exact inverse; it is not yet integrated into HDC-LTC and has no learned parameters until a separate optimizer is used.",
+      "primary_outcomes": [
+        "basis_coordinate_spread",
+        "round_trip_max_abs_error",
+        "relative_norm_error",
+        "apply_latency_ns",
+        "butterfly_angle_parameter_count",
+        "dense_matrix_parameter_count"
+      ],
+      "diagnostics": [
+        "operator_kind",
+        "dimension",
+        "stage_count",
+        "rotation_pair_count",
+        "measured_cpu_latency",
+        "inverse_error",
+        "operator_norm_error",
+        "parameter_to_dense_ratio"
+      ],
+      "negative_controls": [
+        "identity_preserves_basis_support",
+        "cyclic_permutation_is_exactly_invertible",
+        "zero_angle_butterfly_equals_identity",
+        "butterfly_inverse_reverses_stage_order",
+        "nonfinite_butterfly_parameters_rejected",
+        "wrong_parameter_count_rejected",
+        "dimension_mismatch_rejected"
+      ],
+      "scope_note": "This benchmark is an operator characterization only. It does not establish improved forecasting, associative retrieval, HDC-LTC task performance, or SOTA. Integration into the unified neuron is a separate preregistered ablation after operator-level qualification."
+    },
+    {
+      "id": "open_world_model_adequacy_and_tv_robust_diagnostics",
+      "environment": "Paired categorical diagnostic episodes with frozen prequential predictive distributions, well-specified and misspecified registered model families, omitted outcome support, abrupt regime changes, and candidate probes evaluated under finite total-variation ambiguity radii",
+      "primary_outcomes": [
+        "false_adequacy_rate",
+        "false_abstention_rate",
+        "worst_case_decision_regret",
+        "held_out_task_loss",
+        "diagnostic_coverage",
+        "probe_cost"
+      ],
+      "diagnostics": [
+        "prequential_log_loss",
+        "multiclass_brier_score",
+        "zero_support_count",
+        "low_probability_rate",
+        "nominal_evsi",
+        "worst_case_evsi",
+        "tv_ambiguity_radius",
+        "adversarial_outcome_distribution",
+        "nominal_robust_selection_disagreement",
+        "calibration",
+        "prequential_mixture_e_value",
+        "anytime_alarm_observation_index",
+        "declared_alpha",
+        "alternative_model_coverage",
+        "nominal_actual_expected_score",
+        "robust_actual_expected_score",
+        "known_truth_decision_regret",
+        "e_process_crossing_index",
+        "mean_score_vs_sequential_detection_disagreement",
+        "strict_alpha_domain_validation",
+        "calibration_sample_count",
+        "calibrated_tv_radius",
+        "ambiguity_radius_confidence",
+        "fixed_vs_calibrated_radius_selection_disagreement",
+        "log_domain_alpha_threshold",
+        "dirichlet_mixture_e_value",
+        "dirichlet_alternative_posterior_predictive",
+        "effective_adequacy_gate_disposition",
+        "weight_program_generation_authority",
+        "live_model_mutation_never_authorized_by_adequacy_gate"
+      ],
+      "negative_controls": [
+        "well_specified_family",
+        "zero_tv_radius_matches_nominal_evsi",
+        "outcome_outside_registered_support",
+        "omitted_fault_hypothesis",
+        "mild_likelihood_misspecification",
+        "abrupt_regime_shift",
+        "always_abstain",
+        "same_nominal_predictive_distribution",
+        "null_predictive_generator_type_one_error",
+        "alternatives_frozen_before_each_observation",
+        "alternative_weights_normalized",
+        "nominal-probe misspecification causing robust policy switch",
+        "aggregate log-loss/Brier gate misses symmetric-predictive regime shift",
+        "prequential e-process catches persistent regime shift",
+        "out-of-support observation forces adequacy failure",
+        "balanced_no_shift_control_for_dirichlet_alternative",
+        "history_dependent_predictable_null_martingale_enumeration",
+        "persistent_frequency_shift_detected_by_universal_dirichlet_alternative",
+        "dirichlet_e_process_crossing_overrides_aggregate_no_detected_inadequacy",
+        "insufficient_evidence_blocks_weight_program_generation",
+        "inadequate_model_blocks_weight_program_generation",
+        "no_detected_inadequacy_allows_detached_candidate_only",
+        "adequacy_gate_never_authorizes_live_mutation_or_candidate_acceptance"
+      ]
+    },
+    {
+      "id": "static_model_robust_sequential_diagnostics",
+      "environment": "Two-stage exact synthetic diagnostic campaigns with a hidden world/fault hypothesis and a latent observation-model vertex fixed for the whole episode; first-stage calibration outcome informs the second-stage action, while model identity remains hidden from the policy. Include persistent-model and genuinely switching-model control lanes.",
+      "primary_outcomes": [
+        "static_model_worst_case_terminal_risk",
+        "rectangular_worst_case_terminal_risk",
+        "static_vs_rectangular_conservatism_gap",
+        "calibration_value",
+        "decision_regret",
+        "probe_cost"
+      ],
+      "diagnostics": [
+        "clairvoyant_lower_bound",
+        "policy_tree_node_count",
+        "exact_policy_enumeration_count",
+        "model_vertex_posterior_calibration",
+        "non_anticipativity_check",
+        "static_vertex_consistency_check",
+        "rectangular_vertex_switch_count",
+        "realized_decision_information_gain",
+        "static_model_expected_value_of_sample_information"
+      ],
+      "negative_controls": [
+        "all_model_vertices_observationally_equivalent",
+        "uninformative_calibration",
+        "genuinely_switching_model_world",
+        "hidden_model_vertex_never_exposed_to_policy",
+        "truth_labels_and_evaluator_seeds_sealed",
+        "fixed_probe_without_calibration",
+        "static_risk_matches_second_brute_force_reference"
+      ]
+    }
+  ],
+  "baselines": [
+    {
+      "id": "hdc_onlinehd_or_equivalent",
+      "scope": "online HDC classification and associative representation"
+    },
+    {
+      "id": "map_bipolar_xor",
+      "scope": "VSA binding baseline with self-inverse bipolar contract"
+    },
+    {
+      "id": "continuous_hadamard",
+      "scope": "real-valued Hadamard binding with declared inverse/cleanup contract"
+    },
+    {
+      "id": "hrr_circular_convolution",
+      "scope": "HRR with unitary roles and correlation unbinding"
+    },
+    {
+      "id": "fixed_seed_random_projection",
+      "scope": "representation control"
+    },
+    {
+      "id": "svm_shared_features",
+      "scope": "conventional classification on identical input features"
+    },
+    {
+      "id": "rvfl_shared_features",
+      "scope": "random vector functional link baseline on identical input features"
+    },
+    {
+      "id": "gradient_boosted_trees",
+      "scope": "strong tabular baseline when task/data type permits"
+    },
+    {
+      "id": "original_ltc_cfc",
+      "scope": "continuous-time temporal baseline"
+    },
+    {
+      "id": "parameter_matched_gru",
+      "scope": "temporal architecture baseline"
+    },
+    {
+      "id": "parameter_matched_lstm",
+      "scope": "temporal architecture baseline"
+    },
+    {
+      "id": "neural_cde_or_ode_rnn",
+      "scope": "irregular-time continuous-time comparator where fair"
+    },
+    {
+      "id": "nialim_dfa_cfn_prdfa_cfn",
+      "scope": "2026 rederived CfC interpolation/error-bound line; reproduce matched tasks"
+    },
+    {
+      "id": "state_space_model",
+      "scope": "state-space temporal baseline where fair implementation is available"
+    },
+    {
+      "id": "simple_leaky_state",
+      "scope": "minimal temporal memory control"
+    },
+    {
+      "id": "memoryless_model",
+      "scope": "non-temporal control"
+    },
+    {
+      "id": "pragmatic_greedy_policy",
+      "scope": "FEP ablation using same observation/world-model interface"
+    },
+    {
+      "id": "random_probe_policy",
+      "scope": "diagnostic action baseline"
+    },
+    {
+      "id": "always_probe_policy",
+      "scope": "diagnostic action baseline"
+    },
+    {
+      "id": "cue_greedy_policy",
+      "scope": "diagnostic action baseline"
+    },
+    {
+      "id": "bounded_bayesian_value_of_information",
+      "scope": "model-relative information-seeking baseline"
+    },
+    {
+      "id": "matched_rl_exploration",
+      "scope": "complexity-matched RL baseline"
+    },
+    {
+      "id": "perfect_information_oracle",
+      "scope": "labelled upper bound only; never a deployable comparator or tuning signal"
+    },
+    {
+      "id": "no_edit",
+      "scope": "repair control"
+    },
+    {
+      "id": "random_matched_sparsity_edit",
+      "scope": "repair control matched on edit count and norm"
+    },
+    {
+      "id": "analytic_oracle_repair",
+      "scope": "known-fault upper bound only; never a tuning signal"
+    },
+    {
+      "id": "gradient_adam_repair",
+      "scope": "optimization-based repair under matched forward/backward budget"
+    },
+    {
+      "id": "black_box_coordinate_or_evolutionary_search",
+      "scope": "non-gradient candidate search under matched candidate budget"
+    },
+    {
+      "id": "wsp_weights_only",
+      "scope": "WSP without execution traces; separate capability score"
+    },
+    {
+      "id": "wsp_trace_assisted",
+      "scope": "WSP with explicitly permitted training/diagnostic traces; separate capability score"
+    },
+    {
+      "id": "swi_constrained_wsp_with_verifier",
+      "scope": "typed WeightProgram, transactional candidate edits and independent verifier"
+    },
+    {
+      "id": "raw_flat_weight_distance_editor",
+      "scope": "weight-space repair without hidden-unit alignment"
+    },
+    {
+      "id": "activation_probe_alignment_editor",
+      "scope": "functional probe/activation-based hidden-unit alignment followed by bounded edits"
+    },
+    {
+      "id": "permutation_equivariant_weight_space_editor",
+      "scope": "weight-space model designed to respect hidden-unit permutation symmetries"
+    },
+    {
+      "id": "oracle_permutation_alignment",
+      "scope": "labelled alignment upper bound only; never used by proposer or tuning"
+    },
+    {
+      "id": "bayesian_model_reduction_structure_selection",
+      "scope": "Bayesian model reduction over nested, prior-restricted model structures; separate posterior model-evidence update, only for shared parameterization"
+    },
+    {
+      "id": "hierarchical_state_parameter_model_information_gain",
+      "scope": "joint-posterior chain-rule decomposition over model structure, model parameters, and latent state"
+    },
+    {
+      "id": "diagonal_gaussian_bayesian_model_reduction",
+      "scope": "Analytic BMR log evidence ratios for nested prior-only reductions under independent diagonal-Gaussian full posterior, full prior, and reduced priors"
+    },
+    {
+      "id": "three_ball_active_inference_published_protocol",
+      "scope": "Exact Friston et al. (2026) three-ball active structure-learning protocol; use only after paper/supplement task, preferences, likelihoods, and stopping rule are transcribed and verified"
+    },
+    {
+      "id": "random_partial_observation_policy",
+      "scope": "Random legal observation policy with identical action availability, observation cost, and horizon"
+    },
+    {
+      "id": "reward_greedy_without_model_information",
+      "scope": "Pragmatic/reward-only policy without model-structure information, sharing the same predictive and preference interfaces"
+    },
+    {
+      "id": "hierarchical_model_eig_with_bmr",
+      "scope": "Prospective hierarchical model information gain with post-observation BMR model comparison; evaluate only after predictive-outcome and posterior adapters are implemented"
+    },
+    {
+      "id": "dirichlet_bayesian_model_reduction_three_ball",
+      "scope": "Exact Dirichlet BMR over categorical likelihood columns, using the paper's full-model Dirichlet posterior/prior and prior-restricted reduced Dirichlet tensors; strictly positive proper concentrations only"
+    },
+    {
+      "id": "categorical_dirichlet_model_average_then_bmr",
+      "scope": "Bayesian model average over categorical likelihood mappings with sequential posterior Dirichlet count updates and post-observation reduced-model evidence"
+    },
+    {
+      "id": "dirichlet_bmr_prospective_model_eig",
+      "scope": "One-step categorical model expected information gain computed from the current and hypothetical-outcome Dirichlet BMR posteriors; uses full Bayesian-model-average parent predictive outcome probabilities and the exact weighted-average prior constraint"
+    },
+    {
+      "id": "no_model_structure_eig",
+      "scope": "Ablation removing model-structure expected information gain while keeping state/parameter EIG, preference vector, action costs, and horizon fixed"
+    },
+    {
+      "id": "random_functional_probe_selection",
+      "scope": "Random probe chosen from the same frozen candidate pool and with the same number of model forward passes"
+    },
+    {
+      "id": "deterministic_max_margin_probe_selection",
+      "scope": "Greedy selection maximizing accumulated hidden-unit assignment margin; primary SWI implementation"
+    },
+    {
+      "id": "exhaustive_probe_subset_oracle",
+      "scope": "Small-pool oracle enumerating all allowed probe subsets at a fixed budget; verifier-only upper bound"
+    },
+    {
+      "id": "deep_align_learned_weight_alignment",
+      "scope": "Navon et al. ICML 2024 Deep-Align when exact layer shapes and architecture families are supported; report unsupported cases"
+    },
+    {
+      "id": "activation_alignment_then_candidate_only_wsp_canonicalization",
+      "scope": "Probe-aligned function-preserving coordinate canonicalization via typed WeightProgram and native SWI candidate transaction; initially restricted to a one-layer, non-residual, no-backbone CfC network"
+    },
+    {
+      "id": "weightloop_fixed_editor_sequential",
+      "scope": "WeightLoop-style fixed editor writes a bounded reusable parameter-editing program once; subsequent evidence batches drive candidate selection/execution without another LLM call"
+    },
+    {
+      "id": "per_batch_llm_reproposal_wsp",
+      "scope": "WSP editor is re-prompted/re-invoked after each feedback batch; compare editor-call and candidate-evaluation cost with fixed-program reuse"
+    },
+    {
+      "id": "sequential_gradient_or_online_update",
+      "scope": "Matched gradient, online-learning or closed-form update under identical evidence batches, endpoint budget, and held-out evaluation"
+    },
+    {
+      "id": "fep_probe_selection_plus_fixed_wsp",
+      "scope": "Prospective information-gain policy selects which measurement/assay to acquire; fixed bounded WeightProgram uses the resulting evidence in candidate-only SWI validation"
+    },
+    {
+      "id": "weight_program_feedback_blind",
+      "scope": "The fixed WeightProgram executes with shuffled or withheld measurement feedback, isolating whether gains arise from evidence-conditioned updates"
+    },
+    {
+      "id": "weight_only_llm_semantic_reader",
+      "scope": "LLM prompted with raw weights and architecture only; fixed prompt/editor/tool/token budget, no forward-pass tools"
+    },
+    {
+      "id": "architecture_only_task_prior",
+      "scope": "Task/label prediction from architecture and tensor shapes only, without parameter values"
+    },
+    {
+      "id": "activation_probe_semantic_reader",
+      "scope": "Semantic interpretation using frozen input/output probes and hidden activations, with matched probe budget"
+    },
+    {
+      "id": "intervention_verified_semantic_reader",
+      "scope": "Interpretation with targeted ablation/permutation interventions and independent output verification"
+    },
+    {
+      "id": "function_oracle_semantic_upper_bound",
+      "scope": "Oracle with full held-out function access; verifier-only upper bound, never available to proposer"
+    },
+    {
+      "id": "sequential_weightprogram_session_contract",
+      "scope": "Sequential WSP control with exact same base model, task, evidence batches, compute budget, and native candidate verifier; distinct control isolates whether frozen-template session binding adds value"
+    },
+    {
+      "id": "per_batch_editor_reprompt_with_same_compute_budget",
+      "scope": "Sequential WSP control with exact same base model, task, evidence batches, compute budget, and native candidate verifier; distinct control isolates whether frozen-template session binding adds value"
+    },
+    {
+      "id": "fixed_weightprogram_template_without_evidence",
+      "scope": "Sequential WSP control with exact same base model, task, evidence batches, compute budget, and native candidate verifier; distinct control isolates whether frozen-template session binding adds value"
+    },
+    {
+      "id": "three_ball_source_labelled_81_model_space",
+      "scope": "Source-faithful 81 labelled hypotheses with original equal 1/81 prior mass"
+    },
+    {
+      "id": "three_ball_semantic_quotient_75_model_space",
+      "scope": "Explicit 75-class quotient of the pinned public SPM generator; identical likelihood tensors are grouped and prior mass summed; compare outputs/evidence/action selection against labelled family"
+    },
+    {
+      "id": "three_ball_quotient_model_evidence_invariance",
+      "scope": "Paired invariant check that class posterior equals sum of member-label posteriors after every evidence increment"
+    },
+    {
+      "id": "weight_oracles_small_transformer",
+      "scope": "Ahmed et al. (arXiv:2610.07334) staged weight-reading oracle with external deterministic computation; reproduce only on its declared small-transformer architecture/task and compare compute, training-data and probe budget"
+    },
+    {
+      "id": "ahmed_zero_probe_weight_reader",
+      "scope": "Ahmed (arXiv:2611.08070) no-tool/no-forward-pass weight-only reader; preserve randomized labels and unfamiliar task-family controls"
+    },
+    {
+      "id": "activation_probe_causal_weight_reader",
+      "scope": "Same reader with a fixed, budgeted functional probe set; no hidden labels or metadata"
+    },
+    {
+      "id": "controlled_intervention_weight_reader",
+      "scope": "Same reader with preregistered parameter-group interventions and measured consequences; interventions are exposed by benchmark contract only"
+    },
+    {
+      "id": "label_permutation_semantic_canary",
+      "scope": "Output-label permutation control: the function's indexed output pattern remains but semantic names are permuted; reader must recover the new index-to-name mapping or abstain"
+    },
+    {
+      "id": "three_ball_known_state_pragmatic_only",
+      "scope": "Minimize KL[Q(feedback | action) || C(feedback)] on the same known-state feedback probe set, with epistemic weight fixed to zero"
+    },
+    {
+      "id": "three_ball_known_state_model_eig_only",
+      "scope": "Maximize one-step Dirichlet-BMR model information gain on the same known-state feedback probe set, with pragmatic risk and action cost disabled"
+    },
+    {
+      "id": "three_ball_known_state_combined_one_step_efe",
+      "scope": "Minimize pragmatic KL minus a preregistered weight times prospective model EIG plus explicit action cost, using the shared known-state posterior predictive model"
+    },
+    {
+      "id": "three_ball_known_state_random_action",
+      "scope": "Uniform random legal feedback choice including no-choice, with identical action set and per-action cost"
+    },
+    {
+      "id": "spm_source_compatible_dirichlet_bmr",
+      "scope": "Pinned SPM spm_MDP_log_evidence semantics: 1/32 dense pseudocount, independent Dirichlet columns, globally normalized weighted sum of reduced prior tensors, posterior model odds"
+    },
+    {
+      "id": "strict_structural_zero_dirichlet_bmr",
+      "scope": "Strict simplex-face BMR with exact structural zeros and zero evidence for posterior counts outside reduced support"
+    },
+    {
+      "id": "uniform_random_gaze",
+      "scope": "Random legal gaze location with identical action costs and one-observation horizon"
+    },
+    {
+      "id": "maximum_state_information_gaze",
+      "scope": "Greedy gaze selection maximizing conditional hidden-state information only"
+    },
+    {
+      "id": "two_step_active_inference_gaze_choice",
+      "scope": "Two-step gaze/observation/choice lookahead using joint model-state belief, pragmatic feedback preferences, conditional state information, model information, and action costs"
+    },
+    {
+      "id": "immediate_choice_without_gaze",
+      "scope": "Choose from current joint belief without taking an additional visual observation"
+    },
+    {
+      "id": "three_ball_two_step_finite_hypothesis_fep",
+      "scope": "Repeated two-step gaze/observe/choice policy with joint finite posterior, neutral discovery preferences, posterior class commitment, and preference restoration; adaptation only"
+    },
+    {
+      "id": "three_ball_state_information_only",
+      "scope": "Same seeded scenes and trial horizon, with model_information_weight=0"
+    },
+    {
+      "id": "three_ball_model_information_only",
+      "scope": "Same seeded scenes and trial horizon, with conditional_state_information_weight=0"
+    },
+    {
+      "id": "three_ball_pragmatic_only",
+      "scope": "Same seeded scenes and trial horizon, with both epistemic weights=0"
+    },
+    {
+      "id": "three_ball_source_labelled_vs_semantic_quotient",
+      "scope": "Paired seeded episodes comparing 81 source labels to semantically deduplicated likelihood-tensor classes, scored after aggregating equivalent labels"
+    },
+    {
+      "id": "three_ball_full_expected_free_energy",
+      "scope": "Paired-seed active inference with model and conditional-state information, pragmatic preferences, and observation cost"
+    },
+    {
+      "id": "three_ball_immediate_choice_only",
+      "scope": "No additional gaze; choose immediately under the same response policy and preferences"
+    },
+    {
+      "id": "three_ball_fixed_centre_gaze",
+      "scope": "Always inspect the centre location then use the same downstream response policy"
+    },
+    {
+      "id": "three_ball_uniform_random_legal_action",
+      "scope": "Uniform random choice among immediate response or one of three gaze locations, then uniform random response among three colours or no response; independent policy RNG"
+    },
+    {
+      "id": "dayan_eitan_maron_icml_2026_permutation_equivariant_wsn",
+      "scope": "Published permutation-equivariant weight-space network family from Dayan, Eitan and Maron (ICML 2026); implement or reproduce on identical architecture/task families where supported; compare parameter- and function-space generalization, symmetry handling, compute and capacity"
+    },
+    {
+      "id": "navon_et_al_icml_2024_deep_align",
+      "scope": "Deep-Align learned weight alignment baseline from Navon et al. (ICML 2024), restricted to supported architecture/layer families; report unsupported topologies and alignment quality separately"
+    },
+    {
+      "id": "maximum_assignment_margin_probe_selection",
+      "scope": "Deterministic probe selector maximizing the alternating-cycle assignment margin; not Bayesian EIG"
+    },
+    {
+      "id": "minimum_functional_fit_error_probe_selection",
+      "scope": "Select probes minimizing assignment-matched activation MSE; diagnostic baseline"
+    },
+    {
+      "id": "finite_permutation_posterior_eig_small_width",
+      "scope": "Exact finite-permutation posterior and action-conditioned EIG for small widths only, with empirically calibrated observation noise; factorial-cost oracle, not scalable"
+    },
+    {
+      "id": "sinkhorn_soft_assignment_probe_selection",
+      "scope": "Approximate soft-assignment/entropy-based alignment for widths beyond exact permutation enumeration"
+    },
+    {
+      "id": "fep_epistemic_alignment_probe_selection",
+      "scope": "Candidate FEP probe policy maximizing calibrated expected information gain about hidden-unit correspondence under a registered observation-noise model"
+    },
+    {
+      "id": "gaussian_permutation_hypothesis_eig_probe_selector",
+      "scope": "Exact finite permutation posterior with explicit scalar Gaussian projection-observation likelihood; prospective I(Permutation; projected activation | candidate input probe), limited to at most 120 permutations and 32 candidate probes per call; noise scale must be empirically calibrated before claiming diagnostic efficiency"
+    },
+    "decision_focused_evsi_cost_aware",
+    "pure_model_eig_only",
+    "no_probe_bayes_decision",
+    "always_inspect_first_safe",
+    "paired_truth_separated_diagnostic_policy_harness",
+    "symthaea_binaryhv_packed_majority_bundle",
+    "symthaea_continuoushv_reference",
+    "symbolar_rust_vsa_reference",
+    "oxicuda_hdc_0_5_5",
+    "ibm_jair_vsa_capacity_bound_reference",
+    "date_2026_ghrr_reference",
+    "symthaea_structured_mixer_identity",
+    "symthaea_structured_mixer_cyclic_permutation",
+    "symthaea_structured_mixer_walsh_hadamard",
+    "symthaea_parameterized_orthogonal_butterfly",
+    "dense_orthogonal_matrix_reference",
+    "monarch_structured_matrix_reference",
+    "butterfly_factorization_reference",
+    "boft_orthogonal_butterfly_reference",
+    {
+      "id": "targeted_active_learning_optimal_decision_information_gain",
+      "scope": "Published decision-focused active-learning criterion maximizing expected information gain about the optimal downstream decision; compare as a distinct policy from EVSI (Filstroff et al., TMLR 2024)."
+    },
+    {
+      "id": "weightloop_experimental_feedback_2026",
+      "scope": "Fixed reusable weight-editor with sequential experimental-feedback-driven predictor updates; reproduce matched feedback budget and candidate-validation protocol (Li et al., arXiv:2611.07319, 2026)."
+    },
+    {
+      "id": "wsp_scope_multi_trajectory_generalization_2026",
+      "scope": "Hu et al. (arXiv:2611.09382): 16 editing trajectories across seven benchmarks and Qwen3.5-0.8B/9B; register trajectory-level variance, no-op retention when improvements are not qualified, and cross-task transfer/regression matrices. External result is a comparator, not a reproduced result or a single-trajectory success target."
+    },
+    {
+      "id": "finite_tv_robust_evsi",
+      "scope": "Exact worst-case posterior Bayes risk over a finite categorical total-variation ball around each action's nominal predictive outcome distribution; implementation in open_world_robust_decision.rs."
+    },
+    {
+      "id": "prequential_predictive_adequacy_gate",
+      "scope": "Frozen pre-observation categorical predictions evaluated with support violations, prequential log loss, multiclass Brier score, and externally calibrated thresholds."
+    },
+    {
+      "id": "out_of_support_abstention",
+      "scope": "Hard adequacy-failure response when a subsequently observed outcome has zero predictive support under the registered model family."
+    },
+    {
+      "id": "dro_robas_mmd_external_reference",
+      "scope": "Dellaporta, O'Hara and Damoulas (Entropy 2026), robust Bayesian ambiguity sets using MMD; external reference only, not reproduced by this finite categorical TV implementation."
+    },
+    {
+      "id": "prequential_mixture_likelihood_ratio_e_process",
+      "scope": "Anytime-valid mixture of likelihood-ratio e-processes against preregistered predictable alternative categorical forecasts; Ville threshold 1/alpha is conditional on the declared null predictive model."
+    },
+    {
+      "id": "known_truth_open_world_robustness_runner",
+      "scope": "Source-bound deterministic runner with exact nominal-vs-TV-robust decision regret, prequential mean-score and regime-shift controls, e-process sequential evidence, and zero-support adequacy failure. Synthetic fixture only."
+    },
+    {
+      "id": "categorical_hoeffding_union_bound_tv_calibration",
+      "scope": "Finite-sample distribution-free TV-radius reference from independent IID categorical calibration counts; per-category Hoeffding intervals plus Bonferroni/union bound, explicitly conservative and not valid under dependent or shifted calibration."
+    },
+    {
+      "id": "dirichlet_mixture_prequential_e_process",
+      "scope": "Online Dirichlet-multinomial categorical alternative q_t(k)=(alpha_k+N_{t-1,k})/(sum alpha+t-1) against frozen predictable null forecasts; anytime-valid likelihood-ratio e-process under any correctly specified conditional null, strongest for persistent frequency shifts."
+    },
+    {
+      "id": "static_model_robust_sequential_policy",
+      "scope": "Finite policy-tree oracle minimizing worst-case risk over one latent observation-model vertex fixed for the full episode; policy branches only on observable histories."
+    },
+    {
+      "id": "rectangular_sequential_robust_relaxation",
+      "scope": "Comparator permitting a distinct ambiguity-set vertex at each stage/history; diagnostic conservatism bound, not assumed to represent one physically persistent model."
+    },
+    {
+      "id": "clairvoyant_model_vertex_policy_lower_bound",
+      "scope": "Diagnostic lower bound with the hidden model vertex revealed to the policy; never a deployable policy."
+    }
+  ],
+  "seeds": {
+    "development": [
+      11,
+      23,
+      37,
+      53,
+      71,
+      89,
+      107,
+      131,
+      151,
+      173
+    ],
+    "held_out": [
+      211,
+      223,
+      227,
+      229,
+      233,
+      239,
+      241,
+      251,
+      257,
+      263,
+      269,
+      271,
+      277,
+      281,
+      283,
+      293,
+      307,
+      311,
+      313,
+      317
+    ]
+  },
+  "tuning_budget": {
+    "max_candidate_configs_per_profile_task": 40,
+    "max_weight_program_candidates_per_fault_instance": 8,
+    "forward_pass_budget_per_candidate": 50,
+    "same_candidate_count_for_all_profiles": true,
+    "aggregate_validation_compute_must_be_recorded": true,
+    "deviations_require_explicit_receipt_field": true
+  },
+  "metrics": {
+    "primary": [
+      "diagnosis_accuracy",
+      "normalized_regret",
+      "repair_success_rate",
+      "collateral_regression_rate",
+      "healthy_model_false_edit_rate",
+      "held_out_compositional_success",
+      "forecast_error",
+      "function_equivalence_error",
+      "equivalent_healthy_false_edit_rate",
+      "cross_permutation_repair_success",
+      "state_information_gain_nats",
+      "parameter_information_gain_nats",
+      "model_structure_information_gain_nats",
+      "rule_identification_accuracy",
+      "trials_to_model_selection",
+      "model_choice_brier_score",
+      "realized_model_entropy_reduction_nats",
+      "bmr_log_evidence_ratio_nats",
+      "dirichlet_model_evidence_log_ratio_nats",
+      "rule_65_posterior_probability",
+      "occams_razor_log_odds_nats",
+      "trials_to_log_odds_threshold_16_nats",
+      "prospective_model_information_gain_nats",
+      "expected_posterior_model_entropy_nats",
+      "model_average_prior_coherence_error",
+      "predictive_outcome_mass_error",
+      "probes_to_unambiguous_alignment",
+      "held_out_function_equivalence_after_probe_selection",
+      "assignment_margin_at_fixed_probe_budget",
+      "cumulative_ranking_utility",
+      "final_discovery_utility",
+      "endpoint_budget_efficiency",
+      "cumulative_decision_regret",
+      "multilayer_function_equivalence_error",
+      "multilayer_heldout_function_retention",
+      "task_semantics_identification_accuracy",
+      "heldout_function_prediction_accuracy",
+      "causal_intervention_prediction_accuracy",
+      "semantic_claim_false_positive_rate",
+      "known_state_feedback_pragmatic_risk_kl_nats",
+      "known_state_feedback_model_information_gain_nats",
+      "known_state_feedback_expected_free_energy_nats",
+      "known_state_feedback_action_ranking_regret",
+      "known_state_feedback_score_decomposition_error_nats",
+      "correct_choice_after_observation",
+      "trials_to_rule_identification",
+      "gaze_observation_cost",
+      "two_step_policy_regret",
+      "trials_to_correct_rule_commitment",
+      "mean_true_class_brier_score",
+      "mean_true_class_negative_log_probability",
+      "model_entropy_trajectory",
+      "source_to_candidate_permutation_accuracy",
+      "canonicalization_native_digest_recovery_rate",
+      "cross_layer_permutation_coupling_error",
+      "permutation_posterior_brier_score",
+      "held_out_permutation_accuracy",
+      "expected_information_gain_about_permutation_nats",
+      "probe_cost_to_accepted_alignment",
+      "permutation_probe_expected_information_gain_nats",
+      "permutation_probe_expected_posterior_entropy_nats",
+      "expected_value_of_sample_information",
+      "prior_bayes_risk",
+      "expected_posterior_bayes_risk",
+      "decision_focused_diagnostic_regret",
+      "diagnostic_total_cost",
+      "mean_member_cosine",
+      "mean_nonmember_cosine",
+      "pairwise_auc",
+      "tpr_at_empirical_one_percent_fpr",
+      "empirical_false_positive_rate",
+      "basis_coordinate_spread",
+      "round_trip_max_abs_error",
+      "relative_norm_error",
+      "apply_latency_ns",
+      "butterfly_angle_parameter_count",
+      "dense_matrix_parameter_count",
+      "decision_information_gain_nats",
+      "mean_predicted_decision_eig_nats",
+      "paired_evsi_regret_difference",
+      "paired_evsi_total_cost_difference",
+      "source_bound_diagnostic_result_digest"
+    ],
+    "guardrails": [
+      "constraint_violation_rate",
+      "posterior_brier_score",
+      "selective_risk_at_common_coverage",
+      "false_retrieval_rate",
+      "invalid_edit_rejection_rate",
+      "rollback_rate",
+      "permutation_false_fault_rate",
+      "false_edit_rate_on_function_equivalent_models",
+      "joint_information_chain_rule_error",
+      "posterior_calibration_by_uncertainty_level",
+      "joint_information_gain_nats",
+      "mutual_information_chain_rule_error_nats",
+      "model_evidence_log_ratio_nats",
+      "posterior_model_entropy_after_bmr_nats",
+      "bmr_nonintegrable_ratio_rejection_rate",
+      "bmr_parameterization_mismatch_rejection_rate",
+      "bmr_invalid_parameterization_digest_rejection_rate",
+      "minimum_hidden_unit_assignment_margin",
+      "ambiguous_alignment_abstention_rate",
+      "dirichlet_support_mask_validation_failure_rate",
+      "dirichlet_excluded_observed_outcome_zero_evidence_accuracy",
+      "dirichlet_reduced_posterior_nonintegrability_rejection_rate",
+      "architecture_mismatch_rejection_rate",
+      "manifest_mismatch_rejection_rate",
+      "probe_set_mismatch_rejection_rate",
+      "held_out_alignment_acceptance_false_positive_rate",
+      "source_rule_hypothesis_count",
+      "source_semantic_unique_likelihood_tensor_count",
+      "paper_reported_unique_rule_count",
+      "model_space_count_discrepancy",
+      "symmetry_canonicalization_function_drift",
+      "stale_alignment_canonicalization_acceptance_rate",
+      "cumulative_parameter_drift_l2",
+      "task_retention_after_update",
+      "held_out_future_batch_leakage_rate",
+      "weight_reading_accuracy_after_label_permutation",
+      "semantic_accuracy_on_unseen_task_families",
+      "semantic_reader_calibration",
+      "sequential_session_receipt_chain_integrity",
+      "verifier_gated_session_advancement",
+      "cumulative_l2_budget_violations",
+      "semantic_quotient_rule_count",
+      "model_posterior_aggregation_error_nats",
+      "prior_predictive_invariance_error",
+      "quotient_action_ranking_invariance_error",
+      "labelled_vs_quotient_feedback_model_eig_delta_nats",
+      "feedback_only_known_state_quotient_fixture_status",
+      "posterior_predictive_mixture_coherence_error",
+      "per_model_predictive_mass_error",
+      "model_predictive_missing_or_duplicate_id_rejection_rate",
+      "posterior_vs_prior_weighting_difference_nats",
+      "known_state_feedback_fixture_status",
+      "full_pomdp_parent_state_posterior_update_status",
+      "model_conditioned_parent_state_count_increment_contract",
+      "gaze_vision_action_information_gain_nats",
+      "preference_log_normalization_error",
+      "negative_or_nonfinite_action_cost_rejection_rate",
+      "invalid_epistemic_weight_rejection_rate",
+      "zero_information_no_choice_control_error",
+      "spm_bmr_log_evidence_ratio_difference_nats_vs_pinned_reference",
+      "spm_full_prior_global_normalization_error",
+      "spm_pseudocount_coordinate_coverage",
+      "strict_vs_spm_posterior_model_kl_nats",
+      "conditional_state_information_gain_nats",
+      "information_chain_rule_error_nats",
+      "posterior_state_entropy",
+      "posterior_model_entropy",
+      "gaze_observation_cost_nats",
+      "three_ball_duplicate_partition_count",
+      "three_ball_constant_context_duplicate_partition_exactness",
+      "three_ball_paper_count_discrepancy_preserved_without_forced_deduplication",
+      "native_cfc_sequential_candidate_boundary_receipt_chain_integrity",
+      "feedback_preference_shift_invariance_error_nats",
+      "negative_pragmatic_kl_risk_rejection_count",
+      "dayan_2026_wsn_protocol_fidelity",
+      "deep_align_2024_protocol_fidelity",
+      "canonicalization_native_digest_mismatch_rate",
+      "probe_noise_sigma_calibration_error",
+      "permutation_posterior_calibration_error",
+      "zero_noise_eig_claim_rejection_rate",
+      "exact_permutation_width_limit_violation_rate",
+      "permutation_posterior_brier_score",
+      "gaussian_observation_noise_calibration_error",
+      "permutation_probe_realized_entropy_reduction_nats",
+      "high_eig_zero_evsi_selection_error",
+      "lower_eig_higher_evsi_selection_error",
+      "model_misspecification_brier_increase",
+      "truth_outside_model_support_acceptance_rate",
+      "paired_policy_hidden_hypothesis_mismatch_rate",
+      "safety_threshold_violation_rate",
+      "nonpositive_net_evsi_probe_selection_rate",
+      "binary_bundle_capacity_false_retrieval_rate",
+      "single_item_binary_bundle_round_trip_error",
+      "nonmember_query_seed_collision_rate",
+      "packed_vs_unpacked_storage_accounting_error",
+      "orthogonal_mixer_norm_error",
+      "orthogonal_mixer_inverse_error",
+      "butterfly_parameter_count_contract_error",
+      "butterfly_nonfinite_angle_acceptance_rate",
+      "orthogonal_mixer_basis_spread_control_error",
+      "high_model_eig_zero_decision_information_gain",
+      "decision_information_vs_model_information_gap",
+      "targeted_decision_eig_policy_selection_error",
+      "decision_information_data_processing_inequality_violation_rate",
+      "targeted_decision_policy_cost_ignorance_guardrail",
+      "paired_policy_seed_count_mismatch_rate",
+      "paired_contrast_confidence_interval_nonfinite_rate"
+    ],
+    "efficiency": [
+      "diagnostic_probes",
+      "candidate_evaluations",
+      "p50_latency_ns",
+      "p95_latency_ns",
+      "peak_memory_bytes",
+      "state_bytes",
+      "edited_parameter_count",
+      "measured_operation_count",
+      "functional_probe_budget",
+      "permutation_alignment_operations",
+      "probe_candidate_forward_passes",
+      "alignment_runtime_ns",
+      "assignment_margin_evidence_per_probe",
+      "canonicalization_changed_parameter_count",
+      "canonicalization_candidate_evaluations",
+      "edit_program_reuse_rate",
+      "llm_editor_call_count",
+      "diagnostic_probes_taken",
+      "diagnostic_observation_cost",
+      "decision_value_per_probe_cost",
+      "diagnostic_policy_selection_runtime_ns",
+      "packed_hypervector_bytes",
+      "unpacked_i8_hypervector_bytes",
+      "f32_hypervector_bytes",
+      "bundle_bytes_read",
+      "query_bytes_read",
+      "structured_mixer_apply_latency_ns",
+      "structured_mixer_inverse_latency_ns",
+      "butterfly_angle_parameters",
+      "dense_matrix_parameters",
+      "structured_mixer_parameter_ratio",
+      "structured_mixer_rotation_pairs",
+      "structured_mixer_bytes_allocated_per_apply"
+    ],
+    "energy": "Report only when device, power instrumentation, limits, and aggregation protocol are documented and reproducible."
+  },
+  "analysis_plan": {
+    "pairing": "Pair all task seeds, fault instances, and scenarios across all sixteen profiles and baselines.",
+    "uncertainty": "Report per-task effect sizes, distributions across seeds, and 95% confidence intervals; use exact binomial intervals for false-edit rates.",
+    "multiplicity": "Predeclare primary contrasts and apply Holm correction across registered primary tests.",
+    "interaction": "Estimate preregistered H×C×F×W interaction effects; do not infer synergy from the full profile alone. Include an explicit equivalence subgroup contrast: healthy permutation-only controls must not be classified as faults.",
+    "budgets": "Match proposer candidates, forward passes, tuning opportunities, parameter counts, and compute. Report unmatched deviations.",
+    "holdout": "Holdout labels/results are inaccessible to proposer, policy, editor, and tuning. Open once for final report; no post-hoc retuning.",
+    "healthy_controls": "Include enough independent healthy networks to estimate low false-edit rates. A low observed count from a small sample is not a low-risk guarantee.",
+    "reporting": "Publish null/negative results, all registered contrasts, failed runs, and artifact/source digests."
+  },
+  "hard_gates": [
+    "All sixteen unique H×C×F×W profiles must be present exactly once and each factor setting must match its profile ID.",
+    "Each enabled/disabled factor must have an explicit adapter and runtime receipt proving which implementation actually ran.",
+    "Protocol-only validation must never mark any profile as executed or emit task-performance claims.",
+    "Exact source SHA, protocol digest, task revision, profile, baseline, seed/split, tuning budget, and result artifact digests are mandatory.",
+    "Development and held-out seeds are disjoint; no held-out label or result may leak into model, policy, proposer, verifier tuning, or candidate selection.",
+    "FEP information gain must be prospective, model-relative, action-dependent, and based on outcome likelihoods/posteriors; novelty or entropy of deterministic predicted states is insufficient.",
+    "The information-channel-off control must remove the information-selection benefit while reward, action cost, and novelty accounting remain fixed.",
+    "WSP must write only to isolated candidate copies through typed SWI operations with exact base-digest preconditions.",
+    "Stale digests, malformed dimensions, duplicate conflicting groups, non-finite values, invalid tau, norm/budget violations, or algebra-invariant violations must fail closed before mutation.",
+    "Healthy networks and sham fault metadata must be included; false edits to healthy models must be reported with confidence intervals.",
+    "Repair success must include held-out target improvement and non-target collateral-regression measurements.",
+    "Weights-only and trace-assisted WSP results must be reported separately.",
+    "Gradient, analytic, black-box, random matched-sparsity, no-edit, and task-appropriate conventional baselines must be budget-matched.",
+    "Primary contrasts, multiple-comparison procedure, and stop conditions must be preregistered before held-out evaluation.",
+    "Incomplete execution, skipped tests, queued workflows, missing baselines, invalid outputs, or integrity failures are non-qualification states.",
+    "No SOTA, production readiness, general self-improvement, safety certification, biological equivalence, or consciousness claim follows from this protocol.",
+    "Function-preserving hidden-unit permutations are negative controls; raw parameter distance alone cannot label a behavior change.",
+    "Any permutation alignment is diagnostic metadata and must not silently rewrite the source checkpoint or alter native digest semantics.",
+    "Cross-permutation repair is scored only after held-out function equivalence and preservation tests; oracle alignments are upper bounds, not proposer inputs.",
+    "State-, parameter-, and model-structure information gains are reported separately only when their generative models and posterior updates are explicitly defined.",
+    "Any aggregation of epistemic terms declares its factorization and is checked against a joint mutual-information chain-rule calculation; arbitrary entropy deltas cannot be added.",
+    "Bayesian Model Reduction or another model-selection procedure must be qualified against held-out model evidence and cannot commit a structural change from a probe ranking alone.",
+    "Hierarchical epistemic terms are derived from one declared joint posterior and action-conditioned outcome model; their sum must agree with the joint mutual-information chain rule within numerical tolerance.",
+    "Bayesian Model Reduction is applied only to prior-only reductions that share one parameterization; the posterior/full-prior pair and exact-vs-variational posterior status are recorded, and non-integrable ratios are rejected.",
+    "The CfC symmetry fixture must execute the function-preserving hidden-unit permutation through WeightProgram and the candidate-only SWI adapter, verify distinct native fingerprints with held-out functional equivalence, and verify that an incomplete permutation changes outputs.",
+    "The three-ball task is labelled an exact reproduction only when the paper/supplement state space, rule set, preference distribution, observation likelihoods, action constraints, and stopping rule are transcribed and independently verified; otherwise it must be named a task adaptation.",
+    "BMR log evidence is used only for post-observation model comparison; it is not added directly to prospective expected information gain or pragmatic value.",
+    "All Gaussian distributions supplied to BMR (full posterior, full prior, and each reduced prior) carry the same canonical parameterization digest binding coordinate identities, semantic roles, tensor shapes, and coordinate order; missing, malformed, or mismatched digests are rejected before evidence calculation.",
+    "Activation-based hidden-unit correspondence is diagnostic only: the source model is unchanged, native fingerprints are not rewritten, and low-margin or ambiguous assignments must abstain. Report probe-set identity, signature error, and assignment margin for every attempted alignment.",
+    "The three-ball implementation records the paper's published rule (centre green→green; centre red→left colour; centre blue→right colour), foveated single-ball observation, and outcome preference log probabilities (no feedback=0, correct=2, incorrect=-6 nats); any changed mechanism is labelled as an adaptation.",
+    "The three-ball categorical likelihood reproduction must use Dirichlet model reduction over the full-model posterior and prior concentrations; the diagonal-Gaussian BMR primitive must not be substituted for this conjugate categorical case.",
+    "Three-ball model evidence must use the registered model family and Dirichlet column ordering, and the reported Occam threshold must be expressed as posterior model log-odds in nats; model commitment is evaluated at the declared 16-nat threshold as a replication metric, not as a universal constant.",
+    "Dirichlet BMR requires positive concentrations on active coordinates and an explicit active-support mask; inactive coordinates must have exactly zero concentration, and any posterior count in an excluded coordinate makes that reduced model's evidence zero. Empty or malformed support and non-integrable reduced posteriors are rejected.",
+    "The one-step Dirichlet model-EIG evaluator must compute current and post-outcome model beliefs from BMR, weight posterior model entropy by the full Bayesian-model-average parent predictive outcome distribution, and must not reweight the predictive distribution by Bayes factors a second time.",
+    "The parent Dirichlet prior used for prospective model EIG must equal the reduced-model-prior arithmetic mean under the registered model probabilities; predictive outcome probabilities must be normalized, and hypothetical sufficient-statistic increments must match the exact parameterization and be finite and non-negative.",
+    "Adaptive functional-probe selection must report the full frozen candidate pool, selected probe, per-candidate accumulated assignment margin and mean activation error, source/candidate/architecture/manifest digests, and the final ordered probe-set digest. It must be deterministic and must not mutate either model.",
+    "Probe selection and alignment fitting must use a declared selection-probe pool; final functional-equivalence and acceptance metrics must use a disjoint held-out probe sequence not used for selection, threshold tuning, or assignment fitting.",
+    "Accumulated assignment margin is computed from summed squared activation differences across probes, while the reported fit error remains mean-squared activation error; the same mapping repeated across independent probes must increase the margin in proportion to probe count without changing mean fit error.",
+    "The three-ball source audit preserves the 81 labelled SPM hypotheses and equal 1/81 prior mass. It independently canonicalizes the exact full feedback likelihood tensors and records the current public-generator result of 75 semantic classes (three triplicate constant mappings) against the paper-reported 79. The exact-reproduction status remains blocked until this discrepancy is reconciled against the paper's archived code/uniqueness criterion; neither model labels nor priors may be silently deduplicated.",
+    "CfC symmetry canonicalization must bind to the current source and candidate native model digests, shared architecture/manifest digests, and accepted alignment receipt; it must only target the registered one-layer, non-residual, no-backbone topology, use the coupled five-group permutation, materialize on a candidate clone, recover the canonical fixture digest, and preserve the candidate's function on disjoint held-out input sequences.",
+    "The sequential WeightProgram benchmark must distinguish one fixed editor-authored program reused across evidence batches from per-batch editor re-prompting; report LLM calls, candidate evaluations, update count, inference cost, and endpoint budget separately.",
+    "Every sequential edit is bound to the exact model, program, target specification, evidence-batch digest, and verifier receipt; candidates are evaluated on predeclared held-out observations and promoted only through a separate explicit acceptance boundary.",
+    "Future measurement batches, hidden endpoints, and held-out assay outcomes are inaccessible to the editor and probe selector; include a leakage canary and report all candidate evaluations, rollbacks, and unsuccessful edits.",
+    "Sequential WSP results are compared with no-edit, random matched-norm, feedback-blind, re-prompted WSP, and matched online/gradient baselines under identical evidence batches and endpoint budgets; online-replay author-reported results are not treated as independent replication.",
+    "The multi-layer CfC canonicalizer must use one fresh, fingerprint-bound activation-alignment receipt per layer, validate every layer index exactly once, propagate each layer permutation through the next layer's input columns, and verify full held-out output equivalence on candidate-only materialization. Residual, bidirectional, and backbone topologies remain explicitly unsupported.",
+    "Weight-space semantic-reading results must include randomized output labels/action names and task families absent from public training corpora; familiar dataset-name recognition alone is not accepted as function understanding.",
+    "At least one intervention must test causal predictions about outputs after a targeted parameter-group or hidden-unit manipulation; unverified verbal interpretations are not scored as correct semantic recovery.",
+    "Report architecture-only, raw-weight-only, probe-assisted, and intervention-assisted semantic-reading baselines separately under matched information, tool, token, and probe budgets.",
+    "sequential_session_receipt_chain_integrity",
+    "no_batch_advancement_without_native_candidate_and_verifier_receipts",
+    "session_rejects_replayed_or_out_of_order_evidence_and_stale_parent_candidate",
+    "cumulative_edit_path_and_parameter_change_budgets_are_enforced_across_accepted_batches",
+    "The source-faithful 81-label rule family is retained. Any semantic quotient is an explicit secondary representation with prior mass aggregated over exact-likelihood-equivalence classes; prior predictive distributions, model evidence, class posteriors, and action rankings must match the labelled family within declared numerical tolerances.",
+    "The causal weight-reading task must distinguish structural weight arithmetic from semantic interpretation: output labels and task names are randomized, label permutations are hidden from the reader, and predictions are scored against actual outputs under sealed parameter-group interventions. Dataset-name guesses alone never count as successful interpretation.",
+    "The feedback-only known-state three-ball quotient fixture is reported separately from full-task reproduction; it must compare prospective Dirichlet model-EIG, predictive outcome masses, post-outcome semantic-class posterior aggregation, and action rankings across 81 labelled versus 75 quotient hypotheses, including a no-choice zero-information control.",
+    "Prospective Dirichlet model-EIG derives each action-outcome probability as the mixture of per-model posterior-predictive probabilities weighted by the current posterior model belief from BMR; it rejects missing, duplicate, or unknown model IDs, per-model predictive distributions that do not normalize, and caller-supplied aggregate probabilities that disagree with the reconstructed mixture.",
+    "The known-ball-state feedback-only Dirichlet EIG fixture must not be reported as full POMDP reproduction. Full partial-observation qualification requires action/outcome-conditioned parent-state posterior expectations and a declared, provenance-bound sufficient-statistic update convention; a shared known-state count increment is insufficient.",
+    "The known-state feedback action scorer is evaluated separately from the full partially observed task. It must reproduce G(a)=KL[Q(feedback|a,D)||C(feedback)]-lambda_info*I(model;feedback|a,D)+action_cost under a fixed known ball-colour state and fixed gaze, with the three-ball feedback log preferences [0,2,-6] nats in no-feedback/correct/incorrect order.",
+    "The known-state action score is compared against random, pragmatic-only (lambda_info=0), model-EIG-only, and combined one-step FEP-style baselines under the same legal action set and cost; preference risk, model EIG, epistemic weight, and action cost are reported separately. This is not evidence of full POMDP performance or production ActiveInferenceAgent integration.",
+    "The three-ball source-reproduction profile must use the pinned SPM globally normalized prior over all Dirichlet tensor entries, not independent per-column arithmetic normalization.",
+    "The three-ball source-reproduction profile must apply the pinned SPM 1/32 pseudocount to every posterior, full-prior, and reduced-prior coordinate in Dirichlet model evidence; strict structural-zero BMR is registered as a separate ablation.",
+    "The BMR reference test must reproduce spm_MDP_log_evidence with first-dimension multivariate-beta columns and source-pinned SPM revision metadata; the source digest and formula must be recorded in the experiment receipt.",
+    "The three-ball partial-observation policy maintains a normalized joint P(model,state) belief; it must not replace it with independent marginals after evidence introduces model/state correlation.",
+    "Gaze information is measured as model information plus conditional state information I(State; Observation | Model); the joint mutual-information chain-rule residual is reported and bounded.",
+    "The two-step gaze/choice policy is labelled a bounded receding-horizon approximation; it is not called a full SPM POMDP reproduction or a continuous-parameter learner.",
+    "A constant visual sensor independent of hidden state must produce zero conditional state information gain; impossible observations must fail closed.",
+    "The repeated three-ball finite-hypothesis evaluator is explicitly labelled a two-step-per-trial adaptation, not an exact reproduction of the published five-move SPM schedule or its continuous Dirichlet parameter-learning path.",
+    "Each trial carries only semantic model posterior mass forward and resets the newly sampled hidden-state prior; the environment truth and hidden scene are available only to the evaluator receipt, not the action-selection function.",
+    "Posterior entropy may increase after an individual surprising observation; only expected entropy reduction equals mutual information. Tests must not assert per-observation entropy monotonicity.",
+    "Source-labelled and semantic-quotient sequential runs with matched seeds must preserve semantic-class posterior, action scores, and commitment decisions within declared numerical tolerances.",
+    "Sequential three-ball result receipts bind the pinned SPM demo commit, rule-generator commit, canonical parameterization digest, model-family choice, seed, and deterministic RNG algorithm/version.",
+    "The sequential discovery runner carries only model posterior marginals across independent trials and resets the hidden-state prior; the hidden scene is never an input to action selection and appears only in evaluator-visible receipts.",
+    "Preference schedule values are validated before the first trial, including post-commitment preferences that may not be reached in a finite test episode.",
+    "An exactly certain semantic model posterior is represented in serialized receipts without non-finite JSON numbers; commitment logic treats posterior 1 as infinite log odds while the trace stores an explicit absence marker.",
+    "Paired three-ball policy arms must use a domain-separated environment RNG and policy RNG so all policies receive identical hidden-scene sequences for matched seeds regardless of policy random draw count.",
+    "Policy ablation runs must preserve the same model family, true rule, scene seeds, scene reset schedule, trial horizon, action costs, and evaluator information; only the declared policy component may change.",
+    "The pinned SPM rule generator fixture must retain all 81 labelled hypotheses and their source prior mass, and must verify that the only exact feedback-tensor duplicate groups are the three triplicate constant-criterion mappings (75 exact tensors). The paper-reported 79-unique count must remain an explicit unresolved discrepancy; no relabeling or silent replacement is allowed.",
+    "The native CfC sequential WSP integration fixture must materialize two consecutive frozen-template evidence batches through candidate-only native snapshots, prove verifier rejection does not advance the session, prove accepted batches bind to the prior accepted native fingerprint and advance exactly once, and prove the original live/source network fingerprint remains unchanged.",
+    "Feedback log preferences are treated as relative log weights: normalize with a stable log-sum-exp before evaluating KL pragmatic risk, and verify that adding a common constant to all preference logits leaves every action's risk and policy ranking invariant.",
+    "Bayesian expected information gain over hidden-unit permutations is claimed only when an explicit observation/measurement-noise likelihood is independently calibrated from repeat-run, device/precision, or stochastic-model variation; a deterministic margin heuristic is labelled as such and is not called EIG.",
+    "Exact finite-permutation enumeration is restricted to declared small-width oracle fixtures and must report factorial scaling; larger-width methods report approximation residuals, calibration, ambiguity abstention, and compute.",
+    "Gaussian permutation EIG may be reported as calibrated diagnostic efficiency only when the scalar observation-noise standard deviation is estimated from a preregistered repeated-probe/device/stochasticity protocol on development data and then frozen for held-out evaluation; arbitrary noise insertion solely to increase EIG is prohibited.",
+    "Exact permutation EIG is limited to at most 120 hypotheses (five hidden units) and 32 candidate probes per call; larger layers must use a separately benchmarked approximate posterior/assignment method and cannot be labelled exact.",
+    "Model expected information gain and expected value of sample information are distinct registered quantities; the benchmark must report both and must not use EIG as a proxy for downstream decision value.",
+    "A high-EIG diagnostic with zero EVSI and nonzero cost or risk must not be selected; a lower-EIG diagnostic with positive net EVSI must be selectable.",
+    "A no-probe option is always evaluated and must win whenever all eligible probes have non-positive net decision value.",
+    "Agent belief likelihoods and evaluator truth-side outcome distributions are separately represented; model-misspecification arms must report task regret and posterior calibration rather than sampling from the agent's own predictions.",
+    "Paired policy comparisons derive the same hidden-hypothesis draw from a domain-separated per-episode seed independent of the number of random draws consumed by a policy.",
+    "All action selectors enforce the preregistered hard safety-risk threshold; information gain or decision value cannot override an ineligible action.",
+    "Impossible observations, truth probability outside the agent likelihood support, malformed probability mass, non-finite losses, and invalid costs fail closed.",
+    "The packed BinaryHV pilot must state the fixed logical dimension and packed byte width; it cannot be compared to i8/f32/complex baselines without separately reporting physical storage and precision.",
+    "A single-item majority bundle must round-trip exactly; member and nonmember score distributions, pairwise AUC, empirical false-positive rate, and TPR at the declared operating point are all reported across every registered load.",
+    "The packed BinaryHV pilot is labelled a fixed-dimension implementation characterization; it is not a theoretical capacity proof, a full VSA comparison, or a SOTA result.",
+    "The packed BinaryHV operating threshold is calibrated on a dedicated negative-query set; empirical false-positive rate is measured on a disjoint negative-query set that was not used to choose the threshold.",
+    "The packed BinaryHV pilot must compare empirical mean member similarity to the analytic independent-bipolar majority-bundle expectation C(2m,m)/4^m for odd load 2m+1, preserving the exact discrete formula separately from its asymptotic approximation.",
+    "Parameterized butterfly mixing is an opt-in, standalone orthogonal operator until a separate HDC-LTC task ablation justifies integration; it must not silently alter the default neuron.",
+    "For dimension D=2^L, the butterfly angle manifest contains exactly (D/2)*L finite parameters, stage-major and pair-major, and reports this count against D^2 dense parameters.",
+    "Each butterfly stage consists of disjoint orthogonal Givens rotations; the inverse applies transposed rotations in reverse stage order and must restore the input within the preregistered floating-point tolerance.",
+    "Operator characterization reports norm preservation, inverse error, basis-coordinate spread, parameter count, and measured latency separately; operator-level performance is not a downstream task or SOTA claim.",
+    "A zero-angle butterfly is the identity and invalid dimensions, angle counts, non-finite angles, and input dimensions must fail closed.",
+    "Optimal-decision information gain is computed from a deterministic hypothesis-to-optimal-decision map and must not exceed model information gain beyond the preregistered numerical tolerance.",
+    "The decision-diagnostic harness must run no-probe, pure model-EIG, targeted decision-EIG, cost-aware EVSI, and always-inspect on paired episode seeds; report paired EVSI-versus-baseline differences and identify the confidence-interval method.",
+    "WeightLoop comparisons must match endpoint/assay budget, candidate/forward-pass budget, parameter-edit budget, and editor-call/token budget; author-reported offline replay results must remain distinct from independent reproduction.",
+    "The standalone diagnostic runner must emit a JSON result bound to the exact 40-character source SHA, the declared scenario, fixed seed, and all five policies; four paired EVSI contrasts must be present, and the result must remain explicitly marked synthetic-only.",
+    "Model-adequacy monitoring must use prequential predictions frozen before each observation; zero-support outcomes are counted as model-family violations and are never epsilon-smoothed or silently renormalized.",
+    "NoDetectedInadequacy means only that frozen thresholds found no failure; it must never be reported as proof that the registered model family is correct.",
+    "Finite-TV robust diagnostics must report the declared radius and adversarial outcome distribution; radius zero must exactly reproduce the nominal EVSI risk and selection.",
+    "Outcomes with zero nominal support receive the maximum declared task loss in the TV-robust envelope; all claims are conditional on the registered prior and declared ambiguity radius.",
+    "Prequential alternative forecasts and their mixture weights must be fixed from information available before each evaluated observation; retrospective fitting on evaluation outcomes invalidates the e-process guarantee.",
+    "The fixed alternative mixture weights must be normalized; sequential evidence is reported as a log e-value and crosses only at the preregistered Ville threshold log(1/alpha).",
+    "The anytime false-alarm guarantee is conditional on the declared null predictive distribution being correct; a zero-support observation is a separate hard adequacy violation and must not be epsilon-smoothed.",
+    "The open-world stress runner must assert a preregistered nominal-to-TV-robust probe switch under a declared known-truth misspecification and report exact expected scores against a no-probe and known-truth oracle reference.",
+    "The prequential benchmark must include a symmetric-predictive regime-shift fixture where aggregate log-loss and Brier thresholds do not cross but a predictable-alternative e-process crosses its preregistered Ville threshold.",
+    "A deterministic out-of-support observation must trigger the hard model-adequacy failure even when the minimum-observation threshold is not met.",
+    "The open-world benchmark result must be marked synthetic-known-truth-only and bind its exact source SHA; it must not be presented as a live ActiveInferenceAgent, field, or SOTA result.",
+    "The anytime e-process significance parameter must satisfy the strict open interval 0 < alpha < 1; zero, one, out-of-range, NaN, and infinite values fail closed.",
+    "A calibrated TV ambiguity radius must be computed from an independent IID calibration sample using a declared confidence parameter and explicit finite-sample bound; calibration observations may not be reused as evaluation outcomes.",
+    "The categorical Hoeffding/union-bound radius must report category count, sample count, empirical distribution, per-coordinate bound, alpha, confidence level, and derived TV radius; it must not be described as valid under temporal dependence or calibration/deployment shift.",
+    "Sequential e-process thresholds and categorical TV calibration bounds must be calculated in the log domain so valid subnormal alpha values cannot cause reciprocal overflow; strict alpha bounds remain 0 < alpha < 1."
+  ],
+  "research_references": [
+    {
+      "id": "wsp_mit_2026",
+      "url": "https://rikiyat.github.io/blog/weight-space-programming/"
+    },
+    {
+      "id": "weight_space_learning_survey_2026",
+      "url": "https://arxiv.org/abs/2603.10090"
+    },
+    {
+      "id": "clinical_network_wsp_audit_2026",
+      "url": "https://arxiv.org/abs/2611.05341"
+    },
+    {
+      "id": "hdc_comparative_review_2025",
+      "url": "https://doi.org/10.1007/s10462-025-11181-2"
+    },
+    {
+      "id": "original_cfc_ltc_2022",
+      "url": "https://doi.org/10.1038/s42256-022-00556-7"
+    },
+    {
+      "id": "rederived_cfc_nialim_2026",
+      "url": "https://doi.org/10.1109/TNNLS.2026.3669345"
+    },
+    {
+      "id": "active_inference_artificial_reasoning_2026",
+      "url": "https://doi.org/10.1038/s41467-026-77209-5"
+    },
+    {
+      "id": "active_inference_vs_rl_2026",
+      "url": "https://doi.org/10.1016/j.jmp.2026.103011"
+    },
+    {
+      "id": "symthaea_fep_issue_8391",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/8391"
+    },
+    {
+      "id": "symthaea_swi_pr_10628",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10628"
+    },
+    {
+      "id": "symthaea_hlb_pr_10694",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10694"
+    },
+    {
+      "id": "symthaea_factorial_v1_pr_8375",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/8375"
+    },
+    {
+      "id": "symthaea_model_information_gain_pr_8394",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/8394"
+    },
+    {
+      "id": "permutation_equivariant_weight_space_networks_icml_2026",
+      "url": "https://proceedings.mlr.press/v306/dayan26a.html"
+    },
+    {
+      "id": "weight_space_first_class_modality_icml_2026",
+      "url": "https://proceedings.mlr.press/v306/wang26mc.html"
+    },
+    {
+      "id": "weight_space_learning_survey_2026",
+      "url": "https://arxiv.org/abs/2603.10090"
+    },
+    {
+      "id": "active_inference_artificial_reasoning_nature_2026",
+      "url": "https://doi.org/10.1038/s41467-026-77209-5"
+    },
+    {
+      "id": "ibm_jair_vsa_capacity_2026",
+      "url": "https://research.ibm.com/publications/capacity-analysis-of-vector-symbolic-architectures"
+    },
+    {
+      "id": "date_2026_ghrr_vector_space_acceleration",
+      "url": "https://doi.org/10.23919/DATE69613.2026.11539261"
+    },
+    {
+      "id": "symbolar_softwarex_2026",
+      "url": "https://doi.org/10.1016/j.softx.2026.102914"
+    },
+    {
+      "id": "oxicuda_hdc_0_5_5",
+      "url": "https://docs.rs/crate/oxicuda-hdc/0.5.5"
+    },
+    {
+      "id": "symthaea_hlb_decision_evsi_integration_issue_11122",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/11122"
+    },
+    {
+      "id": "symthaea_hlb_hdc_capacity_issue_11145",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/11145"
+    },
+    {
+      "id": "monarch_structured_matrices_icml_2022",
+      "url": "https://proceedings.mlr.press/v162/dao22a.html"
+    },
+    {
+      "id": "butterfly_factorizations_fast_linear_transforms_2019",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6879380/"
+    },
+    {
+      "id": "boft_orthogonal_butterfly_iclr_2024",
+      "url": "https://proceedings.iclr.cc/paper_files/paper/2024/hash/a63ce8e6867a1bf4b4ca62e5077814d9-Abstract-Conference.html"
+    },
+    {
+      "id": "efficient_structured_linear_layers_neurips_2024",
+      "url": "https://proceedings.neurips.cc/paper_files/paper/2024/hash/0729c38b421cd66f2313ab397d099e37-Abstract-Conference.html"
+    },
+    {
+      "id": "targeted_active_learning_bayesian_decision_tmlr_2024",
+      "url": "https://openreview.net/forum?id=KxPjuiMgmm"
+    },
+    {
+      "id": "weightloop_wsp_experimental_feedback_2026",
+      "url": "https://arxiv.org/abs/2611.07319"
+    },
+    {
+      "id": "wsp_scope_generalization_and_limits_2026",
+      "url": "https://arxiv.org/abs/2611.09382"
+    },
+    {
+      "id": "zero_probe_weight_reading_semantics_audit_2026",
+      "url": "https://arxiv.org/abs/2611.08070"
+    }
+  ]
+}

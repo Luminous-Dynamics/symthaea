@@ -31,6 +31,18 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Examples-only directory; the repository root package is the actual symthaea package.
+    "crates/core/symthaea",
+    # Source-only cryptographic attestation prototype; no package manifest or current core API.
+    "crates/core/symthaea-observation-attestation",
+    # Research namespace without a Cargo manifest.
+    "crates/core/symthaea-iit",
+    # Research source tree without a package manifest/module ownership contract.
+    "crates/domains/symthaea-architecture-engineering",
+    # Design namespace; active implementation belongs to the existing culinary package.
+    "crates/domains/symthaea-dishwasher-design",
+    # README-only verifier handoff without a buildable Rust package.
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",

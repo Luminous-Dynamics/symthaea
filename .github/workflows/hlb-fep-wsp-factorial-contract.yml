@@ -1,0 +1,334 @@
+name: HLB FEP-WSP Factorial Contract
+
+on:
+  pull_request:
+    branches: [main, research/swi-001-weight-space-introspection]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
+      - ".github/scripts/assert-hlb-test-discovery.sh"
+      - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
+      - "crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs"
+      - "crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs"
+      - "crates/core/symthaea-core/src/hdc/structured_mixer.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "Cargo.lock"
+      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
+      - "docs/research/HLB_EVIDENCE_GOVERNED_SUBSTRATE_ADAPTATION.md"
+      - "docs/research/hlb-fep-wsp-factorial-v1.json"
+      - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
+      - "crates/core/symthaea-fep/src/decision_relevant_information.rs"
+      - "crates/core/symthaea-fep/src/gaussian_decision_diagnostic.rs"
+      - "crates/core/symthaea-fep/src/causal_diagnostic_semantics.rs"
+      - "crates/core/symthaea-fep/src/open_world_robust_decision.rs"
+      - "crates/core/symthaea-fep/src/sibson_alpha_information.rs"
+      - "crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs"
+      - "crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs"
+      - "crates/core/symthaea-fep/src/static_model_diagnostic.rs"
+      - "crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs"
+      - "crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs"
+      - "crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs"
+      - "crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs"
+      - "crates/core/symthaea-fep/src/gaussian_model_information_gain.rs"
+      - "crates/core/symthaea-fep/src/bayesian_model_reduction.rs"
+      - "crates/core/symthaea-fep/src/dirichlet_model_reduction.rs"
+      - "crates/core/symthaea-fep/src/three_ball_rule_space.rs"
+      - "crates/core/symthaea-fep/src/three_ball_partial_observation.rs"
+      - "crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs"
+      - "crates/core/symthaea-fep/Cargo.toml"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
+      - "crates/core/symthaea-core/src/weight_space_program.rs"
+      - "crates/core/symthaea-core/src/sequential_weight_program.rs"
+      - "crates/core/symthaea-core/src/sequential_weight_verification.rs"
+      - "crates/core/symthaea-fep/src/open_world_weight_program_gate.rs"
+      - "src/dynamics/cfc/weight_program_adapter.rs"
+      - "src/dynamics/cfc/mod.rs"
+      - "src/dynamics/cfc/network.rs"
+  push:
+    branches: [research/hlb-fep-wsp-factorial-v2]
+    paths:
+      - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
+      - ".github/scripts/assert-hlb-test-discovery.sh"
+      - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
+      - "crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs"
+      - "crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs"
+      - "crates/core/symthaea-core/src/hdc/structured_mixer.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "Cargo.lock"
+      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
+      - "docs/research/HLB_EVIDENCE_GOVERNED_SUBSTRATE_ADAPTATION.md"
+      - "docs/research/hlb-fep-wsp-factorial-v1.json"
+      - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
+      - "crates/core/symthaea-fep/src/decision_relevant_information.rs"
+      - "crates/core/symthaea-fep/src/gaussian_decision_diagnostic.rs"
+      - "crates/core/symthaea-fep/src/causal_diagnostic_semantics.rs"
+      - "crates/core/symthaea-fep/src/open_world_robust_decision.rs"
+      - "crates/core/symthaea-fep/src/sibson_alpha_information.rs"
+      - "crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs"
+      - "crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs"
+      - "crates/core/symthaea-fep/src/static_model_diagnostic.rs"
+      - "crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs"
+      - "crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs"
+      - "crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs"
+      - "crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs"
+      - "crates/core/symthaea-fep/src/gaussian_model_information_gain.rs"
+      - "crates/core/symthaea-fep/src/bayesian_model_reduction.rs"
+      - "crates/core/symthaea-fep/src/dirichlet_model_reduction.rs"
+      - "crates/core/symthaea-fep/src/three_ball_rule_space.rs"
+      - "crates/core/symthaea-fep/src/three_ball_partial_observation.rs"
+      - "crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs"
+      - "crates/core/symthaea-fep/Cargo.toml"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
+      - "crates/core/symthaea-core/src/weight_space_program.rs"
+      - "crates/core/symthaea-core/src/sequential_weight_program.rs"
+      - "crates/core/symthaea-core/src/sequential_weight_verification.rs"
+      - "crates/core/symthaea-fep/src/open_world_weight_program_gate.rs"
+      - "src/dynamics/cfc/weight_program_adapter.rs"
+      - "src/dynamics/cfc/mod.rs"
+      - "src/dynamics/cfc/network.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hlb-fep-wsp-factorial-contract-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  protocol-contract:
+    name: Validate four-factor protocol contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check protocol schema and disjoint seeds
+        run: |
+          set -euo pipefail
+          jq -e '
+            .schema_version == "hlb-fep-wsp-factorial-v1" and
+            .status == "protocol_only" and
+            (.factors | length == 4) and
+            ([.factors[].id] | unique | length == 4) and
+            (.profiles | length == 16) and
+            ([.profiles[].id] | unique | length == 16) and
+            ([.profiles[].execution_status] | all(. == "planned_not_executed")) and
+            (.tasks | length >= 4) and
+            (.baselines | length >= 16) and
+            (.seeds.development | length == 10) and
+            (.seeds.held_out | length == 20) and
+            (([.seeds.development[], .seeds.held_out[]] | unique | length) == 30) and
+            (.hard_gates | length >= 12)
+          ' docs/research/hlb-fep-wsp-factorial-v1.json >/dev/null
+
+      - name: Check validator formatting
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/structured_mixer.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/weight_space_program.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/sequential_weight_program.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/sequential_weight_verification.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/weight_program_adapter.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs crates/core/symthaea-fep/src/gaussian_model_information_gain.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/gaussian_decision_diagnostic.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/causal_diagnostic_semantics.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/open_world_robust_decision.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/sibson_alpha_information.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/open_world_weight_program_gate.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/static_model_diagnostic.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/gaussian_model_information_gain.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/bayesian_model_reduction.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/dirichlet_model_reduction.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/three_ball_partial_observation.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/lib.rs
+          rustfmt --edition 2024 --check src/dynamics/cfc/weight_program_adapter.rs
+          rustfmt --edition 2024 --check src/dynamics/cfc/network.rs
+          rustfmt --edition 2024 --check src/dynamics/cfc/mod.rs
+
+      - name: Reconcile and capture workspace lockfile
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cp Cargo.lock research-results/Cargo.lock.before
+          # Workspace membership changed on this research branch (source-only
+          # directories are now excluded). Let Cargo produce the canonical
+          # pruned lockfile once, then make all test invocations fail-closed
+          # with --locked.
+          cargo metadata --format-version 1 > /dev/null
+          cp Cargo.lock research-results/Cargo.lock.generated
+          changed_files="$(git diff --name-only)"
+          if [ "$changed_files" != "Cargo.lock" ]; then
+            echo "Unexpected files changed during lockfile reconciliation:"
+            printf '%s\n' "$changed_files"
+            exit 1
+          fi
+          cargo metadata --locked --format-version 1 > /dev/null
+          sha256sum Cargo.lock research-results/Cargo.lock.generated > research-results/Cargo.lock.SHA256SUMS
+
+      - name: Assert focused Rust test filters discover tests
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash .github/scripts/assert-hlb-test-discovery.sh
+
+      - name: Test four-factor contract invariants
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1 --no-deps > /dev/null
+          cargo test --locked --release -p symthaea-core --lib weight_space_program::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --lib sequential_weight_program::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --lib sequential_weight_verification::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib open_world_weight_program_gate::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib decision_relevant_information::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib causal_diagnostic_semantics::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib gaussian_decision_diagnostic::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib open_world_robust_decision::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib sibson_alpha_information::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib sequential_diagnostic_planning::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib sequential_diagnostic_benchmark::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib static_model_diagnostic::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --example hlb_static_model_diagnostic -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib decision_diagnostic_benchmark::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --example hlb_decision_diagnostic_benchmark -- --nocapture
+          cargo test --locked --release -p symthaea-fep --example hlb_open_world_robustness_benchmark -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib gaussian_model_information_gain::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib bayesian_model_reduction::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib dirichlet_model_reduction::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib three_ball_rule_space::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib three_ball_partial_observation::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib three_ball_sequential_discovery::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --lib hdc::weight_program_adapter::tests -- --nocapture
+          cargo test --locked --release -p symthaea --lib dynamics::cfc::weight_program_adapter::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract -- --nocapture
+          cargo test --locked --release -p symthaea-core --example hlb_vsa_bundle_capacity -- --nocapture
+          cargo test --locked --release -p symthaea-core --lib hdc::structured_mixer::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --example hlb_structured_mixer_benchmark -- --nocapture
+
+
+      - name: Run decision-focused diagnostic policy benchmark
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-fep --example hlb_decision_diagnostic_benchmark > research-results/hlb-decision-diagnostic.json
+          jq -e --arg source_sha "$SYMTHAEA_SOURCE_SHA" '
+            .schema_version == "hlb-decision-diagnostic-result-v1" and
+            .status == "synthetic_fixture_result_not_environment_result" and
+            .source_sha == $source_sha and
+            .protocol.episodes == 10000 and
+            (.result.policies | length == 5) and
+            (.result.paired_evsi_contrasts | length == 4) and
+            ([.result.policies[].episodes] | all(. == 10000)) and
+            ([.result.paired_evsi_contrasts[].episodes] | all(. == 10000))
+          ' research-results/hlb-decision-diagnostic.json >/dev/null
+          cat research-results/hlb-decision-diagnostic.json
+
+      - name: Run open-world robustness stress benchmark
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-fep --example hlb_open_world_robustness_benchmark > research-results/hlb-open-world-robustness.json
+          jq -e --arg source_sha "$SYMTHAEA_SOURCE_SHA" '
+            .schema_version == "hlb-open-world-robustness-result-v1" and
+            .status == "synthetic_known_truth_stress_only" and
+            .source_sha == $source_sha and
+            .decision_problem.nominal_selected_action_index == 0 and
+            .decision_problem.robust_selected_action_index == 1 and
+            .decision_problem.calibrated_robust_selected_action_index == 1 and
+            .decision_problem.calibrated_tv_radius.sample_count == 50 and
+            .decision_problem.calibrated_tv_radius.confidence_level == 0.95 and
+            (.decision_problem.robust_actual_expected_score < .decision_problem.nominal_actual_expected_score) and
+            .prequential_adequacy.no_shift_report.status == "NoDetectedInadequacy" and
+            .prequential_adequacy.shifted_aggregate_score_report.status == "NoDetectedInadequacy" and
+            .prequential_adequacy.out_of_support_report.status == "Inadequate" and
+            .anytime_e_process.no_shift_report.crossed_at_observation == null and
+            (.anytime_e_process.regime_shift_report.crossed_at_observation != null)
+          ' research-results/hlb-open-world-robustness.json >/dev/null
+          cat research-results/hlb-open-world-robustness.json
+
+      - name: Run static-versus-rectangular diagnostic policy oracle
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-fep --example hlb_static_model_diagnostic > research-results/hlb-static-model-diagnostic.json
+          jq -e --arg source_sha "$SYMTHAEA_SOURCE_SHA" '
+            .receipt.source_git_sha == $source_sha and
+            .report.static_robust_risk == 0 and
+            .report.clairvoyant_lower_bound_risk == 0 and
+            (.report.rectangular_minimax_risk == 0.5) and
+            (.report.rectangular_risk_of_static_policy == 1) and
+            (.report.one_shot.best_worst_case_risk == 0.5) and
+            (.report.static_policy.worst_branch_cost == 2) and
+            .report.static_robust_certificate and
+            ( .report.rectangular_robust_certificate | not )
+          ' research-results/hlb-static-model-diagnostic.json >/dev/null
+          cat research-results/hlb-static-model-diagnostic.json
+
+      - name: Run packed BinaryHV bundle-capacity pilot
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-core --example hlb_vsa_bundle_capacity > research-results/hlb-vsa-bundle-capacity.csv
+          cat research-results/hlb-vsa-bundle-capacity.csv
+
+      - name: Run structured mixer characterization
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-core --example hlb_structured_mixer_benchmark > research-results/hlb-structured-mixer.csv
+          cat research-results/hlb-structured-mixer.csv
+
+      - name: Generate source-bound protocol receipt
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
+          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md docs/research/HLB_EVIDENCE_GOVERNED_SUBSTRATE_ADAPTATION.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/examples/hlb_vsa_bundle_capacity.rs crates/core/symthaea-core/examples/hlb_structured_mixer_benchmark.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs crates/core/symthaea-core/src/sequential_weight_verification.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/Cargo.toml crates/core/symthaea-fep/Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-core/src/hdc/structured_mixer.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/gaussian_decision_diagnostic.rs crates/core/symthaea-fep/src/causal_diagnostic_semantics.rs crates/core/symthaea-fep/src/open_world_robust_decision.rs crates/core/symthaea-fep/src/sibson_alpha_information.rs crates/core/symthaea-fep/src/open_world_weight_program_gate.rs crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs crates/core/symthaea-fep/src/sequential_diagnostic_benchmark.rs crates/core/symthaea-fep/src/static_model_diagnostic.rs crates/core/symthaea-fep/examples/hlb_static_model_diagnostic.rs crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_decision_diagnostic_benchmark.rs crates/core/symthaea-fep/examples/hlb_open_world_robustness_benchmark.rs research-results/hlb-open-world-robustness.json research-results/hlb-decision-diagnostic.json research-results/hlb-static-model-diagnostic.json crates/core/symthaea-fep/src/gaussian_model_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log research-results/hlb-test-discovery.txt research-results/hlb-vsa-bundle-capacity.csv research-results/hlb-structured-mixer.csv > research-results/SHA256SUMS
+          cat research-results/SHA256SUMS
+
+      - name: Upload protocol-validation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hlb-fep-wsp-factorial-contract-${{ github.event.pull_request.head.sha || github.sha }}
+          path: research-results/
+          if-no-files-found: warn
+          retention-days: 30
