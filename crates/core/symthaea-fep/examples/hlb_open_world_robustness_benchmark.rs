@@ -19,6 +19,9 @@ use symthaea_fep::decision_relevant_information::{
     DecisionDiagnosticConfig, DecisionHypothesis, DiagnosticAction,
     evaluate_decision_focused_diagnostics,
 };
+use symthaea_fep::sibson_alpha_information::{
+    SibsonInformationHypothesis, evaluate_sibson_alpha_information,
+};
 use symthaea_fep::open_world_robust_decision::{
     ModelAdequacyStatus, ModelAdequacyThresholds, PrequentialAlternativeModel,
     PrequentialCategoricalObservation, calibrate_categorical_tv_radius_from_counts,
@@ -137,6 +140,56 @@ fn actual_expected_scores(
         .collect()
 }
 
+fn actual_expected_sibson_scores(
+    hypotheses: &[DecisionHypothesis],
+    actions: &[DiagnosticAction],
+    truth: &[Vec<Vec<f64>>],
+    evaluation: &symthaea_fep::sibson_alpha_information::SibsonInformationEvaluation,
+) -> Vec<f64> {
+    let maximum_loss = hypotheses
+        .iter()
+        .flat_map(|hypothesis| hypothesis.loss_by_final_decision.iter().copied())
+        .fold(0.0_f64, f64::max);
+    evaluation
+        .actions
+        .iter()
+        .zip(actions)
+        .map(|(action_evaluation, action)| {
+            let truth_predictive = marginal_truth_by_action(
+                hypotheses,
+                truth,
+                action_evaluation.action_index,
+            );
+            let expected_posterior_risk = action_evaluation
+                .alpha_tilted_posterior_by_outcome
+                .iter()
+                .enumerate()
+                .map(|(outcome_index, posterior)| {
+                    let probability = truth_predictive[outcome_index];
+                    let Some(posterior) = posterior else {
+                        return probability * maximum_loss;
+                    };
+                    let decision_count = hypotheses[0].loss_by_final_decision.len();
+                    let risk = (0..decision_count)
+                        .map(|decision_index| {
+                            hypotheses
+                                .iter()
+                                .zip(posterior)
+                                .map(|(hypothesis, probability)| {
+                                    probability
+                                        * hypothesis.loss_by_final_decision[decision_index]
+                                })
+                                .sum::<f64>()
+                        })
+                        .fold(f64::INFINITY, f64::min);
+                    probability * risk
+                })
+                .sum::<f64>();
+            expected_posterior_risk + action.observation_cost
+        })
+        .collect()
+}
+
 fn adequacy_thresholds() -> ModelAdequacyThresholds {
     ModelAdequacyThresholds {
         minimum_observations: 32,
@@ -195,6 +248,46 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let nominal =
         evaluate_decision_focused_diagnostics(&hypotheses, &actions, decision_config)?;
+
+    // Compare robust information acquisition and alpha-tempered updating on
+    // the same nominal-versus-ground-truth likelihood fixture. Alpha is not
+    // tuned against this truth-side result; the grid is descriptive only.
+    let sibson_hypotheses: Vec<SibsonInformationHypothesis> = hypotheses
+        .iter()
+        .map(|hypothesis| SibsonInformationHypothesis {
+            id: hypothesis.id.clone(),
+            prior_probability: hypothesis.prior_probability,
+            outcome_probabilities_by_action: hypothesis.outcome_probabilities_by_action.clone(),
+        })
+        .collect();
+    let alpha_grid = [1.0, 0.9, 0.7, 0.5, 0.3, 0.1];
+    let mut sibson_alpha_sweep = Vec::with_capacity(alpha_grid.len());
+    let mut alpha_one_consistency_error = 0.0_f64;
+    for alpha in alpha_grid {
+        let evaluation = evaluate_sibson_alpha_information(&sibson_hypotheses, alpha)?;
+        let actual_scores =
+            actual_expected_sibson_scores(&hypotheses, &actions, &truth, &evaluation);
+        if alpha == 1.0 {
+            for (alpha_score, nominal_score) in actual_scores.iter().zip(&actual_scores) {
+                alpha_one_consistency_error =
+                    alpha_one_consistency_error.max((alpha_score - nominal_score).abs());
+            }
+        }
+        let robust_action = evaluation.most_robustly_informative_action;
+        sibson_alpha_sweep.push(json!({
+            "alpha": alpha,
+            "robust_information_selected_action_index": robust_action,
+            "robust_information_selected_action_id": actions[robust_action].id,
+            "sibson_information_by_action_nats": evaluation.actions.iter()
+                .map(|action| action.sibson_information_nats).collect::<Vec<_>>(),
+            "shannon_information_by_action_nats": evaluation.actions.iter()
+                .map(|action| action.shannon_information_nats).collect::<Vec<_>>(),
+            "alpha_tilted_actual_expected_score_by_action": actual_scores,
+            "selected_action_actual_expected_score": actual_scores[robust_action],
+            "interpretation": "Information-only selection; score uses alpha-tilted posterior and independent ground-truth outcome probabilities. No cost/risk selection authority."
+        }));
+    }
+
     let robust = evaluate_tv_robust_decision_diagnostics(
         &hypotheses,
         &actions,
@@ -345,6 +438,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             "robust_actual_regret": (robust_actual_score - oracle_score).max(0.0),
             "maximum_reported_regret": maximum_regret,
             "nominal_policy_evaluation": nominal,
+            "sibson_alpha_sweep": sibson_alpha_sweep,
+            "alpha_one_consistency_error": alpha_one_consistency_error,
             "robust_policy_evaluation": robust,
             "actual_expected_score_by_action": actual_scores
         },
