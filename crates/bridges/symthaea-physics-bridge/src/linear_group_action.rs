@@ -484,7 +484,7 @@ fn relative_symmetry_defect(
                 .iter()
                 .enumerate()
                 .map(|(inner_index, value)| {
-                    scaled_metric_cholesky_lower[row_index][inner_index] * value
+                    scaled_metric_cholesky_lower[row_index][inner_index] * *value
                 })
                 .sum::<f64>();
             let pivot = scaled_metric_cholesky_lower[row_index][row_index];
@@ -508,7 +508,7 @@ fn relative_symmetry_defect(
                 .iter()
                 .zip(scaled_metric_cholesky_lower[column_index].iter())
                 .take(column_index)
-                .map(|(value, lower_value)| value * lower_value)
+                .map(|(value, lower_value)| *value * *lower_value)
                 .sum::<f64>();
             let pivot = scaled_metric_cholesky_lower[column_index][column_index];
             let value = (*left_entry - correction) / pivot;
