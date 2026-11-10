@@ -41,11 +41,10 @@ The visual weight is fixed-point parts-per-million in the receipt. This is repre
 
 The receipt contains:
 - raw frame SHA-256;
-- serialized VisionConfig SHA-256;
-- vehicle encoder seed-phrase SHA-256 (the phrase itself is never placed in the receipt);
+- visual scene-state SHA-256 and previous visual-state digest;
+- proprioceptive-state SHA-256 and previous vehicle-state digest (the vehicle encoder includes derivative history);
+- serialized VisionConfig SHA-256 and vehicle encoder seed-phrase SHA-256;
 - HDC dimension and vehicle encoder level count;
-- visual scene-state SHA-256;
-- proprioceptive-state SHA-256;
 - proprioceptive HDC SHA-256;
 - fused policy-input SHA-256;
 - capture sequence, timestamp and derived timestep;
