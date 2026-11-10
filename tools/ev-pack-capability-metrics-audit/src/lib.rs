@@ -360,7 +360,10 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
     if !nonempty(&profile.topology.topology_ref) || !is_digest(&profile.topology.topology_digest) {
         errors.push("topology reference or digest is invalid".to_owned());
     }
-    match (profile.topology.status.as_str(), &profile.topology.qualification) {
+    match (
+        profile.topology.status.as_str(),
+        &profile.topology.qualification,
+    ) {
         ("qualified", Some(qualification)) => {
             if !nonempty(&qualification.qualification_ref)
                 || !nonempty(&qualification.authority_ref)
@@ -662,8 +665,11 @@ fn computed(
     mut evidence: Vec<MetricEvidence>,
 ) -> MetricResult {
     evidence.sort_by(|left, right| {
-        (&left.role, &left.digest, &left.evidence_class)
-            .cmp(&(&right.role, &right.digest, &right.evidence_class))
+        (&left.role, &left.digest, &left.evidence_class).cmp(&(
+            &right.role,
+            &right.digest,
+            &right.evidence_class,
+        ))
     });
     evidence.dedup_by(|left, right| {
         left.role == right.role
@@ -680,11 +686,7 @@ fn computed(
     }
 }
 
-fn metric_evidence(
-    role: String,
-    digest: String,
-    evidence_class: Option<String>,
-) -> MetricEvidence {
+fn metric_evidence(role: String, digest: String, evidence_class: Option<String>) -> MetricEvidence {
     MetricEvidence {
         role,
         digest,
@@ -788,7 +790,10 @@ fn calculate_metrics(
                 )
             }
             Some(lifetime)
-                if lifetime.units.iter().any(|row| row.status != "observed_eol") =>
+                if lifetime
+                    .units
+                    .iter()
+                    .any(|row| row.status != "observed_eol") =>
             {
                 not_computable(
                     "ratio",
@@ -1166,9 +1171,13 @@ mod tests {
             item.role == "capacity_soh:cell-001"
                 && item.evidence_class.as_deref() == Some("synthetic_fixture")
         }));
-        assert!(metrics.sigma_soh.evidence.iter().any(|item| {
-            item.role == "unit_inventory_and_nominal_capacity"
-        }));
+        assert!(
+            metrics
+                .sigma_soh
+                .evidence
+                .iter()
+                .any(|item| { item.role == "unit_inventory_and_nominal_capacity" })
+        );
         assert!(metrics.beta_soh.evidence.iter().any(|item| {
             item.role == "topology_qualification"
                 && item.evidence_class.as_deref() == Some("synthetic_fixture")
@@ -1264,7 +1273,9 @@ mod tests {
             }
             if case["profile"]["lifetime_evidence"].is_object() {
                 case["profile"]["lifetime_evidence"]["units"]
-                    .as_array_mut().unwrap().reverse();
+                    .as_array_mut()
+                    .unwrap()
+                    .reverse();
             }
         }
         let reversed = serde_json::to_vec(&value).expect("reversed corpus");
