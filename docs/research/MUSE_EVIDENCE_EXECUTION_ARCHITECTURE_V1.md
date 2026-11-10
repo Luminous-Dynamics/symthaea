@@ -32,8 +32,20 @@ Runtime authority gate
 Renderer / DSP / local editor
   |  output artifact + action/tool receipts
   v
-Independent observation layer
-  |  F0 / phoneme / timing / timbre / energy / locality + calibrated intervals
+Independent observation + response identification
+  |  F0 / phoneme / timing / timbre / energy / locality
+  |  VCRB response matrix + VNOC no-op calibrated intervals
+  v
+VRCO-001 bounded robust control proposal
+  |  target + collateral interval must both fit; otherwise no proposal
+  v
+CQEP/runtime authority re-check
+  |  exact parent, plan, registry, bounds, budgets and authorization
+  v
+Renderer / DSP / local editor (next bounded step)
+  |  actual output + receipts
+  v
+Independent post-render measurement
   v
 VMEA-001 per-edit assurance
   |  instruction result + preservation result; strict exact match
@@ -81,7 +93,7 @@ Each mutation should follow the same transaction:
 
 1. **Resolve:** Bind the normalized request to a stable target, protected properties and user authorization.
 2. **Plan:** Select a registered operator using the frozen capability registry; preserve exact artifact types, target scope and required evidence.
-3. **Preflight:** Check operator artifact/version, exact parent-output digest, input manifest, dependency receipts, capability bounds, rights/policy and remaining resource budget.
+3. **Preflight:** Check operator artifact/version, exact parent-output digest, input manifest, dependency receipts, capability bounds, rights/policy and remaining resource budget. Any VRCO proposal must also fit every interval target and collateral guard.
 4. **Execute:** Run only the declared operation in the designated isolation boundary. Record tool attempt, action digest, configuration, seed/determinism and output digest.
 5. **Observe:** Run independent evaluators on the exact output; bind every interval to evaluator artifact and calibration receipts.
 6. **Decide:** PASS only when the entire uncertainty interval is within its frozen acceptance region. FAIL when wholly outside; INDETERMINATE when overlapping.
@@ -114,7 +126,7 @@ Use LyricEditBench and matched YingMusic-Singer-Plus / Vevo2 comparisons for the
 
 Use VPTB-001 for score-independent F0 tracker comparisons against pinned RMVPE, pYIN, CREPE/FCPE/SwiftF0 reference implementations where supported. Score-relative pitch remains a distinct measurement track.
 
-Use VCRB/VNOC/VELB/VCCR for the control, no-op, locality and correction properties. A passing pitch score is not a passing performance.
+Use VCRB/VNOC/VRCO/VIA/VELB/VCCR for control response, no-op, robust bounded intervention, interval assurance, locality and correction trajectories. A proposed robust step is not a measured result; always measure the actual render. A passing pitch score is not a passing performance.
 
 ### General instruction-based audio editing
 
@@ -143,11 +155,12 @@ For a 500-case benchmark, report binomial uncertainty and paired test difference
 
 1. Run the dedicated exact-head contracts for #11488, #11491, #11506, #11517, #11523 and #11528; resolve failures without weakening gates.
 2. Integrate VMEA rubric profiles with VCCR/VIA/VPTB observations through the versioned observation adapter.
-3. Add the runtime authority gate that verifies the exact CQEP plan, registry snapshot, parent artifact and evidence preconditions before any renderer/DSP mutation.
-4. Build the first real, rights-cleared singing edit pilot: one-word substitution, one-phone correction, one-note edit and one phrase-level edit.
-5. Compare current Muse render path against YingMusic-Singer-Plus and Vevo2 on matched LyricEditBench tasks, and independently measure preservation/locality.
-6. Use MMAE public development data to compare naive routing, fixed sequences, static capability-qualified plans and evidence-feedback replanning.
-7. Only after the local export matches the official SDK, create a fully valid sample submission directory; official server validation remains mandatory.
+3. Connect VCRB/VNOC response identification to VRCO's bounded solver, then require CQEP/runtime preflight before any proposed control delta is executed.
+4. Add the runtime authority gate that verifies the exact CQEP plan, registry snapshot, parent artifact and evidence preconditions before any renderer/DSP mutation.
+5. Build the first real, rights-cleared singing edit pilot: one-word substitution, one-phone correction, one-note edit and one phrase-level edit.
+6. Compare current Muse render path against YingMusic-Singer-Plus and Vevo2 on matched LyricEditBench tasks, and independently measure preservation/locality.
+7. Use MMAE public development data to compare naive routing, fixed sequences, static capability-qualified plans and evidence-feedback replanning.
+8. Only after the local export matches the official SDK, create a fully valid sample submission directory; official server validation remains mandatory.
 
 ## Current engineering components
 
@@ -160,6 +173,7 @@ For a 500-case benchmark, report binomial uncertainty and paired test difference
 - #11517 MMAE-TRACE-001 session ledger (draft PR)
 - #11523 MMAE-EXPORT-001 submission manifest exporter (draft PR)
 - #11528 CQEP-001 capability-qualified edit planner (draft PR)
+- #11533 / PR #11536 VRCO-001 robust bounded vocal control solver (draft PR)
 - #11356 renderer-neutral VocalEditPatch
 - #11402 versioned acoustic observation integration
 - #11525 CQEP-001 plan compiler issue
