@@ -545,14 +545,14 @@ mod tests {
     fn pitch_spec() -> ControlSpec {
         ControlSpec {
             control_id: "pitch_offset".into(),
-            requested_delta: 2.0,
-            requested_unit: "semitone".into(),
+            requested_delta: 200.0,
+            requested_unit: "cents".into(),
             target: MetricContract {
                 metric_id: "pitch_error_cents".into(),
                 unit: "cents".into(),
             },
-            expected_target_delta_min: 1.5,
-            expected_target_delta_max: 2.5,
+            expected_target_delta_min: 180.0,
+            expected_target_delta_max: 220.0,
             minimum_target_in_window_fraction: 0.8,
             minimum_pairs: 3,
             collateral_limits: vec![
@@ -612,9 +612,9 @@ mod tests {
                 source_case_id: "heldout-phrase-001".into(),
                 control_id: "pitch_offset".into(),
                 pairs: vec![
-                    pair("seed-1", 0.0, 2.0, 30.0, 30.0, -10.0, -10.0),
-                    pair("seed-2", 0.0, 2.1, 30.0, 30.0, -10.0, -10.0),
-                    pair("seed-3", 0.0, 1.9, 30.0, 30.0, -10.0, -10.0),
+                    pair("seed-1", 0.0, 200.0, 30.0, 30.0, -10.0, -10.0),
+                    pair("seed-2", 0.0, 210.0, 30.0, 30.0, -10.0, -10.0),
+                    pair("seed-3", 0.0, 190.0, 30.0, 30.0, -10.0, -10.0),
                 ],
             },
             ControlTrial {
@@ -649,7 +649,7 @@ mod tests {
         let mut trials = valid_trials();
         for pair in &mut trials[0].pairs {
             for observation in &mut pair.intervention {
-                if observation.metric_id == "pitch_error_cents" { observation.value = -2.0; }
+                if observation.metric_id == "pitch_error_cents" { observation.value = -200.0; }
             }
         }
         let report = evaluate_control_response_matrix(
@@ -693,9 +693,9 @@ mod tests {
     fn target_pair_fraction_is_enforced_not_only_the_mean() {
         let pairs = vec![
             pair("seed-1", 0.0, 0.0, 30.0, 30.0, -10.0, -10.0),
-            pair("seed-2", 0.0, 2.0, 30.0, 30.0, -10.0, -10.0),
-            pair("seed-3", 0.0, 2.0, 30.0, 30.0, -10.0, -10.0),
-            pair("seed-4", 0.0, 2.0, 30.0, 30.0, -10.0, -10.0),
+            pair("seed-2", 0.0, 200.0, 30.0, 30.0, -10.0, -10.0),
+            pair("seed-3", 0.0, 200.0, 30.0, 30.0, -10.0, -10.0),
+            pair("seed-4", 0.0, 200.0, 30.0, 30.0, -10.0, -10.0),
         ];
         let trial = ControlTrial {
             source_case_id: "heldout-phrase-001".into(),
