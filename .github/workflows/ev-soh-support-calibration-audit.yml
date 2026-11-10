@@ -1,0 +1,39 @@
+name: EV SOH support-conditioned calibration v0.1 audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_SOH_SUPPORT_CALIBRATION_V0_1.md"
+      - "schemas/transport/ev_soh_support_calibration_v0_1.schema.json"
+      - "fixtures/ev_battery/soh_support_calibration_scenarios_v0_1.json"
+      - "tools/ev-soh-support-calibration-audit/**"
+      - ".github/workflows/ev-soh-support-calibration-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-soh-support-calibration-audit/Cargo.toml -- --check
+      - name: Run support calibration and mutation tests
+        run: cargo test --manifest-path tools/ev-soh-support-calibration-audit/Cargo.toml
+      - name: Audit frozen support-conditioned fixtures
+        run: |
+          cargo run --manifest-path tools/ev-soh-support-calibration-audit/Cargo.toml -- --schema schemas/transport/ev_soh_support_calibration_v0_1.schema.json --corpus fixtures/ev_battery/soh_support_calibration_scenarios_v0_1.json > "$RUNNER_TEMP/ev-soh-support-calibration-report.json"
+          jq -e '
+            .case_count == 16 and
+            .accepted_count == 4 and
+            .rejected_count == 12 and
+            .extrapolation_undercovered_count == 2 and
+            .support_detector_failure_count == 1 and
+            (.report_sha256 | test("^[a-f0-9]{64}$"))
+          ' "$RUNNER_TEMP/ev-soh-support-calibration-report.json"
