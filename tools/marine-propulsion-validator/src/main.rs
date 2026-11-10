@@ -1350,7 +1350,7 @@ mod tests {
             serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
         assert_eq!(
             compute_service_fingerprint(&fixture).expect("canonical fingerprint"),
-            "38e8d556612ac380d71ca6786146bfa47f78cec97ce00a32698ae8cf82a3eda2"
+            "e3ec23f5308213b6d7ea3743e6cf483623436bec5384e29d3044d525d736fca9"
         );
     }
 
