@@ -92,9 +92,110 @@ fn validate_schema(schema: &Value, instance: &Value, findings: &mut Findings) {
     }
 }
 
+fn check_operating_context(record: &Value, findings: &mut Findings) {
+    let context = record.get("measurement_context").unwrap_or(&Value::Null);
+    let fingerprint = context.get("service_fingerprint").and_then(Value::as_str);
+    if fingerprint.is_none_or(|value|
+        value.len() != 64 || !value.chars().all(|character| character.is_ascii_hexdigit())
+    ) {
+        findings.push(
+            "/measurement_context/service_fingerprint",
+            "INVALID",
+            "v0.2 measurement context requires a 64-character hexadecimal service fingerprint",
+        );
+    }
+
+    let installation = context.get("wind_assist_installation").and_then(Value::as_str);
+    let states = context.get("wind_device_states").and_then(Value::as_array);
+    let states = states.map(Vec::as_slice).unwrap_or(&[]);
+    match installation {
+        Some("installed") if states.is_empty() => findings.push(
+            "/measurement_context/wind_device_states",
+            "INCOMPLETE",
+            "wind assistance is declared installed but no device operating states are recorded",
+        ),
+        Some("not_installed") if !states.is_empty() => findings.push(
+            "/measurement_context/wind_device_states",
+            "INVALID",
+            "wind assistance is declared not installed but device states are present",
+        ),
+        Some("unknown") | None => findings.push(
+            "/measurement_context/wind_assist_installation",
+            "INCOMPLETE",
+            "wind-assist installation status is unknown",
+        ),
+        _ => {}
+    }
+
+    let mut device_ids = BTreeSet::new();
+    for (index, device) in states.iter().enumerate() {
+        let path = format!("/measurement_context/wind_device_states/{index}");
+        if let Some(id) = device.get("device_id").and_then(Value::as_str) {
+            if !device_ids.insert(id.to_owned()) {
+                findings.push(
+                    format!("{path}/device_id"),
+                    "INVALID",
+                    format!("duplicate wind-device identity '{id}'"),
+                );
+            }
+        }
+        let commanded = device.get("commanded_state").and_then(Value::as_str);
+        let achieved = device.get("achieved_state").and_then(Value::as_str);
+        if achieved == Some("unknown") || achieved.is_none() {
+            findings.push(
+                format!("{path}/achieved_state"),
+                "INCOMPLETE",
+                "achieved wind-device state is unknown; commanded state is not a substitute",
+            );
+        } else if commanded.is_some() && commanded != achieved {
+            findings.push(
+                &path,
+                "INCOMPLETE",
+                "commanded and achieved WAPS states differ; preserve this as non-adherence and distinguish intention-to-treat from treatment-on-treated analysis",
+            );
+        }
+    }
+
+    let loading = context.get("loading_condition").and_then(Value::as_str);
+    if loading == Some("unknown") || loading.is_none() {
+        findings.push(
+            "/measurement_context/loading_condition",
+            "INCOMPLETE",
+            "loading condition is unknown",
+        );
+    }
+
+    let has_active_device = states.iter().any(|device| {
+        matches!(
+            device.get("achieved_state").and_then(Value::as_str),
+            Some("active") | Some("feathered") | Some("stowed") | Some("retracted") | Some("faulted")
+        )
+    });
+    if installation == Some("installed") && has_active_device {
+        for field in [
+            "true_wind_speed_kn",
+            "true_wind_from_bow_deg",
+            "apparent_wind_speed_kn",
+            "apparent_wind_from_bow_deg",
+        ] {
+            if context.get(field).and_then(Value::as_f64).is_none() {
+                findings.push(
+                    format!("/measurement_context/{field}"),
+                    "INCOMPLETE",
+                    "wind-device exposure is recorded without the corresponding wind condition",
+                );
+            }
+        }
+    }
+}
+
 fn check_record(record: &Value, findings: &mut Findings) {
-    if record.get("schema_version").and_then(Value::as_str) != Some("0.1.0") {
+    let schema_version = record.get("schema_version").and_then(Value::as_str).unwrap_or("");
+    if schema_version != "0.1.0" && schema_version != "0.2.0" {
         findings.push("/schema_version", "INVALID", "unsupported gas emissions evidence schema version");
+    }
+    if schema_version == "0.2.0" {
+        check_operating_context(record, findings);
     }
 
     if record.get("record_status").and_then(Value::as_str) == Some("synthetic") {
@@ -398,6 +499,10 @@ mod tests {
         include_str!("../../../../docs/research/marine/marine-emissions-evidence-v0.1.0.schema.json");
     const SYNTHETIC_EMISSIONS: &str =
         include_str!("../../../../docs/research/marine/fixtures/synthetic-gas-emissions-v0.1.0.json");
+    const EMISSIONS_SCHEMA_V2: &str =
+        include_str!("../../../../docs/research/marine/marine-emissions-evidence-v0.2.0.schema.json");
+    const SYNTHETIC_EMISSIONS_V2: &str =
+        include_str!("../../../../docs/research/marine/fixtures/synthetic-gas-emissions-v0.2.0.json");
 
     #[test]
     fn committed_emissions_schema_and_fixture_validate() {
@@ -418,6 +523,63 @@ mod tests {
         check_record(&record, &mut findings);
         assert!(findings.incomplete);
         assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn v0_2_context_schema_and_fixture_validate() {
+        let schema: Value = serde_json::from_str(EMISSIONS_SCHEMA_V2).expect("emissions v0.2 schema JSON");
+        let record: Value = serde_json::from_str(SYNTHETIC_EMISSIONS_V2).expect("emissions v0.2 fixture JSON");
+        assert!(jsonschema::draft202012::meta::is_valid(&schema));
+        let validator = jsonschema::draft202012::options()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("emissions v0.2 schema compiles");
+        assert!(validator.is_valid(&record));
+        let mut findings = Findings::default();
+        check_record(&record, &mut findings);
+        assert!(findings.incomplete); // Synthetic, rights unknown and uncertainty unknown.
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn v0_2_duplicate_wind_device_identity_is_invalid() {
+        let mut record: Value = serde_json::from_str(SYNTHETIC_EMISSIONS_V2).expect("v0.2 fixture JSON");
+        let mut second = record["measurement_context"]["wind_device_states"][0].clone();
+        second["configuration_revision"] = serde_json::json!("rev-b");
+        record["measurement_context"]["wind_device_states"].as_array_mut().unwrap().push(second);
+        let mut findings = Findings::default();
+        check_operating_context(&record, &mut findings);
+        assert!(findings.invalid);
+    }
+
+    #[test]
+    fn v0_2_commanded_and_achieved_waps_states_are_not_conflated() {
+        let mut record: Value = serde_json::from_str(SYNTHETIC_EMISSIONS_V2).expect("v0.2 fixture JSON");
+        record["measurement_context"]["wind_device_states"][0]["achieved_state"] =
+            serde_json::json!("unavailable");
+        let mut findings = Findings::default();
+        check_operating_context(&record, &mut findings);
+        assert!(findings.incomplete);
+        assert!(!findings.invalid);
+    }
+
+    #[test]
+    fn v0_2_unknown_achieved_state_is_incomplete_even_when_commanded_active() {
+        let mut record: Value = serde_json::from_str(SYNTHETIC_EMISSIONS_V2).expect("v0.2 fixture JSON");
+        record["measurement_context"]["wind_device_states"][0]["achieved_state"] =
+            serde_json::json!("unknown");
+        let mut findings = Findings::default();
+        check_operating_context(&record, &mut findings);
+        assert!(findings.incomplete);
+    }
+
+    #[test]
+    fn v0_2_installed_waps_requires_wind_observations() {
+        let mut record: Value = serde_json::from_str(SYNTHETIC_EMISSIONS_V2).expect("v0.2 fixture JSON");
+        record["measurement_context"].as_object_mut().unwrap().remove("apparent_wind_speed_kn");
+        let mut findings = Findings::default();
+        check_operating_context(&record, &mut findings);
+        assert!(findings.incomplete);
     }
 
     #[test]
