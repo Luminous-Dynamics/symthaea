@@ -3,7 +3,7 @@
   "status": "synthetic_scenario_design_unexecuted",
   "protocol_id": "IG-CONTAGION-001",
   "protocol_version": "0.1.0",
-  "fixture_count": 40,
+  "fixture_count": 45,
   "family_count": 8,
   "families": [
     {
@@ -68,7 +68,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise."
+      "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-002",
@@ -90,7 +91,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise."
+      "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-003",
@@ -112,7 +114,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise."
+      "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-004",
@@ -134,7 +137,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise."
+      "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-005",
@@ -156,7 +160,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise."
+      "scenario_note": "Repeated private elicitation without group exposure to quantify response/session noise.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-006",
@@ -178,7 +183,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position."
+      "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-007",
@@ -200,7 +206,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position."
+      "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-008",
@@ -222,7 +229,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position."
+      "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-009",
@@ -244,7 +252,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position."
+      "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-010",
@@ -266,7 +275,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position."
+      "scenario_note": "An agent receives genuinely relevant new evidence supporting a minority position.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-011",
@@ -288,7 +298,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence."
+      "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-012",
@@ -310,7 +321,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence."
+      "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-013",
@@ -332,7 +344,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence."
+      "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-014",
@@ -354,7 +367,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence."
+      "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-015",
@@ -376,7 +390,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence."
+      "scenario_note": "A repeated or persuasive claim is introduced without supporting evidence.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-016",
@@ -385,7 +400,7 @@
       "topology_family": "complete",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
       "graph_profile_ref": "IG-DATA-001/complete/v0.1",
-      "agent_placement": "random_seeded",
+      "agent_placement": "leaf_or_periphery",
       "paired_block_id": "CENTRALITY-PAIR-01",
       "seed": 1016,
       "condition": "centrality_placement_paired_content",
@@ -398,7 +413,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "The same content and agent profile are placed at different graph positions."
+      "scenario_note": "Paired with the hub/core placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "paired_content_ref": "IG-CONTENT-PAIR-01"
     },
     {
       "fixture_id": "IGC-017",
@@ -420,7 +436,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "The same content and agent profile are placed at different graph positions."
+      "scenario_note": "Paired with the hub/core placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "paired_content_ref": "IG-CONTENT-PAIR-02"
     },
     {
       "fixture_id": "IGC-018",
@@ -429,7 +446,7 @@
       "topology_family": "stochastic_block",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
       "graph_profile_ref": "IG-DATA-001/stochastic_block/v0.1",
-      "agent_placement": "bridge_or_broker",
+      "agent_placement": "leaf_or_periphery",
       "paired_block_id": "CENTRALITY-PAIR-03",
       "seed": 1018,
       "condition": "centrality_placement_paired_content",
@@ -442,7 +459,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "The same content and agent profile are placed at different graph positions."
+      "scenario_note": "Paired with the hub/core placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "paired_content_ref": "IG-CONTENT-PAIR-03"
     },
     {
       "fixture_id": "IGC-019",
@@ -451,7 +469,7 @@
       "topology_family": "core_periphery",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
       "graph_profile_ref": "IG-DATA-001/core_periphery/v0.1",
-      "agent_placement": "hub_or_core",
+      "agent_placement": "leaf_or_periphery",
       "paired_block_id": "CENTRALITY-PAIR-04",
       "seed": 1019,
       "condition": "centrality_placement_paired_content",
@@ -464,7 +482,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "The same content and agent profile are placed at different graph positions."
+      "scenario_note": "Paired with the hub/core placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "paired_content_ref": "IG-CONTENT-PAIR-04"
     },
     {
       "fixture_id": "IGC-020",
@@ -473,7 +492,7 @@
       "topology_family": "temporal_churn",
       "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
       "graph_profile_ref": "IG-DATA-001/temporal_churn/v0.1",
-      "agent_placement": "random_seeded",
+      "agent_placement": "leaf_or_periphery",
       "paired_block_id": "CENTRALITY-PAIR-05",
       "seed": 1020,
       "condition": "centrality_placement_paired_content",
@@ -486,7 +505,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "The same content and agent profile are placed at different graph positions."
+      "scenario_note": "Paired with the hub/core placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "paired_content_ref": "IG-CONTENT-PAIR-05"
     },
     {
       "fixture_id": "IGC-021",
@@ -508,7 +528,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "An unsupported claim is followed by valid corrective evidence."
+      "scenario_note": "An unsupported claim is followed by valid corrective evidence.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-022",
@@ -530,7 +551,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "An unsupported claim is followed by valid corrective evidence."
+      "scenario_note": "An unsupported claim is followed by valid corrective evidence.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-023",
@@ -552,7 +574,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "An unsupported claim is followed by valid corrective evidence."
+      "scenario_note": "An unsupported claim is followed by valid corrective evidence.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-024",
@@ -574,7 +597,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "An unsupported claim is followed by valid corrective evidence."
+      "scenario_note": "An unsupported claim is followed by valid corrective evidence.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-025",
@@ -596,7 +620,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "An unsupported claim is followed by valid corrective evidence."
+      "scenario_note": "An unsupported claim is followed by valid corrective evidence.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-026",
@@ -618,7 +643,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent."
+      "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-027",
@@ -640,7 +666,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent."
+      "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-028",
@@ -662,7 +689,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent."
+      "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-029",
@@ -684,7 +712,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent."
+      "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-030",
@@ -706,7 +735,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent."
+      "scenario_note": "A high-status or central speaker asserts consensus despite recorded dissent.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-031",
@@ -728,7 +758,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure."
+      "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-032",
@@ -750,7 +781,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure."
+      "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-033",
@@ -772,7 +804,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure."
+      "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-034",
@@ -794,7 +827,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure."
+      "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-035",
@@ -816,7 +850,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure."
+      "scenario_note": "Identity multiplicity or prompt injection contaminates social exposure.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-036",
@@ -838,7 +873,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available."
+      "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-037",
@@ -860,7 +896,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available."
+      "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-038",
@@ -882,7 +919,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available."
+      "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-039",
@@ -904,7 +942,8 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available."
+      "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
+      "paired_content_ref": null
     },
     {
       "fixture_id": "IGC-040",
@@ -926,7 +965,123 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available."
+      "scenario_note": "Evidence remains conflicting or unresolved; abstention and uncertainty should remain available.",
+      "paired_content_ref": null
+    },
+    {
+      "fixture_id": "IGC-041",
+      "family_id": "centrality_placement",
+      "class": "red_team",
+      "topology_family": "complete",
+      "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+      "graph_profile_ref": "IG-DATA-001/complete/v0.1",
+      "agent_placement": "hub_or_core",
+      "paired_block_id": "CENTRALITY-PAIR-01",
+      "seed": 1016,
+      "condition": "centrality_placement_paired_content",
+      "expected_measurement_properties": [
+        "baseline_private_measurement_recorded",
+        "public_interaction_trace_recorded",
+        "private_post_measurement_recorded_or_explicit_not_run",
+        "evidence_exposure_and_provenance_recorded",
+        "no_live_peer_access_in_private_reelicitation",
+        "exposure_memory_digest_recorded_when_persistence_is_measured",
+        "claim_ceiling_preserved"
+      ],
+      "scenario_note": "Paired with the leaf/periphery placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "paired_content_ref": "IG-CONTENT-PAIR-01"
+    },
+    {
+      "fixture_id": "IGC-042",
+      "family_id": "centrality_placement",
+      "class": "red_team",
+      "topology_family": "sparse_random",
+      "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+      "graph_profile_ref": "IG-DATA-001/sparse_random/v0.1",
+      "agent_placement": "hub_or_core",
+      "paired_block_id": "CENTRALITY-PAIR-02",
+      "seed": 1017,
+      "condition": "centrality_placement_paired_content",
+      "expected_measurement_properties": [
+        "baseline_private_measurement_recorded",
+        "public_interaction_trace_recorded",
+        "private_post_measurement_recorded_or_explicit_not_run",
+        "evidence_exposure_and_provenance_recorded",
+        "no_live_peer_access_in_private_reelicitation",
+        "exposure_memory_digest_recorded_when_persistence_is_measured",
+        "claim_ceiling_preserved"
+      ],
+      "scenario_note": "Paired with the leaf/periphery placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "paired_content_ref": "IG-CONTENT-PAIR-02"
+    },
+    {
+      "fixture_id": "IGC-043",
+      "family_id": "centrality_placement",
+      "class": "red_team",
+      "topology_family": "stochastic_block",
+      "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+      "graph_profile_ref": "IG-DATA-001/stochastic_block/v0.1",
+      "agent_placement": "hub_or_core",
+      "paired_block_id": "CENTRALITY-PAIR-03",
+      "seed": 1018,
+      "condition": "centrality_placement_paired_content",
+      "expected_measurement_properties": [
+        "baseline_private_measurement_recorded",
+        "public_interaction_trace_recorded",
+        "private_post_measurement_recorded_or_explicit_not_run",
+        "evidence_exposure_and_provenance_recorded",
+        "no_live_peer_access_in_private_reelicitation",
+        "exposure_memory_digest_recorded_when_persistence_is_measured",
+        "claim_ceiling_preserved"
+      ],
+      "scenario_note": "Paired with the leaf/periphery placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "paired_content_ref": "IG-CONTENT-PAIR-03"
+    },
+    {
+      "fixture_id": "IGC-044",
+      "family_id": "centrality_placement",
+      "class": "red_team",
+      "topology_family": "core_periphery",
+      "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+      "graph_profile_ref": "IG-DATA-001/core_periphery/v0.1",
+      "agent_placement": "hub_or_core",
+      "paired_block_id": "CENTRALITY-PAIR-04",
+      "seed": 1019,
+      "condition": "centrality_placement_paired_content",
+      "expected_measurement_properties": [
+        "baseline_private_measurement_recorded",
+        "public_interaction_trace_recorded",
+        "private_post_measurement_recorded_or_explicit_not_run",
+        "evidence_exposure_and_provenance_recorded",
+        "no_live_peer_access_in_private_reelicitation",
+        "exposure_memory_digest_recorded_when_persistence_is_measured",
+        "claim_ceiling_preserved"
+      ],
+      "scenario_note": "Paired with the leaf/periphery placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "paired_content_ref": "IG-CONTENT-PAIR-04"
+    },
+    {
+      "fixture_id": "IGC-045",
+      "family_id": "centrality_placement",
+      "class": "red_team",
+      "topology_family": "temporal_churn",
+      "graph_generator_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+      "graph_profile_ref": "IG-DATA-001/temporal_churn/v0.1",
+      "agent_placement": "hub_or_core",
+      "paired_block_id": "CENTRALITY-PAIR-05",
+      "seed": 1020,
+      "condition": "centrality_placement_paired_content",
+      "expected_measurement_properties": [
+        "baseline_private_measurement_recorded",
+        "public_interaction_trace_recorded",
+        "private_post_measurement_recorded_or_explicit_not_run",
+        "evidence_exposure_and_provenance_recorded",
+        "no_live_peer_access_in_private_reelicitation",
+        "exposure_memory_digest_recorded_when_persistence_is_measured",
+        "claim_ceiling_preserved"
+      ],
+      "scenario_note": "Paired with the leaf/periphery placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "paired_content_ref": "IG-CONTENT-PAIR-05"
     }
   ],
   "claim_ceiling": "This is a preregisterable synthetic scenario matrix. No agent simulations or human-subject experiments have been executed by checking in these descriptors."
