@@ -117,6 +117,7 @@ pub enum MaterialLineageIssueCodeV1 {
     DuplicateEventReference,
     EventIndexOutOfRange,
     EventPartMismatch,
+    InvalidSourceEventTime,
     EventOutsideInstanceWindow,
     InvalidEdgeId,
     DuplicateEdgeId,
@@ -467,6 +468,14 @@ pub fn validate_material_lineage(
                 );
                 continue;
             }
+            if note.duration.num() <= 0 {
+                report.push(
+                    MaterialLineageIssueCodeV1::InvalidSourceEventTime,
+                    Some(&instance.instance_id), None, Some(instance.part_id), Some(event_index),
+                    "referenced Score event must have a positive duration",
+                );
+                continue;
+            }
             let (Some(onset), Some(duration)) = (
                 Moment::from_duration(note.onset),
                 Moment::from_duration(note.duration),
@@ -746,6 +755,20 @@ mod tests {
         let report = validate_material_lineage(&score(), &wrong_window, &digest());
         assert!(report.issues.iter().any(|issue| {
             issue.code == MaterialLineageIssueCodeV1::EventOutsideInstanceWindow
+        }));
+    }
+
+    #[test]
+    fn rejects_zero_duration_source_events() {
+        let mut source = score();
+        source.notes[0].duration = Duration::zero();
+        let timeline = timeline(
+            vec![instance("zero-duration", "alpha", 1, 0, 1, vec![0])],
+            Vec::new(),
+        );
+        let report = validate_material_lineage(&source, &timeline, &digest());
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == MaterialLineageIssueCodeV1::InvalidSourceEventTime
         }));
     }
 
