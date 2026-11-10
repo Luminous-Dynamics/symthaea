@@ -303,6 +303,7 @@ pub enum MetricAwareLinearActionSampleErrorV1 {
     NonFiniteSampleCoordinate { sample_index: usize, coordinate_index: usize },
     ExpressionTooComplex { actual: usize, maximum: usize },
     TotalGradientWorkExceeded { actual: usize, maximum: usize },
+    GeneratorSampleBudgetExceeded { actual: usize, maximum: usize },
     EmptyFixedBindingName { index: usize },
     DuplicateFixedBinding { name: String },
     FixedBindingConflictsWithActionCoordinate { name: String },
@@ -1299,6 +1300,10 @@ fn eval_expression_with_gradient(
 }
 
 fn canonical_expression(expr: &Expr) -> String {
+    format!("symthaea-expr-v1:{}", canonical_expression_node(expr))
+}
+
+fn canonical_expression_node(expr: &Expr) -> String {
     match expr {
         Expr::Var(name) => format!("V{}:{name}", name.len()),
         Expr::Const(value) => format!("C{:016x}", value.to_bits()),
@@ -1310,7 +1315,7 @@ fn canonical_expression(expr: &Expr) -> String {
                 BinOp::Div => "DIV",
                 BinOp::Pow => "POW",
             };
-            format!("B{tag}({},{})", canonical_expression(left), canonical_expression(right))
+            format!("B{tag}({},{})", canonical_expression_node(left), canonical_expression_node(right))
         }
         Expr::Func(function, argument) => {
             let tag = match function {
@@ -1322,10 +1327,10 @@ fn canonical_expression(expr: &Expr) -> String {
                 UnaryFn::Abs => "ABS",
                 UnaryFn::Floor => "FLOOR",
             };
-            format!("F{tag}({})", canonical_expression(argument))
+            format!("F{tag}({})", canonical_expression_node(argument))
         }
         Expr::Sum(body, variable) => {
-            format!("SUM{}:{variable}({})", variable.len(), canonical_expression(body))
+            format!("SUM{}:{variable}({})", variable.len(), canonical_expression_node(body))
         }
     }
 }
@@ -1483,7 +1488,7 @@ pub fn evaluate_metric_aware_linear_action_samples(
         .checked_mul(declaration.generators.len())
         .ok_or(MetricAwareLinearActionSampleErrorV1::InvalidProfile)?;
     if generator_sample_pairs > profile.maximum_total_generator_sample_pairs {
-        return Err(MetricAwareLinearActionSampleErrorV1::TotalGradientWorkExceeded {
+        return Err(MetricAwareLinearActionSampleErrorV1::GeneratorSampleBudgetExceeded {
             actual: generator_sample_pairs,
             maximum: profile.maximum_total_generator_sample_pairs,
         });
@@ -1947,7 +1952,7 @@ mod tests {
         assert!(report.invariant_under_every_generator());
         assert_eq!(report.sample_states, metric_sample_states());
         assert_eq!(report.coordinate_unit_ids, vec!["1".to_string(), "1".to_string()]);
-        assert!(report.expression_canonical.starts_with("BADD("));
+        assert!(report.expression_canonical.starts_with("symthaea-expr-v1:BADD("));
         assert_eq!(report.action_declaration.action_id, "sample-so2");
         assert_eq!(report.original_action_declaration.action_id, "sample-so2");
         assert_eq!(report.total_invalid_evaluations(), 0);
@@ -2174,7 +2179,7 @@ mod tests {
                 &[],
                 low_pair_budget
             ),
-            Err(MetricAwareLinearActionSampleErrorV1::TotalGradientWorkExceeded { .. })
+            Err(MetricAwareLinearActionSampleErrorV1::GeneratorSampleBudgetExceeded { .. })
         ));
     }
 
