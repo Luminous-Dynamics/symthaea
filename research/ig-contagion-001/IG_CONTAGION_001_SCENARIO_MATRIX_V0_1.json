@@ -413,7 +413,7 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Paired with the hub/core placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
       "paired_content_ref": "IG-CONTENT-PAIR-01"
     },
     {
@@ -436,7 +436,7 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Paired with the hub/core placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
       "paired_content_ref": "IG-CONTENT-PAIR-02"
     },
     {
@@ -459,7 +459,7 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Paired with the hub/core placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
       "paired_content_ref": "IG-CONTENT-PAIR-03"
     },
     {
@@ -482,7 +482,7 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Paired with the hub/core placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
       "paired_content_ref": "IG-CONTENT-PAIR-04"
     },
     {
@@ -505,7 +505,7 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Paired with the hub/core placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
       "paired_content_ref": "IG-CONTENT-PAIR-05"
     },
     {
@@ -988,7 +988,7 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Paired with the leaf/periphery placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
       "paired_content_ref": "IG-CONTENT-PAIR-01"
     },
     {
@@ -1011,7 +1011,7 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Paired with the leaf/periphery placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
       "paired_content_ref": "IG-CONTENT-PAIR-02"
     },
     {
@@ -1034,7 +1034,7 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Paired with the leaf/periphery placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
       "paired_content_ref": "IG-CONTENT-PAIR-03"
     },
     {
@@ -1057,7 +1057,7 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Paired with the leaf/periphery placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
       "paired_content_ref": "IG-CONTENT-PAIR-04"
     },
     {
@@ -1080,7 +1080,7 @@
         "exposure_memory_digest_recorded_when_persistence_is_measured",
         "claim_ceiling_preserved"
       ],
-      "scenario_note": "Paired with the leaf/periphery placement: same message/content profile, agent profile, topology, graph profile, condition and seed; only the declared speaker placement differs.",
+      "scenario_note": "Matched counterfactual pair: identical content, agent profile, topology, graph profile, condition and RNG seed; only the target speaker placement changes from leaf/periphery to hub/core.",
       "paired_content_ref": "IG-CONTENT-PAIR-05"
     }
   ],
