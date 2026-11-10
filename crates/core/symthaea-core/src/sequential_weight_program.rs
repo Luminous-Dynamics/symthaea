@@ -912,7 +912,8 @@ mod tests {
     fn statistical_evidence_binding(
         session: &SequentialEditSession,
         candidate_native_model_digest: &str,
-    ) -> SequentialVerifierEvidenceBinding {
+        combined_alpha_budget: f64,
+    ) -> Result<SequentialVerifierEvidenceBinding, SequentialWeightProgramError> {
         use crate::sequential_weight_verification::{
             ConfirmatoryEpisodeManifest, PairedLossObservation,
             SequentialWeightVerificationCampaign, SequentialWeightVerificationConfig,
@@ -1011,9 +1012,8 @@ mod tests {
             candidate_native_model_digest,
             &report,
             &family_verifier,
-            0.05,
+            combined_alpha_budget,
         )
-        .expect("aggregate and family reports bound to sequential edit candidate")
     }
 
     fn signed_attestation(
@@ -1140,7 +1140,7 @@ mod tests {
         assert!(prepared.candidate.receipt.total_l2_delta > 0.0);
         let signing_key = SigningKey::from_bytes(&[42_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let evidence_binding = statistical_evidence_binding(&session, &digest('9'));
+        let evidence_binding = statistical_evidence_binding(&session, &digest('9'), 0.05).expect("qualified composite evidence");
         let rejected = signed_attestation(
             &session,
             &prepared,
@@ -1233,7 +1233,7 @@ mod tests {
         modified.batch.evidence_batch_digest = digest('2');
         let signing_key = SigningKey::from_bytes(&[43_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let evidence_binding = statistical_evidence_binding(&session, &digest('9'));
+        let evidence_binding = statistical_evidence_binding(&session, &digest('9'), 0.05).expect("qualified composite evidence");
         let attestation = signed_attestation(
             &session,
             &modified,
@@ -1272,7 +1272,7 @@ mod tests {
         .expect("prepare batch zero");
         let signing_key = SigningKey::from_bytes(&[44_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let evidence_binding0 = statistical_evidence_binding(&session, &digest('9'));
+        let evidence_binding0 = statistical_evidence_binding(&session, &digest('9'), 0.05).expect("qualified composite evidence");
         let attestation0 = signed_attestation(
             &session,
             &prepared0,
@@ -1302,7 +1302,7 @@ mod tests {
             &batch(&session_id, 1, &digest('9'), '2'),
         )
         .expect("prepare batch one");
-        let evidence_binding1 = statistical_evidence_binding(&advanced, &digest('7'));
+        let evidence_binding1 = statistical_evidence_binding(&advanced, &digest('7'), 0.05).expect("qualified second-step composite evidence");
         let attestation1 = signed_attestation(
             &advanced,
             &prepared1,
@@ -1341,8 +1341,8 @@ mod tests {
         .expect("prepare");
         let signing_key = SigningKey::from_bytes(&[45_u8; 32]);
         let pinned_key = signing_key.verifying_key();
-        let evidence_binding = statistical_evidence_binding(&session, &digest('9'));
-        let wrong_candidate_binding = statistical_evidence_binding(&session, &digest('7'));
+        let evidence_binding = statistical_evidence_binding(&session, &digest('9'), 0.05).expect("qualified composite evidence");
+        let wrong_candidate_binding = statistical_evidence_binding(&session, &digest('7'), 0.05).expect("qualified alternate composite evidence");
         let correctly_bound = signed_attestation(
             &session,
             &prepared,
@@ -1483,6 +1483,21 @@ mod tests {
                 &untrusted_key,
             ),
             Err(SequentialWeightProgramError::VerifierKeyIdMismatch)
+        ));
+    }
+
+    #[test]
+    fn composite_acceptance_rejects_alpha_allocations_over_the_frozen_budget() {
+        let base = snapshot();
+        let template = template();
+        let session_id = digest('f');
+        let session =
+            begin_sequential_edit_session(session_id, &template, &base).expect("begin");
+
+        let result = statistical_evidence_binding(&session, &digest('9'), 0.049);
+        assert!(matches!(
+            result,
+            Err(SequentialWeightProgramError::CombinedAlphaBudgetExceeded)
         ));
     }
 
