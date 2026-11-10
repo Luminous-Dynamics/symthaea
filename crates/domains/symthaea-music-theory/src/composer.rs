@@ -664,6 +664,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     }
     apply_development_style(
         &mut score,
+        GENERAL_MELODY_PART_V1,
         &form,
         spec.development,
         &motif,
@@ -672,8 +673,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
         intent.seed,
     );
     if tx.additive_process {
-        apply_additive_process(
+        apply_additive_process_for_part(
             &mut score,
+            GENERAL_MELODY_PART_V1,
             &form,
             intent.bars.max(1) as i64,
             meter_beats,
@@ -725,7 +727,13 @@ fn compose_with_spec_and_form_and_grammar_impl(
     }
     match attitude {
         Some(crate::spec::Attitude::Grief) => {
-            apply_grief_suspensions(&mut score, &form, meter_beats, intent);
+            apply_grief_suspensions(
+                &mut score,
+                GENERAL_GRIEF_SUSPENSION_PART_V1,
+                &form,
+                meter_beats,
+                intent,
+            );
         }
         Some(crate::spec::Attitude::Defiance) => {
             apply_defiant_syncopation(&mut score, meter_beats);
@@ -736,7 +744,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
             }
         }
         Some(crate::spec::Attitude::Joy) => {
-            apply_joyful_lift(&mut score);
+            apply_joyful_lift_for_part(&mut score, GENERAL_MELODY_PART_V1);
         }
         _ => {}
     }
@@ -773,12 +781,12 @@ fn compose_with_spec_and_form_and_grammar_impl(
         // Supersedes the plain drone below (it calls `apply_drone_pedal`
         // itself internally, then replaces Harmony too) — after intro/coda
         // so the pad covers the FULL span they extend.
-        apply_full_drone(&mut score, key);
+        apply_full_drone_for_parts(&mut score, GENERAL_BASS_PART_V1, GENERAL_HARMONY_PART_V1, key);
     } else if tx.drone {
         // After intro/coda so the pedal covers the FULL span they extend
         // — a drone that dropped out for the intro or coda would stop
         // being a drone.
-        apply_drone_pedal(&mut score, key);
+        apply_drone_pedal_for_part(&mut score, GENERAL_BASS_PART_V1, key);
     }
     // LAST, so intro shifts and the coda's own cadence are included: the
     // style's phrase rhetoric — the conversational layer the second
@@ -922,6 +930,7 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
 /// consequent is left intact (it owns the section's cadence).
 fn apply_development_style(
     score: &mut Score,
+    melody_part_id: PartId,
     form: &Form,
     dna: crate::spec::DevelopmentDna,
     motif: &crate::motif::Motif,
@@ -1103,7 +1112,7 @@ fn apply_development_style(
                         pitch = pitch.transpose(-12);
                     }
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: melody_part_id,
                         pitch,
                         onset: t,
                         duration: note.duration,
@@ -1749,6 +1758,17 @@ fn apply_harmonic_stasis(score: &mut Score) {
 /// (mirroring how [`apply_drone_pedal`] replaces the whole bass, but
 /// scoped to specific sections rather than the whole piece).
 fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats: f64, seed: u64) {
+    apply_additive_process_for_part(score, PartId::UNASSIGNED, form, bars, meter_beats, seed);
+}
+
+fn apply_additive_process_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    bars: i64,
+    meter_beats: f64,
+    seed: u64,
+) {
     let cell = crate::hook::HookCell::generate_with(
         &crate::spec::MelodicDna::default(),
         seed,
@@ -1795,7 +1815,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch,
                     onset: Duration::new((t * 480.0).round() as i64, 480),
                     duration: Duration::new((this_dur * 480.0).round().max(1.0) as i64, 480),
@@ -1831,6 +1851,10 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
 /// harmony moving freely against it. Runs LAST, after every other bass
 /// note is in place, and simply replaces them all.
 fn apply_drone_pedal(score: &mut Score, key: Key) {
+    apply_drone_pedal_for_part(score, PartId::UNASSIGNED, key);
+}
+
+fn apply_drone_pedal_for_part(score: &mut Score, bass_part_id: PartId, key: Key) {
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -1860,7 +1884,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
         let onset = bar.scale(m, 1);
         let si = intensity_near(onset.beats());
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part_id,
             pitch: tonic,
             onset,
             duration: half,
@@ -1870,7 +1894,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
             section_intensity: si,
         });
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part_id,
             pitch: fifth,
             onset: onset + half,
             duration: half,
@@ -1896,7 +1920,16 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
 /// becoming duration) rather than re-deriving tying logic, since the
 /// effect wanted is identical.
 fn apply_full_drone(score: &mut Score, key: Key) {
-    apply_drone_pedal(score, key);
+    apply_full_drone_for_parts(score, PartId::UNASSIGNED, PartId::UNASSIGNED, key);
+}
+
+fn apply_full_drone_for_parts(
+    score: &mut Score,
+    bass_part_id: PartId,
+    harmony_part_id: PartId,
+    key: Key,
+) {
+    apply_drone_pedal_for_part(score, bass_part_id, key);
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -1925,7 +1958,7 @@ fn apply_full_drone(score: &mut Score, key: Key) {
         let si = intensity_near(onset.beats());
         for pitch in [tonic, fifth, octave] {
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: harmony_part_id,
                 pitch,
                 onset,
                 duration: bar,
@@ -2347,6 +2380,7 @@ fn apply_phrase_rhetoric(
 /// semitones below it.
 fn apply_grief_suspensions(
     score: &mut Score,
+    part_id: PartId,
     form: &Form,
     meter_beats: f64,
     intent: &MusicalIntent,
@@ -2378,7 +2412,7 @@ fn apply_grief_suspensions(
             };
             let onset = bar.scale(measure + i as i64, 1);
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: sus,
                 onset,
                 duration: Duration::new(1, 1),
@@ -2388,7 +2422,7 @@ fn apply_grief_suspensions(
                 section_intensity: section.role.intensity(),
             });
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: part_id,
                 pitch: resolution,
                 onset: onset + Duration::new(1, 1),
                 duration: Duration::new((meter_beats as i64 - 1).max(1), 1),
@@ -2435,6 +2469,10 @@ fn apply_defiant_syncopation(score: &mut Score, meter_beats: f64) {
 /// shorter — so the line dances instead of singing legato. Long tones
 /// (holds, cadences) keep their length; joy is airborne, not clipped.
 fn apply_joyful_lift(score: &mut Score) {
+    apply_joyful_lift_for_part(score, PartId::UNASSIGNED);
+}
+
+fn apply_joyful_lift_for_part(score: &mut Score, melody_part_id: PartId) {
     for n in score.notes.iter_mut() {
         if n.role == VoiceRole::Melody && n.emphasis == Emphasis::Normal && n.duration.beats() < 1.5
         {
@@ -2616,7 +2654,7 @@ fn apply_damage(
             let grace = Duration::sixteenth();
             let passing_onset = score.notes[bi].onset.saturating_sub(grace);
             let passing = ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: melody_part_id,
                 pitch: score.notes[ai].pitch.transpose(dir),
                 onset: passing_onset,
                 duration: grace,
