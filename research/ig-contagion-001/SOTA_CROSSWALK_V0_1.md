@@ -20,6 +20,9 @@ Links:
 - https://proceedings.mlr.press/v306/ha26a.html
 - https://arxiv.org/abs/2603.23848
 - https://www.nature.com/articles/s41598-026-42705-7
+- https://arxiv.org/abs/2609.39146
+- https://aclanthology.org/2026.findings-acl.1694/
+- https://aclanthology.org/2026.findings-acl.1600/
 
 ## The comparison principle
 
@@ -89,6 +92,8 @@ A2 and A3 separate the two DReaMAD design levers. A4/A5 are candidate Symthaea i
 
 ### Efficiency and reliability
 - tokens / tool calls / latency / model cost;
+- initial answer diversity and confidence calibration;
+- trajectory-scoring vs terminal-vote performance and cost;
 - run-completion and invalid-trace rates;
 - repeated-seed variance;
 - evaluator disagreement and correlated-error profile.
@@ -124,7 +129,7 @@ A numerical target should be set only after a reproduced baseline, variance esti
 2. Run deterministic non-LLM fixture-oracle checks before invoking any model.
 3. Implement a runner adapter that records exact model/provider/revision/prompt/budget/evidence/topology and separates recorded-trace replay from stochastic regeneration.
 4. Reproduce A0 and A1 on a small pilot matrix; freeze confirmatory design only after variance and runtime are understood.
-5. Run A2–A6 as separate treatments; preserve failures and incomplete runs.
+5. Run A2–A9 as separate treatments; preserve failures and incomplete runs.
 6. Publish raw multi-axis receipts and counterexample traces; no aggregate "alignment contagion" score.
 7. Only after synthetic evidence is stable, consider separately authorized human-group experiments under Mycelix #5999 and independent ethics review.
 
@@ -138,3 +143,14 @@ A numerical target should be set only after a reproduced baseline, variance esti
 - Mycelix #5999/#6011 own human-group process and participant-conditioned summary evaluation.
 
 No existing engine or production governance authority is duplicated by this crosswalk.
+
+
+## Graph ownership and semantics
+
+The topology axis in this programme is a **CommunicationGraph**, not the delegation graph.
+
+- [Symthaea #11337](https://github.com/Luminous-Dynamics/symthaea/issues/11337) owns AgentInstanceId nodes, directed MessageChannel edges, delivery/revocation events, communication reachability, and the normalized-betweenness definition used by #11320.
+- [Symthaea #11248](https://github.com/Luminous-Dynamics/symthaea/issues/11248) owns PrincipalId/scoped mandate delegation networks. Its edges are not message channels and must not be reused as such.
+- An optional principal binding on a communication node is metadata only. Multiple AgentInstanceIds per PrincipalId remain distinct unless a declared experiment transformation explicitly aggregates them.
+
+The five matched centrality controls require strongly connected reciprocal directed graphs, unweighted hop-count shortest paths, minimum/maximum tie-set capture and deterministic AgentInstanceId tie-breaking. A disconnected or unsupported graph remains Unsupported; the runner does not manufacture a centrality result.
