@@ -1,16 +1,23 @@
-# EV Cell-Limited Power Envelope v0.1
+# EV Cell-Limited Power Envelope v0.2
 
-**Status:** Synthetic evidence-qualified electrical/thermal envelope prototype. Not a BMS, validated battery model, safety approval or vehicle qualification.
-**Owner:** [EV-POWER-ENVELOPE-001 #11384](https://github.com/Luminous-Dynamics/symthaea/issues/11384).
-**Related:** [Pack inconsistency metrics v0.2 PR #11324](https://github.com/Luminous-Dynamics/symthaea/pull/11324).
+**Status:** Synthetic evidence-qualified electrical/thermal envelope and β_power evaluator. Not a BMS, validated battery model, safety approval or vehicle qualification.
+**Owner:** [EV-BETA-POWER-002 #11438](https://github.com/Luminous-Dynamics/symthaea/issues/11438).
+**Predecessor:** [EV-POWER-ENVELOPE-001 PR #11384](https://github.com/Luminous-Dynamics/symthaea/pull/11384).
+**Consumer:** [Pack inconsistency metrics v0.2 PR #11324](https://github.com/Luminous-Dynamics/symthaea/pull/11324).
 
 ## Why this work exists
 
-The pack inconsistency programme correctly leaves β_power NOT_COMPUTABLE when it has only resistance dispersion. This prototype supplies a narrowly scoped power calculation prerequisite: for a complete, explicitly qualified series-single-parallel string, determine the largest conservative common discharge current allowed by every cell's voltage, current-rating and pulse-temperature limits.
+The 2026 Nature Energy study defines six cell-inconsistency metrics. Its power-utilization ratio is:
 
-It does not yet calculate the Nature Energy paper's β_power ratio. That requires implementing the exact numerator/denominator aggregation and matching its stated operating point and topology assumptions to the model outputs.
+[
+\beta_{power}(t)=\frac{P_{pack}}{\sum_{i=1}^{N}P_{cell,i}}
+]
 
-## v0.1 model
+where the numerator is maximum available pack power under the declared pack conditions and the denominator is the sum of each constituent cell's individual maximum available power. Source: Zhou et al., *Nature Energy* (2026), https://www.nature.com/articles/s41560-026-02131-5.
+
+v0.1 calculated only the common-current pack envelope. v0.2 adds every cell's independently admissible maximum-power point under the same pulse, OCV/SOC/temperature reference, model, parameter bounds, voltage/current/thermal constraints and evidence protocol.
+
+## v0.1 pack model retained
 
 For each cell under a constant-current discharge pulse of duration t:
 
@@ -19,27 +26,63 @@ For each cell under a constant-current discharge pulse of duration t:
 - Rated current ceiling: I_C,i = I_rating,i,lower.
 - Thermal current ceiling: I_T,i = sqrt((T_max,i,lower − T_base,i,upper) / G_i), if thermal margin is positive, otherwise zero.
 - G_i = R_i,upper R_th,i,upper [1 − exp(−t/(R_th,i,upper C_th,i,lower))].
-- T_base,i,upper is the maximum of the cell's upper-bound initial temperature and the pulse ambient upper bound.
+- T_base,i,upper is the maximum of the cell's upper-bound initial temperature and pulse ambient upper bound.
 
-The pack's maximum admissible common current is min_i min(I_V,i, I_C,i, I_T,i). The limiting cell and binding constraint are preserved. Within that feasible current interval, the conservative terminal power envelope uses the maximum of P(I)=I[ΣOCV_i,lower − IΣR_i,upper], with its unconstrained optimum clipped to the admissible interval. Output power is DC at the declared pack terminals for the specified pulse horizon.
+The pack's common admissible current is the minimum of all cell voltage/current/thermal ceilings. The pack's maximum terminal power is the maximum of P_pack(I)=I[ΣOCV_i,lower − IΣR_i,upper] over that common current interval.
 
-## Adverse-direction uncertainty
+## v0.2 cell denominator and β_power
 
-OCV uses its lower bound; resistance and thermal resistance use upper bounds; thermal capacity uses its lower bound; cell temperature and ambient temperature use upper bounds; minimum allowed terminal voltage and temperature use lower bounds; current rating uses its lower bound. A zero or negative thermal margin produces NO_ADMISSIBLE_DISCHARGE, not a positive power estimate.
+For each cell independently:
 
-All cell identities, the hashed pack cell-inventory manifest, asset/configuration digests, topology qualification and authority reference, model/equation/parameter digests, protocol, calibration and domain evidence are bound into the output receipt with evidence class. Voltage/current limits and ambient conditions also carry evidence digests and evidence classes.
+[
+I_{cell,i}^{*}=\min\left(I_{admissible,i},\frac{OCV_{i,lower}}{2R_{i,upper}}\right)
+]
 
-## Frozen corpus
+[
+P_{cell,i,max}=I_{cell,i}^{*}(OCV_{i,lower}-I_{cell,i}^{*}R_{i,upper})
+]
 
-Eleven synthetic cases include equal-cell reference, weak-cell voltage limit, thermal limit, current-rating limit, an exhausted thermal-margin no-discharge result, and six fail-closed controls (SOC out of domain, temperature out of domain, unsupported topology, invalid calibration, OCV/SOC context mismatch and OCV/temperature context mismatch). OCV evidence is bound to the cell operating SOC and temperature within declared uncertainty; maximum-temperature limits have a separate evidence digest and class. These are arithmetic and gate tests only.
+For the pack:
+
+[
+P_{pack,max}=\max_{0\le I\le I_{common}} I\left(\sum_i OCV_{i,lower}-I\sum_iR_{i,upper}\right)
+]
+
+Then:
+
+[
+\beta_{power,model}=\frac{P_{pack,max}}{\sum_iP_{cell,i,max}}
+]
+
+The output is labelled a model-derived ratio under the declared first-order model and adverse parameter selection. It is not a statistical lower confidence bound, not a universal BMS limit and not a physically validated fleet metric. Because each constituent cell's individual feasible current interval contains the common pack current, the pack numerator must not exceed the sum of independent cell maxima; values above 1 (outside numerical tolerance) force rejection, never clamping.
+
+When the pack has no admissible discharge or the individual-cell denominator is zero, β_power is NOT_COMPUTABLE. No fabricated zero or infinite ratio is emitted.
+
+## Adverse-direction uncertainty and lineage
+
+OCV uses its lower bound; resistance and thermal resistance use upper bounds; thermal capacity uses its lower bound; cell and ambient temperature use upper bounds; minimum allowed voltage and temperature use lower bounds; current rating uses its lower bound. OCV reference state is bound to the cell's current SOC and temperature within declared uncertainty.
+
+Receipts bind vehicle/pack configuration, hashed cell inventory, cell identity/configuration, topology qualification and authority reference, model/equation/parameters, protocol, calibration/domain, pulse, and every cell measurement and hard-limit digest with evidence class.
+
+## Frozen synthetic corpus
+
+Eleven synthetic cases: four computed, one explicit no-discharge, six rejected controls. Independent reference arithmetic gives:
+
+| Case | Limiting condition | Pack maximum power | Sum of individual cell maxima | β_power |
+|---|---|---:|---:|---:|
+| Equal series reference | Cell voltage | 464.2857 W | 464.2857 W | 1.0000 |
+| Weak-cell voltage limit | Cell 003 voltage | 185.5567 W | 363.7174 W | 0.5102 |
+| Thermal limit | Cell 001 temperature | 497.3047 W | 497.3047 W | 1.0000 |
+| Current-rating limit | Cell 002 current rating | 285.3000 W | 404.6238 W | 0.7051 |
+| Exhausted thermal margin | No admissible discharge | Not emitted | 0 W | Not computable |
+
+All fixtures are synthetic arithmetic/gate tests, not physical cell or pack results. Identical cells yield β_power=1 in this model; the intentionally weak cell reduces usable pack power to about 51.0% of the sum of its cells' individual maxima.
 
 ## Deliberate limits
 
-The lumped first-order thermal model is a research approximation. It does not capture electrochemical polarization, nonlinear OCV/impedance, spatial gradients, cooling-plate dynamics, heat generation beyond I²R, ageing-dependent thermal parameters, charge capability, regenerative braking, parallel-string imbalance or switchable topologies. It assumes the same current through every cell in one series string. The model must not be used for control or safety decisions.
+The lumped first-order thermal model is a research approximation. It does not capture electrochemical polarization, nonlinear OCV/impedance, spatial gradients, cooling-plate dynamics, heat generation beyond I²R, ageing-dependent thermal parameters, charge capability, regenerative braking, parallel-string imbalance or switched topologies. The model is limited to a complete, qualified series-single-parallel string under one fixed discharge pulse.
 
-## Validation ladder
-
-Synthetic known-truth and mutation tests → independently measured cell pulse/HPPC data → module/pack pulse tests at matched SOC, temperature and duration → fleet shadow comparisons. At each stage report absolute power error, conservative-bound coverage, limiting-cell identification, voltage/temperature margin, worst chemistry/SOC/temperature domain, compute and evidence coverage. No stage can be skipped by passing software tests.
+It does not compute β_energy, authorize BMS action or establish safety/certification. Physical validation requires independent cell pulse/HPPC tests and matched module/pack pulse tests using the same SOC, temperature and duration, followed by fleet shadow.
 
 ## Run
 
