@@ -190,6 +190,53 @@ impl SceneAdmissionReceipt {
             return Err(FollowEvidenceError::SceneAdmissionRejected);
         }
 
+        let mut source_ids = BTreeSet::new();
+        for source in &sources {
+            if source.source_id.is_empty()
+                || source.source_event_id.is_empty()
+                || source.failure_domain_id.is_empty()
+                || source.frame_id.is_empty()
+                || source.clock_domain_id.is_empty()
+                || source.source_clock_domain_id.is_empty()
+                || source.clock_transform_id.is_empty()
+                || source.calibration_profile_id.is_empty()
+                || source.extrinsic_profile_id.is_empty()
+                || source.acquisition_tick_ns > source.receive_tick_ns
+                || !source_ids.insert(source.source_id.as_str())
+            {
+                return Err(FollowEvidenceError::SceneAdmissionRejected);
+            }
+        }
+
+        let mut hypothesis_ids = BTreeSet::new();
+        for track in &tracks {
+            if track.hypothesis_id.is_empty()
+                || track.track_lineage_id.is_empty()
+                || track.reference_frame_id != frame_id
+                || track.measurement_tick_ns > event_tick_ns
+                || !track.position_x_m.is_finite()
+                || !track.position_y_m.is_finite()
+                || !track.velocity_x_mps.is_finite()
+                || !track.extent_width_m.is_finite()
+                || track.extent_width_m < 0.0
+                || !track.distance_uncertainty_radius_m.is_finite()
+                || track.distance_uncertainty_radius_m < 0.0
+                || track.uncertainty_semantics_id.is_empty()
+                || track.hypotheses_for_lineage == 0
+                || track.source_ids.is_empty()
+                || !hypothesis_ids.insert(track.hypothesis_id.as_str())
+            {
+                return Err(FollowEvidenceError::SceneAdmissionRejected);
+            }
+            let mut track_sources = BTreeSet::new();
+            if track.source_ids.iter().any(|source_id| {
+                !source_ids.contains(source_id.as_str())
+                    || !track_sources.insert(source_id.as_str())
+            }) {
+                return Err(FollowEvidenceError::MissingProvenance);
+            }
+        }
+
         Ok(Self {
             snapshot_id,
             schema_version,
