@@ -489,12 +489,12 @@ pub fn materialize_qualified_instrument_capability_v1(
     let ranges: Vec<&CapabilityClaimV1> = claims
         .iter()
         .copied()
-        .filter(|claim| matches!(claim.value, CapabilityValueV1::SoundingRange { .. }))
+        .filter(|claim| matches!(&claim.value, CapabilityValueV1::SoundingRange { .. }))
         .collect();
     let polyphony: Vec<&CapabilityClaimV1> = claims
         .iter()
         .copied()
-        .filter(|claim| matches!(claim.value, CapabilityValueV1::MaxPolyphony { .. }))
+        .filter(|claim| matches!(&claim.value, CapabilityValueV1::MaxPolyphony { .. }))
         .collect();
 
     if ranges.is_empty() {
@@ -516,7 +516,7 @@ pub fn materialize_qualified_instrument_capability_v1(
             .copied()
             .filter(|claim| {
                 matches!(
-                    claim.value,
+                    &claim.value,
                     CapabilityValueV1::RendererPatchAvailability { .. }
                 )
             })
@@ -528,25 +528,25 @@ pub fn materialize_qualified_instrument_capability_v1(
             return Err(CapabilityMaterializationErrorV1::DuplicateQualifiedCapability);
         }
         if !matches!(
-            renderer_claims[0].value,
+            &renderer_claims[0].value,
             CapabilityValueV1::RendererPatchAvailability { available: true }
         ) {
             return Err(CapabilityMaterializationErrorV1::RendererPatchUnavailable);
         }
     }
 
-    let sounding_range = match ranges[0].value {
+    let sounding_range = match &ranges[0].value {
         CapabilityValueV1::SoundingRange {
             lowest_midi,
             highest_midi,
         } => SoundingRangeV1 {
-            lowest_midi,
-            highest_midi,
+            lowest_midi: *lowest_midi,
+            highest_midi: *highest_midi,
         },
         _ => unreachable!("range candidates were filtered by variant"),
     };
-    let max_polyphony = match polyphony[0].value {
-        CapabilityValueV1::MaxPolyphony { notes } => notes,
+    let max_polyphony = match &polyphony[0].value {
+        CapabilityValueV1::MaxPolyphony { notes } => *notes,
         _ => unreachable!("polyphony candidates were filtered by variant"),
     };
 
