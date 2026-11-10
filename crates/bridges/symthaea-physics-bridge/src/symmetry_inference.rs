@@ -230,12 +230,27 @@ pub enum SymmetryInferenceSearchStatus {
     NumericSearchSkippedTooFewVariables,
 }
 
-/// Auditable result of symmetry inference.
+/// Mathematical object to which this report's symmetry claim applies.
 ///
+/// The current inference entry point receives one scalar expression. Its result
+/// is therefore only a claim that this expression is invariant under the
+/// searched standard coordinate-rotation action. It is not a claim that a
+/// vector field is equivariant, that the expression is conserved by an ODE,
+/// or that a Lagrangian/Hamiltonian has a Noether symmetry or momentum map.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SymmetryClaimScope {
+    #[default]
+    ScalarExpressionInvariant,
+}
+
+/// Auditable result of symmetry inference.///
 /// A missing candidate means only that the recorded bounded search found no candidate;
 /// it is not evidence that the expression has no symmetry.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SymmetryInferenceReport {
+    /// The precise mathematical object covered by this candidate.
+    #[serde(default)]
+    pub claim_scope: SymmetryClaimScope,
     pub candidate: Option<SymmetryDescriptor>,
     pub evidence: Option<SymmetryInferenceEvidence>,
     pub search_status: SymmetryInferenceSearchStatus,
@@ -268,6 +283,7 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
     {
         let dimension = variables.len() as u8;
         return SymmetryInferenceReport {
+            claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
             candidate: Some(SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(dimension)], false)),
             evidence: Some(SymmetryInferenceEvidence::StructuralPatternMatch {
                 pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares {
@@ -284,6 +300,7 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
 
     if let Some((first_pair, second_pair)) = detect_2d_antisymmetric_cross(expr) {
         return SymmetryInferenceReport {
+            claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
             candidate: Some(SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false)),
             evidence: Some(SymmetryInferenceEvidence::StructuralPatternMatch {
                 pattern: StructuralSymmetryPattern::TwoDimensionalAntisymmetricBilinear {
@@ -302,6 +319,7 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
     collect_var_names(expr, &mut var_names);
     if var_names.len() < 2 {
         return SymmetryInferenceReport {
+            claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
             candidate: None,
             evidence: None,
             search_status: SymmetryInferenceSearchStatus::NumericSearchSkippedTooFewVariables,
@@ -314,6 +332,7 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
     match exact_polynomial_symmetry_candidate(expr, &var_names, exact_polynomial_profile) {
         Ok(Some((group, acted_on_variables, checked_generator_count))) => {
             SymmetryInferenceReport {
+                claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
                 candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
                 evidence: Some(SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
                     profile: exact_polynomial_profile,
@@ -328,6 +347,7 @@ pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
             }
         }
         Ok(None) => SymmetryInferenceReport {
+            claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
             candidate: None,
             evidence: None,
             search_status: SymmetryInferenceSearchStatus::ExactPolynomialSearchCompletedNoCandidate,
@@ -376,6 +396,7 @@ fn infer_symmetry_numeric_with_profile(
 
     if var_names.len() < 2 {
         return SymmetryInferenceReport {
+            claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
             candidate: None,
             evidence: None,
             search_status: SymmetryInferenceSearchStatus::NumericSearchSkippedTooFewVariables,
@@ -392,6 +413,7 @@ fn infer_symmetry_numeric_with_profile(
     let subset_count = group_subset_count(n, profile.pairwise_so2_search);
     if subset_count > profile.maximum_group_subsets {
         return SymmetryInferenceReport {
+            claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
             candidate: None,
             evidence: None,
             search_status: SymmetryInferenceSearchStatus::NumericSearchBudgetExceeded,
@@ -410,6 +432,7 @@ fn infer_symmetry_numeric_with_profile(
                 let group = LieGroup::SO(subset_size as u8);
                 let acted_on_variables = active_indices.iter().map(|&i| var_names[i].clone()).collect();
                 return SymmetryInferenceReport {
+                    claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
                     candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
                     evidence: Some(SymmetryInferenceEvidence::SampledLieDerivative {
                         profile,
@@ -439,6 +462,7 @@ fn infer_symmetry_numeric_with_profile(
                 }
                 if checked_extra_pairs >= remaining_pair_budget {
                     return SymmetryInferenceReport {
+                        claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
                         candidate: None,
                         evidence: None,
                         search_status: SymmetryInferenceSearchStatus::NumericSearchBudgetExceeded,
@@ -451,6 +475,7 @@ fn infer_symmetry_numeric_with_profile(
                 if let Some(statistics) = is_lie_invariant(expr, &var_names, &[i, j], &so2, profile) {
                     let group = LieGroup::SO(2);
                     return SymmetryInferenceReport {
+                        claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
                         candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
                         evidence: Some(SymmetryInferenceEvidence::SampledLieDerivative {
                             profile,
@@ -469,6 +494,7 @@ fn infer_symmetry_numeric_with_profile(
     }
 
     SymmetryInferenceReport {
+        claim_scope: SymmetryClaimScope::ScalarExpressionInvariant,
         candidate: None,
         evidence: None,
         search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
@@ -1243,6 +1269,7 @@ mod tests {
     fn structural_symmetry_report_preserves_pattern_provenance() {
         let expr = add(pow2("x"), pow2("y"));
         let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(report.claim_scope, SymmetryClaimScope::ScalarExpressionInvariant);
         assert_eq!(
             report.candidate.unwrap().lie_groups,
             vec![LieGroup::SO(2)]
@@ -1266,6 +1293,7 @@ mod tests {
     fn numeric_symmetry_report_is_explicitly_sampled_not_proven() {
         let expr = sqrt_of(add(pow2("x"), pow2("y")));
         let report = infer_symmetry_numeric_with_evidence(&expr);
+        assert_eq!(report.claim_scope, SymmetryClaimScope::ScalarExpressionInvariant);
         assert_eq!(report.candidate.unwrap().lie_groups, vec![LieGroup::SO(2)]);
         let Some(SymmetryInferenceEvidence::SampledLieDerivative {
             profile,
@@ -1328,6 +1356,7 @@ mod tests {
         // A dyadic coefficient tests the exact rational interpretation of f64 literals.
         let expr = mul(Expr::Const(0.5), quartic);
         let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(report.claim_scope, SymmetryClaimScope::ScalarExpressionInvariant);
         assert_eq!(
             report.candidate.as_ref().unwrap().lie_groups,
             vec![LieGroup::SO(2)]
