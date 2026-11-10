@@ -1623,6 +1623,63 @@ mod tests {
     }
 
     #[test]
+    fn sampled_linear_action_rejects_action_dimension_above_hard_ceiling() {
+        let dimension = HARD_MAX_LINEAR_ACTION_DIMENSION + 1;
+        let mut generator = vec![vec![0.0_f64; dimension]; dimension];
+        generator[0][1] = -1.0;
+        generator[1][0] = 1.0;
+        let action = LinearGroupActionV1 {
+            action_id: "over-dimension-cap".to_string(),
+            coordinate_basis_id: "large-basis".to_string(),
+            coordinate_names: (0..dimension).map(|index| format!("x{index}")).collect(),
+            coordinate_unit_ids: vec!["1".to_string(); dimension],
+            metric: (0..dimension)
+                .map(|row| {
+                    (0..dimension)
+                        .map(|column| if row == column { 1.0 } else { 0.0 })
+                        .collect()
+                })
+                .collect(),
+            generators: vec![LinearGeneratorV1 {
+                id: "J".to_string(),
+                matrix: generator,
+            }],
+        }
+        .try_admit(LinearGroupActionAdmissionProfileV1 {
+            maximum_dimension: dimension,
+            ..LinearGroupActionAdmissionProfileV1::default()
+        })
+        .unwrap();
+        let sample = LinearActionSampleV1 {
+            sample_id: "dimension-cap".to_string(),
+            state: vec![1.0; dimension],
+            direction_basis: (0..dimension)
+                .map(|column| {
+                    (0..dimension)
+                        .map(|row| if row == column { 1.0 } else { 0.0 })
+                        .collect()
+                })
+                .collect(),
+        };
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &Expr::Var("x0".to_string()),
+                &action,
+                &[sample],
+                LinearActionSamplingProfileV1 {
+                    maximum_samples: 1,
+                    minimum_informative_samples: 1,
+                    ..LinearActionSamplingProfileV1::default()
+                }
+            ),
+            Err(LinearActionSamplingErrorV1::ActionDimensionLimitExceeded {
+                actual: 33,
+                maximum: 32
+            })
+        ));
+    }
+
+    #[test]
     fn sampled_linear_action_rejects_generator_count_above_sampling_ceiling() {
         let action = LinearGroupActionV1 {
             action_id: "too-many-generators".to_string(),
