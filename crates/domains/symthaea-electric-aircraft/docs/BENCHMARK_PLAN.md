@@ -70,6 +70,8 @@ For every Luminous aircraft concept, collect and compare: battery calendar age a
 4. Report confidence intervals and failed/incomplete runs; never select only favourable seeds or scenarios.
 5. Freeze all source data and manifests by hash before comparing versions.
 
+Use [METRIC_BOUNDARIES.md](METRIC_BOUNDARIES.md) for mandatory numerator/denominator, configuration, operating-point, evidence-class and uncertainty definitions. A comparison with mismatched or unresolved boundaries is `Incomplete`, not a valid SOTA comparison.
+
 ## Proposed stretch goals
 
 These are internal research goals, not industry-standard thresholds or demonstrated capabilities:
