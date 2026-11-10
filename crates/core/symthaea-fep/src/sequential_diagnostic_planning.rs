@@ -1279,6 +1279,22 @@ mod tests {
         }
     }
 
+    fn independent_max_path_risk(
+        node: &SequentialDiagnosticPlanNode,
+        actions: &[DiagnosticAction],
+    ) -> f64 {
+        let action_risk = node
+            .selected_action_index
+            .map(|index| actions[index].safety_risk)
+            .unwrap_or(0.0);
+        let maximum_continuation = node
+            .branches
+            .iter()
+            .map(|branch| independent_max_path_risk(&branch.continuation, actions))
+            .fold(0.0_f64, f64::max);
+        action_risk + maximum_continuation
+    }
+
     fn causal_descriptors(
         hypotheses: &[DecisionHypothesis],
         actions: &[DiagnosticAction],
@@ -1339,6 +1355,13 @@ mod tests {
         assert_eq!(result.policy_receipt.decision_problem_digest,
             result.decision_problem_receipt.decision_problem_digest);
         assert_eq!(result.policy_receipt.maximum_path_risk_upper_bound, 0.7);
+        assert_eq!(
+            result.policy_receipt.maximum_path_risk_upper_bound,
+            independent_max_path_risk(
+                &result.budgeted_evaluation.evaluation.plan,
+                &actions
+            )
+        );
         assert_eq!(result.policy_receipt.modeled_terminal_path_count, 4);
         assert_eq!(
             result.policy_receipt.receipt_digest.len(),
@@ -1379,6 +1402,33 @@ mod tests {
         assert_ne!(
             result.policy_receipt.receipt_digest,
             changed_budget.policy_receipt.receipt_digest
+        );
+
+        // The same tree shape with different externally supplied action-risk
+        // bounds must produce a different causal problem and policy receipt.
+        let mut changed_actions = actions.clone();
+        changed_actions[1].safety_risk = 0.30;
+        let changed_descriptors = causal_descriptors(&hypotheses, &changed_actions);
+        let changed_action_risk = evaluate_sequential_decision_diagnostics_with_policy_receipt(
+            &hypotheses,
+            &changed_actions,
+            &changed_descriptors,
+            config,
+            planning,
+            SequentialDiagnosticSafetyBudget {
+                maximum_cumulative_risk: 0.7,
+                risk_semantics_digest: "c".repeat(64),
+            },
+            &"d".repeat(64),
+        )
+        .expect("changed action risk bound");
+        assert_eq!(
+            changed_action_risk.policy_receipt.maximum_path_risk_upper_bound,
+            0.65
+        );
+        assert_ne!(
+            result.policy_receipt.receipt_digest,
+            changed_action_risk.policy_receipt.receipt_digest
         );
     }
 
