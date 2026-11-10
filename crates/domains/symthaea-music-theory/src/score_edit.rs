@@ -90,6 +90,7 @@ pub enum ScoreEditIssueCodeV1 {
     EmptyInterval,
     IntervalBeyondScore,
     InvalidVelocityScale,
+    NoOpVelocityScale,
     EmptyTargetSelection,
     PartialNoteBoundary,
     VelocityOutOfRange,
@@ -424,6 +425,17 @@ pub fn apply_score_edit_plan(
                 Some(operation.part_id),
                 None,
                 "velocity scale numerator and denominator must be in 1..=64",
+            );
+            continue;
+        }
+        if operation.numerator == operation.denominator {
+            push_issue(
+                &mut issues,
+                ScoreEditIssueCodeV1::NoOpVelocityScale,
+                Some(&operation.id),
+                Some(operation.part_id),
+                None,
+                "identity velocity scaling is a no-op and cannot produce a change receipt",
             );
             continue;
         }
@@ -799,6 +811,17 @@ mod tests {
         );
         assert!(result.unwrap_err().iter().any(|issue| {
             issue.code == ScoreEditIssueCodeV1::OverlappingOperations
+        }));
+    }
+
+    #[test]
+    fn rejects_identity_velocity_scaling_as_a_no_op() {
+        let mut op = operation("no-op", 0, 1);
+        op.numerator = 1;
+        op.denominator = 1;
+        let result = apply_score_edit_plan(&source_score(), &plan(vec![op]), &digest());
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEditIssueCodeV1::NoOpVelocityScale
         }));
     }
 
