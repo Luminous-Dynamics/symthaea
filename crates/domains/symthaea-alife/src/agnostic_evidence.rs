@@ -17,7 +17,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 /// Property names and states are aligned with OLI M0 fixture v0.1.
-pub const SYMTHAEA_OLI_CONTEXT_VERSION: &str = "oli-m0-fixture-v0.1";
+pub const SYMTHAEA_OLI_CONTEXT_VERSION: &str = "symthaea-oli-context-v0.1.0";
 
 /// Substrate-agnostic properties using the canonical OLI M0 property keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
