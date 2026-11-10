@@ -69,6 +69,8 @@ pub struct EfficiencySample {
 pub struct EfficiencyCurve {
     pub id: String,
     pub x_axis: String,
+    /// Engineering unit for x (for example "1", "rpm", or "m/s").
+    pub x_unit: String,
     pub evidence: EvidenceRecord,
     pub points: Vec<EfficiencyPoint>,
 }
@@ -97,7 +99,11 @@ impl std::error::Error for CharacterizationError {}
 impl EfficiencyCurve {
     pub fn validate(&self) -> Result<(), CharacterizationError> {
         self.evidence.validate()?;
-        if self.id.trim().is_empty() || self.x_axis.trim().is_empty() || self.points.len() < 2 {
+        if self.id.trim().is_empty()
+            || self.x_axis.trim().is_empty()
+            || self.x_unit.trim().is_empty()
+            || self.points.len() < 2
+        {
             return Err(CharacterizationError::InvalidCurve(
                 "curve ID/axis must be nonempty and at least two points are required".into(),
             ));
@@ -304,6 +310,7 @@ mod tests {
         EfficiencyCurve {
             id: id.into(),
             x_axis: axis.into(),
+            x_unit: "dimensionless".into(),
             evidence: evidence(&format!("{id}-dataset")),
             points,
         }
