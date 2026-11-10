@@ -14,7 +14,7 @@ The European Commission's COM(2026)620 proposal, published 17 July 2026, would a
 
 The proposal would align ship GHG and energy monitoring under one MRV system, one monitoring plan and one ship report. Its proposed "energy used on board" metric is expressed in GJ and covers propulsion plus onboard equipment at sea and at berth. It identifies wind-assisted propulsion systems (WAPS) as substitute energy sources and defines wind assistance to include rotor sails, kites, rigid/soft sails, suction wings and turbines.
 
-Most importantly, the proposal text would empower the Commission to specify, through future implementing acts, standards and certification to determine the amount of energy used from wind power. **Those standards and the final legal text are not yet in force or specified by this proposal.**
+Most importantly, proposed Article 5(4) and the Annex I amendment would empower the Commission to specify, through future implementing acts, international standards and certification references to determine the amount of energy used from wind power. The proposed Annex I treatment keeps energy used from substitute sources distinct from fuel energy; it is not yet a final formula. **Those standards and the final legal text are not yet in force or specified by this proposal.**
 
 That creates an opportunity: build the auditable measurement and provenance infrastructure now, but keep any future regulatory calculation method pluggable and versioned. Do not invent the future method.
 
@@ -141,7 +141,7 @@ This complements DLR Odyssa, specialist CFD and WAPS suppliers rather than repla
 
 - European Commission, COM(2026)620 final, 17 July 2026: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52026PC0620
 - European Parliament Legislative Observatory, procedure 2026/0210(COD): https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2026%2F0210%28COD%29
-- European Commission Annex to COM(2026)620: https://publications.europa.eu/resource/cellar/bef58239-81f4-11f1-bf5e-01aa75ed71a1.0001.03/DOC_2
+- European Commission Annex to COM(2026)620 (proposed Annex I method and Article 5(4) wind standard/certification hook): https://publications.europa.eu/resource/cellar/bef58239-81f4-11f1-bf5e-01aa75ed71a1.0001.03/DOC_2
 - EU MRV Regulation (EU) 2015/757: https://eur-lex.europa.eu/eli/reg/2015/757/oj/eng
 - FuelEU Maritime Regulation (EU) 2023/1805: https://eur-lex.europa.eu/eli/reg/2023/1805/oj/eng
 
