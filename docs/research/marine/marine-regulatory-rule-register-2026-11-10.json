@@ -336,9 +336,7 @@
       "revision_or_resolution": "SDC 12, 19–23 January 2026; dated regulatory snapshot 10 November 2026",
       "rule_status": "under_review",
       "legal_character": "committee_workplan",
-      "dates": {
-        "review_scheduled_from": "2027-01-01"
-      },
+      "dates": {},
       "applicability": {
         "ship_scope": "Proposed new ISSM intended for new ships subject to draft goal-based SOLAS steering/propulsion regulations; exact ship/type/date scope is not yet adopted.",
         "geographic_scope": "Potential international SOLAS application, subject to final instruments and ratification/entry-into-force terms.",
