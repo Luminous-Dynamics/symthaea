@@ -113,6 +113,9 @@ struct Cell {
     ocv_upper_v: f64,
     ocv_evidence_digest: String,
     ocv_evidence_class: String,
+    ocv_soc_fraction: f64,
+    ocv_temperature_c: f64,
+    ocv_condition_digest: String,
     resistance_lower_ohm: f64,
     resistance_upper_ohm: f64,
     resistance_evidence_digest: String,
@@ -136,6 +139,8 @@ struct Cell {
     thermal_evidence_digest: String,
     thermal_evidence_class: String,
     maximum_temperature_lower_c: f64,
+    maximum_temperature_evidence_digest: String,
+    maximum_temperature_evidence_class: String,
     cell_configuration_digest: String,
 }
 
@@ -344,6 +349,13 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
         }
         if !cell.ocv_lower_v.is_finite()
             || !cell.ocv_upper_v.is_finite()
+            || !cell.ocv_soc_fraction.is_finite()
+            || !cell.ocv_temperature_c.is_finite()
+            || !is_digest(&cell.ocv_condition_digest)
+            || (cell.ocv_soc_fraction - cell.soc_fraction).abs()
+                > cell.soc_uncertainty + EPSILON
+            || (cell.ocv_temperature_c - cell.temperature_estimate_c).abs()
+                > cell.temperature_uncertainty_c + EPSILON
             || cell.ocv_lower_v <= 0.0
             || cell.ocv_upper_v < cell.ocv_lower_v
             || !is_digest(&cell.ocv_evidence_digest)
@@ -403,6 +415,8 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
             || !is_digest(&cell.thermal_evidence_digest)
             || !valid_class(&cell.thermal_evidence_class)
             || !cell.maximum_temperature_lower_c.is_finite()
+            || !is_digest(&cell.maximum_temperature_evidence_digest)
+            || !valid_class(&cell.maximum_temperature_evidence_class)
         {
             errors.push(format!("cell {} thermal parameters/evidence are invalid", cell.cell_ref));
         }
@@ -529,6 +543,11 @@ fn build_evidence(profile: &Profile) -> Vec<EvidenceRef> {
                 Some(&cell.ocv_evidence_class),
             ),
             evidence(
+                &format!("ocv_reference_condition:{}", cell.cell_ref),
+                &cell.ocv_condition_digest,
+                None,
+            ),
+            evidence(
                 &format!("resistance:{}", cell.cell_ref),
                 &cell.resistance_evidence_digest,
                 Some(&cell.resistance_evidence_class),
@@ -557,6 +576,11 @@ fn build_evidence(profile: &Profile) -> Vec<EvidenceRef> {
                 &format!("thermal:{}", cell.cell_ref),
                 &cell.thermal_evidence_digest,
                 Some(&cell.thermal_evidence_class),
+            ),
+            evidence(
+                &format!("maximum_temperature_limit:{}", cell.cell_ref),
+                &cell.maximum_temperature_evidence_digest,
+                Some(&cell.maximum_temperature_evidence_class),
             ),
         ]);
     }
@@ -950,6 +974,34 @@ mod tests {
         }));
         assert!(envelope.evidence.iter().any(|row| row.role == "cell_inventory"));
         assert_eq!(envelope.topology_authority_ref, "synthetic-authority");
+    }
+
+    #[test]
+    fn ocv_reference_state_must_match_cell_operating_soc_and_temperature() {
+        let audited = report();
+        for case_id in [
+            "ocv-soc-context-mismatch-rejected",
+            "ocv-temperature-context-mismatch-rejected",
+        ] {
+            let case = audited.payload.cases.iter()
+                .find(|case| case.case_id == case_id)
+                .expect("OCV reference-state negative control");
+            assert!(!case.accepted);
+            assert!(case.envelope.is_none());
+        }
+    }
+
+    #[test]
+    fn maximum_temperature_limit_has_its_own_evidence_receipt() {
+        let audited = report();
+        let envelope = audited.payload.cases.iter()
+            .find(|case| case.case_id == "equal-series-reference")
+            .and_then(|case| case.envelope.as_ref())
+            .expect("reference envelope");
+        assert!(envelope.evidence.iter().any(|row| {
+            row.role == "maximum_temperature_limit:cell-001"
+                && row.evidence_class.as_deref() == Some("synthetic_fixture")
+        }));
     }
 
     #[test]
