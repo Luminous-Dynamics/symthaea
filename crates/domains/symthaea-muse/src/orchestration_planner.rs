@@ -243,6 +243,22 @@ fn valid_capability_receipt(
             .qualification_record_sha256s
             .iter()
             .all(|value| valid_sha256_hex_v1(value))
+        && instrument.renderer_scope.as_ref().is_none_or(|scope| {
+            scope
+                .renderer_id
+                .as_ref()
+                .is_some_and(|value| !value.trim().is_empty())
+                && scope
+                    .patch_id
+                    .as_ref()
+                    .is_some_and(|value| !value.trim().is_empty())
+                // Procedural renderers have no sample asset. Sample-backed
+                // renderers bind one; absence is not automatically a failure.
+                && scope
+                    .asset_sha256
+                    .as_ref()
+                    .is_none_or(|digest| valid_sha256_hex_v1(digest))
+        })
 }
 
 fn part_demand_is_valid(demand: &VoiceDemand) -> bool {
@@ -293,7 +309,7 @@ fn scope_matches_requirement(
                         && renderer
                             .asset_sha256
                             .as_ref()
-                            .is_some_and(|digest| valid_sha256_hex_v1(digest))
+                            .is_none_or(|digest| valid_sha256_hex_v1(digest))
                 })))
 }
 
@@ -1046,6 +1062,62 @@ mod tests {
         assert_eq!(report.disposition, PlannerDispositionV1::InfeasibleComplete);
         assert!(report.issues.iter().any(|issue| {
             issue.code == PlannerIssueCodeV1::NoQualifiedCandidateForPart
+        }));
+    }
+
+    fn with_procedural_renderer(
+        mut instrument: QualifiedInstrumentCapabilityV1,
+    ) -> QualifiedInstrumentCapabilityV1 {
+        instrument.renderer_scope = Some(CapabilityScopeV1 {
+            instrument_model: instrument.performance_scope.instrument_model.clone(),
+            performer_level: None,
+            technique: None,
+            dynamic: None,
+            renderer_id: Some("symthaea-procedural-renderer-v1".into()),
+            patch_id: Some("partials-cello-default-v1".into()),
+            asset_sha256: None,
+        });
+        instrument.claim_ids.push("procedural-renderer-availability".into());
+        instrument.evidence_ids.push("procedural-renderer-evidence".into());
+        instrument.qualification_record_ids.push("procedural-renderer-review".into());
+        instrument.qualification_record_sha256s.push(sha('h'));
+        instrument
+    }
+
+    #[test]
+    fn exact_procedural_renderer_patch_is_allowed_without_a_sample_asset_digest() {
+        let mut request = request();
+        request.part_requirements[0].renderer_required = true;
+        request.instruments[0] = with_procedural_renderer(request.instruments[0].clone());
+
+        let report = plan_orchestration_v1(&request);
+        assert_eq!(report.disposition, PlannerDispositionV1::FeasibleComplete);
+        assert_eq!(report.candidates.len(), 1);
+        let assignment = report.candidates[0]
+            .assignments
+            .iter()
+            .find(|assignment| assignment.part_id == 1)
+            .unwrap();
+        let renderer = assignment.renderer_scope.as_ref().unwrap();
+        assert_eq!(
+            renderer.renderer_id.as_deref(),
+            Some("symthaea-procedural-renderer-v1")
+        );
+        assert!(renderer.asset_sha256.is_none());
+    }
+
+    #[test]
+    fn malformed_asset_digest_in_renderer_receipt_is_rejected() {
+        let mut request = request();
+        request.part_requirements[0].renderer_required = true;
+        let mut instrument = with_procedural_renderer(request.instruments[0].clone());
+        instrument.renderer_scope.as_mut().unwrap().asset_sha256 = Some("not-a-sha256".into());
+        request.instruments[0] = instrument;
+
+        let report = plan_orchestration_v1(&request);
+        assert_eq!(report.disposition, PlannerDispositionV1::InvalidRequest);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == PlannerIssueCodeV1::InvalidCapabilityReceipt
         }));
     }
 
