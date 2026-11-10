@@ -311,9 +311,8 @@ impl LinearGroupActionV1 {
 
             let relative_defect = metric_skew_relative_defect(
                 &generator.matrix,
-                &self.metric,
                 generator_scale,
-                metric_scale,
+                &scaled_metric_cholesky_lower,
             );
             if !relative_defect.is_finite()
                 || relative_defect > profile.metric_skew_relative_tolerance
@@ -486,29 +485,65 @@ fn cholesky_lower_scaled_metric(
 
 fn metric_skew_relative_defect(
     generator: &[Vec<f64>],
-    metric: &[Vec<f64>],
     generator_scale: f64,
-    metric_scale: f64,
+    scaled_metric_cholesky_lower: &[Vec<f64>],
 ) -> f64 {
-    let generator_norm = scaled_frobenius_norm(generator, generator_scale);
-    let metric_norm = scaled_frobenius_norm(metric, metric_scale);
-    let mut defect_norm = 0.0_f64;
-
-    for (row_index, generator_row) in generator.iter().enumerate() {
-        for (column_index, _) in generator_row.iter().enumerate() {
-            let mut residual = 0.0_f64;
-            for (inner_index, generator_inner_row) in generator.iter().enumerate() {
-                let a_inner_row = generator_inner_row[row_index] / generator_scale;
-                let a_inner_column = generator_inner_row[column_index] / generator_scale;
-                let g_inner_column = metric[inner_index][column_index] / metric_scale;
-                let g_row_inner = metric[row_index][inner_index] / metric_scale;
-                residual += a_inner_row * g_inner_column + g_row_inner * a_inner_column;
+    // Let G / metric_scale = L L^T. The metric-skew condition
+    // A^T G + G A = 0 becomes B^T + B = 0 for
+    // B = L^T A L^-T. Under a coordinate change, valid Cholesky
+    // whitenings differ by an orthogonal factor, so this Frobenius
+    // residual is representation-invariant.
+    //
+    // Normalize A before multiplication and compute B with a
+    // right-triangular solve instead of explicitly forming L^-T.
+    let dimension = generator.len();
+    let mut left_product = vec![vec![0.0_f64; dimension]; dimension];
+    for (row_index, output_row) in left_product.iter_mut().enumerate() {
+        for (column_index, output) in output_row.iter_mut().enumerate() {
+            let mut value = 0.0_f64;
+            for (inner_index, generator_row) in generator.iter().enumerate() {
+                value += scaled_metric_cholesky_lower[inner_index][row_index]
+                    * (generator_row[column_index] / generator_scale);
             }
+            *output = value;
+        }
+    }
+
+    let mut whitened = vec![vec![0.0_f64; dimension]; dimension];
+    for (row_index, left_row) in left_product.iter().enumerate() {
+        let mut solved_row = Vec::with_capacity(dimension);
+        for (column_index, left_entry) in left_row.iter().enumerate() {
+            let correction = solved_row
+                .iter()
+                .zip(scaled_metric_cholesky_lower[column_index].iter())
+                .take(column_index)
+                .map(|(value, lower_value)| value * lower_value)
+                .sum::<f64>();
+            let pivot = scaled_metric_cholesky_lower[column_index][column_index];
+            let value = (*left_entry - correction) / pivot;
+            if !value.is_finite() {
+                return f64::INFINITY;
+            }
+            solved_row.push(value);
+        }
+        whitened[row_index] = solved_row;
+    }
+
+    let whitened_scale = max_abs(&whitened);
+    if !whitened_scale.is_finite() || whitened_scale == 0.0 {
+        return f64::INFINITY;
+    }
+    let generator_norm = scaled_frobenius_norm(&whitened, whitened_scale);
+    let mut defect_norm = 0.0_f64;
+    for (row_index, row) in whitened.iter().enumerate() {
+        for (column_index, value) in row.iter().enumerate() {
+            let residual =
+                *value / whitened_scale + whitened[column_index][row_index] / whitened_scale;
             defect_norm = defect_norm.hypot(residual);
         }
     }
 
-    defect_norm / (2.0 * generator_norm * metric_norm)
+    defect_norm / (2.0 * generator_norm)
 }
 
 #[cfg(test)]
@@ -581,6 +616,52 @@ mod tests {
             admitted.diagnostics().maximum_scaled_cholesky_diagonal,
             1.0
         );
+    }
+
+    #[test]
+    fn metric_skew_admission_is_invariant_under_nonorthogonal_basis_change() {
+        // D = [[1, 1], [0, 1]], A' = D A D^-1, and G' = D^-T D^-1.
+        // The epsilon perturbation is intentionally not metric-skew. Admission
+        // must make the same decision and report the same normalized defect in
+        // both representations.
+        let tolerance = 5.0e-4;
+        let mut canonical = canonical_so2();
+        canonical.generators[0].matrix =
+            vec![vec![0.001, -1.0], vec![1.0, -0.001]];
+        let mut canonical_profile = profile();
+        canonical_profile.metric_skew_relative_tolerance = tolerance;
+
+        let transformed = LinearGroupActionV1 {
+            action_id: "so2-sheared-approximate".to_string(),
+            coordinate_basis_id: "xy-sheared".to_string(),
+            coordinate_names: vec!["X".to_string(), "Y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, -1.0], vec![-1.0, 2.0]],
+            generators: vec![LinearGeneratorV1 {
+                id: "conjugated-J-perturbed".to_string(),
+                matrix: vec![vec![1.001, -2.002], vec![1.0, -1.001]],
+            }],
+        };
+        let transformed_profile = canonical_profile;
+        let canonical_error = canonical
+            .try_admit(canonical_profile)
+            .unwrap_err();
+        let transformed_error = transformed
+            .try_admit(transformed_profile)
+            .unwrap_err();
+
+        let relative_defect = |error: LinearGroupActionAdmissionError| match error {
+            LinearGroupActionAdmissionError::GeneratorNotMetricSkew {
+                relative_defect,
+                ..
+            } => relative_defect,
+            other => panic!("expected metric-skew rejection, got {other:?}"),
+        };
+        let canonical_defect = relative_defect(canonical_error);
+        let transformed_defect = relative_defect(transformed_error);
+        assert!((canonical_defect - transformed_defect).abs() < 1.0e-12);
+        assert!(canonical_defect > tolerance);
+        assert!(transformed_defect > tolerance);
     }
 
     #[test]
