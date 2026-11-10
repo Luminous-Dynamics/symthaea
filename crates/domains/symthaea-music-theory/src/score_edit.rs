@@ -728,6 +728,17 @@ pub fn build_velocity_edit_event_remap(
             "transformation digest must be 64 lowercase hexadecimal characters",
         );
     }
+    if source.key != candidate.key
+        || source.tempo_bpm.to_bits() != candidate.tempo_bpm.to_bits()
+        || source.meter != candidate.meter
+        || source.total_beats != candidate.total_beats
+    {
+        push(
+            ScoreEventRemapIssueCodeV1::ScoreMetadataChanged,
+            None, None,
+            "velocity-only edit must preserve key, tempo, meter and declared score span",
+        );
+    }
     if source.notes.len() != candidate.notes.len() {
         push(
             ScoreEventRemapIssueCodeV1::CandidateEventCountMismatch,
@@ -745,6 +756,13 @@ pub fn build_velocity_edit_event_remap(
 
     let operation_ids: std::collections::BTreeSet<&str> =
         receipt.operation_ids.iter().map(String::as_str).collect();
+    if receipt.operation_ids.iter().any(|id| id.trim().is_empty()) {
+        push(
+            ScoreEventRemapIssueCodeV1::InvalidDispositionOperationId,
+            None, None,
+            "edit receipt contains an empty operation ID",
+        );
+    }
     if operation_ids.len() != receipt.operation_ids.len() {
         push(
             ScoreEventRemapIssueCodeV1::InvalidDispositionOperationId,
@@ -1112,6 +1130,27 @@ mod tests {
         );
         assert!(result.unwrap_err().iter().any(|issue| {
             issue.code == ScoreEventRemapIssueCodeV1::RetainedEventChanged
+        }));
+    }
+
+    #[test]
+    fn velocity_remap_rejects_unrequested_score_metadata_changes() {
+        let source = source_score();
+        let mut edit = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("soften-answer", 0, 2)]),
+            &digest(),
+        ).expect("valid velocity edit");
+        edit.candidate.tempo_bpm += 1.0;
+        let result = build_velocity_edit_event_remap(
+            &source,
+            &edit,
+            &digest(),
+            &"b".repeat(64),
+            &"c".repeat(64),
+        );
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEventRemapIssueCodeV1::ScoreMetadataChanged
         }));
     }
 
