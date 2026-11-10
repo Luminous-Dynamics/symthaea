@@ -6,8 +6,9 @@
 //!   cargo run --locked -p symthaea-silicon --example hdc_retrieval_host_benchmark
 //!
 //! Optional flags:
-//!   --store-size 64|256|1024|4096
-//!   --batch-size 1|4|16|64
+//!   --store-size 64|256|1024|4096|16384|32768|65536|131072
+//!   --batch-size 1|2|4|8|16|32|64
+//!   --parallel-threads N (default: available parallelism, capped at 64)
 //!   --repetitions N     (measurement batches; default 30)
 //!   --warmup N           (warm-up batches; default 5)
 //!   --out DIR            (default target/neuro-silicon-003)
@@ -29,8 +30,11 @@ use symthaea_core::hdc::binary_hv::BinaryHV;
 
 const DIMENSION_BITS: usize = BinaryHV::DIM;
 const VECTOR_BYTES: usize = BinaryHV::BYTES;
-const STORE_SIZES: [usize; 4] = [64, 256, 1024, 4096];
-const BATCH_SIZES: [usize; 4] = [1, 4, 16, 64];
+const STORE_SIZES: [usize; 8] = [64, 256, 1024, 4096, 16384, 32768, 65536, 131072];
+const BATCH_SIZES: [usize; 7] = [1, 2, 4, 8, 16, 32, 64];
+const MAX_STORE_BYTES: usize = 256 * 1024 * 1024;
+const MAX_PARALLEL_THREADS: usize = 64;
+const SCAN_ORDER_ARM_COUNT: usize = 4;
 const TARGET_NOISE_BITS: usize = 64;
 const NOISE_STRIDE: usize = 7919;
 const MAX_QUERY_OBSERVATIONS: usize = 100_000;
@@ -42,6 +46,7 @@ struct Config {
     batch_size: usize,
     repetitions: usize,
     warmup: usize,
+    parallel_threads: usize,
     output_dir: PathBuf,
 }
 
@@ -102,7 +107,7 @@ fn run() -> Result<(), String> {
         .checked_mul(config.batch_size)
         .ok_or_else(|| "repetition × batch sample count overflows usize".to_owned())?;
     let scan_order_capacity = config.repetitions
-        .checked_mul(3)
+        .checked_mul(SCAN_ORDER_ARM_COUNT)
         .ok_or_else(|| "repetition × scan-arm count overflows usize".to_owned())?;
     if query_observation_capacity > MAX_QUERY_OBSERVATIONS {
         return Err(format!(
@@ -207,6 +212,7 @@ fn run() -> Result<(), String> {
         }
         std::hint::black_box(retrieve_batch_store_major(&store, &queries)?);
         std::hint::black_box(retrieve_batch_store_major_tiled(&store, &queries, 8)?);
+        std::hint::black_box(retrieve_batch_store_major_parallel(&store, &queries, config.parallel_threads)?);
     }
 
     // A single canonical query-major output vector is the exact parity oracle
@@ -214,23 +220,24 @@ fn run() -> Result<(), String> {
     // query batch and canonical BinaryHV::hamming_distance implementation.
     let query_major_reference = retrieve_batch_query_major(&store, &queries)?;
     let mut scan_order_observations = Vec::with_capacity(scan_order_capacity);
-    let mut scan_order_elapsed_ns: [Vec<u128>; 3] =
+    let mut scan_order_elapsed_ns: [Vec<u128>; SCAN_ORDER_ARM_COUNT] =
         std::array::from_fn(|_| Vec::with_capacity(config.repetitions));
-    let mut scan_order_parity_mismatches = [0usize; 3];
-    let mut scan_order_oracle_mismatches = [0usize; 3];
+    let mut scan_order_parity_mismatches = [0usize; SCAN_ORDER_ARM_COUNT];
+    let mut scan_order_oracle_mismatches = [0usize; SCAN_ORDER_ARM_COUNT];
 
-    // Rotate the three arms each repetition to reduce fixed order bias.
-    // Per-arm samples are batch latencies; we do not fabricate per-query
-    // timing measurements for store-major traversal.
+    // Rotate the four arms each repetition to reduce fixed order bias.
+    // The parallel-store arm includes scoped-worker creation/join cost; do not
+    // present it as a persistent worker-pool measurement.
     for repetition in 0..config.repetitions {
-        for offset in 0..3 {
-            let arm = (repetition + offset) % 3;
+        for offset in 0..SCAN_ORDER_ARM_COUNT {
+            let arm = (repetition + offset) % SCAN_ORDER_ARM_COUNT;
             let started = Instant::now();
             let results = match arm {
                 0 => retrieve_batch_query_major(&store, &queries)?,
                 1 => retrieve_batch_store_major(&store, &queries)?,
                 2 => retrieve_batch_store_major_tiled(&store, &queries, 8)?,
-                _ => unreachable!("three scan-order arms"),
+                3 => retrieve_batch_store_major_parallel(&store, &queries, config.parallel_threads)?,
+                _ => unreachable!("four scan-order arms"),
             };
             let elapsed_ns = started.elapsed().as_nanos().max(1);
             let parity_mismatches = results
@@ -254,7 +261,8 @@ fn run() -> Result<(), String> {
                     0 => "query_major",
                     1 => "store_major",
                     2 => "store_major_tiled_q8",
-                    _ => unreachable!("three scan-order arms"),
+                    3 => "store_major_parallel",
+                    _ => unreachable!("four scan-order arms"),
                 },
                 elapsed_ns,
                 parity_mismatches,
@@ -310,7 +318,9 @@ fn run() -> Result<(), String> {
         "scan_order_comparison": {
             "boundary": "prebuilt resident store and prebuilt query batch; complete exact scan and top-1 selection; batch timed as one unit",
             "canonical_distance": "BinaryHV::hamming_distance",
-            "arms": ["query_major", "store_major", "store_major_tiled_q8"],
+            "arms": ["query_major", "store_major", "store_major_tiled_q8", "store_major_parallel"],
+            "parallel_worker_count": config.parallel_threads,
+            "parallel_worker_lifecycle": "std::thread::scope workers created and joined within each timed batch",
             "interleaving": "arm order rotated once per repetition",
             "observations": scan_order_observations.iter().map(|observation| json!({
                 "repetition": observation.repetition,
@@ -322,12 +332,14 @@ fn run() -> Result<(), String> {
             "aggregate_parity_mismatches": {
                 "query_major": scan_order_parity_mismatches[0],
                 "store_major": scan_order_parity_mismatches[1],
-                "store_major_tiled_q8": scan_order_parity_mismatches[2]
+                "store_major_tiled_q8": scan_order_parity_mismatches[2],
+                "store_major_parallel": scan_order_parity_mismatches[3]
             },
             "aggregate_oracle_mismatches": {
                 "query_major": scan_order_oracle_mismatches[0],
                 "store_major": scan_order_oracle_mismatches[1],
-                "store_major_tiled_q8": scan_order_oracle_mismatches[2]
+                "store_major_tiled_q8": scan_order_oracle_mismatches[2],
+                "store_major_parallel": scan_order_oracle_mismatches[3]
             }
         }
     });
@@ -351,7 +363,7 @@ fn run() -> Result<(), String> {
         metrics.push(metric("latency_p99", percentile(&latency_samples, 0.99) as f64, "ns", "measured", latency_scope, measured_queries, "nearest-rank percentile; emitted only with at least 1,000 individual query observations"));
     }
 
-    for (arm_index, arm_name) in ["query_major", "store_major", "store_major_tiled_q8"].iter().enumerate() {
+    for (arm_index, arm_name) in ["query_major", "store_major", "store_major_tiled_q8", "store_major_parallel"].iter().enumerate() {
         let mut samples = scan_order_elapsed_ns[arm_index].clone();
         samples.sort_unstable();
         let arm_scope = format!("complete prebuilt query-batch scan using {arm_name}; canonical BinaryHV::hamming_distance; excludes query/store construction and serialization");
@@ -421,6 +433,7 @@ fn run() -> Result<(), String> {
         "CPU-only profile: no host/device transfer, GPU, FPGA, power, or energy result is measured.".to_owned(),
         "The receipt is incomplete for NEURO-SILICON-003's full end-to-end promotion gate because boundary_complete is false.".to_owned(),
         "The scan-order comparison is an exact host-only traversal experiment; it does not measure remote placement, GPU/FPGA execution, hardware cache counters or energy.".to_owned(),
+        "The parallel store-major arm creates and joins scoped OS threads inside each timed batch; it is a bounded parallel-scan experiment, not a persistent worker-pool serving result.".to_owned(),
         "Scan-order p99 batch latency is omitted unless each arm has at least 1,000 batch observations; p95 from the default 30 repetitions is exploratory.".to_owned(),
         "No malformed hardware frames are applicable to this host-only retrieval run; malformed_frames_accepted is null, not a tested zero.".to_owned(),
         "Command stdout/stderr hashes are not captured by this in-process example; preserve external runner logs with any qualification package.".to_owned(),
@@ -468,7 +481,8 @@ fn run() -> Result<(), String> {
             "device_stages": [],
             "hardware_identity": hardware_identity,
             "memory_profile": format!("host-resident vector store; logical working set {working_set_bytes} bytes; actual cache/DRAM residency not measured"),
-            "clock_power_profile": env::var("SYMTHAEA_BENCH_CLOCK_POWER_PROFILE").unwrap_or_else(|_| "not captured".to_owned())
+            "parallel_threads": config.parallel_threads,
+        "clock_power_profile": env::var("SYMTHAEA_BENCH_CLOCK_POWER_PROFILE").unwrap_or_else(|_| "not captured".to_owned())
         },
         "execution": {
             "measurement_boundary": latency_scope,
@@ -497,8 +511,8 @@ fn run() -> Result<(), String> {
 
     println!("{}", String::from_utf8_lossy(&receipt_bytes));
     eprintln!(
-        "output={} status={} batches={} queries={} mismatches={}",
-        output_dir.display(), status, config.repetitions, measured_queries, mismatches
+        "output={} status={} batches={} queries={} mismatches={} parallel_threads={}",
+        output_dir.display(), status, config.repetitions, measured_queries, mismatches, config.parallel_threads
     );
     Ok(())
 }
@@ -642,13 +656,16 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
         batch_size: 1,
         repetitions: 30,
         warmup: 5,
+        parallel_threads: std::thread::available_parallelism()
+            .map_or(1, |count| count.get())
+            .min(MAX_PARALLEL_THREADS),
         output_dir: PathBuf::from("target/neuro-silicon-003"),
     };
     let mut index = 0;
     while index < args.len() {
         let flag = args[index].as_str();
         if flag == "--help" || flag == "-h" {
-            println!("hdc_retrieval_host_benchmark [--store-size 64|256|1024|4096] [--batch-size 1|4|16|64] [--repetitions N] [--warmup N] [--out DIR]");
+            println!("hdc_retrieval_host_benchmark [--store-size 64|256|1024|4096|16384|32768|65536|131072] [--batch-size 1|2|4|8|16|32|64] [--parallel-threads N] [--repetitions N] [--warmup N] [--out DIR]");
             println!("limits: <= {MAX_QUERY_OBSERVATIONS} query observations and <= {MAX_WARMUP_BATCHES} warm-up batches");
             std::process::exit(0);
         }
@@ -658,6 +675,7 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
             "--batch-size" => config.batch_size = parse_usize(flag, value)?,
             "--repetitions" => config.repetitions = parse_usize(flag, value)?,
             "--warmup" => config.warmup = parse_usize(flag, value)?,
+            "--parallel-threads" => config.parallel_threads = parse_usize(flag, value)?,
             "--out" => config.output_dir = PathBuf::from(value),
             _ => return Err(format!("unknown argument: {flag}; use --help")),
         }
@@ -668,6 +686,14 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
     }
     if !BATCH_SIZES.contains(&config.batch_size) || config.batch_size > config.store_size {
         return Err(format!("unsupported batch size {}; choose one of {:?}", config.batch_size, BATCH_SIZES));
+    }
+    if config.parallel_threads == 0 || config.parallel_threads > MAX_PARALLEL_THREADS {
+        return Err(format!("--parallel-threads must be in 1..={MAX_PARALLEL_THREADS}"));
+    }
+    let store_bytes = config.store_size.checked_mul(VECTOR_BYTES)
+        .ok_or_else(|| "store size × vector bytes overflows usize".to_owned())?;
+    if store_bytes > MAX_STORE_BYTES {
+        return Err(format!("store exceeds {MAX_STORE_BYTES} byte safety cap"));
     }
     if config.repetitions == 0 {
         return Err("--repetitions must be greater than zero".to_owned());
@@ -727,6 +753,65 @@ fn retrieve_batch_query_major(
         .iter()
         .map(|query| retrieve_top1(store, &query.vector))
         .collect())
+}
+
+/// Parallel exact store scan. Each worker owns a disjoint contiguous store
+/// shard and computes an independent best result for every query. The final
+/// reduction uses (distance, stable ID) ordering, making tie resolution
+/// independent of thread completion order. Thread creation/join is included in
+/// the caller's measured boundary.
+fn retrieve_batch_store_major_parallel(
+    store: &[BinaryHV],
+    queries: &[QueryCase],
+    worker_count: usize,
+) -> Result<Vec<(usize, u32)>, String> {
+    if worker_count == 0 || worker_count > MAX_PARALLEL_THREADS {
+        return Err(format!("parallel worker count must be in 1..={MAX_PARALLEL_THREADS}"));
+    }
+    if store.is_empty() && !queries.is_empty() {
+        return Err("cannot retrieve from an empty store".to_owned());
+    }
+    if queries.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let workers = worker_count.min(store.len());
+    let chunk_size = store.len().div_ceil(workers);
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = store
+            .chunks(chunk_size)
+            .enumerate()
+            .map(|(chunk_index, chunk)| {
+                let start_id = chunk_index * chunk_size;
+                scope.spawn(move || {
+                    let mut best = vec![(usize::MAX, u32::MAX); queries.len()];
+                    for (offset, item) in chunk.iter().enumerate() {
+                        let item_id = start_id + offset;
+                        for (query_index, query) in queries.iter().enumerate() {
+                            let distance = query.vector.hamming_distance(item);
+                            let current = &mut best[query_index];
+                            if distance < current.1 || (distance == current.1 && item_id < current.0) {
+                                *current = (item_id, distance);
+                            }
+                        }
+                    }
+                    best
+                })
+            })
+            .collect();
+
+        let mut combined = vec![(usize::MAX, u32::MAX); queries.len()];
+        for handle in handles {
+            let partial = handle.join()
+                .map_err(|_| "parallel HDC scan worker panicked".to_owned())?;
+            for (current, candidate) in combined.iter_mut().zip(partial) {
+                if candidate.1 < current.1 || (candidate.1 == current.1 && candidate.0 < current.0) {
+                    *current = candidate;
+                }
+            }
+        }
+        Ok(combined)
+    })
 }
 
 /// Store-major exact batch scan. Each resident store vector is traversed once
@@ -959,6 +1044,29 @@ mod tests {
     }
 
     #[test]
+    fn parallel_store_major_matches_query_major_across_thread_counts() {
+        let store: Vec<BinaryHV> = (0..128).map(|i| BinaryHV::random(i as u64 + 500)).collect();
+        let queries: Vec<QueryCase> = (0..7)
+            .map(|index| {
+                let target_id = (index * 13 + 5) % store.len();
+                QueryCase {
+                    index,
+                    target_id,
+                    vector: perturb_query(store[target_id], index, target_id, TARGET_NOISE_BITS),
+                }
+            })
+            .collect();
+        let expected = retrieve_batch_query_major(&store, &queries).unwrap();
+        for worker_count in [1, 2, 4, 16] {
+            assert_eq!(
+                retrieve_batch_store_major_parallel(&store, &queries, worker_count).unwrap(),
+                expected,
+                "worker count {worker_count}"
+            );
+        }
+    }
+
+    #[test]
     fn tiled_store_major_matches_for_tile_sizes_and_partial_final_tile() {
         let store: Vec<BinaryHV> = (0..64).map(|i| BinaryHV::random(i as u64)).collect();
         let queries: Vec<QueryCase> = (0..7)
@@ -993,6 +1101,19 @@ mod tests {
     }
 
     #[test]
+    fn parallel_store_major_preserves_ties_and_rejects_invalid_worker_count() {
+        let vector = BinaryHV::random(1999);
+        let store = vec![vector; 7];
+        let queries = vec![QueryCase { index: 0, target_id: 0, vector }];
+        assert_eq!(
+            retrieve_batch_store_major_parallel(&store, &queries, 3).unwrap(),
+            vec![(0, 0)]
+        );
+        assert!(retrieve_batch_store_major_parallel(&store, &queries, 0).is_err());
+        assert!(retrieve_batch_store_major_parallel(&store, &queries, MAX_PARALLEL_THREADS + 1).is_err());
+    }
+
+    #[test]
     fn empty_query_batch_is_supported_but_empty_store_is_not() {
         assert!(retrieve_batch_query_major(&[], &[]).unwrap().is_empty());
         assert!(retrieve_batch_store_major(&[], &[]).unwrap().is_empty());
@@ -1000,6 +1121,13 @@ mod tests {
 
         let query = QueryCase { index: 0, target_id: 0, vector: BinaryHV::random(7) };
         assert!(retrieve_batch_query_major(&[], &[query]).is_err());
+    }
+
+    #[test]
+    fn parallel_store_major_empty_and_empty_store_semantics_are_explicit() {
+        assert!(retrieve_batch_store_major_parallel(&[], &[], 1).unwrap().is_empty());
+        let query = QueryCase { index: 0, target_id: 0, vector: BinaryHV::random(2000) };
+        assert!(retrieve_batch_store_major_parallel(&[], &[query], 2).is_err());
     }
 
     #[test]
