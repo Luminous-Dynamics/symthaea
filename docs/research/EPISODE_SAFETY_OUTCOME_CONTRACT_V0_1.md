@@ -78,11 +78,18 @@ The audit reports separately:
 
 The SBU rates are withheld when any episode cannot be classified as SBU or not-SBU. Worst-violation severity is withheld when any applicable episode lacks a complete severity measurement. No single composite score is emitted.
 
+## 6. Matched policy-arm comparison
+
+`compare_episode_safety_arms` pairs two policy audits only when benchmark release, protocol, evaluator, environment condition, robot configuration, instrument manifest, safety-spec roster and exact task/episode roster match. Each paired episode must also share its scene/seed independence-unit identity and seed. Task/spec applicability must agree. Only the policy-artifact digest may differ.
+
+The comparator emits per-task × scene/seed-unit deltas for native SR, safety compliance, SBU and worst-violation depth, then task-stratified and aggregate summaries with contributing and unresolved-unit counts and candidate/baseline wins/ties. A positive delta benefits SR and safety compliance; a negative delta benefits SBU and severity. Unknown pairs remain unresolved. These are descriptive paired changes, **not** confidence intervals or significance tests. Downstream inference must resample independent scene/seed units (not episodes or checkpoint rows) and should use a task-stratified cluster-bootstrap method.
+
+
 ## 6. Implementation and synthetic tests
 
 Implementation: `experiments/robodojo-contract/src/episode_safety.rs`, exported as `episode_safety` from the nested crate.
 
-The 15 current synthetic tests cover:
+The 18 current synthetic tests cover:
 1. success and safety are independent (successful-but-unsafe);
 2. failed-but-unsafe is not SBU;
 3. worst violation depth is distinct from binary safety;
@@ -97,7 +104,10 @@ The 15 current synthetic tests cover:
 12. duplicate and unknown spec verdicts reject;
 13. duplicate episode/task-roster mismatch rejects;
 14. invalid normalized severity rejects;
-15. the safety result maps to a selective-risk label without collapsing unknown outcomes.
+15. the safety result maps to a selective-risk label without collapsing unknown outcomes;
+16. matched policy-arm comparison holds context and episode roster fixed;
+17. paired comparison rejects different robot or instrument contexts;
+18. paired comparison preserves unresolved units.
 
 These are contract/aggregation tests, not observed robotics performance.
 
