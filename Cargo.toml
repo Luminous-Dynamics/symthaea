@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "xtask",
-    "tools/vocal-pitch-eval",
     "crates/core/*",
     "crates/domains/*",
     "crates/bridges/*",
