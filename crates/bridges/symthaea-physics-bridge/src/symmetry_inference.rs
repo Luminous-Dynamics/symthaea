@@ -1198,7 +1198,7 @@ fn squared_term(expr: &Expr) -> Option<(String, f64)> {
     match expr {
         Expr::BinOp(BinOp::Pow, base, exp) => {
             if let (Expr::Var(name), Expr::Const(k)) = (base.as_ref(), exp.as_ref())
-                && (*k - 2.0).abs() < 1e-12
+                && *k == 2.0
             {
                 return Some((name.clone(), 1.0));
             }
@@ -1282,6 +1282,34 @@ mod tests {
 
     fn var(name: &str) -> Expr {
         Expr::Var(name.to_string())
+    }
+
+    #[test]
+    fn structural_sum_of_squares_requires_exact_quadratic_exponents() {
+        // An exponent merely close to two is not a quadratic polynomial and
+        // must not receive exact structural-pattern evidence.
+        let exponent = 2.0 + 5e-13;
+        assert_ne!(exponent, 2.0);
+        let nearly_quadratic = add(
+            Expr::BinOp(
+                BinOp::Pow,
+                Box::new(var("x")),
+                Box::new(Expr::Const(exponent)),
+            ),
+            Expr::BinOp(
+                BinOp::Pow,
+                Box::new(var("y")),
+                Box::new(Expr::Const(exponent)),
+            ),
+        );
+        assert!(detect_sum_of_squares(&nearly_quadratic).is_none());
+        let report = infer_symmetry_with_evidence(&nearly_quadratic);
+        assert!(!matches!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares { .. },
+            })
+        ));
     }
 
     #[test]
