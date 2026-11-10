@@ -451,11 +451,11 @@ fn check_trial(case: &Value, f: &mut Findings) {
         .pointer("/sample_completeness_policy/minimum_observed_fraction")
         .and_then(Value::as_f64);
 
-    if minimum_observed_fraction.is_some_and(|v| !(0.0..=1.0).contains(&v)) {
+    if minimum_observed_fraction.is_some_and(|v| v <= 0.0 || v > 1.0) {
         f.push(
             "/trial_evidence/sample_completeness_policy/minimum_observed_fraction",
             "INVALID",
-            "minimum observed sample fraction must be between zero and one",
+            "minimum observed sample fraction must be greater than zero and no greater than one",
         );
     }
 
@@ -637,6 +637,15 @@ fn check_trial(case: &Value, f: &mut Findings) {
                             .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
                         let valid_until = record.get("valid_until").and_then(Value::as_str)
                             .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
+                        let calibration_date = record.get("calibration_date").and_then(Value::as_str)
+                            .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
+                        if matches!((calibration_date, valid_from), (Some(calibrated), Some(from)) if calibrated > from) {
+                            f.push(
+                                record_path.clone(),
+                                "INVALID",
+                                "calibration_date must not be later than valid_from",
+                            );
+                        }
                         match (valid_from, valid_until) {
                             (Some(from), Some(until)) if from <= sample_start && until >= sample_end => {}
                             (Some(from), Some(until)) if from >= until => f.push(
@@ -1169,6 +1178,42 @@ mod tests {
             serde_json::json!(59);
         let schema: Value = serde_json::from_str(MARINE_SCHEMA_V2).expect("v0.2 schema JSON");
         validate_instance(&schema, &fixture, "case", &mut findings);
+        check_trial(&fixture, &mut findings);
+        assert!(findings.invalid);
+    }
+
+    #[test]
+    fn v0_2_coverage_below_policy_is_incomplete_not_a_pass() {
+        let mut findings = Findings::default();
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        fixture["trial_evidence"]["channels"][0]["observed_sample_count"] =
+            serde_json::json!(57);
+        fixture["trial_evidence"]["channels"][0]["missing_sample_count"] =
+            serde_json::json!(3);
+        check_trial(&fixture, &mut findings);
+        assert!(findings.incomplete);
+        assert!(!findings.invalid);
+    }
+
+    #[test]
+    fn v0_2_calibration_instrument_mismatch_is_invalid() {
+        let mut findings = Findings::default();
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        fixture["trial_evidence"]["calibration_records"][0]["instrument_identity"]["revision"] =
+            serde_json::json!("wrong-revision");
+        check_trial(&fixture, &mut findings);
+        assert!(findings.invalid);
+    }
+
+    #[test]
+    fn v0_2_channel_cannot_understate_timebase_uncertainty() {
+        let mut findings = Findings::default();
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        fixture["trial_evidence"]["channels"][0]["time_alignment_uncertainty"]["value"] =
+            serde_json::json!(0.001);
         check_trial(&fixture, &mut findings);
         assert!(findings.invalid);
     }
