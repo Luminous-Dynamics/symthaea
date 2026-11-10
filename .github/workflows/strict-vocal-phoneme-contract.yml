@@ -83,8 +83,19 @@ jobs:
             examples/muse_vocal_release_gate.rs
           if-no-files-found: error
 
-      - name: Format-check standalone pronunciation lattice
-        run: cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
+      - name: Apply pinned rustfmt to standalone pronunciation lattice
+        run: |
+          cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml
+          cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
+
+      - name: Upload canonical pronunciation-plan source
+        uses: actions/upload-artifact@v4
+        with:
+          name: pronunciation-plan-rustfmt-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            tools/pronunciation-plan/src/lib.rs
+            tools/pronunciation-plan/src/main.rs
+          if-no-files-found: error
 
       - name: Resolve pinned pronunciation-plan dependencies
         run: cargo +1.96.0 generate-lockfile --manifest-path tools/pronunciation-plan/Cargo.toml
