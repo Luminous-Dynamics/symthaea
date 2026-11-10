@@ -188,7 +188,7 @@ impl VssiMechanicalEnvironment {
             available_experiments: vec![
                 VssiExperimentSpec {
                     kind: VssiExperimentKind::PassiveObservation,
-                    observation_cost: 0.0,
+                    observation_cost: 0.25,
                     minimum_load: 0.15,
                     maximum_load: 0.15,
                     duration_ticks: 16,
@@ -255,8 +255,9 @@ impl VssiMechanicalEnvironment {
         (self.task.observation_budget - self.spent_observation_cost).max(0.0)
     }
 
-    /// Evaluator-only disposition scoring. Do not expose this method through
-    /// the investigator's environment interface.
+    /// Unit-test oracle only. The independent campaign evaluator must live
+    /// outside the investigator-facing crate/process boundary.
+    #[cfg(test)]
     pub(crate) fn score_disposition(
         &self,
         proposed: VssiDisposition,
@@ -548,6 +549,7 @@ mod tests {
         let task = environment.public_task();
         assert_eq!(task.available_experiments.len(), 3);
         assert_eq!(task.observation_budget, 1.2);
+        assert_eq!(task.available_experiments[0].observation_cost, 0.25);
         assert!(task.available_experiments.iter().all(|spec| {
             spec.observation_cost.is_finite()
                 && spec.observation_cost >= 0.0
@@ -578,6 +580,26 @@ mod tests {
         let rejected = environment.observe_experiment(VssiExperimentKind::AlternatingLoad);
         assert!(matches!(rejected, Err(VssiFixtureError::BudgetExceeded { .. })));
         assert!((environment.spent_observation_cost() - 0.7).abs() < 1e-12);
+    }
+
+    #[test]
+    fn repeated_passive_acquisition_also_consumes_the_budget() {
+        let mut environment = VssiMechanicalEnvironment::new(
+            "vssi-passive-budget-control",
+            VssiFixtureCase::HealthyControl,
+        )
+        .unwrap();
+
+        for _ in 0..4 {
+            environment
+                .observe_experiment(VssiExperimentKind::PassiveObservation)
+                .unwrap();
+        }
+        assert!((environment.spent_observation_cost() - 1.0).abs() < 1e-12);
+
+        let rejected = environment.observe_experiment(VssiExperimentKind::PassiveObservation);
+        assert!(matches!(rejected, Err(VssiFixtureError::BudgetExceeded { .. })));
+        assert!((environment.spent_observation_cost() - 1.0).abs() < 1e-12);
     }
 
     #[test]
