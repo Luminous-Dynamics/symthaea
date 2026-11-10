@@ -1,0 +1,125 @@
+{
+  "fixture_id": "sam.option-preservation.clairvoyance-trap.v0.1",
+  "fixture_status": "synthetic_analytic_conformance_only",
+  "description": "Two hidden successor states produce the same controller-visible observation. Each state has a feasible continuation, but the feasible action differs. The controller therefore has no common next action even though a clairvoyant evaluator sees one action per state.",
+  "manifest_digest_mode": "recompute_blake3_from_input_expected_cells_before_evaluation",
+  "input": {
+    "contract_version": "sam.option-preservation.v0.1",
+    "decision_id": "clairvoyance-trap-decision-001",
+    "scenario_digest": "sha256:synthetic-clairvoyance-trap-scenario-v1",
+    "initial_context_digest": "sha256:synthetic-clairvoyance-trap-initial-context-v1",
+    "current_action_set_digest": "sha256:current-actions-continue-v1",
+    "current_action_ids": [
+      "continue"
+    ],
+    "continuation_action_set_digest": "sha256:continuation-actions-brake-coast-v1",
+    "continuation_action_ids": [
+      "brake",
+      "coast"
+    ],
+    "expected_cell_manifest_digest": "computed-by-fixture-loader",
+    "expected_cells": [
+      {
+        "key": {
+          "parent_action_id": "continue",
+          "observation_class_id": "same-observation",
+          "hidden_state_id": "hidden-a",
+          "reference_id": "analytic-reference-v1"
+        },
+        "observation_equivalence_receipt_digest": "sha256:observation-equivalence-same-v1"
+      },
+      {
+        "key": {
+          "parent_action_id": "continue",
+          "observation_class_id": "same-observation",
+          "hidden_state_id": "hidden-b",
+          "reference_id": "analytic-reference-v1"
+        },
+        "observation_equivalence_receipt_digest": "sha256:observation-equivalence-same-v1"
+      }
+    ],
+    "observed_cells": [
+      {
+        "key": {
+          "parent_action_id": "continue",
+          "observation_class_id": "same-observation",
+          "hidden_state_id": "hidden-a",
+          "reference_id": "analytic-reference-v1"
+        },
+        "observation_equivalence_receipt_digest": "sha256:observation-equivalence-same-v1",
+        "execution_receipt_digest": "sha256:execution-hidden-a-v1",
+        "cell_receipt_digest": "sha256:cell-hidden-a-v1",
+        "continuation_action_set_digest": "sha256:continuation-actions-brake-coast-v1",
+        "evaluator_profile_digest": "sha256:analytic-feasibility-evaluator-v1",
+        "dispositions": {
+          "brake": {
+            "disposition": "feasible",
+            "witness_digest": "sha256:witness-hidden-a-brake"
+          },
+          "coast": {
+            "disposition": "infeasible",
+            "witness_digest": "sha256:witness-hidden-a-coast"
+          }
+        }
+      },
+      {
+        "key": {
+          "parent_action_id": "continue",
+          "observation_class_id": "same-observation",
+          "hidden_state_id": "hidden-b",
+          "reference_id": "analytic-reference-v1"
+        },
+        "observation_equivalence_receipt_digest": "sha256:observation-equivalence-same-v1",
+        "execution_receipt_digest": "sha256:execution-hidden-b-v1",
+        "cell_receipt_digest": "sha256:cell-hidden-b-v1",
+        "continuation_action_set_digest": "sha256:continuation-actions-brake-coast-v1",
+        "evaluator_profile_digest": "sha256:analytic-feasibility-evaluator-v1",
+        "dispositions": {
+          "brake": {
+            "disposition": "infeasible",
+            "witness_digest": "sha256:witness-hidden-b-brake"
+          },
+          "coast": {
+            "disposition": "feasible",
+            "witness_digest": "sha256:witness-hidden-b-coast"
+          }
+        }
+      }
+    ],
+    "evaluator_profile_digest": "sha256:analytic-feasibility-evaluator-v1",
+    "qualifications": {
+      "action_domain": {
+        "status": "qualified",
+        "receipt_digest": "sha256:analytic-action-domain-receipt-v1"
+      },
+      "reference_portfolio": {
+        "status": "qualified",
+        "receipt_digest": "sha256:analytic-reference-portfolio-receipt-v1"
+      },
+      "execution_manifest": {
+        "status": "qualified",
+        "receipt_digest": "sha256:analytic-execution-manifest-receipt-v1"
+      },
+      "observation_partition": {
+        "status": "qualified",
+        "receipt_digest": "sha256:analytic-observation-partition-receipt-v1"
+      }
+    }
+  },
+  "expected": {
+    "parent_action_id": "continue",
+    "status": "no_continuation_for_at_least_one_observation_class",
+    "observation_class_id": "same-observation",
+    "observation_class_status": "no_possible_options",
+    "robust_option_ids": [],
+    "possible_option_ids": [],
+    "clairvoyant_union_option_ids": [
+      "brake",
+      "coast"
+    ],
+    "robust_option_width": 0,
+    "possible_option_width": 0,
+    "clairvoyance_gap": 2
+  },
+  "claim_ceiling": "This fixture validates a finite set-intersection calculation only. It is not a physical safety result, probability, reachability proof, or completeness claim."
+}
