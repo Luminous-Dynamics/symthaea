@@ -58,6 +58,7 @@
 //! they don't fire, keeping the common cases fast and precise.
 
 use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::lie_theory::{self, LieAlgebra};
 
 use crate::types::{LieGroup, SymmetryDescriptor};
@@ -535,7 +536,10 @@ mod tests {
     fn structural_symmetry_report_preserves_pattern_provenance() {
         let expr = add(pow2("x"), pow2("y"));
         let report = infer_symmetry_with_evidence(&expr);
-        assert_eq!(report.candidate.unwrap().lie_groups, vec![LieGroup::SO(2)]);
+        assert_eq!(
+            report.candidate.unwrap().lie_groups,
+            vec![LieGroup::SO(2)]
+        );
         assert_eq!(
             report.evidence,
             Some(SymmetryInferenceEvidence::StructuralPatternMatch {
@@ -553,7 +557,12 @@ mod tests {
         let expr = sqrt_of(add(pow2("x"), pow2("y")));
         let report = infer_symmetry_numeric_with_evidence(&expr);
         assert_eq!(report.candidate.unwrap().lie_groups, vec![LieGroup::SO(2)]);
-        let Some(SymmetryInferenceEvidence::SampledLieDerivative { profile, group, acted_on_variables }) = report.evidence else {
+        let Some(SymmetryInferenceEvidence::SampledLieDerivative {
+            profile,
+            group,
+            acted_on_variables,
+        }) = report.evidence
+        else {
             panic!("numeric fallback must preserve sampled evidence provenance");
         };
         assert_eq!(group, LieGroup::SO(2));
@@ -562,7 +571,10 @@ mod tests {
         assert_eq!(profile.finite_difference_step, 1e-5);
         assert_eq!(profile.sample_min_inclusive, 0.5);
         assert_eq!(profile.sample_max_exclusive, 3.0);
-        assert_eq!(report.search_status, SymmetryInferenceSearchStatus::NumericSearchCompleted);
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::NumericSearchCompleted
+        );
     }
 
     #[test]
