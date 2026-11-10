@@ -4,7 +4,7 @@ A small, inspectable Rust engineering kernel for reduced-order fixed-wing electr
 
 ## First increment
 
-The v0.1 model estimates, for a supplied sequence of steady-flight mission segments:
+The v0.2 crate estimates, for a supplied sequence of steady-flight mission segments:
 
 - all-up mass and MTOW compliance;
 - aerodynamic drag from a declared lift-to-drag ratio;
@@ -13,7 +13,8 @@ The v0.1 model estimates, for a supplied sequence of steady-flight mission segme
 - battery terminal power, current, voltage sag, and I²R heat;
 - a lumped first-order battery thermal response;
 - state-of-charge depletion, state-of-health-adjusted capacity, and protected reserve;
-- an explicit user-configured uncertainty margin.
+- an explicit user-configured uncertainty margin;
+- evidence-bound propulsion efficiency curves with conservative uncertainty bounds and no extrapolation.
 
 It is dependency-free Rust and uses fail-closed errors for invalid inputs, MTOW violations, battery power/current/voltage/temperature limits, and reserve infringement.
 
