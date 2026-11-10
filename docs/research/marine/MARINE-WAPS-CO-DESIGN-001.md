@@ -236,6 +236,31 @@ The counterfactual must use the same service and weather/sea-state realization, 
 
 Report CAPEX, OPEX, replacement, maintenance, fuel/electricity, port infrastructure, financing/discount assumptions, residual value and decommissioning with an explicit price year and lifecycle horizon. Report tank-to-wake and well-to-wake emissions separately. Fuel production pathway and electricity mix are part of the case, not footnotes.
 
+### 5.6 Trial-evidence and measurement-chain contract
+
+A whole-vessel comparison must be traceable from a design case to the physical signals used to judge it. The case schema therefore supports an optional `trial_evidence` block with:
+
+- exact trial and protocol ID/revision;
+- same service fingerprint, paired baseline/candidate case IDs and declared trial stage (bench, model test, sea trial, in-service, published-only, synthetic-only, unknown);
+- each channel's physical quantity, unit, instrument identity/revision, measurement location and sample rate;
+- calibration record and calibration disposition;
+- timebase ID, synchronization method, time-alignment uncertainty, sample window, missing-sample count and raw trace SHA-256;
+- channel uncertainty, provenance, limitations and derived-channel lineage;
+- raw and processed dataset digests, environmental correction method/revision, and explicit excluded intervals/reasons.
+
+**Critical boundary:** a digest proves identity of bytes presented to the workflow, not the sensor's authenticity. Calibration status does not by itself prove calibration traceability. A schema-valid record is not a valid sea trial. The trial protocol must establish measurement locations, sensor range/accuracy, sampling adequacy, synchronization, uncertainty propagation, environmental corrections, exclusion policy and pre-registered analysis. Report missing/invalid channels rather than aggregating around them.
+
+For the first wind-assist validation campaign, prioritize synchronized:
+1. apparent and true wind speed/direction with declared measurement height/location;
+2. rotor/wing/suction device state, RPM/suction power, angle/camber, retraction state and controller commands;
+3. shaft torque/RPM and main-engine fuel mass flow or independently calibrated fuel-energy measurement;
+4. electrical generation, battery SOC/current/voltage/temperature and converter losses;
+5. speed through water and over ground, heading, rudder angle, draft/trim/loading;
+6. wave/current/weather reference channels and route/arrival/cargo-service record;
+7. auxiliary and hotel-load power, plus all wind-device parasitic demand.
+
+The paired candidate and baseline records must be comparable for service, route, loading, environment, sensor calibration and power/fuel boundary. When an exact paired baseline is impossible, the correction/counterfactual model becomes an explicit source of uncertainty and must be independently evaluated. Never present an uncorrected before/after comparison as causal proof.
+
 ## 6. SOTA and industry crosswalk
 
 | Capability | Current benchmark / industry reference | Luminous strategy |
