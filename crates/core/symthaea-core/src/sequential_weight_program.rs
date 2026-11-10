@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::family_noninferiority::{
-    FamilyGuardrailPlan, FamilyGuardrailReport, FamilyGuardrailStatus,
-    validate_family_guardrail_report_for_candidate,
+    FamilyGuardrailObservation, FamilyGuardrailPlan, FamilyGuardrailReport,
+    FamilyGuardrailStatus, validate_family_guardrail_report_for_candidate,
 };
 use crate::sequential_weight_verification::{
     SequentialWeightVerificationError, SequentialWeightVerificationReport,
@@ -190,6 +190,7 @@ pub fn bind_sequential_verification_evidence(
     report: &SequentialWeightVerificationReport,
     family_plan: &FamilyGuardrailPlan,
     family_report: &FamilyGuardrailReport,
+    family_observations: &[FamilyGuardrailObservation],
 ) -> Result<SequentialVerifierEvidenceBinding, SequentialWeightProgramError> {
     validate_qualified_report(report)?;
     validate_digest(candidate_native_model_digest)?;
@@ -230,9 +231,10 @@ pub fn bind_sequential_verification_evidence(
     };
     validate_family_guardrail_report_for_candidate(
         family_report,
+        family_plan,
+        family_observations,
         &expected_family_binding,
         report.binding.candidate_index,
-        family_plan.plan_digest(),
     )
     .map_err(|_| SequentialWeightProgramError::FamilyGuardrailEvidenceMismatch)?;
 
@@ -905,6 +907,7 @@ mod tests {
 
         let mut report = verifier.report().expect("initial statistical report");
         let mut family_report = family_gate.report().expect("initial family report");
+        let mut family_observations = Vec::new();
         for index in 0..600 {
             let baseline_loss = 0.9;
             let candidate_loss = 0.5;
@@ -915,13 +918,15 @@ mod tests {
                     candidate_loss,
                 })
                 .expect("paired confirmatory observation");
+            let family_observation = FamilyGuardrailObservation {
+                episode_id: format!("confirmatory-{index}"),
+                family_id: "all-protected-tasks".to_owned(),
+                baseline_loss,
+                candidate_loss,
+            };
+            family_observations.push(family_observation.clone());
             family_report = family_gate
-                .observe(FamilyGuardrailObservation {
-                    episode_id: format!("confirmatory-{index}"),
-                    family_id: "all-protected-tasks".to_owned(),
-                    baseline_loss,
-                    candidate_loss,
-                })
+                .observe(family_observation)
                 .expect("paired family guardrail observation");
             if report.status == crate::sequential_weight_verification::SequentialWeightVerificationStatus::BenefitEstablished
                 && family_report.status == crate::family_noninferiority::FamilyGuardrailStatus::AllFamiliesNonInferior
@@ -939,6 +944,7 @@ mod tests {
             &report,
             &family_plan,
             &family_report,
+            &family_observations,
         )
         .expect("statistical and family reports bound to sequential edit candidate")
     }
