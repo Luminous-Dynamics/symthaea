@@ -23,6 +23,8 @@ struct ReliabilityBin {
 #[derive(Debug, Clone, PartialEq)]
 struct CalibrationMetrics {
     sample_count: usize,
+    independent_group_count: usize,
+    uncertainty_interval_status: &'static str,
     brier_score: f64,
     log_loss: f64,
     ece_equal_width: f64,
@@ -328,38 +330,100 @@ fn calculate_metrics(bundle: &Value) -> Option<CalibrationMetrics> {
     for index in 0..ECE_BINS {
         let lower = index as f64 / ECE_BINS as f64;
         let upper = (index + 1) as f64 / ECE_BINS as f64;
-        let members: Vec<(f64, f64)> = pairs.iter().copied()
-            .filter(|(p, _)| {
-                let bucket = ((*p * ECE_BINS as f64).floor() as usize).min(ECE_BINS - 1);
+        let members: Vec<(f64, f64)> = pairs
+            .iter()
+            .copied()
+            .filter(|(probability, _)| {
+                let bucket = ((*probability * ECE_BINS as f64).floor() as usize)
+                    .min(ECE_BINS - 1);
                 bucket == index
-            }).collect();
-        if members.is_empty() { continue; }
+            })
+            .collect();
+        if members.is_empty() {
+            continue;
+        }
         let count = members.len();
-        let mean_probability = members.iter().map(|(p, _)| *p).sum::<f64>() / count as f64;
-        let observed_frequency = members.iter().map(|(_, y)| *y).sum::<f64>() / count as f64;
+        let mean_probability =
+            members.iter().map(|(probability, _)| *probability).sum::<f64>() / count as f64;
+        let observed_frequency =
+            members.iter().map(|(_, outcome)| *outcome).sum::<f64>() / count as f64;
         ece += (count as f64 / n) * (mean_probability - observed_frequency).abs();
-        bins.push(ReliabilityBin { lower, upper, count, mean_probability, observed_frequency });
+        bins.push(ReliabilityBin {
+            lower,
+            upper,
+            count,
+            mean_probability,
+            observed_frequency,
+        });
     }
 
+    // Equal-confidence observations are a single ranking block. Fractional
+    // inclusion within a tie uses that block's empirical error rate, so row
+    // order cannot alter risk@coverage or AURC.
     let mut ranked = pairs.clone();
-    ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
-    let mut errors = 0.0;
+    ranked.sort_by(|left, right| right.0.total_cmp(&left.0));
+    let mut tie_groups: Vec<(f64, usize, f64)> = Vec::new();
+    for (probability, outcome) in ranked {
+        if let Some((last_probability, count, error_rate)) = tie_groups.last_mut() {
+            if *last_probability == probability {
+                let errors_before = *error_rate * *count as f64;
+                *count += 1;
+                *error_rate = (errors_before + (1.0 - outcome)) / *count as f64;
+                continue;
+            }
+        }
+        tie_groups.push((probability, 1, 1.0 - outcome));
+    }
+
+    let mut observations_before = 0usize;
+    let mut errors_before = 0.0;
     let mut cumulative_risk_sum = 0.0;
-    for (index, (_, y)) in ranked.iter().enumerate() {
-        errors += 1.0 - *y;
-        cumulative_risk_sum += errors / (index + 1) as f64;
+    for (_, group_count, group_error_rate) in &tie_groups {
+        for included_from_tie in 1..=*group_count {
+            let expected_tie_errors = *group_error_rate * included_from_tie as f64;
+            let included = observations_before as f64 + included_from_tie as f64;
+            let risk = (errors_before + expected_tie_errors) / included;
+            cumulative_risk_sum += risk;
+        }
+        errors_before += *group_error_rate * *group_count as f64;
+        observations_before += *group_count;
     }
     let aurc = cumulative_risk_sum / n;
 
     let mut risk_at_coverage = Vec::new();
     for coverage in [0.25, 0.50, 0.75, 1.00] {
-        let count = ((coverage * n).ceil() as usize).clamp(1, ranked.len());
-        let risk = ranked[..count].iter().map(|(_, y)| 1.0 - *y).sum::<f64>() / count as f64;
-        risk_at_coverage.push((coverage, risk));
+        let target_count = coverage * n;
+        let mut included = 0.0;
+        let mut expected_errors = 0.0;
+        for (_, group_count, group_error_rate) in &tie_groups {
+            let available = *group_count as f64;
+            let take = (target_count - included).clamp(0.0, available);
+            expected_errors += take * *group_error_rate;
+            included += take;
+            if included >= target_count {
+                break;
+            }
+        }
+        if included <= 0.0 {
+            return None;
+        }
+        risk_at_coverage.push((coverage, expected_errors / included));
     }
+
+    let independent_group_count = bundle["observations"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|row| row["task_group_id"].as_str())
+        .collect::<BTreeSet<_>>()
+        .len();
 
     Some(CalibrationMetrics {
         sample_count: rows.len(),
+        independent_group_count,
+        // The two-group synthetic fixture is not enough to justify a cluster
+        // uncertainty interval. Confirmatory studies must preregister this.
+        uncertainty_interval_status: "NotEstimated",
         brier_score: brier,
         log_loss,
         ece_equal_width: ece,
@@ -436,9 +500,14 @@ fn main() -> ExitCode {
         eprintln!("metrics are unavailable");
         return ExitCode::FAILURE;
     };
-    println!("QUALIFIED STRUCTURAL CONFIDENCE EVALUATOR: n={}", metrics.sample_count);
     println!(
-        "Brier={:.8} log_loss={:.8} ECE10={:.8} AURC={:.8}",
+        "QUALIFIED STRUCTURAL CONFIDENCE EVALUATOR: n={} independent_groups={} uncertainty_interval={}",
+        metrics.sample_count,
+        metrics.independent_group_count,
+        metrics.uncertainty_interval_status
+    );
+    println!(
+        "Brier={:.8} log_loss={:.8} ECE10={:.8} tie_aware_AURC={:.8}",
         metrics.brier_score, metrics.log_loss, metrics.ece_equal_width, metrics.aurc
     );
     for (coverage, risk) in metrics.risk_at_coverage {
@@ -476,6 +545,32 @@ mod tests {
         assert!(metrics.ece_equal_width.abs() < 1e-12);
         assert!((metrics.log_loss - 0.5004024235381879).abs() < 1e-12);
         assert_eq!(metrics.reliability_bins.len(), 2);
+    }
+
+    #[test]
+    fn tied_confidence_risk_metrics_are_invariant_to_row_order() {
+        let original = parsed(BUNDLE);
+        let mut reordered = original.clone();
+        reordered["observations"].as_array_mut().unwrap().reverse();
+        let original_metrics = calculate_metrics(&original).unwrap();
+        let reordered_metrics = calculate_metrics(&reordered).unwrap();
+        assert!((original_metrics.aurc - reordered_metrics.aurc).abs() < 1e-12);
+        assert_eq!(original_metrics.risk_at_coverage.len(), reordered_metrics.risk_at_coverage.len());
+        for (left, right) in original_metrics
+            .risk_at_coverage
+            .iter()
+            .zip(reordered_metrics.risk_at_coverage.iter())
+        {
+            assert!((left.0 - right.0).abs() < 1e-12);
+            assert!((left.1 - right.1).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn cluster_uncertainty_is_not_claimed_from_two_synthetic_groups() {
+        let metrics = calculate_metrics(&parsed(BUNDLE)).unwrap();
+        assert_eq!(metrics.independent_group_count, 2);
+        assert_eq!(metrics.uncertainty_interval_status, "NotEstimated");
     }
 
     #[test]
