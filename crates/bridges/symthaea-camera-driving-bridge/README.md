@@ -19,6 +19,7 @@ It deliberately does not call `VehicleController`, command an actuator, or claim
 - Input channels are grayscale (1), RGB (3) or RGBA (4).
 - Frame dimensions, byte lengths and maximum allocation are checked before mutation.
 - Capture timestamps, capture sequence numbers and vehicle-state timestamps must each strictly increase.
+- The upstream renderer's RGB8 sRGB observation identity and receipt SHA-256 are recomputed and checked against the actual pixel bytes and policy-visible metadata before any temporal state advances.
 - Camera/vehicle timestamp skew is bounded.
 - The first timestep is supplied as a configuration constant; subsequent timesteps are derived from capture timestamps.
 - A configured maximum inter-frame gap and maximum camera/vehicle timestamp skew are enforced.
@@ -81,7 +82,7 @@ cargo run --locked \
   episode-request.json receipts-output.json policy-inputs/
 ```
 
-The request schema is `schemas/episode-request-v1.schema.json`. Each observation references an RGB pixel artifact by a path relative to the request file. The CLI rejects absolute paths, parent-directory traversal and symlinks that resolve outside the request directory. It checks the source pixel digest against the upstream Symtropy policy receipt before advancing the Vision Manifold.
+The request schema is `schemas/episode-request-v1.schema.json`; the emitted fused receipt schema is `schemas/driving-observation-receipt-v1.schema.json`. Each observation references an RGB pixel artifact by a path relative to the request file. The CLI rejects absolute paths, parent-directory traversal and symlinks that resolve outside the request directory. It checks the source pixel digest against the upstream Symtropy policy receipt before advancing the Vision Manifold.
 
 The CLI writes:
 - one serialized `DrivingObservationReceipt` per delivered observation;
@@ -89,7 +90,7 @@ The CLI writes:
 - one binary HDC policy-input artifact per sequence under the requested output directory;
 - artifact metadata with sequence, dimension, byte length and SHA-256.
 
-The HDC artifact format is an 8-byte unsigned little-endian dimension followed by 16,384 little-endian IEEE-754 f32 components. The binary file hash uses the same dimension-prefixed representation as the bridge receipt's `fused_policy_input_sha256`. The CLI checks the two digests match before writing a successful result.
+The HDC artifact format is an 8-byte unsigned little-endian dimension followed by 16,384 little-endian IEEE-754 f32 components. The binary file hash uses the same dimension-prefixed representation as the bridge receipt's `fused_policy_input_sha256`. The CLI checks the two digests match before writing a successful result. The receipt itself also carries the upstream observation ID, upstream policy-receipt SHA-256, action receipt identity, camera calibration digest and renderer revision.
 
 Only delivered frames are passed through this bridge. Missing/dropped/stale observation events must remain in the episode stream and denominator; they are not replaced or synthesized by the CLI. A successful bridge receipt does not authorize a controller or actuator.
 
