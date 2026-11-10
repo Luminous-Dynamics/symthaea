@@ -1283,6 +1283,16 @@ mod tests {
         }
         let reversed = serde_json::to_vec(&value).expect("reversed corpus");
         let replay = audit_corpus(SCHEMA, &reversed).expect("permuted corpus");
+        assert_eq!(
+            original.payload.canonical_corpus_sha256,
+            replay.payload.canonical_corpus_sha256,
+            "canonical input identity must ignore corpus and unit order"
+        );
+        assert_eq!(
+            serde_json::to_value(&original.payload).unwrap(),
+            serde_json::to_value(&replay.payload).unwrap(),
+            "canonicalized report payload must ignore evidence row order"
+        );
         assert_eq!(original.report_sha256, replay.report_sha256);
     }
 }
