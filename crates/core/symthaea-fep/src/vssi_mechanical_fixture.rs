@@ -113,6 +113,8 @@ pub struct VssiPublicTask {
     pub nominal_parameters: VssiMechanicalParameters,
     pub initial_observations: Vec<VssiObservation>,
     pub available_experiments: Vec<VssiExperimentSpec>,
+    /// Maximum cumulative cost of investigations in abstract fixture units.
+    pub observation_budget: f64,
     /// Declared correlated sensor-noise covariance for the synthetic fixture.
     /// It is a model input, not an empirical calibration claim.
     pub observation_covariance: [[f64; 2]; 2],
@@ -135,6 +137,7 @@ struct HiddenMechanism {
 pub struct VssiMechanicalEnvironment {
     task: VssiPublicTask,
     hidden: HiddenMechanism,
+    spent_observation_cost: f64,
 }
 
 /// A disposition score intended only for the independent benchmark evaluator.
@@ -151,6 +154,10 @@ pub enum VssiFixtureError {
     EmptyScenarioId,
     #[error("synthetic trajectory became non-finite at tick {tick}")]
     NonFiniteTrajectory { tick: u8 },
+    #[error("experiment {kind:?} is not registered for this task")]
+    UnregisteredExperiment { kind: VssiExperimentKind },
+    #[error("experiment cost {requested} exceeds remaining budget {remaining}")]
+    BudgetExceeded { remaining: f64, requested: f64 },
 }
 
 impl VssiMechanicalEnvironment {
@@ -201,10 +208,11 @@ impl VssiMechanicalEnvironment {
                     duration_ticks: 16,
                 },
             ],
+            observation_budget: 1.2,
             observation_covariance: [[0.04, 0.028], [0.028, 0.05]],
         };
 
-        Ok(Self { task, hidden })
+        Ok(Self { task, hidden, spent_observation_cost: 0.0 })
     }
 
     /// Return the investigator-visible task envelope.
@@ -218,15 +226,33 @@ impl VssiMechanicalEnvironment {
     /// a protocol identifier and receives observations, not hidden state,
     /// fault labels or simulator parameters.
     pub fn observe_experiment(
-        &self,
+        &mut self,
         kind: VssiExperimentKind,
     ) -> Result<Vec<VssiObservation>, VssiFixtureError> {
-        if !self.task.available_experiments.iter().any(|spec| spec.kind == kind) {
-            // All current enum variants are registered. Keep the check here so
-            // a future experiment cannot silently bypass the task catalog.
-            return Err(VssiFixtureError::EmptyScenarioId);
+        let spec = self.task.available_experiments.iter()
+            .find(|spec| spec.kind == kind)
+            .copied()
+            .ok_or(VssiFixtureError::UnregisteredExperiment { kind })?;
+        let remaining = self.remaining_observation_budget();
+        if spec.observation_cost > remaining + 1e-12 {
+            return Err(VssiFixtureError::BudgetExceeded {
+                remaining,
+                requested: spec.observation_cost,
+            });
         }
-        simulate(&self.hidden, kind)
+        let observations = simulate(&self.hidden, kind)?;
+        self.spent_observation_cost += spec.observation_cost;
+        Ok(observations)
+    }
+
+    /// Cumulative abstract experiment cost consumed by this environment.
+    pub fn spent_observation_cost(&self) -> f64 {
+        self.spent_observation_cost
+    }
+
+    /// Remaining abstract experiment budget.
+    pub fn remaining_observation_budget(&self) -> f64 {
+        (self.task.observation_budget - self.spent_observation_cost).max(0.0)
     }
 
     /// Evaluator-only disposition scoring. Do not expose this method through
@@ -451,31 +477,40 @@ mod tests {
 
     #[test]
     fn investigation_protocols_produce_distinct_reproducible_traces() {
-        let environment = VssiMechanicalEnvironment::new(
-            "vssi-investigation-control",
+        let mut pulse_environment = VssiMechanicalEnvironment::new(
+            "vssi-investigation-pulse-control",
             VssiFixtureCase::ParameterFault,
         )
         .unwrap();
-
-        let pulse = environment
+        let pulse = pulse_environment
             .observe_experiment(VssiExperimentKind::ThermalImpulse)
             .unwrap();
-        let alternating = environment
+
+        let mut pulse_replay_environment = VssiMechanicalEnvironment::new(
+            "vssi-investigation-pulse-replay-control",
+            VssiFixtureCase::ParameterFault,
+        )
+        .unwrap();
+        let pulse_replay = pulse_replay_environment
+            .observe_experiment(VssiExperimentKind::ThermalImpulse)
+            .unwrap();
+
+        let mut alternating_environment = VssiMechanicalEnvironment::new(
+            "vssi-investigation-alternating-control",
+            VssiFixtureCase::ParameterFault,
+        )
+        .unwrap();
+        let alternating = alternating_environment
             .observe_experiment(VssiExperimentKind::AlternatingLoad)
             .unwrap();
 
-        assert_eq!(
-            pulse,
-            environment
-                .observe_experiment(VssiExperimentKind::ThermalImpulse)
-                .unwrap()
-        );
+        assert_eq!(pulse, pulse_replay);
         assert_ne!(pulse, alternating);
     }
 
     #[test]
     fn observations_keep_event_time_acquisition_time_and_missingness_separate() {
-        let environment = VssiMechanicalEnvironment::new(
+        let mut environment = VssiMechanicalEnvironment::new(
             "vssi-irregular-observation-control",
             VssiFixtureCase::HealthyControl,
         )
@@ -512,6 +547,7 @@ mod tests {
 
         let task = environment.public_task();
         assert_eq!(task.available_experiments.len(), 3);
+        assert_eq!(task.observation_budget, 1.2);
         assert!(task.available_experiments.iter().all(|spec| {
             spec.observation_cost.is_finite()
                 && spec.observation_cost >= 0.0
@@ -523,6 +559,25 @@ mod tests {
             task.observation_covariance[0][1],
             task.observation_covariance[1][0]
         );
+    }
+
+    #[test]
+    fn experiment_budget_is_enforced_before_observations_are_released() {
+        let mut environment = VssiMechanicalEnvironment::new(
+            "vssi-budget-enforcement-control",
+            VssiFixtureCase::HealthyControl,
+        )
+        .unwrap();
+
+        environment
+            .observe_experiment(VssiExperimentKind::ThermalImpulse)
+            .unwrap();
+        assert!((environment.spent_observation_cost() - 0.7).abs() < 1e-12);
+        assert!((environment.remaining_observation_budget() - 0.5).abs() < 1e-12);
+
+        let rejected = environment.observe_experiment(VssiExperimentKind::AlternatingLoad);
+        assert!(matches!(rejected, Err(VssiFixtureError::BudgetExceeded { .. })));
+        assert!((environment.spent_observation_cost() - 0.7).abs() < 1e-12);
     }
 
     #[test]
