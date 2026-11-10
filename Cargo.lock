@@ -19594,6 +19594,7 @@ name = "symthaea-physics-bridge"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blake3",
  "nalgebra 0.34.2",
  "serde",
  "serde_json",
