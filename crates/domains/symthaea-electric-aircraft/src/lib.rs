@@ -197,13 +197,11 @@ pub fn evaluate_mission(input: &MissionInput) -> Result<MissionReport, ModelErro
             return Err(ModelError::InvalidMission("computed segment power overflowed"));
         }
 
-        let max_physical_power_w = battery_power_limit_w(battery);
-        let maximum_power_w = battery.maximum_continuous_power_w.min(max_physical_power_w);
-        if battery_power_w > maximum_power_w + 1e-9 {
+        if battery_power_w > battery.maximum_continuous_power_w + 1e-9 {
             return Err(ModelError::BatteryPowerLimitExceeded {
                 segment_id: segment.id.clone(),
                 requested_w: battery_power_w,
-                maximum_w: maximum_power_w,
+                maximum_w: battery.maximum_continuous_power_w,
             });
         }
 
@@ -316,18 +314,6 @@ pub fn evaluate_mission(input: &MissionInput) -> Result<MissionReport, ModelErro
         final_state_of_charge: soc,
         segments: results,
     })
-}
-
-fn battery_power_limit_w(battery: &BatteryConfig) -> f64 {
-    let current_limit = battery.maximum_continuous_current_a;
-    let resistance = battery.internal_resistance_ohm;
-    let voltage = battery.nominal_open_circuit_voltage_v;
-    let physical_current_limit = if resistance > 0.0 {
-        (voltage / (2.0 * resistance)).min(current_limit)
-    } else {
-        current_limit
-    };
-    physical_current_limit * (voltage - physical_current_limit * resistance)
 }
 
 fn current_for_terminal_power(
@@ -561,6 +547,26 @@ mod tests {
         assert!(matches!(
             evaluate_mission(&input),
             Err(ModelError::BatteryPowerLimitExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn battery_current_limit_is_enforced_independently() {
+        let mut input = baseline();
+        input.battery.maximum_continuous_current_a = 100.0;
+        assert!(matches!(
+            evaluate_mission(&input),
+            Err(ModelError::BatteryCurrentLimitExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn infeasible_terminal_power_causes_voltage_collapse() {
+        let mut input = baseline();
+        input.battery.internal_resistance_ohm = 1.0;
+        assert!(matches!(
+            evaluate_mission(&input),
+            Err(ModelError::BatteryVoltageCollapse { .. })
         ));
     }
 
