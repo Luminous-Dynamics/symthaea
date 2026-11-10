@@ -1095,16 +1095,12 @@ fn is_lie_invariant(
                 flow[vi] = acc;
             }
 
-            let lie: f64 = grad.iter().zip(flow.iter()).map(|(g, f)| g * f).sum();
-            if !lie.is_finite() {
-                return None;
-            }
-
-            // Normalize by both vector norms. The prior |L_A f|² / ||grad f||²
-            // metric scaled with the arbitrary amplitude of f and could accept
-            // an anisotropic expression merely by multiplying it by a small
-            // constant. hypot avoids unnecessary overflow/underflow in the
-            // norm accumulation; sequential division avoids forming the product.
+            // Normalize both vectors before taking their dot product. The prior
+            // |L_A f|² / ||grad f||² metric scaled with the arbitrary amplitude of
+            // f and could accept an anisotropic expression merely by multiplying
+            // it by a small constant. hypot keeps norm accumulation stable; the
+            // normalized dot product avoids forming an unscaled Lie derivative
+            // or multiplying the two norms.
             let gradient_norm = active_indices
                 .iter()
                 .fold(0.0_f64, |norm, &vi| norm.hypot(grad[vi]));
@@ -1118,7 +1114,13 @@ fn is_lie_invariant(
                 continue;
             }
 
-            let normalized_directional_derivative = (lie / gradient_norm) / flow_norm;
+            let normalized_directional_derivative: f64 = active_indices
+                .iter()
+                .map(|&vi| (grad[vi] / gradient_norm) * (flow[vi] / flow_norm))
+                .sum();
+            if !normalized_directional_derivative.is_finite() {
+                return None;
+            }
             let normalized_squared_residual =
                 normalized_directional_derivative * normalized_directional_derivative;
             if !normalized_squared_residual.is_finite()
@@ -1343,8 +1345,8 @@ mod tests {
         // Exercise the numeric lane directly. A nonzero scalar changes the
         // expression amplitude, not its symmetry group.
         let radial = add(pow2("x"), pow2("y"));
-        let scaled_radial = mul(Expr::Const(5e-4), radial.clone());
         let radial_report = infer_symmetry_numeric_with_evidence(&radial);
+        let scaled_radial = mul(Expr::Const(5e-200), radial.clone());
         let scaled_radial_report = infer_symmetry_numeric_with_evidence(&scaled_radial);
         assert_eq!(
             radial_report.candidate.as_ref().map(|candidate| candidate.lie_groups.clone()),
@@ -1359,14 +1361,18 @@ mod tests {
         // gradient-only normalization, this 5e-4 rescaling reduced the sampled
         // residual below tolerance and produced a false SO(2) candidate.
         let anisotropic = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
-        let scaled_anisotropic = mul(Expr::Const(5e-4), anisotropic.clone());
         let anisotropic_report = infer_symmetry_numeric_with_evidence(&anisotropic);
-        let scaled_anisotropic_report =
-            infer_symmetry_numeric_with_evidence(&scaled_anisotropic);
         assert!(anisotropic_report.candidate.is_none());
-        assert!(scaled_anisotropic_report.candidate.is_none());
         assert!(anisotropic_report.evidence.is_none());
-        assert!(scaled_anisotropic_report.evidence.is_none());
+        for scale in [5e-4, 5e-200, 5e200] {
+            let scaled_anisotropic = mul(Expr::Const(scale), anisotropic.clone());
+            let scaled_report = infer_symmetry_numeric_with_evidence(&scaled_anisotropic);
+            assert!(
+                scaled_report.candidate.is_none(),
+                "anisotropic expression was falsely accepted at scale {scale}"
+            );
+            assert!(scaled_report.evidence.is_none());
+        }
     }
 
     #[test]
