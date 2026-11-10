@@ -118,6 +118,10 @@ path = "examples/hlb_fep_wsp_factorial_contract.rs"
 name = "hlb_structured_mixer_benchmark"
 path = "examples/hlb_structured_mixer_benchmark.rs"
 
+[[example]]
+name = "hlb_family_noninferiority_guardrails"
+path = "examples/hlb_family_noninferiority_guardrails.rs"
+
 # scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
 [[example]]
 name = "scaling_study_demo"

@@ -2,7 +2,7 @@ name: HLB FEP-WSP Factorial Contract
 
 on:
   pull_request:
-    branches: [main, research/swi-001-weight-space-introspection]
+    branches: [main, research/swi-001-weight-space-introspection, research/hlb-fep-wsp-factorial-v2]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
@@ -43,12 +43,14 @@ on:
       - "crates/core/symthaea-core/src/weight_space_program.rs"
       - "crates/core/symthaea-core/src/sequential_weight_program.rs"
       - "crates/core/symthaea-core/src/sequential_weight_verification.rs"
+      - "crates/core/symthaea-core/src/family_noninferiority.rs"
+      - "crates/core/symthaea-core/examples/hlb_family_noninferiority_guardrails.rs"
       - "crates/core/symthaea-fep/src/open_world_weight_program_gate.rs"
       - "src/dynamics/cfc/weight_program_adapter.rs"
       - "src/dynamics/cfc/mod.rs"
       - "src/dynamics/cfc/network.rs"
   push:
-    branches: [research/hlb-fep-wsp-factorial-v2]
+    branches: [research/hlb-fep-wsp-factorial-v2, research/hlb-family-noninferiority-guardrails-v0]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - ".github/scripts/assert-hlb-test-discovery.sh"
@@ -151,6 +153,8 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/weight_space_program.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/sequential_weight_program.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/sequential_weight_verification.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/family_noninferiority.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_family_noninferiority_guardrails.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/weight_program_adapter.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs crates/core/symthaea-fep/src/gaussian_model_information_gain.rs
@@ -208,6 +212,7 @@ jobs:
           cargo test --locked --release -p symthaea-core --lib weight_space_program::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --lib sequential_weight_program::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --lib sequential_weight_verification::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --lib family_noninferiority::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib open_world_weight_program_gate::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib decision_relevant_information::tests -- --nocapture
@@ -235,6 +240,27 @@ jobs:
           cargo test --locked --release -p symthaea-core --lib hdc::structured_mixer::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_structured_mixer_benchmark -- --nocapture
 
+
+      - name: Run exact-head family non-inferiority known answers
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-core --example hlb_family_noninferiority_guardrails > research-results/hlb-family-noninferiority-known-answers.json
+          jq -e --arg source_sha "$SYMTHAEA_SOURCE_SHA" '
+            .schema_version == "hlb-family-noninferiority-known-answers-v1" and
+            .status == "synthetic_known_answer_fixture_only" and
+            .source_sha == $source_sha and
+            .campaign_alpha == 0.05 and
+            .candidate_ordinal == 1 and
+            .simultaneous_family_bounds == true and
+            (.cases | length == 3) and
+            .cases[0].status == "AllFamiliesNonInferior" and
+            .cases[1].status == "RegressionDetected" and
+            .cases[2].status == "InconclusiveAtBudget"
+          ' research-results/hlb-family-noninferiority-known-answers.json >/dev/null
+          cat research-results/hlb-family-noninferiority-known-answers.json
 
       - name: Run decision-focused diagnostic policy benchmark
         env:
