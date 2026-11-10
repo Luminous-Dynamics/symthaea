@@ -79,6 +79,7 @@ pub(crate) struct SceneTrackReceipt {
     position_x_m: f64,
     position_y_m: f64,
     velocity_x_mps: f64,
+    extent_width_m: f64,
     distance_uncertainty_radius_m: f64,
     association: SceneAssociationState,
     state: SceneTrackState,
@@ -230,6 +231,8 @@ pub struct AdmittedLocalFollowTarget {
     gap_lower_bound_m: f64,
     relative_speed_mps: f64,
     distance_uncertainty_radius_m: f64,
+    evaluated_at_s: f64,
+    max_age_s: f64,
 }
 
 impl AdmittedLocalFollowTarget {
@@ -301,6 +304,14 @@ impl AdmittedLocalFollowTarget {
         self.relative_speed_mps
     }
 
+    pub fn evaluated_at_s(&self) -> f64 {
+        self.evaluated_at_s
+    }
+
+    pub fn max_age_s(&self) -> f64 {
+        self.max_age_s
+    }
+
     /// This is the radius supplied by the upstream admitted uncertainty calculation. It is
     /// not independently promoted here into a calibrated probability or deterministic bound.
     pub fn distance_uncertainty_radius_m(&self) -> f64 {
@@ -362,12 +373,12 @@ pub(crate) fn admit_local_follow_target(
         return Err(FollowEvidenceError::InvalidNumericValue);
     }
 
-    let age_ns = receipt
+    let snapshot_age_ns = receipt
         .evaluated_at_tick_ns
         .checked_sub(receipt.event_tick_ns)
         .ok_or(FollowEvidenceError::StaleOrFutureObservation)?;
-    let observation_age_s = age_ns as f64 / 1_000_000_000.0;
-    if !observation_age_s.is_finite() || observation_age_s > max_age_s {
+    let snapshot_age_s = snapshot_age_ns as f64 / 1_000_000_000.0;
+    if !snapshot_age_s.is_finite() || snapshot_age_s > max_age_s {
         return Err(FollowEvidenceError::StaleOrFutureObservation);
     }
 
@@ -378,7 +389,7 @@ pub(crate) fn admit_local_follow_target(
     for source in &receipt.sources {
         if source.source_id.is_empty()
             || source.source_event_id.is_empty()
-            || source.clock_transform_id.is_empty()
+            || source.clock_transform_id != receipt.clock_transform_id
             || source.calibration_profile_id.is_empty()
             || source.extrinsic_profile_id.is_empty()
             || source.frame_id != receipt.frame_id
@@ -401,8 +412,10 @@ pub(crate) fn admit_local_follow_target(
         .filter(|track| {
             track.reference_frame_id == receipt.frame_id
                 && track.position_x_m > receipt.ego_position_x_m
-                && track.position_y_m >= receipt.lane_min_y_m
-                && track.position_y_m <= receipt.lane_max_y_m
+                && track.extent_width_m.is_finite()
+                && track.extent_width_m >= 0.0
+                && track.position_y_m - track.extent_width_m / 2.0 >= receipt.lane_min_y_m
+                && track.position_y_m + track.extent_width_m / 2.0 <= receipt.lane_max_y_m
         })
         .collect();
     candidates.sort_by(|left, right| {
@@ -424,28 +437,32 @@ pub(crate) fn admit_local_follow_target(
         || target.track_lineage_id.is_empty()
         || target.source_ids.is_empty()
         || target.measurement_tick_ns > receipt.event_tick_ns
-        || receipt
-            .evaluated_at_tick_ns
-            .saturating_sub(target.measurement_tick_ns)
-            > age_ns
+        || target.measurement_tick_ns > receipt.evaluated_at_tick_ns
         || !target.position_x_m.is_finite()
         || !target.position_y_m.is_finite()
         || !target.velocity_x_mps.is_finite()
+        || !target.extent_width_m.is_finite()
+        || target.extent_width_m < 0.0
         || target.uncertainty_semantics_id.is_empty()
         || !target.distance_uncertainty_radius_m.is_finite()
         || target.distance_uncertainty_radius_m < 0.0
     {
         return Err(FollowEvidenceError::SceneAdmissionRejected);
     }
-    if target
-        .source_ids
-        .iter()
-        .any(|source_id| !source_ids.contains(source_id.as_str()))
-    {
+    let mut unique_target_sources = BTreeSet::new();
+    if target.source_ids.iter().any(|source_id| {
+        !source_ids.contains(source_id.as_str()) || !unique_target_sources.insert(source_id.as_str())
+    }) {
         return Err(FollowEvidenceError::MissingProvenance);
     }
     if target.distance_uncertainty_radius_m > max_uncertainty_m {
         return Err(FollowEvidenceError::ExcessiveDistanceErrorBound);
+    }
+
+    let target_age_ns = receipt.evaluated_at_tick_ns - target.measurement_tick_ns;
+    let observation_age_s = target_age_ns as f64 / 1_000_000_000.0;
+    if !observation_age_s.is_finite() || observation_age_s > max_age_s {
+        return Err(FollowEvidenceError::StaleOrFutureObservation);
     }
 
     let gap_m = target.position_x_m - receipt.ego_position_x_m;
@@ -473,6 +490,8 @@ pub(crate) fn admit_local_follow_target(
         gap_lower_bound_m: (gap_m - target.distance_uncertainty_radius_m).max(0.0),
         relative_speed_mps,
         distance_uncertainty_radius_m: target.distance_uncertainty_radius_m,
+        evaluated_at_s: receipt.evaluated_at_tick_ns as f64 / 1_000_000_000.0,
+        max_age_s,
     })
 }
 
@@ -491,6 +510,10 @@ pub fn pd_cruise_with_admitted_local_target(
         || target_gap < 0.0
         || !target.gap_lower_bound_m.is_finite()
         || !target.relative_speed_mps.is_finite()
+        || !state.timestamp.is_finite()
+        || !target.evaluated_at_s.is_finite()
+        || state.timestamp < target.evaluated_at_s
+        || state.timestamp - target.evaluated_at_s > target.max_age_s
     {
         return Err(FollowEvidenceError::InvalidNumericValue);
     }
@@ -551,6 +574,7 @@ mod tests {
                 position_x_m: 15.0,
                 position_y_m: 0.2,
                 velocity_x_mps: 3.0,
+                extent_width_m: 1.0,
                 distance_uncertainty_radius_m: 2.0,
                 association: SceneAssociationState::Confirmed,
                 state: SceneTrackState::Observed,
@@ -582,6 +606,11 @@ mod tests {
         assert_eq!(admitted.track_hypothesis_id(), "hyp-1");
         assert_eq!(admitted.track_lineage_id(), "track-1");
         assert_eq!(admitted.scene_digest(), [0x11; 32]);
+        assert_eq!(admitted.schema_version(), "0.1.0");
+        assert_eq!(admitted.frame_transform_id(), "map-to-road-local-v1");
+        assert_eq!(admitted.clock_domain_id(), "vehicle-monotonic");
+        assert_eq!(admitted.clock_transform_id(), "clock-transform-v1");
+        assert_eq!(admitted.uncertainty_semantics_id(), "scene-track-interval-bound-v1");
     }
 
     #[test]
