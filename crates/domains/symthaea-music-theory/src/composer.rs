@@ -5363,6 +5363,85 @@ mod tests {
     }
 
     #[test]
+    fn melody_climax_grace_ignores_an_unrelated_melody_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let motif = Motif::from_degrees(&[
+            (1, Duration::quarter()),
+            (3, Duration::quarter()),
+            (5, Duration::half()),
+        ]);
+        let antecedent = crate::phrase::Phrase::build(
+            &motif,
+            &[1, 4],
+            crate::cadence::Cadence::Half,
+            4.0,
+        );
+        let consequent = crate::phrase::Phrase::build(
+            &motif,
+            &[5, 1],
+            crate::cadence::Cadence::Authentic,
+            4.0,
+        );
+        let form = Form {
+            sections: vec![Section {
+                role: SectionRole::A,
+                key,
+                period: crate::phrase::Period {
+                    antecedent,
+                    consequent,
+                },
+            }],
+        };
+        let intent = MusicalIntent {
+            seed: 11,
+            ..MusicalIntent::default()
+        };
+
+        let mut baseline = Score::new(key, 100.0, 4);
+        realize_melody_for_part(&mut baseline, PartId(1), &form, &intent, Duration::zero(), 4.0, true);
+        let mut with_unrelated_climax = Score::new(key, 100.0, 4);
+        let unrelated = ScoreNote {
+            part: PartId(99),
+            pitch: Pitch::from_midi(100),
+            onset: Duration::new(2, 1),
+            duration: Duration::new(1, 1),
+            velocity: 0.9,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Climax,
+            section_intensity: 0.7,
+        };
+        with_unrelated_climax.push(unrelated);
+        realize_melody_for_part(
+            &mut with_unrelated_climax,
+            PartId(1),
+            &form,
+            &intent,
+            Duration::zero(),
+            4.0,
+            true,
+        );
+
+        let baseline_part: Vec<ScoreNote> = baseline.notes.iter()
+            .copied()
+            .filter(|note| note.part == PartId(1))
+            .collect();
+        let scoped_part: Vec<ScoreNote> = with_unrelated_climax.notes.iter()
+            .copied()
+            .filter(|note| note.part == PartId(1))
+            .collect();
+        assert_eq!(
+            scoped_part,
+            baseline_part,
+            "an unrelated Melody/Climax event must not change the source melody's grace placement"
+        );
+        assert_eq!(
+            with_unrelated_climax.notes.iter().find(|note| note.part == PartId(99)),
+            Some(&unrelated),
+            "the pre-existing unrelated climax event must remain unchanged"
+        );
+    }
+
+    #[test]
     fn transformed_coda_quotes_only_its_source_melody_part() {
         let key = Key::major(crate::pitch::PitchClass::C);
         let mut score = Score::new(key, 100.0, 4);
