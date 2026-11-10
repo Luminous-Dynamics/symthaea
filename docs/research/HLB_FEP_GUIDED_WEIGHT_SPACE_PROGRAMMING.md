@@ -901,6 +901,45 @@ The critical fixture is a four-hypothesis XOR task. Two diagnostic probes indepe
 
 Tracking: [issue #11179](https://github.com/Luminous-Dynamics/symthaea/issues/11179). Required next step: extend the paired diagnostic benchmark to compare myopic EVSI and bounded sequential EVSI under identical probe, compute, and cost budgets, including model-likelihood misspecification.
 
+### 10.1 Causal semantics: observation is not intervention
+
+The diagnostic kernels consume action-conditioned predictive distributions. That interface must not collapse distinct causal semantics:
+
+- **Passive observation:** acquire an observation without intentionally changing the system.
+- **Measurement:** apply a measurement protocol with an explicit observation/noise model and possible back-action or disturbance.
+- **Hard intervention:** represent a well-defined `do(X=x)` operation under an admitted structural causal model (SCM).
+- **Mechanism replacement:** explicitly replace a structural equation or regime; this is not an ordinary observation.
+
+In particular,
+
+`P(O | A=a, M)` is not generally `P(O | do(A=a), M)`.
+
+The production adapter must bind the exact SCM revision, intervention target/value, mechanism identity, observation model, identification assumptions, confounder treatment, carryover/interference assumptions, and evidence provenance. If the causal effect is not identifiable under the available assumptions and data, the policy must abstain or request a different probe. A model-relative interventional prediction is not a realized intervention result and never authorizes physical execution.
+
+Reuse the causal work already in the repository:
+- #8286 owns active probe design over noisy multi-node SCMs and explicit intervention/mechanism-replacement semantics.
+- #6202/#6203 own evidence-governed causal reasoning and proposal-only engineering information actions.
+- #11181/#11222 own model-adequacy and static-model ambiguity semantics.
+- #11122 owns the production FEP/EVSI adapter.
+
+#### External causal benchmark comparators
+
+1. **ACDB (September 2026)** uses linear-Gaussian SCMs and budgeted hard interventions under an observe-intervene-submit interface. Its current six-level benchmark audit reports PC with a greedy active-orientation heuristic at directed F1 42.7% / SHD 4.79, ahead of the tested raw LLM active policies; it also reports that a structure-blind random-DAG baseline reaches 23.6% directed F1 on its dense v0 ladder. These are benchmark-specific calibration results, not universal ceilings. Use ACDB-compatible tasks and protocol where feasible, and do not overstate uncalibrated leaderboard gaps. https://arxiv.org/abs/2609.31675
+2. **CausalArena (September 2026)** varies synthetic, semantically grounded operational, formula-grounded and public real-data SCM families. Its reported ranking shifts show why random seed splits within one generator are insufficient. Split held-out evaluation by mechanism, graph family, semantics and data source; audit pretraining/evaluation overlap. https://arxiv.org/abs/2609.11897
+3. **TCD-Arena (ICLR 2026)** stresses time-series causal discovery across 33 assumption violations and roughly 30 million individual attempts. Reuse it as a shift/assumption stress suite rather than writing another generic causal-discovery leaderboard. https://proceedings.iclr.cc/paper_files/paper/2026/hash/7d90f1e2591685c286d5d4b014b8c0f8-Abstract-Conference.html
+
+#### HLB causal-EVSI acceptance matrix
+
+- Hidden-confounder control where observational association gives the wrong action ranking.
+- Randomized intervention where the true `do` effect is identifiable.
+- Sham intervention that changes the measurement context but not the target mechanism.
+- Measurement back-action and intervention carryover with explicit state evolution.
+- Mechanism replacement with a known structural change.
+- Unidentifiable intervention where the correct response is abstention.
+- Model-family omission and unseen mechanism tests, with ground truth held outside the policy process.
+
+Report graph skeleton and directed-edge metrics separately, intervention-effect error, posterior calibration, downstream decision regret, probe cost/disturbance, abstention/coverage, and source/model/policy digests. Do not treat graph recovery, causal-effect estimation, and decision utility as interchangeable outcomes.
+
 ## 11. Current industry and hardware comparison requirements
 
 The HLB programme must compare against current deployable systems, not only academic neural-network baselines.
