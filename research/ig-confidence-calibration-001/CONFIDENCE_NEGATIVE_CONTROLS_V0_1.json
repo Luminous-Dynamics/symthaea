@@ -183,7 +183,8 @@
         "value": "TEST-HIGH-01"
       },
       "expected_violations": [
-        "duplicate_sample_id"
+        "duplicate_sample_id",
+        "evaluation_dataset_digest_mismatch"
       ]
     },
     {
@@ -195,7 +196,8 @@
         "value": 1.01
       },
       "expected_violations": [
-        "probability_out_of_range"
+        "probability_out_of_range",
+        "evaluation_dataset_digest_mismatch"
       ]
     },
     {
@@ -207,7 +209,8 @@
         "value": null
       },
       "expected_violations": [
-        "binary_outcome_missing"
+        "binary_outcome_missing",
+        "evaluation_dataset_digest_mismatch"
       ]
     },
     {
@@ -219,7 +222,8 @@
         "value": "unseen-side-channel"
       },
       "expected_violations": [
-        "evaluation_group_unbound"
+        "evaluation_group_unbound",
+        "evaluation_dataset_digest_mismatch"
       ]
     },
     {
@@ -286,12 +290,13 @@
       "fixture_id": "CONF-024",
       "description": "A task with only one observed outcome class cannot support calibration diagnostics",
       "mutation": {
-        "operation": "set",
-        "path": "/observations/0/outcome_correct",
+        "operation": "set_all",
+        "path": "/observations/*/outcome_correct",
         "value": true
       },
       "expected_violations": [
-        "single_outcome_class"
+        "single_outcome_class",
+        "evaluation_dataset_digest_mismatch"
       ]
     }
   ],
