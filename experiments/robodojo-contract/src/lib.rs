@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod active_sensing;
+pub mod episode_safety;
 pub mod selective_risk;
 pub mod sensing_benchmark;
 pub mod calibration;
