@@ -1701,6 +1701,159 @@
       "ineligible_use": [
         "Whole ship WAPS/fuel/cargo service performance claim"
       ]
+    },
+    {
+      "source_id": "WAPS-MMG-VCT-FREERUN-2025-100664",
+      "title": "Identification of maneuvering models for wind-assisted ships with large rudders using virtual captive tests",
+      "publisher": "International Journal of Naval Architecture and Ocean Engineering / Chalmers University of Technology",
+      "publication_date": "2025",
+      "url": "https://doi.org/10.1016/j.ijnaoe.2025.100664",
+      "evidence_class": "peer_reviewed_waps_maneuvering_model_and_free_running_comparison",
+      "scope": {
+        "model": "Modular MMG manoeuvring model adapted for WAPS and enlarged rudders.",
+        "methods": [
+          "virtual captive tests to identify hydrodynamic damping",
+          "fully nonlinear potential-flow panel method for pure-sway/pure-yaw added masses",
+          "inverse-dynamics comparison against free-running model tests"
+        ],
+        "vessels": [
+          {
+            "name": "wPCC",
+            "features": "WAPS-designed cargo vessel, twin large rudders and bilge fins; study used motor mode."
+          },
+          {
+            "name": "Optiwise",
+            "features": "VLCC tanker with enlarged single rudder for wind-assist requirements."
+          }
+        ],
+        "findings": [
+          "Virtual captive forces can identify model parameters when the correct VCT set and assumptions are used.",
+          "Measured propeller thrust is used to reduce uncertainty in propeller-rudder interaction while identifying rudder/hull effects.",
+          "wPCC inverse-dynamics comparison exposed potential VCT errors associated with wave-generation and roll assumptions; Optiwise showed better agreement."
+        ]
+      },
+      "limitations": [
+        "VCT and inverse-dynamics agreement do not replace independent free-running validation for all states.",
+        "The paper's two model cases have different rudder/propulsion architectures; do not transfer coefficients between them.",
+        "Exact data and reuse rights must be checked before implementation."
+      ],
+      "eligible_use": [
+        "WAPS-specific MMG manoeuvring-model benchmark",
+        "VCT versus free-running validation protocol",
+        "Rudder/hull/propeller interaction and model-discrepancy analysis"
+      ],
+      "ineligible_use": [
+        "Assuming virtual captive tests prove manoeuvrability in gusts/waves",
+        "Applying the same identified coefficients to other hull/rudder layouts without validation"
+      ]
+    },
+    {
+      "source_id": "IMO-MSC137-76-SHIP-MANOEUVRABILITY",
+      "title": "Standards for Ship Manoeuvrability",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2002-12-04",
+      "url": "https://wwwcdn.imo.org/localresources/en/KnowledgeCentre/IndexofIMOResolutions/MSCResolutions/MSC.137%2876%29.pdf",
+      "evidence_class": "official_imo_resolution",
+      "scope": {
+        "resolution": "MSC.137(76)",
+        "manoeuvres": [
+          "turning circle",
+          "initial turning",
+          "10°/10° zig-zag",
+          "20°/20° zig-zag",
+          "full-astern stopping"
+        ],
+        "criteria": {
+          "turning_advance_ship_lengths_max": 4.5,
+          "tactical_diameter_ship_lengths_max": 5,
+          "initial_turning_distance_for_10deg_heading_change_ship_lengths_max": 2.5,
+          "full_astern_track_reach_ship_lengths_default_max": 15
+        },
+        "scope_caveat": "The resolution says its standards were developed for traditional propulsion and steering systems; Administration applicability/interpretation for WAPS and non-conventional steering/propulsion must be confirmed."
+      },
+      "limitations": [
+        "Not a complete WAPS-specific manoeuvrability code.",
+        "Do not present reference criteria as automatically applicable to every vessel; confirm ship type, size, date and Administration requirements."
+      ],
+      "eligible_use": [
+        "Conventional manoeuvring reference test suite",
+        "Turning/zig-zag/stopping metric definitions",
+        "Baseline for supplementary WAPS-specific course-keeping tests"
+      ],
+      "ineligible_use": [
+        "Claiming WAPS compliance solely from MSC.137(76) predictions"
+      ]
+    },
+    {
+      "source_id": "OPTIWISE-WAPS-MANOEUVRABILITY-CRITERIA",
+      "title": "Methods to execute manoeuvring and seakeeping tests with substantial wind propulsion",
+      "publisher": "OPTIWISE project",
+      "publication_date": "2026",
+      "url": "https://www.optiwise-project.eu/exploitable-results",
+      "evidence_class": "eu_project_methodology_and_test-development",
+      "scope": {
+        "topic": "Design-stage manoeuvrability and course-keeping assessment of ships with substantial wind propulsion.",
+        "proposed_methods": [
+          "integrate wind propulsion forces into free-sailing model tests",
+          "define additional course-keeping criteria for physical and digital tests",
+          "identify relevant wind and wave scenarios"
+        ],
+        "objective": "Address the shortfall of conventional procedures for wind-propelled ships and support early design and safety assessment."
+      },
+      "limitations": [
+        "Project methodology and proposed criteria are not automatically statutory or class rules.",
+        "Confirm latest public deliverables, exact criteria, test conditions, partner data rights and validation status."
+      ],
+      "eligible_use": [
+        "WAPS-specific course-keeping test design",
+        "Wind/wave scenario construction",
+        "Comparison against conventional manoeuvring criteria"
+      ],
+      "ineligible_use": [
+        "Treating project recommendations as approved certification criteria"
+      ]
+    },
+    {
+      "source_id": "SOTON-KCS-TIMEACCURATE-HULL-PROPELLER-RUDDER-DATA-2024",
+      "title": "Experimental dataset of a model-scale ship in calm water and waves",
+      "publisher": "University of Southampton / Data in Brief",
+      "publication_date": "2025-02-01",
+      "url": "https://doi.org/10.5258/SOTON/D3076",
+      "evidence_class": "public_model_scale_KCS_hull_propeller_rudder_experimental_dataset",
+      "scope": {
+        "hull": "KRISO Container Ship (KCS), single-screw model, LBP 3.773 m.",
+        "test_site": "University of Southampton, Boldrewood towing tank.",
+        "instrumentation": [
+          "propeller thrust and torque load cells",
+          "RPM encoder",
+          "six-component rudder dynamometer",
+          "six-degree-of-freedom IMU"
+        ],
+        "sample_rate_hz": 250,
+        "conditions": [
+          "calm water and regular waves",
+          "leeway and rudder angle combinations",
+          "offloaded propeller operation"
+        ],
+        "repository": "https://eprints.soton.ac.uk/490226/",
+        "doi": "10.5258/SOTON/D3076",
+        "related_paper": "https://doi.org/10.1016/j.oceaneng.2024.119258",
+        "rights": "The related Data in Brief article is CC BY-NC-ND; the repository's dataset-specific license and permitted commercial/derivative use must be checked separately."
+      },
+      "limitations": [
+        "KCS conventional single-screw model is a hydrodynamic interaction reference, not itself a WAPS trial.",
+        "Model scale and captive test constraints must be preserved.",
+        "No commercial use, derivative publication or mirroring until repository-specific rights are resolved."
+      ],
+      "eligible_use": [
+        "Non-commercial methodology reproduction after legal review",
+        "Hull-propeller-rudder signal-processing and provenance tests",
+        "Independent hydrodynamic model validation where license permits"
+      ],
+      "ineligible_use": [
+        "WAPS full-scale performance claim",
+        "Commercial model training or derivative dataset release without separate rights"
+      ]
     }
   ]
 }
