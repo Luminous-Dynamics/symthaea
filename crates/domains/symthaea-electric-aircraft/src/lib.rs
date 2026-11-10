@@ -686,7 +686,7 @@ mod tests {
             id: id.into(),
             uri: format!("artifact://test/{id}"),
             sha256: "b".repeat(64),
-            class: EvidenceClass::PhysicalMeasurement,
+            class: EvidenceClass::Simulation,
             description: "Synthetic unit-test fixture; not physical evidence".into(),
         };
         let curve = |id: &str, axis: &str, points: Vec<EfficiencyPoint>| EfficiencyCurve {
