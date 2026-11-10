@@ -55,6 +55,16 @@ cargo run --bin marine-regulatory-rule-audit -- \
 
 The retained v0.1.0 snapshot remains available for historical comparison. v0.2.0 separates emissions year from surrender year, statutory voyage-coverage fraction from surrender phase-in, and EU MRV gas-monitoring years from EU ETS gas-surrender years.
 
+Audit a preregistered causal study protocol:
+
+~~~sh
+cargo run --bin marine-causal-protocol-audit -- \
+  ../../docs/research/marine/marine-causal-study-protocol-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-causal-study-protocol-v0.1.0.json
+~~~
+
+The causal audit checks schema conformance, estimand/outcome linkage, preregistration timing, evidence-source references, confounder roles, observational overlap/effective sample size, battery SOC boundaries, identification-gate status and negative-control outcomes. It reports protocol readiness only; it does not estimate or certify causal effects.
+
 Audit the dated regulatory rule register:
 
 ~~~sh
