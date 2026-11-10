@@ -39,7 +39,7 @@ The exporter computes the canonical Score digest using the existing score-demand
 - Every used instrument instance has exactly one explicit MIDI binding. Duplicate, missing, malformed, or unused bindings are rejected.
 - GM program numbers are limited to 0–127.
 - Different instrument instances receive different pitched MIDI channels in V1. Channel 10 (zero-based 9) is reserved for conventional percussion.
-- Note onset and end times are converted to 960 PPQ only when the rational value is exactly representable. There is no silent rounding or quantization.
+- Note onset and end times are converted to 960 PPQ only when the rational value is exactly representable. There is no silent rounding or quantization of note timing.
 - Zero-velocity note events are rejected rather than turned into MIDI NoteOn events with velocity zero (which MIDI receivers interpret as NoteOff).
 - Every source note receives one note receipt containing its original score-array ordinal, PartId, segment, instrument instance, track, pitch, velocity and exact start/end ticks.
 - Source note ordinals are scoped to the Score digest. They are not persistent EventIds; event correspondence after edits must use the explicit event-remap contract.
@@ -48,7 +48,7 @@ The exporter computes the canonical Score digest using the existing score-demand
 
 ### Explicit V1 limits
 
-- Standard MIDI 1.0 is used, at 960 ticks per quarter note.
+- Standard MIDI 1.0 is used, at 960 ticks per quarter note. Note velocity is quantized to MIDI's 7-bit range and the exact emitted value is recorded in the note receipt. Floating-point BPM is converted to the MIDI integer microseconds-per-quarter representation by nearest-microsecond rounding; both the encoded tempo and meter are recorded in the manifest.
 - Fifteen pitched channels are available because channel 10 is reserved for conventional percussion.
 - The legacy Score schema represents meter as quarter-note beats per bar; the MIDI time-signature denominator is therefore emitted as 4.
 - Renderer and patch identifiers are explicit routing labels. Their presence is not evidence of sample coverage, articulation support, performer playability, or acoustic equivalence.
@@ -100,7 +100,7 @@ The objective is not merely to show that a MIDI file can be written. The benchma
 
 **Metrics:** Note-on/off parity; pitch parity; velocity conversion error; onset/end tick error; refusal rate for unrepresentable timing.
 
-**Promotion target:** Zero timing error for representable events. Zero silently quantized events. Unsupported time values must be refused with a typed reason.
+**Promotion target:** Zero tick error for representable note events. Zero silently quantized note times. Unsupported time values must be refused with a typed reason. Report the bounded tempo-resolution and 7-bit velocity quantization separately.
 
 ### B3 — Provenance completeness
 
