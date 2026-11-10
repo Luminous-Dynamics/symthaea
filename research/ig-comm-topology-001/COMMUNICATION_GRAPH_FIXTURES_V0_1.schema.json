@@ -115,7 +115,9 @@
               "required": [
                 "agent_instance_id",
                 "principal_ref",
-                "role"
+                "role",
+                "active_from_round",
+                "active_until_round"
               ],
               "properties": {
                 "agent_instance_id": {
@@ -126,6 +128,17 @@
                 },
                 "role": {
                   "type": "string"
+                },
+                "active_from_round": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "active_until_round": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
                 }
               }
             }
@@ -198,7 +211,18 @@
             "const": false
           },
           "centrality_reference": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "reciprocity": {
+                "enum": [
+                  "required",
+                  "not_required_for_unsupported_tie_control"
+                ]
+              }
+            },
+            "required": [
+              "reciprocity"
+            ]
           },
           "graph_sha256": {
             "type": "string",
