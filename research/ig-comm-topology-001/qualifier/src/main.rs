@@ -115,6 +115,9 @@ fn graph_snapshot_at(profile: &Value, round: u64) -> Result<GraphSnapshot, Strin
         let start = node["active_from_round"]
             .as_u64()
             .ok_or_else(|| format!("node {id} active_from_round must be an integer"))?;
+        if node.get("active_until_round").is_none() {
+            return Err(format!("node {id} active_until_round must be present (null means unbounded)"));
+        }
         let end = node["active_until_round"].as_u64();
         if end.is_some_and(|end| end <= start) {
             return Err(format!("node {id} has an empty or reversed active interval"));
@@ -141,6 +144,9 @@ fn graph_snapshot_at(profile: &Value, round: u64) -> Result<GraphSnapshot, Strin
         let start = edge["active_from_round"]
             .as_u64()
             .ok_or_else(|| format!("channel {channel_id} active_from_round must be an integer"))?;
+        if edge.get("active_until_round").is_none() {
+            return Err(format!("channel {channel_id} active_until_round must be present (null means unbounded)"));
+        }
         let end = edge["active_until_round"].as_u64();
         if end.is_some_and(|end| end <= start) {
             return Err(format!("channel {channel_id} has an empty or reversed active interval"));
@@ -470,6 +476,9 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                 if old_ids.is_empty() || old_ids.len() != new_ids.len() {
                     add(errors, context, "restore_channel requires paired old and new channel ID sets");
                     continue;
+                }
+                if !string_set(&event["channel_ids"]).is_disjoint(&string_set(&event["new_channel_ids"])) {
+                    add(errors, context, "restore must use new channel identities");
                 }
                 let mut matched_new = BTreeSet::new();
                 for old_id in old_ids {
@@ -867,6 +876,30 @@ mod tests {
     fn temporal_event_ledger_matches_all_node_and_channel_intervals() {
         let profile = profile("temporal_churn");
         assert!(validate_profile(&profile).is_empty());
+    }
+
+    #[test]
+    fn centrality_rejects_strong_but_nonreciprocal_directed_graph() {
+        let mut profile = profile("star");
+        profile["edges"].as_array_mut().unwrap().retain(|edge| {
+            !(edge["sender"] == "AGENT-01" && edge["recipient"] == "AGENT-00")
+        });
+        profile["edges"].as_array_mut().unwrap().push(json!({
+            "channel_id":"ONE-WAY-1-2",
+            "sender":"AGENT-01",
+            "recipient":"AGENT-02",
+            "message_classes":["claim","evidence","challenge"],
+            "active_from_round":0,
+            "active_until_round":null,
+            "capacity_per_round":4,
+            "latency_ticks":0
+        }));
+        let adjacency = edge_adjacency(&profile).unwrap();
+        assert!(is_strongly_connected(&adjacency));
+        assert!(!is_reciprocal(&adjacency));
+        let mut errors = Vec::new();
+        validate_centrality(&profile, &mut errors);
+        assert!(errors.iter().any(|error| error.contains("reciprocal MessageChannel arcs")));
     }
 
     #[test]
