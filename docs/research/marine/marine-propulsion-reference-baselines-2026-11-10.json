@@ -149,6 +149,99 @@
         "Deep-sea savings prediction",
         "Wind propulsion performance claim",
         "Independent physical validation"
+      ],
+      "case_facts": {
+        "vessel_particulars": {
+          "deadweight_tonne": 8000,
+          "length_overall_m": 110,
+          "length_between_perpendiculars_m": 104,
+          "beam_m": 18,
+          "design_draft_m": 7,
+          "service_speed_kn": 14
+        },
+        "mechanical_baseline": {
+          "propulsion_diesels": "2 × 3,000 kW medium-speed diesels",
+          "hotel_generators": "2 × 750 kW diesel generator sets",
+          "fuel_tonnes_per_year": 4250,
+          "lifecycle_cost_usd_millions": 28.6,
+          "co2_tonnes_per_year": 13260
+        },
+        "hybrid_design_space": {
+          "architecture": "DC bus, diesel generator sets, propulsion motors and lithium-ion ESS",
+          "ess_capacity_range_mwh": [
+            0.8,
+            3
+          ],
+          "optimized_generator_power_mw": 2.3,
+          "optimized_ess_capacity_mwh": 1.6
+        },
+        "operational_profile": {
+          "ais_period": "2021-2022 (24 months)",
+          "complete_voyages_reported": ">120",
+          "average_original_sampling_interval_minutes": 3,
+          "profile_count_used_for_optimization": 5,
+          "data_gap_repair": "For gaps longer than 15 minutes, linear interpolation or speed extrapolation is used.",
+          "source_data_availability": "Data and code available from the corresponding author upon reasonable request; not a public raw-data download."
+        },
+        "reported_normalized_results": {
+          "mechanical": {
+            "fuel": 1,
+            "lifecycle_cost": 1,
+            "co2": 1
+          },
+          "rule_based_hybrid": {
+            "fuel": 0.92,
+            "lifecycle_cost": 0.94,
+            "co2": 0.91
+          },
+          "optimized_hybrid": {
+            "fuel": 0.81,
+            "lifecycle_cost": 0.86,
+            "co2": 0.8
+          },
+          "route_patterns": [
+            {
+              "route_type": "transit-dominated",
+              "fuel_reduction_percent": 16,
+              "lifecycle_cost_reduction_percent": 11,
+              "ess_kwh": 1400
+            },
+            {
+              "route_type": "port-dominated",
+              "fuel_reduction_percent": 21,
+              "lifecycle_cost_reduction_percent": 16,
+              "ess_kwh": 1800
+            }
+          ]
+        },
+        "degradation_sensitivity": {
+          "description": "The article reports fuel-reduction/battery-lifetime trade-offs for different degradation weightings.",
+          "cases": [
+            {
+              "weighting": "low",
+              "fuel_reduction_percent": 22,
+              "ess_lifetime_years": 6
+            },
+            {
+              "weighting": "medium",
+              "fuel_reduction_percent": 19,
+              "ess_lifetime_years": 9
+            },
+            {
+              "weighting": "high",
+              "fuel_reduction_percent": 14,
+              "ess_lifetime_years": 12
+            }
+          ]
+        }
+      },
+      "methodological_details": [
+        "The lower-level dynamic-programming energy-management policy assumes perfect knowledge of each voyage's future power profile; this is an offline design upper bound, not a deployable online controller.",
+        "The propulsion-power reconstruction uses simplified resistance and propulsion relations and assumes a single-screw arrangement; higher-order hull-propeller-rudder interaction effects are neglected.",
+        "The article identifies incomplete representation of hull fouling, extreme weather and detailed manoeuvring.",
+        "Battery ageing uses laboratory-derived cycle-life data represented as a stationary cycle-life surface with pack-level scaling assumptions; thermal gradients and cell-to-cell variation are not fully represented.",
+        "Long AIS data gaps are repaired by interpolation or speed extrapolation; the effects of that repair policy should be stress-tested.",
+        "Five statistically representative typical operating profiles are used for the optimization, rather than scoring every voyage as a held-out observation."
       ]
     },
     {
@@ -766,6 +859,45 @@
       ],
       "ineligible_use": [
         "Claim that WAPS safety requirements are fully harmonized or approved"
+      ]
+    },
+    {
+      "source_id": "IMO-MARITIME-CYBER-REV4-2026",
+      "title": "Guidelines on Maritime Cyber Risk Management (MSC-FAL.1/Circ.3/Rev.4)",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026",
+      "url": "https://www.imo.org/en/ourwork/security/pages/cyber-security.aspx",
+      "evidence_class": "official_maritime_guidance",
+      "scope": {
+        "topic": "Maritime cyber-risk management",
+        "systems_in_scope": [
+          "bridge systems",
+          "cargo handling and management systems",
+          "propulsion and machinery management",
+          "power control systems",
+          "communications and ship/shore interfaces"
+        ],
+        "intent": "Risk-based resilience across digitization, system integration and automation."
+      },
+      "limitations": [
+        "High-level cyber-risk-management guidance; not a WAPS-specific technical approval or a substitute for vessel-specific class/flag requirements.",
+        "Applicability and implementation must be assessed for the vessel, equipment, operator and flag context."
+      ]
+    },
+    {
+      "source_id": "IACS-UR-E26-E27-CYBER-RESILIENCE",
+      "title": "UR E26 Cyber Resilience of Ships and UR E27 Cyber Resilience of On-Board Systems and Equipment",
+      "publisher": "International Association of Classification Societies",
+      "publication_date": "2023 (revised URs apply to new ships contracted for construction on or after 2024-07-01)",
+      "url": "https://iacs.org.uk/news/iacs-ur-e26-and-e27-press-release",
+      "evidence_class": "official_class_society_unified_requirements",
+      "scope": {
+        "UR_E26": "Cyber resilience of the ship as a whole, including secure IT/OT integration through design, construction, commissioning and operation.",
+        "UR_E27": "Cyber resilience of on-board systems and equipment, including equipment/system hardening and supplier design/development."
+      },
+      "limitations": [
+        "Applicability has vessel-type and size criteria and must be confirmed with the selected class society and flag.",
+        "The existence of UR E26/E27 does not mean this research programme or any proposed configuration is compliant or approved."
       ]
     }
   ]
