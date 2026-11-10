@@ -4974,6 +4974,135 @@ mod tests {
         }
     }
 
+    fn ornament_source_note(part: PartId, duration: Duration, emphasis: Emphasis) -> ScoreNote {
+        ScoreNote {
+            part,
+            pitch: Pitch::new(crate::pitch::PitchClass::C, 4),
+            onset: Duration::zero(),
+            duration,
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis,
+            section_intensity: 1.0,
+        }
+    }
+
+    #[test]
+    fn appoggiatura_inherits_its_source_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ornament_source_note(PartId(42), Duration::new(2, 1), Emphasis::Cadential));
+        let dna = crate::spec::MelodicDna {
+            appoggiatura_rate: 1.0,
+            ..Default::default()
+        };
+        apply_appoggiaturas(&mut score, key, &dna, 7);
+        assert!(score.notes.len() >= 2);
+        assert!(score.notes.iter().all(|note| note.part == PartId(42)));
+    }
+
+    #[test]
+    fn grace_cut_inherits_its_source_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ornament_source_note(PartId(43), Duration::new(1, 1), Emphasis::Normal));
+        let dna = crate::spec::MelodicDna {
+            ornament_rate: 1.0,
+            ..Default::default()
+        };
+        apply_grace_ornaments(&mut score, key, &dna, 11);
+        assert!(score.notes.len() >= 2);
+        assert!(score.notes.iter().all(|note| note.part == PartId(43)));
+    }
+
+    #[test]
+    fn roll_chain_inherits_its_source_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ornament_source_note(PartId(44), Duration::new(2, 1), Emphasis::Normal));
+        let dna = crate::spec::MelodicDna {
+            ornament_rate: 1.0,
+            ..Default::default()
+        };
+        apply_roll_ornaments(&mut score, key, &dna, 13);
+        assert_eq!(score.notes.len(), 5);
+        assert!(score.notes.iter().all(|note| note.part == PartId(44)));
+    }
+
+    #[test]
+    fn parallel_planing_preserves_each_source_harmony_part_identity() {
+        let mut form = one_section_form(SectionRole::A);
+        form.sections.extend(one_section_form(SectionRole::B).sections);
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for (midi, onset) in [(62u8, 8i64), (64, 9)] {
+            score.push(ScoreNote {
+                part: PartId(1),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::new(1, 1),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        for midi in [48u8, 55, 60] {
+            score.push(ScoreNote {
+                part: PartId(27),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(8, 1),
+                duration: Duration::new(4, 1),
+                velocity: 0.45,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 0.8,
+            });
+        }
+        apply_parallel_planing(&mut score, &form, 1, 4.0);
+        let planed: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Harmony && note.onset.beats() >= 8.0)
+            .collect();
+        assert_eq!(planed.len(), 6);
+        assert!(planed.iter().all(|note| note.part == PartId(27)));
+    }
+
+    #[test]
+    fn suspension_and_resolution_inherit_the_incoming_harmony_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for pitch in key.diatonic_triad(1).voice(4) {
+            score.push(ScoreNote {
+                part: PartId(19),
+                pitch,
+                onset: Duration::zero(),
+                duration: Duration::new(4, 1),
+                velocity: 0.5,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        for pitch in key.diatonic_triad(4).voice(4) {
+            score.push(ScoreNote {
+                part: PartId(73),
+                pitch,
+                onset: Duration::new(4, 1),
+                duration: Duration::new(4, 1),
+                velocity: 0.5,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        apply_suspensions(&mut score, key, 1.0, 1);
+        let generated: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.onset.beats() >= 4.0 && note.onset.beats() < 8.0)
+            .collect();
+        assert_eq!(generated.len(), 2);
+        assert!(generated.iter().all(|note| note.part == PartId(73)));
+    }
+
     #[test]
     fn source_authored_melody_part_survives_every_phrase_and_climax_grace() {
         let form = one_section_form(SectionRole::A);
