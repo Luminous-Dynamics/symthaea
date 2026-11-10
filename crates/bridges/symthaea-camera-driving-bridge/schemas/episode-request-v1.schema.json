@@ -1,0 +1,411 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/camera-driving-episode-request-v1.schema.json",
+  "title": "Symthaea camera driving bridge episode request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "bridge_config",
+    "vision_config",
+    "observations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "bridge_config": {
+      "$ref": "#/$defs/bridge_config"
+    },
+    "vision_config": {
+      "type": "object",
+      "description": "Complete serde-serialized symthaea_vision_manifold::VisionConfig. The Rust type validates all feature-specific values.",
+      "additionalProperties": true
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "bridge_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "max_width",
+        "max_height",
+        "max_frame_bytes",
+        "initial_dt_us",
+        "maximum_frame_gap_us",
+        "maximum_sensor_clock_skew_us",
+        "visual_weight_ppm",
+        "vehicle_encoder_seed_phrase"
+      ],
+      "properties": {
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "run_id",
+            "episode_id",
+            "scenario_id",
+            "agent_id",
+            "camera_id",
+            "simulator_revision",
+            "policy_revision"
+          ],
+          "properties": {
+            "run_id": {
+              "$ref": "#/$defs/id"
+            },
+            "episode_id": {
+              "$ref": "#/$defs/id"
+            },
+            "scenario_id": {
+              "$ref": "#/$defs/id"
+            },
+            "agent_id": {
+              "$ref": "#/$defs/id"
+            },
+            "camera_id": {
+              "$ref": "#/$defs/id"
+            },
+            "simulator_revision": {
+              "$ref": "#/$defs/id"
+            },
+            "policy_revision": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        "max_width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "max_height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "max_frame_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
+        },
+        "initial_dt_us": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_frame_gap_us": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_sensor_clock_skew_us": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "visual_weight_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "vehicle_encoder_seed_phrase": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      }
+    },
+    "vehicle_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "speed",
+        "lateral_velocity",
+        "yaw_rate",
+        "heading",
+        "position_x",
+        "position_y",
+        "steering_angle",
+        "throttle_position",
+        "brake_pressure",
+        "longitudinal_accel",
+        "lateral_accel",
+        "tire_slip_front",
+        "tire_slip_rear",
+        "pitch",
+        "lateral_offset",
+        "curvature_ahead",
+        "nearest_peer_distance",
+        "peer_relative_speed",
+        "mesh_brake_density",
+        "mesh_confidence",
+        "timestamp"
+      ],
+      "properties": {
+        "speed": {
+          "type": "number"
+        },
+        "lateral_velocity": {
+          "type": "number"
+        },
+        "yaw_rate": {
+          "type": "number"
+        },
+        "heading": {
+          "type": "number"
+        },
+        "position_x": {
+          "type": "number"
+        },
+        "position_y": {
+          "type": "number"
+        },
+        "steering_angle": {
+          "type": "number"
+        },
+        "throttle_position": {
+          "type": "number"
+        },
+        "brake_pressure": {
+          "type": "number"
+        },
+        "longitudinal_accel": {
+          "type": "number"
+        },
+        "lateral_accel": {
+          "type": "number"
+        },
+        "tire_slip_front": {
+          "type": "number"
+        },
+        "tire_slip_rear": {
+          "type": "number"
+        },
+        "pitch": {
+          "type": "number"
+        },
+        "lateral_offset": {
+          "type": "number"
+        },
+        "curvature_ahead": {
+          "type": "number"
+        },
+        "nearest_peer_distance": {
+          "type": "number"
+        },
+        "peer_relative_speed": {
+          "type": "number"
+        },
+        "mesh_brake_density": {
+          "type": "number"
+        },
+        "mesh_confidence": {
+          "type": "number"
+        },
+        "timestamp": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "upstream_camera_observation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "schema_version",
+        "observation_id",
+        "pixel_format",
+        "frame_byte_len",
+        "episode_id",
+        "agent_id",
+        "clock_id",
+        "tick",
+        "sequence",
+        "camera_id",
+        "camera_calibration_sha256",
+        "renderer_revision",
+        "capture_timestamp_us",
+        "render_completed_timestamp_us",
+        "delivered_timestamp_us",
+        "frame_width",
+        "frame_height",
+        "channels",
+        "frame_sha256",
+        "receipt_sha256",
+        "applied_action_receipt_id",
+        "applied_action_receipt_sha256",
+        "applied_action_command_id",
+        "applied_action_tick"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "observation_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "pixel_format": {
+          "const": "rgb8_srgb"
+        },
+        "frame_byte_len": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 67108864
+        },
+        "episode_id": {
+          "$ref": "#/$defs/id"
+        },
+        "agent_id": {
+          "$ref": "#/$defs/id"
+        },
+        "clock_id": {
+          "$ref": "#/$defs/id"
+        },
+        "tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "camera_id": {
+          "$ref": "#/$defs/id"
+        },
+        "camera_calibration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "renderer_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "capture_timestamp_us": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "render_completed_timestamp_us": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "delivered_timestamp_us": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "frame_width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "frame_height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "channels": {
+          "const": 3
+        },
+        "frame_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "applied_action_receipt_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "applied_action_receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "applied_action_command_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "applied_action_tick": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "timestamp_us",
+        "vehicle_state_timestamp_us",
+        "pixels_file",
+        "vehicle_state",
+        "upstream"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timestamp_us": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "vehicle_state_timestamp_us": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pixels_file": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^(?!/)(?!.*(^|/)\\.\\.(?:/|$)).+$"
+        },
+        "vehicle_state": {
+          "$ref": "#/$defs/vehicle_state"
+        },
+        "upstream": {
+          "$ref": "#/$defs/upstream_camera_observation"
+        }
+      }
+    }
+  },
+  "x-invariants": [
+    "pixels_file is resolved relative to the episode request file; absolute paths, parent-directory traversal and symlink escapes are rejected by the CLI.",
+    "The upstream frame SHA-256 must equal the bytes read from pixels_file.",
+    "Upstream observation identity and receipt SHA-256 are recomputed from policy-visible fields and must match exactly. These unkeyed digests establish internal consistency, not publisher authentication.",
+    "Observation sequence, capture time and vehicle-state capture time must increase according to bridge rules.",
+    "Only delivered observations are listed. Missing or dropped frames remain separate explicit stream events and cannot be omitted from the external episode denominator.",
+    "VisionConfig must pin hdc_dim to 16384 and enable_depth=false; the Rust constructor performs authoritative validation.",
+    "The CLI preserves temporal state by processing the full observation array sequentially in one process."
+  ]
+}
