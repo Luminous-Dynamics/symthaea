@@ -17,6 +17,7 @@
 //! planner, not a general POMDP solver or an action-execution authority.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use super::decision_relevant_information::{
@@ -48,6 +49,8 @@ pub struct SequentialDiagnosticSafetyBudget {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BudgetedSequentialDiagnosticEvaluation {
     pub safety_budget: SequentialDiagnosticSafetyBudget,
+    /// Canonical SHA-256 over the exact numerical budget and risk-semantics digest.
+    pub safety_budget_digest: String,
     pub evaluation: SequentialDiagnosticEvaluation,
 }
 
@@ -192,7 +195,8 @@ pub fn evaluate_sequential_decision_diagnostics_with_safety_budget(
     planning_config: SequentialDiagnosticConfig,
     safety_budget: SequentialDiagnosticSafetyBudget,
 ) -> Result<BudgetedSequentialDiagnosticEvaluation, SequentialDiagnosticError> {
-    validate_safety_budget(&safety_budget)?;
+    let safety_budget_digest =
+        compute_sequential_diagnostic_safety_budget_digest(&safety_budget)?;
     let evaluation = evaluate_sequential_decision_diagnostics_internal(
         hypotheses,
         actions,
@@ -202,8 +206,32 @@ pub fn evaluate_sequential_decision_diagnostics_with_safety_budget(
     )?;
     Ok(BudgetedSequentialDiagnosticEvaluation {
         safety_budget,
+        safety_budget_digest,
         evaluation,
     })
+}
+
+/// Compute a canonical, domain-separated SHA-256 digest for a path safety budget.
+///
+/// The digest binds the exact IEEE-754 bit pattern of the maximum cumulative
+/// risk together with the external risk-semantics/calibration digest.
+pub fn compute_sequential_diagnostic_safety_budget_digest(
+    safety_budget: &SequentialDiagnosticSafetyBudget,
+) -> Result<String, SequentialDiagnosticError> {
+    validate_safety_budget(safety_budget)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-sequential-diagnostic-safety-budget-v1\\0");
+    hasher.update(safety_budget.maximum_cumulative_risk.to_bits().to_le_bytes());
+    hasher.update((safety_budget.risk_semantics_digest.len() as u64).to_le_bytes());
+    hasher.update(safety_budget.risk_semantics_digest.as_bytes());
+    let digest = hasher.finalize();
+    let mut encoded = String::with_capacity(64);
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for byte in digest {
+        encoded.push(HEX[(byte >> 4) as usize] as char);
+        encoded.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    Ok(encoded)
 }
 
 fn validate_safety_budget(
@@ -690,6 +718,40 @@ mod tests {
         assert!((result.evaluation.plan.expected_safety_penalty - 0.07).abs() < 1e-10);
         assert!(result.evaluation.expected_total_cost < 0.1);
         assert_eq!(result.safety_budget.maximum_cumulative_risk, 0.7);
+    }
+
+    #[test]
+    fn cumulative_safety_budget_digest_binds_limit_and_semantics() {
+        let budget = SequentialDiagnosticSafetyBudget {
+            maximum_cumulative_risk: 0.6,
+            risk_semantics_digest: "d".repeat(64),
+        };
+        let original =
+            compute_sequential_diagnostic_safety_budget_digest(&budget).expect("digest");
+        assert_eq!(original.len(), 64);
+        assert_eq!(
+            original,
+            compute_sequential_diagnostic_safety_budget_digest(&budget).expect("stable digest")
+        );
+
+        let changed_limit = SequentialDiagnosticSafetyBudget {
+            maximum_cumulative_risk: 0.7,
+            ..budget.clone()
+        };
+        let changed_semantics = SequentialDiagnosticSafetyBudget {
+            risk_semantics_digest: "e".repeat(64),
+            ..budget
+        };
+        assert_ne!(
+            original,
+            compute_sequential_diagnostic_safety_budget_digest(&changed_limit)
+                .expect("changed limit digest")
+        );
+        assert_ne!(
+            original,
+            compute_sequential_diagnostic_safety_budget_digest(&changed_semantics)
+                .expect("changed semantics digest")
+        );
     }
 
     #[test]
