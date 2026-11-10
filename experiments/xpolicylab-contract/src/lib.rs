@@ -672,7 +672,9 @@ mod tests {
         actual.observation_bundle_digest = Digest32::from_bytes([9; 32]).unwrap();
         assert_eq!(
             validate_action_response(&expected(), &actual),
-            Err(ContractError::DigestMismatch(ContextField::ObservationBundleDigest))
+            Err(ContractError::DigestMismatch(
+                ContextField::ObservationBundleDigest
+            ))
         );
     }
 
@@ -682,7 +684,9 @@ mod tests {
         actual.policy_artifact_digest = Digest32::from_bytes([9; 32]).unwrap();
         assert_eq!(
             validate_action_response(&expected(), &actual),
-            Err(ContractError::DigestMismatch(ContextField::PolicyArtifactDigest))
+            Err(ContractError::DigestMismatch(
+                ContextField::PolicyArtifactDigest
+            ))
         );
     }
 
@@ -692,7 +696,9 @@ mod tests {
         actual.deployment_config_digest = Digest32::from_bytes([9; 32]).unwrap();
         assert_eq!(
             validate_action_response(&expected(), &actual),
-            Err(ContractError::DigestMismatch(ContextField::DeploymentConfigDigest))
+            Err(ContractError::DigestMismatch(
+                ContextField::DeploymentConfigDigest
+            ))
         );
     }
 
@@ -702,7 +708,9 @@ mod tests {
         actual.assistance_profile_digest = Digest32::from_bytes([9; 32]).unwrap();
         assert_eq!(
             validate_action_response(&expected(), &actual),
-            Err(ContractError::DigestMismatch(ContextField::AssistanceProfileDigest))
+            Err(ContractError::DigestMismatch(
+                ContextField::AssistanceProfileDigest
+            ))
         );
     }
 
