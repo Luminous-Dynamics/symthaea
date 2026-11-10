@@ -13,8 +13,8 @@
 //! Two narrow but high-value patterns that cover the Ramanujan Protocol
 //! showcase's canonical invariants:
 //!
-//! 1. **Sum of squared variables** — `x² + y²`, `x² + y² + z²`, `px² + py² + pz²`
-//!    → SO(n) where n = number of distinct squared variables.
+//! 1. **Equal-coefficient sum of squared variables** — `x² + y²`, `x² + y² + z²`, `px² + py² + pz²`
+//!    → SO(n) where n = number of distinct squared variables. A shared finite nonzero scalar is allowed; unequal per-variable weights are rejected.
 //!    Matches Harmonic Oscillator, kinetic energy, `r² = x² + y² + z²`.
 //!
 //! 2. **2D antisymmetric cross product** — `a·b - c·d` where `{a,c}` and
@@ -26,9 +26,25 @@
 //! NOT classified — we prefer to undersell symmetry than to claim false
 //! rotational invariance on a transcendental like the Lotka-Volterra invariant.
 //!
-//! ## Beyond the two structural heuristics: numeric Lie-derivative fallback
+//! ## Exact polynomial and sampled Lie-derivative lanes
 //!
-//! The two heuristics above are exact-shape pattern matches — fast, but blind
+//! For bounded polynomial ASTs (constants, variables, addition, subtraction,
+//! multiplication and non-negative integer powers), the exact lane normalizes
+//! the expression into sparse monomials with exact rational coefficients and
+//! checks every generator's Lie derivative. Finite `f64` literals are interpreted
+//! as their exact IEEE-754 dyadic rationals. A zero residual is an exact algebraic
+//! identity for that interpreted polynomial, not a Lean proof or a physical-units proof.
+//!
+//! Unsupported constructs and resource-limit outcomes fall through to the sampled
+//! numeric lane, which preserves its seed, domain, finite-difference step and tolerances.
+//! A sampled candidate is never promoted to exact or formal evidence.
+//!
+//! ## Sampled numeric Lie-derivative fallback
+//!
+//! The sampled lane can detect radial expressions such as square roots and reciprocal
+//! functions that are outside the polynomial fragment, but it remains finite evidence.
+//!
+//! The two structural heuristics above are exact-shape pattern matches — fast, but blind
 //! to anything that isn't literally a monomial sum-of-squares or cross-product
 //! (e.g. `sqrt(x²+y²)`, `1/(x²+y²)`, or any other radially-symmetric function
 //! of the same invariant). [`infer_symmetry_numeric`] closes that gap using the
@@ -58,55 +74,364 @@
 //! they don't fire, keeping the common cases fast and precise.
 
 use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::lie_theory::{self, LieAlgebra};
 
 use crate::types::{LieGroup, SymmetryDescriptor};
 
-/// Infer a best-effort symmetry descriptor from a discovered expression.
-pub fn infer_symmetry(expr: &Expr) -> SymmetryDescriptor {
-    if let Some(n) = detect_sum_of_squares(expr)
-        && (2..=10).contains(&n)
-    {
-        return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(n)], false);
-    }
-    if detect_2d_antisymmetric_cross(expr) {
-        return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false);
-    }
-    infer_symmetry_numeric(expr)
+/// Fully specified numerical policy used by the bounded Lie-derivative fallback.
+///
+/// The profile is returned with every numerical candidate so a consumer can
+/// distinguish a sampled heuristic from a symbolic identity or formal proof.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct NumericLieDerivativeProfileV1 {
+    pub seed: u64,
+    pub samples_per_generator: usize,
+    pub finite_difference_step: f64,
+    pub normalized_squared_residual_tolerance: f64,
+    pub minimum_gradient_squared: f64,
+    pub sample_min_inclusive: f64,
+    pub sample_max_exclusive: f64,
+    pub maximum_joint_dimension: usize,
+    pub pairwise_so2_search: bool,
 }
 
-/// The generic numeric fallback described in the module docs. Public so
-/// callers/tests can exercise it directly, independent of whether the fast
-/// structural heuristics already fired.
+impl Default for NumericLieDerivativeProfileV1 {
+    fn default() -> Self {
+        Self {
+            seed: 0x9E3779B97F4A7C15,
+            samples_per_generator: 8,
+            finite_difference_step: 1e-5,
+            normalized_squared_residual_tolerance: 1e-6,
+            minimum_gradient_squared: 1e-8,
+            sample_min_inclusive: 0.5,
+            sample_max_exclusive: 3.0,
+            maximum_joint_dimension: 6,
+            pairwise_so2_search: true,
+        }
+    }
+}
+
+/// Resource-bounded exact-polynomial profile for symbolic Lie-derivative checks.
+///
+/// Float literals in the source AST are interpreted as their exact IEEE-754
+/// dyadic rational values. Coefficient arithmetic is then exact within checked
+/// `i128` numerator/denominator bounds. This establishes an algebraic identity
+/// for the represented polynomial; it is not a Lean proof or a physical-units proof.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExactPolynomialLieProfileV1 {
+    pub maximum_variables: usize,
+    pub maximum_terms: usize,
+    /// Maximum monomial-pair multiplications per polynomial product operation.
+    pub maximum_term_products: usize,
+    pub maximum_total_degree: usize,
+    pub maximum_power: u32,
+    pub maximum_dyadic_denominator_power: u32,
+    pub pairwise_so2_search: bool,
+}
+
+impl Default for ExactPolynomialLieProfileV1 {
+    fn default() -> Self {
+        Self {
+            maximum_variables: 6,
+            maximum_terms: 4096,
+            maximum_term_products: 65_536,
+            maximum_total_degree: 48,
+            maximum_power: 16,
+            maximum_dyadic_denominator_power: 126,
+            pairwise_so2_search: true,
+        }
+    }
+}
+
+/// Outcome of the bounded exact-polynomial parser and Lie-derivative search.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExactPolynomialSearchStatus {
+    NotRequested,
+    NotRunStructuralShortcut,
+    IdentityFound,
+    CompletedNoCandidate,
+    SkippedTooFewVariables,
+    UnsupportedExpression,
+    ResourceLimitExceeded,
+}
+
+/// Structural pattern that produced a symmetry candidate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum StructuralSymmetryPattern {
+    /// A sum of distinct squared variables with one shared finite nonzero coefficient.
+    EqualCoefficientSumOfSquares {
+        variables: Vec<String>,
+        shared_coefficient: f64,
+    },
+    /// A determinant invariant under one diagonal SO(2) action on two coordinate pairs.
+    TwoDimensionalAntisymmetricBilinear {
+        first_pair: [String; 2],
+        second_pair: [String; 2],
+    },
+}
+
+/// Observed diagnostics for an accepted sampled Lie-derivative candidate.
+///
+/// The maximum is taken over every informative generator/sample pair evaluated
+/// by the declared profile. It is not a confidence interval or a proof.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct LieDerivativeSampleStatisticsV1 {
+    pub sample_count_per_generator: usize,
+    pub checked_generator_count: usize,
+    pub informative_evaluation_count: usize,
+    pub maximum_normalized_squared_residual: f64,
+}
+
+/// Evidence source for a candidate symmetry.
+///
+/// `StructuralPatternMatch` means the expression matched a narrowly specified
+/// exact AST pattern; it is not a Lean proof or a claim about physical units.
+/// `SampledLieDerivative` is empirical evidence over a finite, declared sample
+/// domain and must never be promoted to a symbolic/formal proof.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SymmetryInferenceEvidence {
+    StructuralPatternMatch { pattern: StructuralSymmetryPattern },
+    ExactPolynomialLieDerivative {
+        profile: ExactPolynomialLieProfileV1,
+        acted_on_variables: Vec<String>,
+        group: LieGroup,
+        checked_generator_count: usize,
+    },
+    SampledLieDerivative {
+        profile: NumericLieDerivativeProfileV1,
+        acted_on_variables: Vec<String>,
+        group: LieGroup,
+        statistics: LieDerivativeSampleStatisticsV1,
+    },
+}
+
+/// How far the symmetry-inference pipeline progressed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SymmetryInferenceSearchStatus {
+    /// An exact-shape structural detector matched; numeric search was short-circuited.
+    StructuralMatchShortCircuit,
+    /// The bounded exact-polynomial Lie-derivative identity was zero for every searched generator.
+    ExactPolynomialIdentityFound,
+    /// The supported polynomial was checked exactly against the searched group families; none matched.
+    ExactPolynomialSearchCompletedNoCandidate,
+    /// The bounded numerical search ran to completion.
+    NumericSearchCompleted,
+    /// The expression had fewer than two free variables, so numerical rotation search was skipped.
+    NumericSearchSkippedTooFewVariables,
+}
+
+/// Auditable result of symmetry inference.
+///
+/// A missing candidate means only that the recorded bounded search found no candidate;
+/// it is not evidence that the expression has no symmetry.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SymmetryInferenceReport {
+    pub candidate: Option<SymmetryDescriptor>,
+    pub evidence: Option<SymmetryInferenceEvidence>,
+    pub search_status: SymmetryInferenceSearchStatus,
+    pub numeric_profile: NumericLieDerivativeProfileV1,
+    pub exact_polynomial_profile: ExactPolynomialLieProfileV1,
+    pub exact_polynomial_status: ExactPolynomialSearchStatus,
+}
+
+impl SymmetryInferenceReport {
+    /// Compatibility projection for APIs that still consume only a descriptor.
+    pub fn descriptor_or_none(&self) -> SymmetryDescriptor {
+        self.candidate.clone().unwrap_or_else(SymmetryDescriptor::none)
+    }
+}
+/// Infer a best-effort symmetry descriptor from a discovered expression.
+///
+/// This compatibility API intentionally discards evidence provenance. New
+/// claim-bearing callers should use [`infer_symmetry_with_evidence`].
+pub fn infer_symmetry(expr: &Expr) -> SymmetryDescriptor {
+    infer_symmetry_with_evidence(expr).descriptor_or_none()
+}
+
+/// Infer a symmetry candidate while preserving the evidence source and search limits.
+pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
+    let numeric_profile = NumericLieDerivativeProfileV1::default();
+    let exact_polynomial_profile = ExactPolynomialLieProfileV1::default();
+
+    if let Some((variables, shared_coefficient)) = detect_sum_of_squares(expr)
+        && (2..=10).contains(&variables.len())
+    {
+        let dimension = variables.len() as u8;
+        return SymmetryInferenceReport {
+            candidate: Some(SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(dimension)], false)),
+            evidence: Some(SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares {
+                    variables,
+                    shared_coefficient,
+                },
+            }),
+            search_status: SymmetryInferenceSearchStatus::StructuralMatchShortCircuit,
+            numeric_profile,
+            exact_polynomial_profile,
+            exact_polynomial_status: ExactPolynomialSearchStatus::NotRunStructuralShortcut,
+        };
+    }
+
+    if let Some((first_pair, second_pair)) = detect_2d_antisymmetric_cross(expr) {
+        return SymmetryInferenceReport {
+            candidate: Some(SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false)),
+            evidence: Some(SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: StructuralSymmetryPattern::TwoDimensionalAntisymmetricBilinear {
+                    first_pair,
+                    second_pair,
+                },
+            }),
+            search_status: SymmetryInferenceSearchStatus::StructuralMatchShortCircuit,
+            numeric_profile,
+            exact_polynomial_profile,
+            exact_polynomial_status: ExactPolynomialSearchStatus::NotRunStructuralShortcut,
+        };
+    }
+
+    let mut var_names = Vec::new();
+    collect_var_names(expr, &mut var_names);
+    if var_names.len() < 2 {
+        return SymmetryInferenceReport {
+            candidate: None,
+            evidence: None,
+            search_status: SymmetryInferenceSearchStatus::NumericSearchSkippedTooFewVariables,
+            numeric_profile,
+            exact_polynomial_profile,
+            exact_polynomial_status: ExactPolynomialSearchStatus::SkippedTooFewVariables,
+        };
+    }
+
+    match exact_polynomial_symmetry_candidate(expr, &var_names, exact_polynomial_profile) {
+        Ok(Some((group, acted_on_variables, checked_generator_count))) => {
+            SymmetryInferenceReport {
+                candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
+                evidence: Some(SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
+                    profile: exact_polynomial_profile,
+                    acted_on_variables,
+                    group,
+                    checked_generator_count,
+                }),
+                search_status: SymmetryInferenceSearchStatus::ExactPolynomialIdentityFound,
+                numeric_profile,
+                exact_polynomial_profile,
+                exact_polynomial_status: ExactPolynomialSearchStatus::IdentityFound,
+            }
+        }
+        Ok(None) => SymmetryInferenceReport {
+            candidate: None,
+            evidence: None,
+            search_status: SymmetryInferenceSearchStatus::ExactPolynomialSearchCompletedNoCandidate,
+            numeric_profile,
+            exact_polynomial_profile,
+            exact_polynomial_status: ExactPolynomialSearchStatus::CompletedNoCandidate,
+        },
+        Err(ExactPolynomialError::UnsupportedExpression) => infer_symmetry_numeric_with_profile(
+            expr,
+            numeric_profile,
+            exact_polynomial_profile,
+            ExactPolynomialSearchStatus::UnsupportedExpression,
+        ),
+        Err(ExactPolynomialError::ResourceLimitExceeded) => infer_symmetry_numeric_with_profile(
+            expr,
+            numeric_profile,
+            exact_polynomial_profile,
+            ExactPolynomialSearchStatus::ResourceLimitExceeded,
+        ),
+    }
+}
+
+/// The generic numeric fallback, with its finite search domain and tolerances in the result.
+pub fn infer_symmetry_numeric_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
+    infer_symmetry_numeric_with_profile(
+        expr,
+        NumericLieDerivativeProfileV1::default(),
+        ExactPolynomialLieProfileV1::default(),
+        ExactPolynomialSearchStatus::NotRequested,
+    )
+}
+
+/// Compatibility API for callers that need only a descriptor from the numeric fallback.
 pub fn infer_symmetry_numeric(expr: &Expr) -> SymmetryDescriptor {
+    infer_symmetry_numeric_with_evidence(expr).descriptor_or_none()
+}
+
+fn infer_symmetry_numeric_with_profile(
+    expr: &Expr,
+    profile: NumericLieDerivativeProfileV1,
+    exact_polynomial_profile: ExactPolynomialLieProfileV1,
+    exact_polynomial_status: ExactPolynomialSearchStatus,
+) -> SymmetryInferenceReport {
     let mut var_names = Vec::new();
     collect_var_names(expr, &mut var_names);
 
     if var_names.len() < 2 {
-        return SymmetryDescriptor::none();
+        return SymmetryInferenceReport {
+            candidate: None,
+            evidence: None,
+            search_status: SymmetryInferenceSearchStatus::NumericSearchSkippedTooFewVariables,
+            numeric_profile: profile,
+            exact_polynomial_profile,
+            exact_polynomial_status,
+        };
     }
 
-    // Joint rotation of all variables (bounded to so(6) for generator-count cost).
-    let n = var_names.len().min(6);
+    // Joint rotation of the first n variables (bounded by the declared profile).
+    let n = var_names.len().min(profile.maximum_joint_dimension);
     let joint_algebra = lie_theory::so_n(n);
     let joint_indices: Vec<usize> = (0..n).collect();
-    if is_lie_invariant(expr, &var_names, &joint_indices, &joint_algebra) {
-        return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(n as u8)], false);
+    if let Some(statistics) = is_lie_invariant(expr, &var_names, &joint_indices, &joint_algebra, profile) {
+        let group = LieGroup::SO(n as u8);
+        return SymmetryInferenceReport {
+            candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
+            evidence: Some(SymmetryInferenceEvidence::SampledLieDerivative {
+                profile,
+                acted_on_variables: var_names[..n].to_vec(),
+                group,
+                statistics,
+            }),
+            search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
+            numeric_profile: profile,
+            exact_polynomial_profile,
+            exact_polynomial_status,
+        };
     }
 
-    // Pairwise SO(2) on each distinct pair of variables.
-    let so2 = lie_theory::so_n(2);
-    for i in 0..var_names.len() {
-        for j in (i + 1)..var_names.len() {
-            if is_lie_invariant(expr, &var_names, &[i, j], &so2) {
-                return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false);
+    // Pairwise SO(2) search over every distinct variable pair when enabled.
+    if profile.pairwise_so2_search {
+        let so2 = lie_theory::so_n(2);
+        for i in 0..var_names.len() {
+            for j in (i + 1)..var_names.len() {
+                if let Some(statistics) = is_lie_invariant(expr, &var_names, &[i, j], &so2, profile) {
+                    let group = LieGroup::SO(2);
+                    return SymmetryInferenceReport {
+                        candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
+                        evidence: Some(SymmetryInferenceEvidence::SampledLieDerivative {
+                            profile,
+                            acted_on_variables: vec![var_names[i].clone(), var_names[j].clone()],
+                            group,
+                            statistics,
+                        }),
+                        search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
+                        numeric_profile: profile,
+                        exact_polynomial_profile,
+                        exact_polynomial_status,
+                    };
+                }
             }
         }
     }
 
-    SymmetryDescriptor::none()
+    SymmetryInferenceReport {
+        candidate: None,
+        evidence: None,
+        search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
+        numeric_profile: profile,
+        exact_polynomial_profile,
+        exact_polynomial_status,
+    }
 }
-
 /// Collect free variable names referenced by `expr`, first-seen order, deduplicated.
 fn collect_var_names(expr: &Expr, out: &mut Vec<String>) {
     match expr {
@@ -130,18 +455,457 @@ fn collect_var_names(expr: &Expr, out: &mut Vec<String>) {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExactPolynomialError {
+    UnsupportedExpression,
+    ResourceLimitExceeded,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ExactRational {
+    numerator: i128,
+    denominator: i128,
+}
+
+impl ExactRational {
+    const ZERO: Self = Self { numerator: 0, denominator: 1 };
+    const ONE: Self = Self { numerator: 1, denominator: 1 };
+
+    fn new(mut numerator: i128, mut denominator: i128) -> Option<Self> {
+        if denominator == 0 {
+            return None;
+        }
+        if numerator == 0 {
+            return Some(Self::ZERO);
+        }
+        if denominator < 0 {
+            numerator = numerator.checked_neg()?;
+            denominator = denominator.checked_neg()?;
+        }
+        let divisor = exact_gcd(numerator.unsigned_abs(), denominator as u128);
+        let divisor = i128::try_from(divisor).ok()?;
+        Some(Self {
+            numerator: numerator / divisor,
+            denominator: denominator / divisor,
+        })
+    }
+
+    fn from_f64(value: f64, maximum_denominator_power: u32) -> Option<Self> {
+        if !value.is_finite() {
+            return None;
+        }
+        if value == 0.0 {
+            return Some(Self::ZERO);
+        }
+
+        // Decode the exact binary rational represented by this IEEE-754 value.
+        let bits = value.to_bits();
+        let negative = (bits >> 63) != 0;
+        let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+        let fraction = bits & ((1_u64 << 52) - 1);
+        let (mut significand, mut binary_exponent) = if exponent_bits == 0 {
+            (fraction, -1022 - 52)
+        } else {
+            (fraction | (1_u64 << 52), exponent_bits - 1023 - 52)
+        };
+        if significand == 0 {
+            return Some(Self::ZERO);
+        }
+
+        let trailing_zeros = significand.trailing_zeros();
+        significand >>= trailing_zeros;
+        binary_exponent += trailing_zeros as i32;
+
+        let magnitude = i128::from(significand);
+        if binary_exponent >= 0 {
+            let shift = u32::try_from(binary_exponent).ok()?;
+            if shift > 126 {
+                return None;
+            }
+            let scale = 1_i128.checked_shl(shift)?;
+            let numerator = magnitude.checked_mul(scale)?;
+            let numerator = if negative { numerator.checked_neg()? } else { numerator };
+            Self::new(numerator, 1)
+        } else {
+            let denominator_power = u32::try_from(-binary_exponent).ok()?;
+            if denominator_power > maximum_denominator_power || denominator_power > 126 {
+                return None;
+            }
+            let denominator = 1_i128.checked_shl(denominator_power)?;
+            let numerator = if negative { magnitude.checked_neg()? } else { magnitude };
+            Self::new(numerator, denominator)
+        }
+    }
+
+    fn checked_add(self, other: Self) -> Option<Self> {
+        // Use the least common denominator to avoid avoidable intermediate growth.
+        let common = exact_gcd(self.denominator as u128, other.denominator as u128);
+        let common = i128::try_from(common).ok()?;
+        let left_scale = other.denominator / common;
+        let right_scale = self.denominator / common;
+        let left = self.numerator.checked_mul(left_scale)?;
+        let right = other.numerator.checked_mul(right_scale)?;
+        let numerator = left.checked_add(right)?;
+        let denominator = self.denominator.checked_mul(left_scale)?;
+        Self::new(numerator, denominator)
+    }
+
+    fn checked_mul(self, other: Self) -> Option<Self> {
+        // Cross-cancel before multiplication to preserve the bounded exact domain.
+        let cancel_left = exact_gcd(self.numerator.unsigned_abs(), other.denominator as u128);
+        let cancel_right = exact_gcd(other.numerator.unsigned_abs(), self.denominator as u128);
+        let cancel_left = i128::try_from(cancel_left).ok()?;
+        let cancel_right = i128::try_from(cancel_right).ok()?;
+        let left_numerator = self.numerator / cancel_left;
+        let right_denominator = other.denominator / cancel_left;
+        let right_numerator = other.numerator / cancel_right;
+        let left_denominator = self.denominator / cancel_right;
+        let numerator = left_numerator.checked_mul(right_numerator)?;
+        let denominator = left_denominator.checked_mul(right_denominator)?;
+        Self::new(numerator, denominator)
+    }
+
+    fn checked_neg(self) -> Option<Self> {
+        Some(Self {
+            numerator: self.numerator.checked_neg()?,
+            denominator: self.denominator,
+        })
+    }
+
+    fn is_zero(self) -> bool {
+        self.numerator == 0
+    }
+}
+
+fn exact_gcd(mut a: u128, mut b: u128) -> u128 {
+    while b != 0 {
+        let remainder = a % b;
+        a = b;
+        b = remainder;
+    }
+    a.max(1)
+}
+
+type ExactPolynomial = BTreeMap<Vec<u8>, ExactRational>;
+
+fn check_monomial(
+    monomial: &[u8],
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<(), ExactPolynomialError> {
+    let degree: usize = monomial.iter().map(|power| usize::from(*power)).sum();
+    if degree > profile.maximum_total_degree {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    Ok(())
+}
+
+fn polynomial_add_term(
+    polynomial: &mut ExactPolynomial,
+    monomial: Vec<u8>,
+    coefficient: ExactRational,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<(), ExactPolynomialError> {
+    check_monomial(&monomial, profile)?;
+    if coefficient.is_zero() {
+        return Ok(());
+    }
+
+    if let Some(existing) = polynomial.get(&monomial).copied() {
+        let combined = existing
+            .checked_add(coefficient)
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        if combined.is_zero() {
+            polynomial.remove(&monomial);
+        } else {
+            polynomial.insert(monomial, combined);
+        }
+    } else {
+        polynomial.insert(monomial, coefficient);
+    }
+
+    if polynomial.len() > profile.maximum_terms {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    Ok(())
+}
+
+fn polynomial_constant(
+    dimension: usize,
+    coefficient: ExactRational,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut polynomial = ExactPolynomial::new();
+    polynomial_add_term(&mut polynomial, vec![0; dimension], coefficient, profile)?;
+    Ok(polynomial)
+}
+
+fn polynomial_add(
+    left: &ExactPolynomial,
+    right: &ExactPolynomial,
+    negate_right: bool,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut result = left.clone();
+    for (monomial, coefficient) in right {
+        let coefficient = if negate_right {
+            coefficient.checked_neg().ok_or(ExactPolynomialError::ResourceLimitExceeded)?
+        } else {
+            *coefficient
+        };
+        polynomial_add_term(&mut result, monomial.clone(), coefficient, profile)?;
+    }
+    Ok(result)
+}
+
+fn polynomial_multiply(
+    left: &ExactPolynomial,
+    right: &ExactPolynomial,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut result = ExactPolynomial::new();
+    let mut term_products = 0usize;
+    for (left_monomial, left_coefficient) in left {
+        for (right_monomial, right_coefficient) in right {
+            term_products = term_products.saturating_add(1);
+            if term_products > profile.maximum_term_products {
+                return Err(ExactPolynomialError::ResourceLimitExceeded);
+            }
+            let mut monomial = Vec::with_capacity(left_monomial.len());
+            for (left_power, right_power) in left_monomial.iter().zip(right_monomial) {
+                monomial.push(
+                    left_power
+                        .checked_add(*right_power)
+                        .ok_or(ExactPolynomialError::ResourceLimitExceeded)?,
+                );
+            }
+            let coefficient = left_coefficient
+                .checked_mul(*right_coefficient)
+                .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+            polynomial_add_term(&mut result, monomial, coefficient, profile)?;
+        }
+    }
+    Ok(result)
+}
+
+fn polynomial_power(
+    base: &ExactPolynomial,
+    exponent: u32,
+    dimension: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    if exponent > profile.maximum_power {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    let mut result = polynomial_constant(dimension, ExactRational::ONE, profile)?;
+    let mut factor = base.clone();
+    let mut remaining = exponent;
+    while remaining > 0 {
+        if remaining & 1 == 1 {
+            result = polynomial_multiply(&result, &factor, profile)?;
+        }
+        remaining >>= 1;
+        if remaining > 0 {
+            factor = polynomial_multiply(&factor, &factor, profile)?;
+        }
+    }
+    Ok(result)
+}
+
+fn parse_exact_polynomial(
+    expr: &Expr,
+    variable_names: &[String],
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let dimension = variable_names.len();
+    match expr {
+        Expr::Const(value) => {
+            let coefficient = ExactRational::from_f64(
+                *value,
+                profile.maximum_dyadic_denominator_power,
+            )
+            .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+            polynomial_constant(dimension, coefficient, profile)
+        }
+        Expr::Var(name) => {
+            let index = variable_names
+                .iter()
+                .position(|candidate| candidate == name)
+                .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+            let mut monomial = vec![0; dimension];
+            monomial[index] = 1;
+            let mut polynomial = ExactPolynomial::new();
+            polynomial_add_term(&mut polynomial, monomial, ExactRational::ONE, profile)?;
+            Ok(polynomial)
+        }
+        Expr::BinOp(BinOp::Add, left, right) => {
+            let left = parse_exact_polynomial(left, variable_names, profile)?;
+            let right = parse_exact_polynomial(right, variable_names, profile)?;
+            polynomial_add(&left, &right, false, profile)
+        }
+        Expr::BinOp(BinOp::Sub, left, right) => {
+            let left = parse_exact_polynomial(left, variable_names, profile)?;
+            let right = parse_exact_polynomial(right, variable_names, profile)?;
+            polynomial_add(&left, &right, true, profile)
+        }
+        Expr::BinOp(BinOp::Mul, left, right) => {
+            let left = parse_exact_polynomial(left, variable_names, profile)?;
+            let right = parse_exact_polynomial(right, variable_names, profile)?;
+            polynomial_multiply(&left, &right, profile)
+        }
+        Expr::BinOp(BinOp::Pow, base, exponent) => {
+            let Expr::Const(exponent) = exponent.as_ref() else {
+                return Err(ExactPolynomialError::UnsupportedExpression);
+            };
+            if !exponent.is_finite() || exponent.fract() != 0.0 || *exponent < 0.0 {
+                return Err(ExactPolynomialError::UnsupportedExpression);
+            }
+            let exponent = u32::try_from(*exponent as u64)
+                .map_err(|_| ExactPolynomialError::ResourceLimitExceeded)?;
+            let base = parse_exact_polynomial(base, variable_names, profile)?;
+            polynomial_power(&base, exponent, dimension, profile)
+        }
+        Expr::BinOp(BinOp::Div, _, _) | Expr::Func(_, _) | Expr::Sum(_, _) => {
+            Err(ExactPolynomialError::UnsupportedExpression)
+        }
+    }
+}
+
+fn polynomial_derivative(
+    polynomial: &ExactPolynomial,
+    variable_index: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut result = ExactPolynomial::new();
+    for (monomial, coefficient) in polynomial {
+        let exponent = monomial[variable_index];
+        if exponent == 0 {
+            continue;
+        }
+        let scaled = coefficient
+            .checked_mul(ExactRational::new(i128::from(exponent), 1).unwrap())
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        let mut reduced = monomial.clone();
+        reduced[variable_index] -= 1;
+        polynomial_add_term(&mut result, reduced, scaled, profile)?;
+    }
+    Ok(result)
+}
+
+fn polynomial_multiply_variable(
+    polynomial: &ExactPolynomial,
+    variable_index: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut result = ExactPolynomial::new();
+    for (monomial, coefficient) in polynomial {
+        let mut multiplied = monomial.clone();
+        multiplied[variable_index] = multiplied[variable_index]
+            .checked_add(1)
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        polynomial_add_term(&mut result, multiplied, *coefficient, profile)?;
+    }
+    Ok(result)
+}
+
+fn polynomial_depends_on_variable(polynomial: &ExactPolynomial, variable_index: usize) -> bool {
+    polynomial
+        .keys()
+        .any(|monomial| monomial.get(variable_index).is_some_and(|power| *power > 0))
+}
+/// Exact Lie derivative for the SO(n) generator with δx_i=-x_j, δx_j=x_i.
+fn exact_polynomial_lie_derivative_is_zero(
+    polynomial: &ExactPolynomial,
+    i: usize,
+    j: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<bool, ExactPolynomialError> {
+    let derivative_i = polynomial_derivative(polynomial, i, profile)?;
+    let derivative_j = polynomial_derivative(polynomial, j, profile)?;
+    let term_i = polynomial_multiply_variable(&derivative_i, j, profile)?;
+    let term_j = polynomial_multiply_variable(&derivative_j, i, profile)?;
+    let residual = polynomial_add(&term_j, &term_i, true, profile)?;
+    Ok(residual.is_empty())
+}
+
+fn exact_polynomial_symmetry_candidate(
+    expr: &Expr,
+    variable_names: &[String],
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<Option<(LieGroup, Vec<String>, usize)>, ExactPolynomialError> {
+    if variable_names.len() < 2 {
+        return Ok(None);
+    }
+    if variable_names.len() > profile.maximum_variables {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    let polynomial = parse_exact_polynomial(expr, variable_names, profile)?;
+    if polynomial
+        .keys()
+        .all(|monomial| monomial.iter().all(|exponent| *exponent == 0))
+    {
+        // Constant/zero expressions carry no useful state-dependent symmetry signal.
+        return Ok(None);
+    }
+    let dimension = variable_names.len();
+    let generator_count = dimension * (dimension - 1) / 2;
+
+    let all_coordinates_present =
+        (0..dimension).all(|index| polynomial_depends_on_variable(&polynomial, index));
+    let mut all_generators_invariant = all_coordinates_present;
+    for i in 0..dimension {
+        for j in (i + 1)..dimension {
+            if !exact_polynomial_lie_derivative_is_zero(&polynomial, i, j, profile)? {
+                all_generators_invariant = false;
+                break;
+            }
+        }
+        if !all_generators_invariant {
+            break;
+        }
+    }
+    if all_generators_invariant {
+        return Ok(Some((
+            LieGroup::SO(dimension as u8),
+            variable_names.to_vec(),
+            generator_count,
+        )));
+    }
+
+    if profile.pairwise_so2_search {
+        for i in 0..dimension {
+            for j in (i + 1)..dimension {
+                if polynomial_depends_on_variable(&polynomial, i)
+                    && polynomial_depends_on_variable(&polynomial, j)
+                    && exact_polynomial_lie_derivative_is_zero(&polynomial, i, j, profile)?
+                {
+                    return Ok(Some((
+                        LieGroup::SO(2),
+                        vec![variable_names[i].clone(), variable_names[j].clone()],
+                        1,
+                    )));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
 /// Central-difference gradient of `expr` at `state`, w.r.t. `var_names` (same
 /// binding order as `state`). Mirrors
 /// `conjecture_engine::gp_support::fd_gradient`, reimplemented locally since
 /// that helper is `pub(crate)` to symthaea-core.
-fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[String]) -> Vec<f64> {
-    const EPS: f64 = 1e-5;
+fn fd_gradient(
+    expr: &Expr,
+    state: &[f64],
+    var_names: &[String],
+    profile: NumericLieDerivativeProfileV1,
+) -> Vec<f64> {
+    let eps = profile.finite_difference_step;
     let mut grad = Vec::with_capacity(var_names.len());
     for i in 0..var_names.len() {
         let mut plus = state.to_vec();
         let mut minus = state.to_vec();
-        plus[i] += EPS;
-        minus[i] -= EPS;
+        plus[i] += eps;
+        minus[i] -= eps;
         let bindings_plus: Vec<(&str, f64)> = var_names
             .iter()
             .map(|s| s.as_str())
@@ -152,16 +916,16 @@ fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[String]) -> Vec<f64> {
             .map(|s| s.as_str())
             .zip(minus.iter().copied())
             .collect();
-        grad.push((expr.eval(&bindings_plus) - expr.eval(&bindings_minus)) / (2.0 * EPS));
+        grad.push((expr.eval(&bindings_plus) - expr.eval(&bindings_minus)) / (2.0 * eps));
     }
     grad
 }
 
 /// Deterministic xorshift64 sampler — no external RNG dependency, reproducible
 /// across runs (important for test stability).
-fn sample_states(dim: usize, count: usize, seed: u64) -> Vec<Vec<f64>> {
-    let mut state = seed | 1;
-    (0..count)
+fn sample_states(dim: usize, profile: NumericLieDerivativeProfileV1) -> Vec<Vec<f64>> {
+    let mut state = profile.seed | 1;
+    (0..profile.samples_per_generator)
         .map(|_| {
             (0..dim)
                 .map(|_| {
@@ -170,12 +934,9 @@ fn sample_states(dim: usize, count: usize, seed: u64) -> Vec<Vec<f64>> {
                     x ^= x >> 7;
                     x ^= x << 17;
                     state = x;
-                    let unit = (x >> 11) as f64 / (1u64 << 53) as f64; // [0, 1)
-                    // [0.5, 3.0) — strictly positive, avoids the origin (where
-                    // e.g. 1/r and ln(x) are singular) while still probing a
-                    // range wide enough to distinguish real invariance from
-                    // a coincidental zero at a single point.
-                    0.5 + unit * 2.5
+                    let unit = (x >> 11) as f64 / (1u64 << 53) as f64;
+                    profile.sample_min_inclusive
+                        + unit * (profile.sample_max_exclusive - profile.sample_min_inclusive)
                 })
                 .collect()
         })
@@ -194,17 +955,17 @@ fn is_lie_invariant(
     var_names: &[String],
     active_indices: &[usize],
     algebra: &LieAlgebra,
-) -> bool {
-    const TOLERANCE: f64 = 1e-6;
-    const MIN_GRADIENT_MAG_SQ: f64 = 1e-8;
-    let samples = sample_states(var_names.len(), 8, 0x9E3779B97F4A7C15);
+    profile: NumericLieDerivativeProfileV1,
+) -> Option<LieDerivativeSampleStatisticsV1> {
+    let samples = sample_states(var_names.len(), profile);
 
-    let mut informative = false;
+    let mut informative_evaluation_count = 0usize;
+    let mut maximum_normalized_squared_residual = 0.0_f64;
     for generator in &algebra.basis {
         for state in &samples {
-            let grad = fd_gradient(expr, state, var_names);
+            let grad = fd_gradient(expr, state, var_names, profile);
             if grad.iter().any(|g| !g.is_finite()) {
-                return false;
+                return None;
             }
 
             // flow[active_indices[gi]] = sum_gj generator[gi][gj] * state[active_indices[gj]]
@@ -220,18 +981,31 @@ fn is_lie_invariant(
             let lie: f64 = grad.iter().zip(flow.iter()).map(|(g, f)| g * f).sum();
             let grad_sq: f64 = active_indices.iter().map(|&vi| grad[vi] * grad[vi]).sum();
             if !lie.is_finite() || !grad_sq.is_finite() {
-                return false;
+                return None;
             }
-            if grad_sq < MIN_GRADIENT_MAG_SQ {
+            if grad_sq < profile.minimum_gradient_squared {
                 continue;
             }
-            informative = true;
-            if (lie * lie) / grad_sq > TOLERANCE {
-                return false;
+
+            let normalized_squared_residual = (lie * lie) / grad_sq;
+            if !normalized_squared_residual.is_finite()
+                || normalized_squared_residual > profile.normalized_squared_residual_tolerance
+            {
+                return None;
             }
+
+            informative_evaluation_count = informative_evaluation_count.saturating_add(1);
+            maximum_normalized_squared_residual =
+                maximum_normalized_squared_residual.max(normalized_squared_residual);
         }
     }
-    informative
+
+    (informative_evaluation_count > 0).then_some(LieDerivativeSampleStatisticsV1 {
+        sample_count_per_generator: samples.len(),
+        checked_generator_count: algebra.basis.len(),
+        informative_evaluation_count,
+        maximum_normalized_squared_residual,
+    })
 }
 
 /// Flatten an `Add` tree into a vector of leaf terms. Unlike the recognize
@@ -248,13 +1022,10 @@ fn flatten_add_only<'a>(expr: &'a Expr, out: &mut Vec<&'a Expr>) {
     }
 }
 
-/// If `expr` is a sum of k ≥ 1 distinct squared variables (i.e.
-/// `Power(Var(xᵢ), 2)` with unique `xᵢ`), return k. Otherwise return None.
-///
-/// Accepts extra coefficients via `Mul(Const(c), Power(Var, 2))` but rejects
-/// any non-square term — so `x² + y²` matches (returns 2) but
-/// `x² + y² + y³` does not.
-fn detect_sum_of_squares(expr: &Expr) -> Option<u8> {
+/// If expr is `c * (x₁² + ... + xₖ²)` for k ≥ 2 distinct variables and one
+/// shared finite, nonzero coefficient c, return k. Unequal weights define an
+/// ellipsoid rather than an SO(k)-invariant quadratic form and are rejected.
+fn detect_sum_of_squares(expr: &Expr) -> Option<(Vec<String>, f64)> {
     let mut terms = Vec::new();
     flatten_add_only(expr, &mut terms);
     if terms.len() < 2 {
@@ -262,33 +1033,50 @@ fn detect_sum_of_squares(expr: &Expr) -> Option<u8> {
     }
 
     let mut seen = Vec::new();
-    for t in terms {
-        let var = squared_var(t)?;
+    let mut common_coefficient: Option<f64> = None;
+    for term in terms {
+        let (var, coefficient) = squared_term(term)?;
+        if !coefficient.is_finite() || coefficient == 0.0 {
+            return None;
+        }
+        if let Some(common) = common_coefficient {
+            // Coefficients are AST literals: require exact equality rather
+            // than a tolerance that could promote an anisotropic form.
+            if coefficient != common {
+                return None;
+            }
+        } else {
+            common_coefficient = Some(coefficient);
+        }
+
         // Reject duplicates — they'd over-count the symmetry group dimension.
         if seen.contains(&var) {
             return None;
         }
         seen.push(var);
     }
-    Some(seen.len() as u8)
+    Some((seen, common_coefficient?))
 }
 
-/// If `expr` is `Power(Var(name), 2)` or `Const * Power(Var(name), 2)`,
-/// return the variable name; otherwise None.
-fn squared_var(expr: &Expr) -> Option<String> {
+/// Return (variable name, total scalar coefficient) for a squared variable.
+/// Nested scalar multiplications are accumulated, and non-finite products fail.
+fn squared_term(expr: &Expr) -> Option<(String, f64)> {
     match expr {
         Expr::BinOp(BinOp::Pow, base, exp) => {
             if let (Expr::Var(name), Expr::Const(k)) = (base.as_ref(), exp.as_ref())
                 && (*k - 2.0).abs() < 1e-12
             {
-                return Some(name.clone());
+                return Some((name.clone(), 1.0));
             }
             None
         }
         Expr::BinOp(BinOp::Mul, l, r) => {
-            // Allow Const · Power(Var, 2)
             match (l.as_ref(), r.as_ref()) {
-                (Expr::Const(_), other) | (other, Expr::Const(_)) => squared_var(other),
+                (Expr::Const(coefficient), other) | (other, Expr::Const(coefficient)) => {
+                    let (name, inner_coefficient) = squared_term(other)?;
+                    let total = *coefficient * inner_coefficient;
+                    total.is_finite().then_some((name, total))
+                }
                 _ => None,
             }
         }
@@ -302,35 +1090,32 @@ fn squared_var(expr: &Expr) -> Option<String> {
 /// Example matches: `x*vy - y*vx`, `p*q - q*p` → SO(2). The match is
 /// structural only; we don't verify that the variables form an actual
 /// canonical pair (position/momentum), just that the shape is antisymmetric.
-fn detect_2d_antisymmetric_cross(expr: &Expr) -> bool {
+fn detect_2d_antisymmetric_cross(expr: &Expr) -> Option<([String; 2], [String; 2])> {
     let Expr::BinOp(BinOp::Sub, l, r) = expr else {
-        return false;
+        return None;
     };
     let Expr::BinOp(BinOp::Mul, l1, l2) = l.as_ref() else {
-        return false;
+        return None;
     };
     let Expr::BinOp(BinOp::Mul, r1, r2) = r.as_ref() else {
-        return false;
+        return None;
     };
-    let (l1v, l2v, r1v, r2v) = match (l1.as_ref(), l2.as_ref(), r1.as_ref(), r2.as_ref()) {
+    let (a, b, c, d) = match (l1.as_ref(), l2.as_ref(), r1.as_ref(), r2.as_ref()) {
         (Expr::Var(a), Expr::Var(b), Expr::Var(c), Expr::Var(d)) => (a, b, c, d),
-        _ => return false,
+        _ => return None,
     };
-    // {l1, r1} and {l2, r2} should each be a pair of distinct variables,
-    // and the two pairs together must use 4 distinct names (e.g. x, vy, y, vx).
-    let all = [l1v, l2v, r1v, r2v];
+    // Interpret a*b-c*d as det([[a,d],[c,b]]). Left SO(2) multiplication
+    // rotates (a,c) and (d,b) by the same angle, preserving the determinant.
+    let all = [a, b, c, d];
     let unique_count = all
         .iter()
         .enumerate()
         .filter(|(i, name)| !all[..*i].contains(name))
         .count();
     if unique_count != 4 {
-        return false;
+        return None;
     }
-    // The shape `a·b - c·d` is antisymmetric iff swapping `a↔c` and `b↔d`
-    // negates the expression, which is automatic when {a,c} and {b,d} are
-    // the two pairs of the cross product.
-    true
+    Some(([a.clone(), c.clone()], [d.clone(), b.clone()]))
 }
 
 // Silence unused-import warning when UnaryFn is referenced only in rustdoc.
@@ -366,6 +1151,212 @@ mod tests {
     }
 
     #[test]
+    fn structural_symmetry_report_preserves_pattern_provenance() {
+        let expr = add(pow2("x"), pow2("y"));
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(
+            report.candidate.unwrap().lie_groups,
+            vec![LieGroup::SO(2)]
+        );
+        assert_eq!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares {
+                    variables: vec!["x".to_string(), "y".to_string()],
+                    shared_coefficient: 1.0,
+                },
+            })
+        );
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::StructuralMatchShortCircuit
+        );
+    }
+
+    #[test]
+    fn numeric_symmetry_report_is_explicitly_sampled_not_proven() {
+        let expr = sqrt_of(add(pow2("x"), pow2("y")));
+        let report = infer_symmetry_numeric_with_evidence(&expr);
+        assert_eq!(report.candidate.unwrap().lie_groups, vec![LieGroup::SO(2)]);
+        let Some(SymmetryInferenceEvidence::SampledLieDerivative {
+            profile,
+            group,
+            acted_on_variables,
+            statistics,
+        }) = report.evidence
+        else {
+            panic!("numeric fallback must preserve sampled evidence provenance");
+        };
+        assert_eq!(group, LieGroup::SO(2));
+        assert_eq!(acted_on_variables, vec!["x".to_string(), "y".to_string()]);
+        assert_eq!(profile.samples_per_generator, 8);
+        assert_eq!(profile.finite_difference_step, 1e-5);
+        assert_eq!(profile.sample_min_inclusive, 0.5);
+        assert_eq!(profile.sample_max_exclusive, 3.0);
+        assert_eq!(statistics.sample_count_per_generator, 8);
+        assert_eq!(statistics.checked_generator_count, 1);
+        assert_eq!(statistics.informative_evaluation_count, 8);
+        assert!(statistics.maximum_normalized_squared_residual <= profile.normalized_squared_residual_tolerance);
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::NumericSearchCompleted
+        );
+    }
+
+    #[test]
+    fn near_isotropic_quadratic_candidate_remains_sampled_evidence() {
+        // The 1e-5 anisotropy is below the declared sampled residual threshold.
+        // It must not be represented as an exact structural pattern or formal proof.
+        let expr = sqrt_of(add(
+            pow2("x"),
+            mul(Expr::Const(1.00001), pow2("y")),
+        ));
+        assert!(detect_sum_of_squares(&expr).is_none());
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(
+            report.candidate.as_ref().unwrap().lie_groups,
+            vec![LieGroup::SO(2)]
+        );
+        let Some(SymmetryInferenceEvidence::SampledLieDerivative { statistics, profile, .. }) = report.evidence else {
+            panic!("near-isotropic candidate must remain sampled evidence");
+        };
+        assert!(statistics.maximum_normalized_squared_residual > 0.0);
+        assert!(statistics.maximum_normalized_squared_residual <= profile.normalized_squared_residual_tolerance);
+        assert_eq!(statistics.sample_count_per_generator, profile.samples_per_generator);
+        assert_eq!(
+            report.exact_polynomial_status,
+            ExactPolynomialSearchStatus::UnsupportedExpression
+        );
+    }
+    #[test]
+    fn quartic_radial_polynomial_has_exact_so2_lie_derivative_identity() {
+        let radial_squared = add(pow2("x"), pow2("y"));
+        let quartic = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(radial_squared),
+            Box::new(Expr::Const(2.0)),
+        );
+        // A dyadic coefficient tests the exact rational interpretation of f64 literals.
+        let expr = mul(Expr::Const(0.5), quartic);
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(
+            report.candidate.as_ref().unwrap().lie_groups,
+            vec![LieGroup::SO(2)]
+        );
+        let Some(SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
+            profile,
+            acted_on_variables,
+            group,
+            checked_generator_count,
+        }) = report.evidence
+        else {
+            panic!("supported radial polynomial should produce exact symbolic evidence");
+        };
+        assert_eq!(group, LieGroup::SO(2));
+        assert_eq!(acted_on_variables, vec!["x".to_string(), "y".to_string()]);
+        assert_eq!(checked_generator_count, 1);
+        assert_eq!(profile.maximum_terms, 4096);
+        assert_eq!(profile.maximum_term_products, 65_536);
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::ExactPolynomialIdentityFound
+        );
+        assert_eq!(report.exact_polynomial_status, ExactPolynomialSearchStatus::IdentityFound);
+    }
+
+    #[test]
+    fn exact_polynomial_search_finds_pairwise_rotation_with_an_unacted_parameter() {
+        // z*(x²+y²) is invariant under SO(2) acting on x,y while z remains fixed.
+        let expr = mul(
+            var("z"),
+            add(pow2("x"), pow2("y")),
+        );
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(
+            report.candidate.as_ref().unwrap().lie_groups,
+            vec![LieGroup::SO(2)]
+        );
+        assert!(matches!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
+                acted_on_variables,
+                checked_generator_count: 1,
+                ..
+            }) if acted_on_variables == vec!["x".to_string(), "y".to_string()]
+        ));
+    }
+
+    #[test]
+    fn exact_polynomial_search_rejects_anisotropic_quadratic_with_no_numeric_promotion() {
+        let expr = add(
+            pow2("x"),
+            mul(Expr::Const(1.00001), pow2("y")),
+        );
+        let report = infer_symmetry_with_evidence(&expr);
+        assert!(report.candidate.is_none());
+        assert!(report.evidence.is_none());
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::ExactPolynomialSearchCompletedNoCandidate
+        );
+        assert_eq!(report.exact_polynomial_status, ExactPolynomialSearchStatus::CompletedNoCandidate);
+    }
+
+    #[test]
+    fn exact_polynomial_search_does_not_infer_rotation_on_unused_variables() {
+        // The source AST mentions x and y, but both disappear after multiplying by zero.
+        let expr = add(
+            var("z"),
+            add(
+                mul(Expr::Const(0.0), var("x")),
+                mul(Expr::Const(0.0), var("y")),
+            ),
+        );
+        let report = infer_symmetry_with_evidence(&expr);
+        assert!(report.candidate.is_none());
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::ExactPolynomialSearchCompletedNoCandidate
+        );
+    }
+    #[test]
+    fn exact_polynomial_search_uses_full_so3_generator_basis() {
+        let radial_squared = add(add(pow2("x"), pow2("y")), pow2("z"));
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(radial_squared),
+            Box::new(Expr::Const(2.0)),
+        );
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(report.candidate.unwrap().lie_groups, vec![LieGroup::SO(3)]);
+        assert!(matches!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
+                checked_generator_count: 3,
+                group: LieGroup::SO(3),
+                ..
+            })
+        ));
+    }
+    #[test]
+    fn no_candidate_report_does_not_claim_absence_of_symmetry() {
+        let report = infer_symmetry_with_evidence(&mul(var("x"), var("y")));
+        assert!(report.candidate.is_none());
+        assert!(report.evidence.is_none());
+        assert_eq!(report.search_status, SymmetryInferenceSearchStatus::ExactPolynomialSearchCompletedNoCandidate);
+        assert_eq!(report.exact_polynomial_status, ExactPolynomialSearchStatus::CompletedNoCandidate);
+    }
+
+    #[test]
+    fn numeric_search_skip_is_a_distinct_status() {
+        let report = infer_symmetry_numeric_with_evidence(&pow2("x"));
+        assert!(report.candidate.is_none());
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::NumericSearchSkippedTooFewVariables
+        );
+    }
+    #[test]
     fn harmonic_oscillator_infers_so2() {
         let expr = add(pow2("x"), pow2("v"));
         let sym = infer_symmetry(&expr);
@@ -379,6 +1370,62 @@ mod tests {
         assert_eq!(sym.lie_groups, vec![LieGroup::SO(3)]);
     }
 
+    #[test]
+    fn unequal_quadratic_weights_do_not_infer_rotational_symmetry() {
+        // x² + 2y² is an ellipse, not an SO(2)-invariant radial form.
+        let expr = add(
+            mul(Expr::Const(1.0), pow2("x")),
+            mul(Expr::Const(2.0), pow2("y")),
+        );
+        assert!(detect_sum_of_squares(&expr).is_none());
+        assert!(infer_symmetry(&expr).lie_groups.is_empty());
+    }
+
+    #[test]
+    fn equal_nonzero_quadratic_weights_preserve_rotational_symmetry() {
+        let expr = add(
+            mul(Expr::Const(2.5), pow2("x")),
+            mul(Expr::Const(2.5), pow2("y")),
+        );
+        assert_eq!(detect_sum_of_squares(&expr), Some((vec!["x".to_string(), "y".to_string()], 2.5)));
+        assert_eq!(infer_symmetry(&expr).lie_groups, vec![LieGroup::SO(2)]);
+    }
+
+    #[test]
+    fn negative_common_quadratic_weight_preserves_rotational_symmetry() {
+        let expr = add(
+            mul(Expr::Const(-3.0), pow2("x")),
+            mul(Expr::Const(-3.0), pow2("y")),
+        );
+        assert_eq!(detect_sum_of_squares(&expr), Some((vec!["x".to_string(), "y".to_string()], -3.0)));
+        assert_eq!(infer_symmetry(&expr).lie_groups, vec![LieGroup::SO(2)]);
+    }
+
+    #[test]
+    fn zero_quadratic_weight_does_not_create_rotational_symmetry() {
+        let expr = add(
+            mul(Expr::Const(0.0), pow2("x")),
+            mul(Expr::Const(2.0), pow2("y")),
+        );
+        assert!(detect_sum_of_squares(&expr).is_none());
+        assert!(infer_symmetry(&expr).lie_groups.is_empty());
+    }
+
+    #[test]
+    fn antisymmetric_bilinear_report_binds_the_diagonal_rotation_action() {
+        let expr = sub(mul(var("x"), var("vy")), mul(var("y"), var("vx")));
+        let report = infer_symmetry_with_evidence(&expr);
+        assert!(matches!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: StructuralSymmetryPattern::TwoDimensionalAntisymmetricBilinear {
+                    first_pair,
+                    second_pair,
+                },
+            }) if first_pair == ["x".to_string(), "y".to_string()]
+                && second_pair == ["vx".to_string(), "vy".to_string()]
+        ));
+    }
     #[test]
     fn angular_momentum_cartesian_infers_so2() {
         // x*vy - y*vx
