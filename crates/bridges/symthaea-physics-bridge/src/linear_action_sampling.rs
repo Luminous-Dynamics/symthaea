@@ -76,7 +76,7 @@ pub struct LinearActionGeneratorSampleStatisticsV1 {
     pub sample_residuals: Vec<LinearActionSampleResidualV1>,
 }
 
-/// Evidence report for a sampled scalar-expression invariance check.
+/// Numerical conditioning diagnostics for one sample's finite-difference basis.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinearActionSampleConditionDiagnosticV1 {
     pub sample_id: String,
@@ -710,11 +710,35 @@ mod tests {
     }
 
     #[test]
-    fn sampled_residual_is_covariant_under_paired_nonorthogonal_coordinate_change() {
-        // D = [[1, 1], [0, 1]]. States, action, metric and finite-difference
-        // direction vectors are all transformed together.
-        let transform = nalgebra::Matrix2::new(1.0, 1.0, 0.0, 1.0);
-        let inverse = transform.try_inverse().unwrap();
+    fn quadratic_form_expression(
+        matrix: &nalgebra::Matrix2<f64>,
+        first: &str,
+        second: &str,
+    ) -> Expr {
+        add(
+            add(
+                mul(Expr::Const(matrix[(0, 0)]), square(first)),
+                mul(Expr::Const(matrix[(1, 1)]), square(second)),
+            ),
+            mul(
+                Expr::Const(matrix[(0, 1)] + matrix[(1, 0)]),
+                mul(Expr::Var(first.to_string()), Expr::Var(second.to_string())),
+            ),
+        )
+    }
+
+    #[test]
+    fn sampled_residual_is_covariant_across_paired_nonorthogonal_coordinate_changes() {
+        // Replay the exact same geometric samples and their finite-difference
+        // directions in six valid non-orthogonal coordinate representations.
+        let transforms = [
+            nalgebra::Matrix2::new(1.0, 1.0, 0.0, 1.0),
+            nalgebra::Matrix2::new(2.0, 1.0, 1.0, 1.0),
+            nalgebra::Matrix2::new(1.0, 0.5, -0.25, 2.0),
+            nalgebra::Matrix2::new(0.5, -1.0, 1.0, 1.0),
+            nalgebra::Matrix2::new(2.0, -1.0, 0.5, 1.0),
+            nalgebra::Matrix2::new(1.0, 0.0, 3.0, 1.0),
+        ];
         let canonical_states = [
             nalgebra::Vector2::new(0.7, 1.1),
             nalgebra::Vector2::new(1.2, 0.8),
@@ -723,81 +747,109 @@ mod tests {
             nalgebra::Vector2::new(0.9, 2.5),
             nalgebra::Vector2::new(2.6, 2.1),
         ];
-        let expression = add(square("x"), mul(Expr::Const(1.2), square("y")));
+        let canonical_quadratic = nalgebra::Matrix2::new(1.0, 0.0, 0.0, 1.2);
+        let canonical_generator = nalgebra::Matrix2::new(0.0, -1.0, 1.0, 0.0);
+        let canonical_expression =
+            quadratic_form_expression(&canonical_quadratic, "x", "y");
         let canonical_samples = samples(
             &canonical_states.map(|state| [state[0], state[1]]),
             [[1.0, 0.0], [0.0, 1.0]],
         );
         let canonical_report = evaluate_linear_action_samples(
-            &expression,
+            &canonical_expression,
             &canonical_action(),
             &canonical_samples,
             sampling_profile(),
         )
         .unwrap();
 
-        let transformed_metric = inverse.transpose() * nalgebra::Matrix2::identity() * inverse;
-        let transformed_generator =
-            transform * nalgebra::Matrix2::new(0.0, -1.0, 1.0, 0.0) * inverse;
-        let transformed_action = LinearGroupActionV1 {
-            action_id: "sampled-so2-sheared".to_string(),
-            coordinate_basis_id: "XY".to_string(),
-            coordinate_names: vec!["X".to_string(), "Y".to_string()],
-            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
-            metric: transformed_metric
-                .row_iter()
-                .map(|row| row.iter().copied().collect())
-                .collect(),
-            generators: vec![LinearGeneratorV1 {
-                id: "J-sheared".to_string(),
-                matrix: transformed_generator
+        for (basis_index, transform) in transforms.iter().enumerate() {
+            let inverse = transform.try_inverse().expect("frozen coordinate transform");
+            let transformed_metric =
+                inverse.transpose() * nalgebra::Matrix2::identity() * inverse;
+            let transformed_generator = transform * canonical_generator * inverse;
+            let transformed_quadratic = inverse.transpose() * canonical_quadratic * inverse;
+
+            let transformed_action = LinearGroupActionV1 {
+                action_id: format!("sampled-so2-basis-{basis_index}"),
+                coordinate_basis_id: format!("basis-{basis_index}"),
+                coordinate_names: vec!["X".to_string(), "Y".to_string()],
+                coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+                metric: transformed_metric
                     .row_iter()
                     .map(|row| row.iter().copied().collect())
                     .collect(),
-            }],
-        }
-        .try_admit(LinearGroupActionAdmissionProfileV1::default())
-        .unwrap();
-        let transformed_expression = sub(
-            add(square("X"), mul(Expr::Const(2.2), square("Y"))),
-            mul(Expr::Const(2.0), mul(Expr::Var("X".to_string()), Expr::Var("Y".to_string()))),
-        );
-        let transformed_directions = transform;
-        let transformed_samples: Vec<LinearActionSampleV1> = canonical_states
-            .iter()
-            .enumerate()
-            .map(|(index, state)| {
-                let transformed_state = transform * state;
-                LinearActionSampleV1 {
-                    sample_id: format!("paired-{index}"),
-                    state: vec![transformed_state[0], transformed_state[1]],
-                    direction_basis: (0..2)
-                        .map(|column| {
-                            vec![
-                                transformed_directions[(0, column)],
-                                transformed_directions[(1, column)],
-                            ]
-                        })
+                generators: vec![LinearGeneratorV1 {
+                    id: "J-transformed".to_string(),
+                    matrix: transformed_generator
+                        .row_iter()
+                        .map(|row| row.iter().copied().collect())
                         .collect(),
-                }
-            })
-            .collect();
-        let transformed_report = evaluate_linear_action_samples(
-            &transformed_expression,
-            &transformed_action,
-            &transformed_samples,
-            sampling_profile(),
-        )
-        .unwrap();
-        let canonical_residual =
-            canonical_report.generator_statistics[0].maximum_normalized_squared_residual;
-        let transformed_residual =
-            transformed_report.generator_statistics[0].maximum_normalized_squared_residual;
-        assert!((canonical_residual - transformed_residual).abs() < 2.0e-9);
-        assert_eq!(
-            canonical_report.invariant_within_tolerance(),
-            transformed_report.invariant_within_tolerance()
-        );
+                }],
+            }
+            .try_admit(LinearGroupActionAdmissionProfileV1::default())
+            .unwrap();
+            let transformed_expression =
+                quadratic_form_expression(&transformed_quadratic, "X", "Y");
+
+            let transformed_samples: Vec<LinearActionSampleV1> = canonical_states
+                .iter()
+                .enumerate()
+                .map(|(sample_index, state)| {
+                    let transformed_state = transform * state;
+                    LinearActionSampleV1 {
+                        sample_id: format!("paired-{sample_index}"),
+                        state: vec![transformed_state[0], transformed_state[1]],
+                        direction_basis: (0..2)
+                            .map(|column| {
+                                vec![transform[(0, column)], transform[(1, column)]]
+                            })
+                            .collect(),
+                    }
+                })
+                .collect();
+            let transformed_report = evaluate_linear_action_samples(
+                &transformed_expression,
+                &transformed_action,
+                &transformed_samples,
+                sampling_profile(),
+            )
+            .unwrap();
+
+            let canonical_statistics = &canonical_report.generator_statistics[0];
+            let transformed_statistics = &transformed_report.generator_statistics[0];
+            assert!(
+                (canonical_statistics.maximum_normalized_squared_residual
+                    - transformed_statistics.maximum_normalized_squared_residual)
+                    .abs()
+                    < 2.0e-8,
+                "maximum residual changed under basis {basis_index}"
+            );
+            assert_eq!(
+                canonical_report.invariant_within_tolerance(),
+                transformed_report.invariant_within_tolerance()
+            );
+            for (canonical_sample, transformed_sample) in canonical_statistics
+                .sample_residuals
+                .iter()
+                .zip(transformed_statistics.sample_residuals.iter())
+            {
+                assert_eq!(canonical_sample.sample_id, transformed_sample.sample_id);
+                assert!(
+                    (canonical_sample.normalized_squared_residual.unwrap()
+                        - transformed_sample.normalized_squared_residual.unwrap())
+                        .abs()
+                        < 2.0e-8,
+                    "paired residual changed under basis {basis_index}"
+                );
+            }
+            assert_eq!(transformed_report.sample_ids, canonical_report.sample_ids);
+            assert!(
+                transformed_report.direction_basis_diagnostics.iter().all(|diagnostic| {
+                    diagnostic.relative_directional_reconstruction_residual < 1.0e-10
+                })
+            );
+        }
     }
 
     #[test]
