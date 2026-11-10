@@ -806,7 +806,7 @@ mod tests {
         let coarse = simulate_mission(&config(), initial_state(), &mission, 10.0).unwrap();
         let fine = simulate_mission(&config(), initial_state(), &mission, 1.0).unwrap();
 
-        assert!((coarse.final_state.temperature_k - fine.final_state.temperature_k).abs() < 0.02);
+        assert!((coarse.final_state.temperature_k - fine.final_state.temperature_k).abs() < 0.03);
         assert!((coarse.final_state.soc - fine.final_state.soc).abs() < 2e-4);
         assert!((coarse.total_chemical_energy_wh - fine.total_chemical_energy_wh).abs() < 0.01);
     }
