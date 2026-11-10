@@ -924,7 +924,7 @@ pub enum ResourceRightsStatus {
     Excluded,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LanguageTask {
     GraphemeToPhoneme,
@@ -998,7 +998,6 @@ impl LanguageProfileManifest {
             ));
         }
         if self.profile_id.trim().is_empty()
-            || !valid_source_digest(&format!("git-sha1:{}", self.source_revision))
             || self.language_tag.trim().is_empty()
             || self
                 .language_tag
@@ -1108,6 +1107,7 @@ impl LanguageProfileManifest {
             if resource.resource_id.trim().is_empty()
                 || !resource_ids.insert(resource.resource_id.as_str())
                 || resource.source_repository.trim().is_empty()
+                || !valid_source_digest(&format!("git-sha1:{}", resource.source_revision))
                 || !valid_source_digest(&resource.source_digest)
                 || !valid_source_digest(&resource.license_document_digest)
                 || resource.license_expression.trim().is_empty()
@@ -1555,6 +1555,19 @@ mod tests {
                 .unwrap_err()
                 .contains("requires evidence reference and digest")
         );
+    }
+
+    #[test]
+    fn language_profile_requires_an_exact_immutable_resource_revision() {
+        let mut profile = xhosa_profile_fixture();
+        profile.resources[0].source_revision = "main".into();
+        let error = profile.validate().unwrap_err();
+        assert!(error.contains("incomplete provenance/license metadata"), "{error}");
+
+        let mut profile = xhosa_profile_fixture();
+        profile.resources[0].source_revision = "59A93768D72B5804F8B87BC3DD409320C8F0C328".into();
+        let error = profile.validate().unwrap_err();
+        assert!(error.contains("incomplete provenance/license metadata"), "{error}");
     }
 
     #[test]
