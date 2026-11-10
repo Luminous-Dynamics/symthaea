@@ -18378,6 +18378,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-camera-driving-bridge"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sha2 0.10.9",
+ "symthaea-core",
+ "symthaea-vehicle",
+ "symthaea-vision-manifold",
+]
+
+[[package]]
 name = "symthaea-canvas"
 version = "0.1.0"
 dependencies = [
