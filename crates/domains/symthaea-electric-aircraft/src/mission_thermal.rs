@@ -666,6 +666,8 @@ fn validate_mission_report_pair(
             || resistance_ohm < 0.0
             || terminal_voltage_v <= 0.0
             || electrical_terminal_power_w < 0.0
+            || electrical_terminal_power_w > battery.maximum_continuous_power_w + 1e-9
+            || current_a > battery.maximum_continuous_current_a + 1e-9
             || result.state_of_charge_end < battery.reserve_state_of_charge
             || result.state_of_charge_end > 1.0
             || result.pack_temperature_end_k <= 0.0
@@ -733,6 +735,12 @@ fn validate_mission_report_pair(
         total_chemical_wh * (1.0 + mission.mission_uncertainty_fraction);
     let expected_energy_margin_wh =
         expected_available_energy_wh - expected_energy_with_uncertainty;
+    if !expected_energy_margin_wh.is_finite() || expected_energy_margin_wh < -1e-9 {
+        return Err(MissionThermalError::MissionReportInputMismatch {
+            segment_id: "<mission>".into(),
+            field: "mission energy reserve is infringed",
+        });
+    }
     let expected_final_soc = report
         .segments
         .last()
