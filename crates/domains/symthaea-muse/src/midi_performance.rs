@@ -180,7 +180,6 @@ impl RationalMoment {
 }
 
 struct SegmentInfo<'a> {
-    original_index: usize,
     segment: &'a symthaea_music_theory::orchestration_timeline::OrchestrationSegmentV1,
     start: RationalMoment,
     end: RationalMoment,
@@ -272,6 +271,7 @@ fn validate_bindings(
         if binding.instrument_id.trim().is_empty()
             || binding.renderer_id.trim().is_empty()
             || binding.patch_id.trim().is_empty()
+            || binding.gm_program > 127
             || binding.asset_sha256.as_ref().is_some_and(|digest| !valid_sha256_hex(digest))
         {
             return Err(MidiPerformanceErrorV1::InvalidInstrumentBinding(
@@ -416,7 +416,7 @@ fn build_segments<'a>(
     timeline: &'a OrchestrationTimelineV1,
 ) -> Result<Vec<SegmentInfo<'a>>, MidiPerformanceErrorV1> {
     let mut result = Vec::with_capacity(timeline.segments.len());
-    for (original_index, segment) in timeline.segments.iter().enumerate() {
+    for segment in &timeline.segments {
         let start = RationalMoment::from_wire(segment.start)
             .ok_or(MidiPerformanceErrorV1::InvalidRationalTime)?;
         let end = RationalMoment::from_wire(segment.end)
@@ -427,7 +427,6 @@ fn build_segments<'a>(
             return Err(MidiPerformanceErrorV1::InvalidRationalTime);
         }
         result.push(SegmentInfo {
-            original_index,
             segment,
             start,
             end,
