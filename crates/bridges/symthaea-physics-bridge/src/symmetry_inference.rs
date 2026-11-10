@@ -319,13 +319,21 @@ pub struct MetricAwareGeneratorSampleResultV1 {
 }
 
 /// Replayable sampled evidence for a declared action and scalar expression.
-/// The exact states and fixed parameters are retained in the receipt.
+/// The effective and original declarations, exact expression tree, states and
+/// fixed parameters are retained in the receipt.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MetricAwareLinearActionSampleReportV1 {
     pub action_id: String,
     pub coordinate_basis_id: String,
+    pub action_declaration: crate::linear_group_action::LinearGroupActionV1,
+    pub original_action_declaration: crate::linear_group_action::LinearGroupActionV1,
+    pub action_admission_profile: crate::linear_group_action::LinearGroupActionAdmissionProfileV1,
+    pub action_admission_diagnostics: crate::linear_group_action::LinearGroupActionAdmissionDiagnosticsV1,
     pub coordinate_names: Vec<String>,
+    pub coordinate_unit_ids: Vec<String>,
     pub expression_display: String,
+    /// Structural AST representation with exact IEEE-754 bit patterns.
+    pub expression_canonical: String,
     pub expression_complexity: usize,
     pub profile: MetricAwareLinearActionSampleProfileV1,
     pub fixed_bindings: Vec<(String, f64)>,
@@ -1286,6 +1294,38 @@ fn eval_expression_with_gradient(
     }
 }
 
+fn canonical_expression(expr: &Expr) -> String {
+    match expr {
+        Expr::Var(name) => format!("V{}:{name}", name.len()),
+        Expr::Const(value) => format!("C{:016x}", value.to_bits()),
+        Expr::BinOp(operation, left, right) => {
+            let tag = match operation {
+                BinOp::Add => "ADD",
+                BinOp::Sub => "SUB",
+                BinOp::Mul => "MUL",
+                BinOp::Div => "DIV",
+                BinOp::Pow => "POW",
+            };
+            format!("B{tag}({},{})", canonical_expression(left), canonical_expression(right))
+        }
+        Expr::Func(function, argument) => {
+            let tag = match function {
+                UnaryFn::Sqrt => "SQRT",
+                UnaryFn::Log => "LOG",
+                UnaryFn::Exp => "EXP",
+                UnaryFn::Sin => "SIN",
+                UnaryFn::Cos => "COS",
+                UnaryFn::Abs => "ABS",
+                UnaryFn::Floor => "FLOOR",
+            };
+            format!("F{tag}({})", canonical_expression(argument))
+        }
+        Expr::Sum(body, variable) => {
+            format!("SUM{}:{variable}({})", variable.len(), canonical_expression(body))
+        }
+    }
+}
+
 /// Solve L * result = rhs for a lower-triangular L using forward substitution.
 fn solve_lower_triangular(lower: &[Vec<f64>], rhs: &[f64]) -> Option<Vec<f64>> {
     let mut result = Vec::with_capacity(rhs.len());
@@ -1562,8 +1602,14 @@ pub fn evaluate_metric_aware_linear_action_samples(
     Ok(MetricAwareLinearActionSampleReportV1 {
         action_id: declaration.action_id.clone(),
         coordinate_basis_id: declaration.coordinate_basis_id.clone(),
+        action_declaration: declaration.clone(),
+        original_action_declaration: action.declared_action().clone(),
+        action_admission_profile: *action.profile(),
+        action_admission_diagnostics: action.diagnostics().clone(),
         coordinate_names: declaration.coordinate_names.clone(),
+        coordinate_unit_ids: declaration.coordinate_unit_ids.clone(),
         expression_display: expr.to_string(),
+        expression_canonical: canonical_expression(expr),
         expression_complexity: complexity,
         profile,
         fixed_bindings: fixed_bindings_owned,
