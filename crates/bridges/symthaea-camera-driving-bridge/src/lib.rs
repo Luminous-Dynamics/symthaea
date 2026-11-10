@@ -15,6 +15,7 @@ use symthaea_vision_manifold::{VisionConfig, VisionManifold, VisionTelemetry};
 pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
 pub const MAX_ID_BYTES: usize = 256;
 pub const MAX_FRAME_BYTES_HARD_LIMIT: usize = 64 * 1024 * 1024;
+pub const MAX_FRAME_DIMENSION: u32 = 4_096;
 pub const MAX_VEHICLE_ENCODER_LEVELS: usize = 32;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,8 +67,12 @@ pub struct BridgeConfig {
 impl BridgeConfig {
     pub fn validate(&self) -> Result<(), BridgeError> {
         self.identity.validate()?;
-        if self.max_width == 0 || self.max_height == 0 {
-            return Err(BridgeError::InvalidConfig("maximum frame dimensions must be non-zero"));
+        if self.max_width == 0
+            || self.max_height == 0
+            || self.max_width > MAX_FRAME_DIMENSION
+            || self.max_height > MAX_FRAME_DIMENSION
+        {
+            return Err(BridgeError::InvalidConfig("maximum frame dimensions must be in 1..=4096"));
         }
         if self.max_frame_bytes == 0 || self.max_frame_bytes > MAX_FRAME_BYTES_HARD_LIMIT {
             return Err(BridgeError::InvalidConfig("frame-byte bound must be in 1..=64 MiB"));
@@ -717,6 +722,78 @@ mod tests {
         assert_eq!(
             CameraDrivingBridge::try_new(invalid, VisionConfig::default()).err(),
             Some(BridgeError::InvalidConfig("visual weight must be <= 1,000,000 ppm"))
+        );
+    }
+
+    #[test]
+    fn visual_weight_zero_uses_only_proprioceptive_hv() {
+        let mut cfg = config();
+        cfg.visual_weight_ppm = 0;
+        let mut bridge = CameraDrivingBridge::try_new(cfg, VisionConfig::default()).unwrap();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let result = bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        assert_eq!(
+            result.receipt.fused_policy_input_sha256,
+            result.receipt.proprioceptive_hv_sha256
+        );
+    }
+
+    #[test]
+    fn visual_weight_one_million_uses_only_visual_hv() {
+        let mut cfg = config();
+        cfg.visual_weight_ppm = 1_000_000;
+        let mut bridge = CameraDrivingBridge::try_new(cfg, VisionConfig::default()).unwrap();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let result = bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        assert_eq!(
+            result.receipt.fused_policy_input_sha256,
+            result.receipt.visual_state_sha256
+        );
+    }
+
+    #[test]
+    fn rejects_unsupported_channel_layout() {
+        let mut bridge = bridge();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 2];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.channels = 2;
+        assert_eq!(bridge.observe(item).err(), Some(BridgeError::UnsupportedChannels));
+        assert_eq!(bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_frame_over_configured_allocation_bound() {
+        let mut bridge = bridge();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.pixels = &pixels;
+        item.width = 32;
+        item.height = 32;
+        assert_eq!(bridge.observe(item).err(), Some(BridgeError::FrameExceedsByteBound));
+        assert_eq!(bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_unbounded_vision_manifold_allocation_config() {
+        let mut cfg = config();
+        cfg.max_width = u32::MAX;
+        assert_eq!(
+            CameraDrivingBridge::try_new(cfg, VisionConfig::default()).err(),
+            Some(BridgeError::InvalidConfig("maximum frame dimensions must be in 1..=4096"))
+        );
+    }
+
+    #[test]
+    fn rejects_missing_run_identity() {
+        let mut cfg = config();
+        cfg.identity.camera_id.clear();
+        assert_eq!(
+            CameraDrivingBridge::try_new(cfg, VisionConfig::default()).err(),
+            Some(BridgeError::MissingIdentity("camera_id"))
         );
     }
 
