@@ -63,6 +63,8 @@ These values are not a universal ranking and do not imply that all properties ar
 
 A negative measurement cannot be the sole evidence supporting `SUPPORTED_WITHIN_SCOPE`. The module does not infer biological absence from non-detection.
 
+A `MODEL_INADEQUATE` finding must link at least one `DerivedInference` / `DerivedResult` record documenting the model-adequacy failure (for example, a posterior-predictive residual check). A model cannot simply emit an unsupported self-abstention status without retaining its diagnostic evidence.
+
 This implements a narrow type-level guard; it does not establish calibrated detection probability. The Sol-Atlas spatial/temporal coverage work remains authoritative for actual observability and coverage accounting.
 
 ## 4. Provenance and common-cause dependence
