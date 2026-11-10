@@ -118,6 +118,7 @@ pub enum BridgeError {
     FrameExceedsByteBound,
     FrameLengthMismatch,
     SequenceRegression,
+    VehicleTimestampRegression,
     TimestampRegression,
     FrameGapTooLarge,
     SensorClockSkewExceeded,
@@ -209,6 +210,7 @@ pub struct CameraDrivingBridge {
     vehicle_encoder: VehicleHdcEncoder,
     last_sequence: Option<u64>,
     last_timestamp_us: Option<u64>,
+    last_vehicle_timestamp_us: Option<u64>,
     faulted: bool,
 }
 
@@ -237,6 +239,7 @@ impl CameraDrivingBridge {
             vehicle_encoder,
             last_sequence: None,
             last_timestamp_us: None,
+            last_vehicle_timestamp_us: None,
             faulted: false,
         })
     }
@@ -343,6 +346,7 @@ impl CameraDrivingBridge {
 
         self.last_sequence = Some(observation.sequence);
         self.last_timestamp_us = Some(observation.timestamp_us);
+        self.last_vehicle_timestamp_us = Some(observation.vehicle_state_timestamp_us);
 
         Ok(FusedDrivingInput {
             policy_input,
@@ -389,6 +393,12 @@ impl CameraDrivingBridge {
         };
         if dt_us > self.config.maximum_frame_gap_us {
             return Err(BridgeError::FrameGapTooLarge);
+        }
+        if self
+            .last_vehicle_timestamp_us
+            .is_some_and(|last| observation.vehicle_state_timestamp_us <= last)
+        {
+            return Err(BridgeError::VehicleTimestampRegression);
         }
         if observation.timestamp_us.abs_diff(observation.vehicle_state_timestamp_us)
             > self.config.maximum_sensor_clock_skew_us
@@ -672,6 +682,32 @@ mod tests {
             Err(BridgeError::FrameLengthMismatch)
         ));
         assert_eq!(bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_vehicle_state_clock_regression() {
+        let mut bridge = bridge();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        let mut stale = observation(&pixels, 2, 20_000, &state);
+        stale.vehicle_state_timestamp_us = 9_500;
+        assert_eq!(
+            bridge.observe(stale).err(),
+            Some(BridgeError::VehicleTimestampRegression)
+        );
+        assert_eq!(bridge.frames_processed(), 1);
+        let valid = CapturedDrivingObservation {
+            sequence: 2,
+            timestamp_us: 20_000,
+            vehicle_state_timestamp_us: 20_000,
+            pixels: &pixels,
+            width: 16,
+            height: 16,
+            channels: 3,
+            vehicle_state: &state,
+        };
+        assert!(bridge.observe(valid).is_ok());
     }
 
     #[test]
