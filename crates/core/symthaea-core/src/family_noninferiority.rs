@@ -304,6 +304,8 @@ pub struct FamilyGuardrailReport {
     pub status: FamilyGuardrailStatus,
     /// Ordered family-specific confidence results.
     pub families: Vec<FamilyNonInferiorityResult>,
+    /// Digest of the ordered family/episode/loss stream used to compute the bounds.
+    pub observation_stream_digest: String,
     /// Integrity digest over the complete report claims; not a signature.
     pub report_digest: String,
 }
@@ -377,6 +379,7 @@ pub struct FamilyNonInferiorityGate {
     seen_episode_ids: BTreeSet<String>,
     total_observations: u64,
     terminal: bool,
+    observation_hasher: blake3::Hasher,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -438,6 +441,11 @@ impl FamilyNonInferiorityGate {
             seen_episode_ids: BTreeSet::new(),
             total_observations: 0,
             terminal: false,
+            observation_hasher: {
+                let mut hasher = blake3::Hasher::new();
+                hasher.update(b"symthaea-family-noninferiority-observations-v1\\0");
+                hasher
+            },
         })
     }
 
@@ -490,6 +498,7 @@ impl FamilyNonInferiorityGate {
         }
 
         let improvement = observation.baseline_loss - observation.candidate_loss;
+        hash_observation(&mut self.observation_hasher, &observation);
         accumulator.count += 1;
         accumulator.mean_improvement +=
             (improvement - accumulator.mean_improvement) / accumulator.count as f64;
@@ -615,6 +624,7 @@ impl FamilyNonInferiorityGate {
             simultaneous_family_bounds: true,
             status,
             families: family_results,
+            observation_stream_digest: self.observation_hasher.clone().finalize().to_hex().to_string(),
             report_digest: String::new(),
         };
         report.report_digest = family_guardrail_report_digest(&report)?;
@@ -641,6 +651,7 @@ pub fn validate_family_guardrail_report(
         || !is_lowercase_hex_digest(&report.binding.evaluation_protocol_digest)
         || !is_lowercase_hex_digest(&report.binding.confirmatory_episode_manifest_digest)
         || !is_lowercase_hex_digest(&report.binding.precondition_gate_digest)
+        || !is_lowercase_hex_digest(&report.observation_stream_digest)
         || report.binding.maximum_total_observations == 0
     {
         return Err(FamilyGuardrailError::ReportDigestMismatch);
@@ -694,6 +705,7 @@ fn family_guardrail_report_digest(
         simultaneous_family_bounds: bool,
         status: FamilyGuardrailStatus,
         families: &'a [FamilyNonInferiorityResult],
+        observation_stream_digest: &'a str,
     }
     let claims = Claims {
         format_version: report.format_version,
@@ -707,6 +719,7 @@ fn family_guardrail_report_digest(
         simultaneous_family_bounds: report.simultaneous_family_bounds,
         status: report.status,
         families: &report.families,
+        observation_stream_digest: &report.observation_stream_digest,
     };
     let encoded =
         serde_json::to_vec(&claims).map_err(|_| FamilyGuardrailError::ReportSerialization)?;
@@ -715,6 +728,17 @@ fn family_guardrail_report_digest(
     hasher.update(&(encoded.len() as u64).to_le_bytes());
     hasher.update(&encoded);
     Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn hash_observation(hasher: &mut blake3::Hasher, observation: &FamilyGuardrailObservation) {
+    let family_id = observation.family_id.as_bytes();
+    let episode_id = observation.episode_id.as_bytes();
+    hasher.update(&(family_id.len() as u64).to_le_bytes());
+    hasher.update(family_id);
+    hasher.update(&(episode_id.len() as u64).to_le_bytes());
+    hasher.update(episode_id);
+    hasher.update(&observation.baseline_loss.to_bits().to_le_bytes());
+    hasher.update(&observation.candidate_loss.to_bits().to_le_bytes());
 }
 
 fn is_lowercase_hex_digest(value: &str) -> bool {
@@ -984,6 +1008,37 @@ mod tests {
             FamilyNonInferiorityGate::new(plan, 0.05, 1, binding),
             Err(FamilyGuardrailError::CandidateObservationBudgetMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn ordered_observation_stream_digest_binds_family_episode_and_paired_losses() {
+        let plan_a = plan();
+        let mut gate_a = gate(plan_a, 1);
+        let report_a = gate_a
+            .observe(FamilyGuardrailObservation {
+                episode_id: "family-a-episode-0000".to_owned(),
+                family_id: "family-a".to_owned(),
+                baseline_loss: 0.8,
+                candidate_loss: 0.6,
+            })
+            .unwrap();
+
+        let plan_b = plan();
+        let mut gate_b = gate(plan_b, 1);
+        let report_b = gate_b
+            .observe(FamilyGuardrailObservation {
+                episode_id: "family-a-episode-0000".to_owned(),
+                family_id: "family-a".to_owned(),
+                baseline_loss: 0.8,
+                candidate_loss: 0.7,
+            })
+            .unwrap();
+        assert_ne!(
+            report_a.observation_stream_digest,
+            report_b.observation_stream_digest
+        );
+        assert_ne!(report_a.report_digest, report_b.report_digest);
+        validate_family_guardrail_report(&report_a).unwrap();
     }
 
     #[test]
