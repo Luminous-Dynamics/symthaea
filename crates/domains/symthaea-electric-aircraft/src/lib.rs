@@ -20,7 +20,7 @@ pub mod characterization;
 pub mod uncertainty;
 
 use characterization::{
-    BatteryCharacterization, BatteryOperatingPoint, CharacterizationError,
+    BatteryCharacterization, BatteryOperatingPoint, CharacterizationError, EvidenceRecord,
     PropulsionCharacterization, PropulsionOperatingPoint,
 };
 
@@ -135,8 +135,16 @@ pub struct MissionReport {
     pub final_state_of_charge: f64,
     /// Evidence dataset IDs used by calibrated propulsion maps; empty for scalar mode.
     pub characterization_evidence_ids: Vec<String>,
-    /// Battery OCV/resistance evidence datasets; empty for scalar battery mode.
+    /// Full source metadata and digests for calibrated propulsion maps.
+    pub characterization_evidence_records: Vec<EvidenceRecord>,
+    /// Battery OCV/resistance evidence dataset IDs; empty for scalar battery mode.
     pub battery_characterization_evidence_ids: Vec<String>,
+    /// Full source metadata and digests for characterized battery maps.
+    pub battery_characterization_evidence_records: Vec<EvidenceRecord>,
+    /// True only when exact caller-supplied dataset bytes passed SHA-256
+    /// checks through the fully verified evaluator. This is not a signature,
+    /// publisher, authority or configuration-approval verdict.
+    pub evidence_content_digests_verified: bool,
     pub segments: Vec<SegmentResult>,
 }
 
@@ -191,7 +199,7 @@ pub fn evaluate_mission_characterized(
     characterization: &PropulsionCharacterization,
 ) -> Result<MissionReport, ModelError> {
     characterization.validate().map_err(ModelError::Characterization)?;
-    let evidence_ids = characterization.evidence_ids();
+    let evidence_records = characterization.evidence_records();
     let battery = &input.battery;
     let scalar_battery = BatteryOperatingPoint {
         open_circuit_voltage_v: battery.nominal_open_circuit_voltage_v,
@@ -205,7 +213,7 @@ pub fn evaluate_mission_characterized(
                 .map_err(ModelError::Characterization)
         },
         |_, _| Ok(scalar_battery.clone()),
-        evidence_ids,
+        evidence_records,
         Vec::new(),
     )
 }
@@ -217,7 +225,7 @@ pub fn evaluate_mission_battery_characterized(
     characterization: &BatteryCharacterization,
 ) -> Result<MissionReport, ModelError> {
     characterization.validate().map_err(ModelError::Characterization)?;
-    let evidence_ids = characterization.evidence_ids();
+    let evidence_records = characterization.evidence_records();
     let scalar_propulsion = scalar_propulsion_point(&input.propulsion);
     evaluate_mission_with_providers(
         input,
@@ -228,7 +236,7 @@ pub fn evaluate_mission_battery_characterized(
                 .map_err(ModelError::Characterization)
         },
         Vec::new(),
-        evidence_ids,
+        evidence_records,
     )
 }
 
@@ -242,8 +250,8 @@ pub fn evaluate_mission_fully_characterized(
 ) -> Result<MissionReport, ModelError> {
     propulsion.validate().map_err(ModelError::Characterization)?;
     battery.validate().map_err(ModelError::Characterization)?;
-    let propulsion_evidence_ids = propulsion.evidence_ids();
-    let battery_evidence_ids = battery.evidence_ids();
+    let propulsion_evidence_records = propulsion.evidence_records();
+    let battery_evidence_records = battery.evidence_records();
     evaluate_mission_with_providers(
         input,
         |segment, useful_power_w| {
@@ -256,8 +264,8 @@ pub fn evaluate_mission_fully_characterized(
                 .operating_point(soc, temperature)
                 .map_err(ModelError::Characterization)
         },
-        propulsion_evidence_ids,
-        battery_evidence_ids,
+        propulsion_evidence_records,
+        battery_evidence_records,
     )
 }
 
@@ -277,7 +285,9 @@ pub fn evaluate_mission_fully_verified(
     battery
         .verify_evidence_payloads(evidence_payloads)
         .map_err(ModelError::Characterization)?;
-    evaluate_mission_fully_characterized(input, propulsion, battery)
+    let mut report = evaluate_mission_fully_characterized(input, propulsion, battery)?;
+    report.evidence_content_digests_verified = true;
+    Ok(report)
 }
 
 fn scalar_propulsion_point(config: &PropulsionConfig) -> PropulsionOperatingPoint {
@@ -295,8 +305,8 @@ fn evaluate_mission_with_providers<F, G>(
     input: &MissionInput,
     mut efficiency_provider: F,
     mut battery_provider: G,
-    characterization_evidence_ids: Vec<String>,
-    battery_characterization_evidence_ids: Vec<String>,
+    characterization_evidence_records: Vec<EvidenceRecord>,
+    battery_characterization_evidence_records: Vec<EvidenceRecord>,
 ) -> Result<MissionReport, ModelError>
 where
     F: FnMut(&MissionSegment, f64) -> Result<PropulsionOperatingPoint, ModelError>,
@@ -494,8 +504,17 @@ where
         minimum_terminal_voltage_v: minimum_voltage_v,
         maximum_pack_temperature_k,
         final_state_of_charge: soc,
-        characterization_evidence_ids,
-        battery_characterization_evidence_ids,
+        characterization_evidence_ids: characterization_evidence_records
+            .iter()
+            .map(|record| record.id.clone())
+            .collect(),
+        characterization_evidence_records,
+        battery_characterization_evidence_ids: battery_characterization_evidence_records
+            .iter()
+            .map(|record| record.id.clone())
+            .collect(),
+        battery_characterization_evidence_records,
+        evidence_content_digests_verified: false,
         segments: results,
     })
 }
