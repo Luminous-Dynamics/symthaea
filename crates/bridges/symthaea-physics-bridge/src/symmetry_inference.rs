@@ -62,49 +62,200 @@ use symthaea_core::hdc::lie_theory::{self, LieAlgebra};
 
 use crate::types::{LieGroup, SymmetryDescriptor};
 
+/// Fully specified numerical policy used by the bounded Lie-derivative fallback.
+///
+/// The profile is returned with every numerical candidate so a consumer can
+/// distinguish a sampled heuristic from a symbolic identity or formal proof.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct NumericLieDerivativeProfileV1 {
+    pub seed: u64,
+    pub samples_per_generator: usize,
+    pub finite_difference_step: f64,
+    pub normalized_squared_residual_tolerance: f64,
+    pub minimum_gradient_squared: f64,
+    pub sample_min_inclusive: f64,
+    pub sample_max_exclusive: f64,
+    pub maximum_joint_dimension: usize,
+}
+
+impl Default for NumericLieDerivativeProfileV1 {
+    fn default() -> Self {
+        Self {
+            seed: 0x9E3779B97F4A7C15,
+            samples_per_generator: 8,
+            finite_difference_step: 1e-5,
+            normalized_squared_residual_tolerance: 1e-6,
+            minimum_gradient_squared: 1e-8,
+            sample_min_inclusive: 0.5,
+            sample_max_exclusive: 3.0,
+            maximum_joint_dimension: 6,
+        }
+    }
+}
+
+/// Structural pattern that produced a symmetry candidate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StructuralSymmetryPattern {
+    /// A sum of distinct squared variables with one shared finite nonzero coefficient.
+    EqualCoefficientSumOfSquares,
+    /// A two-dimensional antisymmetric bilinear determinant with four distinct variables.
+    TwoDimensionalAntisymmetricBilinear,
+}
+
+/// Evidence source for a candidate symmetry.
+///
+/// `StructuralPatternMatch` means the expression matched a narrowly specified
+/// exact AST pattern; it is not a Lean proof or a claim about physical units.
+/// `SampledLieDerivative` is empirical evidence over a finite, declared sample
+/// domain and must never be promoted to a symbolic/formal proof.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SymmetryInferenceEvidence {
+    StructuralPatternMatch { pattern: StructuralSymmetryPattern },
+    SampledLieDerivative {
+        profile: NumericLieDerivativeProfileV1,
+        acted_on_variables: Vec<String>,
+        group: LieGroup,
+    },
+}
+
+/// How far the symmetry-inference pipeline progressed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SymmetryInferenceSearchStatus {
+    /// An exact-shape structural detector matched; numeric search was short-circuited.
+    StructuralMatchShortCircuit,
+    /// The bounded numerical search ran to completion.
+    NumericSearchCompleted,
+    /// The expression had fewer than two free variables, so numerical rotation search was skipped.
+    NumericSearchSkippedTooFewVariables,
+}
+
+/// Auditable result of symmetry inference.
+///
+/// A missing candidate means only that this bounded search found no candidate;
+/// it is not evidence that the expression has no symmetry.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SymmetryInferenceReport {
+    pub candidate: Option<SymmetryDescriptor>,
+    pub evidence: Option<SymmetryInferenceEvidence>,
+    pub search_status: SymmetryInferenceSearchStatus,
+    pub numeric_profile: NumericLieDerivativeProfileV1,
+}
+
+impl SymmetryInferenceReport {
+    /// Compatibility projection for APIs that still consume only a descriptor.
+    pub fn descriptor_or_none(&self) -> SymmetryDescriptor {
+        self.candidate.clone().unwrap_or_else(SymmetryDescriptor::none)
+    }
+}
 /// Infer a best-effort symmetry descriptor from a discovered expression.
+///
+/// This compatibility API intentionally discards evidence provenance. New
+/// claim-bearing callers should use [`infer_symmetry_with_evidence`].
 pub fn infer_symmetry(expr: &Expr) -> SymmetryDescriptor {
+    infer_symmetry_with_evidence(expr).descriptor_or_none()
+}
+
+/// Infer a symmetry candidate while preserving the evidence source and search limits.
+pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
+    let numeric_profile = NumericLieDerivativeProfileV1::default();
+
     if let Some(n) = detect_sum_of_squares(expr)
         && (2..=10).contains(&n)
     {
-        return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(n)], false);
+        return SymmetryInferenceReport {
+            candidate: Some(SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(n)], false)),
+            evidence: Some(SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares,
+            }),
+            search_status: SymmetryInferenceSearchStatus::StructuralMatchShortCircuit,
+            numeric_profile,
+        };
     }
+
     if detect_2d_antisymmetric_cross(expr) {
-        return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false);
+        return SymmetryInferenceReport {
+            candidate: Some(SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false)),
+            evidence: Some(SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: StructuralSymmetryPattern::TwoDimensionalAntisymmetricBilinear,
+            }),
+            search_status: SymmetryInferenceSearchStatus::StructuralMatchShortCircuit,
+            numeric_profile,
+        };
     }
-    infer_symmetry_numeric(expr)
+
+    infer_symmetry_numeric_with_profile(expr, numeric_profile)
 }
 
-/// The generic numeric fallback described in the module docs. Public so
-/// callers/tests can exercise it directly, independent of whether the fast
-/// structural heuristics already fired.
+/// The generic numeric fallback, with its finite search domain and tolerances in the result.
+pub fn infer_symmetry_numeric_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
+    infer_symmetry_numeric_with_profile(expr, NumericLieDerivativeProfileV1::default())
+}
+
+/// Compatibility API for callers that need only a descriptor from the numeric fallback.
 pub fn infer_symmetry_numeric(expr: &Expr) -> SymmetryDescriptor {
+    infer_symmetry_numeric_with_evidence(expr).descriptor_or_none()
+}
+
+fn infer_symmetry_numeric_with_profile(
+    expr: &Expr,
+    profile: NumericLieDerivativeProfileV1,
+) -> SymmetryInferenceReport {
     let mut var_names = Vec::new();
     collect_var_names(expr, &mut var_names);
 
     if var_names.len() < 2 {
-        return SymmetryDescriptor::none();
+        return SymmetryInferenceReport {
+            candidate: None,
+            evidence: None,
+            search_status: SymmetryInferenceSearchStatus::NumericSearchSkippedTooFewVariables,
+            numeric_profile: profile,
+        };
     }
 
-    // Joint rotation of all variables (bounded to so(6) for generator-count cost).
-    let n = var_names.len().min(6);
+    // Joint rotation of the first n variables (bounded by the declared profile).
+    let n = var_names.len().min(profile.maximum_joint_dimension);
     let joint_algebra = lie_theory::so_n(n);
     let joint_indices: Vec<usize> = (0..n).collect();
-    if is_lie_invariant(expr, &var_names, &joint_indices, &joint_algebra) {
-        return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(n as u8)], false);
+    if is_lie_invariant(expr, &var_names, &joint_indices, &joint_algebra, profile) {
+        let group = LieGroup::SO(n as u8);
+        return SymmetryInferenceReport {
+            candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
+            evidence: Some(SymmetryInferenceEvidence::SampledLieDerivative {
+                profile,
+                acted_on_variables: var_names[..n].to_vec(),
+                group,
+            }),
+            search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
+            numeric_profile: profile,
+        };
     }
 
-    // Pairwise SO(2) on each distinct pair of variables.
+    // Pairwise SO(2) search over every distinct variable pair.
     let so2 = lie_theory::so_n(2);
     for i in 0..var_names.len() {
         for j in (i + 1)..var_names.len() {
-            if is_lie_invariant(expr, &var_names, &[i, j], &so2) {
-                return SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false);
+            if is_lie_invariant(expr, &var_names, &[i, j], &so2, profile) {
+                let group = LieGroup::SO(2);
+                return SymmetryInferenceReport {
+                    candidate: Some(SymmetryDescriptor::from_lie_groups(vec![group], false)),
+                    evidence: Some(SymmetryInferenceEvidence::SampledLieDerivative {
+                        profile,
+                        acted_on_variables: vec![var_names[i].clone(), var_names[j].clone()],
+                        group,
+                    }),
+                    search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
+                    numeric_profile: profile,
+                };
             }
         }
     }
 
-    SymmetryDescriptor::none()
+    SymmetryInferenceReport {
+        candidate: None,
+        evidence: None,
+        search_status: SymmetryInferenceSearchStatus::NumericSearchCompleted,
+        numeric_profile: profile,
+    }
 }
 
 /// Collect free variable names referenced by `expr`, first-seen order, deduplicated.
@@ -134,14 +285,19 @@ fn collect_var_names(expr: &Expr, out: &mut Vec<String>) {
 /// binding order as `state`). Mirrors
 /// `conjecture_engine::gp_support::fd_gradient`, reimplemented locally since
 /// that helper is `pub(crate)` to symthaea-core.
-fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[String]) -> Vec<f64> {
-    const EPS: f64 = 1e-5;
+fn fd_gradient(
+    expr: &Expr,
+    state: &[f64],
+    var_names: &[String],
+    profile: NumericLieDerivativeProfileV1,
+) -> Vec<f64> {
+    let eps = profile.finite_difference_step;
     let mut grad = Vec::with_capacity(var_names.len());
     for i in 0..var_names.len() {
         let mut plus = state.to_vec();
         let mut minus = state.to_vec();
-        plus[i] += EPS;
-        minus[i] -= EPS;
+        plus[i] += eps;
+        minus[i] -= eps;
         let bindings_plus: Vec<(&str, f64)> = var_names
             .iter()
             .map(|s| s.as_str())
@@ -152,16 +308,16 @@ fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[String]) -> Vec<f64> {
             .map(|s| s.as_str())
             .zip(minus.iter().copied())
             .collect();
-        grad.push((expr.eval(&bindings_plus) - expr.eval(&bindings_minus)) / (2.0 * EPS));
+        grad.push((expr.eval(&bindings_plus) - expr.eval(&bindings_minus)) / (2.0 * eps));
     }
     grad
 }
 
 /// Deterministic xorshift64 sampler — no external RNG dependency, reproducible
 /// across runs (important for test stability).
-fn sample_states(dim: usize, count: usize, seed: u64) -> Vec<Vec<f64>> {
-    let mut state = seed | 1;
-    (0..count)
+fn sample_states(dim: usize, profile: NumericLieDerivativeProfileV1) -> Vec<Vec<f64>> {
+    let mut state = profile.seed | 1;
+    (0..profile.samples_per_generator)
         .map(|_| {
             (0..dim)
                 .map(|_| {
@@ -170,12 +326,9 @@ fn sample_states(dim: usize, count: usize, seed: u64) -> Vec<Vec<f64>> {
                     x ^= x >> 7;
                     x ^= x << 17;
                     state = x;
-                    let unit = (x >> 11) as f64 / (1u64 << 53) as f64; // [0, 1)
-                    // [0.5, 3.0) — strictly positive, avoids the origin (where
-                    // e.g. 1/r and ln(x) are singular) while still probing a
-                    // range wide enough to distinguish real invariance from
-                    // a coincidental zero at a single point.
-                    0.5 + unit * 2.5
+                    let unit = (x >> 11) as f64 / (1u64 << 53) as f64;
+                    profile.sample_min_inclusive
+                        + unit * (profile.sample_max_exclusive - profile.sample_min_inclusive)
                 })
                 .collect()
         })
@@ -194,15 +347,14 @@ fn is_lie_invariant(
     var_names: &[String],
     active_indices: &[usize],
     algebra: &LieAlgebra,
+    profile: NumericLieDerivativeProfileV1,
 ) -> bool {
-    const TOLERANCE: f64 = 1e-6;
-    const MIN_GRADIENT_MAG_SQ: f64 = 1e-8;
-    let samples = sample_states(var_names.len(), 8, 0x9E3779B97F4A7C15);
+    let samples = sample_states(var_names.len(), profile);
 
     let mut informative = false;
     for generator in &algebra.basis {
         for state in &samples {
-            let grad = fd_gradient(expr, state, var_names);
+            let grad = fd_gradient(expr, state, var_names, profile);
             if grad.iter().any(|g| !g.is_finite()) {
                 return false;
             }
@@ -222,11 +374,11 @@ fn is_lie_invariant(
             if !lie.is_finite() || !grad_sq.is_finite() {
                 return false;
             }
-            if grad_sq < MIN_GRADIENT_MAG_SQ {
+            if grad_sq < profile.minimum_gradient_squared {
                 continue;
             }
             informative = true;
-            if (lie * lie) / grad_sq > TOLERANCE {
+            if (lie * lie) / grad_sq > profile.normalized_squared_residual_tolerance {
                 return false;
             }
         }
@@ -379,6 +531,57 @@ mod tests {
         Expr::Var(name.to_string())
     }
 
+    #[test]
+    fn structural_symmetry_report_preserves_pattern_provenance() {
+        let expr = add(pow2("x"), pow2("y"));
+        let report = infer_symmetry_with_evidence(&expr);
+        assert_eq!(report.candidate.unwrap().lie_groups, vec![LieGroup::SO(2)]);
+        assert_eq!(
+            report.evidence,
+            Some(SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: StructuralSymmetryPattern::EqualCoefficientSumOfSquares,
+            })
+        );
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::StructuralMatchShortCircuit
+        );
+    }
+
+    #[test]
+    fn numeric_symmetry_report_is_explicitly_sampled_not_proven() {
+        let expr = sqrt_of(add(pow2("x"), pow2("y")));
+        let report = infer_symmetry_numeric_with_evidence(&expr);
+        assert_eq!(report.candidate.unwrap().lie_groups, vec![LieGroup::SO(2)]);
+        let Some(SymmetryInferenceEvidence::SampledLieDerivative { profile, group, acted_on_variables }) = report.evidence else {
+            panic!("numeric fallback must preserve sampled evidence provenance");
+        };
+        assert_eq!(group, LieGroup::SO(2));
+        assert_eq!(acted_on_variables, vec!["x".to_string(), "y".to_string()]);
+        assert_eq!(profile.samples_per_generator, 8);
+        assert_eq!(profile.finite_difference_step, 1e-5);
+        assert_eq!(profile.sample_min_inclusive, 0.5);
+        assert_eq!(profile.sample_max_exclusive, 3.0);
+        assert_eq!(report.search_status, SymmetryInferenceSearchStatus::NumericSearchCompleted);
+    }
+
+    #[test]
+    fn no_candidate_report_does_not_claim_absence_of_symmetry() {
+        let report = infer_symmetry_with_evidence(&mul(var("x"), var("y")));
+        assert!(report.candidate.is_none());
+        assert!(report.evidence.is_none());
+        assert_eq!(report.search_status, SymmetryInferenceSearchStatus::NumericSearchCompleted);
+    }
+
+    #[test]
+    fn numeric_search_skip_is_a_distinct_status() {
+        let report = infer_symmetry_numeric_with_evidence(&pow2("x"));
+        assert!(report.candidate.is_none());
+        assert_eq!(
+            report.search_status,
+            SymmetryInferenceSearchStatus::NumericSearchSkippedTooFewVariables
+        );
+    }
     #[test]
     fn harmonic_oscillator_infers_so2() {
         let expr = add(pow2("x"), pow2("v"));
