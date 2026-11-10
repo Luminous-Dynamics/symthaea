@@ -1065,6 +1065,78 @@ mod tests {
     }
 
     #[test]
+    fn velocity_edit_emits_a_complete_digest_bound_event_remap() {
+        let source = source_score();
+        let edit = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("soften-answer", 0, 2)]),
+            &digest(),
+        ).expect("valid velocity edit");
+        let remap = build_velocity_edit_event_remap(
+            &source,
+            &edit,
+            &digest(),
+            &"b".repeat(64),
+            &"c".repeat(64),
+        ).expect("complete one-to-one event remap");
+        let report = validate_score_event_remap(
+            &source,
+            &edit.candidate,
+            &remap,
+            &digest(),
+            &"b".repeat(64),
+            &"c".repeat(64),
+        );
+        assert!(report.valid, "{:?}", report.issues);
+        assert_eq!(report.modified_count, 2);
+        assert_eq!(report.retained_count, 2);
+        assert_eq!(remap.source_entries.len(), source.notes.len());
+        assert!(remap.insertions.is_empty());
+    }
+
+    #[test]
+    fn velocity_remap_rejects_unreported_non_target_mutation() {
+        let source = source_score();
+        let mut edit = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("soften-answer", 0, 2)]),
+            &digest(),
+        ).expect("valid velocity edit");
+        edit.candidate.notes[2].pitch = Pitch::from_midi(71);
+        let result = build_velocity_edit_event_remap(
+            &source,
+            &edit,
+            &digest(),
+            &"b".repeat(64),
+            &"c".repeat(64),
+        );
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEventRemapIssueCodeV1::RetainedEventChanged
+        }));
+    }
+
+    #[test]
+    fn velocity_remap_rejects_a_tampered_before_after_receipt() {
+        let source = source_score();
+        let mut edit = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("soften-answer", 0, 2)]),
+            &digest(),
+        ).expect("valid velocity edit");
+        edit.receipt.changes[0].before = 0.1;
+        let result = build_velocity_edit_event_remap(
+            &source,
+            &edit,
+            &digest(),
+            &"b".repeat(64),
+            &"c".repeat(64),
+        );
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEventRemapIssueCodeV1::ModifiedFieldMismatch
+        }));
+    }
+
+    #[test]
     fn rejects_an_edit_plan_for_a_different_score_digest() {
         let result = apply_score_edit_plan(&source_score(), &plan(vec![operation("edit", 0, 1)]), &"b".repeat(64));
         assert!(result.unwrap_err().iter().any(|issue| {
