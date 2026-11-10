@@ -62,7 +62,7 @@ cargo run --manifest-path research/ig-revision-ledger-001/qualifier/Cargo.toml -
   research/ig-revision-ledger-001/REVISION_LEDGER_RECORD_V0_1.schema.json
 ```
 
-The qualifier checks a bounded event/fixture contract and expected violation oracles. It is not a complete JSON Schema validator, model runner, causal estimator, or human-subject measurement tool.
+The qualifier recursively audits the complete schema definitions for unsupported keywords and applies the declared bounded schema subset to the manifest and every event record. It enforces transition/digest consistency, claim-set deltas against before/after claim identities, evidence availability and invalidation, unique event IDs, channel-event binding, confidence-report boundaries, and matched-pair common-input / varied-factor identities. SHA-256 fields require canonical lowercase hexadecimal. This is a deliberately bounded JSON-Schema subset, not a complete JSON Schema implementation; it is not a model runner, causal estimator, confidence calibrator, or human-subject measurement tool.
 
 ## Claim ceiling
 
