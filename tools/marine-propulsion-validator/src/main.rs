@@ -1474,7 +1474,10 @@ mod tests {
     fn service_fingerprint_distinguishes_not_applicable_from_unknown_and_zero() {
         let mut fixture: Value =
             serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
-        let baseline = compute_service_fingerprint(&fixture).expect("baseline fingerprint");
+
+        fixture["service"]["annual_delivered_cargo_mass"]["value"] = serde_json::json!(0);
+        let numeric_zero = compute_service_fingerprint(&fixture).expect("zero fingerprint");
+
         fixture["service"]["annual_delivered_cargo_mass"] = serde_json::json!({
             "value": null,
             "unit": "tonne",
@@ -1488,7 +1491,8 @@ mod tests {
             }
         });
         let not_applicable = compute_service_fingerprint(&fixture).expect("not-applicable fingerprint");
-        assert_ne!(baseline, not_applicable);
+        assert_ne!(numeric_zero, not_applicable);
+
         fixture["service"]["annual_delivered_cargo_mass"] = serde_json::json!({
             "value": null,
             "unit": "tonne",
@@ -1503,6 +1507,12 @@ mod tests {
         });
         let unknown = compute_service_fingerprint(&fixture).expect("unknown fingerprint");
         assert_ne!(not_applicable, unknown);
+
+        fixture["service"].as_object_mut().expect("service object")
+            .remove("annual_delivered_cargo_mass");
+        let omitted = compute_service_fingerprint(&fixture).expect("omitted fingerprint");
+        assert_ne!(unknown, omitted);
+        assert_ne!(not_applicable, omitted);
     }
 
     #[test]
