@@ -92,10 +92,11 @@ pub enum FullFrameJoint {
 /// Number of joints in the full-frame suit.
 pub const NUM_FULL_FRAME_JOINTS: usize = 20;
 
-/// Human load model — treats the human as a dynamic load inside the suit.
+/// Synthetic human-load signal generator.
 ///
-/// Each segment has mass (human body part weight) and exerts gait torques
-/// that the suit must either assist or resist.
+/// It generates candidate per-joint torque traces for research. It is not a
+/// coupled articulated human model; the generated torques are currently not
+/// injected into the physics world.
 #[derive(Debug, Clone)]
 pub struct HumanLoadModel {
     /// Total human mass in kg.
@@ -465,7 +466,7 @@ mod tests {
 
         assert!(
             fresh.sum_abs_joint_torque_nm() > tired.sum_abs_joint_torque_nm(),
-            "Fresh human should generate more power than fatigued"
+            "Fresh synthetic profile should generate a larger absolute torque sum than the fatigued profile"
         );
     }
 
