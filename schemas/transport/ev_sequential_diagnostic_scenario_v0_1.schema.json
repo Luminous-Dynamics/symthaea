@@ -145,7 +145,11 @@
               "domain_supported",
               "equipment_available",
               "protocol_digest",
-              "equipment_digest"
+              "equipment_digest",
+              "safety_approval_digest",
+              "safety_authority_ref",
+              "calibration_record_digest",
+              "domain_scope_digest"
             ],
             "properties": {
               "safety_approved": {
@@ -165,6 +169,22 @@
                 "pattern": "^[a-f0-9]{64}$"
               },
               "equipment_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "safety_approval_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "safety_authority_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "calibration_record_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "domain_scope_digest": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
               }
