@@ -14,6 +14,16 @@ pub struct VocalQualityMetrics {
     pub p95_pitch_error_cents: f32,
     pub stable_pitch_p95_cents: f32,
     pub transition_pitch_p95_cents: f32,
+    /// Error from a broad 40-1200 Hz search that does not use the score pitch.
+    pub score_independent_median_pitch_error_cents: f32,
+    pub score_independent_p95_pitch_error_cents: f32,
+    /// Independent F0 support divided by frames accepted by the score-conditioned tracker.
+    pub score_independent_valid_fraction: f32,
+    /// Count of matched frames whose broad-search pitch differs by more than 300 cents.
+    pub prior_mismatch_frames: usize,
+    pub prior_mismatch_fraction: f32,
+    /// None means insufficient independent coverage; Some(false) means a material mismatch.
+    pub score_independent_pitch_audit_pass: Option<bool>,
     pub median_onset_error_ms: f32,
     pub duration_error_ms: f32,
     pub peak_sample_delta: f32,
@@ -98,6 +108,10 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     let mut attempted = 0usize;
     let mut vuv_errors = 0usize;
     let mut all_frames = 0usize;
+    let mut score_conditioned_matches = 0usize;
+    let mut score_independent_matches = 0usize;
+    let mut score_independent_errors = Vec::new();
+    let mut prior_mismatch_frames = 0usize;
     if stem.samples.len() >= frame {
         for start in (0..=stem.samples.len() - frame).step_by(hop.max(1)) {
             let time = (start + frame / 2) as f32 / rate as f32;
@@ -126,6 +140,23 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
                 if let (Some(expected), Some(actual)) = (expected_pitch, actual) {
                     let error = (1200.0 * (actual / expected).log2()).abs();
                     errors.push(error);
+                    score_conditioned_matches += 1;
+
+                    // This search deliberately ignores the expected score pitch.
+                    // It is still autocorrelation-based, so it is a broad-prior
+                    // cross-check rather than a fully independent algorithm family.
+                    if let Some(independent) =
+                        estimate_f0_broad(&stem.samples[start..start + frame], rate)
+                    {
+                        score_independent_matches += 1;
+                        let independent_error =
+                            (1200.0 * (independent / expected).log2()).abs();
+                        score_independent_errors.push(independent_error);
+                        if independent_error > 300.0 {
+                            prior_mismatch_frames += 1;
+                        }
+                    }
+
                     let stable = performance
                         .syllables
                         .iter()
@@ -153,6 +184,22 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     transition_errors.sort_by(f32::total_cmp);
     let stable_pitch_p95_cents = percentile(&stable_errors, 0.95);
     let transition_pitch_p95_cents = percentile(&transition_errors, 0.95);
+    score_independent_errors.sort_by(f32::total_cmp);
+    let score_independent_median_pitch_error_cents = percentile(&score_independent_errors, 0.5);
+    let score_independent_p95_pitch_error_cents = percentile(&score_independent_errors, 0.95);
+    let score_independent_valid_fraction = score_independent_matches as f32
+        / score_conditioned_matches.max(1) as f32;
+    let prior_mismatch_fraction = prior_mismatch_frames as f32
+        / score_independent_matches.max(1) as f32;
+    // Insufficient independent support is undefined, never a zero-error pass.
+    // 80% coverage and a 10% gross-mismatch limit are provisional engineering
+    // guards that require calibration on held-out human-sung references.
+    let score_independent_pitch_audit_pass =
+        if score_independent_valid_fraction < 0.8 || score_independent_matches == 0 {
+            None
+        } else {
+            Some(prior_mismatch_fraction <= 0.10)
+        };
     // An onset-from-silence metric is meaningful for the first note and after
     // an actual gap, not at a connected legato boundary where audio continues.
     let mut previous_end = None;
@@ -204,6 +251,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         && timing_pass
         && physical_stability_pass
         && render_cleanliness_pass
+        && score_independent_pitch_audit_pass == Some(true)
         // Raw physical renders intentionally retain diagnostic headroom. The
         // gallery emits a separate loudness-normalized listening copy, so a
         // clean quiet source must not fail the synthesis-quality gate merely
@@ -217,6 +265,12 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         p95_pitch_error_cents,
         stable_pitch_p95_cents,
         transition_pitch_p95_cents,
+        score_independent_median_pitch_error_cents,
+        score_independent_p95_pitch_error_cents,
+        score_independent_valid_fraction,
+        prior_mismatch_frames,
+        prior_mismatch_fraction,
+        score_independent_pitch_audit_pass,
         median_onset_error_ms,
         duration_error_ms,
         peak_sample_delta,
@@ -304,6 +358,64 @@ fn estimate_f0_near(x: &[f32], rate: u32, expected: f32) -> Option<f32> {
         }
     }
     (best.0 > 0 && best.1 >= 0.12).then(|| rate as f32 / best.0 as f32)
+}
+
+/// Broad-range autocorrelation cross-check that deliberately does not use
+/// the expected note. The 40-1200 Hz range covers common low/high singing
+/// fundamentals and permits an octave-error detector to observe a true pitch
+/// outside the score-conditioned estimator's +/-300-cent search window.
+///
+/// This shares the autocorrelation algorithm family with the score-conditioned
+/// estimator. It addresses prior-window bias, not correlated estimator error.
+fn estimate_f0_broad(x: &[f32], rate: u32) -> Option<f32> {
+    let rms = (x.iter().map(|value| value * value).sum::<f32>() / x.len().max(1) as f32).sqrt();
+    if x.len() < 4 || rate == 0 || rms < 0.003 {
+        return None;
+    }
+    let min_lag = (rate as f32 / 1200.0).floor().max(1.0) as usize;
+    let max_lag = ((rate as f32 / 40.0).ceil() as usize).min(x.len() / 2);
+    if min_lag > max_lag {
+        return None;
+    }
+
+    let mut scores = Vec::with_capacity(max_lag - min_lag + 1);
+    let mut best_score = f64::NEG_INFINITY;
+    for lag in min_lag..=max_lag {
+        let (dot, energy_a, energy_b) = x[..x.len() - lag].iter().zip(&x[lag..]).fold(
+            (0.0f64, 0.0f64, 0.0f64),
+            |(dot, a2, b2), (&a, &b)| {
+                (
+                    dot + (a * b) as f64,
+                    a2 + (a * a) as f64,
+                    b2 + (b * b) as f64,
+                )
+            },
+        );
+        let score = dot / (energy_a * energy_b).sqrt().max(1e-12);
+        best_score = best_score.max(score);
+        scores.push((lag, score));
+    }
+    if best_score < 0.25 {
+        return None;
+    }
+
+    // Retain the legacy earliest-credible-peak policy, but over a wider range.
+    let threshold = (best_score * 0.85).max(0.25);
+    let selected = scores
+        .windows(3)
+        .find(|window| {
+            window[1].1 >= threshold
+                && window[1].1 >= window[0].1
+                && window[1].1 >= window[2].1
+        })
+        .map(|window| window[1].0)
+        .or_else(|| {
+            scores
+                .iter()
+                .find(|(_, score)| *score >= threshold)
+                .map(|(lag, _)| *lag)
+        })?;
+    Some(rate as f32 / selected as f32)
 }
 
 fn expected_pitch_at(performance: &VocalPerformance, time: f32) -> Option<f32> {
@@ -448,6 +560,80 @@ mod tests {
     /// saturation with a sine wave synthesized nearly an octave away from
     /// the note it is meant to represent, and confirms the reported error
     /// sits near the window edge (~300-320 cents), not the true ~1421 cents.
+    #[test]
+    fn score_independent_pitch_detects_octave_subharmonic_false_reassurance() {
+        let note = symthaea_muse::Note {
+            frequency: 240.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.8,
+        };
+        let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        let rate = 24_000;
+        let actual_hz = 480.0;
+        let samples: Vec<_> = (0..rate / 2)
+            .map(|index| {
+                (std::f32::consts::TAU * actual_hz * index as f32 / rate as f32).sin() * 0.2
+            })
+            .collect();
+        let stem = VocalStem {
+            samples,
+            sample_rate: rate,
+            backend: "octave-negative-control".into(),
+        };
+        let metrics = analyze_vocal_stem(&performance, &stem);
+        assert!(
+            metrics.median_pitch_error_cents < 100.0,
+            "score-conditioned estimate should demonstrate the prior-window false reassurance: {metrics:?}"
+        );
+        assert!(
+            metrics.score_independent_median_pitch_error_cents > 1100.0,
+            "broad search should recover the 480 Hz fundamental: {metrics:?}"
+        );
+        assert!(metrics.prior_mismatch_frames > 0, "{metrics:?}");
+        assert!(metrics.prior_mismatch_fraction > 0.1, "{metrics:?}");
+        assert_eq!(metrics.score_independent_pitch_audit_pass, Some(false));
+        assert!(!metrics.objective_pass);
+    }
+
+    #[test]
+    fn score_independent_pitch_audit_is_undefined_without_acoustic_support() {
+        let note = symthaea_muse::Note {
+            frequency: 240.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.8,
+        };
+        let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        let stem = VocalStem {
+            samples: vec![0.0; 12_000],
+            sample_rate: 24_000,
+            backend: "silence-negative-control".into(),
+        };
+        let metrics = analyze_vocal_stem(&performance, &stem);
+        assert_eq!(metrics.score_independent_valid_fraction, 0.0);
+        assert_eq!(metrics.score_independent_pitch_audit_pass, None);
+        assert!(!metrics.objective_pass);
+    }
+
+    #[test]
+    fn broad_pitch_search_covers_low_and_high_singing_registers() {
+        let rate = 24_000;
+        for target_hz in [80.0f32, 800.0] {
+            let samples: Vec<_> = (0..rate / 2)
+                .map(|index| {
+                    (std::f32::consts::TAU * target_hz * index as f32 / rate as f32).sin() * 0.2
+                })
+                .collect();
+            let estimated = estimate_f0_broad(&samples, rate).unwrap();
+            let error_cents = (1200.0 * (estimated / target_hz).log2()).abs();
+            assert!(
+                error_cents < 20.0,
+                "target={target_hz} estimated={estimated} error={error_cents}"
+            );
+        }
+    }
+
     #[test]
     fn pitch_error_saturates_at_octave_safety_window_edge() {
         let note = symthaea_muse::Note {
