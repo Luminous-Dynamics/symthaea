@@ -802,6 +802,14 @@ fn check_trial(case: &Value, f: &mut Findings) {
         };
 
         if is_v3 {
+            match channel.get("sample_rate_basis").and_then(Value::as_str) {
+                Some("nominal") | Some("measured") => {}
+                _ => f.push(
+                    pointer_child(path.clone(), "sample_rate_basis"),
+                    "INVALID",
+                    "v0.3 channel must declare whether its sampling rate is nominal or measured",
+                ),
+            }
             if let (Some((window_start, window_end)), Some(expected), Some(tolerance)) =
                 (window.as_ref(), expected_samples, rate_count_tolerance)
             {
@@ -813,7 +821,7 @@ fn check_trial(case: &Value, f: &mut Findings) {
                     .and_then(Value::as_str);
                 match (sample_rate, sample_rate_unit.and_then(frequency_to_hz)) {
                     (Some(rate), Some(scale)) if rate > 0.0 => {
-                        let duration_ns = window_end.signed_duration_since(window_start.clone()).num_nanoseconds();
+                        let duration_ns = window_end.clone().signed_duration_since(window_start.clone()).num_nanoseconds();
                         match duration_ns {
                             Some(duration_ns) if duration_ns > 0 => {
                                 let expected_from_rate = duration_ns as f64 / 1_000_000_000.0 * rate * scale;
