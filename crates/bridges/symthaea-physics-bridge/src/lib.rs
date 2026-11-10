@@ -70,7 +70,8 @@ pub use dimensional_inference::{InferenceResult, UnitMap, infer_dimensions};
 pub use equation_ast::EquationEncoder;
 pub use query::{PhysicsSearchEngine, SearchWeights};
 pub use linear_group_action::{
-    AdmittedLinearGroupActionV1, LinearGeneratorV1, LinearGroupActionAdmissionError,
+    AdmittedLinearGroupActionV1, GeneratorMetricSkewDiagnosticV1, LinearGeneratorV1,
+    LinearGroupActionAdmissionDiagnosticsV1, LinearGroupActionAdmissionError,
     LinearGroupActionAdmissionProfileV1, LinearGroupActionV1,
 };
 pub use recognize::{
