@@ -821,7 +821,7 @@ mod tests {
                 *value += 1.0e-4 * generators[1].1[row][column];
             }
         }
-        generators[2] = ("near-copy-1e-4", near_copy);
+        generators[0] = ("Jx-near-copy-1e-4", near_copy);
         let admitted = action(
             "ill-conditioned-so3",
             vec!["x", "y", "z"],
