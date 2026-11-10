@@ -178,6 +178,55 @@ A numerical target should be set only after a reproduced baseline, variance esti
 No existing engine or production governance authority is duplicated by this crosswalk.
 
 
+## Industry platform comparison and interoperability target
+
+These platforms already provide strong generic orchestration primitives. The benchmark should run against them through adapters rather than attempt to replace them.
+
+| Platform / published pattern | Existing strengths documented by provider | Where this benchmark should complement it |
+|---|---|---|
+| OpenAI Agents SDK | Agent/handoff/guardrail/session primitives; built-in tracing for model calls, tools, handoffs and guardrails; trace grading and repeatable eval runs | Add content-addressed revision/evidence receipts, matched causal-pair identity checks, explicit social exposure and authority semantics, cross-provider trace portability, and pluralism-aware human evaluation |
+| Microsoft Agent Framework | Python and C#/.NET; graph-based sequential/concurrent/handoff/group orchestration; typed state, middleware, OpenTelemetry, checkpoint/restart and human-in-the-loop controls | Validate the same scenario/event contracts across runtime providers; test whether typed run/effect evidence survives retries, restarts and handoffs; distinguish workflow routing from decision authority |
+| Anthropic multi-agent research pattern | Long-horizon context management; phase summaries and external memory; artifact-first subagent work to reduce lossy coordinator relays; evaluate final state and discrete checkpoints | Measure artifact/provenance retention, evidence loss in handoffs, revision history and checkpoint completeness; compare output/effect quality under matched cost and task budgets |
+
+Official/provider sources:
+- OpenAI agent-building and orchestration primitives: https://developers.openai.com/tracks/building-agents
+- OpenAI Agents SDK tracing: https://openai.github.io/openai-agents-python/tracing/
+- OpenAI trace grading and eval workflows: https://developers.openai.com/api/docs/guides/agent-evals
+- OpenAI guardrails and human approvals: https://developers.openai.com/api/docs/guides/agents/guardrails-approvals
+- Microsoft Agent Framework: https://labs.ai.azure.com/innovations/microsoft-agent-framework/
+- Anthropic multi-agent research system: https://www.anthropic.com/research/multi-agent-research-system
+
+### What not to compete on
+
+Do not create another generic agent loop, handoff router, trace dashboard, memory wrapper, group-chat engine or human-approval widget. Use adapters to consume each platform's traces and action/effect events.
+
+### Cross-platform benchmark protocol
+
+For each adapter, freeze:
+- provider/runtime and exact package/commit/model revision;
+- agent roles, prompts, tool/capability grants and handoff policy;
+- memory/session/checkpoint semantics;
+- model, token, tool-call, latency and human-review budgets;
+- evaluator and evidence-oracle identities;
+- CommunicationGraph profile and delivered message events;
+- output/effect state and recovery transcript.
+
+Run the same scenario, attack, truth-profile and revision-ledger fixtures where semantics allow. Mark unsupported features as Unsupported rather than silently weakening a test.
+
+Compare the following vectors separately:
+1. task answer and warranted-revision sensitivity;
+2. persistent unsupported-influence susceptibility and false-correction rate;
+3. evidence/provenance completeness across handoffs and memory checkpoints;
+4. unauthorized reads, writes, exfiltration and policy-boundary effects;
+5. blind-human alignment and role-asymmetry bias on subjective tasks;
+6. recovery correctness after timeout, partial result, restart and stale context;
+7. cost, latency, token/tool budget, trace size and operator burden;
+8. exportability/replayability of run, evidence and effect receipts across providers.
+
+This is not a present-day product benchmark result. The platform matrix is an adapter/evaluation target. No claim that Symthaea already outperforms these stacks is made; a fair comparison requires the same tasks, models, tools, budgets and independently verified outcomes.
+
+The strategic differentiation is **assurance and institutional semantics above the orchestration substrate**: a portable proof/evidence vocabulary for what agents saw, what they changed, what they were authorized to do, what happened at the effect boundary, how a result can be replayed, and where uncertainty or normative disagreement remains unresolved.
+
 ## Graph ownership and semantics
 
 The topology axis in this programme is a **CommunicationGraph**, not the delegation graph.
