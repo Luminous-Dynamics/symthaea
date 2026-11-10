@@ -376,14 +376,41 @@
         "required": [
           "message_id",
           "channel_event_id",
+          "channel_event_sha256",
+          "communication_graph_sha256",
+          "sender_agent_instance_id",
+          "recipient_agent_instance_id",
+          "delivery_sequence",
           "payload_sha256"
         ],
         "properties": {
           "message_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "channel_event_id": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
+          },
+          "channel_event_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "communication_graph_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sender_agent_instance_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recipient_agent_instance_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "delivery_sequence": {
+            "type": "integer",
+            "minimum": 1
           },
           "payload_sha256": {
             "type": "string",
@@ -768,7 +795,19 @@
           "properties": {
             "id": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "enum": [
+                "persuasion_exposure",
+                "communication_placement",
+                "confidence_policy",
+                "debate_method",
+                "evidence_availability",
+                "message_order",
+                "agent_diversity",
+                "abstention_policy",
+                "loss_profile",
+                "retrieval_policy"
+              ]
             },
             "treatment_sha256": {
               "type": "string",
