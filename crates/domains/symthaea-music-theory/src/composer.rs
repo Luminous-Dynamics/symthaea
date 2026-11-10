@@ -1685,7 +1685,10 @@ fn apply_harmonic_stasis(score: &mut Score) {
         onsets.sort_by(f64::total_cmp);
         onsets.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
 
-        let mut active: std::collections::HashMap<u8, usize> = std::collections::HashMap::new();
+        // Pitch alone is not a voice identity: two independent parts may
+        // legitimately sustain the same sounding pitch at the same time.
+        let mut active: std::collections::HashMap<(PartId, u8), usize> =
+            std::collections::HashMap::new();
         let mut removed: Vec<usize> = Vec::new();
 
         for &t in &onsets {
@@ -1696,18 +1699,18 @@ fn apply_harmonic_stasis(score: &mut Score) {
                 .filter(|(_, n)| n.role == role && (n.onset.beats() - t).abs() < 1e-9)
                 .map(|(idx, _)| idx)
                 .collect();
-            let mut still_active: std::collections::HashMap<u8, usize> =
+            let mut still_active: std::collections::HashMap<(PartId, u8), usize> =
                 std::collections::HashMap::new();
             for &idx in &chord {
-                let midi = score.notes[idx].pitch.midi();
-                if let Some(&source) = active.get(&midi) {
+                let identity = (score.notes[idx].part, score.notes[idx].pitch.midi());
+                if let Some(&source) = active.get(&identity) {
                     let new_end = score.notes[idx].onset + score.notes[idx].duration;
                     let src_onset = score.notes[source].onset;
                     score.notes[source].duration = new_end.saturating_sub(src_onset);
                     removed.push(idx);
-                    still_active.insert(midi, source);
+                    still_active.insert(identity, source);
                 } else {
-                    still_active.insert(midi, idx);
+                    still_active.insert(identity, idx);
                 }
             }
             active = still_active;
@@ -7336,6 +7339,46 @@ mod tests {
                 "the changed chord is NOT tied to anything before it"
             );
         }
+    }
+
+    #[test]
+    fn harmonic_stasis_never_merges_equal_pitch_across_distinct_parts() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        let bar = Duration::new(4, 1);
+        for (part, beat) in [
+            (PartId(11), 0i64),
+            (PartId(22), 0i64),
+            (PartId(11), 4i64),
+            (PartId(22), 4i64),
+        ] {
+            score.push(ScoreNote {
+                part,
+                pitch: Pitch::from_midi(48),
+                onset: Duration::new(beat, 1),
+                duration: bar,
+                velocity: 0.5,
+                role: VoiceRole::Harmony,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+
+        apply_harmonic_stasis(&mut score);
+
+        let harmony: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Harmony)
+            .collect();
+        assert_eq!(harmony.len(), 2, "each part should retain one sustained note");
+        for (part, expected) in [(PartId(11), 1usize), (PartId(22), 1usize)] {
+            let notes: Vec<&&ScoreNote> = harmony.iter()
+                .filter(|note| note.part == part)
+                .collect();
+            assert_eq!(notes.len(), expected);
+            assert_eq!(notes[0].onset, Duration::zero());
+            assert_eq!(notes[0].duration, Duration::new(8, 1));
+        }
+        assert!(score.has_part_identity());
     }
 
     #[test]
