@@ -261,7 +261,9 @@ pub fn certify_selective_risk(
             continue;
         }
         accepted_samples += 1;
-        accepted_valid_runs += usize::from(sample.valid_run);
+        if sample.valid_run {
+            accepted_valid_runs += 1;
+        }
         if !sample.valid_run {
             accepted_task_failures += 1;
         } else if let Some(success) = sample.observed_success {
