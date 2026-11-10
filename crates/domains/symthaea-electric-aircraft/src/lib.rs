@@ -776,6 +776,65 @@ mod tests {
         assert!(b.energy_required_with_uncertainty_wh > a.energy_required_with_uncertainty_wh);
     }
 
+    fn battery_characterization() -> BatteryCharacterization {
+        use characterization::{
+            EvidenceClass, EvidenceRecord, ScalarGrid2D, ScalarGridPoint,
+        };
+
+        let evidence = |id: &str| EvidenceRecord {
+            id: id.into(),
+            uri: format!("artifact://test/{id}"),
+            sha256: "c".repeat(64),
+            class: EvidenceClass::Simulation,
+            description: "Synthetic unit-test fixture; not physical evidence".into(),
+        };
+        let grid = |id: &str, evidence_id: &str, values: Vec<Vec<f64>>, uncertainty: f64| {
+            ScalarGrid2D {
+                id: id.into(),
+                x_axis: "state_of_charge".into(),
+                x_unit: "1".into(),
+                x_values: vec![0.2, 0.6, 0.95],
+                y_axis: "temperature".into(),
+                y_unit: "K".into(),
+                y_values: vec![273.0, 298.0, 323.0],
+                evidence: evidence(evidence_id),
+                values: values
+                    .into_iter()
+                    .map(|row| {
+                        row.into_iter()
+                            .map(|value| ScalarGridPoint {
+                                value,
+                                absolute_uncertainty: uncertainty,
+                            })
+                            .collect()
+                    })
+                    .collect(),
+            }
+        };
+        BatteryCharacterization {
+            open_circuit_voltage: grid(
+                "pack-ocv",
+                "pack-ocv-data",
+                vec![
+                    vec![340.0, 350.0, 345.0],
+                    vec![365.0, 375.0, 370.0],
+                    vec![385.0, 395.0, 390.0],
+                ],
+                1.5,
+            ),
+            internal_resistance: grid(
+                "pack-resistance",
+                "pack-resistance-data",
+                vec![
+                    vec![0.070, 0.065, 0.070],
+                    vec![0.055, 0.050, 0.060],
+                    vec![0.050, 0.045, 0.055],
+                ],
+                0.002,
+            ),
+        }
+    }
+
     fn propulsion_characterization() -> PropulsionCharacterization {
         use characterization::{EfficiencyCurve, EfficiencyPoint, EvidenceClass, EvidenceRecord};
 
@@ -862,6 +921,42 @@ mod tests {
             evaluate_mission_characterized(&input, &characterization),
             Err(ModelError::Characterization(
                 CharacterizationError::OutsideCalibrationDomain { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn battery_characterized_mission_uses_conservative_surfaces_and_records_evidence() {
+        let input = baseline();
+        let propulsion = propulsion_characterization();
+        let battery = battery_characterization();
+        let propulsion_only = evaluate_mission_characterized(&input, &propulsion).unwrap();
+        let fully_mapped =
+            evaluate_mission_fully_characterized(&input, &propulsion, &battery).unwrap();
+
+        assert_eq!(fully_mapped.model_version, "electric-fixed-wing-energy-v0.3.0");
+        assert_eq!(
+            fully_mapped.battery_characterization_evidence_ids,
+            vec!["pack-ocv-data", "pack-resistance-data"]
+        );
+        assert!(fully_mapped.segments[0].battery_open_circuit_voltage_used_v < 400.0);
+        assert!(fully_mapped.segments[0].battery_internal_resistance_used_ohm > 0.04);
+        assert!(fully_mapped.mission_chemical_energy_wh
+            > propulsion_only.mission_chemical_energy_wh);
+        // Independent numerical oracle for this synthetic SOC/temperature map fixture.
+        assert!((fully_mapped.mission_chemical_energy_wh - 15_089.329_326_948_14).abs() < 1e-5);
+        assert!((fully_mapped.energy_margin_wh - 10_392.804_807_662_233).abs() < 1e-5);
+    }
+
+    #[test]
+    fn battery_characterized_mission_rejects_out_of_domain_soc() {
+        let mut input = baseline();
+        input.battery.initial_state_of_charge = 0.15;
+        input.battery.reserve_state_of_charge = 0.10;
+        assert!(matches!(
+            evaluate_mission_battery_characterized(&input, &battery_characterization()),
+            Err(ModelError::Characterization(
+                CharacterizationError::GridOutsideCalibrationDomain { .. }
             ))
         ));
     }
