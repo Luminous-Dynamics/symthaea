@@ -12,6 +12,7 @@
 //! existing renderer-independent InstrumentCapabilityV1 contract.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 use symthaea_music_theory::orchestration::{
@@ -20,6 +21,8 @@ use symthaea_music_theory::orchestration::{
 
 pub const INSTRUMENT_CAPABILITY_EVIDENCE_SCHEMA_V1: &str =
     "muse-instrument-capability-evidence-v1";
+pub const INSTRUMENT_CAPABILITY_PROFILE_DIGEST_SCHEMA_V1: &str =
+    "muse-instrument-capability-profile-sha256-v1";
 pub const MAX_CAPABILITY_CLAIMS_V1: usize = 128;
 pub const MAX_PARENT_EVIDENCE_IDS_V1: usize = 32;
 pub const MAX_POLYPHONY_V1: u8 = 64;
@@ -215,6 +218,7 @@ impl CapabilityEvidenceReportV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CapabilityMaterializationErrorV1 {
     InvalidProfile,
+    ProfileSerialization,
     ScopeMismatch,
     MissingQualifiedSoundingRange,
     MissingQualifiedPolyphony,
@@ -222,6 +226,31 @@ pub enum CapabilityMaterializationErrorV1 {
     DuplicateQualifiedPolyphony,
     MissingQualifiedRendererPatch,
     RendererPatchUnavailable,
+}
+
+/// Evidence receipt kept beside the existing orchestration capability.
+/// Downstream planners should retain this value instead of copying only the
+/// range/polyphony numbers and losing their qualification lineage.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct QualifiedInstrumentCapabilityV1 {
+    pub capability: InstrumentCapabilityV1,
+    pub profile_sha256: String,
+    pub profile_digest_schema: String,
+    pub scope: CapabilityScopeV1,
+    pub claim_ids: Vec<String>,
+    pub evidence_ids: Vec<String>,
+    pub qualification_record_ids: Vec<String>,
+}
+
+pub fn instrument_capability_profile_sha256_v1(
+    profile: &InstrumentCapabilityEvidenceProfileV1,
+) -> Result<String, serde_json::Error> {
+    let serialized = serde_json::to_vec(profile)?;
+    let mut hasher = Sha256::new();
+    hasher.update(INSTRUMENT_CAPABILITY_PROFILE_DIGEST_SCHEMA_V1.as_bytes());
+    hasher.update([0]);
+    hasher.update(serialized);
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 pub fn valid_sha256_hex_v1(value: &str) -> bool {
@@ -521,7 +550,7 @@ fn qualified_values<'a>(
 pub fn materialize_qualified_instrument_capability_v1(
     profile: &InstrumentCapabilityEvidenceProfileV1,
     required_scope: &CapabilityScopeV1,
-) -> Result<InstrumentCapabilityV1, CapabilityMaterializationErrorV1> {
+) -> Result<QualifiedInstrumentCapabilityV1, CapabilityMaterializationErrorV1> {
     let validation = validate_instrument_capability_evidence_v1(profile);
     if !validation.valid {
         return Err(CapabilityMaterializationErrorV1::InvalidProfile);
@@ -609,11 +638,51 @@ pub fn materialize_qualified_instrument_capability_v1(
         _ => unreachable!("polyphony candidates were filtered by variant"),
     };
 
-    Ok(InstrumentCapabilityV1 {
-        id: profile.instrument_instance_id.clone(),
-        kind: profile.instrument_kind,
-        sounding_range,
-        max_polyphony,
+    let mut required_claims = vec![ranges[0], polyphony[0]];
+    if required_scope.renderer_id.is_some() || required_scope.patch_id.is_some() {
+        required_claims.push(
+            claims
+                .iter()
+                .copied()
+                .find(|claim| {
+                    matches!(
+                        &claim.value,
+                        CapabilityValueV1::RendererPatchAvailability { available: true }
+                    )
+                })
+                .ok_or(CapabilityMaterializationErrorV1::MissingQualifiedRendererPatch)?,
+        );
+    }
+    required_claims.sort_by(|a, b| a.claim_id.cmp(&b.claim_id));
+
+    let profile_sha256 = instrument_capability_profile_sha256_v1(profile)
+        .map_err(|_| CapabilityMaterializationErrorV1::ProfileSerialization)?;
+    let claim_ids = required_claims
+        .iter()
+        .map(|claim| claim.claim_id.clone())
+        .collect();
+    let evidence_ids = required_claims
+        .iter()
+        .map(|claim| claim.evidence.evidence_id.clone())
+        .collect();
+    let qualification_record_ids = required_claims
+        .iter()
+        .filter_map(|claim| claim.qualification_record_id.clone())
+        .collect();
+
+    Ok(QualifiedInstrumentCapabilityV1 {
+        capability: InstrumentCapabilityV1 {
+            id: profile.instrument_instance_id.clone(),
+            kind: profile.instrument_kind,
+            sounding_range,
+            max_polyphony,
+        },
+        profile_sha256,
+        profile_digest_schema: INSTRUMENT_CAPABILITY_PROFILE_DIGEST_SCHEMA_V1.into(),
+        scope: required_scope.clone(),
+        claim_ids,
+        evidence_ids,
+        qualification_record_ids,
     })
 }
 
@@ -719,11 +788,16 @@ mod tests {
         let (profile, required_scope) = valid_profile(true);
         let capability =
             materialize_qualified_instrument_capability_v1(&profile, &required_scope).unwrap();
-        assert_eq!(capability.id, "solo-cello-01");
-        assert_eq!(capability.kind, InstrumentKindV1::Cello);
-        assert_eq!(capability.sounding_range.lowest_midi, 36);
-        assert_eq!(capability.sounding_range.highest_midi, 84);
-        assert_eq!(capability.max_polyphony, 1);
+        assert_eq!(capability.capability.id, "solo-cello-01");
+        assert_eq!(capability.capability.kind, InstrumentKindV1::Cello);
+        assert_eq!(capability.capability.sounding_range.lowest_midi, 36);
+        assert_eq!(capability.capability.sounding_range.highest_midi, 84);
+        assert_eq!(capability.capability.max_polyphony, 1);
+        assert!(valid_sha256_hex_v1(&capability.profile_sha256));
+        assert_eq!(capability.claim_ids.len(), 3);
+        assert_eq!(capability.evidence_ids.len(), 3);
+        assert_eq!(capability.qualification_record_ids.len(), 3);
+        assert_eq!(capability.scope, required_scope);
     }
 
     #[test]
