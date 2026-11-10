@@ -110,7 +110,9 @@
         "expected_sample_count",
         "observed_sample_count",
         "missing_sample_count",
-        "minimum_observed_fraction"
+        "minimum_observed_fraction",
+        "window_semantics",
+        "rate_count_tolerance_samples"
       ],
       "properties": {
         "start": {
@@ -149,6 +151,14 @@
         "time_alignment_uncertainty_seconds": {
           "type": "number",
           "minimum": 0
+        },
+        "window_semantics": {
+          "const": "start_inclusive_end_exclusive"
+        },
+        "rate_count_tolerance_samples": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     },
