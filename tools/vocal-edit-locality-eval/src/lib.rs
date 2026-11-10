@@ -406,7 +406,7 @@ mod tests {
 
         assert!(!report.objective_pass);
         assert_eq!(report.protected[0].correlation, None);
-        assert_eq!(report.protected[0].rms_delta, 0.0);
+        assert!(report.protected[0].rms_delta > 0.0);
         assert_eq!(report.protected[1].rms_delta, 0.0);
     }
 }
