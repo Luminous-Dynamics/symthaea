@@ -116,6 +116,17 @@ The competitive claim should be a Pareto profile across:
 
 Do not claim state-of-the-art edit locality until at least two integrated backends and a held-out, human-reviewed edit corpus have been evaluated under the same protocol.
 
+
+## Research references and comparison boundaries
+
+- **STARS (Findings of ACL 2025)** combines singing transcription, phoneme-audio alignment, note transcription/timing, vocal-technique identification and global style annotation. This is useful for authoring the target/protected intervals and evaluating whether an edit preserved the surrounding phonetic and musical structure. It is an annotation framework, not a localized-edit benchmark. https://aclanthology.org/2025.findings-acl.781/
+- **SoulX-Singer (2026)** is a high-priority open score/MIDI/F0-conditioned singing baseline, trained on more than 42,000 hours of vocal data and supporting Mandarin, English and Cantonese. It is useful for naturalness and score-control comparisons, but its paper does not establish local edit preservation. https://arxiv.org/abs/2602.07803
+- **MusicJudge (Interspeech 2026)** evaluates block-aligned lyrical correctness together with pitch/rhythm fidelity. It is a complementary diagnostic for target correctness, not a measurement of protected-region waveform drift. https://arxiv.org/abs/2606.26451
+- **Phoneme-level energy sequence control (ASRU 2025)** reports more than 50% lower energy-sequence MAE for user-specified phoneme-level dynamics than the paper's baseline and energy-predictor approaches. This is an adjacent control-fidelity target; energy control and edit locality must still be measured separately. https://arxiv.org/abs/2509.07038
+- **SOTA2's singing evaluation-set leaderboard** reports an In-house SVS 2026.05 quality score of 4.45 (SingMOS 4.148, WER 0.118, naturalness 4.46 and expressiveness 4.55). Its evaluation set and full scoring protocol differ from this benchmark, so it is a secondary industry-quality reference, not a directly comparable VELB score. https://www.sota2.com/research/sota/singing-voice-synthesis-on-singing-evaluation-set
+
+The competitive target is not to claim that a symbolic edit receipt is better than those naturalness/quality results. It is to establish an additional capability they do not report directly: a requested correction with measured target success, bounded protected-region drift, reproducible provenance and human-acceptable seams.
+
 ## Acceptance milestones
 
 1. **Scorer correctness:** all synthetic positive/negative controls pass at the exact commit.
