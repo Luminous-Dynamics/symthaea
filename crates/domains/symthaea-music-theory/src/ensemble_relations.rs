@@ -14,7 +14,7 @@ use crate::rhythm::Duration;
 use crate::score::{PartId, Score};
 
 pub const ENSEMBLE_RELATION_SCHEMA_V1: &str = "ensemble-relations-v1";
-/// Exact domain-separated digest recipe emitted by #9461 ScoreDemandProfile.
+/// Canonical SHA-256 of serialized Score bytes, shared with Muse genealogy.
 pub const ENSEMBLE_RELATION_SCORE_DIGEST_SCHEMA_V1: &str = "muse-score-serde-json-sha256-v1";
 pub const MAX_ENSEMBLE_RELATIONS_V1: usize = 4_096;
 const MAX_RELATION_BEAT_NUMERATOR: i128 = 1_000_000_000;
