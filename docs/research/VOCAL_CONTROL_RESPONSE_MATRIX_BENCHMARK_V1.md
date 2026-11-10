@@ -135,12 +135,26 @@ Existing score-conditioned singing benchmarks emphasize combinations of lyric, p
 
 The research opportunity is to publish a control-compliance matrix that makes intended response and unintended coupling visible under a fixed score and pronunciation plan. I did not identify a directly comparable, standardized public leaderboard for this complete intervention-and-cross-coupling protocol in the sources reviewed. That is a reason to publish a transparent protocol—not evidence that no prior work exists.
 
+### Industry evaluation protocols worth adopting
+
+The benchmark design should borrow methods from adjacent evaluation work while keeping task boundaries explicit:
+
+- **Hume Voice Controllability Leaderboard (17 models; September 2026):** uses forced-choice comparisons between contrasting delivery instructions and human judgments for voice instruction. It also evaluates inline instruction execution, placement and naturalness. The authors explicitly avoid relying on LLM judges for most outcomes because judge-optimized models can inflate their own scores. The adjacent Real World VoiceEQ effort covered 40+ voice models, 60+ metrics and more than a million human ratings during development; these figures should not be confused with the smaller controllability leaderboard. Muse should adapt the paired-instruction and human-gold methodology to singing controls, not treat Hume's speech results as an SVS baseline. https://www.hume.ai/blog/introducing-the-hume-voice-controllability-leaderboard
+- **MusicJudge (Interspeech 2026):** couples lyric correctness to pitch/rhythm fidelity using block-aligned multimodal analysis, semantic/lexical matching and phonetic alignment. This is a good independent audit track for whether a corrected musical/lyric block is actually right. It does not measure waveform preservation outside a local edit or the causal effect of one requested control. https://arxiv.org/abs/2606.26451
+- **SoulX-Singer-Eval:** provides a practical zero-shot evaluation suite covering singing aesthetics (SingMOS-Pro and Sheet-SSQA), MCD, WER/CER, speaker similarity and FFE/GPE/VDE. Its README describes GMO-SVS with 802 samples and a separate zero-shot set of 100 segments from 50 speakers (25 Mandarin and 25 English), with manually annotated melody. It is a priority baseline protocol, but its fixed task and dataset split must be preserved when comparing. https://github.com/Soul-AILab/SoulX-Singer-Eval
+- **SingMOS-Pro:** supplies professional ratings for lyrics, melody and overall quality across 7,981 clips from 41 models and 12 datasets. Use it as a perceptual benchmark reference where the dataset and predictor terms permit, not as a substitute for direct human ratings on Muse-specific interventions. https://arxiv.org/abs/2510.01812
+
+The resulting Muse study should have three distinct human/automatic layers: (1) independent objective measurements for the target and collateral properties; (2) blinded forced-choice judgments of which paired output better follows the requested control; and (3) separate naturalness, lyric clarity, musical coherence and identity-continuity ratings. Keep each rating question narrow enough that a strong result on one dimension cannot conceal failure on another.
+
 ## Acceptance boundary
 
 Passing synthetic evaluator tests proves only that the scorer enforces its input and arithmetic contract. It does not establish that a renderer follows any control. A renderer claim requires held-out audio, independent analyzers, calibrated tolerances, exact artifact receipts, negative controls and blinded listening. A SOTA claim additionally requires matched baselines, licensed data, preregistered splits, adequate repetitions and independently reproducible results.
 
 ## References
 
+- Hume Voice Controllability Leaderboard, September 2026. https://www.hume.ai/blog/introducing-the-hume-voice-controllability-leaderboard
+- SoulX-Singer-Eval benchmark suite and dataset protocol. https://github.com/Soul-AILab/SoulX-Singer-Eval
+- SingMOS-Pro: An Comprehensive Benchmark for Singing Quality Assessment. https://arxiv.org/abs/2510.01812
 - STARS: A Unified Framework for Singing Transcription, Alignment, and Refined Style Annotation, Findings of ACL 2025. https://aclanthology.org/2025.findings-acl.781/
 - Controllable Singing Voice Synthesis using Phoneme-Level Energy Sequence, ASRU 2025. https://doi.org/10.1109/ASRU65441.2025.11434790
 - SoulX-Singer, score/MIDI/F0-conditioned singing voice synthesis. https://arxiv.org/abs/2602.07803
