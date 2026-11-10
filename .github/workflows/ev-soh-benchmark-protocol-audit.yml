@@ -1,0 +1,37 @@
+name: EV SOH benchmark protocol v0.1 audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_SOH_BENCHMARK_PROTOCOL_V0_1.md"
+      - "schemas/transport/ev_soh_benchmark_protocol_v0_1.schema.json"
+      - "fixtures/ev_battery/soh_benchmark_protocol_scenarios_v0_1.json"
+      - "tools/ev-soh-benchmark-protocol-audit/**"
+      - ".github/workflows/ev-soh-benchmark-protocol-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-soh-benchmark-protocol-audit/Cargo.toml -- --check
+      - name: Run protocol and leakage tests
+        run: cargo test --manifest-path tools/ev-soh-benchmark-protocol-audit/Cargo.toml
+      - name: Audit frozen synthetic protocol corpus
+        run: |
+          cargo run --manifest-path tools/ev-soh-benchmark-protocol-audit/Cargo.toml -- --schema schemas/transport/ev_soh_benchmark_protocol_v0_1.schema.json --corpus fixtures/ev_battery/soh_benchmark_protocol_scenarios_v0_1.json > "$RUNNER_TEMP/ev-soh-benchmark-report.json"
+          jq -e '
+            .case_count == 11 and
+            .accepted_count == 2 and
+            .rejected_count == 9 and
+            (.report_sha256 | test("^[a-f0-9]{64}$"))
+          ' "$RUNNER_TEMP/ev-soh-benchmark-report.json"
