@@ -39,6 +39,15 @@
 //! numeric lane, which preserves its seed, domain, finite-difference step and tolerances.
 //! A sampled candidate is never promoted to exact or formal evidence.
 //!
+//! ## Exact checks for declared linear actions
+//!
+//! `check_exact_linear_action_invariance` is a separate verifier for an
+//! already admitted `LinearGroupActionV1`. It computes the exact polynomial
+//! Lie derivative for each supplied matrix generator, including non-standard
+//! and conjugated coordinate representations. This verifies scalar-expression
+//! invariance under the supplied infinitesimal generators; it does not discover
+//! a group, establish Lie-algebra closure, or make a physical claim.
+//!
 //! ## Sampled numeric Lie-derivative fallback
 //!
 //! The sampled lane can detect radial expressions such as square roots and reciprocal
