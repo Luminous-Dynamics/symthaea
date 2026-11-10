@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: marine-evidence-validation-\${{ github.ref }}
+  group: marine-evidence-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
