@@ -871,72 +871,6 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         "/trial_evidence/calibration_records/{}",
                         calibration_records.iter().position(|r| r.get("calibration_record_id").and_then(Value::as_str)==Some(calibration_id)).unwrap_or(0)
                     );
-                    if is_v4 {
-                        let reference_epoch = record
-                            .get("reference_epoch")
-                            .and_then(Value::as_str)
-                            .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
-                        match reference_epoch.as_ref() {
-                            Some(epoch) => {
-                                let valid_from = record.get("valid_from").and_then(Value::as_str)
-                                    .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
-                                let valid_until = record.get("valid_until").and_then(Value::as_str)
-                                    .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
-                                match (valid_from, valid_until) {
-                                    (Some(from), Some(until)) if epoch < &from || epoch > &until => f.push(
-                                        pointer_child(record_path.clone(), "reference_epoch"),
-                                        "INVALID",
-                                        "timebase reference_epoch must lie within the timebase validity interval",
-                                    ),
-                                    (Some(_), Some(_)) => {}
-                                    _ => f.push(
-                                        pointer_child(record_path.clone(), "reference_epoch"),
-                                        "INCOMPLETE",
-                                        "timebase reference epoch cannot be checked because validity dates are unresolved",
-                                    ),
-                                }
-                            }
-                            None => f.push(
-                                pointer_child(record_path.clone(), "reference_epoch"),
-                                "INVALID",
-                                "v0.4 timebase must declare a valid RFC3339 reference_epoch",
-                            ),
-                        }
-                        if record.get("drift_semantics").and_then(Value::as_str)
-                            != Some("residual_rate_uncertainty_after_correction")
-                        {
-                            f.push(
-                                pointer_child(record_path.clone(), "drift_semantics"),
-                                "INVALID",
-                                "v0.4 drift uncertainty must be declared as residual rate uncertainty after correction",
-                            );
-                        }
-                        let drift_unit = record.pointer("/drift_uncertainty_ppm/unit").and_then(Value::as_str);
-                        if drift_unit != Some("ppm") {
-                            f.push(
-                                pointer_child(record_path.clone(), "drift_uncertainty_ppm"),
-                                "INVALID",
-                                "residual timebase rate uncertainty must use the reviewed ppm unit",
-                            );
-                        }
-                        if record.pointer("/drift_uncertainty_ppm/value").and_then(Value::as_f64)
-                            .is_some_and(|value| value < 0.0)
-                        {
-                            f.push(
-                                pointer_child(record_path.clone(), "drift_uncertainty_ppm"),
-                                "INVALID",
-                                "residual drift-rate uncertainty cannot be negative",
-                            );
-                        }
-                        if record.pointer("/drift_uncertainty_ppm/value").and_then(Value::as_f64).is_none() {
-                            f.push(
-                                pointer_child(record_path.clone(), "drift_uncertainty_ppm"),
-                                "INCOMPLETE",
-                                "residual drift-rate uncertainty is unknown; it cannot be treated as zero",
-                            );
-                        }
-                    }
-
                     if is_v3 {
                         match record.get("evidence_source_id").and_then(Value::as_str) {
                             Some(source_id) if source_ids.contains(source_id) => {}
@@ -1073,6 +1007,72 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         "/trial_evidence/timebases/{}",
                         timebases.iter().position(|r| r.get("timebase_id").and_then(Value::as_str)==Some(timebase_id)).unwrap_or(0)
                     );
+                    if is_v4 {
+                        let reference_epoch = record
+                            .get("reference_epoch")
+                            .and_then(Value::as_str)
+                            .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+                        match reference_epoch.as_ref() {
+                            Some(epoch) => {
+                                let valid_from = record.get("valid_from").and_then(Value::as_str)
+                                    .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+                                let valid_until = record.get("valid_until").and_then(Value::as_str)
+                                    .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+                                match (valid_from, valid_until) {
+                                    (Some(from), Some(until)) if epoch < &from || epoch > &until => f.push(
+                                        pointer_child(record_path.clone(), "reference_epoch"),
+                                        "INVALID",
+                                        "timebase reference_epoch must lie within the timebase validity interval",
+                                    ),
+                                    (Some(_), Some(_)) => {}
+                                    _ => f.push(
+                                        pointer_child(record_path.clone(), "reference_epoch"),
+                                        "INCOMPLETE",
+                                        "timebase reference epoch cannot be checked because validity dates are unresolved",
+                                    ),
+                                }
+                            }
+                            None => f.push(
+                                pointer_child(record_path.clone(), "reference_epoch"),
+                                "INVALID",
+                                "v0.4 timebase must declare a valid RFC3339 reference_epoch",
+                            ),
+                        }
+                        if record.get("drift_semantics").and_then(Value::as_str)
+                            != Some("residual_rate_uncertainty_after_correction")
+                        {
+                            f.push(
+                                pointer_child(record_path.clone(), "drift_semantics"),
+                                "INVALID",
+                                "v0.4 drift uncertainty must be declared as residual rate uncertainty after correction",
+                            );
+                        }
+                        let drift_unit = record.pointer("/drift_uncertainty_ppm/unit").and_then(Value::as_str);
+                        if drift_unit != Some("ppm") {
+                            f.push(
+                                pointer_child(record_path.clone(), "drift_uncertainty_ppm"),
+                                "INVALID",
+                                "residual timebase rate uncertainty must use the reviewed ppm unit",
+                            );
+                        }
+                        if record.pointer("/drift_uncertainty_ppm/value").and_then(Value::as_f64)
+                            .is_some_and(|value| value < 0.0)
+                        {
+                            f.push(
+                                pointer_child(record_path.clone(), "drift_uncertainty_ppm"),
+                                "INVALID",
+                                "residual drift-rate uncertainty cannot be negative",
+                            );
+                        }
+                        if record.pointer("/drift_uncertainty_ppm/value").and_then(Value::as_f64).is_none() {
+                            f.push(
+                                pointer_child(record_path.clone(), "drift_uncertainty_ppm"),
+                                "INCOMPLETE",
+                                "residual drift-rate uncertainty is unknown; it cannot be treated as zero",
+                            );
+                        }
+                    }
+
                     if is_v3 {
                         match record.get("evidence_source_id").and_then(Value::as_str) {
                             Some(source_id) if source_ids.contains(source_id) => {}
