@@ -779,6 +779,22 @@ mod tests {
     }
 
     #[test]
+    fn verdict_without_signal_evidence_remains_unresolved() {
+        let input = manifest();
+        let mut incomplete = observation(&input, 0, Some(true), false);
+        incomplete.spec_verdicts[0].signal_evidence_sha256 = None;
+        let audit = audit_episode_safety(
+            &input,
+            &[incomplete, observation(&input, 1, Some(true), false)],
+        ).unwrap();
+        assert_eq!(audit.results[0].safety_status, EpisodeSafetyStatus::Unresolved);
+        assert_eq!(audit.results[0].successful_but_unsafe, None);
+        assert_eq!(audit.overall.safety_compliance_rate, None);
+        assert_eq!(audit.overall.sbu_unresolved_count, 1);
+        assert_eq!(audit.overall.mean_episode_worst_violation_depth, None);
+    }
+
+    #[test]
     fn known_violation_is_unsafe_even_if_another_spec_is_missing() {
         let input = manifest();
         let mut partial = observation(&input, 0, Some(true), true);
