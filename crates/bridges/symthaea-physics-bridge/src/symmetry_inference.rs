@@ -786,6 +786,9 @@ fn exact_polynomial_symmetry_candidate(
         .all(|monomial| monomial.iter().all(|exponent| *exponent == 0))
     {
         // Constant/zero expressions carry no useful state-dependent symmetry signal.
+        return Ok(None);
+    }
+    let dimension = variable_names.len();
     let generator_count = dimension * (dimension - 1) / 2;
 
     let mut all_generators_invariant = true;
