@@ -124,6 +124,8 @@ pub struct LinearLieJacobiDiagnosticV1 {
     pub first_generator_id: String,
     pub second_generator_id: String,
     pub third_generator_id: String,
+    pub absolute_residual_norm: f64,
+    pub normalization_term_norm: f64,
     pub relative_defect: f64,
 }
 
@@ -171,7 +173,12 @@ impl AdmittedLinearLieAlgebraV1 {
     pub fn is_abelian(&self) -> bool {
         self.structure_constants
             .iter()
-            .all(|bracket| bracket.coefficients_in_normalized_basis.iter().all(|value| *value == 0.0))
+            .all(|bracket| {
+                bracket
+                    .coefficients_in_normalized_basis
+                    .iter()
+                    .all(|value| value.abs() <= self.profile.maximum_bracket_closure_relative_defect)
+            })
     }
 }
 
@@ -441,6 +448,8 @@ impl AdmittedLinearGroupActionV1 {
                         first_generator_id: declaration.generators[first].id.clone(),
                         second_generator_id: declaration.generators[second].id.clone(),
                         third_generator_id: declaration.generators[third].id.clone(),
+                        absolute_residual_norm: jacobi_norm,
+                        normalization_term_norm: terms_norm,
                         relative_defect,
                     });
                 }
@@ -685,6 +694,42 @@ mod tests {
         assert_eq!(qualified.jacobi_diagnostics.len(), 1);
         assert!(qualified.diagnostics.maximum_bracket_closure_relative_defect < 1e-12);
         assert!(qualified.diagnostics.maximum_jacobi_relative_defect < 1e-12);
+    }
+
+    #[test]
+    fn jacobi_check_measures_nonzero_terms_that_cancel() {
+        // A non-orthogonal generator basis of so(3) makes the nested Jacobi
+        // terms individually nonzero; the three-term sum must still vanish.
+        let generators = vec![
+            so3_generators()[0].clone(),
+            (
+                "Jy-plus-Jz",
+                {
+                    let jy = so3_generators()[1].1.clone();
+                    let jz = so3_generators()[2].1.clone();
+                    jy.iter()
+                        .zip(jz.iter())
+                        .map(|(left, right)| {
+                            left.iter().zip(right.iter()).map(|(a, b)| a + b).collect()
+                        })
+                        .collect()
+                },
+            ),
+            so3_generators()[2].clone(),
+        ];
+        let qualified = action(
+            "so3-mixed-generator-basis",
+            vec!["x", "y", "z"],
+            vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0], vec![0.0, 0.0, 1.0]],
+            generators,
+        )
+        .try_qualify_lie_algebra(LinearLieAlgebraProfileV1::default())
+        .unwrap();
+        assert_eq!(qualified.jacobi_diagnostics.len(), 1);
+        let jacobi = &qualified.jacobi_diagnostics[0];
+        assert!(jacobi.normalization_term_norm > 0.1);
+        assert!(jacobi.absolute_residual_norm < 1e-12);
+        assert!(jacobi.relative_defect < 1e-12);
     }
 
     #[test]
