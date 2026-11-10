@@ -430,8 +430,18 @@ fn write_manifest_atomically(
         file.sync_all()
             .map_err(|error| ExportError::new(format!("cannot sync submission manifest: {error}")))?;
         drop(file);
-        fs::rename(&temp_path, destination).map_err(|error| {
-            ExportError::new(format!("cannot atomically publish submission.jsonl: {error}"))
+        // A same-directory hard link publishes the complete inode atomically
+        // without replacing a destination that appeared after the preflight
+        // check. This is a no-clobber publish, unlike rename on Unix.
+        fs::hard_link(&temp_path, destination).map_err(|error| {
+            ExportError::new(format!(
+                "cannot atomically publish submission.jsonl without overwriting an existing destination: {error}"
+            ))
+        })?;
+        fs::remove_file(&temp_path).map_err(|error| {
+            ExportError::new(format!(
+                "manifest was published but the temporary link could not be removed: {error}"
+            ))
         })?;
         Ok(())
     })();
