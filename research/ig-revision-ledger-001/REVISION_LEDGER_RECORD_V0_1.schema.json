@@ -133,9 +133,7 @@
               "type": [
                 "number",
                 "null"
-              ],
-              "minimum": 0,
-              "maximum": 1
+              ]
             },
             "scale": {
               "type": [
@@ -228,9 +226,7 @@
               "type": [
                 "number",
                 "null"
-              ],
-              "minimum": 0,
-              "maximum": 1
+              ]
             },
             "scale": {
               "type": [
@@ -387,8 +383,7 @@
             "type": "string"
           },
           "channel_event_id": {
-            "type": "string",
-            "minLength": 1
+            "type": "string"
           },
           "payload_sha256": {
             "type": "string",
