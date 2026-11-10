@@ -156,8 +156,8 @@ pub struct InstrumentCapabilityClaimV1 {
     /// Required for derived claims; references source claims in this profile.
     pub parent_claim_ids: Vec<String>,
     pub use_status: EvidenceUseStatusV1,
-    /// Explicitly records whether an attribution obligation has been attached.
-    pub attribution_attached: bool,
+    /// Stable receipt/reference for an attribution obligation, when required.
+    pub attribution_record_id: Option<String>,
 }
 
 /// Evidence profile is bound to the same instance ID and kind as the
@@ -202,6 +202,9 @@ pub enum CapabilityEvidenceIssueCodeV1 {
     EstimatedOrUnverifiedQualified,
     RestrictedEvidenceQualified,
     MissingAttribution,
+    FallbackMappingCannotBeHardQualified,
+    UnavailableRendererMappingQualified,
+    ContradictoryQualifiedClaims,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -323,7 +326,9 @@ fn validate_value(
         CapabilityValueV1::ArticulationSupport {
             articulation_id, ..
         } => {
-            if articulation_id.trim().is_empty() {
+            if articulation_id.trim().is_empty()
+                || claim.scope.articulation_id.as_deref() != Some(articulation_id.as_str())
+            {
                 report.push(
                     CapabilityEvidenceIssueCodeV1::EmptyArticulationId,
                     Some(&claim.id),
@@ -334,9 +339,27 @@ fn validate_value(
         CapabilityValueV1::RendererPatchMapping {
             renderer_id,
             patch_id,
+            status,
             asset_sha256,
-            ..
         } => {
+            if *status == RendererMappingStatusV1::Unavailable
+                && claim.disposition == CapabilityDispositionV1::Qualified
+            {
+                report.push(
+                    CapabilityEvidenceIssueCodeV1::UnavailableRendererMappingQualified,
+                    Some(&claim.id),
+                    "an unavailable renderer/patch mapping cannot be hard-qualified",
+                );
+            }
+            if *status == RendererMappingStatusV1::ExplicitFallback
+                && claim.disposition == CapabilityDispositionV1::Qualified
+            {
+                report.push(
+                    CapabilityEvidenceIssueCodeV1::FallbackMappingCannotBeHardQualified,
+                    Some(&claim.id),
+                    "an explicit fallback is a conditional realization, not an exact instrument/patch qualification",
+                );
+            }
             if renderer_id.trim().is_empty()
                 || patch_id.trim().is_empty()
                 || claim.scope.renderer_id.as_deref() != Some(renderer_id.as_str())
@@ -467,12 +490,12 @@ fn validate_source_and_promotion(
             );
         }
         if claim.use_status == EvidenceUseStatusV1::AttributionRequired
-            && !claim.attribution_attached
+            && !non_empty(&claim.attribution_record_id)
         {
             report.push(
                 CapabilityEvidenceIssueCodeV1::MissingAttribution,
                 Some(&claim.id),
-                "attribution-required evidence needs an attached attribution record before qualification",
+                "attribution-required evidence needs a stable attribution record ID before qualification",
             );
         }
     }
@@ -633,6 +656,27 @@ pub fn validate_instrument_capability_evidence(
         }
     }
 
+    // Conflicting values for the same capability and exact scope remain
+    // visible. Never average them or select one by insertion order.
+    for (index, left) in profile.claims.iter().enumerate() {
+        if left.disposition != CapabilityDispositionV1::Qualified {
+            continue;
+        }
+        for right in profile.claims.iter().skip(index + 1) {
+            if right.disposition == CapabilityDispositionV1::Qualified
+                && left.kind == right.kind
+                && left.scope == right.scope
+                && left.value != right.value
+            {
+                report.push(
+                    CapabilityEvidenceIssueCodeV1::ContradictoryQualifiedClaims,
+                    Some(&right.id),
+                    format!("claim conflicts with qualified claim {} at the same capability scope", left.id),
+                );
+            }
+        }
+    }
+
     let mut done = BTreeSet::new();
     for claim in &profile.claims {
         if claim.evidence_class != CapabilityEvidenceClassV1::Derived {
@@ -707,7 +751,7 @@ mod tests {
             method_or_transform: Some("chromatic playable-note protocol v1".into()),
             parent_claim_ids: Vec::new(),
             use_status: EvidenceUseStatusV1::NotApplicable,
-            attribution_attached: false,
+            attribution_record_id: None,
         }
     }
 
@@ -849,6 +893,46 @@ mod tests {
         }));
         assert!(report.issues.iter().any(|issue| {
             issue.code == CapabilityEvidenceIssueCodeV1::KindValueMismatch
+        }));
+    }
+
+    #[test]
+    fn refuses_to_average_conflicting_qualified_values() {
+        let first = measured_range_claim();
+        let mut second = measured_range_claim();
+        second.id = "range-conflict".into();
+        second.value = CapabilityValueV1::SoundingRange {
+            lowest_midi: 38,
+            highest_midi: 86,
+        };
+        let report = validate_instrument_capability_evidence(
+            &instrument(),
+            &profile(vec![first, second]),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == CapabilityEvidenceIssueCodeV1::ContradictoryQualifiedClaims
+        }));
+    }
+
+    #[test]
+    fn explicit_renderer_fallback_cannot_be_promoted_to_exact_qualification() {
+        let mut claim = measured_range_claim();
+        claim.id = "renderer-fallback".into();
+        claim.kind = CapabilityKindV1::RendererPatchMapping;
+        claim.value = CapabilityValueV1::RendererPatchMapping {
+            renderer_id: "fluidsynth-2".into(),
+            patch_id: "soundfont:0:42".into(),
+            status: RendererMappingStatusV1::ExplicitFallback,
+            asset_sha256: Some("c".repeat(64)),
+        };
+        claim.scope.renderer_id = Some("fluidsynth-2".into());
+        claim.scope.patch_id = Some("soundfont:0:42".into());
+        let report = validate_instrument_capability_evidence(
+            &instrument(),
+            &profile(vec![claim]),
+        );
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == CapabilityEvidenceIssueCodeV1::FallbackMappingCannotBeHardQualified
         }));
     }
 
