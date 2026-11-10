@@ -6,7 +6,7 @@
   "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
   "communication_graph_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
   "delegation_graph_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
-  "fixture_count": 21,
+  "fixture_count": 22,
   "fixtures": [
     {
       "fixture_id": "REV-001",
@@ -20,14 +20,14 @@
         "stage": "PrivateContextReset",
         "transition": "NoChange",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -95,7 +95,7 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+          "state_sha256": "1e7552039055ed29facc1fb4f75ea958f1c5be5408a3aed2102eff731268f253",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [
@@ -106,7 +106,7 @@
           ]
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+          "state_sha256": "eb9c7a6e251a517ffeeec5aa2758c06fbab1a86ba3059b20b1968b13c9f74493",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [
@@ -194,14 +194,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+          "state_sha256": "54c62823ffe01223f954971bc0a5e042bd33a3279c0eee780f72ea369565167a",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -225,7 +225,12 @@
           {
             "message_id": "MSG-1",
             "channel_event_id": "CHANNEL-EVENT-1",
-            "payload_sha256": "000000000000000000000000000000000000000000000000000000000000000a"
+            "payload_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+            "channel_event_sha256": "32aba7a4f9a831d2dc56125223a6d3c4009ca72c02ed8ef929b659af46cdf0c2",
+            "communication_graph_sha256": "9071110dfc523edef0402db085bcabdac1148b6d670e20f5f1e3e4dc254610ca",
+            "sender_agent_instance_id": "AGENT-02",
+            "recipient_agent_instance_id": "AGENT-01",
+            "delivery_sequence": 1
           }
         ],
         "agent_report": {
@@ -275,14 +280,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Abstained",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+          "state_sha256": "883e4f4eab36114c2171f844226eeb1f9f09da95f53503e9781a8debf84f2a24",
           "stance": "A",
           "uncertainty_state": "Uncertain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+          "state_sha256": "28d5e17d2487cb5ed828aae222339d614025985e796670ea49406c1e1e2f9cea",
           "stance": "Abstain",
           "uncertainty_state": "Abstained",
           "claim_ids": [],
@@ -354,15 +359,15 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
-          "stance": "B",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
+          "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
@@ -416,7 +421,8 @@
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
       },
       "expected_violations": [
-        "changed_state_digest_unchanged"
+        "changed_state_digest_unchanged",
+        "changed_transition_no_semantic_delta"
       ]
     },
     {
@@ -431,14 +437,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Missing",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+          "state_sha256": "54c62823ffe01223f954971bc0a5e042bd33a3279c0eee780f72ea369565167a",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -508,14 +514,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
+          "state_sha256": "54c62823ffe01223f954971bc0a5e042bd33a3279c0eee780f72ea369565167a",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -585,14 +591,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "000000000000000000000000000000000000000000000000000000000000000f",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000010",
+          "state_sha256": "54c62823ffe01223f954971bc0a5e042bd33a3279c0eee780f72ea369565167a",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -667,14 +673,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000012",
+          "state_sha256": "54c62823ffe01223f954971bc0a5e042bd33a3279c0eee780f72ea369565167a",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -698,7 +704,12 @@
           {
             "message_id": "MSG-9",
             "channel_event_id": "",
-            "payload_sha256": "0000000000000000000000000000000000000000000000000000000000000011"
+            "payload_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
+            "channel_event_sha256": "cf23c063be1553592c7c45cf238b8d622efc983d44ae9fa09f7b0becd7cb9ae1",
+            "communication_graph_sha256": "4b274352fab90c99c474e0ebde73ec201054ef66dc640ece81b3a6690838c1d5",
+            "sender_agent_instance_id": "AGENT-02",
+            "recipient_agent_instance_id": "AGENT-01",
+            "delivery_sequence": 1
           }
         ],
         "agent_report": {
@@ -750,14 +761,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000013",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000014",
+          "state_sha256": "54c62823ffe01223f954971bc0a5e042bd33a3279c0eee780f72ea369565167a",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -870,7 +881,7 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
+          "state_sha256": "bf2262a46b18b16a265bbe1c261ac71f824fc07c2d2ae46c65e6c4b8eaab2249",
           "stance": "ValuePosition-A",
           "uncertainty_state": "Certain",
           "claim_ids": [
@@ -879,7 +890,7 @@
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000019",
+          "state_sha256": "77368c138126b43616c9c38dbf69143697e267e38b0de4358fea738f0e86ca3f",
           "stance": "ValuePosition-B",
           "uncertainty_state": "Certain",
           "claim_ids": [
@@ -953,7 +964,7 @@
         "stage": "DelayedPrivate",
         "transition": "Missing",
         "previous_state": {
-          "state_sha256": "000000000000000000000000000000000000000000000000000000000000001a",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1022,14 +1033,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "000000000000000000000000000000000000000000000000000000000000001b",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "000000000000000000000000000000000000000000000000000000000000001c",
+          "state_sha256": "54c62823ffe01223f954971bc0a5e042bd33a3279c0eee780f72ea369565167a",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1099,14 +1110,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "000000000000000000000000000000000000000000000000000000000000001e",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
+          "state_sha256": "54c62823ffe01223f954971bc0a5e042bd33a3279c0eee780f72ea369565167a",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1177,14 +1188,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000022",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000023",
+          "state_sha256": "54c62823ffe01223f954971bc0a5e042bd33a3279c0eee780f72ea369565167a",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1299,7 +1310,7 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000026",
+          "state_sha256": "650d8e248fd4657e39cb182d8cb55eb9efa67a02ea01d2e4c714674cdb1b349e",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [
@@ -1310,7 +1321,7 @@
           ]
         },
         "next_state": {
-          "state_sha256": "0000000000000000000000000000000000000000000000000000000000000027",
+          "state_sha256": "dc6d966f282f52888bf834553f3aa88214971dfe6237dff84e369b7dc994364c",
           "stance": "B",
           "uncertainty_state": "Uncertain",
           "claim_ids": [],
@@ -1394,14 +1405,14 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "00000000000000000000000000000000000000000000000000000000000001a1",
+          "state_sha256": "e70d0b6ae14ae1289ad2870e003c93ec46a57384f251d4075022b3cb5a219d66",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
           "evidence_ids": []
         },
         "next_state": {
-          "state_sha256": "00000000000000000000000000000000000000000000000000000000000001a2",
+          "state_sha256": "54c62823ffe01223f954971bc0a5e042bd33a3279c0eee780f72ea369565167a",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1516,7 +1527,7 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000b4",
+          "state_sha256": "623db60c0b8972f4f2ec3ae91c106e5e976eb21692cabad6a9f05b55b07e25d7",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1530,7 +1541,7 @@
           }
         },
         "next_state": {
-          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000b5",
+          "state_sha256": "094f2b1162e58e3215f2262dec07df00690d6a248fee3f55bb5059b3af700bfd",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1561,7 +1572,12 @@
           {
             "message_id": "MSG-018",
             "channel_event_id": "CHANNEL-EVENT-018",
-            "payload_sha256": "00000000000000000000000000000000000000000000000000000000000000b6"
+            "payload_sha256": "00000000000000000000000000000000000000000000000000000000000000b6",
+            "channel_event_sha256": "10803c45d1a784f1ca9b50369c1be9fd383f947ef079b657c677174085899f27",
+            "communication_graph_sha256": "7ac6f1ad52cba3f247b649e87164adba326d842b02cc9c61666065dcaad4eaa2",
+            "sender_agent_instance_id": "AGENT-02",
+            "recipient_agent_instance_id": "AGENT-01",
+            "delivery_sequence": 1
           }
         ],
         "agent_report": {
@@ -1611,7 +1627,7 @@
         "stage": "PrivateExposureMemory",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000be",
+          "state_sha256": "7ecbe0e63ab70bbee8e0565fbae6cd2028a889490d23ad63bc567a42d668e403",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [
@@ -1629,7 +1645,7 @@
           }
         },
         "next_state": {
-          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000bf",
+          "state_sha256": "dc033656daf381ad2a03340e55c5bcd4ec3810d83e8f5a6cc04bace5b92a1b02",
           "stance": "B",
           "uncertainty_state": "Certain",
           "claim_ids": [
@@ -1724,7 +1740,7 @@
         "stage": "PrivateContextReset",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000c8",
+          "state_sha256": "0863429cbd333b0569002abbd0973c8bdd4dcd32ffbce81d6a17378da01c8712",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1738,7 +1754,7 @@
           }
         },
         "next_state": {
-          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000c9",
+          "state_sha256": "d0bcd4491a93e77e73432da4af168c4956739ab7a9eb08b21a01d35063c14e4a",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1815,7 +1831,7 @@
         "stage": "PrivateContextReset",
         "transition": "Changed",
         "previous_state": {
-          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000d2",
+          "state_sha256": "3532b7397f6cd24b8514ac9b20abd7fb9c3e83527b96e91eeb7efcc14ff71a53",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1829,7 +1845,7 @@
           }
         },
         "next_state": {
-          "state_sha256": "00000000000000000000000000000000000000000000000000000000000000d3",
+          "state_sha256": "5b27afaa698b6237d2fd4ce4ecb905be4d7683d0037c4b4cf8307562ffa64dfc",
           "stance": "A",
           "uncertainty_state": "Certain",
           "claim_ids": [],
@@ -1892,6 +1908,107 @@
       },
       "expected_violations": [
         "confidence_value_out_of_range"
+      ]
+    },
+    {
+      "fixture_id": "REV-022",
+      "description": "Negative control: state content is edited after its canonical state commitment was created.",
+      "record": {
+        "revision_event_id": "REV-022",
+        "run_id": "RUN-REV-022",
+        "scenario_id": "SCENARIO-REV-022",
+        "agent_instance_id": "AGENT-01",
+        "principal_ref": "PRINCIPAL-01",
+        "stage": "PrivateExposureMemory",
+        "transition": "Changed",
+        "previous_state": {
+          "state_sha256": "1e7552039055ed29facc1fb4f75ea958f1c5be5408a3aed2102eff731268f253",
+          "stance": "A",
+          "uncertainty_state": "Certain",
+          "claim_ids": [
+            "CLAIM-A"
+          ],
+          "evidence_ids": [
+            "EVID-OLD"
+          ]
+        },
+        "next_state": {
+          "state_sha256": "eb9c7a6e251a517ffeeec5aa2758c06fbab1a86ba3059b20b1968b13c9f74493",
+          "stance": "Tampered-stance",
+          "uncertainty_state": "Certain",
+          "claim_ids": [
+            "CLAIM-B"
+          ],
+          "evidence_ids": [
+            "EVID-NEW"
+          ]
+        },
+        "claim_delta": {
+          "added": [
+            "CLAIM-B"
+          ],
+          "removed": [
+            "CLAIM-A"
+          ],
+          "retained": [],
+          "contradicted": [
+            "CLAIM-A"
+          ],
+          "retracted": []
+        },
+        "evidence_delta": {
+          "available_before": [
+            "EVID-OLD"
+          ],
+          "newly_available": [
+            "EVID-NEW"
+          ],
+          "newly_unavailable": [],
+          "invalidated": []
+        },
+        "claim_evidence_links": [
+          {
+            "claim_id": "CLAIM-B",
+            "evidence_id": "EVID-NEW",
+            "relationship": "supports"
+          }
+        ],
+        "delivered_messages": [],
+        "agent_report": {
+          "provided": false,
+          "kind": "self_report",
+          "reason_code": "NotProvided",
+          "explanation_sha256": null
+        },
+        "oracle": {
+          "task_profile": "SyntheticKnownAnswer",
+          "outcome": "Supported",
+          "answer_space_sha256": "000000000000000000000000000000000000000000000000000000000000005a",
+          "oracle_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000005b"
+        },
+        "descriptive_exposure": {
+          "social_message_exposure": false,
+          "status_cue_exposure": false,
+          "repetition_cue_exposure": false,
+          "valid_evidence_delta": true
+        },
+        "causal_attribution": {
+          "status": "NotEstimated",
+          "matched_pair_id": null,
+          "treatment_run_id": null,
+          "control_run_id": null,
+          "analysis_plan_sha256": null,
+          "effect_estimate_sha256": null,
+          "matched_inputs": null,
+          "varied_factor": null,
+          "pair_validator_id": null,
+          "pair_validation_receipt_sha256": null
+        },
+        "event_status": "Pass",
+        "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
+      },
+      "expected_violations": [
+        "state_content_digest_mismatch"
       ]
     }
   ],
