@@ -9003,7 +9003,7 @@ mod tests {
         for (m, &deg) in [1, 4, 5, 6, 2, 1].iter().enumerate() {
             for pitch in key.diatonic_triad(deg).voice(3) {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: GENERAL_HARMONY_PART_V1,
                     pitch,
                     onset: bar.scale(m as i64, 1),
                     duration: bar,
@@ -9014,7 +9014,7 @@ mod tests {
                 });
             }
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: GENERAL_BASS_PART_V1,
                 pitch: key.diatonic_triad(deg).voice(2)[0],
                 onset: bar.scale(m as i64, 1),
                 duration: bar,
