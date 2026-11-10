@@ -557,9 +557,9 @@ fn matrix_commutator(left: &[Vec<f64>], right: &[Vec<f64>]) -> Vec<Vec<f64>> {
     for (row_index, result_row) in result.iter_mut().enumerate() {
         for (column_index, result_entry) in result_row.iter_mut().enumerate() {
             let mut value = 0.0_f64;
-            for (inner_index, left_row) in left.iter().enumerate() {
-                value += left_row[column_index] * right[row_index][inner_index]
-                    - right[inner_index][column_index] * left[row_index][inner_index];
+            for (inner_index, left_row_entry) in left[row_index].iter().enumerate() {
+                value += *left_row_entry * right[inner_index][column_index]
+                    - right[row_index][inner_index] * left[inner_index][column_index];
             }
             *result_entry = value;
         }
@@ -648,6 +648,20 @@ mod tests {
     }
 
     #[test]
+    fn so3_structure_constants_use_conventional_commutator_orientation() {
+        let qualified = so3_action()
+            .try_qualify_lie_algebra(LinearLieAlgebraProfileV1::default())
+            .unwrap();
+        let bracket = &qualified.structure_constants[0];
+        assert_eq!(bracket.left_generator_id, "Jx");
+        assert_eq!(bracket.right_generator_id, "Jy");
+        let expected = 1.0 / 2.0_f64.sqrt();
+        assert!(
+            (bracket.coefficients_in_normalized_basis[2] - expected).abs() < 1e-12
+        );
+    }
+
+    #[test]
     fn qualifies_so3_and_reports_structure_constants_and_jacobi() {
         let qualified = so3_action()
             .try_qualify_lie_algebra(LinearLieAlgebraProfileV1::default())
@@ -715,7 +729,8 @@ mod tests {
     #[test]
     fn rejects_duplicate_generator_basis() {
         let mut generators = so3_generators();
-        generators.push(("Jx-copy", generators[0].1.clone()));
+        let duplicate = generators[0].1.clone();
+        generators.push(("Jx-copy", duplicate));
         assert!(matches!(
             action(
                 "duplicate-so3",
