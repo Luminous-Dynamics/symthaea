@@ -39,7 +39,7 @@ sum(discounted lifecycle costs)
 sum(discounted delivered service)
 ```
 
-The delivered service unit and delivery boundary are mandatory. Comparisons are blocked unless both cases have matching currency, price basis, base year, discount rate, service unit and delivery boundary. Every mandatory feasibility gate must be explicitly PASS and carry a non-empty evidence reference.
+The delivered service unit and delivery boundary are mandatory. Comparisons are blocked unless both cases have matching currency, price basis, base year, discount rate, service unit and delivery boundary. Every mandatory feasibility gate must be explicitly PASS, have a unique gate identity, and carry a non-empty evidence reference. Direct comparisons also require the same lifecycle horizon; annual series must include every year explicitly, with zero-valued records where appropriate. The verifier rejects duplicate source identities, blank source methods/limitations, incomplete capacity ranks and blank evidence/caveat entries.
 
 Hard gates are not costs. A failed gate yields NO_GO; an unresolved mandatory gate, a blank gate ID, or a PASS without an evidence reference yields UNKNOWN. A set with no mandatory gates is UNKNOWN rather than vacuously eligible. Evidence references are locators only: this package does not authenticate issuers or determine legal authority.
 
@@ -53,7 +53,7 @@ These are not one synchronized load-flow record. The verifier does not join them
 
 ## Build reproducibility status
 
-This initial slice does not yet include a committed Cargo.lock. The direct dependencies use semver ranges, so the resolved transitive dependency graph is not frozen. Before any production or long-lived benchmark use, generate and commit the exact lockfile, pin the toolchain, and bind the lockfile/toolchain digests into the build receipt. The current workflow checks source formatting, Clippy, tests and input structure, but does not by itself freeze the dependency graph.
+The workflow pins Rust 1.96.0, but this initial slice does not yet include a committed Cargo.lock. The direct dependencies use semver ranges, so the resolved transitive dependency graph is not frozen. Before any production or long-lived benchmark use, generate and commit the exact lockfile, bind its digest and the toolchain identity into the build receipt, and verify the resulting build on the exact PR head. The current workflow checks source formatting, Clippy, tests and input structure, but does not by itself freeze the dependency graph.
 
 ## Evidence and claim ceiling
 
