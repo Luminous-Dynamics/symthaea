@@ -1961,6 +1961,54 @@ mod tests {
     }
 
     #[test]
+    fn metric_aware_sampler_supports_composed_smooth_unary_functions() {
+        let radius = sqrt_of(add(pow2("x"), pow2("y")));
+        let expression = Expr::Func(UnaryFn::Sin, Box::new(radius));
+        let report = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert!(report.invariant_under_every_generator());
+        assert!(report.generator_results[0].maximum_squared_residual < 1e-26);
+    }
+
+    #[test]
+    fn metric_aware_receipt_expression_identity_preserves_exact_constant_bits() {
+        let first = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(var("x")),
+            Box::new(Expr::Const(1.0000001)),
+        );
+        let second = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(var("x")),
+            Box::new(Expr::Const(1.0000002)),
+        );
+        let first_report = evaluate_metric_aware_linear_action_samples(
+            &first,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        let second_report = evaluate_metric_aware_linear_action_samples(
+            &second,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert_eq!(first_report.expression_display, second_report.expression_display);
+        assert_ne!(first_report.expression_canonical, second_report.expression_canonical);
+    }
+
+    #[test]
     fn metric_aware_sampler_rejects_anisotropic_expression() {
         let expression = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
         let report = evaluate_metric_aware_linear_action_samples(
