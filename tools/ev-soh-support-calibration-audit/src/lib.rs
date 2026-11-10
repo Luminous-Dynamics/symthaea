@@ -738,7 +738,12 @@ fn compute_support_detection(manifest: &Manifest) -> SupportDetectionSummary {
 
     SupportDetectionSummary {
         reference_extrapolation_group_count: positive_groups,
-        predicted_extrapolation_group_count: tp_groups + fp_negative_only_groups,
+        predicted_extrapolation_group_count: by_group
+            .values()
+            .filter(|(positive, negative)| {
+                positive.iter().chain(negative.iter()).any(|score| *score >= threshold)
+            })
+            .count(),
         true_positive_group_count: tp_groups,
         false_negative_group_count: fn_groups,
         false_positive_group_count: fp_negative_only_groups,
@@ -1045,6 +1050,32 @@ mod tests {
             .collect();
         assert!(states.contains("in_support"));
         assert!(states.contains("extrapolation"));
+    }
+
+    #[test]
+    fn assets_that_each_cross_support_states_have_estimable_within_group_metrics() {
+        let report = report();
+        let result = report.payload.cases.iter()
+            .find(|case| case.case_id == "all-physical-groups-cross-support-states")
+            .and_then(|case| case.result.as_ref())
+            .expect("all-groups-crossing fixture");
+        assert_eq!(result.support_detection.groups_with_both_support_states, 6);
+        assert_eq!(result.support_detection.within_group_auc_group_count, 6);
+        assert_eq!(result.support_detection.extrapolation_auroc, Some(1.0));
+        assert_eq!(result.support_detection.extrapolation_recall, 1.0);
+        assert_eq!(result.support_detection.false_extrapolation_rate, 0.0);
+        assert_eq!(result.audit_status, "INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE");
+    }
+
+    #[test]
+    fn within_group_auc_is_optional_when_no_asset_has_both_reference_states() {
+        let report = report();
+        let result = report.payload.cases.iter()
+            .find(|case| case.case_id == "marginal-good-but-extrapolation-undercovered")
+            .and_then(|case| case.result.as_ref())
+            .expect("separate-assets support fixture");
+        assert_eq!(result.support_detection.within_group_auc_group_count, 0);
+        assert_eq!(result.support_detection.extrapolation_auroc, None);
     }
 
     #[test]
