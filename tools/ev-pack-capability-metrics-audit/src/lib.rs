@@ -920,7 +920,7 @@ fn calculate_metrics(
         },
     };
 
-    let beta_soc = match series_cell_gate(profile) {
+    let beta_soc = match beta_soh_gate(profile) {
         Err(reason) => not_computable("ratio", &population_scope, reason),
         Ok(()) => match &profile.soc_snapshot {
             None => not_computable(
@@ -1336,7 +1336,14 @@ mod tests {
             Some("HOMOGENEOUS_NOMINAL_CELL_CAPACITY_REQUIRED")
         );
         assert_eq!(case.inconsistency_metrics.beta_life.status, "COMPUTED");
-        assert_eq!(case.inconsistency_metrics.beta_soc.status, "COMPUTED");
+        assert_eq!(
+            case.inconsistency_metrics.beta_soc.status,
+            "NOT_COMPUTABLE"
+        );
+        assert_eq!(
+            case.inconsistency_metrics.beta_soc.reason.as_deref(),
+            Some("HOMOGENEOUS_NOMINAL_CELL_CAPACITY_REQUIRED")
+        );
     }
 
     #[test]
