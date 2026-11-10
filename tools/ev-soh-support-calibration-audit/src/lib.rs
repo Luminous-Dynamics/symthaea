@@ -690,15 +690,42 @@ fn summarize_risk_coverage(manifest: &Manifest) -> Vec<RiskCoveragePoint> {
         .collect()
 }
 
-fn auc(positive_scores: &[f64], negative_scores: &[f64]) -> f64 {
-    let mut wins = 0.0;
-    for positive in positive_scores {
-        for negative in negative_scores {
-            if positive > negative { wins += 1.0; }
-            else if (positive - negative).abs() <= EPSILON { wins += 0.5; }
-        }
+/// Exact Mann-Whitney AUROC with average ranks for ties.
+///
+/// Sorting once avoids the O(n_positive * n_negative) pairwise comparison
+/// cost that becomes prohibitive for long within-cell time series.
+fn auc(positive_scores: &[f64], negative_scores: &[f64]) -> Option<f64> {
+    if positive_scores.is_empty() || negative_scores.is_empty() {
+        return None;
     }
-    wins / (positive_scores.len() * negative_scores.len()) as f64
+    let positive_count = positive_scores.len() as f64;
+    let negative_count = negative_scores.len() as f64;
+    let mut ranked: Vec<(f64, bool)> = positive_scores
+        .iter()
+        .copied()
+        .map(|score| (score, true))
+        .chain(negative_scores.iter().copied().map(|score| (score, false)))
+        .collect();
+    ranked.sort_by(|left, right| left.0.total_cmp(&right.0));
+
+    let mut positive_rank_sum = 0.0;
+    let mut index = 0usize;
+    while index < ranked.len() {
+        let mut end = index + 1;
+        while end < ranked.len() && ranked[end].0 == ranked[index].0 {
+            end += 1;
+        }
+        let average_rank = ((index + 1 + end) as f64) / 2.0;
+        let tied_positive_count = ranked[index..end]
+            .iter()
+            .filter(|(_, is_positive)| *is_positive)
+            .count() as f64;
+        positive_rank_sum += tied_positive_count * average_rank;
+        index = end;
+    }
+
+    let u_statistic = positive_rank_sum - positive_count * (positive_count + 1.0) / 2.0;
+    Some((u_statistic / (positive_count * negative_count)).clamp(0.0, 1.0))
 }
 
 fn compute_support_detection(manifest: &Manifest) -> SupportDetectionSummary {
@@ -795,7 +822,8 @@ fn compute_support_detection(manifest: &Manifest) -> SupportDetectionSummary {
         }
 
         if group_has_positive && group_has_negative {
-            within_group_auc_sum += auc(positive_scores, negative_scores);
+            within_group_auc_sum += auc(positive_scores, negative_scores)
+                .expect("both reference support states are present");
             within_group_auc_count += 1;
         }
     }
@@ -827,7 +855,8 @@ fn compute_support_detection(manifest: &Manifest) -> SupportDetectionSummary {
         within_group_auc_group_count: within_group_auc_count,
         sample_extrapolation_recall: sample_tp as f64 / sample_positives as f64,
         sample_false_extrapolation_rate: sample_fp as f64 / sample_negatives as f64,
-        sample_extrapolation_auroc: auc(&sample_pos, &sample_neg),
+        sample_extrapolation_auroc: auc(&sample_pos, &sample_neg)
+            .expect("validation requires positive and negative support observations"),
     }
 }
 
@@ -1261,6 +1290,21 @@ mod tests {
                 .expect("support/calibration control");
             assert!(!case.accepted);
         }
+    }
+
+    #[test]
+    fn rank_based_auc_is_exact_for_perfect_reversed_and_tied_scores() {
+        assert_eq!(auc(&[0.8, 0.9], &[0.1, 0.2]), Some(1.0));
+        assert_eq!(auc(&[0.1, 0.2], &[0.8, 0.9]), Some(0.0));
+        assert_eq!(auc(&[0.5, 0.5], &[0.5, 0.5]), Some(0.5));
+        assert_eq!(auc(&[], &[0.1]), None);
+    }
+
+    #[test]
+    fn rank_based_auc_is_invariant_to_sample_order() {
+        let first = auc(&[0.7, 0.9, 0.8], &[0.2, 0.3, 0.1]);
+        let second = auc(&[0.8, 0.7, 0.9], &[0.1, 0.2, 0.3]);
+        assert_eq!(first, second);
     }
 
     #[test]
