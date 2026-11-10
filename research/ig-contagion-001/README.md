@@ -175,3 +175,15 @@ The earlier v0.1 protocol-only hosted run [#42758447839](https://github.com/Lumi
 The current scenario design is still unexecuted. A future structural PASS cannot demonstrate that an agent changed stance, that a defense works, or that human groups behave similarly. Human-subject work requires a separate protocol, applicable ethics review, consent, privacy safeguards, preregistration and independent human evaluation.
 
 No production Mycelix voting, delegation, eligibility, authority or moderation policy is changed by this research.
+
+
+## New research comparators added — 10 November 2026
+
+Four additional EMNLP/ICML 2026 references are now encoded in the machine-readable protocol and SOTA crosswalk:
+
+- **SVR-MAD (Findings EMNLP 2026):** posterior-guided communication-graph construction, with reported token-cost reductions up to 61% in the authors' tested setup. We will test equal-budget quality and whether adaptive routing suppresses minority evidence or overweights miscalibrated signals. [Paper](https://aclanthology.org/2026.findings-emnlp.483/)
+- **Debate-aware Learning Makes LLMs Genuine Debaters (EMNLP 2026):** structured debate, imitation and debate-aware learning; introduces Rebuttal Engagement Score (RES) and Belief Governance Score (BGS). We will reproduce definitions where possible, but treat these as argument-quality metrics—not independent truth or security oracles. [Paper](https://aclanthology.org/2026.emnlp-main.1907/)
+- **When Linguistic and Internal Confidence Diverge (Findings EMNLP 2026):** compares verbal confidence with logits and semantic-entropy signals across 30 models, eight classification tasks and two generation tasks. The protocol now separates rank association, magnitude agreement and probability calibration, and records prompt-induced confidence inflation. [Paper](https://aclanthology.org/2026.findings-emnlp.1300/)
+- **Epistemic Gain, Aleatoric Cost (ICML 2026):** decomposes uncertainty in multi-agent debate. We will preserve within-agent, between-agent and system-level uncertainty separately and explicitly avoid treating pluralistic disagreement as a defect. [Paper](https://proceedings.mlr.press/v306/qiao26a.html)
+
+These conditions and receipt fields are research proposals, not executed model comparisons. Verbal or internal confidence never grants voice, vote weight, credibility, eligibility or authority.
