@@ -140,6 +140,7 @@ pub struct LinearLieAlgebraDiagnosticsV1 {
     pub estimated_basis_rank: usize,
     pub singular_values: Vec<f64>,
     pub relative_rank_threshold: f64,
+    pub smallest_relative_singular_value: f64,
     pub estimated_basis_condition_number: f64,
     pub pairwise_bracket_count: usize,
     pub jacobi_triples_checked: usize,
@@ -474,6 +475,7 @@ impl AdmittedLinearGroupActionV1 {
                 estimated_basis_rank: generator_count,
                 singular_values,
                 relative_rank_threshold,
+                smallest_relative_singular_value,
                 estimated_basis_condition_number,
                 pairwise_bracket_count: pair_count,
                 jacobi_triples_checked: jacobi_triple_count,
@@ -696,6 +698,9 @@ mod tests {
             .try_qualify_lie_algebra(LinearLieAlgebraProfileV1::default())
             .unwrap();
         assert_eq!(qualified.diagnostics.estimated_basis_rank, 3);
+        assert!(
+            (qualified.diagnostics.smallest_relative_singular_value - 1.0).abs() < 1e-12
+        );
         assert_eq!(qualified.structure_constants.len(), 3);
         assert_eq!(qualified.jacobi_diagnostics.len(), 1);
         assert!(qualified.diagnostics.maximum_bracket_closure_relative_defect < 1e-12);
