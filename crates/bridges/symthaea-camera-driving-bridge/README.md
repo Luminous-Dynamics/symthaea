@@ -82,7 +82,17 @@ cargo run --locked \
   episode-request.json receipts-output.json policy-inputs/
 ```
 
-The request schema is `schemas/episode-request-v1.schema.json`; the emitted fused receipt schema is `schemas/driving-observation-receipt-v1.schema.json`. Each observation references an RGB pixel artifact by a path relative to the request file. The CLI rejects absolute paths, parent-directory traversal and symlinks that resolve outside the request directory. It checks the source pixel digest against the upstream Symtropy policy receipt before advancing the Vision Manifold.
+Generate the standard non-secret fixture configs with:
+
+```sh
+cargo run --locked \
+  --manifest-path crates/bridges/symthaea-camera-driving-bridge/Cargo.toml \
+  --example write_fixture_configs -- bridge-config.json vision-config.json
+```
+
+The helper pins the expected episode, agent, camera, 640×360 RGB geometry, one-frame-drop timing bounds and default 16,384D no-depth VisionConfig. Its seed phrase is public fixture data, not a production secret.
+
+The request schema is `schemas/episode-request-v1.schema.json`; the emitted fused receipt schema is `schemas/driving-observation-receipt-v1.schema.json`. the emitted fused receipt schema is `schemas/driving-observation-receipt-v1.schema.json`. Each observation references an RGB pixel artifact by a path relative to the request file. The CLI rejects absolute paths, parent-directory traversal and symlinks that resolve outside the request directory. It checks the source pixel digest against the upstream Symtropy policy receipt before advancing the Vision Manifold.
 
 The CLI writes:
 - one serialized `DrivingObservationReceipt` per delivered observation;
