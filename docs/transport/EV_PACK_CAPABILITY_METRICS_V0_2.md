@@ -53,7 +53,7 @@ Per-unit capacity/resistance uncertainty is preserved but not propagated into po
 
 ## Frozen synthetic corpus
 
-Eight cases cover a fully qualified simple-series pack, partial population, unknown topology, parallel-series topology, a censored EOL record, asynchronous SOC rejection, duplicate EOL identity rejection, and module-level observations. Expected metric results include the four supported computed/not-computable states above. All source rows are explicitly synthetic.
+Twelve cases cover a fully qualified series/single-parallel pack, partial population, unknown topology, series-parallel topology, censored EOL, asynchronous SOC rejection, duplicate EOL identity rejection, module-level observations, mismatched SOH/SOC digests, stale SOH references, lifetime pack-configuration drift, and heterogeneous nominal cell capacities. Seven profiles are structurally accepted and five adversarial controls are rejected. Accepted does not mean every metric is computable; each output retains its own eligibility gate. Expected metric results include the four supported computed/not-computable states above. All source rows are explicitly synthetic.
 
 ## Run
 
