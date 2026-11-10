@@ -248,7 +248,15 @@ pub enum FeedbackUnavailableReason {
     CalibrationNotCurrent,
     StaleReceiveTimestamp,
     FutureReceiveTimestamp,
-    NoQualifyingSignal,
+    ReplayOrOutOfOrder,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FeedbackFrameDisposition {
+    CuesEncoded,
+    NoCue,
+    DataUnavailable(FeedbackUnavailableReason),
+    Disabled,
 }
 
 /// Every output retains the source evidence class and mapping identity.
@@ -258,9 +266,7 @@ pub struct ProstheticFeedbackFrameV1 {
     pub source_sequence: u64,
     pub evidence_class: SensoryEvidenceClass,
     pub cues: Vec<HapticCue>,
-    pub unavailable_reason: Option<FeedbackUnavailableReason>,
-    /// False means no tactile information was emitted for this frame.
-    pub information_available: bool,
+    pub disposition: FeedbackFrameDisposition,
 }
 
 /// Structural errors fail closed rather than being converted to tactile claims.
@@ -328,8 +334,7 @@ impl ProstheticFeedbackEncoder {
             return Ok(self.frame(
                 observation,
                 Vec::new(),
-                None,
-                false,
+                FeedbackFrameDisposition::Disabled,
             ));
         }
 
@@ -339,7 +344,7 @@ impl ProstheticFeedbackEncoder {
         {
             return Ok(self.unavailable(
                 observation,
-                FeedbackUnavailableReason::NoQualifyingSignal,
+                FeedbackUnavailableReason::ReplayOrOutOfOrder,
             ));
         }
 
@@ -374,6 +379,10 @@ impl ProstheticFeedbackEncoder {
                 FeedbackUnavailableReason::CalibrationNotCurrent,
             ));
         }
+
+        // Valid samples advance replay protection even when there is no event
+        // to communicate to the wearer.
+        self.last_sequence = Some(observation.sequence);
 
         let mut cues = Vec::new();
 
@@ -420,14 +429,18 @@ impl ProstheticFeedbackEncoder {
         }
 
         if cues.is_empty() {
-            return Ok(self.unavailable(
+            return Ok(self.frame(
                 observation,
-                FeedbackUnavailableReason::NoQualifyingSignal,
+                Vec::new(),
+                FeedbackFrameDisposition::NoCue,
             ));
         }
 
-        self.last_sequence = Some(observation.sequence);
-        Ok(self.frame(observation, cues, None, true))
+        Ok(self.frame(
+            observation,
+            cues,
+            FeedbackFrameDisposition::CuesEncoded,
+        ))
     }
 
     fn unavailable(
@@ -444,23 +457,25 @@ impl ProstheticFeedbackEncoder {
         } else {
             Vec::new()
         };
-        self.frame(observation, cues, Some(reason), false)
+        self.frame(
+            observation,
+            cues,
+            FeedbackFrameDisposition::DataUnavailable(reason),
+        )
     }
 
     fn frame(
         &self,
         observation: &ProstheticSensoryObservationV1,
         cues: Vec<HapticCue>,
-        unavailable_reason: Option<FeedbackUnavailableReason>,
-        information_available: bool,
+        disposition: FeedbackFrameDisposition,
     ) -> ProstheticFeedbackFrameV1 {
         ProstheticFeedbackFrameV1 {
             mapping_id: self.codebook.mapping_id.clone(),
             source_sequence: observation.sequence,
             evidence_class: observation.evidence_class,
             cues,
-            unavailable_reason,
-            information_available,
+            disposition,
         }
     }
 }
@@ -523,7 +538,7 @@ mod tests {
         });
 
         let frame = encoder.encode(&sample, 150).unwrap();
-        assert!(frame.information_available);
+        assert_eq!(frame.disposition, FeedbackFrameDisposition::CuesEncoded);
         assert_eq!(frame.mapping_id, "user-map-v1");
         assert_eq!(frame.cues[0].code_id, 10);
         assert_eq!(
@@ -579,10 +594,11 @@ mod tests {
         });
 
         let frame = encoder.encode(&sample, 201).unwrap();
-        assert!(!frame.information_available);
         assert_eq!(
-            frame.unavailable_reason,
-            Some(FeedbackUnavailableReason::StaleReceiveTimestamp)
+            frame.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::StaleReceiveTimestamp
+            )
         );
         assert_eq!(frame.cues.len(), 1);
         assert_eq!(frame.cues[0].semantic, HapticCueSemantic::DataUnavailable);
@@ -600,10 +616,11 @@ mod tests {
         });
 
         let frame = encoder.encode(&sample, 150).unwrap();
-        assert!(!frame.information_available);
         assert_eq!(
-            frame.unavailable_reason,
-            Some(FeedbackUnavailableReason::CalibrationNotCurrent)
+            frame.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::CalibrationNotCurrent
+            )
         );
         assert_eq!(frame.cues[0].semantic, HapticCueSemantic::DataUnavailable);
     }
@@ -620,10 +637,11 @@ mod tests {
         });
 
         let frame = encoder.encode(&sample, 150).unwrap();
-        assert!(!frame.information_available);
         assert_eq!(
-            frame.unavailable_reason,
-            Some(FeedbackUnavailableReason::MissingProvenanceReceipt)
+            frame.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::MissingProvenanceReceipt
+            )
         );
     }
 
@@ -636,7 +654,10 @@ mod tests {
             in_contact: true,
             origin: ObservationOrigin::DirectMeasurement,
         });
-        assert!(encoder.encode(&first, 150).unwrap().information_available);
+        assert_eq!(
+            encoder.encode(&first, 150).unwrap().disposition,
+            FeedbackFrameDisposition::CuesEncoded
+        );
 
         let mut replay = observation(7);
         replay.contacts.push(ContactReading {
@@ -645,10 +666,11 @@ mod tests {
             origin: ObservationOrigin::DirectMeasurement,
         });
         let frame = encoder.encode(&replay, 150).unwrap();
-        assert!(!frame.information_available);
         assert_eq!(
-            frame.unavailable_reason,
-            Some(FeedbackUnavailableReason::NoQualifyingSignal)
+            frame.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::ReplayOrOutOfOrder
+            )
         );
     }
 
@@ -678,7 +700,64 @@ mod tests {
         });
         let frame = disabled.encode(&sample, 150).unwrap();
         assert!(frame.cues.is_empty());
-        assert!(!frame.information_available);
+        assert_eq!(frame.disposition, FeedbackFrameDisposition::Disabled);
+    }
+
+    #[test]
+    fn valid_quiet_sample_is_not_reported_as_missing_data() {
+        let mut encoder = encoder();
+        let sample = observation(1);
+
+        let frame = encoder.encode(&sample, 150).unwrap();
+        assert_eq!(frame.disposition, FeedbackFrameDisposition::NoCue);
+        assert!(frame.cues.is_empty());
+
+        let replay = encoder.encode(&sample, 150).unwrap();
+        assert_eq!(
+            replay.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::ReplayOrOutOfOrder
+            )
+        );
+    }
+
+    #[test]
+    fn future_receive_timestamp_is_rejected() {
+        let mut encoder = encoder();
+        let mut sample = observation(1);
+        sample.received_monotonic_ns = 200;
+
+        let frame = encoder.encode(&sample, 150).unwrap();
+        assert_eq!(
+            frame.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::FutureReceiveTimestamp
+            )
+        );
+    }
+
+    #[test]
+    fn duplicate_digit_readings_are_rejected() {
+        let mut encoder = encoder();
+        let mut sample = observation(1);
+        sample.contacts = vec![
+            ContactReading {
+                digit: HandDigit::Index,
+                in_contact: true,
+                origin: ObservationOrigin::DirectMeasurement,
+            },
+            ContactReading {
+                digit: HandDigit::Index,
+                in_contact: false,
+                origin: ObservationOrigin::DirectMeasurement,
+            },
+        ];
+        assert_eq!(
+            encoder.encode(&sample, 150),
+            Err(ObservationValidationError::DuplicateDigit {
+                digit: HandDigit::Index
+            })
+        );
     }
 
     #[test]
