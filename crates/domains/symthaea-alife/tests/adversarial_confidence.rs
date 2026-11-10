@@ -47,7 +47,7 @@ fn confidence_ascent_can_find_a_confident_false_positive() {
     .expect("attack completes");
 
     assert_eq!(result.model_queries, 500);
-    assert_eq!(result.endpoint, b"bbbbb");
+    assert_eq!(result.endpoint.as_slice(), b"bbbbb");
     assert_eq!(result.endpoint_confidence, 1.0);
     assert!(!result.endpoint_is_positive);
     assert!(result.accepted_mutations > 0);
@@ -92,7 +92,7 @@ fn flat_confidence_surface_never_accepts_mutations() {
     .expect("attack completes");
 
     assert_eq!(result.accepted_mutations, 0);
-    assert_eq!(result.endpoint, b"aaaa");
+    assert_eq!(result.endpoint.as_slice(), b"aaaa");
     assert_eq!(result.endpoint_confidence, 0.5);
 }
 
