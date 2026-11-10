@@ -1,0 +1,42 @@
+name: IG-DELIB-CONTROL-001 Qualifier
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "research/ig-delib-control-001/**"
+      - ".github/workflows/ig-delib-control-qualifier.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/ig-delib-control-001/**"
+      - ".github/workflows/ig-delib-control-qualifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ig-delib-control-qualifier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Format
+        run: cargo fmt --manifest-path research/ig-delib-control-001/qualifier/Cargo.toml --check
+      - name: Unit tests and negative controls
+        run: cargo test --manifest-path research/ig-delib-control-001/qualifier/Cargo.toml
+      - name: Qualify deterministic reference policy
+        run: |
+          cargo run --manifest-path research/ig-delib-control-001/qualifier/Cargo.toml -- \
+            research/ig-delib-control-001/DELIB_CONTROL_SCENARIOS_V0_1.json \
+            research/ig-delib-control-001/DELIB_CONTROL_NEGATIVE_CONTROLS_V0_1.json
