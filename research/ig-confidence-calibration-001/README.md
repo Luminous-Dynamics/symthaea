@@ -41,6 +41,12 @@ The test evaluator recomputes SHA-256 over the canonical compact JSON observatio
 
 The fit/validation samples and report are external artifacts at this stage. Their hashes and sample-count declarations are not self-authenticating; a future verifier must inspect the referenced files, check the training procedure, recompute their digests and establish no leakage.
 
+## Selective-risk ties and uncertainty boundary
+
+Selective-risk calculations must be invariant to row order when forecasts have equal confidence. The evaluator now groups equal-probability observations and calculates fractional expected inclusion within a tied block. This avoids an arbitrary top-k result when a coverage cutoff falls inside a tie group. The AURC and risk-at-coverage outputs are therefore tie-aware and deterministic.
+
+The checked-in synthetic evaluation has 50 rows but only **two independent task groups** (high-confidence and low-confidence). The CLI reports that group count and marks the uncertainty interval as `NotEstimated`; it does not treat the 50 rows as 50 independent clusters or emit a misleading confidence interval. A confirmatory real-model evaluation must preregister its independent sampling unit, cluster structure, sample-size/power plan and uncertainty method before evaluation.
+
 ## Metrics
 
 The Rust evaluator reports independent measures:
