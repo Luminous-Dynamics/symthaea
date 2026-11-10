@@ -1102,6 +1102,56 @@ fn validate_config(
 mod tests {
     use super::*;
 
+    /// Exact dynamic-programming enumeration of the probability that a
+    /// candidate's lower confidence sequence crosses a zero-effect boundary.
+    ///
+    /// Paired improvements are independent Rademacher variables under this
+    /// null (each is -1 or +1 with probability 1/2). The state at look n is the
+    /// probability mass for each success count among paths that have not
+    /// crossed at any earlier look. This integrates all 2^N paths without
+    /// Monte Carlo error.
+    fn exact_null_false_accept_probability(
+        candidate_index: u64,
+        max_look: usize,
+        campaign_alpha: f64,
+    ) -> f64 {
+        let mut surviving_mass = vec![1.0_f64];
+        let mut false_accept_probability = 0.0_f64;
+
+        for observation_count in 1..=max_look {
+            let n = observation_count as f64;
+            let candidate = candidate_index as f64;
+            let log_tail_ratio = std::f64::consts::LN_2 - campaign_alpha.ln()
+                + candidate.ln()
+                + (candidate + 1.0).ln()
+                + n.ln()
+                + (n + 1.0).ln()
+                + 1e-12;
+            let radius = (2.0 * log_tail_ratio / n).sqrt();
+            let mut next_surviving_mass = vec![0.0_f64; observation_count + 1];
+
+            for (successes, mass) in surviving_mass.iter().copied().enumerate() {
+                for (is_positive, branch_probability) in [(false, 0.5), (true, 0.5)] {
+                    let next_successes = successes + usize::from(is_positive);
+                    let mean_improvement =
+                        (2.0 * next_successes as f64 - n) / n;
+                    let lower_bound = (mean_improvement - radius).max(-1.0);
+                    let branch_mass = mass * branch_probability;
+
+                    if lower_bound > 0.0 {
+                        false_accept_probability += branch_mass;
+                    } else {
+                        next_surviving_mass[next_successes] += branch_mass;
+                    }
+                }
+            }
+
+            surviving_mass = next_surviving_mass;
+        }
+
+        false_accept_probability
+    }
+
     fn digest(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()
     }
@@ -1339,6 +1389,38 @@ mod tests {
             SequentialWeightVerificationStatus::BenefitNotEstablished
         );
         assert!(report.upper_confidence_bound < report.config.minimum_improvement);
+    }
+
+    #[test]
+    fn anytime_valid_sequence_controls_exact_rademacher_null_false_acceptance() {
+        let campaign_alpha = 0.05;
+        let max_look = 512;
+        let mut familywise_false_accept_upper_bound = 0.0;
+
+        // The candidate ordinal and interim look are both included in the
+        // production alpha-spending schedule. Each finite DP computes the
+        // exact path probability under a zero-mean bounded paired-loss null.
+        for candidate_index in 1..=8_u64 {
+            let false_accept_probability = exact_null_false_accept_probability(
+                candidate_index,
+                max_look,
+                campaign_alpha,
+            );
+            let candidate_alpha = campaign_alpha
+                / (candidate_index as f64 * (candidate_index + 1) as f64);
+
+            assert!(
+                false_accept_probability <= candidate_alpha + 1e-12,
+                "candidate {candidate_index} crossed with probability                  {false_accept_probability}, allocated {candidate_alpha}"
+            );
+            familywise_false_accept_upper_bound += false_accept_probability;
+        }
+
+        // Bonferroni across the first eight adaptive candidate ordinals.
+        // The infinite campaign allocation sums to campaign_alpha; this
+        // finite prefix must therefore remain below that budget.
+        assert!(familywise_false_accept_upper_bound <= campaign_alpha);
+        assert!(familywise_false_accept_upper_bound > 0.0);
     }
 
     #[test]
