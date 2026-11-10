@@ -276,6 +276,12 @@ Include stale/forged wind or shaft data, GNSS/AIS anomalies, timebase drift, tel
 
 Reference the current IMO Guidelines on Maritime Cyber Risk Management (MSC-FAL.1/Circ.3/Rev.4) and applicable IACS UR E26/E27 requirements. Applicability depends on vessel type, size, build contract, class, flag and equipment; this research document is not a compliance assessment or approval.
 
+### 14.7 WAPS wind-energy MRV evidence preparation
+
+COM(2026)620 (procedure 2026/0210(COD)) is a pending proposal, not current law. It would align MRV/FuelEU monitoring of GHG emissions and onboard energy, include WAPS among substitute sources, and leave wind-energy quantity determination to future standards/certification in Commission implementing acts.
+
+The new [MARINE-WIND-ENERGY-MRV-001](./MARINE-WIND-ENERGY-MRV-001.md) workstream (#11501) prepares a versioned evidence contract. It separates standard-derived wind energy, research estimates and counterfactual avoided propulsion energy. No current regulatory wind-energy formula is assumed.
+
 ### 14.5 Regulatory route and emissions exposure
 
 The route-robustness benchmark must also preserve a versioned regulatory exposure map. Physical service, whole-vessel energy, well-to-wake emissions, statutory CII/EEXI/EEDI, EU ETS covered emissions, FuelEU intensity and ECA fuel constraints are separate outputs. Do not collapse them into one score.
