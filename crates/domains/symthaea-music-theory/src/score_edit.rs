@@ -88,7 +88,7 @@ pub enum ScoreEditIssueCodeV1 {
     VelocityOutOfRange,
     ProtectedScopeOverlap,
     OverlappingOperations,
-    InvalidSourceVelocity,
+    InvalidSourceNoteTime,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -425,7 +425,7 @@ pub fn apply_score_edit_plan(
             ) else {
                 push_issue(
                     &mut issues,
-                    ScoreEditIssueCodeV1::InvalidSourceVelocity,
+                    ScoreEditIssueCodeV1::InvalidSourceNoteTime,
                     Some(&operation.id),
                     Some(operation.part_id),
                     Some(index),
@@ -436,7 +436,7 @@ pub fn apply_score_edit_plan(
             let Some(note_end) = onset.checked_add(duration) else {
                 push_issue(
                     &mut issues,
-                    ScoreEditIssueCodeV1::InvalidSourceVelocity,
+                    ScoreEditIssueCodeV1::InvalidSourceNoteTime,
                     Some(&operation.id),
                     Some(operation.part_id),
                     Some(index),
@@ -710,8 +710,10 @@ mod tests {
     #[test]
     fn rejects_a_target_window_with_no_fully_contained_notes() {
         let source = source_score();
-        let mut op = operation("empty-target", 10, 11);
-        op.part_id = 10;
+        // Part 20 has a note in [0,1), but none in [1,2), which is
+        // a valid in-score window with a genuinely empty target selection.
+        let mut op = operation("empty-target", 1, 2);
+        op.part_id = 20;
         let result = apply_score_edit_plan(&source, &plan(vec![op]), &digest());
         assert!(result.unwrap_err().iter().any(|issue| {
             issue.code == ScoreEditIssueCodeV1::EmptyTargetSelection
