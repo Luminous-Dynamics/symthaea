@@ -1512,13 +1512,13 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
     onsets.sort_by(f64::total_cmp);
     onsets.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
 
-    let chord_at = |t: f64, score: &Score| -> Vec<(usize, Pitch, Duration, f32, f32)> {
+    let chord_at = |t: f64, score: &Score| -> Vec<(usize, Pitch, Duration, f32, f32, PartId)> {
         score
             .notes
             .iter()
             .enumerate()
             .filter(|(_, n)| n.role == VoiceRole::Harmony && (n.onset.beats() - t).abs() < 1e-9)
-            .map(|(idx, n)| (idx, n.pitch, n.duration, n.velocity, n.section_intensity))
+            .map(|(idx, n)| (idx, n.pitch, n.duration, n.velocity, n.section_intensity, n.part))
             .collect()
     };
 
@@ -1533,8 +1533,8 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
         if chord1.is_empty() || chord2.is_empty() {
             continue;
         }
-        let mut found: Option<(Pitch, usize, Pitch, Duration, f32, f32)> = None;
-        for &(j_idx, p2, dur2, vel2, si2) in &chord2 {
+        let mut found: Option<(Pitch, usize, Pitch, Duration, f32, f32, PartId)> = None;
+        for &(j_idx, p2, dur2, vel2, si2, part_id) in &chord2 {
             let degree = (1..=15)
                 .min_by_key(|&d| (scale.degree_pitch(d, 4).midi() as i32 - p2.midi() as i32).abs())
                 .unwrap();
@@ -1542,11 +1542,11 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             if let Some(&(_, p1, ..)) = chord1.iter().find(|&&(_, p1, ..)| {
                 p1.pitch_class() == target_pc && (p1.midi() as i32 - p2.midi() as i32).abs() <= 3
             }) {
-                found = Some((p1, j_idx, p2, dur2, vel2, si2));
+                found = Some((p1, j_idx, p2, dur2, vel2, si2, part_id));
                 break;
             }
         }
-        let Some((suspended_pitch, j_idx, resolved_pitch, dur2, vel2, si2)) = found else {
+        let Some((suspended_pitch, j_idx, resolved_pitch, dur2, vel2, si2, part_id)) = found else {
             continue;
         };
         counter += 1;
@@ -1563,7 +1563,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
         let hold = Duration::new((hold_beats * 480.0).round() as i64, 480);
         resolved_indices.push(j_idx);
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: part_id,
             pitch: suspended_pitch,
             onset: onset2,
             duration: hold,
@@ -1573,7 +1573,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             section_intensity: si2,
         });
         additions.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: part_id,
             pitch: resolved_pitch,
             onset: onset2 + hold,
             duration: dur2.saturating_sub(hold),
@@ -4751,6 +4751,44 @@ mod tests {
     use super::*;
     use crate::harmony::{Progression, Tonality};
     use crate::score::VoiceRole;
+
+    #[test]
+    fn suspension_and_resolution_inherit_the_replaced_harmony_part_identity() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        // F4 (part 28) is prepared in the outgoing chord; E4 (part 27)
+        // is the incoming harmony tone replaced by the suspension/resolution.
+        score.push(ScoreNote {
+            part: PartId(28),
+            pitch: Pitch::from_midi(65),
+            onset: Duration::zero(),
+            duration: Duration::new(4, 1),
+            velocity: 0.5,
+            role: VoiceRole::Harmony,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        score.push(ScoreNote {
+            part: PartId(27),
+            pitch: Pitch::from_midi(64),
+            onset: Duration::new(4, 1),
+            duration: Duration::new(2, 1),
+            velocity: 0.6,
+            role: VoiceRole::Harmony,
+            emphasis: Emphasis::Normal,
+            section_intensity: 0.9,
+        });
+
+        apply_suspensions(&mut score, key, 1.0, 17);
+
+        let transformed: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.onset.beats() >= 4.0)
+            .collect();
+        assert_eq!(transformed.len(), 2);
+        assert!(transformed.iter().all(|note| note.part == PartId(27)));
+        assert!(transformed.iter().all(|note| note.role == VoiceRole::Harmony));
+        assert!(score.has_part_identity());
+    }
 
     fn ornament_source_note(part: PartId, duration: Duration, emphasis: Emphasis) -> ScoreNote {
         ScoreNote {
