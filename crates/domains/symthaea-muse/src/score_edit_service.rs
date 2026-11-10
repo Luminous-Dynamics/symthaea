@@ -269,8 +269,9 @@ mod tests {
     #[test]
     fn invalid_source_score_returns_no_partial_preview() {
         let mut invalid = source_score();
+        let stale_plan = plan(&invalid);
         invalid.notes[0].velocity = 1.2;
-        let result = preview_score_edit(&invalid, &plan());
+        let result = preview_score_edit(&invalid, &stale_plan);
         assert!(matches!(
             result,
             Err(ScoreEditServiceErrorV1::SourceDemand(_))
@@ -292,8 +293,9 @@ mod tests {
     #[test]
     fn frozen_source_and_plan_produce_identical_preview_artifacts() {
         let source = source_score();
-        let first = preview_score_edit(&source, &plan(&source)).unwrap();
-        let second = preview_score_edit(&source, &plan(&source)).unwrap();
+        let frozen_plan = plan(&source);
+        let first = preview_score_edit(&source, &frozen_plan).unwrap();
+        let second = preview_score_edit(&source, &frozen_plan).unwrap();
         assert_eq!(first, second);
     }
 }
