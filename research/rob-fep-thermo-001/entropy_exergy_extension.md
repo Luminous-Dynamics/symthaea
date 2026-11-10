@@ -81,6 +81,14 @@ The research hypothesis is that the best long-horizon controller will not simply
 
 The value of an additional computation, observation or physical probe should be priced in its expected effect on the downstream decision, compute/latency budget and physical state—not in raw entropy reduction alone.
 
+## Machine-readable starter fixtures
+
+The seven synthetic cases and the Draft 2020-12 schema are committed alongside this addendum:
+- [entropy_exergy_v0_1.json](./fixtures/entropy_exergy_v0_1.json)
+- [entropy_exergy_v0_1.schema.json](./fixtures/entropy_exergy_v0_1.schema.json)
+
+The fixture arithmetic received a deterministic semantic preflight after fetching the files back from the branch. It is not yet validated by an independent JSON Schema implementation, Rust test suite, physical simulator or hardware experiment.
+
 ## Minimum analytical corpus
 
 The physical-accounting work item #4631 should implement exact known-answer tests before simulator or hardware integration:
