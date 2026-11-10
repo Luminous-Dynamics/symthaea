@@ -483,7 +483,7 @@ mod tests {
     fn invalid_runs_count_as_task_failures_in_the_accepted_denominator() {
         let mut samples = safe_samples(100);
         samples[0].valid_run = false;
-        samples[0].observed_success = false;
+        samples[0].observed_success = Some(false);
         let certificate =
             certify_selective_risk(&samples, policy(), "4".repeat(64)).unwrap();
         assert_eq!(certificate.accepted_samples(), 100);
@@ -495,7 +495,7 @@ mod tests {
     #[test]
     fn one_unsafe_event_is_not_hidden_by_successful_task_completion() {
         let mut samples = safe_samples(100);
-        samples[0].observed_unsafe_event = true;
+        samples[0].observed_unsafe_event = Some(true);
         let certificate =
             certify_selective_risk(&samples, policy(), "4".repeat(64)).unwrap();
         assert_eq!(certificate.accepted_task_failures(), 0);
