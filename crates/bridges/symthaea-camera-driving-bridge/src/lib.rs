@@ -192,6 +192,8 @@ pub struct DrivingObservationReceipt {
     pub raw_frame_sha256: String,
     pub visual_state_sha256: String,
     pub vehicle_state_sha256: String,
+    pub previous_vehicle_state_sha256: Option<String>,
+    pub previous_visual_state_sha256: Option<String>,
     pub proprioceptive_hv_sha256: String,
     pub fused_policy_input_sha256: String,
     pub vision_telemetry: VisionTelemetryReceipt,
@@ -217,6 +219,8 @@ pub struct CameraDrivingBridge {
     last_sequence: Option<u64>,
     last_timestamp_us: Option<u64>,
     last_vehicle_timestamp_us: Option<u64>,
+    last_vehicle_state_sha256: Option<String>,
+    last_visual_state_sha256: Option<String>,
     faulted: bool,
 }
 
@@ -252,6 +256,8 @@ impl CameraDrivingBridge {
             last_sequence: None,
             last_timestamp_us: None,
             last_vehicle_timestamp_us: None,
+            last_vehicle_state_sha256: None,
+            last_visual_state_sha256: None,
             faulted: false,
         })
     }
@@ -272,6 +278,9 @@ impl CameraDrivingBridge {
             return Err(BridgeError::NonFiniteVehicleState);
         }
 
+        let previous_vehicle_state_sha256 = self.last_vehicle_state_sha256.clone();
+        let previous_visual_state_sha256 = self.last_visual_state_sha256.clone();
+        let vehicle_state_sha256 = digest_vehicle_state(observation.vehicle_state, &state_channels);
         let training_steps_before = self.vision.training_steps();
         let dt = (dt_us as f64 / 1_000_000.0) as f32;
         let telemetry = match self.vision.observe_frame_checked(
@@ -328,7 +337,6 @@ impl CameraDrivingBridge {
         };
         let raw_frame_sha256 = digest_bytes(observation.pixels);
         let visual_state_sha256 = digest_hv(&visual_state);
-        let vehicle_state_sha256 = digest_vehicle_state(observation.vehicle_state, &state_channels);
         let proprioceptive_hv_sha256 = digest_hv(&proprioceptive_hv);
         let fused_policy_input_sha256 = digest_hv(&policy_input);
 
@@ -349,7 +357,9 @@ impl CameraDrivingBridge {
             vehicle_encoder_levels: MAX_VEHICLE_ENCODER_LEVELS,
             raw_frame_sha256,
             visual_state_sha256,
-            vehicle_state_sha256,
+            vehicle_state_sha256: vehicle_state_sha256.clone(),
+            previous_vehicle_state_sha256,
+            previous_visual_state_sha256,
             proprioceptive_hv_sha256,
             fused_policy_input_sha256,
             vision_telemetry,
@@ -363,6 +373,8 @@ impl CameraDrivingBridge {
         self.last_sequence = Some(observation.sequence);
         self.last_timestamp_us = Some(observation.timestamp_us);
         self.last_vehicle_timestamp_us = Some(observation.vehicle_state_timestamp_us);
+        self.last_vehicle_state_sha256 = Some(vehicle_state_sha256);
+        self.last_visual_state_sha256 = Some(visual_state_sha256);
 
         Ok(FusedDrivingInput {
             policy_input,
@@ -467,6 +479,8 @@ fn digest_vehicle_state(state: &VehicleState, channels: &[f32]) -> String {
 fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
     let mut hasher = Sha256::new();
     hasher.update(receipt.schema_version.to_le_bytes());
+    hasher.update([u8::from(receipt.previous_vehicle_state_sha256.is_some())]);
+    hasher.update([u8::from(receipt.previous_visual_state_sha256.is_some())]);
     for value in [
         &receipt.identity.run_id,
         &receipt.identity.episode_id,
@@ -479,6 +493,8 @@ fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
         &receipt.raw_frame_sha256,
         &receipt.visual_state_sha256,
         &receipt.vehicle_state_sha256,
+        &receipt.previous_vehicle_state_sha256.as_deref().unwrap_or(""),
+        &receipt.previous_visual_state_sha256.as_deref().unwrap_or(""),
         &receipt.proprioceptive_hv_sha256,
         &receipt.fused_policy_input_sha256,
     ] {
@@ -668,6 +684,28 @@ mod tests {
         let b = second.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
         assert_ne!(a.receipt.vision_config_sha256, b.receipt.vision_config_sha256);
         assert_ne!(a.receipt.visual_state_sha256, b.receipt.visual_state_sha256);
+    }
+
+    #[test]
+    fn receipt_chain_binds_previous_visual_and_vehicle_states() {
+        let mut bridge = bridge();
+        let state_a = VehicleState::cruising(10.0);
+        let state_b = VehicleState::cruising(11.0);
+        let first_pixels = vec![20; 16 * 16 * 3];
+        let second_pixels = vec![30; 16 * 16 * 3];
+        let first = bridge.observe(observation(&first_pixels, 1, 10_000, &state_a)).unwrap();
+        assert_eq!(first.receipt.previous_vehicle_state_sha256, None);
+        assert_eq!(first.receipt.previous_visual_state_sha256, None);
+        let second = bridge.observe(observation(&second_pixels, 2, 20_000, &state_b)).unwrap();
+        assert_eq!(
+            second.receipt.previous_vehicle_state_sha256.as_deref(),
+            Some(first.receipt.vehicle_state_sha256.as_str())
+        );
+        assert_eq!(
+            second.receipt.previous_visual_state_sha256.as_deref(),
+            Some(first.receipt.visual_state_sha256.as_str())
+        );
+        assert_eq!(second.receipt.receipt_sha256, digest_receipt(&second.receipt));
     }
 
     #[test]
