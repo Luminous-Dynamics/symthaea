@@ -10,6 +10,9 @@ repository = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["electric-aircraft", "aerospace", "battery", "mission-energy", "engineering"]
 categories = ["aerospace", "simulation"]
 
+[dependencies]
+sha2 = { workspace = true }
+
 [lib]
 name = "symthaea_electric_aircraft"
 path = "src/lib.rs"
