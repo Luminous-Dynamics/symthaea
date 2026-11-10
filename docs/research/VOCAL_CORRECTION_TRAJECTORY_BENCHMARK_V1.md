@@ -38,7 +38,7 @@ At every correction:
 - no previously compliant target may become noncompliant;
 - every target's conservative distance-to-acceptance stays within its declared regression allowance;
 - at least one unsatisfied target improves by its declared minimum or becomes compliant;
-- the action norm stays within the predeclared maximum;
+- the action norm stays within the predeclared maximum under a versioned action-norm profile that defines control coordinates and normalization;
 - the output must bind to the previous iteration's exact output digest;
 - source case and frozen context remain unchanged.
 
