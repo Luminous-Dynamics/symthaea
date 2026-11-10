@@ -47,7 +47,7 @@ Every computed metric carries status, value, unit, population scope and a list o
 
 The SOC snapshot binds the exact pack configuration, end-of-charge event, reference condition, evidence digest, evidence class for each cell, and a maximum sample-skew window. The synchronization tolerance is declared in the fixture/protocol; it is not silently widened to accommodate late or stale samples. A snapshot missing any declared cell or exceeding the synchronization window cannot produce β_SOC.
 
-The lifetime contract binds the EOL rule, threshold, per-cell EFC, EOL event, evidence digest and evidence class. A censored/unknown unit is retained and prevents β_life.
+The lifetime contract binds the pack configuration, EOL rule and digest, service-history digest, EFC method and digest, per-cell EFC, EOL event, evidence digest and evidence class. A censored/unknown unit is retained and prevents β_life.
 
 Per-unit capacity/resistance uncertainty is preserved but not propagated into population confidence intervals in v0.2.
 
