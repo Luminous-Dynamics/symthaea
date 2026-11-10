@@ -18,7 +18,7 @@ jobs:
       - name: Check out exact PR revision
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Verify exact source revision
@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
           echo "VOCAL_GUIDANCE_REVISION=$actual" >> "$GITHUB_ENV"
 
@@ -50,9 +50,33 @@ jobs:
             --input tools/vocal-guidance-lab/fixtures/conflicting-gradients.json \
             --output vocal-guidance-conflict-report.json
 
+      - name: Verify synthetic control expectations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          with open("vocal-guidance-conflict-report.json", encoding="utf-8") as handle:
+              report = json.load(handle)
+          assert report["conflict_class"] == "conflicting_but_projectable", report
+          assert report["two_objective_guidance_direction_available"] is True, report
+          assert abs(report["projected_dot_product"] - 0.5) < 1e-12, report
+          assert report["phoneme_projected"] == [0.5, 0.5], report
+          assert report["pitch_projected"] == [0.0, 1.0], report
+          assert report["source_revision"] == os.environ["VOCAL_GUIDANCE_REVISION"], report
+          PY
+
+      - name: Record exact source revision
+        shell: bash
+        run: printf '%s\\n' "$VOCAL_GUIDANCE_REVISION" > vocal-guidance-source.revision
+
       - name: Upload conflict receipt
         uses: actions/upload-artifact@v4
         with:
-          name: vocal-guidance-conflict-\${{ github.event.pull_request.head.sha || github.sha }}
-          path: vocal-guidance-conflict-report.json
+          name: vocal-guidance-conflict-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            vocal-guidance-conflict-report.json
+            vocal-guidance-source.revision
+            tools/vocal-guidance-lab/Cargo.lock
           if-no-files-found: error
