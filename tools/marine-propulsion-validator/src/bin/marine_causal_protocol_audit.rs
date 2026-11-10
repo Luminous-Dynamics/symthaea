@@ -178,6 +178,20 @@ fn check_protocol(protocol: &Value, findings: &mut Findings) {
 
     let design = protocol.get("design").unwrap_or(&Value::Null);
     let design_type = design.get("design_type").and_then(Value::as_str).unwrap_or("");
+    if let Some(authorization_ids) = design.get("authorization_evidence_ids").and_then(Value::as_array) {
+        for (index, evidence) in authorization_ids.iter().enumerate() {
+            if let Some(id) = evidence.as_str() {
+                if !source_ids.contains(id) {
+                    findings.push(
+                        format!("/design/authorization_evidence_ids/{index}"),
+                        "INVALID",
+                        format!("authorization evidence reference '{id}' does not resolve in evidence_source_ids"),
+                    );
+                }
+            }
+        }
+    }
+
     if design_type == "randomized_switchback" {
         if design.get("randomization_authorized").and_then(Value::as_bool) != Some(true) {
             findings.push("/design/randomization_authorized", "BLOCKED", "randomized switchback requires separate documented owner/master/SMS and applicable class/flag authorization");
@@ -376,6 +390,17 @@ mod tests {
         let mut findings = Findings::default();
         check_protocol(&protocol, &mut findings);
         assert!(findings.blocked);
+    }
+
+    #[test]
+    fn randomized_switchback_authorization_must_resolve_to_evidence() {
+        let mut protocol = fixture();
+        protocol["design"]["design_type"] = serde_json::json!("randomized_switchback");
+        protocol["design"]["randomization_authorized"] = serde_json::json!(true);
+        protocol["design"]["authorization_evidence_ids"] = serde_json::json!(["MISSING-AUTHORIZATION"]);
+        let mut findings = Findings::default();
+        check_protocol(&protocol, &mut findings);
+        assert!(findings.invalid);
     }
 
     #[test]
