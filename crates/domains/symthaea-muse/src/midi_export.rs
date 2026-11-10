@@ -1697,7 +1697,7 @@ pub mod part_aware_v1 {
 
         let mut event_map = Vec::with_capacity(score.notes.len());
         let mut same_pitch_intervals =
-            BTreeMap::<(u16, u8), Vec<(u64, u64, usize)>>::new();
+            BTreeMap::<(u16, u8), Vec<(i128, i128, i128, i128, usize)>>::new();
 
         for (ordinal, note) in score.notes.iter().enumerate() {
             let mut matched_segment = None;
@@ -1760,7 +1760,7 @@ pub mod part_aware_v1 {
             same_pitch_intervals
                 .entry((note.part.0, note.pitch.midi()))
                 .or_default()
-                .push((onset_tick, offset_tick, ordinal));
+                .push((on_num, on_den, end_num, end_den, ordinal));
 
             let events = events_by_part
                 .get_mut(&note.part.0)
@@ -1806,14 +1806,32 @@ pub mod part_aware_v1 {
         }
 
         // Standard MIDI NoteOff addresses channel+pitch, not a unique source
-        // event. Refuse same-pitch overlap within a part rather than silently
-        // shortening a note or producing an ambiguous event correspondence.
+        // event. Compare exact rational source intervals, not quantized ticks:
+        // two source overlaps must not become an apparently clean retrigger
+        // merely because both boundaries round to the same MIDI tick.
         for ((part_id, pitch), intervals) in &mut same_pitch_intervals {
-            intervals.sort_by_key(|interval| (interval.0, interval.1, interval.2));
-            let mut previous: Option<(u64, usize)> = None;
-            for (onset, offset, ordinal) in intervals.iter().copied() {
-                if let Some((previous_max_offset, previous_ordinal)) = previous {
-                    if onset < previous_max_offset {
+            intervals.sort_by(|left, right| {
+                cmp_rational(left.0, left.1, right.0, right.1)
+                    .expect("validated score rational times are inside the bounded domain")
+                    .then_with(|| left.4.cmp(&right.4))
+            });
+            let mut previous_max_end: Option<(i128, i128, usize)> = None;
+            for (onset_num, onset_den, end_num, end_den, ordinal) in
+                intervals.iter().copied()
+            {
+                if let Some((previous_end_num, previous_end_den, previous_ordinal)) =
+                    previous_max_end
+                {
+                    let onset_vs_previous_end = cmp_rational(
+                        onset_num,
+                        onset_den,
+                        previous_end_num,
+                        previous_end_den,
+                    )
+                    .ok_or(PartAwareMidiExportErrorV1::InvalidRationalTime {
+                        score_note_ordinal: ordinal,
+                    })?;
+                    if onset_vs_previous_end == Ordering::Less {
                         return Err(
                             PartAwareMidiExportErrorV1::OverlappingSamePitchNotes {
                                 part_id: *part_id,
@@ -1823,11 +1841,20 @@ pub mod part_aware_v1 {
                             },
                         );
                     }
-                    if offset > previous_max_offset {
-                        previous = Some((offset, ordinal));
+                    let end_vs_previous_end = cmp_rational(
+                        end_num,
+                        end_den,
+                        previous_end_num,
+                        previous_end_den,
+                    )
+                    .ok_or(PartAwareMidiExportErrorV1::InvalidRationalTime {
+                        score_note_ordinal: ordinal,
+                    })?;
+                    if end_vs_previous_end == Ordering::Greater {
+                        previous_max_end = Some((end_num, end_den, ordinal));
                     }
                 } else {
-                    previous = Some((offset, ordinal));
+                    previous_max_end = Some((end_num, end_den, ordinal));
                 }
             }
         }
@@ -2331,6 +2358,45 @@ pub mod part_aware_v1 {
             assert_eq!(rational_to_tick(3, 1_920), Some(2));
             assert_eq!(rational_to_tick(5, 1_920), Some(2));
             assert_eq!(rational_to_tick(7, 1_920), Some(4));
+        }
+
+        #[test]
+        fn source_overlap_is_rejected_even_when_tick_quantization_hides_it() {
+            let source = score(vec![
+                note(1, 60, Duration::zero(), Duration::new(1, 2)),
+                note(
+                    1,
+                    60,
+                    Duration::new(959, 1_920),
+                    Duration::new(1, 2),
+                ),
+            ]);
+            let digest = score_digest(&source);
+            let timeline = plan(
+                &digest,
+                vec![segment("p1", 1, "cello-1", 0, 1, 2, 1, None)],
+            );
+            let instruments = vec![cap("cello-1", InstrumentKindV1::Cello, 36, 84, 2)];
+            let bindings = vec![binding("cello-1", 42)];
+
+            // The second onset is 479.5 MIDI ticks and rounds to tick 480,
+            // which is also the first note's offset. The source events still
+            // overlap by 1/1920 beat and must not be silently normalized.
+            assert_eq!(
+                rational_to_tick(959, 1_920),
+                Some(480)
+            );
+            let result = encode_score_midi_part_aware_v1(
+                &source,
+                &timeline,
+                &instruments,
+                &bindings,
+                &digest,
+            );
+            assert!(matches!(
+                result,
+                Err(PartAwareMidiExportErrorV1::OverlappingSamePitchNotes { .. })
+            ));
         }
 
         #[test]
