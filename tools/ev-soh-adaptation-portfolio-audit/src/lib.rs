@@ -72,6 +72,7 @@ struct RouterFeature {
     feature_scope: String,
     available_at_ms: u64,
     requires_target_labels: bool,
+    derived_from_target_labels: bool,
     evidence_digest: String,
     evidence_class: String,
 }
@@ -283,6 +284,7 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
             || feature.available_at_ms == 0
             || feature.available_at_ms > router.selection_time_ms
             || feature.requires_target_labels
+            || feature.derived_from_target_labels
             || !is_digest(&feature.evidence_digest)
             || !valid_evidence_class(&feature.evidence_class)
         {
@@ -747,9 +749,9 @@ mod tests {
     #[test]
     fn frozen_corpus_accepts_five_and_rejects_eight_controls() {
         let report = report();
-        assert_eq!(report.payload.case_count, 13);
+        assert_eq!(report.payload.case_count, 16);
         assert_eq!(report.payload.accepted_count, 5);
-        assert_eq!(report.payload.rejected_count, 8);
+        assert_eq!(report.payload.rejected_count, 11);
     }
 
     #[test]
@@ -846,6 +848,33 @@ mod tests {
         assert!(case.accepted);
         assert_eq!(case.selected_strategy.as_deref(), Some("abstain"));
         assert_eq!(case.selected_expert_id.as_deref(), Some("abstain"));
+    }
+
+    #[test]
+    fn router_features_must_not_be_derived_from_target_labels() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "router-feature-derived-from-target-labels")
+            .expect("target-derived router feature control");
+        assert!(!case.accepted);
+    }
+
+    #[test]
+    fn expert_adaptation_must_finish_before_final_test_access() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "expert-adaptation-completes-after-test-access")
+            .expect("late expert readiness control");
+        assert!(!case.accepted);
+    }
+
+    #[test]
+    fn explicit_abstention_cannot_claim_a_prediction_result() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "abstain-expert-claims-prediction-result")
+            .expect("abstain result digest control");
+        assert!(!case.accepted);
     }
 
     #[test]
