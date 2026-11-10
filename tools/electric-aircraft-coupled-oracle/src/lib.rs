@@ -248,7 +248,11 @@ impl std::error::Error for OracleError {}
 #[derive(Debug, Clone, PartialEq)]
 pub struct MissionSegment {
     pub id: String,
-    pub terminal_power_w: f64,
+    /// Required propulsion bus power at the battery terminals (W).
+    pub propulsion_terminal_power_w: f64,
+    /// Separate electrical demand for battery/propulsion thermal management (W).
+    /// It is counted against pack energy but is not added to pack I²R heat twice.
+    pub thermal_management_power_w: f64,
     pub duration_s: f64,
 }
 
@@ -256,6 +260,8 @@ pub struct MissionSegment {
 pub struct SegmentSummary {
     pub id: String,
     pub substeps: usize,
+    pub propulsion_terminal_energy_wh: f64,
+    pub thermal_management_energy_wh: f64,
     pub terminal_energy_wh: f64,
     pub chemical_energy_wh: f64,
     pub resistive_heat_j: f64,
@@ -268,7 +274,11 @@ pub struct MissionReport {
     pub model_version: &'static str,
     pub segments: Vec<SegmentSummary>,
     pub final_state: OracleState,
+    pub total_propulsion_terminal_energy_wh: f64,
+    pub total_thermal_management_energy_wh: f64,
     pub total_terminal_energy_wh: f64,
+    /// Fraction of battery-terminal mission energy consumed by thermal management.
+    pub thermal_management_energy_fraction: f64,
     pub total_chemical_energy_wh: f64,
     pub total_resistive_heat_j: f64,
     pub total_ambient_rejected_energy_j: f64,
@@ -514,6 +524,8 @@ pub fn simulate_mission(
     let mut state = initial_state;
     let mut summaries = Vec::with_capacity(segments.len());
     let mut substeps = Vec::new();
+    let mut total_propulsion_terminal_energy_wh = 0.0;
+    let mut total_thermal_management_energy_wh = 0.0;
     let mut total_terminal_energy_wh = 0.0;
     let mut total_chemical_energy_wh = 0.0;
     let mut total_resistive_heat_j = 0.0;
@@ -524,13 +536,19 @@ pub fn simulate_mission(
         if segment.id.trim().is_empty()
             || !segment.duration_s.is_finite()
             || segment.duration_s <= 0.0
-            || !segment.terminal_power_w.is_finite()
-            || segment.terminal_power_w <= 0.0
+            || !segment.propulsion_terminal_power_w.is_finite()
+            || segment.propulsion_terminal_power_w < 0.0
+            || !segment.thermal_management_power_w.is_finite()
+            || segment.thermal_management_power_w < 0.0
+            || !(segment.propulsion_terminal_power_w + segment.thermal_management_power_w).is_finite()
+            || segment.propulsion_terminal_power_w + segment.thermal_management_power_w <= 0.0
         {
             return Err(OracleError::MissionInvalid(
-                "segment ID, duration and terminal power must be valid",
+                "segment ID, duration and separately declared propulsion / thermal-management powers must be valid",
             ));
         }
+        let total_terminal_power_w =
+            segment.propulsion_terminal_power_w + segment.thermal_management_power_w;
         let substep_count_f = (segment.duration_s / maximum_step_s).ceil();
         if !substep_count_f.is_finite()
             || substep_count_f < 1.0
@@ -542,6 +560,8 @@ pub fn simulate_mission(
         }
         let substep_count = substep_count_f as usize;
         let dt_s = segment.duration_s / substep_count as f64;
+        let mut segment_propulsion_terminal_energy_wh = 0.0;
+        let mut segment_thermal_management_energy_wh = 0.0;
         let mut segment_terminal_energy_wh = 0.0;
         let mut segment_chemical_energy_wh = 0.0;
         let mut segment_resistive_heat_j = 0.0;
@@ -552,7 +572,7 @@ pub fn simulate_mission(
                 config,
                 state,
                 SubstepInput {
-                    terminal_power_w: segment.terminal_power_w,
+                    terminal_power_w: total_terminal_power_w,
                     duration_s: dt_s,
                 },
             )
@@ -562,9 +582,17 @@ pub fn simulate_mission(
                 source: Box::new(source),
             })?;
             state = report.next_state;
+            let propulsion_energy_wh =
+                segment.propulsion_terminal_power_w * dt_s / SECONDS_PER_HOUR;
+            let thermal_management_energy_wh =
+                segment.thermal_management_power_w * dt_s / SECONDS_PER_HOUR;
+            segment_propulsion_terminal_energy_wh += propulsion_energy_wh;
+            segment_thermal_management_energy_wh += thermal_management_energy_wh;
             segment_terminal_energy_wh += report.terminal_energy_wh;
             segment_chemical_energy_wh += report.chemical_energy_wh;
             segment_resistive_heat_j += report.resistive_heat_j;
+            total_propulsion_terminal_energy_wh += propulsion_energy_wh;
+            total_thermal_management_energy_wh += thermal_management_energy_wh;
             total_terminal_energy_wh += report.terminal_energy_wh;
             total_chemical_energy_wh += report.chemical_energy_wh;
             total_resistive_heat_j += report.resistive_heat_j;
@@ -579,6 +607,8 @@ pub fn simulate_mission(
         summaries.push(SegmentSummary {
             id: segment.id.clone(),
             substeps: substep_count,
+            propulsion_terminal_energy_wh: segment_propulsion_terminal_energy_wh,
+            thermal_management_energy_wh: segment_thermal_management_energy_wh,
             terminal_energy_wh: segment_terminal_energy_wh,
             chemical_energy_wh: segment_chemical_energy_wh,
             resistive_heat_j: segment_resistive_heat_j,
@@ -591,7 +621,11 @@ pub fn simulate_mission(
         model_version: MODEL_VERSION,
         segments: summaries,
         final_state: state,
+        total_propulsion_terminal_energy_wh,
+        total_thermal_management_energy_wh,
         total_terminal_energy_wh,
+        thermal_management_energy_fraction: total_thermal_management_energy_wh
+            / total_terminal_energy_wh,
         total_chemical_energy_wh,
         total_resistive_heat_j,
         total_ambient_rejected_energy_j,
@@ -783,8 +817,8 @@ mod tests {
     #[test]
     fn mission_replay_preserves_segments_and_exact_substep_history() {
         let mission = vec![
-            MissionSegment { id: "climb".into(), terminal_power_w: 80_000.0, duration_s: 120.0 },
-            MissionSegment { id: "cruise".into(), terminal_power_w: 35_000.0, duration_s: 300.0 },
+            MissionSegment { id: "climb".into(), propulsion_terminal_power_w: 80_000.0, thermal_management_power_w: 0.0, duration_s: 120.0 },
+            MissionSegment { id: "cruise".into(), propulsion_terminal_power_w: 35_000.0, thermal_management_power_w: 0.0, duration_s: 300.0 },
         ];
         let report = simulate_mission(&config(), initial_state(), &mission, 10.0).unwrap();
 
@@ -798,10 +832,33 @@ mod tests {
     }
 
     #[test]
+    fn thermal_management_energy_is_separately_charged_to_the_mission() {
+        let mission = vec![MissionSegment {
+            id: "hot-climb".into(),
+            propulsion_terminal_power_w: 80_000.0,
+            thermal_management_power_w: 20_000.0,
+            duration_s: 120.0,
+        }];
+        let report = simulate_mission(&config(), initial_state(), &mission, 10.0).unwrap();
+
+        assert!((report.total_propulsion_terminal_energy_wh - 2_666.666_666_7).abs() < 1e-6);
+        assert!((report.total_thermal_management_energy_wh - 666.666_666_7).abs() < 1e-6);
+        assert!((report.total_terminal_energy_wh - 3_333.333_333_3).abs() < 1e-6);
+        assert!((report.thermal_management_energy_fraction - 0.20).abs() < 1e-10);
+        assert!(
+            (report.total_propulsion_terminal_energy_wh
+                + report.total_thermal_management_energy_wh
+                - report.total_terminal_energy_wh)
+                .abs()
+                < 1e-6
+        );
+    }
+
+    #[test]
     fn timestep_refinement_converges_for_the_frozen_synthetic_mission() {
         let mission = vec![
-            MissionSegment { id: "climb".into(), terminal_power_w: 100_000.0, duration_s: 120.0 },
-            MissionSegment { id: "cruise".into(), terminal_power_w: 40_000.0, duration_s: 600.0 },
+            MissionSegment { id: "climb".into(), propulsion_terminal_power_w: 100_000.0, thermal_management_power_w: 0.0, duration_s: 120.0 },
+            MissionSegment { id: "cruise".into(), propulsion_terminal_power_w: 40_000.0, thermal_management_power_w: 0.0, duration_s: 600.0 },
         ];
         let coarse = simulate_mission(&config(), initial_state(), &mission, 10.0).unwrap();
         let fine = simulate_mission(&config(), initial_state(), &mission, 1.0).unwrap();
@@ -814,8 +871,8 @@ mod tests {
     #[test]
     fn a_failed_substep_does_not_return_a_partial_mission_report() {
         let mission = vec![
-            MissionSegment { id: "cruise".into(), terminal_power_w: 10_000.0, duration_s: 30.0 },
-            MissionSegment { id: "impossible-climb".into(), terminal_power_w: 200_000.0, duration_s: 30.0 },
+            MissionSegment { id: "cruise".into(), propulsion_terminal_power_w: 10_000.0, thermal_management_power_w: 0.0, duration_s: 30.0 },
+            MissionSegment { id: "impossible-climb".into(), propulsion_terminal_power_w: 200_000.0, thermal_management_power_w: 0.0, duration_s: 30.0 },
         ];
         assert!(matches!(
             simulate_mission(&config(), initial_state(), &mission, 10.0),
