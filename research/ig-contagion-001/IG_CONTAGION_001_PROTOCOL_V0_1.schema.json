@@ -1,0 +1,485 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-contagion-001/IG_CONTAGION_001_PROTOCOL_V0_1.schema.json",
+  "title": "IG-CONTAGION-001 protocol manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_id",
+    "version",
+    "status",
+    "title",
+    "owning_repository",
+    "owning_issue",
+    "composition",
+    "evidence_classes",
+    "claim_ceiling",
+    "experiment_stages",
+    "private_measurement_semantics",
+    "topology_profiles",
+    "agent_profile_families",
+    "experimental_conditions",
+    "metrics",
+    "minimum_fixture_requirements",
+    "statistical_protocol",
+    "receipt_contract",
+    "non_compensatory_invariants",
+    "human_study_gate",
+    "non_goals",
+    "external_research"
+  ],
+  "properties": {
+    "protocol_id": {
+      "const": "IG-CONTAGION-001"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "enum": [
+        "research-proposal",
+        "development",
+        "frozen",
+        "retired"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 10
+    },
+    "owning_repository": {
+      "const": "Luminous-Dynamics/symthaea"
+    },
+    "owning_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "parent_programme": {
+      "type": "string",
+      "format": "uri"
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topology_generator",
+        "experiment_orchestration",
+        "mechanism_profile_provenance",
+        "adversarial_execution",
+        "evaluator_error_correlation",
+        "human_group_deliberation",
+        "participant_conditioned_summary"
+      ],
+      "properties": {
+        "topology_generator": {
+          "type": "string",
+          "format": "uri"
+        },
+        "experiment_orchestration": {
+          "type": "string",
+          "format": "uri"
+        },
+        "mechanism_profile_provenance": {
+          "type": "string",
+          "format": "uri"
+        },
+        "adversarial_execution": {
+          "type": "string",
+          "format": "uri"
+        },
+        "evaluator_error_correlation": {
+          "type": "string",
+          "format": "uri"
+        },
+        "human_group_deliberation": {
+          "type": "string",
+          "format": "uri"
+        },
+        "participant_conditioned_summary": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "evidence_classes": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "synthetic_fixture",
+        "bounded_simulation",
+        "recorded_agent_interaction",
+        "human_subject_experiment",
+        "generalization"
+      ],
+      "properties": {
+        "synthetic_fixture": {
+          "type": "string",
+          "minLength": 20
+        },
+        "bounded_simulation": {
+          "type": "string",
+          "minLength": 20
+        },
+        "recorded_agent_interaction": {
+          "type": "string",
+          "minLength": 20
+        },
+        "human_subject_experiment": {
+          "type": "string",
+          "minLength": 20
+        },
+        "generalization": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "experiment_stages": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "visibility",
+          "purpose",
+          "required_fields",
+          "rule"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "required_fields": {
+            "type": "array",
+            "minItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "rule": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "private_measurement_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "live_peer_access",
+        "current_group_messages_visible",
+        "baseline_answer_visible",
+        "exposure_memory_preserved",
+        "exposure_memory_identity_required",
+        "context_reset_is_separate_control",
+        "rationale"
+      ],
+      "properties": {
+        "live_peer_access": {
+          "const": false
+        },
+        "current_group_messages_visible": {
+          "const": false
+        },
+        "baseline_answer_visible": {
+          "const": false
+        },
+        "exposure_memory_preserved": {
+          "const": true
+        },
+        "exposure_memory_identity_required": {
+          "const": true
+        },
+        "context_reset_is_separate_control": {
+          "const": true
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "topology_profiles": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "generator_owner",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "generator_owner": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "agent_profile_families": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "experimental_conditions": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "measures",
+          "interpretation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "measures": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "interpretation": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "minimum_fixture_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_count",
+        "scenario_families",
+        "topology_families",
+        "include_no_discussion_repeat_controls",
+        "include_evidence_supported_revision_positive_controls",
+        "include_unsupported_social_influence_red_team",
+        "include_paired_same_message_different_placement",
+        "include_false_claim_then_correction",
+        "include_missing_measurement_negative_control"
+      ],
+      "properties": {
+        "fixture_count": {
+          "type": "integer",
+          "minimum": 40
+        },
+        "scenario_families": {
+          "type": "integer",
+          "minimum": 8
+        },
+        "topology_families": {
+          "type": "integer",
+          "minimum": 6
+        },
+        "include_no_discussion_repeat_controls": {
+          "const": true
+        },
+        "include_evidence_supported_revision_positive_controls": {
+          "const": true
+        },
+        "include_unsupported_social_influence_red_team": {
+          "const": true
+        },
+        "include_paired_same_message_different_placement": {
+          "const": true
+        },
+        "include_false_claim_then_correction": {
+          "const": true
+        },
+        "include_missing_measurement_negative_control": {
+          "const": true
+        }
+      }
+    },
+    "statistical_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preregister_hypotheses_before_confirmatory_runs",
+        "paired_comparisons_for_same_message_different_topology",
+        "multiple_seeds_required",
+        "separate_exploratory_and_confirmatory_results",
+        "report_intervals_and_variance",
+        "hold_out_topology_or_task_when_supported",
+        "evaluator_must_be_independent_of_candidate_agent",
+        "evaluator_error_correlation_analysis_required",
+        "missing_measurement_is_not_no_change",
+        "no_aggregate_contagion_score"
+      ],
+      "properties": {
+        "preregister_hypotheses_before_confirmatory_runs": {
+          "const": true
+        },
+        "paired_comparisons_for_same_message_different_topology": {
+          "const": true
+        },
+        "multiple_seeds_required": {
+          "const": true
+        },
+        "separate_exploratory_and_confirmatory_results": {
+          "const": true
+        },
+        "report_intervals_and_variance": {
+          "const": true
+        },
+        "hold_out_topology_or_task_when_supported": {
+          "const": true
+        },
+        "evaluator_must_be_independent_of_candidate_agent": {
+          "const": true
+        },
+        "evaluator_error_correlation_analysis_required": {
+          "const": true
+        },
+        "missing_measurement_is_not_no_change": {
+          "const": true
+        },
+        "no_aggregate_contagion_score": {
+          "const": true
+        }
+      }
+    },
+    "receipt_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_commitments",
+        "statuses",
+        "replay_semantics"
+      ],
+      "properties": {
+        "required_commitments": {
+          "type": "array",
+          "minItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "statuses": {
+          "type": "array",
+          "minItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "replay_semantics": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "non_compensatory_invariants": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "human_study_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorized",
+        "required_before_human_recruitment"
+      ],
+      "properties": {
+        "authorized": {
+          "const": false
+        },
+        "required_before_human_recruitment": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "non_goals": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "external_research": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "venue",
+          "url",
+          "use"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "use": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
