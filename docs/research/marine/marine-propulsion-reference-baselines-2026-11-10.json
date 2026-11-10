@@ -1,0 +1,479 @@
+{
+  "schema_version": "0.1.0",
+  "registry_id": "MARINE-PROPULSION-REFERENCE-BASELINES-2026-11-10",
+  "created_on": "2026-11-10",
+  "purpose": "Source-attributed public reference corpus for cargo-vessel propulsion architecture research. Values are not transferable performance predictions.",
+  "evidence_policy": {
+    "evidence_classes_are_not_ranked_as_equivalent": true,
+    "required_comparison_fields": [
+      "vessel_class",
+      "route_and_metocean",
+      "cargo_and_service_fingerprint",
+      "power_and_energy_boundary",
+      "lifecycle_boundary",
+      "measurement_or_model_method",
+      "uncertainty",
+      "configuration_revision"
+    ],
+    "missing_inputs_disposition": "unknown_not_zero",
+    "no_cross_study_averaging": true,
+    "no_addition_of_independent_saving_percentages": true
+  },
+  "sources": [
+    {
+      "source_id": "WIND-REVIEW-2026-IJNAOE-100785",
+      "title": "Wind-propelled ships for maritime decarbonization: Technologies, global deployment, and engineering challenges",
+      "publisher": "International Journal of Naval Architecture and Ocean Engineering",
+      "publication_year": 2026,
+      "volume": "18",
+      "article_number": "100785",
+      "url": "https://doi.org/10.1016/j.ijnaoe.2026.100785",
+      "evidence_class": "peer_reviewed_review_with_inventory",
+      "scope": {
+        "vessel_classes": [
+          "commercial vessels across multiple classes"
+        ],
+        "inventory_cutoff": "2025-12-31",
+        "study_type": "multi-source ship-level deployment inventory and technology review"
+      },
+      "observations": [
+        {
+          "metric_id": "wind_equipped_ships_end_2025",
+          "value": 96,
+          "unit": "ships",
+          "direction": "inventory_count",
+          "statement": "Review inventory identified 96 ships equipped with wind propulsion systems by the end of 2025."
+        },
+        {
+          "metric_id": "wind_equipped_ships_still_operating_end_2025",
+          "value": 90,
+          "unit": "ships",
+          "direction": "inventory_count",
+          "statement": "The review reported 90 of the 96 inventoried ships still in service at the end of 2025."
+        }
+      ],
+      "technology_families": [
+        "Flettner rotors",
+        "suction wing sails",
+        "rigid wing sails",
+        "soft sails",
+        "kite sails"
+      ],
+      "limitations": [
+        "Multi-source inventory coverage depends on public reports and source availability.",
+        "The ship count is not a measure of fuel saved, operational availability, or economic return.",
+        "Device-level savings are route-, vessel-, weather-, control- and service-dependent.",
+        "Do not infer a universal percentage benefit from fleet adoption counts."
+      ],
+      "eligible_use": [
+        "Technology-family taxonomy",
+        "Public deployment corpus seed",
+        "Evidence-gap and operational-maturity questions"
+      ],
+      "ineligible_use": [
+        "Direct prediction of savings for a new vessel",
+        "Proof of economic viability for a specific ship",
+        "Measured device reliability without underlying service records"
+      ]
+    },
+    {
+      "source_id": "COASTAL-HYBRID-2026-APPSCI-4940",
+      "title": "Integrated Design and Dynamic Performance Optimisation of Hybrid Electric Propulsion Systems for Coastal Cargo Vessels Under Real-World Operational Profiles",
+      "publisher": "Applied Sciences",
+      "publication_date": "2026-05-15",
+      "volume": "16",
+      "issue": "10",
+      "article_number": "4940",
+      "url": "https://doi.org/10.3390/app16104940",
+      "evidence_class": "peer_reviewed_model_case_using_AIS_logbook_profiles",
+      "scope": {
+        "vessel_class": "coastal general cargo",
+        "route": "Dalian-Yantai / Bohai Bay short-sea service",
+        "baseline": "conventional mechanical propulsion",
+        "candidate": "diesel generator sets, DC bus, propulsion motors and lithium-ion battery storage",
+        "design_method": "bi-level sizing optimization with dynamic-programming energy management and battery degradation-aware lifecycle cost"
+      },
+      "observations": [
+        {
+          "metric_id": "fuel_saving_vs_mechanical_baseline",
+          "minimum": 16,
+          "maximum": 21,
+          "unit": "percent",
+          "basis": "source-reported route-pattern range",
+          "statement": "The article reports 16-21% fuel savings for its optimized hybrid configuration relative to its mechanical baseline."
+        },
+        {
+          "metric_id": "co2_reduction_vs_mechanical_baseline",
+          "minimum": 17,
+          "maximum": 20,
+          "unit": "percent",
+          "basis": "source-reported route-pattern range",
+          "statement": "The article reports 17-20% CO2 reduction relative to its mechanical baseline."
+        },
+        {
+          "metric_id": "lifecycle_cost_reduction_vs_mechanical_baseline",
+          "minimum": 8,
+          "maximum": 14,
+          "unit": "percent",
+          "basis": "source-reported route-pattern range",
+          "statement": "The article reports 8-14% lifecycle cost reduction relative to its mechanical baseline."
+        },
+        {
+          "metric_id": "optimized_installed_generator_power",
+          "value": 2300,
+          "unit": "kW",
+          "basis": "source case model output",
+          "statement": "The optimized case reports 2.3 MW installed generator power compared with 6.0 MW in its mechanical baseline."
+        },
+        {
+          "metric_id": "optimized_battery_energy",
+          "value": 1600,
+          "unit": "kWh",
+          "basis": "source case model output",
+          "statement": "The optimized case reports a 1.6 MWh battery energy storage system."
+        }
+      ],
+      "limitations": [
+        "This is a specific coastal cargo case, not a deep-sea container-ship result.",
+        "The article uses reconstructed AIS/logbook operating profiles and a model-based optimization; it is not an independent sea-trial measurement of the claimed savings.",
+        "The authors identify simplified resistance/propulsion modeling and incomplete representation of fouling, extreme weather and manoeuvring.",
+        "The lower-level offline dynamic-programming controller assumes perfect knowledge of future voyage power profiles.",
+        "Do not transfer percentages, installed power or battery size to another route/vessel."
+      ],
+      "eligible_use": [
+        "Coastal hybrid design/control reproduction target",
+        "Route-profile and degradation-aware energy-management comparison",
+        "Baseline for a coastal-vessel branch of the programme"
+      ],
+      "ineligible_use": [
+        "Deep-sea savings prediction",
+        "Wind propulsion performance claim",
+        "Independent physical validation"
+      ]
+    },
+    {
+      "source_id": "CFD-LOW-CARBON-SHIPPING-REVIEW-2026-MPB-120155",
+      "title": "CFD-based approaches for low-carbon shipping: A systematic review",
+      "publisher": "Marine Pollution Bulletin",
+      "publication_date": "2026-07-18",
+      "volume": "233",
+      "article_number": "120155",
+      "url": "https://doi.org/10.1016/j.marpolbul.2026.120155",
+      "evidence_class": "peer_reviewed_systematic_review",
+      "scope": {
+        "study_type": "systematic review of CFD applications in hull form, surface drag, propeller/wake, wind integration and operational approaches"
+      },
+      "observations": [
+        {
+          "metric_id": "hull_optimization_resistance_reduction",
+          "minimum": 5,
+          "maximum": 12,
+          "unit": "percent",
+          "basis": "review-reported range across heterogeneous studies"
+        },
+        {
+          "metric_id": "surface_technology_drag_reduction",
+          "minimum": 10,
+          "maximum": 30,
+          "unit": "percent",
+          "basis": "review-reported upper range across heterogeneous studies",
+          "qualifier": "up_to"
+        },
+        {
+          "metric_id": "propeller_wake_propulsive_efficiency_gain",
+          "minimum": 2,
+          "maximum": 10,
+          "unit": "percent",
+          "basis": "review-reported range across heterogeneous studies"
+        }
+      ],
+      "limitations": [
+        "The review synthesizes heterogeneous geometries, regimes, methods and validation levels.",
+        "The ranges are not additive and must not be combined into a synthetic total saving.",
+        "These are not guaranteed improvements for a target cargo vessel.",
+        "Use as a literature landscape and candidate-mechanism map, not as a design input without source-case reproduction."
+      ],
+      "eligible_use": [
+        "Candidate mechanism discovery",
+        "CFD research-gap taxonomy",
+        "Range sanity checks when source studies are individually retrieved"
+      ],
+      "ineligible_use": [
+        "A priori performance guarantee",
+        "Universal technology ranking",
+        "Independent validation of a new hull or surface treatment"
+      ]
+    },
+    {
+      "source_id": "DLR-ODYSSA-WHOLE-SHIP-2026",
+      "title": "Design and Optimisation of Future-Oriented Ships",
+      "publisher": "German Aerospace Center (DLR)",
+      "publication_year": 2026,
+      "url": "https://www.dlr.de/en/ms/research-transfer/topics/design-and-optimization-of-future-oriented-ships",
+      "evidence_class": "research_framework_description",
+      "scope": {
+        "system": "Odyssa framework",
+        "capability_description": [
+          "aero- and hydrodynamics for overall ship system",
+          "load, power and movement profiles from transport task and historical weather",
+          "energy and propulsion system evaluation and optimization"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Public capability description is not a reproducible benchmark result.",
+        "No quantitative prediction-accuracy, cost or fuel-saving metric is inferred from this page.",
+        "Detailed software access, model fidelity and validation corpora are not established by the public description alone."
+      ],
+      "eligible_use": [
+        "State-of-the-art capability crosswalk",
+        "Interoperability and benchmark design",
+        "Competitive comparison questions"
+      ],
+      "ineligible_use": [
+        "Quantitative superiority or inferiority claim",
+        "Assumption that unreported functionality is absent"
+      ]
+    },
+    {
+      "source_id": "SHIPFLOW-CFD-2026-WEB",
+      "title": "SHIPFLOW: CFD for ships",
+      "publisher": "SHIPFLOW",
+      "publication_year": 2026,
+      "url": "https://shipflow.se/",
+      "evidence_class": "vendor_capability_description",
+      "scope": {
+        "capability_description": [
+          "hull and appendage optimization",
+          "propulsion performance analysis",
+          "seakeeping and ship motions",
+          "automated design workflows and CAESES integration"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Vendor capability page is not independent performance validation.",
+        "No benchmark result or quantitative accuracy figure is inferred from the public page.",
+        "Detailed capabilities must be assessed on an identical case and solver-validation basis."
+      ],
+      "eligible_use": [
+        "Commercial tool crosswalk",
+        "Interoperability planning"
+      ],
+      "ineligible_use": [
+        "Independent accuracy claim",
+        "Quantitative product ranking"
+      ]
+    },
+    {
+      "source_id": "ISO-15016-2025",
+      "title": "Ships and marine technology — Specifications for the assessment of speed and power performance by analysis of speed trial data",
+      "publisher": "International Organization for Standardization",
+      "publication_year": 2025,
+      "url": "https://www.iso.org/standard/82080.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "purpose": "Analysis of ship speed-power trial data for prescribed conditions, including environmental corrections within the standard's applicability."
+      },
+      "observations": [],
+      "limitations": [
+        "The standard is a method reference, not a ship-performance data source.",
+        "Applicability and required corrections must be determined by qualified personnel for the vessel and trial.",
+        "This project must not invent or claim ISO conformity from a simplified calculation."
+      ],
+      "eligible_use": [
+        "Trial protocol and data-boundary reference"
+      ],
+      "ineligible_use": [
+        "Direct savings estimate",
+        "Software-only certification"
+      ]
+    },
+    {
+      "source_id": "ISO-19030-1-2016",
+      "title": "Ships and marine technology — Measurement of changes in hull and propeller performance — Part 1: General principles",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2016-11",
+      "url": "https://www.iso.org/standard/63774.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "purpose": "General principles and performance indicators for measuring changes in hull and propeller performance over time."
+      },
+      "observations": [],
+      "limitations": [
+        "The published scope focuses on conventional fixed-pitch propeller ships and compares the same ship to itself over time.",
+        "Do not treat it as a general inter-vessel architecture-ranking method.",
+        "Check current applicability and edition at the time of any formal trial."
+      ],
+      "eligible_use": [
+        "In-service hull/propeller maintenance and retrofit measurement reference"
+      ],
+      "ineligible_use": [
+        "Direct comparison of unlike ship designs",
+        "Novel wind-device validation by itself"
+      ]
+    },
+    {
+      "source_id": "ISO-19030-2-2016",
+      "title": "Ships and marine technology — Measurement of changes in hull and propeller performance — Part 2: Default method",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2016-11",
+      "url": "https://www.iso.org/standard/63775.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "purpose": "Default method and basic performance indicators for measuring hull and propeller performance changes over time on applicable vessel types."
+      },
+      "observations": [],
+      "limitations": [
+        "The published scope is centered on commercial displacement ships with conventional fixed-pitch propellers.",
+        "It is primarily same-vessel before/after measurement, not a universal comparison standard across vessel types.",
+        "Normative procedures are not reproduced in this registry."
+      ],
+      "eligible_use": [
+        "In-service performance measurement reference"
+      ],
+      "ineligible_use": [
+        "Inter-vessel universal score",
+        "Claim of compliance without qualified method execution"
+      ]
+    },
+    {
+      "source_id": "IMO-GREENVOYAGE2050-EFFICIENCY-PORTAL",
+      "title": "Ship Energy Efficiency Solutions Portal",
+      "publisher": "International Maritime Organization / GreenVoyage2050",
+      "publication_year": 2026,
+      "url": "https://greenvoyage2050.imo.org/energy-efficiency-technologies-information-portal/",
+      "evidence_class": "regulator_technical_reference_portal",
+      "scope": {
+        "technology_groups": [
+          "machinery",
+          "propulsion_and_hull",
+          "energy_consumers",
+          "energy_recovery",
+          "operational_optimization"
+        ],
+        "examples": [
+          "waste-heat recovery and batteries",
+          "air lubrication and propeller-improving devices",
+          "kites, fixed sails, wings and Flettner rotors",
+          "trim, draft, speed and autopilot optimization"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Savings and applicability vary by vessel type and operation.",
+        "Portal descriptions are not a matched evaluation of one candidate vessel.",
+        "Do not sum individual measure estimates without interaction and double-counting analysis."
+      ],
+      "eligible_use": [
+        "Coverage taxonomy and measure discovery"
+      ],
+      "ineligible_use": [
+        "Guaranteed combined savings",
+        "Universal technology ranking"
+      ]
+    },
+    {
+      "source_id": "UCL-NUCLEAR-MERCHANT-TCO-2026",
+      "title": "Nuclear Reactors for Merchant Shipping: A Total Cost of Ownership Assessment of a Low-Carbon Pathway",
+      "publisher": "UCL Energy Institute",
+      "publication_date": "2026-11-05",
+      "url": "https://www.ucl.ac.uk/bartlett/publications/2026/nov/nuclear-reactors-merchant-shipping-total-cost-ownership-assessment-low-carbon-pathway",
+      "evidence_class": "peer_reviewed_or_research_cost_model",
+      "scope": {
+        "vessel_class": "large containership",
+        "capacity_range_teu": "14500-19999",
+        "lifecycle_years": 25,
+        "speed_cases_knots": [
+          14.85,
+          25
+        ],
+        "metric": "total cost of ownership normalized by transport work"
+      },
+      "observations": [
+        {
+          "metric_id": "nuclear_cost_competitiveness_without_imo_nzf",
+          "value": "not_least_cost",
+          "unit": "categorical",
+          "statement": "The published summary states no nuclear option is cheaper than conventional ships without the IMO Net-Zero Framework, even under the lowest reactor-cost assumptions."
+        },
+        {
+          "metric_id": "nuclear_cost_competitiveness_with_nzf",
+          "value": "conditional_from_2040",
+          "unit": "categorical",
+          "statement": "The published summary describes nuclear as potentially least cost from 2040 only if reactor costs fall substantially to levels not yet demonstrated."
+        }
+      ],
+      "limitations": [
+        "The result is conditional on the modelled policy and reactor-cost assumptions.",
+        "Insurance, liability and regulatory frameworks remain major barriers.",
+        "This is not a wind-assist study and is not a direct comparator for the hybrid cargo case.",
+        "Use the admitted source-specific inputs and full study boundary for reproduction."
+      ],
+      "eligible_use": [
+        "Economic policy sensitivity and fuel-system architecture reference"
+      ],
+      "ineligible_use": [
+        "Default nuclear economic superiority",
+        "Operational or regulatory readiness claim"
+      ]
+    },
+    {
+      "source_id": "LR-SEASPAN-NUCLEAR-CONTAINERSHIP-2026",
+      "title": "Power Shift: Nuclear Power Pathways for Future Containership Fleets",
+      "publisher": "Lloyd's Register Advisory / LucidCatalyst (case for Seaspan)",
+      "publication_date": "2026-07-14",
+      "url": "https://www.lr.org/en/knowledge/case-studies/power-shift-nuclear-power-pathways-for-future-containership-fleets/",
+      "evidence_class": "industry_model_public_summary",
+      "scope": {
+        "vessel_class": "containership",
+        "capacity_teu": 15000,
+        "service_speed_knots": 25,
+        "comparison_context": "public case study compares a higher-speed nuclear-powered case with conventional vessel operations"
+      },
+      "observations": [
+        {
+          "metric_id": "annual_cargo_capacity_uplift",
+          "value": 38,
+          "unit": "percent",
+          "qualifier": "up_to",
+          "statement": "The public summary reports up to 38% greater annual cargo capacity."
+        },
+        {
+          "metric_id": "additional_container_space",
+          "value": 5,
+          "unit": "percent",
+          "qualifier": "up_to",
+          "statement": "The public summary reports up to 5% additional container space from removing fuel tanks and systems."
+        },
+        {
+          "metric_id": "annual_round_voyages_conventional",
+          "value": 5,
+          "unit": "voyages_per_year",
+          "statement": "Public summary uses five annual round voyages for the conventional comparison."
+        },
+        {
+          "metric_id": "annual_round_voyages_nuclear",
+          "value": 6.3,
+          "unit": "voyages_per_year",
+          "statement": "Public summary uses 6.3 annual round voyages for the nuclear-powered case."
+        }
+      ],
+      "limitations": [
+        "Public summary is insufficient to reconstruct all route, demand, cost, utilization and operating assumptions.",
+        "These are modelled case-study outputs, not measured fleet outcomes.",
+        "The higher annual cargo figure includes speed and space effects and must not be attributed solely to propulsion energy efficiency.",
+        "Do not directly compare against the UCL TCO model without a transparent boundary bridge.",
+        "This is not a wind-assist study."
+      ],
+      "eligible_use": [
+        "Service-throughput benchmark questions",
+        "Separate high-speed cargo-service reference"
+      ],
+      "ineligible_use": [
+        "Universal vessel speed or throughput claim",
+        "Direct economic comparison without source-specific reproduction"
+      ]
+    }
+  ]
+}
