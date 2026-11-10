@@ -29,9 +29,11 @@ This is particularly valuable because it supplies controlled physical responses 
 
 Kytariolou and Themelis, JMSE 14(2), 148 (9 January 2026; DOI 10.3390/jmse14020148), model a Kamsarmax bulk carrier with suction sails. Their 1-DOF model includes only longitudinal force balance. Their 3-DOF model includes sway and yaw effects and solves for drift/leeway and rudder response.
 
-The paper reports that 1-DOF can predict up to 26% FOC savings under favorable tested conditions, while its 3-DOF treatment reduces the predicted benefit by 2–7 percentage points/percent depending on the slice; main-engine power differences reach up to 7% MCR. In its route case, the 3-DOF-optimized route gives 1.25% better total FOC savings than the 1-DOF-optimized route when both are re-evaluated under the 3-DOF model.
+The paper reports that 1-DOF can predict up to 26% FOC savings under favorable tested conditions, while the 3-DOF treatment peaks at 23.5%; differences in the broader condition matrix reach 2–7% in ME power, up to 7% MCR. In its route case, a route optimized with 1-DOF and re-evaluated at 3-DOF achieves 7.07% FOC reduction, while the route optimized with 3-DOF achieves 8.32% under the same 3-DOF evaluation. The latter is about 0.85% longer (approximately two hours) and uses roughly three tonnes less fuel for that case. Treat the time/fuel result as case-specific and keep the arrival-service difference visible.
 
 The associated dataset is declared available via Zenodo DOI 10.5281/zenodo.17859015 under CC BY 4.0. This is a reproducible route/model comparison target, not a transferable cargo-fleet saving figure.
+
+Use the Kamsarmax route case as a test of the service denominator: the 3-DOF-optimized route's additional 1.25 percentage-point FOC saving came with a 0.85% (about two-hour) longer voyage relative to the 1-DOF-optimized route, and about three tonnes less fuel in the paper's route comparison. This is not automatically superior for a contract with a hard arrival window; the service contract decides whether that extra time is eligible.
 
 ### 2.3 Propeller-hull-rudder self-propulsion evidence
 
