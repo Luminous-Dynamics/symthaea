@@ -26,6 +26,7 @@ The plan is a proposal, not a runtime authorization. Each mutation still require
 - Nondeterministic operators cannot satisfy a deterministic/seeded request.
 - Each required observation metric must have an independently qualified observer with a different artifact digest from the selected editor.
 - Candidates are sorted by weighted compute/latency/risk score, then stable ID.
+- The returned plan carries the exact initial artifact IDs/types/digests, budget, objective weights, determinism ceiling and per-stage locality/determinism ceilings.
 - The entire plan is rejected if aggregate resources exceed the request budget.
 
 Errors distinguish:
@@ -46,4 +47,4 @@ This crate does not parse raw natural language, execute tools, edit audio, calcu
 
 The observer independence field is also a registry declaration. The compiler additionally requires a different observer artifact digest from the selected operator, but this alone does not prove statistical independence. A separate audit must establish that.
 
-The compiled plan is returned as typed Rust data. Canonical serialization and cryptographic plan digesting remain an explicit versioned external boundary in v1.
+The compiled plan is returned as typed Rust data, including the exact input hashes and policy ceilings used to compile it. Canonical serialization and cryptographic plan digesting remain an explicit versioned external boundary in v1.
