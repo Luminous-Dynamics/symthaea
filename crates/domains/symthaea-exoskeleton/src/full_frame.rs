@@ -169,6 +169,7 @@ impl PhysicsCallback<3> for FullFrameCallback {
     }
     fn on_collision(&mut self, _event: &CollisionEvent<3>) {}
     fn record_dissipation(&mut self, _energy: f64) {}
+    fn record_work(&mut self, _body: BodyHandle, _work_joules: f64) {}
 }
 
 /// Simplified 20-joint articulated research plant. Synthetic human torques are
