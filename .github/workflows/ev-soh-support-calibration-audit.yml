@@ -30,9 +30,9 @@ jobs:
         run: |
           cargo run --manifest-path tools/ev-soh-support-calibration-audit/Cargo.toml -- --schema schemas/transport/ev_soh_support_calibration_v0_1.schema.json --corpus fixtures/ev_battery/soh_support_calibration_scenarios_v0_1.json > "$RUNNER_TEMP/ev-soh-support-calibration-report.json"
           jq -e '
-            .case_count == 11 and
+            .case_count == 12 and
             .accepted_count == 3 and
-            .rejected_count == 8 and
+            .rejected_count == 9 and
             .extrapolation_undercovered_count == 2 and
             .support_detector_failure_count == 1 and
             (.report_sha256 | test("^[a-f0-9]{64}$"))
