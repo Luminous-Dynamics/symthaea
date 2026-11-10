@@ -50,6 +50,7 @@ done <<'FILTERS'
 symthaea-core|weight_space_program::tests|1
 symthaea-core|sequential_weight_program::tests|1
 symthaea-core|sequential_weight_verification::tests|1
+symthaea-core|family_noninferiority::tests|1
 symthaea-fep|open_world_weight_program_gate::tests|1
 symthaea-fep|hierarchical_information_gain::tests|1
 symthaea-fep|decision_relevant_information::tests|1
