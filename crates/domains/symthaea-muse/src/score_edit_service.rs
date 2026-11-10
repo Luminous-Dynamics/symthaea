@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use symthaea_music_theory::score::Score;
 use symthaea_music_theory::score_edit::{
-    SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1, SCORE_EDIT_SCHEMA_V1,
     ScoreEditCandidateV1, ScoreEditIssueV1, ScoreEditPlanV1,
     ScoreEditReceiptV1, apply_score_edit_plan, build_velocity_edit_event_remap,
 };
@@ -133,6 +132,7 @@ mod tests {
     use symthaea_music_theory::rhythm::Duration;
     use symthaea_music_theory::score::{Emphasis, PartId, ScoreNote, VoiceRole};
     use symthaea_music_theory::score_edit::{
+        SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1, SCORE_EDIT_SCHEMA_V1,
         EditBeatV1, ScalePartVelocityV1, ScoreEditIssueCodeV1,
     };
     use symthaea_music_theory::score_event_remap::validate_score_event_remap;
