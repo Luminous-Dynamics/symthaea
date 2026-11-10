@@ -147,7 +147,9 @@
         "calibration_valid",
         "domain_supported",
         "protocol_ref",
-        "protocol_digest"
+        "protocol_digest",
+        "calibration_digest",
+        "domain_scope_digest"
       ],
       "properties": {
         "model_ref": {
@@ -193,6 +195,14 @@
           "minLength": 1
         },
         "protocol_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "calibration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "domain_scope_digest": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
         }
@@ -246,7 +256,7 @@
           "soc_uncertainty",
           "soc_evidence_digest",
           "soc_evidence_class",
-          "temperature_upper_c",
+          "temperature_estimate_c",
           "temperature_uncertainty_c",
           "temperature_evidence_digest",
           "temperature_evidence_class",
@@ -338,9 +348,6 @@
               "vendor_claim"
             ]
           },
-          "temperature_upper_c": {
-            "type": "number"
-          },
           "temperature_uncertainty_c": {
             "type": "number",
             "minimum": 0
@@ -403,6 +410,9 @@
           "cell_configuration_digest": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "temperature_estimate_c": {
+            "type": "number"
           }
         }
       }
