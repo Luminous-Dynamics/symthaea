@@ -133,7 +133,8 @@
         "split_manifest_digest",
         "train_partition",
         "validation_partition",
-        "test_partition"
+        "test_partition",
+        "split_frozen_on"
       ],
       "properties": {
         "relation": {
@@ -169,6 +170,10 @@
         },
         "test_partition": {
           "const": "test"
+        },
+        "split_frozen_on": {
+          "type": "string",
+          "format": "date"
         }
       }
     },
@@ -256,7 +261,8 @@
           "step_id",
           "transform_ref",
           "fit_scope",
-          "transform_digest"
+          "transform_digest",
+          "predeclared_on"
         ],
         "properties": {
           "step_id": {
@@ -279,6 +285,13 @@
           "transform_digest": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "predeclared_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           }
         }
       }
