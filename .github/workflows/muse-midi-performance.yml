@@ -1,0 +1,64 @@
+name: Muse MIDI Performance
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-muse/src/midi_performance.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-music-theory/src/orchestration.rs"
+      - "crates/domains/symthaea-music-theory/src/orchestration_timeline.rs"
+      - "crates/domains/symthaea-music-theory/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/muse-midi-performance.yml"
+  push:
+    branches:
+      - "research/melothaea-part-aware-midi-performance-v1"
+    paths:
+      - "crates/domains/symthaea-muse/src/midi_performance.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-music-theory/src/orchestration.rs"
+      - "crates/domains/symthaea-music-theory/src/orchestration_timeline.rs"
+      - "crates/domains/symthaea-music-theory/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/muse-midi-performance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-midi-performance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  midi-performance:
+    name: Format and focused Rust tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Record exact source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "checked_out_sha=$(git rev-parse HEAD)"
+          echo "event=${GITHUB_EVENT_NAME}"
+          echo "ref=${GITHUB_REF}"
+
+      - name: Check Muse formatting
+        run: cargo fmt --check -p symthaea-muse
+
+      - name: Run focused MIDI performance tests
+        run: cargo test --locked -p symthaea-muse --features theory midi_performance::tests::
