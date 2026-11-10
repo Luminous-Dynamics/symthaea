@@ -290,9 +290,21 @@ impl SystemProfile {
                         ));
                     }
                 }
-                PropertyAssessment::InsufficientEvidence
-                | PropertyAssessment::NotTested
-                | PropertyAssessment::ModelInadequate => {}
+                PropertyAssessment::ModelInadequate => {
+                    let has_adequacy_diagnostic = finding.evidence_ids.iter().any(|id| {
+                        self.evidence.iter().any(|record| {
+                            record.id == *id
+                                && record.basis == EvidenceBasis::DerivedInference
+                                && record.outcome == EvidenceOutcome::DerivedResult
+                        })
+                    });
+                    if !has_adequacy_diagnostic {
+                        issues.push(format!(
+                            "{path} ModelInadequate requires a derived model-adequacy diagnostic"
+                        ));
+                    }
+                }
+                PropertyAssessment::InsufficientEvidence | PropertyAssessment::NotTested => {}
             }
 
             if no_detection {
