@@ -2639,4 +2639,288 @@ mod tests {
                 .contains("finite positive f32 timeline")
         );
     }
+
+    #[test]
+    fn alignment_builder_splits_multiple_syllables_inside_one_long_note() {
+        let (pronunciation, _) = alignment_fixture();
+        let events = vec![ScoreEvent {
+            start_s: 0.0,
+            duration_s: 1.0,
+            kind: ScoreEventKind::SungNote {
+                frequency_hz: 220.0,
+                velocity: 0.7,
+            },
+        }];
+        let alignment = VocalScoreAlignment::from_duration_weights(
+            &pronunciation,
+            &events,
+            vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 2,
+                breath_before_s: 0.0,
+                breath_after_s: 0.1,
+            }],
+            &[],
+            &[1.0, 1.0],
+        )
+        .unwrap();
+        assert_eq!(alignment.syllable_bindings.len(), 2);
+        assert_eq!(alignment.syllable_bindings[0].spans[0].start_offset_s, 0.0);
+        assert!((alignment.syllable_bindings[0].spans[0].end_offset_s - 0.5).abs() < 1e-6);
+        assert!((alignment.syllable_bindings[1].spans[0].start_offset_s - 0.5).abs() < 1e-6);
+        assert_eq!(alignment.syllable_bindings[1].spans[0].end_offset_s, 1.0);
+        alignment.validate_against(&pronunciation).unwrap();
+    }
+
+    #[test]
+    fn alignment_builder_designates_final_vowel_for_multi_note_melisma() {
+        let (mut pronunciation, _) = alignment_fixture();
+        pronunciation.source_text = "read".into();
+        pronunciation.words.truncate(1);
+        let events = vec![
+            ScoreEvent {
+                start_s: 0.0,
+                duration_s: 0.5,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 220.0,
+                    velocity: 0.7,
+                },
+            },
+            ScoreEvent {
+                start_s: 0.5,
+                duration_s: 0.5,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 246.94,
+                    velocity: 0.7,
+                },
+            },
+        ];
+        let alignment = VocalScoreAlignment::from_duration_weights(
+            &pronunciation,
+            &events,
+            vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 1,
+                breath_before_s: 0.0,
+                breath_after_s: 0.0,
+            }],
+            &[],
+            &[1.0],
+        )
+        .unwrap();
+        assert_eq!(alignment.syllable_bindings[0].spans.len(), 2);
+        assert_eq!(alignment.syllable_bindings[0].melisma_phone_index, Some(1));
+        alignment.validate_against(&pronunciation).unwrap();
+    }
+
+    #[test]
+    fn alignment_builder_requires_explicit_lyric_boundary_at_each_rest() {
+        let (pronunciation, _) = alignment_fixture();
+        let events = vec![
+            ScoreEvent {
+                start_s: 0.0,
+                duration_s: 0.4,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 220.0,
+                    velocity: 0.7,
+                },
+            },
+            ScoreEvent {
+                start_s: 0.4,
+                duration_s: 0.2,
+                kind: ScoreEventKind::Rest,
+            },
+            ScoreEvent {
+                start_s: 0.6,
+                duration_s: 0.4,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 246.94,
+                    velocity: 0.7,
+                },
+            },
+        ];
+        let alignment = VocalScoreAlignment::from_duration_weights(
+            &pronunciation,
+            &events,
+            vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 2,
+                breath_before_s: 0.0,
+                breath_after_s: 0.1,
+            }],
+            &[RestSyllableBoundary {
+                event_index: 1,
+                syllable_boundary: 1,
+            }],
+            &[1.0, 1.0],
+        )
+        .unwrap();
+        assert_eq!(alignment.syllable_bindings[0].spans[0].event_index, 0);
+        assert_eq!(alignment.syllable_bindings[1].spans[0].event_index, 2);
+        alignment.validate_against(&pronunciation).unwrap();
+    }
+
+    #[test]
+    fn alignment_builder_rejects_rest_that_leaves_a_sung_run_without_lyrics() {
+        let (pronunciation, _) = alignment_fixture();
+        let events = vec![
+            ScoreEvent {
+                start_s: 0.0,
+                duration_s: 0.4,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 220.0,
+                    velocity: 0.7,
+                },
+            },
+            ScoreEvent {
+                start_s: 0.4,
+                duration_s: 0.2,
+                kind: ScoreEventKind::Rest,
+            },
+            ScoreEvent {
+                start_s: 0.6,
+                duration_s: 0.4,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 246.94,
+                    velocity: 0.7,
+                },
+            },
+        ];
+        let error = VocalScoreAlignment::from_duration_weights(
+            &pronunciation,
+            &events,
+            vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 2,
+                breath_before_s: 0.0,
+                breath_after_s: 0.1,
+            }],
+            &[RestSyllableBoundary {
+                event_index: 1,
+                syllable_boundary: 0,
+            }],
+            &[1.0, 1.0],
+        )
+        .unwrap_err();
+        assert!(error.contains("has no assigned syllables"), "{error}");
+    }
+
+    #[test]
+    fn alignment_builder_rejects_missing_rest_boundary_and_invalid_weights() {
+        let (pronunciation, _) = alignment_fixture();
+        let events = vec![
+            ScoreEvent {
+                start_s: 0.0,
+                duration_s: 0.4,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 220.0,
+                    velocity: 0.7,
+                },
+            },
+            ScoreEvent {
+                start_s: 0.4,
+                duration_s: 0.2,
+                kind: ScoreEventKind::Rest,
+            },
+            ScoreEvent {
+                start_s: 0.6,
+                duration_s: 0.4,
+                kind: ScoreEventKind::SungNote {
+                    frequency_hz: 246.94,
+                    velocity: 0.7,
+                },
+            },
+        ];
+        let phrase = vec![VocalPhraseSpan {
+            syllable_start: 0,
+            syllable_end: 2,
+            breath_before_s: 0.0,
+            breath_after_s: 0.1,
+        }];
+        let missing_boundary = VocalScoreAlignment::from_duration_weights(
+            &pronunciation,
+            &events,
+            phrase.clone(),
+            &[],
+            &[1.0, 1.0],
+        )
+        .unwrap_err();
+        assert!(missing_boundary.contains("exactly one ordered syllable-boundary"));
+
+        let invalid_weight = VocalScoreAlignment::from_duration_weights(
+            &pronunciation,
+            &events,
+            phrase,
+            &[RestSyllableBoundary {
+                event_index: 1,
+                syllable_boundary: 1,
+            }],
+            &[1.0, f32::NAN],
+        )
+        .unwrap_err();
+        assert!(invalid_weight.contains("finite and positive"));
+    }
+
+    #[test]
+    fn beat_domain_alignment_builder_preserves_tempo_map_and_rest_indices() {
+        let (mut pronunciation, _) = alignment_fixture();
+        let score = BeatDomainScore {
+            schema_version: 1,
+            tempo_map: vec![
+                TempoChange {
+                    start_beat: 0.0,
+                    quarter_bpm: 120.0,
+                },
+                TempoChange {
+                    start_beat: 2.0,
+                    quarter_bpm: 60.0,
+                },
+            ],
+            events: vec![
+                BeatScoreEvent {
+                    start_beat: 0.0,
+                    duration_beats: 2.0,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 220.0,
+                        velocity: 0.7,
+                    },
+                },
+                BeatScoreEvent {
+                    start_beat: 2.0,
+                    duration_beats: 1.0,
+                    kind: ScoreEventKind::Rest,
+                },
+                BeatScoreEvent {
+                    start_beat: 3.0,
+                    duration_beats: 2.0,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 246.94,
+                        velocity: 0.7,
+                    },
+                },
+            ],
+        };
+        let alignment = VocalScoreAlignment::from_beat_domain_score(
+            &pronunciation,
+            &score,
+            vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 2,
+                breath_before_s: 0.0,
+                breath_after_s: 0.1,
+            }],
+            &[RestSyllableBoundary {
+                event_index: 1,
+                syllable_boundary: 1,
+            }],
+            &[1.0, 1.0],
+        )
+        .unwrap();
+        assert_eq!(alignment.syllable_bindings[0].spans[0].event_index, 0);
+        assert_eq!(alignment.syllable_bindings[1].spans[0].event_index, 2);
+        assert!((alignment.events[2].start_s - 2.0).abs() < 1e-6);
+        alignment.validate_against(&pronunciation).unwrap();
+    }
+
+
 }
