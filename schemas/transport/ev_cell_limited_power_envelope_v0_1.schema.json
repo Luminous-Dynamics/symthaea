@@ -30,7 +30,8 @@
         "pack_ref",
         "pack_configuration_digest",
         "chemistry",
-        "declared_cell_count"
+        "declared_cell_count",
+        "cell_inventory_digest"
       ],
       "properties": {
         "vehicle_ref": {
@@ -56,6 +57,10 @@
         "declared_cell_count": {
           "type": "integer",
           "minimum": 2
+        },
+        "cell_inventory_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       }
     },
