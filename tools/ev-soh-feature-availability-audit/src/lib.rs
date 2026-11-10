@@ -376,8 +376,8 @@ fn validate_manifest(manifest: &Manifest) -> (Vec<String>, String) {
                 || !is_digest(&feature_use.availability_evidence_digest)
                 || feature_use.reference_kind != definition.reference_kind
                 || feature_use.latest_measurement_at_ms == 0
-                || feature_use.latest_received_at_ms == 0
-                || feature_use.derived_at_ms == 0
+                || feature_use.latest_received_at_ms < feature_use.latest_measurement_at_ms
+                || feature_use.derived_at_ms < feature_use.latest_received_at_ms
             {
                 errors.push(format!(
                     "prediction {} feature {} has invalid value/availability evidence",
@@ -425,6 +425,9 @@ fn validate_manifest(manifest: &Manifest) -> (Vec<String>, String) {
                         || feature_use.reference_measurement_at_ms.is_none()
                         || feature_use.reference_received_at_ms.is_none()
                         || feature_use.reference_population_digest.is_some()
+                        || feature_use.reference_received_at_ms
+                            .zip(feature_use.reference_measurement_at_ms)
+                            .is_some_and(|(received, measured)| received < measured)
                     {
                         errors.push(format!(
                             "prediction {} feature {} does not bind its same-asset prefix reference",
@@ -444,7 +447,7 @@ fn validate_manifest(manifest: &Manifest) -> (Vec<String>, String) {
                     }
                 }
                 "training_population" => {
-                    if feature_use.reference_population_digest.is_none_or(|digest| !is_digest(&digest))
+                    if feature_use.reference_population_digest.as_deref().is_none_or(|digest| !is_digest(digest))
                         || feature_use.reference_identity_digest.is_some()
                         || feature_use.reference_measurement_at_ms.is_some()
                         || feature_use.reference_received_at_ms.is_some()
@@ -467,6 +470,9 @@ fn validate_manifest(manifest: &Manifest) -> (Vec<String>, String) {
                     }) || feature_use.reference_measurement_at_ms.is_none()
                         || feature_use.reference_received_at_ms.is_none()
                         || feature_use.reference_population_digest.is_some()
+                        || feature_use.reference_received_at_ms
+                            .zip(feature_use.reference_measurement_at_ms)
+                            .is_some_and(|(received, measured)| received < measured)
                     {
                         errors.push(format!(
                             "prediction {} feature {} peer reference is not a distinct training asset",
@@ -486,7 +492,7 @@ fn validate_manifest(manifest: &Manifest) -> (Vec<String>, String) {
                     }
                 }
                 "external_fixed" => {
-                    if feature_use.reference_population_digest.is_none_or(|digest| !is_digest(&digest))
+                    if feature_use.reference_population_digest.as_deref().is_none_or(|digest| !is_digest(digest))
                         || feature_use.reference_identity_digest.is_some()
                         || definition.fit_scope != "fixed_predeclared"
                     {
@@ -827,6 +833,21 @@ mod tests {
             let case = report.payload.cases.iter()
                 .find(|case| case.case_id == case_id)
                 .expect("feature leakage negative control");
+            assert!(!case.accepted);
+        }
+    }
+
+    #[test]
+    fn impossible_source_and_feature_computation_timestamp_orderings_are_rejected() {
+        let report = report();
+        for case_id in [
+            "receive-timestamp-precedes-measurement-rejected",
+            "feature-derived-before-input-arrival-rejected",
+            "peer-reference-received-before-measurement-rejected",
+        ] {
+            let case = report.payload.cases.iter()
+                .find(|case| case.case_id == case_id)
+                .expect("timestamp chronology negative control");
             assert!(!case.accepted);
         }
     }
