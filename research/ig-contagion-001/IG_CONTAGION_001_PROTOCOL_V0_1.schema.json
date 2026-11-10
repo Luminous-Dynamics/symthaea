@@ -268,7 +268,7 @@
     },
     "metrics": {
       "type": "array",
-      "minItems": 9,
+      "minItems": 12,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -426,7 +426,7 @@
       "properties": {
         "required_commitments": {
           "type": "array",
-          "minItems": 28,
+          "minItems": 34,
           "uniqueItems": true,
           "items": {
             "type": "string"
@@ -485,7 +485,7 @@
     },
     "external_research": {
       "type": "array",
-      "minItems": 8,
+      "minItems": 12,
       "uniqueItems": true,
       "items": {
         "type": "object",
