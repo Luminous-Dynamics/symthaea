@@ -29,6 +29,20 @@ Copy `references.template.csv` to a separate working copy and have qualified rev
 
 The scorer reads the structured `normalized_word_hypotheses_json` column, verifies that its raw token stream and punctuation offsets reconstruct the TSV source, and then reports a Unicode-codepoint edit rate after token-boundary flattening, exact normalized IPA-sequence accuracy, heteronym exact sequence accuracy, missing/empty candidate words, and the rate of non-empty IPA guesses on reviewer-confirmed OOV words. Length marks remain individual Unicode code points; no phone-like merging is performed. The latter is not an OOV false-positive rate from an OOV classifier: neither current frontend exposes an explicit calibrated OOV decision. This is a deliberately simple, transparent first metric. It is **not** a full phonological edit distance: stress accuracy, syllable-boundary F1, dialect variance, phone-feature distances, and contextual variant selection need separate annotation and scoring. The report records the normalization method so results are not mistaken for a standard benchmark PER. This is a smoke-test tool until the reference CSV has been completed by qualified reviewers; the committed template is intentionally pending and cannot produce a linguistic-quality result.
 
+## User-generated text track
+
+The fixture now also includes a separate UGT challenge set inspired by UGTPHON (Findings of EMNLP 2026): abbreviations (`ppl`, `imo`), initialisms (`brb`, `idk`), noncanonical spellings (`u r`, `wanna`), elongation (`soooo`, `reallly`), slang (`tho`, `cuz`, `hafta`), and digit/letter mixtures (`gr8 2 c u`).
+
+This track measures two distinct decisions:
+1. **Surface normalization:** infer a plausible canonical lexical form from context, while retaining the exact user-supplied surface string and the alternatives considered.
+2. **Pronunciation:** produce one or more language/dialect-specific pronunciation candidates for that canonical form.
+
+Do not apply a global rewrite such as `u -> you` or `2 -> to` without context. The intended reading may be ambiguous, dialectal, or artistically deliberate. The target artifact should retain a lattice of candidate normalizations, provenance and uncertainty, with an explicit user/reviewer selection before rendering.
+
+The committed UGT reference rows are all `pending`. They are positional placeholders, not labels. They must be adjudicated independently before any UGT score is reported.
+
+UGTPHON reports that canonical/non-canonical input can cause large G2P degradation (up to 66.8 PER points in its studied settings) and explores retrieval-augmented canonicalization with staged decoding. This is an external research result, not a claim about this Piper spike. Source: https://aclanthology.org/2026.findings-emnlp.1020/
+
 ## Why this candidate
 
 Piper Plus G2P 0.5.3 is a Rust crate released 26 October 2026. Its project documentation states MIT licensing, an IPA-first output API, and eight language backends; English is described as a rule-based CMUdict-derived backend. It avoids linking the GPL eSpeak NG engine into the proposed pipeline.
