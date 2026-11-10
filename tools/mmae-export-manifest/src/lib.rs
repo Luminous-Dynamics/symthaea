@@ -17,6 +17,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 pub const REQUIRED_SAMPLE_COUNT: usize = 500;
 pub const OFFICIAL_MANIFEST_NAME: &str = "submission.jsonl";
+pub const OFFICIAL_MANIFEST_MAX_BYTES: usize = 1024 * 1024;
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -175,6 +176,12 @@ pub fn export_submission_manifest(
         manifest.push(b'\n');
     }
 
+    if manifest.len() > OFFICIAL_MANIFEST_MAX_BYTES {
+        return Err(ExportError::new(format!(
+            "submission.jsonl exceeds the official {}-byte manifest limit",
+            OFFICIAL_MANIFEST_MAX_BYTES
+        )));
+    }
     let manifest_sha256 = sha256_bytes(&manifest);
     let manifest_bytes = u64::try_from(manifest.len())
         .map_err(|_| ExportError::new("manifest size does not fit in u64"))?;
