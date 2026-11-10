@@ -471,12 +471,12 @@ fn check_trial(case: &Value, f: &mut Findings) {
                 ) {
                     (Ok(start), Ok(end)) if start < end => {}
                     (Ok(_), Ok(_)) => f.push(
-                        &path,
+                        path.clone(),
                         "INVALID",
                         "excluded interval must have start strictly earlier than end",
                     ),
                     _ => f.push(
-                        &path,
+                        path.clone(),
                         "INVALID",
                         "excluded interval timestamps must be valid RFC3339 date-times",
                     ),
@@ -499,7 +499,7 @@ fn check_trial(case: &Value, f: &mut Findings) {
         };
         if !ids.insert(id.to_owned()) {
             f.push(
-                pointer_child(&path, "channel_id"),
+                pointer_child(path.clone(), "channel_id"),
                 "INVALID",
                 format!("duplicate measurement channel id '{id}'"),
             );
@@ -514,12 +514,12 @@ fn check_trial(case: &Value, f: &mut Findings) {
             ) {
                 (Ok(start), Ok(end)) if start < end => {}
                 (Ok(_), Ok(_)) => f.push(
-                    &path,
+                    path.clone(),
                     "INVALID",
                     "sample window must have start strictly earlier than end",
                 ),
                 _ => f.push(
-                    &path,
+                    path.clone(),
                     "INVALID",
                     "sample window timestamps must be valid RFC3339 date-times",
                 ),
@@ -534,7 +534,7 @@ fn check_trial(case: &Value, f: &mut Findings) {
         {
             if expected == 0 || observed.saturating_add(missing) != expected {
                 f.push(
-                    &path,
+                    path.clone(),
                     "INVALID",
                     "sample counts must satisfy expected > 0 and observed + missing = expected",
                 );
@@ -542,7 +542,7 @@ fn check_trial(case: &Value, f: &mut Findings) {
                 let coverage = observed as f64 / expected as f64;
                 if coverage < minimum {
                     f.push(
-                        pointer_child(&path, "observed_sample_count"),
+                        pointer_child(path.clone(), "observed_sample_count"),
                         "INCOMPLETE",
                         format!(
                             "observed sample coverage {coverage:.6} is below the predeclared minimum {minimum:.6}"
@@ -566,12 +566,12 @@ fn check_trial(case: &Value, f: &mut Findings) {
         if let Some(calibration_id) = channel.get("calibration_record_id").and_then(Value::as_str) {
             match calibration_by_id.get(calibration_id) {
                 None if !calibration_records.is_empty() => f.push(
-                    pointer_child(&path, "calibration_record_id"),
+                    pointer_child(path.clone(), "calibration_record_id"),
                     "INVALID",
                     format!("calibration record '{calibration_id}' does not resolve in trial registry"),
                 ),
                 None => f.push(
-                    pointer_child(&path, "calibration_record_id"),
+                    pointer_child(path.clone(), "calibration_record_id"),
                     "INCOMPLETE",
                     "calibration record is not resolvable because this trial has no calibration registry",
                 ),
@@ -584,7 +584,7 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         || record.get("unit") != channel.get("unit")
                     {
                         f.push(
-                            pointer_child(&path, "unit"),
+                            pointer_child(path.clone(), "unit"),
                             "INVALID",
                             "calibration quantity and unit must exactly match the measurement channel",
                         );
@@ -594,7 +594,7 @@ fn check_trial(case: &Value, f: &mut Findings) {
                             != channel.pointer(&format!("/instrument_identity/{identity_field}"))
                         {
                             f.push(
-                                pointer_child(&path, "instrument_identity"),
+                                pointer_child(path.clone(), "instrument_identity"),
                                 "INVALID",
                                 format!("calibration instrument {identity_field} does not match channel instrument"),
                             );
@@ -605,7 +605,7 @@ fn check_trial(case: &Value, f: &mut Findings) {
                     let range_max = record.get("range_max").and_then(Value::as_f64);
                     if matches!((range_min, range_max), (Some(lo), Some(hi)) if lo > hi) {
                         f.push(
-                            &record_path,
+                            record_path.clone(),
                             "INVALID",
                             "calibration range_min must not exceed range_max",
                         );
@@ -613,7 +613,7 @@ fn check_trial(case: &Value, f: &mut Findings) {
                     let status = record.get("disposition").and_then(Value::as_str);
                     if status != channel.get("calibration_status").and_then(Value::as_str) {
                         f.push(
-                            pointer_child(&path, "calibration_status"),
+                            pointer_child(path.clone(), "calibration_status"),
                             "INVALID",
                             "channel calibration_status must match the referenced calibration record disposition",
                         );
@@ -621,12 +621,12 @@ fn check_trial(case: &Value, f: &mut Findings) {
                     match status {
                         Some("in_tolerance") => {}
                         Some("out_of_tolerance") => f.push(
-                            pointer_child(&path, "calibration_record_id"),
+                            pointer_child(path.clone(), "calibration_record_id"),
                             "INVALID",
                             "referenced calibration is out of tolerance",
                         ),
                         Some("stale") | Some("unknown") | None => f.push(
-                            pointer_child(&path, "calibration_record_id"),
+                            pointer_child(path.clone(), "calibration_record_id"),
                             "INCOMPLETE",
                             "referenced calibration is stale or unknown",
                         ),
@@ -640,12 +640,12 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         match (valid_from, valid_until) {
                             (Some(from), Some(until)) if from <= sample_start && until >= sample_end => {}
                             (Some(from), Some(until)) if from >= until => f.push(
-                                &record_path,
+                                record_path.clone(),
                                 "INVALID",
                                 "calibration validity interval must have valid_from earlier than valid_until",
                             ),
                             _ => f.push(
-                                &record_path,
+                                record_path.clone(),
                                 "INCOMPLETE",
                                 "calibration validity does not cover the complete measurement sample window",
                             ),
@@ -658,12 +658,12 @@ fn check_trial(case: &Value, f: &mut Findings) {
         if let Some(timebase_id) = channel.get("timebase_id").and_then(Value::as_str) {
             match timebase_by_id.get(timebase_id) {
                 None if !timebases.is_empty() => f.push(
-                    pointer_child(&path, "timebase_id"),
+                    pointer_child(path.clone(), "timebase_id"),
                     "INVALID",
                     format!("timebase '{timebase_id}' does not resolve in trial registry"),
                 ),
                 None => f.push(
-                    pointer_child(&path, "timebase_id"),
+                    pointer_child(path.clone(), "timebase_id"),
                     "INCOMPLETE",
                     "timebase is not resolvable because this trial has no timebase registry",
                 ),
@@ -680,12 +680,12 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         match (valid_from, valid_until) {
                             (Some(from), Some(until)) if from <= sample_start && until >= sample_end => {}
                             (Some(from), Some(until)) if from >= until => f.push(
-                                &record_path,
+                                record_path.clone(),
                                 "INVALID",
                                 "timebase validity interval must have valid_from earlier than valid_until",
                             ),
                             _ => f.push(
-                                &record_path,
+                                record_path.clone(),
                                 "INCOMPLETE",
                                 "timebase validity does not cover the complete measurement sample window",
                             ),
@@ -709,14 +709,14 @@ fn check_trial(case: &Value, f: &mut Findings) {
                     {
                         if channel_unit != clock_unit || channel_value < clock_value {
                             f.push(
-                                pointer_child(&path, "time_alignment_uncertainty"),
+                                pointer_child(path.clone(), "time_alignment_uncertainty"),
                                 "INVALID",
                                 "channel alignment uncertainty must use the timebase uncertainty unit and must not understate it",
                             );
                         }
                     } else {
                         f.push(
-                            pointer_child(&path, "time_alignment_uncertainty"),
+                            pointer_child(path.clone(), "time_alignment_uncertainty"),
                             "INCOMPLETE",
                             "channel and timebase synchronization uncertainty must both be known",
                         );
@@ -728,12 +728,12 @@ fn check_trial(case: &Value, f: &mut Findings) {
         match channel.get("calibration_status").and_then(Value::as_str) {
             Some("in_tolerance") => {}
             Some("out_of_tolerance") => f.push(
-                pointer_child(&path, "calibration_status"),
+                pointer_child(path.clone(), "calibration_status"),
                 "INVALID",
                 "out-of-tolerance calibration invalidates this measurement channel",
             ),
             Some("stale") | Some("unknown") | Some("not_applicable") | None => f.push(
-                pointer_child(&path, "calibration_status"),
+                pointer_child(path.clone(), "calibration_status"),
                 "INCOMPLETE",
                 "calibration is not evidenced as in tolerance",
             ),
