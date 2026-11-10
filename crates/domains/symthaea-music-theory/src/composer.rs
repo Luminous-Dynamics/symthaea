@@ -18,9 +18,11 @@ use crate::rhythm::Duration;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
-/// Stable part slot reserved by the general composer for its independent
-/// return-section counterline. Other general-composer parts remain explicitly
-/// unassigned until their source generators are migrated under #11304.
+/// General-composer persistent part slots. The grammar owner assigns these
+/// at source generation; local VoiceRole changes do not create new parts.
+const GENERAL_MELODY_PART_V1: PartId = PartId(0);
+const GENERAL_BASS_PART_V1: PartId = PartId(1);
+const GENERAL_HARMONY_PART_V1: PartId = PartId(2);
 const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
 /// The grief suspension chain is an independently performed, expressive
 /// harmony line, not a continuation of the block-chord accompaniment.
@@ -584,8 +586,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
         spec.accompaniment(intent.seed)
     };
     let tx = &spec.texture;
-    realize_melody(
+    realize_melody_for_part(
         &mut score,
+        GENERAL_MELODY_PART_V1,
         &form,
         intent,
         Duration::zero(),
@@ -611,8 +614,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
     // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
     // and never read each other's state, so the emitted NOTES are unchanged.
-    realize_bass(
+    realize_bass_for_part(
         &mut score,
+        GENERAL_BASS_PART_V1,
         &form,
         meter_beats,
         intent,
@@ -621,8 +625,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
         tx.cadential_harmonic_rhythm,
         spec.development != crate::spec::DevelopmentDna::Classic,
     );
-    realize_harmony(
+    realize_harmony_for_part(
         &mut score,
+        GENERAL_HARMONY_PART_V1,
         &form,
         meter_beats,
         intent,
@@ -939,6 +944,7 @@ fn apply_development_style(
     if dna == DevelopmentDna::Classic {
         return;
     }
+    let melody_part = single_source_part_for_role(score, VoiceRole::Melody);
     let meter_i = meter_beats as i64;
     // The climax note (and whatever `realize_melody`'s grace-note pass or
     // `apply_held_arrivals` already attached to it — a dwelt-on duration,
@@ -1109,7 +1115,7 @@ fn apply_development_style(
                         pitch = pitch.transpose(-12);
                     }
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: melody_part,
                         pitch,
                         onset: t,
                         duration: note.duration,
@@ -1758,6 +1764,7 @@ fn apply_harmonic_stasis(score: &mut Score) {
 /// (mirroring how [`apply_drone_pedal`] replaces the whole bass, but
 /// scoped to specific sections rather than the whole piece).
 fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats: f64, seed: u64) {
+    let melody_part = single_source_part_for_role(score, VoiceRole::Melody);
     let cell = crate::hook::HookCell::generate_with(
         &crate::spec::MelodicDna::default(),
         seed,
@@ -1804,7 +1811,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: melody_part,
                     pitch,
                     onset: Duration::new((t * 480.0).round() as i64, 480),
                     duration: Duration::new((this_dur * 480.0).round().max(1.0) as i64, 480),
@@ -1986,6 +1993,8 @@ fn apply_full_drone(score: &mut Score, key: Key) {
 /// arrival) — you leave home by modulation, you come home by arrival.
 /// The fugue keeps its documented no-modulation limit (its own pipeline).
 fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beats: f64) {
+    let harmony_part = single_source_part_for_role(score, VoiceRole::Harmony);
+    let bass_part = single_source_part_for_role(score, VoiceRole::Bass);
     let section_bars = 2 * bars; // antecedent + consequent
     let meter_i = meter_beats as i64;
     for i in 1..form.sections.len() {
@@ -2099,7 +2108,7 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
         if !window_touched {
             for &pitch in &dom_voiced {
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: harmony_part,
                     pitch,
                     onset: win_onset,
                     duration: half,
@@ -2110,7 +2119,7 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
                 });
             }
             score.push(ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: bass_part,
                 pitch: dom_root_bass,
                 onset: win_onset,
                 duration: half,
@@ -2647,7 +2656,7 @@ fn apply_damage(
             let grace = Duration::sixteenth();
             let passing_onset = score.notes[bi].onset.saturating_sub(grace);
             let passing = ScoreNote {
-                part: PartId::UNASSIGNED,
+                part: score.notes[ai].part,
                 pitch: score.notes[ai].pitch.transpose(dir),
                 onset: passing_onset,
                 duration: grace,
@@ -3916,6 +3925,26 @@ pub(crate) fn realize_melody(
     meter_beats: f64,
     climax_grace: bool,
 ) {
+    realize_melody_for_part(
+        score,
+        PartId::UNASSIGNED,
+        form,
+        intent,
+        start_beat,
+        meter_beats,
+        climax_grace,
+    );
+}
+
+pub(crate) fn realize_melody_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    intent: &MusicalIntent,
+    start_beat: Duration,
+    meter_beats: f64,
+    climax_grace: bool,
+) {
     let melody_octave = 5;
     let base_vel = 0.35 + intent.energy.clamp(0.0, 1.0) * 0.45; // 0.35–0.8
 
@@ -4104,7 +4133,7 @@ pub(crate) fn realize_melody(
                     *dur
                 };
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch: *p,
                     onset,
                     duration: sounded,
@@ -4167,7 +4196,7 @@ pub(crate) fn realize_melody(
                 score.notes.insert(
                     ci,
                     ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: part_id,
                         pitch: below,
                         onset: climax_onset.saturating_sub(grace),
                         duration: grace,
@@ -5083,6 +5112,30 @@ mod tests {
             .collect();
         assert_eq!(quote.len(), 2);
         assert!(quote.iter().all(|note| note.part == PartId(80)));
+    }
+
+    #[test]
+    fn general_classical_composer_emits_complete_primary_part_identity() {
+        let score = compose_styled(
+            &MusicalIntent {
+                seed: 42,
+                ..MusicalIntent::default()
+            },
+            crate::style::Style::Classical,
+        );
+        assert!(
+            score.has_part_identity(),
+            "the general Classical composer must assign melody, bass, harmony and every transformation at source"
+        );
+        let ids: std::collections::BTreeSet<u16> =
+            score.parts().into_iter().map(|part| part.0).collect();
+        for required in [
+            GENERAL_MELODY_PART_V1.0,
+            GENERAL_BASS_PART_V1.0,
+            GENERAL_HARMONY_PART_V1.0,
+        ] {
+            assert!(ids.contains(&required), "missing primary part id {required}");
+        }
     }
 
     #[test]
