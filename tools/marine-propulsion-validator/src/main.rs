@@ -243,6 +243,13 @@ fn walk_semantics(value: &Value, path: &str, f: &mut Findings) {
                         .and_then(Value::as_str)
                         .is_some_and(|reason| !reason.trim().is_empty());
                     if not_applicable {
+                        if path == "/service/annual_delivered_work" || path.ends_with("/distance") {
+                            f.push(
+                                path.clone(),
+                                "INCOMPLETE",
+                                "a required transport-work or route-distance quantity cannot be not applicable",
+                            );
+                        }
                         // Explicit non-applicability is a declared state, not missing data.
                     } else if unknown {
                         f.push(
@@ -1349,6 +1356,29 @@ mod tests {
         include_str!("../../../docs/research/marine/marine-propulsion-case-v0.2.0.schema.json");
     const SYNTHETIC_CASE_V2: &str =
         include_str!("../../../docs/research/marine/fixtures/synthetic-waps-case-v0.2.0.json");
+    const SERVICE_FINGERPRINT_VECTOR_V1: &str =
+        include_str!("../../../docs/research/marine/fixtures/service-fingerprint-v1-vector-0001.json");
+
+    #[test]
+    fn published_service_fingerprint_vector_matches_canonical_bytes_and_digest() {
+        let vector: Value = serde_json::from_str(SERVICE_FINGERPRINT_VECTOR_V1)
+            .expect("service fingerprint vector JSON");
+        let payload = vector.get("payload").expect("payload");
+        let mut canonical = String::new();
+        write_canonical_json(payload, &mut canonical);
+        assert_eq!(
+            canonical,
+            vector.get("canonical_json").and_then(Value::as_str).expect("canonical_json")
+        );
+        assert_eq!(
+            canonical_json_sha256(payload),
+            vector.get("sha256").and_then(Value::as_str).expect("sha256")
+        );
+        assert_eq!(
+            vector.get("profile").and_then(Value::as_str),
+            Some(SERVICE_FINGERPRINT_PROFILE)
+        );
+    }
 
     #[test]
     fn service_fingerprint_matches_known_canonical_vector() {
@@ -1376,6 +1406,25 @@ mod tests {
         let left: Value = serde_json::from_str(r#"{"b":2,"a":{"d":4,"c":3}}"#).unwrap();
         let right: Value = serde_json::from_str(r#"{"a":{"c":3,"d":4},"b":2}"#).unwrap();
         assert_eq!(canonical_json_sha256(&left), canonical_json_sha256(&right));
+    }
+
+    #[test]
+    fn required_transport_work_cannot_be_not_applicable() {
+        let mut findings = Findings::default();
+        let quantity = serde_json::json!({
+            "value": null,
+            "unit": "TEU-nautical_mile",
+            "not_applicable_reason": "None",
+            "provenance": {
+                "class":"synthetic",
+                "source_id":"SYNTHETIC-WAPS-FIXTURE-ONLY",
+                "method":"test",
+                "limitations":["test-only"],
+                "rights_status":"not_applicable"
+            }
+        });
+        walk_semantics(&quantity, "/service/annual_delivered_work", &mut findings);
+        assert!(findings.incomplete);
     }
 
     #[test]
