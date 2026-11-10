@@ -11,6 +11,7 @@ const SCENARIO_VERSION: &str = "ev-sequential-diagnostic/0.1";
 const EPSILON: f64 = 1e-12;
 const MAX_HORIZON: usize = 8;
 const MAX_OUTCOMES: usize = 8;
+const MAX_POLICY_NODES: usize = 4096;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -97,6 +98,8 @@ struct TestOutcome {
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct PolicyNode {
+    pub branch_probability: Option<f64>,
+    pub posterior: BTreeMap<String, f64>,
     pub choice: String,
     pub test_id: Option<String>,
     pub terminal_action: Option<String>,
@@ -105,6 +108,15 @@ pub struct PolicyNode {
     pub expected_tests: f64,
     pub max_tests_on_path: usize,
     pub branches: BTreeMap<String, PolicyNode>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct OneStepValue {
+    pub test_id: String,
+    pub admissible_at_root: bool,
+    pub exclusion_reason: Option<String>,
+    pub expected_total_loss: Option<f64>,
+    pub net_value: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -117,6 +129,7 @@ pub struct PlanResult {
     pub net_value: f64,
     pub expected_tests: f64,
     pub max_tests_on_path: usize,
+    pub one_step_candidates: Vec<OneStepValue>,
     pub policy: PolicyNode,
 }
 
@@ -194,7 +207,10 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
     {
         errors.push("scenario version, identity or decision unit is invalid".to_owned());
     }
-    if scenario.horizon > MAX_HORIZON || scenario.horizon > scenario.tests.len() {
+    if scenario.tests.len() > MAX_HORIZON
+        || scenario.horizon > MAX_HORIZON
+        || scenario.horizon > scenario.tests.len()
+    {
         errors.push("horizon exceeds the finite test catalog or v0.1 cap".to_owned());
     }
     if !scenario.abstain_loss.is_finite() || scenario.abstain_loss < 0.0 {
@@ -420,9 +436,19 @@ fn optimize_node(
     history: &BTreeMap<String, String>,
     used: &BTreeSet<String>,
     remaining: usize,
-) -> PolicyNode {
+    branch_probability: Option<f64>,
+    node_budget: &mut usize,
+) -> Result<PolicyNode, String> {
+    if *node_budget == 0 {
+        return Err(format!(
+            "policy tree exceeded the v0.1 node cap of {MAX_POLICY_NODES}"
+        ));
+    }
+    *node_budget -= 1;
     let (action, stop_loss) = terminal_action(scenario, posterior);
     let mut best = PolicyNode {
+        branch_probability,
+        posterior: posterior.clone(),
         choice: "NO_TEST".to_owned(),
         test_id: None,
         terminal_action: Some(action),
@@ -433,7 +459,7 @@ fn optimize_node(
         branches: BTreeMap::new(),
     };
     if remaining == 0 {
-        return best;
+        return Ok(best);
     }
 
     for test in &scenario.tests {
@@ -474,7 +500,9 @@ fn optimize_node(
                 &next_history,
                 &next_used,
                 remaining - 1,
-            );
+                Some(marginal),
+                node_budget,
+            )?;
             expected_continuation_loss += marginal * child.expected_total_loss;
             expected_future_tests += marginal * child.expected_tests;
             maximum_future_tests = maximum_future_tests.max(child.max_tests_on_path);
@@ -488,6 +516,8 @@ fn optimize_node(
         let candidate_loss = immediate_cost + expected_continuation_loss;
         if candidate_loss < best.expected_total_loss - EPSILON {
             best = PolicyNode {
+                branch_probability,
+                posterior: posterior.clone(),
                 choice: "TEST".to_owned(),
                 test_id: Some(test.id.clone()),
                 terminal_action: None,
@@ -499,7 +529,74 @@ fn optimize_node(
             };
         }
     }
-    best
+    Ok(best)
+}
+
+fn one_step_candidates(
+    scenario: &Scenario,
+    prior: &BTreeMap<String, f64>,
+    baseline: f64,
+) -> Vec<OneStepValue> {
+    let mut candidates = Vec::new();
+    for test in &scenario.tests {
+        let exclusion_reason = if !test.prerequisites.safety_approved {
+            Some("SAFETY_APPROVAL_MISSING".to_owned())
+        } else if !test.prerequisites.calibration_valid {
+            Some("CALIBRATION_INVALID".to_owned())
+        } else if !test.prerequisites.domain_supported {
+            Some("DOMAIN_UNSUPPORTED".to_owned())
+        } else if !test.prerequisites.equipment_available {
+            Some("EQUIPMENT_UNAVAILABLE".to_owned())
+        } else if test.requires.is_some() {
+            Some("CONDITIONAL_DEPENDENCY_NOT_MET_AT_ROOT".to_owned())
+        } else {
+            None
+        };
+        if let Some(reason) = exclusion_reason {
+            candidates.push(OneStepValue {
+                test_id: test.id.clone(),
+                admissible_at_root: false,
+                exclusion_reason: Some(reason),
+                expected_total_loss: None,
+                net_value: None,
+            });
+            continue;
+        }
+
+        let mut expected_terminal_loss = 0.0;
+        for outcome in &test.outcomes {
+            let marginal = prior
+                .iter()
+                .map(|(hypothesis, probability)| {
+                    probability * outcome.likelihood_by_hypothesis[hypothesis]
+                })
+                .sum::<f64>();
+            if marginal <= EPSILON {
+                continue;
+            }
+            let posterior = prior
+                .iter()
+                .map(|(hypothesis, probability)| {
+                    (
+                        hypothesis.clone(),
+                        probability * outcome.likelihood_by_hypothesis[hypothesis] / marginal,
+                    )
+                })
+                .collect::<BTreeMap<String, f64>>();
+            let (_, risk) = terminal_action(scenario, &posterior);
+            expected_terminal_loss += marginal * risk;
+        }
+        let total = test.test_cost + test.downtime_cost + expected_terminal_loss;
+        candidates.push(OneStepValue {
+            test_id: test.id.clone(),
+            admissible_at_root: true,
+            exclusion_reason: None,
+            expected_total_loss: Some(total),
+            net_value: Some(baseline - total),
+        });
+    }
+    candidates.sort_by(|left, right| left.test_id.cmp(&right.test_id));
+    candidates
 }
 
 fn plan_scenario(scenario: &Scenario) -> Result<PlanResult, String> {
@@ -520,13 +617,17 @@ fn plan_scenario(scenario: &Scenario) -> Result<PlanResult, String> {
         .map(|hypothesis| (hypothesis.id.clone(), hypothesis.prior))
         .collect();
     let (_, baseline) = terminal_action(&normalized, &prior);
+    let one_step = one_step_candidates(&normalized, &prior, baseline);
+    let mut node_budget = MAX_POLICY_NODES;
     let policy = optimize_node(
         &normalized,
         &prior,
         &BTreeMap::new(),
         &BTreeSet::new(),
         normalized.horizon,
-    );
+        None,
+        &mut node_budget,
+    )?;
     let net_value = baseline - policy.expected_total_loss;
     if !net_value.is_finite() || !policy.expected_total_loss.is_finite() {
         return Err("planner produced non-finite expected loss".to_owned());
@@ -540,6 +641,7 @@ fn plan_scenario(scenario: &Scenario) -> Result<PlanResult, String> {
         net_value,
         expected_tests: policy.expected_tests,
         max_tests_on_path: policy.max_tests_on_path,
+        one_step_candidates: one_step,
         policy,
     })
 }
@@ -713,8 +815,8 @@ mod tests {
     #[test]
     fn frozen_corpus_plans_five_cases_and_rejects_one() {
         let report = report();
-        assert_eq!(report.payload.case_count, 6);
-        assert_eq!(report.payload.planned_count, 5);
+        assert_eq!(report.payload.case_count, 7);
+        assert_eq!(report.payload.planned_count, 6);
         assert_eq!(report.payload.rejected_count, 1);
     }
 
@@ -733,6 +835,18 @@ mod tests {
         assert!((planned.net_value - 1.175).abs() < 1e-9);
         assert!((planned.expected_tests - 1.5).abs() < 1e-9);
         assert_eq!(planned.max_tests_on_path, 2);
+        for test_id in ["test-a", "test-b"] {
+            let candidate = planned.one_step_candidates.iter()
+                .find(|candidate| candidate.test_id == test_id)
+                .expect("one-step baseline candidate");
+            assert!(candidate.admissible_at_root);
+            assert!((candidate.net_value.unwrap() + 0.15).abs() < 1e-9);
+        }
+        assert_eq!(
+            planned.policy.branches["a1"].branch_probability,
+            Some(0.5)
+        );
+        assert!((planned.policy.branches["a1"].posterior["A1B1"] - 0.4).abs() < 1e-9);
     }
 
     #[test]
@@ -777,6 +891,18 @@ mod tests {
             .expect("safety control plan");
         assert_eq!(planned.root_choice, "NO_TEST");
         assert_eq!(planned.root_test_id, None);
+    }
+
+    #[test]
+    fn no_admissible_terminal_action_returns_abstain() {
+        let result = report();
+        let planned = result.payload.cases.iter()
+            .find(|case| case.case_id == "no-admissible-terminal-action-abstains")
+            .and_then(|case| case.plan.as_ref())
+            .expect("abstention plan");
+        assert_eq!(planned.root_choice, "NO_TEST");
+        assert_eq!(planned.policy.terminal_action.as_deref(), Some("ABSTAIN"));
+        assert_eq!(planned.optimized_expected_loss, 12.0);
     }
 
     #[test]
