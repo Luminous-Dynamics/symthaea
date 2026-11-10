@@ -1,0 +1,8 @@
+{
+  "schema": "vocal-guidance-gradients/v1",
+  "source_revision": "0123456789abcdef0123456789abcdef01234567",
+  "model_id": "synthetic-gradient-fixture",
+  "checkpoint_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "phoneme_gradient": [1.0, 0.0],
+  "pitch_gradient": [-1.0, 1.0]
+}
