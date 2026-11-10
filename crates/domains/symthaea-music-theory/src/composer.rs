@@ -5487,6 +5487,34 @@ mod tests {
     }
 
     #[test]
+    fn joy_grace_note_inherits_the_exact_decorated_melody_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for (midi, onset) in [(60u8, 0i64), (64, 1), (67, 2)] {
+            score.push(ScoreNote {
+                part: PartId(45),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::new(1, 1),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        alter_statement(
+            &mut score,
+            PartId(45),
+            key,
+            0.0,
+            3,
+            crate::spec::Attitude::Joy,
+        );
+        assert!(score.notes.len() > 3);
+        assert!(score.notes.iter().all(|note| note.part == PartId(45)));
+    }
+
+    #[test]
     fn hidden_bass_quote_preserves_the_existing_bass_part_id() {
         let key = Key::major(crate::pitch::PitchClass::C);
         let mut score = Score::new(key, 100.0, 4);
