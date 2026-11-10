@@ -245,3 +245,45 @@ A multi-judge consensus is not a reference oracle. For subjective/rubric tasks, 
 Topology is not a complete security evaluation. [ACIArena (ACL 2026)](https://aclanthology.org/2026.acl-long.457/) spans external inputs, agent profiles and inter-agent messages across six MAS implementations; it reports that topology alone is insufficient. [ART, UK AISI 2026](https://www.aisi.gov.uk/research/security-challenges-in-ai-agent-deployment-insights-from-a-large-scale-public-competition) provides an operational attack/effect benchmark context. Compose the attack surfaces and effect-level outcomes with #1872; do not import those public competition figures as our result.
 
 Uncertainty is hierarchical. [The Value of Variance (ICML 2026)](https://proceedings.mlr.press/v306/tang26n.html) motivates separately recording within-agent, between-agent and system uncertainty. The benchmark must not optimize away valid disagreement or minority dissent by rewarding consensus.
+
+
+## New human-reference and confidence comparators (10 November 2026)
+
+### Human–LLM dynamic update fidelity
+
+**Wali & Tayyab, *Before You Poll with LLMs: A Deliberative Diagnostic Framework*, EMNLP 2026.** The paper compares human and LLM expressed-position changes after identical informational interventions. The authors report using America in One Room data (526 personas / 72 questions) and observe reversal, overshoot and rigidity signatures among the particular frontier models they evaluated. These are reported findings, not a universal model ranking or evidence that any human panel is a normative truth oracle.
+
+This reference motivates a separate human-reference track in [Mycelix #6023](https://github.com/Luminous-Dynamics/mycelix/issues/6023). It is **not** folded into the current synthetic 50-case Symthaea matrix. Dataset use is blocked pending a distinct consent, rights, ethics, privacy, version and split-provenance review.
+
+Comparison metrics should include direction of update, magnitude/overshoot, rigidity, heterogeneity, response-scale harmonization and missingness. Do not simply optimize model output to mimic a single individual's opinion or to steer a demographic group.
+
+Paper:
+- https://aclanthology.org/2026.emnlp-main.2291/
+- https://arxiv.org/abs/2609.15849
+
+### Confidence-channel integrity
+
+**Zhang et al., *When Linguistic and Internal Confidence Diverge in Large Language Models*, Findings of EMNLP 2026.** The authors report analysis across 30 models, eight classification tasks and two generation tasks. They separate instance-level association, magnitude agreement and calibration between verbal confidence and internal/logit or semantic-entropy signals, finding frequent divergence and prompt-sensitive inflation.
+
+This strengthens the revision-ledger / [#11367 confidence-calibration](https://github.com/Luminous-Dynamics/symthaea/issues/11367) contract: confidence should be evaluated across at least three separate axes—rank association, magnitude agreement and probabilistic calibration—with task/model/prompt scope and held-out split evidence. Self-reported verbal confidence is never evidence, source authority or civic entitlement.
+
+Paper:
+- https://aclanthology.org/2026.findings-emnlp.1300/
+
+### Efficiency and adaptive debate
+
+**SVR-MAD, Findings of EMNLP 2026.** The authors propose posterior-guided communication-graph construction using pre-debate signals and debate outcomes; they report up to 61% token-cost reduction while matching or improving the most accurate competing MAD baseline in their tested setup. This should become a matched efficiency baseline: same task/model/agent/tool budget, cost boundary, and quality metrics. We should additionally test whether adaptive pruning suppresses minority evidence or overweights poorly calibrated confidence.
+
+Paper:
+- https://aclanthology.org/2026.findings-emnlp.483/
+- https://arxiv.org/abs/2605.23099
+
+### Treatment arms added to the comparison plan
+
+| Arm | Comparator | Required caveat |
+|---|---|---|
+| A10 — human dynamic-reference diagnostic | Mycelix #6023 / Wali & Tayyab EMNLP 2026 | Human data use requires separate rights/consent review; human response distribution is not normative truth |
+| A11 — confidence-channel audit | Findings EMNLP 2026 linguistic/internal confidence comparison | Report association, magnitude agreement and calibration separately |
+| A12 — adaptive evidence-aware routing | SVR-MAD | Reproduce token savings only at matched output quality and measure minority-evidence exclusion |
+
+A12 should also be compared with Free-MAD's trajectory scoring, standard MAD and static topologies. Communication graph adaptation is not delegation or authority assignment.
