@@ -117,6 +117,55 @@ All first-pass cases are synthetic and openly labelled. They are intentionally n
 
 ### 4.1 Port-city energy system
 
+### 4.1.1 South African public reference evidence
+
+Two September 2025 CSIR/PtX Hub studies make a useful first real-world evidence baseline. They are pre-feasibility estimates, not connection offers or electrical metering records.
+
+**Estimated shore-power demand.** The study uses TNPA vessel-movement logs across financial years 2018–2025, vessel classes and vessel size proxies, berth-time records, data cleaning/merging and linear regression to estimate average-maximum and absolute-maximum shore-power demand. Some port/year data were omitted because of incorrect vessel-type classification. The values below must therefore be labelled `PUBLISHED_ESTIMATE`, not `OBSERVED_METERED_LOAD`.
+
+| Port | Estimated average-maximum demand (MW) | Estimated absolute maximum demand (MW) |
+|---|---:|---:|
+| Durban | 20.30 | 47.19 |
+| Cape Town | 12.71 | 27.16 |
+| Richards Bay | 6.51 | 15.95 |
+| Gqeberha | 6.02 | 12.71 |
+| Ngqura / Coega | 5.77 | 12.56 |
+| Saldanha Bay | 3.68 | 5.98 |
+| East London | 3.32 | 6.30 |
+| Mossel Bay | 2.15 | 3.78 |
+
+**Estimated spare port-intake capacity.** A separate connection-capacity study ranks the assessed ports using an estimated spare-capacity formula:
+
+```
+spare MW = 0.9 × (firm supply MVA − notified maximum demand MVA)
+```
+
+The factor 0.9 is the study's assumed power-factor conversion. The resulting ranking is:
+
+| Port | Estimated spare capacity (MVA) | Estimated spare capacity (MW) | Study's connection-risk label |
+|---|---:|---:|---|
+| Ngqura | 19 | 17.1 | Low |
+| East London | 18 | 16.2 | Low |
+| Gqeberha | 15 | 13.5 | Low |
+| Richards Bay | 11.5 | 10.35 | Low |
+| Mossel Bay | 7 | 6.3 | Medium |
+| Durban | 4 | 3.6 | Medium |
+| Cape Town | 0 | 0 | High |
+| Saldanha Bay | 0 | 0 | High |
+
+**Interpretation and limitations.**
+- Durban is the shore-power demand stress case: the report estimates the country's highest average-maximum and absolute-maximum shore-power demands there.
+- Ngqura is a useful connection-screening case: the report estimates the greatest spare port-intake capacity there.
+- These rankings do not establish a nuclear site, an available firm grid connection, or a viable SMR load. The connection report explicitly says its risk labels are based only on estimated spare capacity and omit substation space, accessibility, electrical servitudes, routing and detailed connection requirements; upstream network capacity and formal supply-authority studies remain necessary.
+- The two studies have different boundaries and must not be subtracted from each other as though they were a single matched load-flow study. The shore-power demand is a time-varying vessel-load estimate; the spare-capacity result is a pre-feasibility port-intake estimate.
+- The reference model should preserve each source's financial-year coverage, method, caveats, units and exact version. It should then acquire interval-meter data, current single-line diagrams and a utility/municipality connection assessment before any project-specific conclusion.
+
+Sources:
+- CSIR / PtX Hub, *Shore Power Demand for South African Ports* (September 2025), especially executive summary p. 6 and demand results. [Publication page](https://ptx-hub.org/publication/shore-power-demand-for-south-african-ports/) · [PDF](https://ptx-hub.org/wp-content/uploads/2025/10/PtX-Hub-Shore-Power-Demand-for-South-African-Ports-2.pdf)
+- CSIR / PtX Hub, *Load Connection Capacity Assessment of South African National Ports* (September 2025), especially discussion and Table 10, p. 34. [Publication page](https://ptx-hub.org/publication/load-connection-capactiy-assessment-of-south-african-national-ports/) · [PDF](https://ptx-hub.org/wp-content/uploads/2025/11/PtX-Hub-Load-Connection-Capacity-Assessment-of-South-African-National-Ports_final-1.pdf)
+
+**Reference-case selection:** use Durban for a high-demand / grid-constrained stress test; use Ngqura for a higher-spare-capacity screening case; retain Cape Town as a high-demand/low-spare-capacity contrast. Add Richards Bay as an industrial-load case. These are analytical case selections only, not site or technology recommendations.
+
 Compare the same service demand under:
 A. Existing grid and existing port systems.
 B. Grid + renewables + storage + flexibility.
