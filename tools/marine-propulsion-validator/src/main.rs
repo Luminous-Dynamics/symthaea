@@ -129,12 +129,14 @@ fn unit_dimension(unit: &str) -> Option<&'static str> {
         "gCO2e/MJ" | "kgCO2e/MJ" | "gCO2e/kWh" => Some("emissions_intensity"),
         "USD" | "EUR" | "ZAR" => Some("currency"),
         "USD/year" | "EUR/year" | "ZAR/year" => Some("currency_per_time"),
-        "USD/kW" | "USD/kWh" | "EUR/kW" | "EUR/kWh" => Some("currency_per_capacity"),
+        "USD/kW" | "EUR/kW" => Some("currency_per_power"),
+        "USD/kWh" | "EUR/kWh" => Some("currency_per_energy"),
         "TEU" => Some("cargo_capacity"),
         "TEU-nautical_mile" => Some("teu_transport_work"),
         "tonne-nautical_mile" => Some("mass_transport_work"),
         "kg/s" | "tonne/day" => Some("mass_flow"),
-        "L" | "litre" | "m3/h" => Some("volume_or_volume_flow"),
+        "L" | "litre" => Some("volume"),
+        "m3/h" => Some("volume_flow"),
         "%" => Some("dimensionless"),
         _ => None,
     }
@@ -382,7 +384,6 @@ fn check_lineage(case: &Value, f: &mut Findings) {
         "propulsion_model_id",
         "control_model_id",
         "degradation_model_id",
-        "environmental_correction_method_id",
     ] {
         collect_string_refs(case, key, &mut model_refs);
     }
@@ -893,6 +894,10 @@ mod tests {
         assert_eq!(unit_dimension("kW"), Some("power"));
         assert_eq!(unit_dimension("nautical_mile"), Some("length"));
         assert_eq!(unit_dimension("gCO2e/MJ"), Some("emissions_intensity"));
+        assert_eq!(unit_dimension("L"), Some("volume"));
+        assert_eq!(unit_dimension("m3/h"), Some("volume_flow"));
+        assert_eq!(unit_dimension("USD/kW"), Some("currency_per_power"));
+        assert_eq!(unit_dimension("USD/kWh"), Some("currency_per_energy"));
         assert_eq!(unit_dimension("invented-unit"), None);
     }
 
