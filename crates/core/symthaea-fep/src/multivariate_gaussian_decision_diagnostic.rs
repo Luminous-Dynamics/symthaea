@@ -90,6 +90,7 @@ pub struct MultivariateGaussianDecisionDiagnosticEvaluation {
     pub task_specification_digest: String,
     /// Binds priors, means, full covariances, feature order, costs, scores and config.
     pub problem_digest: String,
+    pub evaluation_digest: String,
     pub prior_bayes_risk: f64,
     pub no_probe_score: f64,
     pub selected_action_index: Option<usize>,
@@ -182,6 +183,9 @@ pub fn evaluate_multivariate_gaussian_decision_diagnostics(
 > {
     validate_config(config)?;
     validate_task_digest(task_specification_digest)?;
+    if actions.is_empty() {
+        return Err(MultivariateGaussianDecisionDiagnosticError::EmptyActionSet);
+    }
     validate_hypotheses(hypotheses, actions.len())?;
     validate_actions(hypotheses, actions)?;
 
@@ -247,10 +251,18 @@ pub fn evaluate_multivariate_gaussian_decision_diagnostics(
         config,
         task_specification_digest,
     );
+    let evaluation_digest = compute_evaluation_digest(
+        &problem_digest,
+        prior_bayes_risk,
+        no_probe_score,
+        selected_action_index,
+        &evaluations,
+    );
 
     Ok(MultivariateGaussianDecisionDiagnosticEvaluation {
         task_specification_digest: task_specification_digest.to_owned(),
         problem_digest,
+        evaluation_digest,
         prior_bayes_risk,
         no_probe_score,
         selected_action_index,
@@ -325,7 +337,7 @@ fn validate_hypotheses(
                 .loss_by_final_decision
                 .iter()
                 .zip(expected_loss)
-                .any(|(actual, expected)| (*actual - expected).abs() > VALIDATION_TOLERANCE)
+                .any(|(actual, expected)| *actual != expected)
         {
             return Err(
                 MultivariateGaussianDecisionDiagnosticError::UnsupportedLossStructure {
@@ -509,7 +521,7 @@ fn binary_shared_covariance_bayes_risk(
         return Ok(prior_h0.min(prior_h1));
     }
     let distance = mahalanobis_squared.sqrt();
-    let threshold = (prior_h0 / prior_h1).ln();
+    let threshold = prior_h0.ln() - prior_h1.ln();
     let h0_error = standard_normal_cdf(-(threshold + 0.5 * mahalanobis_squared) / distance);
     let h1_error = standard_normal_cdf((threshold - 0.5 * mahalanobis_squared) / distance);
     let risk = prior_h0 * h0_error + prior_h1 * h1_error;
@@ -584,6 +596,49 @@ fn compute_problem_digest(
         }
         hasher.update(action.observation_cost.to_bits().to_le_bytes());
         hasher.update(action.risk_score.to_bits().to_le_bytes());
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn compute_evaluation_digest(
+    problem_digest: &str,
+    prior_bayes_risk: f64,
+    no_probe_score: f64,
+    selected_action_index: Option<usize>,
+    actions: &[MultivariateGaussianDiagnosticActionEvaluation],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea-multivariate-gaussian-binary-evaluation-v1\\0");
+    hash_string(&mut hasher, "problem_digest", problem_digest);
+    hasher.update(prior_bayes_risk.to_bits().to_le_bytes());
+    hasher.update(no_probe_score.to_bits().to_le_bytes());
+    match selected_action_index {
+        Some(index) => {
+            hasher.update([1]);
+            hasher.update((index as u64).to_le_bytes());
+        }
+        None => hasher.update([0]),
+    }
+    for action in actions {
+        hasher.update((action.action_index as u64).to_le_bytes());
+        hash_string(&mut hasher, "action_id", &action.action_id);
+        for value in [
+            action.mahalanobis_squared,
+            action.expected_posterior_bayes_risk,
+            action.expected_value_of_sample_information,
+            action.observation_cost,
+            action.risk_score,
+        ] {
+            hasher.update(value.to_bits().to_le_bytes());
+        }
+        hasher.update([u8::from(action.eligible)]);
+        match action.total_score {
+            Some(score) => {
+                hasher.update([1]);
+                hasher.update(score.to_bits().to_le_bytes());
+            }
+            None => hasher.update([0]),
+        }
     }
     format!("{:x}", hasher.finalize())
 }
@@ -689,6 +744,32 @@ mod tests {
         let result = evaluate(&hypotheses, &actions);
         assert!((result.actions[0].mahalanobis_squared - 4.0).abs() < 1e-12);
         assert!((result.actions[0].expected_posterior_bayes_risk - 0.1586552539).abs() < 1e-7);
+    }
+
+    #[test]
+    fn ignoring_positive_sensor_correlation_is_an_overconfidence_negative_control() {
+        let root_three = 3.0_f64.sqrt();
+        let (hypotheses, correlated_actions) = fixture(
+            [vec![0.0, 0.0], vec![root_three, root_three]],
+            vec![vec![1.0, 0.5], vec![0.5, 1.0]],
+            [0.5, 0.5],
+        );
+        let correct = evaluate(&hypotheses, &correlated_actions);
+
+        // Deliberately wrong control: retain both marginal variances but erase
+        // the positive covariance. It inflates d^2 from 4 to 6 and reports
+        // spuriously lower Bayes error.
+        let mut independent_actions = correlated_actions.clone();
+        independent_actions[0].covariance =
+            vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let independent = evaluate(&hypotheses, &independent_actions);
+        assert!((correct.actions[0].mahalanobis_squared - 4.0).abs() < 1e-12);
+        assert!((independent.actions[0].mahalanobis_squared - 6.0).abs() < 1e-12);
+        assert!(
+            independent.actions[0].expected_posterior_bayes_risk
+                < correct.actions[0].expected_posterior_bayes_risk
+        );
+        assert_ne!(correct.problem_digest, independent.problem_digest);
     }
 
     #[test]
@@ -839,6 +920,27 @@ mod tests {
         assert!(result.actions[0].expected_value_of_sample_information > 0.0);
         assert!(!result.actions[0].eligible);
         assert_eq!(result.actions[0].total_score, None);
+        assert_eq!(result.selected_action_index, None);
+    }
+
+    #[test]
+    fn observation_cost_can_decline_an_eligible_informative_measurement() {
+        let (hypotheses, mut actions) = fixture(
+            [vec![0.0, 0.0], vec![3.0, 3.0]],
+            vec![vec![1.0, 0.8], vec![0.8, 1.0]],
+            [0.5, 0.5],
+        );
+        actions[0].observation_cost = 1.0;
+        let result = evaluate_multivariate_gaussian_decision_diagnostics(
+            &hypotheses,
+            &actions,
+            MultivariateGaussianDecisionDiagnosticConfig::default(),
+            &"a".repeat(64),
+        )
+        .expect("valid informative but expensive action");
+        assert!(result.actions[0].eligible);
+        assert!(result.actions[0].expected_value_of_sample_information > 0.0);
+        assert!(result.actions[0].total_score.unwrap() > result.no_probe_score);
         assert_eq!(result.selected_action_index, None);
     }
 
