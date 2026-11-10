@@ -38,7 +38,7 @@ Public download does not imply permission to train, publish derivatives, release
 
 ## Frozen synthetic corpus
 
-Seventeen fixtures: six accepted metadata/rights/task profiles and eleven rejected controls. Accepted fixtures include permissive open data, controlled non-commercial research use, metadata-only catalogue entries and a partially validated adapter. Negative controls exercise unknown rights, commercial use prohibited by terms, raw redistribution prohibited, conditional rights without clearance, unlabelled periods treated as negative, sentinels collapsed to zero, SOH claimed without reference labels, fault detection claimed without timestamps, pack capability claimed without qualified topology, intervention outcome claims without completion/follow-up/matched comparison, unmapped sentinels with supported tasks, and unknown timezones with fault-detection claims.
+Eighteen fixtures: six accepted metadata/rights/task profiles and twelve rejected controls. Accepted fixtures include permissive open data, controlled non-commercial research use, metadata-only catalogue entries and a partially validated adapter. Negative controls exercise unknown rights, commercial use prohibited by terms, raw redistribution prohibited, conditional rights without clearance, unlabelled periods treated as negative, sentinels collapsed to zero, SOH claimed without reference labels, fault detection claimed without timestamps, pack capability claimed without qualified topology, intervention outcome claims without completion/follow-up/matched comparison, unmapped sentinels with supported tasks, and unknown timezones with fault-detection claims.
 
 These fixtures verify the schema/auditor only. No real field dataset has been imported or evaluated by this PR.
 
