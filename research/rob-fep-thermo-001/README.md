@@ -236,3 +236,10 @@ No motor command or authority is created by this protocol.
 The benchmark now has a dedicated design addendum: [entropy_exergy_extension.md](./entropy_exergy_extension.md). It makes the policy boundary explicit: do not minimize Shannon entropy or physical entropy production as a universal objective. Use decision-focused EVSI for the value of information, physical entropy/exergy only with qualified boundaries and assumptions, and observation-constrained future mobility as the mission-level viability criterion.
 
 The physical-accounting work is tracked separately in [Symtropy #4631](https://github.com/Luminous-Dynamics/symtropy/issues/4631). It composes with #4044 (energy), #4179 (actuator loss maps), #4610 (coupled thermal model) and #4588 (future mobility). It owns no second energy ledger, thermal authority or controller.
+
+
+The entropy/exergy analytical controls are also machine-readable:
+- [fixtures/entropy_exergy_v0_1.json](./fixtures/entropy_exergy_v0_1.json)
+- [fixtures/entropy_exergy_v0_1.schema.json](./fixtures/entropy_exergy_v0_1.schema.json)
+
+They are seven synthetic known-answer cases, not empirical or physical-model qualification. The physical-accounting implementation owner is [Symtropy #4631](https://github.com/Luminous-Dynamics/symtropy/issues/4631).
