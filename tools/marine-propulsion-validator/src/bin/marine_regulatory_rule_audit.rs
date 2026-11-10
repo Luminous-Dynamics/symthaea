@@ -250,6 +250,136 @@ fn check_registry_semantics(register: &Value, findings: &mut Findings) {
     }
 }
 
+fn check_north_east_atlantic_eca(register: &Value, findings: &mut Findings, require_v2_metrics: bool) {
+    let Some(rules) = register.get("rules").and_then(Value::as_array) else { return; };
+    let find_rule = |id: &str| rules.iter().find(|rule| {
+        rule.get("rule_id").and_then(Value::as_str) == Some(id)
+    });
+
+    let nox = find_rule("NE-ATLANTIC-NOX-ECA-2026");
+    let sox = find_rule("NE-ATLANTIC-SOX-PM-ECA-2026");
+
+    let Some(nox) = nox else {
+        findings.push("/rules", "INCOMPLETE", "NOx ECA rule is missing; the combined NOx/SOx rule is not accepted");
+        return;
+    };
+    let Some(sox) = sox else {
+        findings.push("/rules", "INCOMPLETE", "SOx/PM ECA rule is missing; the combined NOx/SOx rule is not accepted");
+        return;
+    };
+
+    let nox_dates = nox.get("dates").unwrap_or(&Value::Null);
+    for (field, expected) in [
+        ("adopted_on", "2026-05-01"),
+        ("entry_into_force_on", "2027-09-01"),
+        ("applies_from", "2027-09-01"),
+    ] {
+        if nox_dates.get(field).and_then(Value::as_str) != Some(expected) {
+            findings.push(
+                format!("/rules/NE-ATLANTIC-NOX-ECA-2026/dates/{field}"),
+                "INVALID",
+                format!("NOx ECA {field} must be {expected}"),
+            );
+        }
+    }
+
+    let nox_app = nox.get("applicability").unwrap_or(&Value::Null);
+    if nox_app.get("engine_power_kw_min_exclusive").and_then(Value::as_f64) != Some(130.0) {
+        findings.push(
+            "/rules/NE-ATLANTIC-NOX-ECA-2026/applicability/engine_power_kw_min_exclusive",
+            "INVALID",
+            "NOx Tier III applicability threshold must be engines with power output greater than 130 kW",
+        );
+    }
+
+    let expected_triggers = [
+        ("building_contract_placed", "2027-01-01"),
+        ("keel_laid_or_similar_stage", "2027-07-01"),
+        ("ship_delivery", "2031-01-01"),
+    ];
+    let triggers = nox_app.get("ship_construction_triggers").and_then(Value::as_array);
+    match triggers {
+        Some(triggers) => {
+            if triggers.len() != expected_triggers.len() {
+                findings.push(
+                    "/rules/NE-ATLANTIC-NOX-ECA-2026/applicability/ship_construction_triggers",
+                    "INVALID",
+                    "NOx construction/delivery applicability must declare exactly three alternative milestones",
+                );
+            }
+            let mut seen = BTreeSet::new();
+            for (index, trigger) in triggers.iter().enumerate() {
+                let path = format!("/rules/NE-ATLANTIC-NOX-ECA-2026/applicability/ship_construction_triggers/{index}");
+                let milestone = trigger.get("milestone").and_then(Value::as_str);
+                let date = trigger.get("threshold_date").and_then(Value::as_str);
+                if let Some(milestone) = milestone {
+                    if !seen.insert(milestone.to_owned()) {
+                        findings.push(format!("{path}/milestone"), "INVALID", "duplicate construction milestone");
+                    }
+                    if let Some((_, expected_date)) = expected_triggers.iter().find(|(expected, _)| *expected == milestone) {
+                        if date != Some(*expected_date) {
+                            findings.push(
+                                format!("{path}/threshold_date"),
+                                "INVALID",
+                                format!("milestone {milestone} threshold must be {expected_date}"),
+                            );
+                        }
+                    } else {
+                        findings.push(format!("{path}/milestone"), "INVALID", "unsupported NOx ship-construction milestone");
+                    }
+                } else {
+                    findings.push(format!("{path}/milestone"), "INVALID", "construction milestone is missing");
+                }
+                if valid_date(date).is_none() {
+                    findings.push(format!("{path}/threshold_date"), "INVALID", "construction threshold date must be a valid YYYY-MM-DD date");
+                }
+            }
+            for (milestone, _) in expected_triggers {
+                if !seen.contains(milestone) {
+                    findings.push(
+                        "/rules/NE-ATLANTIC-NOX-ECA-2026/applicability/ship_construction_triggers",
+                        "INCOMPLETE",
+                        format!("required alternative construction milestone '{milestone}' is missing"),
+                    );
+                }
+            }
+        }
+        None => findings.push(
+            "/rules/NE-ATLANTIC-NOX-ECA-2026/applicability/ship_construction_triggers",
+            "INVALID",
+            "NOx construction/delivery trigger registry is required",
+        ),
+    }
+
+    let sox_dates = sox.get("dates").unwrap_or(&Value::Null);
+    for (field, expected) in [
+        ("adopted_on", "2026-05-01"),
+        ("entry_into_force_on", "2027-09-01"),
+        ("applies_from", "2028-09-01"),
+    ] {
+        if sox_dates.get(field).and_then(Value::as_str) != Some(expected) {
+            findings.push(
+                format!("/rules/NE-ATLANTIC-SOX-PM-ECA-2026/dates/{field}"),
+                "INVALID",
+                format!("SOx/PM ECA {field} must be {expected}"),
+            );
+        }
+    }
+
+    if require_v2_metrics {
+        let calc = sox.get("calculation_contract").unwrap_or(&Value::Null);
+        if calc.get("reference_value").and_then(Value::as_f64) != Some(0.10)
+            || calc.get("reference_unit").and_then(Value::as_str) != Some("percent_mass_sulphur")
+        {
+            findings.push(
+                "/rules/NE-ATLANTIC-SOX-PM-ECA-2026/calculation_contract",
+                "INVALID",
+                "SOx/PM ECA rule must declare the 0.10% m/m sulphur reference limit",
+            );
+        }
+    }
+}
+
 fn check_v0_2_semantics(register: &Value, findings: &mut Findings) {
     if register.get("schema_version").and_then(Value::as_str) != Some("0.2.0") {
         findings.push("/schema_version", "INVALID", "v0.2 audit requires schema_version 0.2.0");
@@ -511,20 +641,7 @@ fn check_v0_2_semantics(register: &Value, findings: &mut Findings) {
         );
     }
 
-    if let Some(eca) = rules.iter().find(|rule| rule.get("rule_id").and_then(Value::as_str) == Some("NE-ATLANTIC-ECA-2026")) {
-        let dates = eca.get("dates").unwrap_or(&Value::Null);
-        if dates.get("entry_into_force_on").and_then(Value::as_str) != Some("2027-09-01")
-            || dates.get("applies_from").and_then(Value::as_str) != Some("2028-09-01")
-        {
-            findings.push(
-                "/rules/NE-ATLANTIC-ECA-2026/dates",
-                "INVALID",
-                "North-East Atlantic ECA snapshot must distinguish 2027-09-01 entry into force from 2028-09-01 application",
-            );
-        }
-    } else {
-        findings.push("/rules", "INCOMPLETE", "v0.2 register has no North-East Atlantic ECA rule");
-    }
+    check_north_east_atlantic_eca(register, findings, true);
 }
 
 fn run() -> Result<i32, String> {
@@ -538,8 +655,10 @@ fn run() -> Result<i32, String> {
     let mut findings = Findings::default();
     validate_schema(&schema, &register, &mut findings);
     check_registry_semantics(&register, &mut findings);
-    if register.get("schema_version").and_then(Value::as_str) == Some("0.2.0") {
-        check_v0_2_semantics(&register, &mut findings);
+    match register.get("schema_version").and_then(Value::as_str) {
+        Some("0.1.0") => check_north_east_atlantic_eca(&register, &mut findings, false),
+        Some("0.2.0") => check_v0_2_semantics(&register, &mut findings),
+        _ => {}
     }
 
     let report = AuditReport {
@@ -669,31 +788,35 @@ mod tests {
     }
 
     #[test]
-    fn v0_2_north_east_atlantic_eca_keeps_entry_and_application_dates_distinct() {
+    fn v0_2_sox_application_cannot_be_moved_to_general_eca_entry_date() {
         let mut register: Value = serde_json::from_str(RULE_REGISTER_V2).expect("v0.2 rule register JSON");
-        let eca_index = register["rules"].as_array().unwrap().iter().position(|rule|
-            rule.get("rule_id").and_then(Value::as_str) == Some("NE-ATLANTIC-ECA-2026")
+        let sox = register["rules"].as_array_mut().unwrap().iter_mut().find(|rule|
+            rule.get("rule_id").and_then(Value::as_str) == Some("NE-ATLANTIC-SOX-PM-ECA-2026")
         ).unwrap();
-        register["rules"][eca_index]["dates"]["entry_into_force_on"] = serde_json::json!("2028-09-01");
+        sox["dates"]["applies_from"] = serde_json::json!("2027-09-01");
         let mut findings = Findings::default();
-        check_v0_2_semantics(&register, &mut findings);
+        check_north_east_atlantic_eca(&register, &mut findings, true);
         assert!(findings.invalid);
     }
 
     #[test]
-    fn north_east_atlantic_eca_separates_entry_force_sox_application_and_nox_build_dates() {
-        let register: Value = serde_json::from_str(RULE_REGISTER).expect("rule register JSON");
-        let rule = register["rules"].as_array().unwrap().iter()
-            .find(|rule| rule["rule_id"] == "NE-ATLANTIC-ECA-2026")
-            .expect("North-East Atlantic ECA rule");
-        assert_eq!(rule["revision_or_resolution"], "Resolution MEPC.407(84)");
-        assert_eq!(rule["dates"]["entry_into_force_on"], "2027-09-01");
-        assert_eq!(rule["dates"]["applies_from"], "2027-09-01");
-        let conditions = rule["applicability"]["conditions"].as_array().unwrap();
-        assert!(conditions.iter().any(|x| x.as_str().unwrap().contains("1 September 2028")));
-        assert!(conditions.iter().any(|x| x.as_str().unwrap().contains("1 January 2031")));
-        let milestones = rule["calculation_contract"]["phase_in"].as_array().unwrap();
-        assert!(milestones.iter().any(|x| x["year"] == 2028 && x["value"] == 0.10));
+    fn north_east_atlantic_eca_separates_nox_and_sox_rules_and_all_dates() {
+        let register: Value = serde_json::from_str(RULE_REGISTER).expect("v0.1 rule register JSON");
+        let mut findings = Findings::default();
+        check_north_east_atlantic_eca(&register, &mut findings, false);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+        let rules = register["rules"].as_array().unwrap();
+        assert!(!rules.iter().any(|rule| rule["rule_id"] == "NE-ATLANTIC-ECA-2026"));
+    }
+
+    #[test]
+    fn v0_2_north_east_atlantic_eca_has_separate_nox_build_triggers_and_sox_date() {
+        let register: Value = serde_json::from_str(RULE_REGISTER_V2).expect("v0.2 rule register JSON");
+        let mut findings = Findings::default();
+        check_north_east_atlantic_eca(&register, &mut findings, true);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+        let rules = register["rules"].as_array().unwrap();
+        assert!(!rules.iter().any(|rule| rule["rule_id"] == "NE-ATLANTIC-ECA-2026"));
     }
 
     #[test]
