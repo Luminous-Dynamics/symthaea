@@ -647,6 +647,71 @@
       ]
     },
     {
+      "source_id": "ITTC-7.5-03-02-01-2024",
+      "title": "Uncertainty Analysis in CFD, Examples for Resistance and Flow",
+      "publisher": "International Towing Tank Conference (ITTC)",
+      "publication_date": "2024-09",
+      "url": "https://ittc.info/media/11954/75-03-02-01.pdf",
+      "evidence_class": "official_recommended_procedure_cfd_uncertainty_example",
+      "scope": {
+        "procedure": "7.5-03-02-01, Revision 02",
+        "benchmark_geometry": "Series 60 cargo/container ship",
+        "conditions": {
+          "froude_number": 0.316,
+          "reynolds_number": 4300000,
+          "sinkage_trim": "zero for fixed model comparison"
+        },
+        "observables": [
+          "total resistance coefficient",
+          "wave profile"
+        ],
+        "method": [
+          "four grid levels",
+          "refinement ratio approximately square-root-of-two",
+          "iterative and grid uncertainty",
+          "comparison against reference data uncertainty"
+        ]
+      },
+      "observations": [
+        {
+          "metric_id": "total_resistance_validation_error_percent",
+          "value": 7.2,
+          "unit": "percent",
+          "basis": "published example; comparison error"
+        },
+        {
+          "metric_id": "total_resistance_validation_uncertainty_percent",
+          "value": 3.1,
+          "unit": "percent",
+          "basis": "published example; combined validation uncertainty"
+        },
+        {
+          "metric_id": "total_resistance_validation_status",
+          "value": "not_validated",
+          "basis": "absolute comparison error exceeds combined validation uncertainty"
+        },
+        {
+          "metric_id": "wave_profile_profile_averaged_error_percent",
+          "value": 5,
+          "unit": "percent",
+          "basis": "approximately as stated in procedure"
+        }
+      ],
+      "limitations": [
+        "The example concerns one solver (CFDSHIP-IOWA), one Series 60 hull and specified flow conditions.",
+        "It is a procedure/example, not a universal accuracy claim for other solvers, hulls, WAPS installations or operating domains.",
+        "Total resistance is explicitly not validated in the published example; wave-profile validation is a separate observable outcome."
+      ],
+      "eligible_use": [
+        "CFD uncertainty and verification/validation protocol benchmark",
+        "Observable-specific validation state design"
+      ],
+      "ineligible_use": [
+        "Claim that an arbitrary solver is validated",
+        "Direct full-scale cargo-vessel or WAPS performance claim"
+      ]
+    },
+    {
       "source_id": "JMSE-PI-FUELCAST-2026-1774",
       "title": "Physics-Informed Machine Learning with Monotonic Constraints for Daily Fuel Consumption and CII Prediction of Ships",
       "publisher": "Journal of Marine Science and Engineering",
