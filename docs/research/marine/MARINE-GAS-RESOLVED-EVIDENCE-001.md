@@ -36,6 +36,8 @@ It requires:
 
 An unmeasured gas is not a numeric zero. Unknown uncertainty remains unknown. Digests identify supplied bytes; they do not establish measurement authenticity.
 
+The first Rust audit binary is `marine-emissions-evidence-audit` under the standalone validator crate. It performs schema validation, method/resolution mapping, measured-vs-calculated evidence compatibility, engine identity/load domain checks, sample/timebase consistency, calibration disposition and expected-gas completeness checks. Its disposition ceiling is evidence-contract integrity only.
+
 ## 3. Falsifiable programme
 
 1. Compare MEPC.414 measurement and MEPC.416 CEMS results on matched engine/load/fuel/ambient windows where a qualified facility supports both methods.
