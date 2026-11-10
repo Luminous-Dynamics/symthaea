@@ -146,9 +146,11 @@ pub struct SupportDetectionSummary {
     pub false_negative_group_count: usize,
     pub false_positive_group_count: usize,
     pub true_negative_group_count: usize,
+    pub groups_with_both_support_states: usize,
     pub extrapolation_recall: f64,
     pub false_extrapolation_rate: f64,
-    pub extrapolation_auroc: f64,
+    pub extrapolation_auroc: Option<f64>,
+    pub within_group_auc_group_count: usize,
     pub sample_extrapolation_recall: f64,
     pub sample_false_extrapolation_rate: f64,
     pub sample_extrapolation_auroc: f64,
@@ -631,69 +633,124 @@ fn auc(positive_scores: &[f64], negative_scores: &[f64]) -> f64 {
 }
 
 fn compute_support_detection(manifest: &Manifest) -> SupportDetectionSummary {
-    // Sample-level detector performance shows which individual predictions
-    // were flagged. These rates are descriptive; windows are not independent.
+    // Sample-level metrics are retained as descriptive diagnostics. Their
+    // windows are correlated; the pass/fail summary below macro-averages
+    // within each independent physical group instead of treating windows as
+    // independent batteries.
     let mut sample_tp = 0usize;
     let mut sample_fn = 0usize;
     let mut sample_fp = 0usize;
     let mut sample_tn = 0usize;
     let mut sample_pos = Vec::new();
     let mut sample_neg = Vec::new();
+
+    // Keep reference-positive and reference-negative observations separate
+    // inside each physical group. A cell can cross from in-support to
+    // extrapolation as it ages; collapsing the entire cell to one binary
+    // label (e.g. "ever OOD") would make its earlier in-support observations
+    // disappear from the false-positive denominator.
+    let mut by_group: BTreeMap<String, (Vec<f64>, Vec<f64>)> = BTreeMap::new();
     for entry in &manifest.test_entries {
         let actual_ood = entry.reference_support_state == "extrapolation";
-        let predicted_ood = entry.support_score >= manifest.support_scoring.extrapolation_min_score;
+        let predicted_ood =
+            entry.support_score >= manifest.support_scoring.extrapolation_min_score;
         match (actual_ood, predicted_ood) {
             (true, true) => sample_tp += 1,
             (true, false) => sample_fn += 1,
             (false, true) => sample_fp += 1,
             (false, false) => sample_tn += 1,
         }
-        if actual_ood { sample_pos.push(entry.support_score); }
-        else { sample_neg.push(entry.support_score); }
+        if actual_ood {
+            sample_pos.push(entry.support_score);
+        } else {
+            sample_neg.push(entry.support_score);
+        }
+        let group = by_group
+            .entry(entry.group_identity_digest.clone())
+            .or_insert_with(|| (Vec::new(), Vec::new()));
+        if actual_ood {
+            group.0.push(entry.support_score);
+        } else {
+            group.1.push(entry.support_score);
+        }
     }
 
-    // Physical-group metrics prevent a high count of correlated windows from
-    // masquerading as many independent batteries. A group is reference-OOD if
-    // any test observation crosses the predeclared extrapolation boundary;
-    // its detector score is the maximum support score over its test windows.
-    let mut by_group: BTreeMap<String, (bool, f64)> = BTreeMap::new();
-    for entry in &manifest.test_entries {
-        let row = by_group.entry(entry.group_identity_digest.clone())
-            .or_insert((false, 0.0));
-        row.0 |= entry.reference_support_state == "extrapolation";
-        row.1 = row.1.max(entry.support_score);
-    }
-    let mut tp = 0usize;
-    let mut fn_count = 0usize;
-    let mut fp = 0usize;
-    let mut tn = 0usize;
-    let mut positive_scores = Vec::new();
-    let mut negative_scores = Vec::new();
-    for (_, (actual_ood, score)) in by_group {
-        let predicted_ood = score >= manifest.support_scoring.extrapolation_min_score;
-        match (actual_ood, predicted_ood) {
-            (true, true) => tp += 1,
-            (true, false) => fn_count += 1,
-            (false, true) => fp += 1,
-            (false, false) => tn += 1,
+    let threshold = manifest.support_scoring.extrapolation_min_score;
+    let mut positive_groups = 0usize;
+    let mut negative_groups = 0usize;
+    let mut tp_groups = 0usize;
+    let mut fn_groups = 0usize;
+    let mut fp_negative_only_groups = 0usize;
+    let mut tn_negative_only_groups = 0usize;
+    let mut recall_sum = 0.0;
+    let mut false_rate_sum = 0.0;
+    let mut within_group_auc_sum = 0.0;
+    let mut within_group_auc_count = 0usize;
+
+    for (_group_id, (positive_scores, negative_scores)) in &by_group {
+        let group_has_positive = !positive_scores.is_empty();
+        let group_has_negative = !negative_scores.is_empty();
+
+        if group_has_positive {
+            positive_groups += 1;
+            let detected = positive_scores
+                .iter()
+                .filter(|score| **score >= threshold)
+                .count();
+            let group_recall = detected as f64 / positive_scores.len() as f64;
+            recall_sum += group_recall;
+            if detected > 0 {
+                tp_groups += 1;
+            } else {
+                fn_groups += 1;
+            }
         }
-        if actual_ood { positive_scores.push(score); }
-        else { negative_scores.push(score); }
+
+        if group_has_negative {
+            negative_groups += 1;
+            let false_alarms = negative_scores
+                .iter()
+                .filter(|score| **score >= threshold)
+                .count();
+            let group_false_rate = false_alarms as f64 / negative_scores.len() as f64;
+            false_rate_sum += group_false_rate;
+            // The confusion counts below describe negative-only groups. Mixed
+            // temporal groups are represented by their within-group rates.
+            if !group_has_positive {
+                if false_alarms > 0 {
+                    fp_negative_only_groups += 1;
+                } else {
+                    tn_negative_only_groups += 1;
+                }
+            }
+        }
+
+        if group_has_positive && group_has_negative {
+            within_group_auc_sum += auc(positive_scores, negative_scores);
+            within_group_auc_count += 1;
+        }
     }
-    let positives = positive_scores.len();
-    let negatives = negative_scores.len();
+
     let sample_positives = sample_pos.len();
     let sample_negatives = sample_neg.len();
+    let within_group_auroc = (within_group_auc_count > 0)
+        .then_some(within_group_auc_sum / within_group_auc_count as f64);
+
     SupportDetectionSummary {
-        reference_extrapolation_group_count: positives,
-        predicted_extrapolation_group_count: tp + fp,
-        true_positive_group_count: tp,
-        false_negative_group_count: fn_count,
-        false_positive_group_count: fp,
-        true_negative_group_count: tn,
-        extrapolation_recall: tp as f64 / positives as f64,
-        false_extrapolation_rate: fp as f64 / negatives as f64,
-        extrapolation_auroc: auc(&positive_scores, &negative_scores),
+        reference_extrapolation_group_count: positive_groups,
+        predicted_extrapolation_group_count: tp_groups + fp_negative_only_groups,
+        true_positive_group_count: tp_groups,
+        false_negative_group_count: fn_groups,
+        false_positive_group_count: fp_negative_only_groups,
+        true_negative_group_count: tn_negative_only_groups,
+        groups_with_both_support_states: within_group_auc_count,
+        extrapolation_recall: recall_sum / positive_groups as f64,
+        false_extrapolation_rate: false_rate_sum / negative_groups as f64,
+        // Average the per-cell AUC only across cells with both reference
+        // support states. If no cell crosses the support boundary during the
+        // observed trajectory, report null rather than inventing an AUC.
+        extrapolation_auroc: within_group_auroc,
+        within_group_auc_group_count: within_group_auc_count,
         sample_extrapolation_recall: sample_tp as f64 / sample_positives as f64,
         sample_false_extrapolation_rate: sample_fp as f64 / sample_negatives as f64,
         sample_extrapolation_auroc: auc(&sample_pos, &sample_neg),
