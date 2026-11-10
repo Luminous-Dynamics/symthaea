@@ -220,7 +220,7 @@ pub fn compute_sequential_diagnostic_safety_budget_digest(
 ) -> Result<String, SequentialDiagnosticError> {
     validate_safety_budget(safety_budget)?;
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea-sequential-diagnostic-safety-budget-v1\\0");
+    hasher.update(b"symthaea-sequential-diagnostic-safety-budget-v1\0");
     hasher.update(safety_budget.maximum_cumulative_risk.to_bits().to_le_bytes());
     hasher.update((safety_budget.risk_semantics_digest.len() as u64).to_le_bytes());
     hasher.update(safety_budget.risk_semantics_digest.as_bytes());
