@@ -878,6 +878,21 @@ fn calculate_metrics(
                             lifetime.evidence_digest.clone(),
                             None,
                         )))
+                        .chain(std::iter::once(metric_evidence(
+                            "eol_rule".to_owned(),
+                            lifetime.eol_rule_digest.clone(),
+                            None,
+                        )))
+                        .chain(std::iter::once(metric_evidence(
+                            "service_history".to_owned(),
+                            lifetime.service_history_digest.clone(),
+                            None,
+                        )))
+                        .chain(std::iter::once(metric_evidence(
+                            "efc_method".to_owned(),
+                            lifetime.efc_method_digest.clone(),
+                            None,
+                        )))
                         .chain(topology_evidence())
                         .collect();
                     computed(value, "ratio", &population_scope, lifetime_evidence)
@@ -949,6 +964,16 @@ fn calculate_metrics(
                             snapshot.snapshot_digest.clone(),
                             None,
                         )))
+                        .chain(snapshot.observations.iter().map(|row| {
+                            let unit = profile.units.iter()
+                                .find(|unit| unit.unit_ref == row.unit_ref)
+                                .expect("validated full cell population has matching SOH unit");
+                            metric_evidence(
+                                format!("soc_soh_binding:{}", row.unit_ref),
+                                row.soh_measurement_digest.clone(),
+                                Some(unit.capacity.evidence_class.clone()),
+                            )
+                        }))
                         .chain(soh_evidence.iter().cloned())
                         .chain(topology_evidence())
                         .collect();
@@ -1174,9 +1199,9 @@ mod tests {
     #[test]
     fn frozen_corpus_accepts_six_cases_and_rejects_two_controls() {
         let report = report();
-        assert_eq!(report.payload.case_count, 8);
+        assert_eq!(report.payload.case_count, 11);
         assert_eq!(report.payload.accepted_count, 6);
-        assert_eq!(report.payload.rejected_count, 2);
+        assert_eq!(report.payload.rejected_count, 5);
     }
 
     #[test]
@@ -1234,6 +1259,35 @@ mod tests {
             item.role == "end_of_charge_soc:cell-001"
                 && item.evidence_class.as_deref() == Some("synthetic_fixture")
         }));
+    }
+
+    #[test]
+    fn soc_metric_binds_exact_soh_digest_for_each_cell() {
+        let audited = report();
+        let complete = audited.payload.cases.iter()
+            .find(|case| case.case_id == "complete-qualified-series-pack")
+            .and_then(|case| case.summary.as_ref())
+            .expect("complete pack summary");
+        assert!(complete.inconsistency_metrics.beta_soc.evidence.iter().any(|item| {
+            item.role == "soc_soh_binding:cell-001"
+                && item.evidence_class.as_deref() == Some("synthetic_fixture")
+        }));
+    }
+
+    #[test]
+    fn temporal_and_pack_identity_negative_controls_are_rejected() {
+        let audited = report();
+        for case_id in [
+            "soc-soh-reference-digest-mismatch",
+            "stale-soh-reference-rejected",
+            "lifetime-pack-configuration-drift-rejected",
+        ] {
+            let case = audited.payload.cases.iter()
+                .find(|case| case.case_id == case_id)
+                .expect("negative control case");
+            assert!(!case.accepted);
+            assert!(case.plan.is_none());
+        }
     }
 
     #[test]
