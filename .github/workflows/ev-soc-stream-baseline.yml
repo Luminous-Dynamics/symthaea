@@ -1,0 +1,43 @@
+name: EV SOC stream baseline v0.1 audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_SOC_STREAM_V0_1.md"
+      - "fixtures/ev_battery/soc_stream_scenarios_v0_1.json"
+      - "tools/ev-soc-stream-baseline/**"
+      - ".github/workflows/ev-soc-stream-baseline.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-soc-stream-baseline/Cargo.toml -- --check
+
+      - name: Run unit and known-truth tests
+        run: cargo test --manifest-path tools/ev-soc-stream-baseline/Cargo.toml
+
+      - name: Audit frozen SOC scenarios
+        run: |
+          cargo run --manifest-path tools/ev-soc-stream-baseline/Cargo.toml -- \
+            --corpus fixtures/ev_battery/soc_stream_scenarios_v0_1.json \
+            > "$RUNNER_TEMP/ev-soc-stream-report.json"
+          jq -e '
+            .case_count == 6 and
+            .estimated_count == 3 and
+            .abstained_count == 3 and
+            (.corpus_sha256 | test("^[a-f0-9]{64}$")) and
+            all(.cases[]; .truth_covered == true)
+          ' "$RUNNER_TEMP/ev-soc-stream-report.json"
