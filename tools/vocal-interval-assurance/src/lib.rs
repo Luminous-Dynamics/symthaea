@@ -332,6 +332,54 @@ pub fn summarize_decisions(
                 report.schema
             )));
         }
+        require_non_empty(&report.control_id, "report control_id")?;
+        require_non_empty(&report.source_case_id, "report source_case_id")?;
+        require_non_empty(&report.trial_id, "report trial_id")?;
+        require_non_empty(&report.input_manifest_digest, "report input_manifest_digest")?;
+        require_non_empty(&report.interval_family_id, "report interval_family_id")?;
+        validate_coverage(report.familywise_coverage, "report familywise_coverage")?;
+        if report.metrics.is_empty() {
+            return Err(AssuranceError::new(
+                "report must contain at least one metric decision",
+            ));
+        }
+
+        let mut report_metric_ids = BTreeSet::new();
+        for metric in &report.metrics {
+            require_non_empty(&metric.metric_id, "report metric_id")?;
+            require_non_empty(&metric.unit, "report metric unit")?;
+            require_non_empty(
+                &metric.uncertainty_method_id,
+                "report uncertainty_method_id",
+            )?;
+            require_non_empty(
+                &metric.calibration_receipt_id,
+                "report calibration_receipt_id",
+            )?;
+            if !metric.lower_delta.is_finite()
+                || !metric.upper_delta.is_finite()
+                || metric.lower_delta > metric.upper_delta
+            {
+                return Err(AssuranceError::new(format!(
+                    "report metric {} has malformed interval bounds",
+                    metric.metric_id
+                )));
+            }
+            if !report_metric_ids.insert(metric.metric_id.as_str()) {
+                return Err(AssuranceError::new(format!(
+                    "report contains duplicate metric ID: {}",
+                    metric.metric_id
+                )));
+            }
+        }
+        let recomputed_decision =
+            aggregate_decisions(report.metrics.iter().map(|metric| metric.decision));
+        if recomputed_decision != report.overall_decision {
+            return Err(AssuranceError::new(
+                "report overall decision does not match its metric decisions",
+            ));
+        }
+
         let identity = (
             report.control_id.as_str(),
             report.source_case_id.as_str(),
@@ -791,6 +839,31 @@ mod tests {
             decision(&spec, &uncertain),
             AssuranceDecision::Indeterminate
         );
+    }
+
+    #[test]
+    fn decision_summary_rejects_forged_or_malformed_reports() {
+        let mut compliant = evaluate_control(&spec(), &valid_observations()).unwrap();
+
+        let mut forged_overall = compliant.clone();
+        forged_overall.overall_decision = AssuranceDecision::Indeterminate;
+        assert!(summarize_decisions(&[forged_overall]).is_err());
+
+        let mut duplicate_metric = compliant.clone();
+        duplicate_metric.metrics.push(duplicate_metric.metrics[0].clone());
+        assert!(summarize_decisions(&[duplicate_metric]).is_err());
+
+        let mut missing_provenance = compliant.clone();
+        missing_provenance.metrics[0].calibration_receipt_id.clear();
+        assert!(summarize_decisions(&[missing_provenance]).is_err());
+
+        let mut reversed_interval = compliant.clone();
+        reversed_interval.metrics[0].lower_delta = 10.0;
+        reversed_interval.metrics[0].upper_delta = 9.0;
+        assert!(summarize_decisions(&[reversed_interval]).is_err());
+
+        compliant.metrics.clear();
+        assert!(summarize_decisions(&[compliant]).is_err());
     }
 
     #[test]
