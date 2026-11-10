@@ -965,13 +965,22 @@ impl Rubato {
             let end = (n.onset + n.duration).beats();
             match n.emphasis {
                 // A breath BEFORE a new phrase begins.
-                Emphasis::PhraseStart => events.push((swing_beat(onset, swing), 0.10 * spb * dialect.breath_scale())),
+                Emphasis::PhraseStart => events.push((
+                    swing_beat(onset, swing),
+                    0.10 * spb * dialect.breath_scale(),
+                )),
                 // Dwell ON the climax (agogic accent) — pause just after it.
-                Emphasis::Climax => events.push((swing_beat(end, swing), 0.18 * spb * dialect.climax_scale())),
+                Emphasis::Climax => events.push((
+                    swing_beat(end, swing),
+                    0.18 * spb * dialect.climax_scale(),
+                )),
                 // Ritardando INTO a cadence; the final cadence relaxes more.
                 Emphasis::Cadential => {
                     let amount = if i == last_idx { 0.9 } else { 0.35 };
-                    events.push((swing_beat(end, swing), amount * spb * dialect.cadence_scale()));
+                    events.push((
+                        swing_beat(end, swing),
+                        amount * spb * dialect.cadence_scale(),
+                    ));
                 }
                 Emphasis::Normal => {}
             }
