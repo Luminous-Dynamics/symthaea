@@ -1,0 +1,163 @@
+{
+  "schema_version": "0.1.0",
+  "record_id": "SYNTHETIC-WIND-ENERGY-EVIDENCE-0001",
+  "record_status": "synthetic",
+  "proposal_basis": {
+    "instrument": "COM(2026)620",
+    "procedure_id": "2026/0210(COD)",
+    "published_on": "2026-07-17",
+    "legal_status": "proposal_not_in_force",
+    "snapshot_date": "2026-11-10",
+    "limitations": [
+      "Pending legislative proposal; no future implementing standard is represented."
+    ]
+  },
+  "vessel": {
+    "vessel_id": "SYNTHETIC-CARGO-001",
+    "configuration_id": "SYNTHETIC-CONFIG-001",
+    "configuration_revision": "0.1",
+    "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "service_fingerprint": "e3ec23f5308213b6d7ea3743e6cf483623436bec5384e29d3044d525d736fca9"
+  },
+  "reporting_window": {
+    "start": "2026-11-01T00:00:00Z",
+    "end": "2026-11-01T01:00:00Z",
+    "location_state": "at_sea",
+    "timebase_id": "SYNTHETIC-TIMEBASE-001"
+  },
+  "devices": [
+    {
+      "device_id": "SYNTHETIC-ROTOR-001",
+      "device_type": "rotor_sail",
+      "identity": {
+        "id": "SYNTHETIC-ROTOR",
+        "revision": "0.1"
+      },
+      "geometry_revision": "0.1",
+      "control_software_revision": "0.1",
+      "commanded_state": "active",
+      "achieved_state": "active",
+      "evidence_channel_ids": [
+        "SYNTHETIC-WIND-CHANNEL",
+        "SYNTHETIC-ROTOR-RPM-CHANNEL"
+      ],
+      "limitations": [
+        "Synthetic placeholder; no installed device exists."
+      ]
+    }
+  ],
+  "observation_channel_ids": [
+    "SYNTHETIC-WIND-CHANNEL",
+    "SYNTHETIC-ROTOR-RPM-CHANNEL",
+    "SYNTHETIC-SHAFT-POWER-CHANNEL",
+    "SYNTHETIC-FUEL-FLOW-CHANNEL"
+  ],
+  "energy_sources": [
+    {
+      "energy_source_id": "MAIN-ENGINE-FUEL",
+      "source_type": "main_propulsion_fuel",
+      "consumer_boundary": "main propulsion prime mover",
+      "energy_gj": {
+        "value": 100,
+        "unit": "GJ",
+        "uncertainty": {
+          "kind": "unknown",
+          "reason_or_method": "Synthetic fixture."
+        },
+        "evidence_source_id": "SYNTHETIC-ONLY"
+      },
+      "method_id": "synthetic-LHV",
+      "limitations": [
+        "Synthetic only."
+      ]
+    },
+    {
+      "energy_source_id": "WIND-SOURCE",
+      "source_type": "wind_assistance",
+      "consumer_boundary": "propulsive source energy under future standard",
+      "energy_gj": {
+        "value": null,
+        "unit": "GJ",
+        "unknown_reason": "No applicable implementing-act standard/certification method is available in this synthetic record.",
+        "evidence_source_id": "SYNTHETIC-ONLY"
+      },
+      "method_id": "NOT_DETERMINED",
+      "limitations": [
+        "No regulatory wind-energy amount is asserted."
+      ]
+    }
+  ],
+  "wind_energy_assessment": {
+    "status": "not_determined",
+    "regulatory_energy_gj": {
+      "value": null,
+      "unit": "GJ",
+      "unknown_reason": "COM(2026)620 remains a proposal and future standards/certification are not specified.",
+      "evidence_source_id": "SYNTHETIC-ONLY"
+    },
+    "method_basis": "none",
+    "method_id": "NOT_DETERMINED",
+    "limitations": [
+      "A research estimate or avoided-fuel counterfactual must not be used as this field."
+    ]
+  },
+  "research_wind_contribution": {
+    "energy_gj": {
+      "value": 12,
+      "unit": "GJ",
+      "uncertainty": {
+        "kind": "unknown",
+        "reason_or_method": "Synthetic example; not empirical."
+      },
+      "evidence_source_id": "SYNTHETIC-ONLY"
+    },
+    "method_id": "SYNTHETIC-RESEARCH-MODEL",
+    "model_id": "SYNTHETIC-WAPS-MODEL",
+    "model_revision": "0.1",
+    "uncertainty_method": "unknown",
+    "limitations": [
+      "This research estimate is not a regulatory amount and not certified."
+    ]
+  },
+  "counterfactual_avoided_propulsion_energy": {
+    "avoided_propulsion_energy_gj": {
+      "value": 8,
+      "unit": "GJ",
+      "uncertainty": {
+        "kind": "unknown",
+        "reason_or_method": "Synthetic example; not empirical."
+      },
+      "evidence_source_id": "SYNTHETIC-ONLY"
+    },
+    "estimand_id": "SYNTHETIC-WAPS-ATE",
+    "counterfactual_method": "Synthetic matched-voyage placeholder",
+    "model_id": "SYNTHETIC-COUNTERFACTUAL",
+    "model_revision": "0.1",
+    "identifiability_status": "not_identifiable",
+    "limitations": [
+      "Counterfactual avoided energy is not wind energy used and cannot populate the regulatory wind-energy amount."
+    ]
+  },
+  "battery_boundary": {
+    "present": false,
+    "initial_soc": 0,
+    "final_soc": 0,
+    "charge_energy_gj": {
+      "value": null,
+      "unit": "GJ",
+      "unknown_reason": "No battery in synthetic case.",
+      "evidence_source_id": "SYNTHETIC-ONLY"
+    },
+    "discharge_energy_gj": {
+      "value": null,
+      "unit": "GJ",
+      "unknown_reason": "No battery in synthetic case.",
+      "evidence_source_id": "SYNTHETIC-ONLY"
+    },
+    "boundary_method": "not_applicable",
+    "uncertainty_method": "not_applicable"
+  },
+  "limitations": [
+    "Synthetic fixture only; no vessel, WAPS installation, measured data, applicable standard or certificate exists."
+  ]
+}
