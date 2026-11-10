@@ -1,4 +1,4 @@
-name: EV cell-limited power envelope v0.1 audit
+name: EV cell-limited power envelope and beta-power v0.2 audit
 
 on:
   pull_request:
