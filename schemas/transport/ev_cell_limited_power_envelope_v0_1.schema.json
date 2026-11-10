@@ -1,0 +1,411 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-cell-limited-power-envelope/0.1",
+  "title": "EV series-string cell-limited power envelope v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_version",
+    "profile_id",
+    "asset",
+    "topology",
+    "model",
+    "pulse",
+    "cells"
+  ],
+  "properties": {
+    "profile_version": {
+      "const": "ev-cell-limited-power-envelope/0.1"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vehicle_ref",
+        "vehicle_configuration_digest",
+        "pack_ref",
+        "pack_configuration_digest",
+        "chemistry",
+        "declared_cell_count"
+      ],
+      "properties": {
+        "vehicle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vehicle_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "pack_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "chemistry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declared_cell_count": {
+          "type": "integer",
+          "minimum": 2
+        }
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "architecture",
+        "topology_ref",
+        "topology_digest",
+        "qualification"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "qualified",
+            "unknown"
+          ]
+        },
+        "architecture": {
+          "enum": [
+            "series_single_parallel",
+            "series_parallel",
+            "parallel_only",
+            "reconfigurable",
+            "unknown"
+          ]
+        },
+        "topology_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "topology_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "qualification": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "qualification_ref",
+            "authority_ref",
+            "evidence_digest",
+            "evidence_class"
+          ],
+          "properties": {
+            "qualification_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "authority_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "evidence_class": {
+              "enum": [
+                "reference_test_measurement",
+                "derived_estimate",
+                "model_prediction",
+                "simulation_output",
+                "synthetic_fixture",
+                "vendor_claim"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_ref",
+        "model_digest",
+        "equation_ref",
+        "parameter_digest",
+        "soc_valid_min",
+        "soc_valid_max",
+        "temperature_valid_min_c",
+        "temperature_valid_max_c",
+        "calibration_valid",
+        "domain_supported",
+        "protocol_ref",
+        "protocol_digest"
+      ],
+      "properties": {
+        "model_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "equation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameter_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "soc_valid_min": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "soc_valid_max": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "temperature_valid_min_c": {
+          "type": "number"
+        },
+        "temperature_valid_max_c": {
+          "type": "number"
+        },
+        "calibration_valid": {
+          "type": "boolean"
+        },
+        "domain_supported": {
+          "type": "boolean"
+        },
+        "protocol_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "pulse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "direction",
+        "duration_s",
+        "ambient_temperature_upper_c",
+        "ambient_evidence_digest"
+      ],
+      "properties": {
+        "direction": {
+          "const": "discharge"
+        },
+        "duration_s": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 600
+        },
+        "ambient_temperature_upper_c": {
+          "type": "number"
+        },
+        "ambient_evidence_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cell_ref",
+          "cell_identity_digest",
+          "ocv_lower_v",
+          "ocv_upper_v",
+          "ocv_evidence_digest",
+          "ocv_evidence_class",
+          "resistance_lower_ohm",
+          "resistance_upper_ohm",
+          "resistance_evidence_digest",
+          "resistance_evidence_class",
+          "soc_fraction",
+          "soc_uncertainty",
+          "soc_evidence_digest",
+          "soc_evidence_class",
+          "temperature_upper_c",
+          "temperature_uncertainty_c",
+          "temperature_evidence_digest",
+          "temperature_evidence_class",
+          "minimum_voltage_v",
+          "voltage_limit_evidence_digest",
+          "maximum_discharge_current_lower_a",
+          "current_limit_evidence_digest",
+          "thermal_resistance_upper_k_per_w",
+          "thermal_capacity_lower_j_per_k",
+          "thermal_evidence_digest",
+          "thermal_evidence_class",
+          "maximum_temperature_lower_c",
+          "cell_configuration_digest"
+        ],
+        "properties": {
+          "cell_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cell_identity_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "ocv_lower_v": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "ocv_upper_v": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "ocv_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "ocv_evidence_class": {
+            "enum": [
+              "reference_test_measurement",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          },
+          "resistance_lower_ohm": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "resistance_upper_ohm": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "resistance_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "resistance_evidence_class": {
+            "enum": [
+              "reference_test_measurement",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          },
+          "soc_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "soc_uncertainty": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.5
+          },
+          "soc_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "soc_evidence_class": {
+            "enum": [
+              "reference_test_measurement",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          },
+          "temperature_upper_c": {
+            "type": "number"
+          },
+          "temperature_uncertainty_c": {
+            "type": "number",
+            "minimum": 0
+          },
+          "temperature_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "temperature_evidence_class": {
+            "enum": [
+              "reference_test_measurement",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          },
+          "minimum_voltage_v": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "voltage_limit_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "maximum_discharge_current_lower_a": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "current_limit_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "thermal_resistance_upper_k_per_w": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "thermal_capacity_lower_j_per_k": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "thermal_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "thermal_evidence_class": {
+            "enum": [
+              "reference_test_measurement",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          },
+          "maximum_temperature_lower_c": {
+            "type": "number"
+          },
+          "cell_configuration_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  }
+}
