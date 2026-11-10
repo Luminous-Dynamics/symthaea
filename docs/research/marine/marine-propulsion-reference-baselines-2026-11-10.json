@@ -17,7 +17,8 @@
     ],
     "missing_inputs_disposition": "unknown_not_zero",
     "no_cross_study_averaging": true,
-    "no_addition_of_independent_saving_percentages": true
+    "no_addition_of_independent_saving_percentages": true,
+    "regulatory_rule_policy": "Regulatory records distinguish proposal, review, adoption, entry into force, application and supersession dates. A meeting summary or workplan is not silently promoted to an effective legal requirement. Route outputs preserve the rule edition and segment applicability."
   },
   "sources": [
     {
@@ -1124,6 +1125,208 @@
         "Direct prediction of savings for a new vessel",
         "Proof of economic viability for a specific ship",
         "Measured device reliability without underlying service records"
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC84-EEXI-CII-WIND-REVIEW-2026",
+      "title": "Marine Environment Protection Committee 84: phase-two review of short-term GHG measures",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-01",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "evidence_class": "official_committee_workplan_and_meeting_outcome",
+      "scope": {
+        "meeting": "MEPC 84, 27 April–1 May 2026",
+        "work": "Initiated the second phase of the review of EEXI, SEEMP and CII short-term measures.",
+        "wind_propulsion": "Work includes consideration of wind propulsion in EEDI/EEXI calculations and possible CII metric/rating revisions."
+      },
+      "limitations": [
+        "A review/workplan is not an adopted wind-propulsion credit formula or a vessel-specific statutory calculation.",
+        "Do not treat discussion topics or candidate amendments as applicable rules before formal adoption and effective dates."
+      ],
+      "eligible_use": [
+        "Regulatory scenario planning",
+        "Versioned rule-change monitoring",
+        "Evidence requirements for wind-propulsion credit review"
+      ],
+      "ineligible_use": [
+        "Claiming an adopted WAPS EEXI/CII credit",
+        "Replacing statutory calculation or verifier approval"
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC414-416-CH4-N2O-2026",
+      "title": "IMO 2026 guidelines for marine diesel engine methane and nitrous-oxide measurements",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-01",
+      "url": "https://www.imo.org/en/knowledgecentre/indexofimoresolutions/pages/mepc-2026-27.aspx",
+      "evidence_class": "official_mepc_resolutions",
+      "scope": {
+        "resolutions": [
+          {
+            "id": "MEPC.414(84)",
+            "topic": "Test-bed and onboard measurements of CH4 and/or N2O emissions from marine diesel engines"
+          },
+          {
+            "id": "MEPC.415(84)",
+            "topic": "Engine-load monitoring and calculation of emission values"
+          },
+          {
+            "id": "MEPC.416(84)",
+            "topic": "Continuous emission monitoring systems for CH4 and/or N2O"
+          }
+        ],
+        "significance": "Provides methods for gas-resolved tank-to-wake emissions measurement and quantification."
+      },
+      "limitations": [
+        "Verify exact resolution text, applicability and any voluntary/mandatory status before using in a compliance determination.",
+        "Method guidance does not establish that a particular ship's instruments are calibrated or emissions data are verified."
+      ],
+      "eligible_use": [
+        "Gas-specific trial-evidence design",
+        "CH4/N2O measurement method mapping",
+        "Emissions uncertainty and provenance requirements"
+      ],
+      "ineligible_use": [
+        "Assuming CH4/N2O values exist when only CO2/fuel data are available",
+        "Claiming verifier approval"
+      ]
+    },
+    {
+      "source_id": "EU-ETS-MARITIME-2026",
+      "title": "EU Emissions Trading System for maritime transport",
+      "publisher": "European Commission",
+      "publication_date": "2026",
+      "url": "https://climate.ec.europa.eu/areas-action/transport-decarbonisation/reducing-emissions-shipping-sector_en",
+      "evidence_class": "official_eu_regulatory_guidance",
+      "scope": {
+        "coverage": "100% of emissions for voyages between EU ports and emissions within EU ports; 50% for voyages with one end outside the EU, subject to legal scope.",
+        "phase_in": {
+          "emissions_year_2024": 40,
+          "emissions_year_2025": 70,
+          "emissions_year_2026_onward": 100
+        },
+        "gases": "CO2; CH4 and N2O from 2026.",
+        "reporting": "Emissions year, voyage legs, port activity and gas-specific covered emissions are distinct inputs."
+      },
+      "limitations": [
+        "Applicability depends on company, ship, voyage and legal scope; use the consolidated legal acts and verifier for actual reporting.",
+        "Surrender percentages are phase-in requirements, not route-level emissions reduction factors."
+      ],
+      "eligible_use": [
+        "Route-specific ETS exposure scenarios",
+        "Gas-specific covered-emissions accounting",
+        "Cost sensitivity under explicit allowance-price assumptions"
+      ],
+      "ineligible_use": [
+        "Legal determination of applicability without vessel/company facts",
+        "Using one fleet-wide coverage fraction for every voyage"
+      ]
+    },
+    {
+      "source_id": "EU-FUELEU-MARITIME-REG2023-1805",
+      "title": "Regulation (EU) 2023/1805 on the use of renewable and low-carbon fuels in maritime transport (FuelEU Maritime)",
+      "publisher": "European Union",
+      "publication_date": "2023-09-22",
+      "url": "https://eur-lex.europa.eu/eli/reg/2023/1805/oj/eng",
+      "evidence_class": "binding_eu_regulation",
+      "scope": {
+        "application_date": "2025-01-01",
+        "reference_ghg_intensity_gco2e_per_mj": 91.16,
+        "reduction_factors_percent": [
+          {
+            "year": 2025,
+            "value": 2
+          },
+          {
+            "year": 2030,
+            "value": 6
+          },
+          {
+            "year": 2035,
+            "value": 14.5
+          },
+          {
+            "year": 2040,
+            "value": 31
+          },
+          {
+            "year": 2045,
+            "value": 62
+          },
+          {
+            "year": 2050,
+            "value": 80
+          }
+        ],
+        "boundary": "Well-to-wake GHG intensity for energy used on board, under the regulation's defined methods and scope."
+      },
+      "limitations": [
+        "Use the consolidated Regulation, delegated/implementing acts and current guidance for actual calculations.",
+        "RFNBO incentives, banking, borrowing, pooling and exemptions require their own legal and evidence checks.",
+        "Do not replace FuelEU methodology with generic tank-to-wake CO2 intensity."
+      ],
+      "eligible_use": [
+        "Fuel-pathway scenario modelling",
+        "Well-to-wake energy intensity calculations",
+        "Regulatory sensitivity analysis"
+      ],
+      "ineligible_use": [
+        "Compliance certification without verifier",
+        "Applying a reduction factor without vessel and fuel scope review"
+      ]
+    },
+    {
+      "source_id": "IMO-NE-ATLANTIC-ECA-2026",
+      "title": "North-East Atlantic Emission Control Area adopted by MEPC 84",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-01",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "evidence_class": "official_adopted_marine_pollution_measure",
+      "scope": {
+        "geography": "North-East Atlantic Emission Control Area",
+        "adoption": "MEPC 84, 27 April–1 May 2026",
+        "anticipated_effective_date": "2028",
+        "sulphur_limit_percent": "0.10",
+        "meaning": "Geographic and date-sensitive fuel-sulphur constraint for applicable operation within the ECA."
+      },
+      "limitations": [
+        "Use the adopted MARPOL amendment and charted boundary/effective date for actual compliance determinations.",
+        "This is not a general lifecycle-GHG factor and must not be conflated with EU ETS or FuelEU."
+      ],
+      "eligible_use": [
+        "Route segment ECA intersection tests",
+        "Fuel sulphur constraint scenarios",
+        "Regulatory map versioning"
+      ],
+      "ineligible_use": [
+        "Assuming a route-wide uniform fuel rule",
+        "Claiming compliance from route geometry alone"
+      ]
+    },
+    {
+      "source_id": "IMO-NETZERO-FRAMEWORK-STATUS-2026-11-10",
+      "title": "IMO Net-Zero Framework status and MEPC 85 schedule",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-11-10",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "evidence_class": "official_negotiation_status_snapshot",
+      "scope": {
+        "as_of": "2026-11-10",
+        "status": "Not formally adopted as of this snapshot; intersessional work continues.",
+        "next_scheduled_meeting": "MEPC 85, 30 November–3 December 2026",
+        "resumed_extraordinary_session": "Provisionally scheduled for 4 December 2026, subject to confirmation."
+      },
+      "limitations": [
+        "A dated status snapshot becomes stale when new sessions or adoption decisions occur.",
+        "Pending proposals are not binding legal obligations and must be maintained as scenario alternatives."
+      ],
+      "eligible_use": [
+        "Policy scenario analysis with dated status",
+        "Rule-version and effective-date monitoring"
+      ],
+      "ineligible_use": [
+        "Treating pending framework provisions as current law",
+        "Using this status snapshot after later decisions without refresh"
       ]
     }
   ]
