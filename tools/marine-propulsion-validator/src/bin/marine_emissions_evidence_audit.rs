@@ -337,7 +337,9 @@ fn check_record(record: &Value, findings: &mut Findings) {
         }
     }
 
-    for gas in expected_gases.difference(&observed_gases).difference(&explicitly_unmeasured) {
+    for gas in expected_gases.iter().filter(|gas|
+        !observed_gases.contains(*gas) && !explicitly_unmeasured.contains(*gas)
+    ) {
         findings.push(
             "/unmeasured_gases",
             "INCOMPLETE",
