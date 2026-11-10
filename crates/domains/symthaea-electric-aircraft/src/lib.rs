@@ -17,7 +17,10 @@ use std::fmt;
 
 pub mod characterization;
 
-use characterization::{CharacterizationError, PropulsionCharacterization, PropulsionOperatingPoint};
+use characterization::{
+    BatteryCharacterization, BatteryOperatingPoint, CharacterizationError,
+    PropulsionCharacterization, PropulsionOperatingPoint,
+};
 
 const STANDARD_GRAVITY_MPS2: f64 = 9.806_65;
 const SECONDS_PER_HOUR: f64 = 3_600.0;
@@ -101,6 +104,8 @@ pub struct SegmentResult {
     pub motor_efficiency_used: f64,
     pub inverter_efficiency_used: f64,
     pub propeller_efficiency_used: f64,
+    pub battery_open_circuit_voltage_used_v: f64,
+    pub battery_internal_resistance_used_ohm: f64,
     pub battery_power_w: f64,
     pub battery_current_a: f64,
     pub terminal_voltage_v: f64,
@@ -128,6 +133,8 @@ pub struct MissionReport {
     pub final_state_of_charge: f64,
     /// Evidence dataset IDs used by calibrated propulsion maps; empty for scalar mode.
     pub characterization_evidence_ids: Vec<String>,
+    /// Battery OCV/resistance evidence datasets; empty for scalar battery mode.
+    pub battery_characterization_evidence_ids: Vec<String>,
     pub segments: Vec<SegmentResult>,
 }
 
@@ -156,18 +163,22 @@ impl fmt::Display for ModelError {
 impl std::error::Error for ModelError {}
 
 pub fn evaluate_mission(input: &MissionInput) -> Result<MissionReport, ModelError> {
-    let scalar = PropulsionOperatingPoint {
-        motor_efficiency_used: input.propulsion.motor_efficiency,
-        inverter_efficiency_used: input.propulsion.inverter_efficiency,
-        propeller_efficiency_used: input.propulsion.propeller_efficiency,
-        motor_load_fraction: 0.0,
-        inverter_load_fraction: 0.0,
-        propeller_advance_ratio: 0.0,
+    let scalar_propulsion = scalar_propulsion_point(&input.propulsion);
+    let battery = &input.battery;
+    let scalar_battery = BatteryOperatingPoint {
+        open_circuit_voltage_v: battery.nominal_open_circuit_voltage_v,
+        internal_resistance_ohm: battery.internal_resistance_ohm,
     };
-    evaluate_mission_with_provider(input, |_, _| Ok(scalar), Vec::new())
+    evaluate_mission_with_providers(
+        input,
+        |_, _| Ok(scalar_propulsion),
+        |_, _| Ok(scalar_battery.clone()),
+        Vec::new(),
+        Vec::new(),
+    )
 }
 
-/// Evaluate a mission using evidence-bound component efficiency maps.
+/// Evaluate with evidence-bound propulsion efficiency maps.
 ///
 /// Each map is sampled only inside its characterized domain. Its nominal
 /// efficiency minus the supplied absolute uncertainty bound is used for
@@ -179,24 +190,96 @@ pub fn evaluate_mission_characterized(
 ) -> Result<MissionReport, ModelError> {
     characterization.validate().map_err(ModelError::Characterization)?;
     let evidence_ids = characterization.evidence_ids();
-    evaluate_mission_with_provider(
+    let battery = &input.battery;
+    let scalar_battery = BatteryOperatingPoint {
+        open_circuit_voltage_v: battery.nominal_open_circuit_voltage_v,
+        internal_resistance_ohm: battery.internal_resistance_ohm,
+    };
+    evaluate_mission_with_providers(
         input,
         |segment, useful_power_w| {
             characterization
                 .operating_point(segment.true_airspeed_mps, useful_power_w)
                 .map_err(ModelError::Characterization)
         },
+        |_, _| Ok(scalar_battery.clone()),
+        evidence_ids,
+        Vec::new(),
+    )
+}
+
+/// Evaluate with SOC/temperature-dependent pack open-circuit voltage and
+/// resistance surfaces while retaining scalar propulsion efficiencies.
+pub fn evaluate_mission_battery_characterized(
+    input: &MissionInput,
+    characterization: &BatteryCharacterization,
+) -> Result<MissionReport, ModelError> {
+    characterization.validate().map_err(ModelError::Characterization)?;
+    let evidence_ids = characterization.evidence_ids();
+    let scalar_propulsion = scalar_propulsion_point(&input.propulsion);
+    evaluate_mission_with_providers(
+        input,
+        |_, _| Ok(scalar_propulsion),
+        |soc, temperature| {
+            characterization
+                .operating_point(soc, temperature)
+                .map_err(ModelError::Characterization)
+        },
+        Vec::new(),
         evidence_ids,
     )
 }
 
-fn evaluate_mission_with_provider<F>(
+/// Evaluate with both evidence-bound propulsion maps and battery OCV/resistance
+/// surfaces. Every map must cover the actual operating point; extrapolation is
+/// rejected.
+pub fn evaluate_mission_fully_characterized(
+    input: &MissionInput,
+    propulsion: &PropulsionCharacterization,
+    battery: &BatteryCharacterization,
+) -> Result<MissionReport, ModelError> {
+    propulsion.validate().map_err(ModelError::Characterization)?;
+    battery.validate().map_err(ModelError::Characterization)?;
+    let propulsion_evidence_ids = propulsion.evidence_ids();
+    let battery_evidence_ids = battery.evidence_ids();
+    evaluate_mission_with_providers(
+        input,
+        |segment, useful_power_w| {
+            propulsion
+                .operating_point(segment.true_airspeed_mps, useful_power_w)
+                .map_err(ModelError::Characterization)
+        },
+        |soc, temperature| {
+            battery
+                .operating_point(soc, temperature)
+                .map_err(ModelError::Characterization)
+        },
+        propulsion_evidence_ids,
+        battery_evidence_ids,
+    )
+}
+
+fn scalar_propulsion_point(config: &PropulsionConfig) -> PropulsionOperatingPoint {
+    PropulsionOperatingPoint {
+        motor_efficiency_used: config.motor_efficiency,
+        inverter_efficiency_used: config.inverter_efficiency,
+        propeller_efficiency_used: config.propeller_efficiency,
+        motor_load_fraction: 0.0,
+        inverter_load_fraction: 0.0,
+        propeller_advance_ratio: 0.0,
+    }
+}
+
+fn evaluate_mission_with_providers<F, G>(
     input: &MissionInput,
     mut efficiency_provider: F,
+    mut battery_provider: G,
     characterization_evidence_ids: Vec<String>,
+    battery_characterization_evidence_ids: Vec<String>,
 ) -> Result<MissionReport, ModelError>
 where
     F: FnMut(&MissionSegment, f64) -> Result<PropulsionOperatingPoint, ModelError>,
+    G: FnMut(f64, f64) -> Result<BatteryOperatingPoint, ModelError>,
 {
     validate_input(input)?;
 
@@ -259,6 +342,19 @@ where
             return Err(ModelError::InvalidMission("computed segment power overflowed"));
         }
 
+        let battery_operating_point = battery_provider(soc, temperature_k)?;
+        let open_circuit_voltage_v = battery_operating_point.open_circuit_voltage_v;
+        let internal_resistance_ohm = battery_operating_point.internal_resistance_ohm;
+        if !open_circuit_voltage_v.is_finite()
+            || open_circuit_voltage_v <= 0.0
+            || !internal_resistance_ohm.is_finite()
+            || internal_resistance_ohm <= 0.0
+        {
+            return Err(ModelError::InvalidBatteryConfig(
+                "resolved battery OCV and internal resistance must be finite and positive",
+            ));
+        }
+
         if battery_power_w > battery.maximum_continuous_power_w + 1e-9 {
             return Err(ModelError::BatteryPowerLimitExceeded {
                 segment_id: segment.id.clone(),
@@ -269,8 +365,8 @@ where
 
         let current_a = current_for_terminal_power(
             battery_power_w,
-            battery.nominal_open_circuit_voltage_v,
-            battery.internal_resistance_ohm,
+            open_circuit_voltage_v,
+            internal_resistance_ohm,
         )
         .ok_or_else(|| ModelError::BatteryVoltageCollapse { segment_id: segment.id.clone() })?;
         if !current_a.is_finite() {
@@ -284,8 +380,7 @@ where
             });
         }
 
-        let terminal_voltage_v = battery.nominal_open_circuit_voltage_v
-            - current_a * battery.internal_resistance_ohm;
+        let terminal_voltage_v = open_circuit_voltage_v - current_a * internal_resistance_ohm;
         if !terminal_voltage_v.is_finite() || terminal_voltage_v <= 0.0 {
             return Err(ModelError::BatteryVoltageCollapse { segment_id: segment.id.clone() });
         }
@@ -294,9 +389,8 @@ where
         let terminal_wh = battery_power_w * dt / SECONDS_PER_HOUR;
         // Chemical energy draw uses open-circuit voltage; the difference from
         // terminal energy is the internal I²R loss in this equivalent model.
-        let chemical_wh = current_a * battery.nominal_open_circuit_voltage_v
-            * dt / SECONDS_PER_HOUR;
-        let heat_w = current_a * current_a * battery.internal_resistance_ohm;
+        let chemical_wh = current_a * open_circuit_voltage_v * dt / SECONDS_PER_HOUR;
+        let heat_w = current_a * current_a * internal_resistance_ohm;
         let heat_wh = heat_w * dt / SECONDS_PER_HOUR;
 
         let thermal_decay = if battery.thermal_conductance_w_per_k > 0.0 {
@@ -339,6 +433,8 @@ where
             motor_efficiency_used: operating_point.motor_efficiency_used,
             inverter_efficiency_used: operating_point.inverter_efficiency_used,
             propeller_efficiency_used: operating_point.propeller_efficiency_used,
+            battery_open_circuit_voltage_used_v: open_circuit_voltage_v,
+            battery_internal_resistance_used_ohm: internal_resistance_ohm,
             battery_power_w,
             battery_current_a: current_a,
             terminal_voltage_v,
@@ -364,7 +460,7 @@ where
     }
 
     Ok(MissionReport {
-        model_version: "electric-fixed-wing-energy-v0.2.0",
+        model_version: "electric-fixed-wing-energy-v0.3.0",
         all_up_mass_kg: mass_kg,
         battery_specific_energy_wh_per_kg: battery.nominal_energy_wh / battery.pack_mass_kg,
         available_energy_to_reserve_wh: available_energy_wh,
@@ -378,6 +474,7 @@ where
         maximum_pack_temperature_k,
         final_state_of_charge: soc,
         characterization_evidence_ids,
+        battery_characterization_evidence_ids,
         segments: results,
     })
 }
