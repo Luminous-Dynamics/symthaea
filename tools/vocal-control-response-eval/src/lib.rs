@@ -14,7 +14,9 @@ pub struct EvaluationError {
 
 impl EvaluationError {
     fn new(message: impl Into<String>) -> Self {
-        Self { message: message.into() }
+        Self {
+            message: message.into(),
+        }
     }
 }
 
@@ -210,7 +212,10 @@ pub fn evaluate_control_response_matrix(
 
     let metrics = common_metrics.expect("non-empty specifications checked above")
         .into_iter()
-        .map(|(metric_id, unit)| MetricContract { metric_id, unit })
+        .map(|(metric_id, unit)| MetricContract {
+            metric_id,
+            unit,
+        })
         .collect::<Vec<_>>();
     let passed = controls.iter().all(|row| row.passed);
 
@@ -506,7 +511,11 @@ mod tests {
     use super::*;
 
     fn metric(metric_id: &str, unit: &str, value: f64) -> MetricObservation {
-        MetricObservation { metric_id: metric_id.into(), unit: unit.into(), value }
+        MetricObservation {
+            metric_id: metric_id.into(),
+            unit: unit.into(),
+            value,
+        }
     }
 
     fn pair(
@@ -538,18 +547,27 @@ mod tests {
             control_id: "pitch_offset".into(),
             requested_delta: 2.0,
             requested_unit: "semitone".into(),
-            target: MetricContract { metric_id: "pitch_error_cents".into(), unit: "cents".into() },
+            target: MetricContract {
+                metric_id: "pitch_error_cents".into(),
+                unit: "cents".into(),
+            },
             expected_target_delta_min: 1.5,
             expected_target_delta_max: 2.5,
             minimum_target_in_window_fraction: 0.8,
             minimum_pairs: 3,
             collateral_limits: vec![
                 CollateralLimit {
-                    metric: MetricContract { metric_id: "vibrato_depth_cents".into(), unit: "cents".into() },
+                    metric: MetricContract {
+                        metric_id: "vibrato_depth_cents".into(),
+                        unit: "cents".into(),
+                    },
                     maximum_absolute_delta: 0.5,
                 },
                 CollateralLimit {
-                    metric: MetricContract { metric_id: "phrase_energy_db".into(), unit: "dB".into() },
+                    metric: MetricContract {
+                        metric_id: "phrase_energy_db".into(),
+                        unit: "dB".into(),
+                    },
                     maximum_absolute_delta: 0.1,
                 },
             ],
@@ -561,14 +579,20 @@ mod tests {
             control_id: "vibrato_depth".into(),
             requested_delta: 10.0,
             requested_unit: "cents".into(),
-            target: MetricContract { metric_id: "vibrato_depth_cents".into(), unit: "cents".into() },
+            target: MetricContract {
+                metric_id: "vibrato_depth_cents".into(),
+                unit: "cents".into(),
+            },
             expected_target_delta_min: 8.0,
             expected_target_delta_max: 12.0,
             minimum_target_in_window_fraction: 0.8,
             minimum_pairs: 3,
             collateral_limits: vec![
                 CollateralLimit {
-                    metric: MetricContract { metric_id: "pitch_error_cents".into(), unit: "cents".into() },
+                    metric: MetricContract {
+                        metric_id: "pitch_error_cents".into(),
+                        unit: "cents".into(),
+                    },
                     maximum_absolute_delta: 0.5,
                 },
                 CollateralLimit {
