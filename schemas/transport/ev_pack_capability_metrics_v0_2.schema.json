@@ -145,7 +145,8 @@
               "minLength": 1
             },
             "evidence_digest": {
-              "$ref": "#/$defs/digest"
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
             },
             "evidence_class": {
               "enum": [
