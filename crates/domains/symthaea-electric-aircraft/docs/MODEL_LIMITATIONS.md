@@ -56,7 +56,7 @@ It solves the low-current root of the equivalent pack equation and advances a lu
 9. Energy use is based on supplied true airspeed and segment duration. Wind, density altitude, atmospheric variation, route feasibility, terrain, runway, reserves required by a regulator, and alternate-airport policy are not modelled.
 10. The scalar mission uncertainty fraction is a user-supplied screening margin. The adverse-corner budget is a deterministic one-sided screening scenario. Neither is a statistical confidence interval or regulatory reserve.
 11. The adverse-corner method does not yet evaluate characterized map paths and does not capture parameter correlation or probability distributions.
-12. Evidence records validate metadata and digest syntax only. The crate does not fetch evidence URIs, recompute artifact hashes, verify signatures, authority, provenance or configuration applicability.
+12. Evidence records validate metadata and digest syntax. The verified-map API recomputes SHA-256 over caller-supplied bytes and rejects missing/mismatched payloads, but it does not fetch evidence URIs, verify signatures, authenticate source authority, or establish provenance/configuration approval.
 13. The model does not claim any battery chemistry, specific energy, range, certification status, airworthiness or safety performance.
 
 ## Promotion gates
