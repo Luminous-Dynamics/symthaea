@@ -743,6 +743,20 @@ fn metric_evidence(role: String, digest: String, evidence_class: Option<String>)
     }
 }
 
+fn beta_soh_gate(profile: &Profile) -> Result<(), &'static str> {
+    series_cell_gate(profile)?;
+    let minimum = profile.units.iter()
+        .map(|unit| unit.nominal_capacity_ah)
+        .fold(f64::INFINITY, f64::min);
+    let maximum = profile.units.iter()
+        .map(|unit| unit.nominal_capacity_ah)
+        .fold(f64::NEG_INFINITY, f64::max);
+    if !minimum.is_finite() || maximum - minimum > maximum * 1e-9 {
+        return Err("HOMOGENEOUS_NOMINAL_CELL_CAPACITY_REQUIRED");
+    }
+    Ok(())
+}
+
 fn series_cell_gate(profile: &Profile) -> Result<(), &'static str> {
     if profile.population.comparison_resolution != "cell" {
         return Err("CELL_RESOLUTION_REQUIRED");
@@ -809,7 +823,7 @@ fn calculate_metrics(
         soh_evidence.clone(),
     );
 
-    let beta_soh = match series_cell_gate(profile) {
+    let beta_soh = match beta_soh_gate(profile) {
         Ok(()) => {
             let mean = soh.iter().sum::<f64>() / soh.len() as f64;
             let minimum = soh.iter().copied().fold(f64::INFINITY, f64::min);
