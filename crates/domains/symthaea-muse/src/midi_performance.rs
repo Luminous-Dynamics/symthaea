@@ -31,6 +31,8 @@ pub const MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1: &str =
     "muse-orchestration-timeline-serde-json-sha256-v1";
 pub const MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1: &str =
     "muse-midi-instrument-bindings-serde-json-sha256-v1";
+pub const MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1: &str =
+    "muse-midi-instrument-capabilities-serde-json-sha256-v1";
 pub const MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1: &str =
     "muse-midi-performance-manifest-serde-json-sha256-v1";
 pub const MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1: u16 = 960;
@@ -91,6 +93,8 @@ pub struct MidiPerformanceManifestV1 {
     pub timeline_sha256: String,
     pub binding_digest_schema: String,
     pub binding_sha256: String,
+    pub capability_digest_schema: String,
+    pub capability_sha256: String,
     pub midi_sha256: String,
     pub ticks_per_quarter: u16,
     pub tracks: Vec<MidiPerformanceTrackReceiptV1>,
@@ -531,6 +535,15 @@ pub fn export_score_midi_performance_v1(
         &binding_json,
     );
 
+    let mut canonical_capabilities = instruments.to_vec();
+    canonical_capabilities.sort_by(|left, right| left.id.cmp(&right.id));
+    let capability_json = serde_json::to_vec(&canonical_capabilities)
+        .map_err(|error| MidiPerformanceErrorV1::ManifestSerialization(error.to_string()))?;
+    let capability_sha256 = domain_separated_sha256(
+        MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1,
+        &capability_json,
+    );
+
     let mut tracks = Vec::with_capacity(segments.len() + 1);
     tracks.push(EncodedTrackV1 {
         name: "Muse Tempo and Meter".into(),
@@ -697,6 +710,8 @@ pub fn export_score_midi_performance_v1(
         timeline_sha256,
         binding_digest_schema: MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1.into(),
         binding_sha256,
+        capability_digest_schema: MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1.into(),
+        capability_sha256,
         midi_sha256,
         ticks_per_quarter: MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1,
         tracks: track_receipts,
@@ -1128,6 +1143,40 @@ mod tests {
                 capacity: 15,
             }
         );
+    }
+
+
+    #[test]
+    fn capability_inventory_is_bound_into_the_realization_manifest() {
+        let score = score(vec![note(1, 60, 0, 1, 1, 1, 0.8)]);
+        let timeline = timeline(
+            &score,
+            vec![segment("p1", 1, "inst-a", (0, 1), (1, 1), None)],
+        );
+        let mut capability_a = capability("inst-a", InstrumentKindV1::Violin);
+        let mut capability_b = capability_a.clone();
+        capability_b.max_polyphony = 8;
+        let bindings = vec![binding("inst-a", 40)];
+        let first = export(
+            &score,
+            &timeline,
+            &[capability_a.clone()],
+            &bindings,
+        )
+        .expect("first structural capability set");
+        let second = export(
+            &score,
+            &timeline,
+            &[capability_b],
+            &bindings,
+        )
+        .expect("second structural capability set");
+        assert_ne!(
+            first.manifest.capability_sha256,
+            second.manifest.capability_sha256
+        );
+        assert_eq!(first.manifest.midi_bytes, second.manifest.midi_bytes);
+        capability_a.max_polyphony = 8;
     }
 
 }
