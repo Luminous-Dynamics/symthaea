@@ -97,6 +97,7 @@ pub enum PlannerIssueCodeV1 {
     ScoreDigestMismatch,
     InvalidScoreDemandSchema,
     InvalidScoreDemandDigestSchema,
+    InvalidScoreDemandMetadata,
     IncompletePartIdentity,
     AssignedPartFractionIncomplete,
     NoStablePartDemands,
@@ -106,12 +107,15 @@ pub enum PlannerIssueCodeV1 {
     DuplicatePartRequirement,
     UnknownPartRequirement,
     InvalidMusicalFunction,
+    InvalidPartRequirementScope,
     InvalidPlannerLimits,
+    EmptyInstrumentInventory,
     TooManyParts,
     TooManyInstrumentInstances,
     InvalidCapabilityReceipt,
     DuplicateInstrumentInstanceId,
     NoQualifiedCandidateForPart,
+    NoFeasibleGlobalAssignment,
     SearchBudgetExceeded,
     CandidateSerializationFailed,
 }
@@ -258,6 +262,7 @@ fn part_demand_is_valid(demand: &VoiceDemand) -> bool {
         && demand.mean_note_duration_beats.is_finite()
         && demand.mean_note_duration_beats > 0.0
         && demand.first_onset_beat.is_finite()
+        && demand.first_onset_beat >= 0.0
         && demand.last_note_end_beat.is_finite()
         && demand.last_note_end_beat > demand.first_onset_beat
         && demand.active_span_beats.is_finite()
@@ -482,6 +487,21 @@ pub fn plan_orchestration_v1(
             "score-demand digest schema is not supported",
         );
     }
+    if request.score_demand.meter_beats == 0
+        || !request.score_demand.tempo_bpm.is_finite()
+        || request.score_demand.tempo_bpm <= 0.0
+        || !request.score_demand.declared_score_span_beats.is_finite()
+        || request.score_demand.declared_score_span_beats < 0.0
+        || !request.score_demand.analyzed_span_beats.is_finite()
+        || request.score_demand.analyzed_span_beats <= 0.0
+    {
+        report.push(
+            PlannerIssueCodeV1::InvalidScoreDemandMetadata,
+            None,
+            None,
+            "score-demand meter, tempo and span metadata must be finite and valid",
+        );
+    }
     if !request.score_demand.has_complete_part_identity {
         report.push(
             PlannerIssueCodeV1::IncompletePartIdentity,
@@ -580,6 +600,21 @@ pub fn plan_orchestration_v1(
                 "musical_function must be caller-authored and non-empty",
             );
         }
+        if [
+            &requirement.performer_level,
+            &requirement.technique,
+            &requirement.dynamic,
+        ]
+        .into_iter()
+        .any(|value| value.as_ref().is_some_and(|text| text.trim().is_empty()))
+        {
+            report.push(
+                PlannerIssueCodeV1::InvalidPartRequirementScope,
+                Some(requirement.part_id),
+                None,
+                "optional performer/technique/dynamic requirements cannot be empty strings",
+            );
+        }
         if requirements.insert(requirement.part_id, requirement).is_some() {
             report.push(
                 PlannerIssueCodeV1::DuplicatePartRequirement,
@@ -610,14 +645,19 @@ pub fn plan_orchestration_v1(
         }
     }
 
-    if request.instruments.is_empty()
-        || request.instruments.len() > MAX_PLANNER_INSTRUMENTS_V1
-    {
+    if request.instruments.is_empty() {
+        report.push(
+            PlannerIssueCodeV1::EmptyInstrumentInventory,
+            None,
+            None,
+            "at least one qualified instrument instance is required",
+        );
+    } else if request.instruments.len() > MAX_PLANNER_INSTRUMENTS_V1 {
         report.push(
             PlannerIssueCodeV1::TooManyInstrumentInstances,
             None,
             None,
-            "qualified instrument inventory must contain 1..=128 instances",
+            "qualified instrument inventory exceeds the 128-instance limit",
         );
     }
     let mut instrument_ids = BTreeSet::new();
@@ -742,6 +782,12 @@ pub fn plan_orchestration_v1(
     report.disposition = if context.state.candidate_limit_reached {
         PlannerDispositionV1::CandidateLimitReached
     } else if report.candidates.is_empty() {
+        report.push(
+            PlannerIssueCodeV1::NoFeasibleGlobalAssignment,
+            None,
+            None,
+            "no complete one-instance-per-part assignment satisfies all hard constraints",
+        );
         PlannerDispositionV1::InfeasibleComplete
     } else {
         PlannerDispositionV1::FeasibleComplete
@@ -952,7 +998,7 @@ mod tests {
     }
 
     #[test]
-    fn renderer_required_part_abstains_from_non_renderer_capabilities() {
+    fn renderer_required_part_rejects_non_renderer_capabilities() {
         let mut request = request();
         request.part_requirements[0].renderer_required = true;
         let report = plan_orchestration_v1(&request);
@@ -967,6 +1013,40 @@ mod tests {
         request.score_demand.has_complete_part_identity = false;
         let report = plan_orchestration_v1(&request);
         assert_eq!(report.disposition, PlannerDispositionV1::InvalidRequest);
+    }
+
+    #[test]
+    fn empty_instrument_inventory_is_invalid_not_a_feasible_empty_plan() {
+        let mut invalid = request();
+        invalid.instruments.clear();
+        let report = plan_orchestration_v1(&invalid);
+        assert_eq!(report.disposition, PlannerDispositionV1::InvalidRequest);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == PlannerIssueCodeV1::EmptyInstrumentInventory
+        }));
+    }
+
+    #[test]
+    fn score_demand_metadata_is_checked_before_search() {
+        let mut invalid = request();
+        invalid.score_demand.meter_beats = 0;
+        let report = plan_orchestration_v1(&invalid);
+        assert_eq!(report.disposition, PlannerDispositionV1::InvalidRequest);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == PlannerIssueCodeV1::InvalidScoreDemandMetadata
+        }));
+    }
+
+    #[test]
+    fn one_instrument_cannot_be_double_booked_as_two_independent_instances() {
+        let mut invalid = request();
+        invalid.instruments.truncate(1);
+        let report = plan_orchestration_v1(&invalid);
+        assert_eq!(report.disposition, PlannerDispositionV1::InfeasibleComplete);
+        assert!(report.candidates.is_empty());
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == PlannerIssueCodeV1::NoFeasibleGlobalAssignment
+        }));
     }
 
     #[test]
