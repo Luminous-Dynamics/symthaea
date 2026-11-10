@@ -1,0 +1,46 @@
+name: Vocal correction trajectory evaluator
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-correction-trajectory-eval/**"
+      - "docs/research/VOCAL_CORRECTION_TRAJECTORY_BENCHMARK_V1.md"
+      - ".github/workflows/vocal-correction-trajectory-eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vocal-correction-trajectory-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_CORRECTION_TRAJECTORY_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check trajectory evaluator
+        run: cargo +1.96.0 fmt --check --manifest-path tools/vocal-correction-trajectory-eval/Cargo.toml
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/vocal-correction-trajectory-eval/Cargo.toml
+
+      - name: Run synthetic convergence, safety and provenance controls
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-correction-trajectory-eval/Cargo.toml
