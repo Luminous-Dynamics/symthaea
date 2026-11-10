@@ -83,6 +83,7 @@ fn run_case(
         "name": name,
         "status": format!("{:?}", final_report.status),
         "report_digest": final_report.report_digest,
+        "observation_stream_digest": final_report.observation_stream_digest,
         "plan_digest": final_report.plan_digest,
         "total_observations": final_report.total_observation_count,
         "families": final_report.families.iter().map(|family| json!({
