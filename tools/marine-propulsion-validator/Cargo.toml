@@ -33,7 +33,3 @@ path = "src/bin/marine_causal_protocol_audit.rs"
 [[bin]]
 name = "marine-wind-energy-evidence-audit"
 path = "src/bin/marine_wind_energy_evidence_audit.rs"
-
-[[bin]]
-name = "marine-wind-energy-evidence-audit"
-path = "src/bin/marine_wind_energy_evidence_audit.rs"
