@@ -29,13 +29,13 @@ fn main() {
     println!("Declared generalized joints: {}", NUM_FULL_FRAME_JOINTS);
     println!("Constructed articulated joints: {}", sim.total_joints());
 
-    let mut synthetic_load = HumanLoadModel::standard_adult();
+    let mut synthetic_load = HumanLoadModel::reference_75kg_profile();
     for _ in 0..5 {
         synthetic_load.update(0.05);
     }
     println!(
-        "Synthetic human-load proxy (sum absolute joint torques): {:.3}",
-        synthetic_load.human_power()
+        "Synthetic load proxy (sum absolute joint torques, N·m): {:.3}",
+        synthetic_load.sum_abs_joint_torque_nm()
     );
     println!("Note: synthetic load torques are not applied to the articulated plant.");
 
