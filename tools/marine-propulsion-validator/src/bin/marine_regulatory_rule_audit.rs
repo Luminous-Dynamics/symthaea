@@ -686,6 +686,22 @@ mod tests {
     }
 
     #[test]
+    fn north_east_atlantic_eca_separates_entry_force_sox_application_and_nox_build_dates() {
+        let register: Value = serde_json::from_str(RULE_REGISTER).expect("rule register JSON");
+        let rule = register["rules"].as_array().unwrap().iter()
+            .find(|rule| rule["rule_id"] == "NE-ATLANTIC-ECA-2026")
+            .expect("North-East Atlantic ECA rule");
+        assert_eq!(rule["revision_or_resolution"], "Resolution MEPC.407(84)");
+        assert_eq!(rule["dates"]["entry_into_force_on"], "2027-09-01");
+        assert_eq!(rule["dates"]["applies_from"], "2027-09-01");
+        let conditions = rule["applicability"]["conditions"].as_array().unwrap();
+        assert!(conditions.iter().any(|x| x.as_str().unwrap().contains("1 September 2028")));
+        assert!(conditions.iter().any(|x| x.as_str().unwrap().contains("1 January 2031")));
+        let milestones = rule["calculation_contract"]["phase_in"].as_array().unwrap();
+        assert!(milestones.iter().any(|x| x["year"] == 2028 && x["value"] == 0.10));
+    }
+
+    #[test]
     fn pending_review_cannot_claim_effective_date() {
         let mut register: Value = serde_json::from_str(RULE_REGISTER).expect("rule register JSON");
         register["rules"][0]["dates"]["applies_from"] = serde_json::json!("2028-01-01");
