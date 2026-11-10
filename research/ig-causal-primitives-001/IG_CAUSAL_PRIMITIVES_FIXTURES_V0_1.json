@@ -1,0 +1,4397 @@
+{
+  "schema_version": "ig-causal-primitives-fixtures-v0.1",
+  "benchmark_id": "IG-CAUSAL-PRIMITIVES-001",
+  "status": "synthetic_known_answer_fixture_bundle_unexecuted",
+  "owning_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11505",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
+  "revision_ledger_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11340",
+  "communication_graph_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
+  "confidence_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11367",
+  "budget_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/11415",
+  "fixture_count": 48,
+  "primitive_counts": {
+    "causal_prior": 12,
+    "forward_state_tracing": 12,
+    "belief_updating": 12,
+    "agency_sensitivity": 12
+  },
+  "domain_counts": {
+    "mechanical_infrastructure": 16,
+    "institutional_resource": 16,
+    "abstract_synthetic": 16
+  },
+  "tasks": [
+    {
+      "task_id": "IGC-AGENCY-1-1-ACTIVE_AGENT",
+      "primitive": "agency_sensitivity",
+      "domain": "mechanical_infrastructure",
+      "pair_id": "IGC-AGENCY-1-1",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "An operator deliberately performs the declared action; the mechanism is otherwise unchanged. Fictional domain: mechanical infrastructure.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-1-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "active_agent"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-1-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "864711c92e7bbb96cbb1216c8a0e3bfb9b6db1f6fd257845fe43c7d61c6bd17c",
+        "expected_state": {
+          "actor_action": true,
+          "context": true,
+          "outcome": true
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-1-1-PASSIVE_EVENT",
+      "primitive": "agency_sensitivity",
+      "domain": "mechanical_infrastructure",
+      "pair_id": "IGC-AGENCY-1-1",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "The same action occurs as a passive event; the mechanism is otherwise unchanged. Fictional domain: mechanical infrastructure.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-1-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "passive_event"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-1-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "864711c92e7bbb96cbb1216c8a0e3bfb9b6db1f6fd257845fe43c7d61c6bd17c",
+        "expected_state": {
+          "actor_action": true,
+          "context": true,
+          "outcome": true
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-1-2-HIGH_STATUS_ACTOR",
+      "primitive": "agency_sensitivity",
+      "domain": "mechanical_infrastructure",
+      "pair_id": "IGC-AGENCY-1-2",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "A high-status official performs the declared action; status does not alter the mechanism. Fictional domain: mechanical infrastructure.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-1-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "high_status_actor"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-1-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "37b7ef7982adf079cd547304443fcae9cfaab41c2249956fd5512edbff068cc9",
+        "expected_state": {
+          "actor_action": false,
+          "context": true,
+          "outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-1-2-ORDINARY_ACTOR",
+      "primitive": "agency_sensitivity",
+      "domain": "mechanical_infrastructure",
+      "pair_id": "IGC-AGENCY-1-2",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "An ordinary participant performs the declared action; status does not alter the mechanism. Fictional domain: mechanical infrastructure.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-1-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "ordinary_actor"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-1-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "37b7ef7982adf079cd547304443fcae9cfaab41c2249956fd5512edbff068cc9",
+        "expected_state": {
+          "actor_action": false,
+          "context": true,
+          "outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-2-1-ACTIVE_AGENT",
+      "primitive": "agency_sensitivity",
+      "domain": "institutional_resource",
+      "pair_id": "IGC-AGENCY-2-1",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "An operator deliberately performs the declared action; the mechanism is otherwise unchanged. Fictional domain: institutional resource.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-2-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "active_agent"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-2-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "dba24d6b2cfb03b02971d871a2a42fde5bf93cfee7dcfe9f611440981323c902",
+        "expected_state": {
+          "actor_action": true,
+          "context": true,
+          "outcome": true
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-2-1-PASSIVE_EVENT",
+      "primitive": "agency_sensitivity",
+      "domain": "institutional_resource",
+      "pair_id": "IGC-AGENCY-2-1",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "The same action occurs as a passive event; the mechanism is otherwise unchanged. Fictional domain: institutional resource.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-2-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "passive_event"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-2-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "dba24d6b2cfb03b02971d871a2a42fde5bf93cfee7dcfe9f611440981323c902",
+        "expected_state": {
+          "actor_action": true,
+          "context": true,
+          "outcome": true
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-2-2-HIGH_STATUS_ACTOR",
+      "primitive": "agency_sensitivity",
+      "domain": "institutional_resource",
+      "pair_id": "IGC-AGENCY-2-2",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "A high-status official performs the declared action; status does not alter the mechanism. Fictional domain: institutional resource.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-2-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "high_status_actor"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-2-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "969e8fc1d3ecdf7917fd0cb404b843a60f8cf1f760d75379d19961f60db79808",
+        "expected_state": {
+          "actor_action": false,
+          "context": true,
+          "outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-2-2-ORDINARY_ACTOR",
+      "primitive": "agency_sensitivity",
+      "domain": "institutional_resource",
+      "pair_id": "IGC-AGENCY-2-2",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "An ordinary participant performs the declared action; status does not alter the mechanism. Fictional domain: institutional resource.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-2-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "ordinary_actor"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-2-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "969e8fc1d3ecdf7917fd0cb404b843a60f8cf1f760d75379d19961f60db79808",
+        "expected_state": {
+          "actor_action": false,
+          "context": true,
+          "outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-3-1-ACTIVE_AGENT",
+      "primitive": "agency_sensitivity",
+      "domain": "abstract_synthetic",
+      "pair_id": "IGC-AGENCY-3-1",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "An operator deliberately performs the declared action; the mechanism is otherwise unchanged. Fictional domain: abstract synthetic.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-3-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "active_agent"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-3-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "a7934a59411c5ff1df71757e599c58e0d370b227d88945c774bd277eae495d8b",
+        "expected_state": {
+          "actor_action": true,
+          "context": true,
+          "outcome": true
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-3-1-PASSIVE_EVENT",
+      "primitive": "agency_sensitivity",
+      "domain": "abstract_synthetic",
+      "pair_id": "IGC-AGENCY-3-1",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "The same action occurs as a passive event; the mechanism is otherwise unchanged. Fictional domain: abstract synthetic.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-3-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "passive_event"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-3-1-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "a7934a59411c5ff1df71757e599c58e0d370b227d88945c774bd277eae495d8b",
+        "expected_state": {
+          "actor_action": true,
+          "context": true,
+          "outcome": true
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-3-2-HIGH_STATUS_ACTOR",
+      "primitive": "agency_sensitivity",
+      "domain": "abstract_synthetic",
+      "pair_id": "IGC-AGENCY-3-2",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "A high-status official performs the declared action; status does not alter the mechanism. Fictional domain: abstract synthetic.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-3-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "high_status_actor"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-3-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "48cd437426ba178cec48e440a27e4d5e6f8d1b919b433083fc63582a9b57698d",
+        "expected_state": {
+          "actor_action": false,
+          "context": true,
+          "outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-AGENCY-3-2-ORDINARY_ACTOR",
+      "primitive": "agency_sensitivity",
+      "domain": "abstract_synthetic",
+      "pair_id": "IGC-AGENCY-3-2",
+      "task_input": {
+        "prompt": "Using the supplied SCM, return the graph and outcome prediction. Ignore actor-status or grammatical agency cues unless they alter a structural equation or intervention.",
+        "narrative": "An ordinary participant performs the declared action; status does not alter the mechanism. Fictional domain: abstract synthetic.",
+        "scm": {
+          "scm_id": "IGC-AGENCY-3-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {},
+        "framing_variant": "ordinary_actor"
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-AGENCY-3-2-SCM",
+          "nodes": [
+            {
+              "id": "actor_action",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "actor_action",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "48cd437426ba178cec48e440a27e4d5e6f8d1b919b433083fc63582a9b57698d",
+        "expected_state": {
+          "actor_action": false,
+          "context": true,
+          "outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-BU-1-001",
+      "primitive": "belief_updating",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional mechanical infrastructure system. The new evidence is observational.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 2,
+            "scm": {
+              "scm_id": "IGC-BU-1-001-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 3,
+            "scm": {
+              "scm_id": "IGC-BU-1-001-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "observational",
+            "interventions": {},
+            "observed": {
+              "context": true,
+              "cause": true,
+              "effect": true
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-1-001-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "0bd2b5c8761d53e69cba1e494d3e0ce8108b13cc7a38a4fa41a1c81c6adfa17f",
+        "posterior_numerators": {
+          "H-CAUSAL": 2,
+          "H-COMMON-CAUSE": 3
+        },
+        "posterior_denominator": 5
+      }
+    },
+    {
+      "task_id": "IGC-BU-1-002",
+      "primitive": "belief_updating",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional mechanical infrastructure system. The new evidence is observational.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 3,
+            "scm": {
+              "scm_id": "IGC-BU-1-002-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 4,
+            "scm": {
+              "scm_id": "IGC-BU-1-002-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "observational",
+            "interventions": {},
+            "observed": {
+              "context": true,
+              "cause": true,
+              "effect": true
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-1-002-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "8db1ac5717e4e4d33f63091d9d48c3651b97ff5901b8844a190001ebca9162b7",
+        "posterior_numerators": {
+          "H-CAUSAL": 3,
+          "H-COMMON-CAUSE": 4
+        },
+        "posterior_denominator": 7
+      }
+    },
+    {
+      "task_id": "IGC-BU-1-003",
+      "primitive": "belief_updating",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional mechanical infrastructure system. The new evidence is interventional.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 4,
+            "scm": {
+              "scm_id": "IGC-BU-1-003-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 5,
+            "scm": {
+              "scm_id": "IGC-BU-1-003-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "interventional",
+            "interventions": {
+              "cause": false
+            },
+            "observed": {
+              "effect": false
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-1-003-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "f219244834d2c942ce40a1689cf9aecdd4fb4903ea12b48e2a6dcd3017852443",
+        "posterior_numerators": {
+          "H-CAUSAL": 4
+        },
+        "posterior_denominator": 4
+      }
+    },
+    {
+      "task_id": "IGC-BU-1-004",
+      "primitive": "belief_updating",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional mechanical infrastructure system. The new evidence is interventional.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 2,
+            "scm": {
+              "scm_id": "IGC-BU-1-004-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 6,
+            "scm": {
+              "scm_id": "IGC-BU-1-004-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "interventional",
+            "interventions": {
+              "cause": false
+            },
+            "observed": {
+              "effect": true
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-1-004-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "c77844cefcf16cabb310b276747f1b32417c0272bcffb9de46d80a41894061df",
+        "posterior_numerators": {
+          "H-COMMON-CAUSE": 6
+        },
+        "posterior_denominator": 6
+      }
+    },
+    {
+      "task_id": "IGC-BU-2-001",
+      "primitive": "belief_updating",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional institutional resource system. The new evidence is observational.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 2,
+            "scm": {
+              "scm_id": "IGC-BU-2-001-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 3,
+            "scm": {
+              "scm_id": "IGC-BU-2-001-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "observational",
+            "interventions": {},
+            "observed": {
+              "context": true,
+              "cause": true,
+              "effect": true
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-2-001-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "c408de915d94150cba5981b45d07dbee2aed005951eda00c3c5579ec848fbd4b",
+        "posterior_numerators": {
+          "H-CAUSAL": 2,
+          "H-COMMON-CAUSE": 3
+        },
+        "posterior_denominator": 5
+      }
+    },
+    {
+      "task_id": "IGC-BU-2-002",
+      "primitive": "belief_updating",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional institutional resource system. The new evidence is observational.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 3,
+            "scm": {
+              "scm_id": "IGC-BU-2-002-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 4,
+            "scm": {
+              "scm_id": "IGC-BU-2-002-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "observational",
+            "interventions": {},
+            "observed": {
+              "context": true,
+              "cause": true,
+              "effect": true
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-2-002-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "85759a743d5130d9fd09f4898217919b0373ab42e4ee04768e83bdf8c438b14c",
+        "posterior_numerators": {
+          "H-CAUSAL": 3,
+          "H-COMMON-CAUSE": 4
+        },
+        "posterior_denominator": 7
+      }
+    },
+    {
+      "task_id": "IGC-BU-2-003",
+      "primitive": "belief_updating",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional institutional resource system. The new evidence is interventional.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 4,
+            "scm": {
+              "scm_id": "IGC-BU-2-003-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 5,
+            "scm": {
+              "scm_id": "IGC-BU-2-003-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "interventional",
+            "interventions": {
+              "cause": false
+            },
+            "observed": {
+              "effect": false
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-2-003-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "ccf10aa4b391f9995b18c2761c6d39a05453e686e92375179f61519c6e6ce547",
+        "posterior_numerators": {
+          "H-CAUSAL": 4
+        },
+        "posterior_denominator": 4
+      }
+    },
+    {
+      "task_id": "IGC-BU-2-004",
+      "primitive": "belief_updating",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional institutional resource system. The new evidence is interventional.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 2,
+            "scm": {
+              "scm_id": "IGC-BU-2-004-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 6,
+            "scm": {
+              "scm_id": "IGC-BU-2-004-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "interventional",
+            "interventions": {
+              "cause": false
+            },
+            "observed": {
+              "effect": true
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-2-004-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "eec4ef8c94cf635d1a91bee268d76e27f8db4e001f15f7191ab10377ce2ad51a",
+        "posterior_numerators": {
+          "H-COMMON-CAUSE": 6
+        },
+        "posterior_denominator": 6
+      }
+    },
+    {
+      "task_id": "IGC-BU-3-001",
+      "primitive": "belief_updating",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional abstract synthetic system. The new evidence is observational.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 2,
+            "scm": {
+              "scm_id": "IGC-BU-3-001-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 3,
+            "scm": {
+              "scm_id": "IGC-BU-3-001-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "observational",
+            "interventions": {},
+            "observed": {
+              "context": true,
+              "cause": true,
+              "effect": true
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-3-001-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "08c92eb579506dea9a18bacc96e4d05d3e39e718f52ec169dcfd9eb89a953c26",
+        "posterior_numerators": {
+          "H-CAUSAL": 2,
+          "H-COMMON-CAUSE": 3
+        },
+        "posterior_denominator": 5
+      }
+    },
+    {
+      "task_id": "IGC-BU-3-002",
+      "primitive": "belief_updating",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional abstract synthetic system. The new evidence is observational.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 3,
+            "scm": {
+              "scm_id": "IGC-BU-3-002-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 4,
+            "scm": {
+              "scm_id": "IGC-BU-3-002-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "observational",
+            "interventions": {},
+            "observed": {
+              "context": true,
+              "cause": true,
+              "effect": true
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-3-002-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "6cc7f8af4d0b69e2b1d33f08d751052e2f9c6fba0ef9d8dc43ec2914a4d48e13",
+        "posterior_numerators": {
+          "H-CAUSAL": 3,
+          "H-COMMON-CAUSE": 4
+        },
+        "posterior_denominator": 7
+      }
+    },
+    {
+      "task_id": "IGC-BU-3-003",
+      "primitive": "belief_updating",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional abstract synthetic system. The new evidence is interventional.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 4,
+            "scm": {
+              "scm_id": "IGC-BU-3-003-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 5,
+            "scm": {
+              "scm_id": "IGC-BU-3-003-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "interventional",
+            "interventions": {
+              "cause": false
+            },
+            "observed": {
+              "effect": false
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-3-003-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "2b5c1d4c96c70a5e267e305f4e789a29bfd1061f0dbbda6579e809ce104abfcd",
+        "posterior_numerators": {
+          "H-CAUSAL": 4
+        },
+        "posterior_denominator": 4
+      }
+    },
+    {
+      "task_id": "IGC-BU-3-004",
+      "primitive": "belief_updating",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Update this finite causal-hypothesis distribution from the supplied evidence. Distinguish observation from do-intervention. Retain multiple hypotheses when evidence does not identify one.",
+        "narrative": "Two deterministic models explain this fictional abstract synthetic system. The new evidence is interventional.",
+        "hypotheses": [
+          {
+            "hypothesis_id": "H-CAUSAL",
+            "prior_weight": 2,
+            "scm": {
+              "scm_id": "IGC-BU-3-004-H-CAUSAL",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "cause"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "hypothesis_id": "H-COMMON-CAUSE",
+            "prior_weight": 6,
+            "scm": {
+              "scm_id": "IGC-BU-3-004-H-COMMON-CAUSE",
+              "nodes": [
+                {
+                  "id": "context",
+                  "equation": {
+                    "kind": "input",
+                    "inputs": [],
+                    "value": true
+                  }
+                },
+                {
+                  "id": "cause",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                },
+                {
+                  "id": "effect",
+                  "equation": {
+                    "kind": "copy",
+                    "inputs": [
+                      "context"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "interventional",
+            "interventions": {
+              "cause": false
+            },
+            "observed": {
+              "effect": true
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-BU-3-004-H-CAUSAL",
+          "nodes": [
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "context"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "8c6180a44d3d02b5f3743867c1cd9a13735587b090af30b3324175ea34992c05",
+        "posterior_numerators": {
+          "H-COMMON-CAUSE": 6
+        },
+        "posterior_denominator": 6
+      }
+    },
+    {
+      "task_id": "IGC-CP-1-001",
+      "primitive": "causal_prior",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional mechanical infrastructure mechanism: Cause A changes a mediator through a direct mechanism; the mediator and context jointly determine the effect. Context also has its own direct path into the effect."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-1-001-ORACLE",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "mediator",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "a5a7dcc620ef54e7a8cf5d27caefc78c6b48976e8cf212215d71cf7a3d89d83f",
+        "expected_edges": [
+          {
+            "from": "cause_a",
+            "to": "mediator"
+          },
+          {
+            "from": "context",
+            "to": "effect"
+          },
+          {
+            "from": "mediator",
+            "to": "effect"
+          }
+        ],
+        "expected_motifs": [
+          "collider",
+          "mediated_path"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-1-002",
+      "primitive": "causal_prior",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional mechanical infrastructure mechanism: A common upstream condition separately determines exposure and outcome. Neither exposure nor outcome causes the common condition."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-1-002-ORACLE",
+          "nodes": [
+            {
+              "id": "common",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "exposure",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "81e3cdbe1aefd7e98ef0a1f3d9e28831849b2a31c45c631f3ec857abbd5064b4",
+        "expected_edges": [
+          {
+            "from": "common",
+            "to": "exposure"
+          },
+          {
+            "from": "common",
+            "to": "outcome"
+          }
+        ],
+        "expected_motifs": [
+          "common_cause_fork"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-1-003",
+      "primitive": "causal_prior",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional mechanical infrastructure mechanism: Two separate upstream causes are both required for a joint outcome. The outcome does not cause either input."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-1-003-ORACLE",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause_b",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "joint_outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "cause_a",
+                  "cause_b"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "cff88e11d9102d3d808f49d0bd5181e9759594f6c8f619bbdc8b20c8e7f6ba13",
+        "expected_edges": [
+          {
+            "from": "cause_a",
+            "to": "joint_outcome"
+          },
+          {
+            "from": "cause_b",
+            "to": "joint_outcome"
+          }
+        ],
+        "expected_motifs": [
+          "collider"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-1-004",
+      "primitive": "causal_prior",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional mechanical infrastructure mechanism: Cause A directly affects the effect and also affects a mediator; the mediator then affects the effect. Direct and mediated paths coexist."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-1-004-ORACLE",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "or",
+                "inputs": [
+                  "cause_a",
+                  "mediator"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "c5604c6dfc1adb328cd180ef955c6a78093df10123318f4a103dc1ff66934952",
+        "expected_edges": [
+          {
+            "from": "cause_a",
+            "to": "effect"
+          },
+          {
+            "from": "cause_a",
+            "to": "mediator"
+          },
+          {
+            "from": "mediator",
+            "to": "effect"
+          }
+        ],
+        "expected_motifs": [
+          "collider",
+          "common_cause_fork",
+          "direct_and_indirect_path",
+          "mediated_path"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-2-001",
+      "primitive": "causal_prior",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional institutional resource mechanism: Cause A changes a mediator through a direct mechanism; the mediator and context jointly determine the effect. Context also has its own direct path into the effect."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-2-001-ORACLE",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "mediator",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "7a65b4c34756ce0f0b223c9eb287df98e4fe3b9fd2fff741e2fa497fa9e8442f",
+        "expected_edges": [
+          {
+            "from": "cause_a",
+            "to": "mediator"
+          },
+          {
+            "from": "context",
+            "to": "effect"
+          },
+          {
+            "from": "mediator",
+            "to": "effect"
+          }
+        ],
+        "expected_motifs": [
+          "collider",
+          "mediated_path"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-2-002",
+      "primitive": "causal_prior",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional institutional resource mechanism: A common upstream condition separately determines exposure and outcome. Neither exposure nor outcome causes the common condition."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-2-002-ORACLE",
+          "nodes": [
+            {
+              "id": "common",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "exposure",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "320bb9c7b50cf7078fd7953cea3b412136644645789b65b7fe2ed27682b64e56",
+        "expected_edges": [
+          {
+            "from": "common",
+            "to": "exposure"
+          },
+          {
+            "from": "common",
+            "to": "outcome"
+          }
+        ],
+        "expected_motifs": [
+          "common_cause_fork"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-2-003",
+      "primitive": "causal_prior",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional institutional resource mechanism: Two separate upstream causes are both required for a joint outcome. The outcome does not cause either input."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-2-003-ORACLE",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause_b",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "joint_outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "cause_a",
+                  "cause_b"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "820126ee735cb503a109a251f5fddfd86593c80e1898c427d3c37c74f52c362c",
+        "expected_edges": [
+          {
+            "from": "cause_a",
+            "to": "joint_outcome"
+          },
+          {
+            "from": "cause_b",
+            "to": "joint_outcome"
+          }
+        ],
+        "expected_motifs": [
+          "collider"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-2-004",
+      "primitive": "causal_prior",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional institutional resource mechanism: Cause A directly affects the effect and also affects a mediator; the mediator then affects the effect. Direct and mediated paths coexist."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-2-004-ORACLE",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "or",
+                "inputs": [
+                  "cause_a",
+                  "mediator"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "bfc77f48bbfe76a2849a0963825364c6a7a16b5d48792081f22f73f8445ab0c9",
+        "expected_edges": [
+          {
+            "from": "cause_a",
+            "to": "effect"
+          },
+          {
+            "from": "cause_a",
+            "to": "mediator"
+          },
+          {
+            "from": "mediator",
+            "to": "effect"
+          }
+        ],
+        "expected_motifs": [
+          "collider",
+          "common_cause_fork",
+          "direct_and_indirect_path",
+          "mediated_path"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-3-001",
+      "primitive": "causal_prior",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional abstract synthetic mechanism: Cause A changes a mediator through a direct mechanism; the mediator and context jointly determine the effect. Context also has its own direct path into the effect."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-3-001-ORACLE",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "mediator",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "b123f6290303074d261afd1ec3f6f2433267d2ecb769e486d411c453de7e4864",
+        "expected_edges": [
+          {
+            "from": "cause_a",
+            "to": "mediator"
+          },
+          {
+            "from": "context",
+            "to": "effect"
+          },
+          {
+            "from": "mediator",
+            "to": "effect"
+          }
+        ],
+        "expected_motifs": [
+          "collider",
+          "mediated_path"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-3-002",
+      "primitive": "causal_prior",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional abstract synthetic mechanism: A common upstream condition separately determines exposure and outcome. Neither exposure nor outcome causes the common condition."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-3-002-ORACLE",
+          "nodes": [
+            {
+              "id": "common",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "exposure",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "601673ed8433b0cdb0f6578843b9d27622527e9e960ff312653badccfe14fe9c",
+        "expected_edges": [
+          {
+            "from": "common",
+            "to": "exposure"
+          },
+          {
+            "from": "common",
+            "to": "outcome"
+          }
+        ],
+        "expected_motifs": [
+          "common_cause_fork"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-3-003",
+      "primitive": "causal_prior",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional abstract synthetic mechanism: Two separate upstream causes are both required for a joint outcome. The outcome does not cause either input."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-3-003-ORACLE",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "cause_b",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "joint_outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "cause_a",
+                  "cause_b"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "3479de949d88bc5269965826dc8345561cf718137ee5f3412ea1e34f23282842",
+        "expected_edges": [
+          {
+            "from": "cause_a",
+            "to": "joint_outcome"
+          },
+          {
+            "from": "cause_b",
+            "to": "joint_outcome"
+          }
+        ],
+        "expected_motifs": [
+          "collider"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-CP-3-004",
+      "primitive": "causal_prior",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Recover every directed causal edge and its orientation from the mechanism narrative. Identify common-cause, collider, mediated and direct-plus-mediated motifs. Do not infer edges from correlation alone.",
+        "narrative": "In this fictional abstract synthetic mechanism: Cause A directly affects the effect and also affects a mediator; the mediator then affects the effect. Direct and mediated paths coexist."
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-CP-3-004-ORACLE",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "or",
+                "inputs": [
+                  "cause_a",
+                  "mediator"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "28d6aeab223dba2fd6b06392ab96c460a5fe5198d5d33416d31d7d7ef0241bf1",
+        "expected_edges": [
+          {
+            "from": "cause_a",
+            "to": "effect"
+          },
+          {
+            "from": "cause_a",
+            "to": "mediator"
+          },
+          {
+            "from": "mediator",
+            "to": "effect"
+          }
+        ],
+        "expected_motifs": [
+          "collider",
+          "common_cause_fork",
+          "direct_and_indirect_path",
+          "mediated_path"
+        ]
+      }
+    },
+    {
+      "task_id": "IGC-FST-1-001",
+      "primitive": "forward_state_tracing",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic mechanical infrastructure model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-1-001-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "mediator",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "cause_a": true
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-1-001-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "mediator",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "c5f0bca588a568d21ce6a15e9e2b88aa6e3dde4586139b8bfdbd37a0523431eb",
+        "expected_state": {
+          "cause_a": true,
+          "context": true,
+          "effect": true,
+          "mediator": true
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-1-002",
+      "primitive": "forward_state_tracing",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic mechanical infrastructure model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-1-002-SCM",
+          "nodes": [
+            {
+              "id": "common",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "exposure",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "common": false
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-1-002-SCM",
+          "nodes": [
+            {
+              "id": "common",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "exposure",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "87f6aa551e7561d0775d9b21637c2027bad63a5574e3e06552e66a07955a2cbb",
+        "expected_state": {
+          "common": false,
+          "exposure": false,
+          "outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-1-003",
+      "primitive": "forward_state_tracing",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic mechanical infrastructure model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-1-003-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "cause_b",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "joint_outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "cause_a",
+                  "cause_b"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "cause_b": false
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-1-003-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "cause_b",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "joint_outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "cause_a",
+                  "cause_b"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "4ca49a0b85d2639febfd538877fdf7e2612915a1c0e433b0d7b1a6721dfa777e",
+        "expected_state": {
+          "cause_a": false,
+          "cause_b": false,
+          "joint_outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-1-004",
+      "primitive": "forward_state_tracing",
+      "domain": "mechanical_infrastructure",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic mechanical infrastructure model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-1-004-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "or",
+                "inputs": [
+                  "cause_a",
+                  "mediator"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "cause_a": false
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-1-004-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "or",
+                "inputs": [
+                  "cause_a",
+                  "mediator"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "33d65b73533635522a9f92d49fa0330392c2e00e6a00e9538d6b03aed4908bda",
+        "expected_state": {
+          "cause_a": false,
+          "effect": false,
+          "mediator": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-2-001",
+      "primitive": "forward_state_tracing",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic institutional resource model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-2-001-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "mediator",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "cause_a": true
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-2-001-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "mediator",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "e2458fd57b8d17d93fe9aed97b3c7fa0b32f29aa81154a159b84e76859a1499d",
+        "expected_state": {
+          "cause_a": true,
+          "context": true,
+          "effect": true,
+          "mediator": true
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-2-002",
+      "primitive": "forward_state_tracing",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic institutional resource model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-2-002-SCM",
+          "nodes": [
+            {
+              "id": "common",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "exposure",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "common": false
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-2-002-SCM",
+          "nodes": [
+            {
+              "id": "common",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "exposure",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "ee71ea783be4a21ae754a8fd74886b33d4767d6dc6a59778e3fedea9a67a043d",
+        "expected_state": {
+          "common": false,
+          "exposure": false,
+          "outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-2-003",
+      "primitive": "forward_state_tracing",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic institutional resource model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-2-003-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "cause_b",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "joint_outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "cause_a",
+                  "cause_b"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "cause_b": false
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-2-003-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "cause_b",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "joint_outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "cause_a",
+                  "cause_b"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "f1dde876acdb3b413852c7390bd6e709863fdabf59ab66ba6395747c0805d7ba",
+        "expected_state": {
+          "cause_a": false,
+          "cause_b": false,
+          "joint_outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-2-004",
+      "primitive": "forward_state_tracing",
+      "domain": "institutional_resource",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic institutional resource model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-2-004-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "or",
+                "inputs": [
+                  "cause_a",
+                  "mediator"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "cause_a": false
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-2-004-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "or",
+                "inputs": [
+                  "cause_a",
+                  "mediator"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "88ba45a1c5f23463c1ff8a23ecf7d81fe7baa4cf29738e6252d1d19bf8f2467d",
+        "expected_state": {
+          "cause_a": false,
+          "effect": false,
+          "mediator": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-3-001",
+      "primitive": "forward_state_tracing",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic abstract synthetic model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-3-001-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "mediator",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "cause_a": true
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-3-001-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "context",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "mediator",
+                  "context"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "fbaea5a9127860e17cda1db80d11133e91a8b6dada54a00fd813d95e2f9d25e0",
+        "expected_state": {
+          "cause_a": true,
+          "context": true,
+          "effect": true,
+          "mediator": true
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-3-002",
+      "primitive": "forward_state_tracing",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic abstract synthetic model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-3-002-SCM",
+          "nodes": [
+            {
+              "id": "common",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "exposure",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "common": false
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-3-002-SCM",
+          "nodes": [
+            {
+              "id": "common",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "exposure",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            },
+            {
+              "id": "outcome",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "common"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "634ed3e730e6e6165c38cc2914371529b38f89357b93f477cf7e51141fee71e1",
+        "expected_state": {
+          "common": false,
+          "exposure": false,
+          "outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-3-003",
+      "primitive": "forward_state_tracing",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic abstract synthetic model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-3-003-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "cause_b",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "joint_outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "cause_a",
+                  "cause_b"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "cause_b": false
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-3-003-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": false
+              }
+            },
+            {
+              "id": "cause_b",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "joint_outcome",
+              "equation": {
+                "kind": "and",
+                "inputs": [
+                  "cause_a",
+                  "cause_b"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "da38f770f80531a46640425915de6a00a55dcaf8d300e00c07da0ef90cb7655a",
+        "expected_state": {
+          "cause_a": false,
+          "cause_b": false,
+          "joint_outcome": false
+        }
+      }
+    },
+    {
+      "task_id": "IGC-FST-3-004",
+      "primitive": "forward_state_tracing",
+      "domain": "abstract_synthetic",
+      "pair_id": null,
+      "task_input": {
+        "prompt": "Apply the declared do-intervention, propagate each structural equation in topological order, and return the complete post-intervention state.",
+        "narrative": "Frozen deterministic abstract synthetic model. Treat the operation as do-intervention, not observational conditioning.",
+        "scm": {
+          "scm_id": "IGC-FST-3-004-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "or",
+                "inputs": [
+                  "cause_a",
+                  "mediator"
+                ]
+              }
+            }
+          ]
+        },
+        "interventions": {
+          "cause_a": false
+        }
+      },
+      "oracle": {
+        "scm": {
+          "scm_id": "IGC-FST-3-004-SCM",
+          "nodes": [
+            {
+              "id": "cause_a",
+              "equation": {
+                "kind": "input",
+                "inputs": [],
+                "value": true
+              }
+            },
+            {
+              "id": "mediator",
+              "equation": {
+                "kind": "copy",
+                "inputs": [
+                  "cause_a"
+                ]
+              }
+            },
+            {
+              "id": "effect",
+              "equation": {
+                "kind": "or",
+                "inputs": [
+                  "cause_a",
+                  "mediator"
+                ]
+              }
+            }
+          ]
+        },
+        "scm_sha256": "718f21f9b7eb415e2565c590a00ef42316b70465ec291f67ba1628abb2041d4b",
+        "expected_state": {
+          "cause_a": false,
+          "effect": false,
+          "mediator": false
+        }
+      }
+    }
+  ],
+  "claim_ceiling": "All cases are fictional deterministic binary SCM controls. A successful fixture qualification establishes only that the checked-in task and oracle contract is internally consistent; it is not a model trial, evidence of causal understanding, a human-behavior result, or a real-world infrastructure/governance claim."
+}
