@@ -278,8 +278,16 @@ pub enum FeedbackFrameDisposition {
 /// Every output retains the source evidence class and mapping identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProstheticFeedbackFrameV1 {
+    /// Immutable user-codebook identity. The codebook owner must assign a new
+    /// identity whenever any semantic-to-code assignment changes.
     pub mapping_id: String,
     pub source_sequence: u64,
+    pub source_sensor_id: String,
+    pub provenance_receipt_ref: Option<String>,
+    pub calibration_ref: Option<String>,
+    pub source_clock_profile_ref: String,
+    pub source_timestamp_ns: u64,
+    pub received_monotonic_ns: u64,
     pub evidence_class: SensoryEvidenceClass,
     pub cues: Vec<HapticCue>,
     pub disposition: FeedbackFrameDisposition,
@@ -489,6 +497,12 @@ impl ProstheticFeedbackEncoder {
         ProstheticFeedbackFrameV1 {
             mapping_id: self.codebook.mapping_id.clone(),
             source_sequence: observation.sequence,
+            source_sensor_id: observation.sensor_id.clone(),
+            provenance_receipt_ref: observation.provenance_receipt_ref.clone(),
+            calibration_ref: observation.calibration_ref.clone(),
+            source_clock_profile_ref: observation.source_clock_profile_ref.clone(),
+            source_timestamp_ns: observation.source_timestamp_ns,
+            received_monotonic_ns: observation.received_monotonic_ns,
             evidence_class: observation.evidence_class,
             cues,
             disposition,
@@ -562,6 +576,26 @@ mod tests {
             HapticCueSemantic::Contact(HandDigit::Thumb)
         );
         assert_eq!(frame.evidence_class, SensoryEvidenceClass::BenchMeasured);
+    }
+
+    #[test]
+    fn output_preserves_sensor_calibration_and_clock_lineage() {
+        let mut encoder = encoder();
+        let mut sample = observation(42);
+        sample.contacts.push(ContactReading {
+            digit: HandDigit::Thumb,
+            in_contact: true,
+            origin: ObservationOrigin::DirectMeasurement,
+        });
+
+        let frame = encoder.encode(&sample, 150).unwrap();
+        assert_eq!(frame.source_sensor_id, sample.sensor_id);
+        assert_eq!(frame.provenance_receipt_ref, sample.provenance_receipt_ref);
+        assert_eq!(frame.calibration_ref, sample.calibration_ref);
+        assert_eq!(frame.source_clock_profile_ref, sample.source_clock_profile_ref);
+        assert_eq!(frame.source_timestamp_ns, sample.source_timestamp_ns);
+        assert_eq!(frame.received_monotonic_ns, sample.received_monotonic_ns);
+        assert_eq!(frame.source_sequence, sample.sequence);
     }
 
     #[test]
