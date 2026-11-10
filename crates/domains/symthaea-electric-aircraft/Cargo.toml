@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-electric-aircraft"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics"]
+description = "Reduced-order mission energy and battery feasibility model for electric fixed-wing aircraft"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+keywords = ["electric-aircraft", "aerospace", "battery", "mission-energy", "engineering"]
+categories = ["aerospace", "simulation"]
+
+[lib]
+name = "symthaea_electric_aircraft"
+path = "src/lib.rs"
