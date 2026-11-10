@@ -18,14 +18,28 @@
     "name": "EVApeCognition Dataset",
     "repository": "https://github.com/ccp-eva/EVApeCognition",
     "concept_doi": "https://doi.org/10.5281/zenodo.18846348",
-    "immutable_version_doi": null,
-    "immutable_version_status": "PENDING_VERSION_RESOLUTION",
+    "immutable_version_doi": "https://doi.org/10.5281/zenodo.18849382",
+    "immutable_version_status": "RESOLVED_BY_ARTICLE_REFERENCE_AND_CATALOG",
     "reported_license": "CC-BY-4.0",
     "license_evidence": [
       "EVApeCognition repository README states CC-BY 4.0",
       "Scientific Data descriptor states the dataset is CC-BY 4.0"
     ],
-    "rights_boundary": "Do not ingest or redistribute data beyond the declared dataset release. The dataset paper states that original contributing authors remain responsible for the accuracy and completeness of contributed data."
+    "rights_boundary": "Do not ingest or redistribute data beyond the declared dataset release. The dataset paper states that original contributing authors remain responsible for the accuracy and completeness of contributed data.",
+    "github_release_tag": "v1.0.4",
+    "git_tag_snapshot_verified": true,
+    "snapshot_verification": {
+      "reference": "https://github.com/ccp-eva/EVApeCognition/releases/tag/v1.0.4",
+      "verification_method": "fetched exact study YAML, data CSV, glossary CSV, domain definitions, and README at Git ref v1.0.4; every returned blob SHA matched the manifest",
+      "verified_artifacts": [
+        "study_files/albiach2010great/albiach2010great.yaml",
+        "study_files/albiach2010great/albiach2010great_data.csv",
+        "study_files/albiach2010great/albiach2010great_glossary.csv",
+        "general_files/domains_definitions.csv",
+        "README.md"
+      ]
+    },
+    "doi_resolution_note": "10.5281/zenodo.18846348 is the concept DOI that resolves to the latest release; 10.5281/zenodo.18849382 is the exact dataset DOI cited in reference 193 of the Scientific Data article and indexed by the NLM Dataset Catalog. The GitHub v1.0.4 tag was independently checked against all source artifact blob SHAs."
   },
   "source_artifacts": [
     {
