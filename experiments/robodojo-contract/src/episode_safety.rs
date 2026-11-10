@@ -129,6 +129,16 @@ pub enum EpisodeSafetyError {
     DuplicateSpecVerdict,
     UnknownSpecVerdict,
     SpecDefinitionMismatch,
+    ComparisonBenchmarkMismatch,
+    ComparisonProtocolMismatch,
+    ComparisonEvaluatorMismatch,
+    ComparisonEnvironmentMismatch,
+    ComparisonRobotConfigurationMismatch,
+    ComparisonInstrumentManifestMismatch,
+    ComparisonSafetySpecRosterMismatch,
+    ComparisonTaskRosterMismatch,
+    ComparisonEpisodeRosterMismatch,
+    ComparisonApplicabilityMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -204,6 +214,63 @@ pub struct EpisodeSafetyAudit {
     pub results: Vec<EpisodeSafetyResult>,
     pub overall: EpisodeSafetySummary,
     pub by_task: Vec<EpisodeSafetySummary>,
+}
+
+/// Episode metrics kept separate in a matched policy comparison.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EpisodeSafetyMetric {
+    NativeTaskSuccess,
+    SafetyCompliance,
+    SuccessfulButUnsafe,
+    WorstViolationDepth,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EpisodeSafetyUnitDelta {
+    pub task_id: String,
+    pub independence_unit_id: String,
+    pub metric: EpisodeSafetyMetric,
+    pub paired_episode_count: usize,
+    pub baseline_unit_rate: Option<f64>,
+    pub candidate_unit_rate: Option<f64>,
+    pub candidate_minus_baseline: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EpisodeSafetyComparisonSummary {
+    /// None for the aggregate; Some for a task-stratified row.
+    pub task_id: Option<String>,
+    pub metric: EpisodeSafetyMetric,
+    pub paired_unit_count: usize,
+    pub contributing_unit_count: usize,
+    pub unresolved_unit_count: usize,
+    pub baseline_mean_unit_rate: Option<f64>,
+    pub candidate_mean_unit_rate: Option<f64>,
+    /// Positive is better for SR/safety; negative is better for SBU/severity.
+    pub mean_paired_delta: Option<f64>,
+    /// Equal-task mean of task-level deltas; populated only on aggregate rows.
+    pub task_macro_mean_paired_delta: Option<f64>,
+    pub candidate_wins: usize,
+    pub baseline_wins: usize,
+    pub ties: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EpisodeSafetyComparison {
+    pub benchmark_release_sha256: String,
+    pub protocol_sha256: String,
+    pub evaluator_sha256: String,
+    pub environment_condition_sha256: String,
+    pub robot_configuration_sha256: String,
+    pub instrument_manifest_sha256: String,
+    pub safety_spec_roster_sha256: String,
+    pub baseline_policy_artifact_sha256: String,
+    pub candidate_policy_artifact_sha256: String,
+    pub paired_episode_count: usize,
+    /// One row per task × scene/seed unit × metric.
+    pub unit_deltas: Vec<EpisodeSafetyUnitDelta>,
+    pub summaries: Vec<EpisodeSafetyComparisonSummary>,
+    pub task_summaries: Vec<EpisodeSafetyComparisonSummary>,
 }
 
 #[derive(Debug, Default)]
@@ -474,6 +541,259 @@ fn classify_episode(
         sbu,
         worst_depth,
     )
+}
+
+/// Compare two policy arms on an identical benchmark/task/episode/seed,
+/// evaluator, robot and instrument roster. Only the policy artifact may differ.
+/// The result is descriptive paired accounting; it does not calculate a p-value
+/// or confidence interval. Resample the returned scene/seed unit rows, not episodes.
+pub fn compare_episode_safety_arms(
+    baseline: &EpisodeSafetyAudit,
+    candidate: &EpisodeSafetyAudit,
+) -> Result<EpisodeSafetyComparison, EpisodeSafetyError> {
+    if baseline.benchmark_release_sha256 != candidate.benchmark_release_sha256 {
+        return Err(EpisodeSafetyError::ComparisonBenchmarkMismatch);
+    }
+    if baseline.protocol_sha256 != candidate.protocol_sha256 {
+        return Err(EpisodeSafetyError::ComparisonProtocolMismatch);
+    }
+    if baseline.evaluator_sha256 != candidate.evaluator_sha256 {
+        return Err(EpisodeSafetyError::ComparisonEvaluatorMismatch);
+    }
+    if baseline.environment_condition_sha256 != candidate.environment_condition_sha256 {
+        return Err(EpisodeSafetyError::ComparisonEnvironmentMismatch);
+    }
+    if baseline.robot_configuration_sha256 != candidate.robot_configuration_sha256 {
+        return Err(EpisodeSafetyError::ComparisonRobotConfigurationMismatch);
+    }
+    if baseline.instrument_manifest_sha256 != candidate.instrument_manifest_sha256 {
+        return Err(EpisodeSafetyError::ComparisonInstrumentManifestMismatch);
+    }
+    if baseline.safety_spec_roster_sha256 != candidate.safety_spec_roster_sha256 {
+        return Err(EpisodeSafetyError::ComparisonSafetySpecRosterMismatch);
+    }
+    if baseline.results.is_empty()
+        || baseline.results.len() != candidate.results.len()
+        || baseline.expected_episode_count != candidate.expected_episode_count
+    {
+        return Err(EpisodeSafetyError::ComparisonEpisodeRosterMismatch);
+    }
+
+    let mut baseline_rows = BTreeMap::new();
+    for row in &baseline.results {
+        let key = (row.task_id.as_str(), row.episode_id.as_str());
+        if baseline_rows.insert(key, row).is_some() {
+            return Err(EpisodeSafetyError::ComparisonEpisodeRosterMismatch);
+        }
+    }
+    let mut candidate_rows = BTreeMap::new();
+    for row in &candidate.results {
+        let key = (row.task_id.as_str(), row.episode_id.as_str());
+        if candidate_rows.insert(key, row).is_some() {
+            return Err(EpisodeSafetyError::ComparisonEpisodeRosterMismatch);
+        }
+    }
+    if baseline_rows.keys().copied().collect::<BTreeSet<_>>()
+        != candidate_rows.keys().copied().collect::<BTreeSet<_>>()
+    {
+        return Err(EpisodeSafetyError::ComparisonEpisodeRosterMismatch);
+    }
+
+    let baseline_tasks = baseline_rows.keys().map(|(task_id, _)| *task_id).collect::<BTreeSet<_>>();
+    let candidate_tasks = candidate_rows.keys().map(|(task_id, _)| *task_id).collect::<BTreeSet<_>>();
+    if baseline_tasks != candidate_tasks {
+        return Err(EpisodeSafetyError::ComparisonTaskRosterMismatch);
+    }
+
+    let mut grouped = BTreeMap::<
+        (String, String),
+        Vec<(&EpisodeSafetyResult, &EpisodeSafetyResult)>,
+    >::new();
+    for (key, base_row) in &baseline_rows {
+        let candidate_row = candidate_rows.get(key)
+            .ok_or(EpisodeSafetyError::ComparisonEpisodeRosterMismatch)?;
+        if base_row.independence_unit_id != candidate_row.independence_unit_id
+            || base_row.seed != candidate_row.seed
+        {
+            return Err(EpisodeSafetyError::ComparisonEpisodeRosterMismatch);
+        }
+        let baseline_na = base_row.safety_status == EpisodeSafetyStatus::NotApplicable;
+        let candidate_na = candidate_row.safety_status == EpisodeSafetyStatus::NotApplicable;
+        if baseline_na != candidate_na {
+            return Err(EpisodeSafetyError::ComparisonApplicabilityMismatch);
+        }
+        grouped.entry((
+            base_row.task_id.clone(),
+            base_row.independence_unit_id.clone(),
+        )).or_default().push((base_row, candidate_row));
+    }
+
+    let metrics = [
+        EpisodeSafetyMetric::NativeTaskSuccess,
+        EpisodeSafetyMetric::SafetyCompliance,
+        EpisodeSafetyMetric::SuccessfulButUnsafe,
+        EpisodeSafetyMetric::WorstViolationDepth,
+    ];
+    let mut unit_deltas = Vec::with_capacity(grouped.len() * metrics.len());
+    for ((task_id, independence_unit_id), rows) in grouped {
+        let baseline_unit = rows.iter().map(|(base, _)| *base).collect::<Vec<_>>();
+        let candidate_unit = rows.iter().map(|(_, row)| *row).collect::<Vec<_>>();
+        for metric in metrics {
+            let base_rate = episode_metric_rate(&baseline_unit, metric);
+            let candidate_rate = episode_metric_rate(&candidate_unit, metric);
+            let delta = match (base_rate, candidate_rate) {
+                (Some(base), Some(candidate)) => Some(candidate - base),
+                (None, None) => None,
+                _ => return Err(EpisodeSafetyError::ComparisonApplicabilityMismatch),
+            };
+            unit_deltas.push(EpisodeSafetyUnitDelta {
+                task_id: task_id.clone(),
+                independence_unit_id: independence_unit_id.clone(),
+                metric,
+                paired_episode_count: rows.len(),
+                baseline_unit_rate: base_rate,
+                candidate_unit_rate: candidate_rate,
+                candidate_minus_baseline: delta,
+            });
+        }
+    }
+
+    let task_ids = unit_deltas.iter().map(|row| row.task_id.as_str()).collect::<BTreeSet<_>>();
+    let mut task_summaries = Vec::new();
+    for task_id in task_ids {
+        for metric in metrics {
+            let rows = unit_deltas.iter()
+                .filter(|row| row.task_id == task_id && row.metric == metric)
+                .collect::<Vec<_>>();
+            task_summaries.push(summarize_safety_deltas(Some(task_id.to_owned()), metric, &rows, false));
+        }
+    }
+
+    let mut summaries = Vec::new();
+    for metric in metrics {
+        let rows = unit_deltas.iter().filter(|row| row.metric == metric).collect::<Vec<_>>();
+        let mut summary = summarize_safety_deltas(None, metric, &rows, false);
+        let task_rows = task_summaries.iter()
+            .filter(|row| row.metric == metric)
+            .filter_map(|row| row.mean_paired_delta)
+            .collect::<Vec<_>>();
+        summary.task_macro_mean_paired_delta = (!task_rows.is_empty())
+            .then(|| task_rows.iter().sum::<f64>() / task_rows.len() as f64);
+        summaries.push(summary);
+    }
+
+    Ok(EpisodeSafetyComparison {
+        benchmark_release_sha256: baseline.benchmark_release_sha256.clone(),
+        protocol_sha256: baseline.protocol_sha256.clone(),
+        evaluator_sha256: baseline.evaluator_sha256.clone(),
+        environment_condition_sha256: baseline.environment_condition_sha256.clone(),
+        robot_configuration_sha256: baseline.robot_configuration_sha256.clone(),
+        instrument_manifest_sha256: baseline.instrument_manifest_sha256.clone(),
+        safety_spec_roster_sha256: baseline.safety_spec_roster_sha256.clone(),
+        baseline_policy_artifact_sha256: baseline.policy_artifact_sha256.clone(),
+        candidate_policy_artifact_sha256: candidate.policy_artifact_sha256.clone(),
+        paired_episode_count: baseline.results.len(),
+        unit_deltas,
+        summaries,
+        task_summaries,
+    })
+}
+
+fn episode_metric_rate(
+    rows: &[&EpisodeSafetyResult],
+    metric: EpisodeSafetyMetric,
+) -> Option<f64> {
+    if rows.is_empty() {
+        return None;
+    }
+    match metric {
+        EpisodeSafetyMetric::NativeTaskSuccess => {
+            let outcomes = rows.iter().map(|row| row.native_task_success).collect::<Option<Vec<_>>>()?;
+            Some(outcomes.iter().filter(|value| **value).count() as f64 / outcomes.len() as f64)
+        }
+        EpisodeSafetyMetric::SafetyCompliance => {
+            let applicable = rows.iter()
+                .filter(|row| row.safety_status != EpisodeSafetyStatus::NotApplicable)
+                .collect::<Vec<_>>();
+            if applicable.is_empty() {
+                return None;
+            }
+            let mut compliant = 0usize;
+            for row in &applicable {
+                match row.safety_status {
+                    EpisodeSafetyStatus::Compliant => compliant += 1,
+                    EpisodeSafetyStatus::Violated => {}
+                    EpisodeSafetyStatus::Unresolved | EpisodeSafetyStatus::NotApplicable => return None,
+                }
+            }
+            Some(compliant as f64 / applicable.len() as f64)
+        }
+        EpisodeSafetyMetric::SuccessfulButUnsafe => {
+            let outcomes = rows.iter()
+                .map(|row| row.successful_but_unsafe)
+                .collect::<Option<Vec<_>>>()?;
+            Some(outcomes.iter().filter(|value| **value).count() as f64 / outcomes.len() as f64)
+        }
+        EpisodeSafetyMetric::WorstViolationDepth => {
+            let applicable = rows.iter()
+                .filter(|row| row.safety_status != EpisodeSafetyStatus::NotApplicable)
+                .collect::<Vec<_>>();
+            if applicable.is_empty() {
+                return None;
+            }
+            let depths = applicable.iter()
+                .map(|row| row.worst_violation_depth)
+                .collect::<Option<Vec<_>>>()?;
+            Some(depths.iter().sum::<f64>() / depths.len() as f64)
+        }
+    }
+}
+
+fn summarize_safety_deltas(
+    task_id: Option<String>,
+    metric: EpisodeSafetyMetric,
+    rows: &[&EpisodeSafetyUnitDelta],
+    _aggregate: bool,
+) -> EpisodeSafetyComparisonSummary {
+    let contributing = rows.iter()
+        .filter(|row| row.candidate_minus_baseline.is_some())
+        .collect::<Vec<_>>();
+    let average = |values: Vec<f64>| {
+        (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
+    };
+    let mut candidate_wins = 0usize;
+    let mut baseline_wins = 0usize;
+    let mut ties = 0usize;
+    for row in &contributing {
+        if let Some(delta) = row.candidate_minus_baseline {
+            let better = match metric {
+                EpisodeSafetyMetric::NativeTaskSuccess | EpisodeSafetyMetric::SafetyCompliance => delta,
+                EpisodeSafetyMetric::SuccessfulButUnsafe | EpisodeSafetyMetric::WorstViolationDepth => -delta,
+            };
+            match better.total_cmp(&0.0) {
+                std::cmp::Ordering::Greater => candidate_wins += 1,
+                std::cmp::Ordering::Less => baseline_wins += 1,
+                std::cmp::Ordering::Equal => ties += 1,
+            }
+        }
+    }
+    EpisodeSafetyComparisonSummary {
+        task_id,
+        metric,
+        paired_unit_count: rows.len(),
+        contributing_unit_count: contributing.len(),
+        unresolved_unit_count: rows.len().saturating_sub(contributing.len()),
+        baseline_mean_unit_rate: average(contributing.iter()
+            .filter_map(|row| row.baseline_unit_rate).collect()),
+        candidate_mean_unit_rate: average(contributing.iter()
+            .filter_map(|row| row.candidate_unit_rate).collect()),
+        mean_paired_delta: average(contributing.iter()
+            .filter_map(|row| row.candidate_minus_baseline).collect()),
+        task_macro_mean_paired_delta: None,
+        candidate_wins,
+        baseline_wins,
+        ties,
+    }
 }
 
 fn validate_observation(
@@ -933,6 +1253,97 @@ mod tests {
             audit_episode_safety(&input, &[]),
             Err(EpisodeSafetyError::TaskRosterMismatch)
         );
+    }
+
+    #[test]
+    fn paired_safety_comparison_holds_context_and_episode_roster_fixed() {
+        let input = manifest();
+        let baseline = audit_episode_safety(
+            &input,
+            &[
+                observation(&input, 0, Some(true), true),
+                observation(&input, 1, Some(true), false),
+            ],
+        ).unwrap();
+
+        let mut candidate_manifest = input.clone();
+        candidate_manifest.policy_artifact_sha256 = digest('z');
+        let candidate = audit_episode_safety(
+            &candidate_manifest,
+            &[
+                observation(&candidate_manifest, 0, Some(true), false),
+                observation(&candidate_manifest, 1, Some(true), false),
+            ],
+        ).unwrap();
+        let comparison = compare_episode_safety_arms(&baseline, &candidate).unwrap();
+        assert_eq!(comparison.paired_episode_count, 2);
+        assert_eq!(comparison.unit_deltas.len(), 8);
+
+        let safety = comparison.summaries.iter()
+            .find(|row| row.metric == EpisodeSafetyMetric::SafetyCompliance).unwrap();
+        assert_eq!(safety.mean_paired_delta, Some(0.5));
+        assert_eq!(safety.candidate_wins, 1);
+        assert_eq!(safety.task_macro_mean_paired_delta, Some(0.5));
+
+        let sbu = comparison.summaries.iter()
+            .find(|row| row.metric == EpisodeSafetyMetric::SuccessfulButUnsafe).unwrap();
+        assert_eq!(sbu.mean_paired_delta, Some(-0.5));
+        assert_eq!(sbu.candidate_wins, 1);
+        assert_eq!(sbu.baseline_wins, 0);
+    }
+
+    #[test]
+    fn paired_safety_comparison_rejects_different_robot_or_instrument_context() {
+        let input = manifest();
+        let baseline = audit_episode_safety(
+            &input,
+            &[observation(&input, 0, Some(true), false), observation(&input, 1, Some(true), false)],
+        ).unwrap();
+
+        let mut changed = input.clone();
+        changed.robot_configuration_sha256 = digest('z');
+        let candidate = audit_episode_safety(
+            &changed,
+            &[observation(&changed, 0, Some(true), false), observation(&changed, 1, Some(true), false)],
+        ).unwrap();
+        assert_eq!(
+            compare_episode_safety_arms(&baseline, &candidate),
+            Err(EpisodeSafetyError::ComparisonRobotConfigurationMismatch)
+        );
+
+        changed = input.clone();
+        changed.instrument_manifest_sha256 = digest('z');
+        let candidate = audit_episode_safety(
+            &changed,
+            &[observation(&changed, 0, Some(true), false), observation(&changed, 1, Some(true), false)],
+        ).unwrap();
+        assert_eq!(
+            compare_episode_safety_arms(&baseline, &candidate),
+            Err(EpisodeSafetyError::ComparisonInstrumentManifestMismatch)
+        );
+    }
+
+    #[test]
+    fn paired_safety_comparison_preserves_unresolved_units() {
+        let input = manifest();
+        let baseline = audit_episode_safety(
+            &input,
+            &[observation(&input, 0, Some(true), false), observation(&input, 1, Some(true), false)],
+        ).unwrap();
+
+        let mut incomplete = observation(&input, 0, Some(true), false);
+        incomplete.spec_verdicts.pop();
+        let candidate = audit_episode_safety(
+            &input,
+            &[incomplete, observation(&input, 1, Some(true), false)],
+        ).unwrap();
+        let comparison = compare_episode_safety_arms(&baseline, &candidate).unwrap();
+        let safety = comparison.summaries.iter()
+            .find(|row| row.metric == EpisodeSafetyMetric::SafetyCompliance).unwrap();
+        assert_eq!(safety.paired_unit_count, 2);
+        assert_eq!(safety.contributing_unit_count, 1);
+        assert_eq!(safety.unresolved_unit_count, 1);
+        assert_eq!(safety.mean_paired_delta, Some(0.0));
     }
 
     #[test]
