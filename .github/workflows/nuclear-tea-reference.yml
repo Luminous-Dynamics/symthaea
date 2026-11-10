@@ -19,9 +19,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install stable Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: 1.96.0
           components: rustfmt, clippy
 
       - name: Format check
