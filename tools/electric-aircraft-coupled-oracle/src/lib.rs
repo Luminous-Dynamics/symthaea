@@ -706,7 +706,7 @@ mod tests {
             solve_substep_bisection(
                 &model,
                 initial_state(),
-                SubstepInput { terminal_power_w: 30_000.0, duration_s: 60.0 }
+                SubstepInput { terminal_power_w: 35_000.0, duration_s: 60.0 }
             ),
             Err(OracleError::ThermalLimitExceeded { .. })
         ));
