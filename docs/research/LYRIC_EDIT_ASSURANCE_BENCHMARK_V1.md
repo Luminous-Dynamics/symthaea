@@ -38,7 +38,7 @@ A complete edit must independently pass:
 1. Instruction realization — requested words/phonemes, operation, target scope, language direction and code-switching.
 2. Preservation — melody, singer/timbre, vocal score/quality, timing/rhythm, protected regions and accompaniment where measured.
 
-The scorer never sums PER, F0-CORR, SIM, MOS or locality into a single quality score. Each metric keeps its own unit, evaluator and accepted interval.
+The scorer never sums PER, F0-CORR, SIM, MOS or locality into a single quality score. Each metric keeps its own unit, evaluator and accepted interval. Same-timbre cases must bind the same melody/timbre reference digest; cross-timbre cases must bind distinct digests, so mislabeled conditions are rejected rather than pooled.
 
 Each interval receives a three-way decision:
 - PASS: the full interval is within its accepted region;
