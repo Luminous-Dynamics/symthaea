@@ -1177,6 +1177,80 @@ mod tests {
     }
 
     #[test]
+    fn hidden_confounder_fixture_keeps_observation_and_do_likelihoods_distinct() {
+        // Known-answer SCM:
+        // U ~ Bernoulli(0.5), A|U=1 ~ Bernoulli(0.9),
+        // A|U=0 ~ Bernoulli(0.1), Y=U. There is no A -> Y edge.
+        // Therefore P(Y=1 | A=1) = 0.9, but P(Y=1 | do(A=1)) = 0.5.
+        // A competing model has Y=A, so both probabilities are 1.0.
+        let hypotheses = vec![
+            DecisionHypothesis {
+                id: "confounded-no-effect".into(),
+                prior_probability: 0.5,
+                outcome_probabilities_by_action: vec![
+                    vec![0.9, 0.1],
+                    vec![0.5, 0.5],
+                ],
+                loss_by_final_decision: vec![0.0, 1.0],
+            },
+            DecisionHypothesis {
+                id: "direct-treatment-effect".into(),
+                prior_probability: 0.5,
+                outcome_probabilities_by_action: vec![
+                    vec![1.0, 0.0],
+                    vec![1.0, 0.0],
+                ],
+                loss_by_final_decision: vec![1.0, 0.0],
+            },
+        ];
+        let actions = vec![action("observe-treated-cohort"), action("do-set-treatment")];
+        let descriptors = vec![
+            descriptor(
+                "observe-treated-cohort",
+                CausalDiagnosticActionKind::PassiveObservation {
+                    observation_model_digest: digest('a'),
+                    evidence_scope_digest: digest('b'),
+                },
+            ),
+            descriptor(
+                "do-set-treatment",
+                CausalDiagnosticActionKind::HardIntervention {
+                    structural_model_digest: digest('c'),
+                    intervention_specification_digest: digest('d'),
+                    target_variable_id: "A".into(),
+                    intervention_value_digest: digest('e'),
+                    identification_assumptions_digest: digest('f'),
+                    outcome_model_digest: digest('1'),
+                    carryover_model_digest: digest('2'),
+                },
+            ),
+        ];
+        let mut bound_descriptors = descriptors;
+        bind_fixture_likelihood_digests(&hypotheses, &mut bound_descriptors);
+        validate_causal_diagnostic_action_likelihood_bindings(
+            &actions,
+            &bound_descriptors,
+            &hypotheses,
+        )
+        .expect("observational and interventional likelihoods bind to their own action semantics");
+
+        // Replacing the observational likelihood slice with the intervention
+        // likelihood slice is a semantic wiring error even though IDs still match.
+        let mut swapped_hypotheses = hypotheses.clone();
+        for hypothesis in &mut swapped_hypotheses {
+            hypothesis.outcome_probabilities_by_action.swap(0, 1);
+        }
+        assert!(matches!(
+            validate_causal_diagnostic_action_likelihood_bindings(
+                &actions,
+                &bound_descriptors,
+                &swapped_hypotheses,
+            ),
+            Err(CausalDiagnosticActionError::ActionLikelihoodDigestMismatch(_))
+        ));
+    }
+
+    #[test]
     fn measurement_requires_typed_back_action_contract() {
         let actions = vec![action("measurement")];
         for back_action in [
