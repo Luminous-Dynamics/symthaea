@@ -19,7 +19,8 @@
     "calibration",
     "test_entries",
     "test_accessed_at_ms",
-    "minimum_independent_groups_per_stratum"
+    "minimum_independent_groups_per_stratum",
+    "reference_support"
   ],
   "properties": {
     "protocol_version": {
@@ -224,7 +225,9 @@
           "prediction_digest",
           "reference_support_state",
           "reference_support_evidence_digest",
-          "reference_support_evidence_class"
+          "reference_support_evidence_class",
+          "observation_time_ms",
+          "reference_support_score"
         ],
         "properties": {
           "sample_digest": {
@@ -318,6 +321,14 @@
               "synthetic_fixture",
               "vendor_claim"
             ]
+          },
+          "observation_time_ms": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reference_support_score": {
+            "type": "number",
+            "minimum": 0
           }
         }
       }
@@ -329,6 +340,74 @@
     "minimum_independent_groups_per_stratum": {
       "type": "integer",
       "minimum": 2
+    },
+    "reference_support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_ref",
+        "method_digest",
+        "feature_schema_digest",
+        "fit_scope",
+        "reference_partition",
+        "uses_validation_or_test_labels",
+        "uses_test_targets",
+        "score_definition",
+        "score_direction",
+        "in_support_max_score",
+        "extrapolation_min_score",
+        "thresholds_frozen_at_ms",
+        "threshold_evidence_digest"
+      ],
+      "properties": {
+        "method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "feature_schema_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fit_scope": {
+          "const": "train_only"
+        },
+        "reference_partition": {
+          "const": "train"
+        },
+        "uses_validation_or_test_labels": {
+          "const": false
+        },
+        "uses_test_targets": {
+          "const": false
+        },
+        "score_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score_direction": {
+          "const": "higher_is_less_supported"
+        },
+        "in_support_max_score": {
+          "type": "number",
+          "minimum": 0
+        },
+        "extrapolation_min_score": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "thresholds_frozen_at_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "threshold_evidence_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
     }
   }
 }
