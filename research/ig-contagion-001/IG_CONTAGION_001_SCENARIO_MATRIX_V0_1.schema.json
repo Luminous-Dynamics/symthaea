@@ -34,15 +34,15 @@
     },
     "fixture_count": {
       "type": "integer",
-      "minimum": 45
+      "minimum": 50
     },
     "family_count": {
       "type": "integer",
-      "minimum": 8
+      "minimum": 9
     },
     "families": {
       "type": "array",
-      "minItems": 8,
+      "minItems": 9,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -68,7 +68,7 @@
     },
     "fixtures": {
       "type": "array",
-      "minItems": 45,
+      "minItems": 50,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -86,7 +86,12 @@
           "condition",
           "expected_measurement_properties",
           "scenario_note",
-          "paired_content_ref"
+          "paired_content_ref",
+          "task_truth_profile",
+          "paired_message_sha256",
+          "paired_agent_profile_sha256",
+          "paired_evidence_packet_sha256",
+          "centrality_metric_profile"
         ],
         "properties": {
           "fixture_id": {
@@ -100,7 +105,8 @@
             "enum": [
               "red_team",
               "positive_control",
-              "measurement_control"
+              "measurement_control",
+              "pluralism_control"
             ]
           },
           "topology_family": {
@@ -145,6 +151,46 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "task_truth_profile": {
+            "enum": [
+              "measurement_control_no_decision_truth",
+              "synthetic_known_answer",
+              "social_claim_integrity_no_majority_truth",
+              "open_world_indeterminate",
+              "normative_pluralism_no_single_answer"
+            ]
+          },
+          "paired_message_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "paired_agent_profile_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "paired_evidence_packet_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "centrality_metric_profile": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "normalized_betweenness_v1",
+              null
             ]
           }
         }
