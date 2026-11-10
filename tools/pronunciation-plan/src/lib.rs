@@ -924,7 +924,7 @@ pub enum ResourceRightsStatus {
     Excluded,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LanguageTask {
     GraphemeToPhoneme,
@@ -997,9 +997,7 @@ impl LanguageProfileManifest {
                 self.schema_version
             ));
         }
-        if self.profile_id.trim().is_empty()
-            || !valid_source_digest(&format!("git-sha1:{}", self.source_revision))
-            || self.language_tag.trim().is_empty()
+        if self.profile_id.trim().is_empty() || self.language_tag.trim().is_empty()
             || self
                 .language_tag
                 .bytes()
@@ -1108,6 +1106,7 @@ impl LanguageProfileManifest {
             if resource.resource_id.trim().is_empty()
                 || !resource_ids.insert(resource.resource_id.as_str())
                 || resource.source_repository.trim().is_empty()
+                || !valid_git_revision(&resource.source_revision)
                 || !valid_source_digest(&resource.source_digest)
                 || !valid_source_digest(&resource.license_document_digest)
                 || resource.license_expression.trim().is_empty()
@@ -1199,6 +1198,13 @@ impl LanguageProfileManifest {
             .iter()
             .find(|capability| capability.task == task)
     }
+}
+
+fn valid_git_revision(value: &str) -> bool {
+    value.len() == 40
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn safe_resource_path(value: &str) -> bool {
