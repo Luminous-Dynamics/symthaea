@@ -15,6 +15,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::rhythm::Duration;
 use crate::score::{PartId, Score};
+use crate::score_event_remap::{
+    SCORE_EVENT_REMAP_DIGEST_SCHEMA_V1, SCORE_EVENT_REMAP_SCHEMA_V1,
+    ScoreEventDispositionV1, ScoreEventFieldV1, ScoreEventRemapEntryV1,
+    ScoreEventRemapIssueCodeV1, ScoreEventRemapIssueV1, ScoreEventRemapV1,
+    validate_score_event_remap,
+};
 
 pub const SCORE_EDIT_SCHEMA_V1: &str = "score-edit-plan-v1";
 /// Must match the canonical SHA-256 of serde_json Score bytes emitted by
@@ -658,6 +664,236 @@ pub fn apply_score_edit_plan(
     Ok(ScoreEditCandidateV1 { candidate, receipt })
 }
 
+/// Build the complete one-to-one event map for a velocity-only score edit.
+///
+/// All three expected digests are supplied by trusted Muse provenance code:
+/// exact source Score, exact candidate Score and exact edit plan.
+/// This verifies the edit receipt against both Scores, then runs the independent
+/// event-remap validator before returning the mapping.
+pub fn build_velocity_edit_event_remap(
+    source: &Score,
+    edit: &ScoreEditCandidateV1,
+    expected_source_score_sha256: &str,
+    candidate_score_sha256: &str,
+    transformation_sha256: &str,
+) -> Result<ScoreEventRemapV1, Vec<ScoreEventRemapIssueV1>> {
+    let receipt = &edit.receipt;
+    let candidate = &edit.candidate;
+    let mut issues = Vec::new();
+
+    let mut push = |code, source_index, candidate_index, message: &str| {
+        issues.push(ScoreEventRemapIssueV1 {
+            code,
+            source_index,
+            candidate_index,
+            merge_group_id: None,
+            message: message.to_owned(),
+        });
+    };
+
+    if receipt.schema != SCORE_EDIT_SCHEMA_V1 {
+        push(
+            ScoreEventRemapIssueCodeV1::InvalidSchema,
+            None, None,
+            "edit receipt schema is unsupported",
+        );
+    }
+    if receipt.input_digest_schema != SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1 {
+        push(
+            ScoreEventRemapIssueCodeV1::InvalidDigestSchema,
+            None, None,
+            "edit receipt uses an unsupported source score digest schema",
+        );
+    }
+    if receipt.input_score_sha256 != expected_source_score_sha256
+        || !valid_digest(expected_source_score_sha256)
+    {
+        push(
+            ScoreEventRemapIssueCodeV1::SourceDigestMismatch,
+            None, None,
+            "edit receipt is not bound to the trusted source Score digest",
+        );
+    }
+    if !valid_digest(candidate_score_sha256) {
+        push(
+            ScoreEventRemapIssueCodeV1::InvalidCandidateDigest,
+            None, None,
+            "candidate Score digest must be 64 lowercase hexadecimal characters",
+        );
+    }
+    if !valid_digest(transformation_sha256) {
+        push(
+            ScoreEventRemapIssueCodeV1::InvalidTransformationDigest,
+            None, None,
+            "transformation digest must be 64 lowercase hexadecimal characters",
+        );
+    }
+    if source.key != candidate.key
+        || source.tempo_bpm.to_bits() != candidate.tempo_bpm.to_bits()
+        || source.meter != candidate.meter
+        || source.total_beats != candidate.total_beats
+    {
+        push(
+            ScoreEventRemapIssueCodeV1::ScoreMetadataChanged,
+            None, None,
+            "velocity-only edit must preserve key, tempo, meter and declared score span",
+        );
+    }
+    if source.notes.len() != candidate.notes.len() {
+        push(
+            ScoreEventRemapIssueCodeV1::CandidateEventCountMismatch,
+            None, None,
+            "velocity-only edits cannot insert, delete, split, merge or reorder events",
+        );
+    }
+    if source.notes.len() > crate::score_event_remap::MAX_SCORE_EVENT_REMAP_EVENTS_V1 {
+        push(
+            ScoreEventRemapIssueCodeV1::ResourceLimitExceeded,
+            None, None,
+            "source event count exceeds the event-remap v1 limit",
+        );
+    }
+
+    let operation_ids: std::collections::BTreeSet<&str> =
+        receipt.operation_ids.iter().map(String::as_str).collect();
+    if receipt.operation_ids.iter().any(|id| id.trim().is_empty()) {
+        push(
+            ScoreEventRemapIssueCodeV1::InvalidDispositionOperationId,
+            None, None,
+            "edit receipt contains an empty operation ID",
+        );
+    }
+    if operation_ids.len() != receipt.operation_ids.len() {
+        push(
+            ScoreEventRemapIssueCodeV1::InvalidDispositionOperationId,
+            None, None,
+            "edit receipt contains duplicate operation IDs",
+        );
+    }
+
+    let mut changes_by_index =
+        std::collections::BTreeMap::<usize, &ScoreNoteVelocityChangeV1>::new();
+    for change in &receipt.changes {
+        if change.operation_id.trim().is_empty()
+            || !operation_ids.contains(change.operation_id.as_str())
+        {
+            push(
+                ScoreEventRemapIssueCodeV1::InvalidDispositionOperationId,
+                Some(change.note_index), Some(change.note_index),
+                "velocity change operation ID is empty or absent from the edit receipt",
+            );
+        }
+        if change.note_index >= source.notes.len()
+            || change.note_index >= candidate.notes.len()
+        {
+            push(
+                ScoreEventRemapIssueCodeV1::SourceIndexOutOfRange,
+                Some(change.note_index), Some(change.note_index),
+                "velocity change ordinal is outside the exact source/candidate Scores",
+            );
+            continue;
+        }
+        if changes_by_index.insert(change.note_index, change).is_some() {
+            push(
+                ScoreEventRemapIssueCodeV1::DuplicateSourceDisposition,
+                Some(change.note_index), Some(change.note_index),
+                "velocity receipt contains more than one change for the same source event",
+            );
+            continue;
+        }
+        let original = &source.notes[change.note_index];
+        let result = &candidate.notes[change.note_index];
+        if original.part.0 != change.part_id || result.part.0 != change.part_id {
+            push(
+                ScoreEventRemapIssueCodeV1::PartIdentityChanged,
+                Some(change.note_index), Some(change.note_index),
+                "velocity receipt PartId does not match both source and candidate events",
+            );
+        }
+        if !change.before.is_finite()
+            || !(0.0..=1.0).contains(&change.before)
+            || !change.after.is_finite()
+            || !(0.0..=1.0).contains(&change.after)
+            || change.before.to_bits() != original.velocity.to_bits()
+            || change.after.to_bits() != result.velocity.to_bits()
+        {
+            push(
+                ScoreEventRemapIssueCodeV1::ModifiedFieldMismatch,
+                Some(change.note_index), Some(change.note_index),
+                "velocity receipt before/after values do not match the source/candidate ScoreNotes",
+            );
+        }
+        let mut expected = *original;
+        expected.velocity = change.after;
+        if expected != *result {
+            push(
+                ScoreEventRemapIssueCodeV1::ModifiedFieldMismatch,
+                Some(change.note_index), Some(change.note_index),
+                "velocity-only candidate changed fields other than the declared velocity",
+            );
+        }
+    }
+
+    let mut source_entries = Vec::with_capacity(source.notes.len());
+    for (index, original) in source.notes.iter().enumerate() {
+        let Some(result) = candidate.notes.get(index) else {
+            continue;
+        };
+        if let Some(change) = changes_by_index.get(&index) {
+            source_entries.push(ScoreEventRemapEntryV1 {
+                source_index: index,
+                disposition: ScoreEventDispositionV1::Modified {
+                    candidate_index: index,
+                    changed_fields: vec![ScoreEventFieldV1::Velocity],
+                    operation_id: change.operation_id.clone(),
+                },
+            });
+        } else if original == result {
+            source_entries.push(ScoreEventRemapEntryV1 {
+                source_index: index,
+                disposition: ScoreEventDispositionV1::Retained {
+                    candidate_index: index,
+                },
+            });
+        } else {
+            push(
+                ScoreEventRemapIssueCodeV1::RetainedEventChanged,
+                Some(index), Some(index),
+                "candidate changed a source event not listed in the velocity edit receipt",
+            );
+        }
+    }
+
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+
+    let remap = ScoreEventRemapV1 {
+        schema: SCORE_EVENT_REMAP_SCHEMA_V1.into(),
+        digest_schema: SCORE_EVENT_REMAP_DIGEST_SCHEMA_V1.into(),
+        source_score_sha256: expected_source_score_sha256.to_owned(),
+        candidate_score_sha256: candidate_score_sha256.to_owned(),
+        transformation_sha256: transformation_sha256.to_owned(),
+        source_event_count: source.notes.len(),
+        candidate_event_count: candidate.notes.len(),
+        source_entries,
+        insertions: Vec::new(),
+    };
+    let validation = validate_score_event_remap(
+        source,
+        candidate,
+        &remap,
+        expected_source_score_sha256,
+        candidate_score_sha256,
+        transformation_sha256,
+    );
+    if validation.valid {
+        Ok(remap)
+    } else {
+        Err(validation.issues)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -843,6 +1079,99 @@ mod tests {
         let result = apply_score_edit_plan(&source_score(), &edit, &digest());
         assert!(result.unwrap_err().iter().any(|issue| {
             issue.code == ScoreEditIssueCodeV1::InvalidInputDigestSchema
+        }));
+    }
+
+    #[test]
+    fn velocity_edit_emits_a_complete_digest_bound_event_remap() {
+        let source = source_score();
+        let edit = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("soften-answer", 0, 2)]),
+            &digest(),
+        ).expect("valid velocity edit");
+        let remap = build_velocity_edit_event_remap(
+            &source,
+            &edit,
+            &digest(),
+            &"b".repeat(64),
+            &"c".repeat(64),
+        ).expect("complete one-to-one event remap");
+        let report = validate_score_event_remap(
+            &source,
+            &edit.candidate,
+            &remap,
+            &digest(),
+            &"b".repeat(64),
+            &"c".repeat(64),
+        );
+        assert!(report.valid, "{:?}", report.issues);
+        assert_eq!(report.modified_count, 2);
+        assert_eq!(report.retained_count, 2);
+        assert_eq!(remap.source_entries.len(), source.notes.len());
+        assert!(remap.insertions.is_empty());
+    }
+
+    #[test]
+    fn velocity_remap_rejects_unreported_non_target_mutation() {
+        let source = source_score();
+        let mut edit = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("soften-answer", 0, 2)]),
+            &digest(),
+        ).expect("valid velocity edit");
+        edit.candidate.notes[2].pitch = Pitch::from_midi(71);
+        let result = build_velocity_edit_event_remap(
+            &source,
+            &edit,
+            &digest(),
+            &"b".repeat(64),
+            &"c".repeat(64),
+        );
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEventRemapIssueCodeV1::RetainedEventChanged
+        }));
+    }
+
+    #[test]
+    fn velocity_remap_rejects_unrequested_score_metadata_changes() {
+        let source = source_score();
+        let mut edit = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("soften-answer", 0, 2)]),
+            &digest(),
+        ).expect("valid velocity edit");
+        edit.candidate.tempo_bpm += 1.0;
+        let result = build_velocity_edit_event_remap(
+            &source,
+            &edit,
+            &digest(),
+            &"b".repeat(64),
+            &"c".repeat(64),
+        );
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEventRemapIssueCodeV1::ScoreMetadataChanged
+        }));
+    }
+
+    #[test]
+    fn velocity_remap_rejects_a_tampered_before_after_receipt() {
+        let source = source_score();
+        let mut edit = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("soften-answer", 0, 2)]),
+            &digest(),
+        ).expect("valid velocity edit");
+        edit.receipt.changes[0].before = 0.1;
+        let result = build_velocity_edit_event_remap(
+            &source,
+            &edit,
+            &digest(),
+            &"b".repeat(64),
+            &"c".repeat(64),
+        );
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEventRemapIssueCodeV1::ModifiedFieldMismatch
         }));
     }
 
