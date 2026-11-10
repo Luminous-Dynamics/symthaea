@@ -6,9 +6,10 @@
     "comparison_group_id": "SYNTHETIC-GROUP-0001",
     "candidate_id": "SYNTHETIC-WIND-ASSIST-01",
     "role": "candidate",
-    "service_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "service_fingerprint": "38e8d556612ac380d71ca6786146bfa47f78cec97ce00a32698ae8cf82a3eda2",
     "paired_case_id": "SYNTHETIC-CONVENTIONAL-BASELINE-0001",
-    "matching_deviations": []
+    "matching_deviations": [],
+    "service_fingerprint_profile": "marine-service-payload-v1+symthaea-canonical-json-sha256-v1"
   },
   "service": {
     "cargo_class": "container",
@@ -740,7 +741,7 @@
     "trial_id": "SYNTHETIC-TRIAL-0001",
     "protocol_id": "SYNTHETIC-TRIAL-PROTOCOL",
     "protocol_revision": "0.0.1",
-    "service_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "service_fingerprint": "38e8d556612ac380d71ca6786146bfa47f78cec97ce00a32698ae8cf82a3eda2",
     "baseline_case_id": "SYNTHETIC-WAPS-BASELINE-0001",
     "candidate_case_id": "SYNTHETIC-WAPS-CASE-0001",
     "disposition": "raw",
