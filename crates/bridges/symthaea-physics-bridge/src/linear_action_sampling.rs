@@ -1621,7 +1621,7 @@ mod tests {
 
     #[test]
     fn sampled_linear_action_rejects_generator_count_above_sampling_ceiling() {
-        let mut action = LinearGroupActionV1 {
+        let action = LinearGroupActionV1 {
             action_id: "too-many-generators".to_string(),
             coordinate_basis_id: "xy".to_string(),
             coordinate_names: vec!["x".to_string(), "y".to_string()],
