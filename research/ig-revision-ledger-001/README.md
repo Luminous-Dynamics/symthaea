@@ -37,11 +37,17 @@ Delegation graph semantics remain separate: #11248 owns mandate/delegation edges
 
 ## Fixtures
 
-The v0.1 corpus contains 17 synthetic cases:
-- Eight valid fixtures: repeat/no-change, evidence-supported revision, social exposure without evidence, abstention under uncertainty, matched-pair estimate, normative pluralism, missing measurement and source correction.
-- Nine negative controls: false Changed with identical state hashes, Missing with a post-state, causal estimate without a pair, overlapping claim deltas, delivered message without channel event, missing answer-space identity, open-world correctness score, same-run treatment/control, and a mismatched shared-input digest in a causal pair.
+The v0.1 corpus contains 21 synthetic cases:
+- Ten valid fixtures: repeat/no-change, evidence-supported revision, social exposure without evidence, abstention under uncertainty, matched-pair estimate, normative pluralism, missing measurement, source correction, high self-reported confidence without new evidence, and a confidence value bound to external calibration references.
+- Eleven negative controls: false Changed with identical state hashes, Missing with a post-state, causal estimate without a pair, overlapping claim deltas, delivered message without channel event, missing answer-space identity, open-world correctness score, same-run treatment/control, a mismatched shared-input digest in a causal pair, calibrated confidence without profile/receipt, and out-of-range probability confidence.
 
 Truth profiles are assigned by fixture semantics: only tasks with a frozen synthetic answer space use `SyntheticKnownAnswer`; measurement, social-claim-integrity, open-world and normative-pluralism controls do not inherit a correctness oracle by default.
+
+## Confidence boundary
+
+The state schema optionally records confidence as `NotProvided`, `SelfReported` or `Calibrated`. Self-reported values require an explicit scale and remain distinct from evidence. A Calibrated value must reference an external calibration-profile digest and receipt digest; the receipt is a pointer/commitment, not proof by itself. The qualifier checks only structural presence and [0,1] probability bounds. It does not calculate Brier score, ECE, calibration slope, held-out performance or transfer validity. Those are owned by [IG-CONFIDENCE-CALIBRATION-001 #11367](https://github.com/Luminous-Dynamics/symthaea/issues/11367).
+
+Confidence does not grant vote weight, authority, eligibility, moderation priority or credibility.
 
 Negative controls are expected to be rejected; they are not failed empirical experiments.
 
