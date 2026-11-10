@@ -22,28 +22,678 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 6,
+      "maxItems": 6,
       "items": {
-        "type": "object",
-        "required": [
-          "case_id",
-          "description",
-          "expected"
-        ],
-        "properties": {
-          "case_id": {
-            "type": "string",
-            "pattern": "^FT[0-9]{2}_[A-Z0-9_]+$"
+        "oneOf": [
+          {
+            "$ref": "#/$defs/FT01"
           },
-          "description": {
-            "type": "string",
-            "minLength": 1
+          {
+            "$ref": "#/$defs/FT02"
           },
-          "expected": {
-            "type": "object"
+          {
+            "$ref": "#/$defs/FT03"
+          },
+          {
+            "$ref": "#/$defs/FT04"
+          },
+          {
+            "$ref": "#/$defs/FT05"
+          },
+          {
+            "$ref": "#/$defs/FT06"
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "FT01": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "current_precision",
+        "transition_precision",
+        "mode_probabilities",
+        "actions",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "const": "FT01_CURRENT_EPISTEMIC_ACTION_INVARIANCE"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "current_precision": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
           }
         },
-        "additionalProperties": true
+        "transition_precision": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "mode_probabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action_id",
+              "predicted_mean"
+            ],
+            "properties": {
+              "action_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "predicted_mean": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "next_precision",
+            "action_dependent_mean_changes",
+            "precision_same_across_actions",
+            "mode_probabilities_same_across_actions",
+            "entropy_based_epistemic_term_action_invariant",
+            "expected_information_gain_status"
+          ],
+          "properties": {
+            "next_precision": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number"
+              }
+            },
+            "action_dependent_mean_changes": {
+              "type": "boolean"
+            },
+            "precision_same_across_actions": {
+              "type": "boolean"
+            },
+            "mode_probabilities_same_across_actions": {
+              "type": "boolean"
+            },
+            "entropy_based_epistemic_term_action_invariant": {
+              "type": "boolean"
+            },
+            "expected_information_gain_status": {
+              "const": "not_established_by_this_entropy_delta"
+            }
+          }
+        }
+      }
+    },
+    "FT02": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "hypotheses",
+        "observations",
+        "decisions",
+        "probe_cost",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "const": "FT02_HIGH_EIG_ZERO_EVSI"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hypotheses": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "prior"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prior": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "observations": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "decisions": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 2,
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "probe_cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decision_loss_units",
+            "physical_energy_j"
+          ],
+          "properties": {
+            "decision_loss_units": {
+              "type": "number",
+              "minimum": 0
+            },
+            "physical_energy_j": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eig_bits",
+            "prior_optimal_decision",
+            "prior_bayes_risk",
+            "posterior_expected_bayes_risk",
+            "evsi_decision_loss_units",
+            "select_probe",
+            "reason"
+          ],
+          "properties": {
+            "eig_bits": {
+              "type": "number",
+              "minimum": 0
+            },
+            "prior_optimal_decision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "prior_bayes_risk": {
+              "type": "number",
+              "minimum": 0
+            },
+            "posterior_expected_bayes_risk": {
+              "type": "number",
+              "minimum": 0
+            },
+            "evsi_decision_loss_units": {
+              "type": "number"
+            },
+            "select_probe": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "FT03": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "hypotheses",
+        "observations",
+        "decisions",
+        "probe_cost",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "const": "FT03_LOW_EIG_HIGH_EVSI"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hypotheses": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "prior"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prior": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "observations": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "decisions": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 2,
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "probe_cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decision_loss_units",
+            "physical_energy_j"
+          ],
+          "properties": {
+            "decision_loss_units": {
+              "type": "number",
+              "minimum": 0
+            },
+            "physical_energy_j": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "prior_optimal_decision",
+            "prior_bayes_risk",
+            "observation_probability",
+            "posterior_fault_probability",
+            "posterior_optimal_decision",
+            "posterior_expected_bayes_risk",
+            "eig_bits",
+            "evsi_decision_loss_units",
+            "net_evsi_decision_loss_units",
+            "select_probe"
+          ],
+          "properties": {
+            "prior_optimal_decision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "prior_bayes_risk": {
+              "type": "number",
+              "minimum": 0
+            },
+            "observation_probability": {
+              "type": "object",
+              "minProperties": 2,
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "posterior_fault_probability": {
+              "type": "object",
+              "minProperties": 2,
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "posterior_optimal_decision": {
+              "type": "object",
+              "minProperties": 2,
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "posterior_expected_bayes_risk": {
+              "type": "number",
+              "minimum": 0
+            },
+            "eig_bits": {
+              "type": "number",
+              "minimum": 0
+            },
+            "evsi_decision_loss_units": {
+              "type": "number"
+            },
+            "net_evsi_decision_loss_units": {
+              "type": "number"
+            },
+            "select_probe": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "FT04": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "candidate",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "const": "FT04_THERMAL_HARD_LIMIT_OVERRIDES_LOW_FEP_SCORE"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action_id",
+            "expected_free_energy_score",
+            "predicted_thermal_nodes"
+          ],
+          "properties": {
+            "action_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expected_free_energy_score": {
+              "type": "number"
+            },
+            "predicted_thermal_nodes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "node_id",
+                  "source_class",
+                  "temperature_c",
+                  "hard_limit_c"
+                ],
+                "properties": {
+                  "node_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source_class": {
+                    "enum": [
+                      "measured",
+                      "estimated",
+                      "derived",
+                      "environmental_boundary",
+                      "synthetic_fixture"
+                    ]
+                  },
+                  "temperature_c": {
+                    "type": "number"
+                  },
+                  "hard_limit_c": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "physical_disposition",
+            "violating_nodes",
+            "action_admitted",
+            "efe_score_cannot_override_thermal_gate"
+          ],
+          "properties": {
+            "physical_disposition": {
+              "const": "Invalid"
+            },
+            "violating_nodes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "action_admitted": {
+              "const": false
+            },
+            "efe_score_cannot_override_thermal_gate": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "FT05": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "terms",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "const": "FT05_VARIATIONAL_VS_PHYSICAL_UNIT_SEPARATION"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "terms": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "value",
+              "unit",
+              "kind"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": "number"
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "direct_addition_allowed",
+            "combined_scalar_allowed_without_explicit_mapping",
+            "preserve_as_separate_dimensions"
+          ],
+          "properties": {
+            "direct_addition_allowed": {
+              "const": false
+            },
+            "combined_scalar_allowed_without_explicit_mapping": {
+              "const": false
+            },
+            "preserve_as_separate_dimensions": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "FT06": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "thermal_manifest",
+        "thermal_evidence",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "const": "FT06_MISSING_THERMAL_NODE_EVIDENCE"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thermal_manifest": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "thermal_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "node_id",
+              "source_class",
+              "fresh",
+              "temperature_c"
+            ],
+            "properties": {
+              "node_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_class": {
+                "enum": [
+                  "measured",
+                  "estimated",
+                  "derived",
+                  "environmental_boundary",
+                  "synthetic_fixture"
+                ]
+              },
+              "fresh": {
+                "type": "boolean"
+              },
+              "temperature_c": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "physical_disposition",
+            "missing_nodes",
+            "positive_thermal_feasibility_claim"
+          ],
+          "properties": {
+            "physical_disposition": {
+              "const": "Unknown"
+            },
+            "missing_nodes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "positive_thermal_feasibility_claim": {
+              "const": false
+            }
+          }
+        }
       }
     }
   }
