@@ -129,7 +129,7 @@ pub struct PlannedPartAssignmentV1 {
     pub part_id: u16,
     pub instrument_instance_id: String,
     pub musical_function: String,
-    pub instrument_kind: crate::instruments::Instrument,
+    pub instrument_kind: symthaea_music_theory::orchestration::InstrumentKindV1,
     pub sounding_lowest_midi: u8,
     pub sounding_highest_midi: u8,
     pub max_polyphony: u8,
