@@ -83,6 +83,11 @@ pub enum CausalDiagnosticActionKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CausalDiagnosticActionDescriptor {
     pub action_id: String,
+    /// Digest of the complete action-conditioned likelihood column/table
+    /// supplied to the decision kernel. The production adapter must recompute
+    /// this from the actual hypothesis/action/outcome tensor before accepting
+    /// the descriptor; this module only validates and binds the supplied digest.
+    pub action_likelihood_table_digest: String,
     pub kind: CausalDiagnosticActionKind,
 }
 
@@ -202,6 +207,11 @@ pub fn validate_causal_diagnostic_action_set(
             .ok_or_else(|| CausalDiagnosticActionError::MissingDescriptor(action_id.to_owned()))?;
 
         hash_field(&mut hasher, "action_id", action_id);
+        hash_digest(
+            &mut hasher,
+            "action_likelihood_table_digest",
+            &descriptor.action_likelihood_table_digest,
+        )?;
         hasher.update(&action.observation_cost.to_bits().to_le_bytes());
         hasher.update(&action.safety_risk.to_bits().to_le_bytes());
 
@@ -403,6 +413,7 @@ mod tests {
     ) -> CausalDiagnosticActionDescriptor {
         CausalDiagnosticActionDescriptor {
             action_id: id.to_owned(),
+            action_likelihood_table_digest: digest('c'),
             kind,
         }
     }
@@ -495,6 +506,19 @@ mod tests {
             Err(CausalDiagnosticActionError::UnknownAction(_))
                 | Err(CausalDiagnosticActionError::MissingDescriptor(_))
         ));
+    }
+
+    #[test]
+    fn descriptor_digest_binds_action_likelihood_table() {
+        let (actions, descriptors) = four_kind_fixture();
+        let original = validate_causal_diagnostic_action_set(&actions, &descriptors)
+            .expect("original likelihood table bindings");
+
+        let mut changed_descriptors = descriptors;
+        changed_descriptors[0].action_likelihood_table_digest = digest('d');
+        let changed = validate_causal_diagnostic_action_set(&actions, &changed_descriptors)
+            .expect("changed likelihood table binding");
+        assert_ne!(original.descriptor_set_digest, changed.descriptor_set_digest);
     }
 
     #[test]
