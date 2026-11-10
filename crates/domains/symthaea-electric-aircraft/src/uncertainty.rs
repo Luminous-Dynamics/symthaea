@@ -17,6 +17,9 @@ use std::fmt;
 
 use crate::{evaluate_mission, MissionInput, MissionReport, ModelError};
 
+pub const ROBUST_UNCERTAINTY_MODEL_VERSION: &str =
+    "electric-fixed-wing-adverse-corner-v0.1.0";
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MissionUncertaintyBudget {
     pub mass_fraction: f64,
@@ -161,6 +164,8 @@ impl std::error::Error for RobustEvaluationError {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RobustMissionReport {
+    pub uncertainty_model_version: &'static str,
+    pub budget: MissionUncertaintyBudget,
     pub nominal: MissionReport,
     /// Exact input after applying all adverse one-sided bounds.
     pub adverse_corner_input: MissionInput,
@@ -197,6 +202,8 @@ pub fn evaluate_mission_robust(
     let adverse_corner_result = evaluate_mission(&adverse_corner_input);
 
     Ok(RobustMissionReport {
+        uncertainty_model_version: ROBUST_UNCERTAINTY_MODEL_VERSION,
+        budget: *budget,
         nominal,
         adverse_corner_input,
         adverse_corner_result,
@@ -276,6 +283,8 @@ mod tests {
         let robust = evaluate_mission_robust(&input, &MissionUncertaintyBudget::default()).unwrap();
         let adverse = robust.adverse_corner_result.unwrap();
 
+        assert_eq!(robust.uncertainty_model_version, ROBUST_UNCERTAINTY_MODEL_VERSION);
+        assert_eq!(robust.budget, MissionUncertaintyBudget::default());
         assert_eq!(robust.nominal, nominal);
         assert_eq!(robust.adverse_corner_input, input);
         assert_eq!(adverse, nominal);
@@ -303,6 +312,8 @@ mod tests {
         let robust = evaluate_mission_robust(&input, &budget).unwrap();
         let adverse = robust.adverse_corner_result.unwrap();
 
+        assert_eq!(robust.uncertainty_model_version, ROBUST_UNCERTAINTY_MODEL_VERSION);
+        assert_eq!(robust.budget, budget);
         assert!(adverse.mission_terminal_energy_wh > robust.nominal.mission_terminal_energy_wh);
         assert!(adverse.energy_margin_wh < robust.nominal.energy_margin_wh);
         assert!(adverse.all_up_mass_kg > robust.nominal.all_up_mass_kg);
