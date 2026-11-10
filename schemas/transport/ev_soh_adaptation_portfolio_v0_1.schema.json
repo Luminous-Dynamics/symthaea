@@ -221,7 +221,8 @@
           "energy_wh",
           "evaluation_group_identity_digests",
           "selection_status",
-          "result_digest"
+          "result_digest",
+          "adaptation_completed_at_ms"
         ],
         "properties": {
           "expert_id": {
@@ -310,6 +311,10 @@
               "null"
             ],
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "adaptation_completed_at_ms": {
+            "type": "integer",
+            "minimum": 1
           }
         }
       }
