@@ -28,7 +28,7 @@ A separate fixture makes test B conditionally available only after A=a1. The sel
 
 ## Frozen corpus
 
-Seven cases: complementary positive sequence, conditionally available second test, positive one-step test, perfect-information/zero-decision-value control, missing-safety-approval control, invalid-likelihood rejection, and no-admissible-terminal-action ABSTAIN. The report includes posterior state and branch probability on each policy node.
+Eleven cases: complementary positive sequence, conditionally available second test, positive one-step EVSI, perfect-information/zero-decision-value control, missing safety approval, invalid likelihood normalization, no-admissible-terminal-action ABSTAIN, invalid calibration, unsupported domain, unavailable equipment and missing domain-scope evidence. Nine produce bounded plans; two invalid manifests are rejected. The report includes posterior state and branch probability on each policy node.
 
 ## Benchmark tournament
 
