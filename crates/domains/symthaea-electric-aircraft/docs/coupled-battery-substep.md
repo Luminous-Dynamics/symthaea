@@ -38,6 +38,6 @@ This is a reduced-order pack model. The numerical fixed point is not proof that 
 
 ## Verification status
 
-- Seven Rust tests are authored in this module, including a frozen analytical electrical reference, temperature/resistance feedback, no-load behavior, out-of-domain rejection, typed power/current/reserve failures, thermal-limit and iteration-limit failures, and an impossible electrical root.
+- Eight Rust tests are authored in this module, including a frozen analytical electrical reference, temperature/resistance feedback, no-load behavior, out-of-domain rejection, typed power/current/reserve failures, thermal-limit and iteration-limit failures, and an impossible electrical root.
 - Tests have not been executed locally in the authoring environment; a dedicated exact-path GitHub Actions workflow runs format, test and Clippy checks.
 - Synthetic fixtures are not physical battery measurements. No aircraft performance, pack safety, thermal-runaway, flight-test or certification claim is made.
