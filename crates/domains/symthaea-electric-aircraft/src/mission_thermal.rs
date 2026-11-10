@@ -1156,21 +1156,21 @@ mod tests {
             id: "motor-map".into(),
             uri: "artifact://test/motor-map".into(),
             sha256: "a".repeat(64),
-            class: EvidenceClass::PhysicalMeasurement,
+            class: EvidenceClass::Simulation,
             description: "Synthetic provenance fixture".into(),
         };
         let battery_record = EvidenceRecord {
             id: "battery-map".into(),
             uri: "artifact://test/battery-map".into(),
             sha256: "b".repeat(64),
-            class: EvidenceClass::PhysicalMeasurement,
+            class: EvidenceClass::Simulation,
             description: "Synthetic provenance fixture".into(),
         };
         energy.characterization_evidence_ids.push(propulsion_record.id.clone());
         energy.characterization_evidence_records.push(propulsion_record.clone());
         energy.battery_characterization_evidence_ids.push(battery_record.id.clone());
         energy.battery_characterization_evidence_records.push(battery_record.clone());
-        energy.evidence_content_digests_verified = true;
+        energy.evidence_content_digests_verified = false;
 
         let result = evaluate_mission_thermal_overlay(
             &mission, &energy, &network(), &initial_state(), &config()
@@ -1178,7 +1178,7 @@ mod tests {
 
         assert_eq!(result.source_characterization_evidence_records, vec![propulsion_record]);
         assert_eq!(result.source_battery_characterization_evidence_records, vec![battery_record]);
-        assert!(result.source_report_claims_evidence_content_digests_verified);
+        assert!(!result.source_report_claims_evidence_content_digests_verified);
     }
 
     #[test]
