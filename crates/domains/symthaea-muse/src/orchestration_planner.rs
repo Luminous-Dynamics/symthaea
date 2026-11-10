@@ -418,7 +418,10 @@ impl SearchContext<'_> {
         }
 
         let part_index = self.order[depth];
-        for &instrument_index in &self.options_by_part[part_index] {
+        // Own the option vector so the recursive mutable borrow of self does
+        // not overlap an immutable borrow into self.options_by_part.
+        let options = self.options_by_part[part_index].clone();
+        for instrument_index in options {
             if used_instruments.contains(&instrument_index) {
                 continue;
             }
