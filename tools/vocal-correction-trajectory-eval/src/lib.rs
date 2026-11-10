@@ -71,6 +71,8 @@ pub struct TrajectorySpecV1 {
     pub baseline_output_digest: String,
     pub minimum_familywise_coverage: f64,
     pub maximum_corrections: usize,
+    /// Names the normalization and coordinate scaling used by action_norm.
+    pub action_norm_profile_id: String,
     pub maximum_action_norm: f64,
     pub targets: Vec<TargetConstraintV1>,
     pub collateral: Vec<CollateralConstraintV1>,
@@ -164,6 +166,10 @@ pub struct TargetMetricResultV1 {
     pub unit: String,
     pub lower_delta: f64,
     pub upper_delta: f64,
+    pub interval_family_id: String,
+    pub familywise_coverage: f64,
+    pub uncertainty_method_id: String,
+    pub calibration_receipt_id: String,
     pub decision: TargetMetricDecision,
     /// Conservative upper bound on distance to the accepted interval.
     /// None is used only for indeterminate intervals.
@@ -176,12 +182,17 @@ pub struct CollateralMetricResultV1 {
     pub unit: String,
     pub lower_delta: f64,
     pub upper_delta: f64,
+    pub interval_family_id: String,
+    pub familywise_coverage: f64,
+    pub uncertainty_method_id: String,
+    pub calibration_receipt_id: String,
     pub decision: CollateralMetricDecision,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct IterationResultV1 {
     pub iteration_index: usize,
+    pub parent_output_digest: Option<String>,
     pub output_digest: String,
     pub action_digest: Option<String>,
     pub action_norm: f64,
@@ -195,7 +206,9 @@ pub struct TrajectoryReportV1 {
     pub schema: String,
     pub trajectory_id: String,
     pub source_case_id: String,
+    pub control_id: String,
     pub frozen_context_digest: String,
+    pub action_norm_profile_id: String,
     pub initial_output_digest: String,
     pub final_output_digest: String,
     pub corrections_used: usize,
@@ -274,6 +287,7 @@ pub fn evaluate_trajectory(
 
         let result = IterationResultV1 {
             iteration_index: iteration.iteration_index,
+            parent_output_digest: iteration.parent_output_digest.clone(),
             output_digest: iteration.output_digest.clone(),
             action_digest: iteration.action_digest.clone(),
             action_norm: iteration.action_norm,
@@ -310,7 +324,9 @@ pub fn evaluate_trajectory(
         schema: TRAJECTORY_SCHEMA_V1.to_owned(),
         trajectory_id: spec.trajectory_id.clone(),
         source_case_id: spec.source_case_id.clone(),
+        control_id: spec.control_id.clone(),
         frozen_context_digest: spec.frozen_context_digest.clone(),
+        action_norm_profile_id: spec.action_norm_profile_id.clone(),
         initial_output_digest: spec.baseline_output_digest.clone(),
         final_output_digest,
         corrections_used,
@@ -323,6 +339,7 @@ fn validate_spec(spec: &TrajectorySpecV1) -> Result<(), TrajectoryError> {
     require_non_empty(&spec.trajectory_id, "trajectory_id")?;
     require_non_empty(&spec.source_case_id, "source_case_id")?;
     require_non_empty(&spec.control_id, "control_id")?;
+    require_non_empty(&spec.action_norm_profile_id, "action_norm_profile_id")?;
     validate_digest(&spec.frozen_context_digest, "frozen_context_digest")?;
     validate_digest(&spec.baseline_output_digest, "baseline_output_digest")?;
 
@@ -628,6 +645,10 @@ fn evaluate_metrics(
             unit: observation.unit.clone(),
             lower_delta: observation.lower_delta,
             upper_delta: observation.upper_delta,
+            interval_family_id: observation.interval_family_id.clone(),
+            familywise_coverage: observation.familywise_coverage,
+            uncertainty_method_id: observation.uncertainty_method_id.clone(),
+            calibration_receipt_id: observation.calibration_receipt_id.clone(),
             decision,
             distance_upper_bound,
         });
@@ -649,6 +670,10 @@ fn evaluate_metrics(
             unit: observation.unit.clone(),
             lower_delta: observation.lower_delta,
             upper_delta: observation.upper_delta,
+            interval_family_id: observation.interval_family_id.clone(),
+            familywise_coverage: observation.familywise_coverage,
+            uncertainty_method_id: observation.uncertainty_method_id.clone(),
+            calibration_receipt_id: observation.calibration_receipt_id.clone(),
             decision: classify_collateral(
                 observation.lower_delta,
                 observation.upper_delta,
@@ -838,6 +863,7 @@ mod tests {
             baseline_output_digest: digest('b'),
             minimum_familywise_coverage: 0.95,
             maximum_corrections: 3,
+            action_norm_profile_id: "normalized-control-l2-v1".to_owned(),
             maximum_action_norm: 2.0,
             targets: vec![
                 TargetConstraintV1 {
