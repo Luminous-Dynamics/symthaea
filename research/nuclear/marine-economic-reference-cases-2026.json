@@ -33,7 +33,96 @@
       "inference_limits": [
         "Does not prove nuclear shipping is uneconomic in every route, time period or policy regime.",
         "Does not establish that nuclear becomes least-cost in 2040; that result is explicitly conditional.",
-        "Does not provide a license, class approval, insurance quote or operating demonstration."
+        "Does not provide a license, class approval, insurance quote or operating demonstration.",
+        "The PDF states document publication date 27 October 2026; the UCL public page release date is 5 November 2026. Preserve both timestamps.",
+        "The low-CAPEX 2040 outcome is conditional on NOAK/series-production costs and policy assumptions, not a demonstrated reactor price or deployment forecast.",
+        "The UCL high-speed result is driven by explicit cube-law power scaling and linear CAPEX-per-kWe scaling; alternative power or cost exponents must be separate sensitivity cases, not silently substituted.",
+        "The study is a per-vessel TCO comparison and does not use fleet adoption outputs."
+      ],
+      "publication_metadata": {
+        "document_publication_date": "2026-10-27",
+        "ucl_publication_page_release_date": "2026-11-05",
+        "note": "The document's internal publication details and the public UCL page's release date differ; preserve both."
+      },
+      "published_model_details": {
+        "vessel_class": {
+          "teu_min": 14500,
+          "teu_max": 19999,
+          "assumed_lifespan_years": 25
+        },
+        "model_scope": "Per-vessel propulsion cost comparison; fleet adoption outcomes of the inherited model are not used.",
+        "reference_operation": {
+          "speed_knots": 14.85,
+          "annual_distance_nautical_miles": 81811,
+          "average_days_at_sea": 225,
+          "at_sea_final_energy_demand_gj_per_hour": 167.75
+        },
+        "nuclear_installed_electrical_power_kwe": {
+          "low_speed_14_85_knots": 35971,
+          "high_speed_25_knots": 115061
+        },
+        "high_speed_operation": {
+          "speed_knots": 25,
+          "annual_distance_nautical_miles": 108054,
+          "average_days_at_sea": 180,
+          "at_sea_final_energy_demand_gj_per_hour": 800,
+          "reported_annual_distance_increase_percent": 32
+        },
+        "reactor_capex_usd_per_kwe": {
+          "low_noak": 2578,
+          "high_foak": 12434,
+          "scaling_assumption": "Reactor CAPEX applied linearly per installed kWe, including auxiliary capacity."
+        },
+        "modeled_options": [
+          "Conventional vessel at 14.85 knots",
+          "Ammonia dual-fuel vessel at 14.85 knots",
+          "Nuclear low-CAPEX vessel at 14.85 knots",
+          "Nuclear high-CAPEX vessel at 14.85 knots",
+          "Nuclear low-CAPEX vessel at 25 knots",
+          "Nuclear high-CAPEX vessel at 25 knots"
+        ],
+        "policy_and_fuel_scenarios": [
+          "IMO Net-Zero Framework with low biofuel price",
+          "IMO Net-Zero Framework with high biofuel price",
+          "No IMO Net-Zero Framework and low biofuel price"
+        ],
+        "time_axis": {
+          "start_year": 2025,
+          "end_year": 2050,
+          "step_years": 3
+        },
+        "tco_method": {
+          "cost_components_included": [
+            "annualized CAPEX",
+            "non-fuel OPEX",
+            "fuel cost",
+            "net policy cost"
+          ],
+          "denominator": "annual transport work",
+          "reported_unit": "USD per tonne-nautical-mile",
+          "fuel_and_compliance_choice": "optimized at each model timestep"
+        },
+        "result_summary": {
+          "no_policy": "No nuclear case is cheaper than the conventional vessel; low-CAPEX 14.85-knot nuclear is closest.",
+          "nzf_low_biofuel": "Low-CAPEX nuclear at 14.85 knots is the cheapest option from its model introduction in 2040; high-CAPEX nuclear remains more expensive than the conventional and ammonia benchmarks.",
+          "nzf_high_biofuel": "Low-CAPEX nuclear at 14.85 knots is cheapest from 2040. The low-CAPEX 25-knot case is cheaper than conventional throughout and cheaper than ammonia in the first years after introduction, but higher TCO than the 14.85-knot nuclear case.",
+          "speed_comparison": "At 25 knots, the nuclear vessel's TCO per tonne-nautical-mile is higher than the same CAPEX case at 14.85 knots."
+        },
+        "source_locations": [
+          "Base vessel parameters: Table 3, printed p. 18",
+          "Installed power and operating metrics: Tables 5–6, printed pp. 20–21",
+          "Reactor CAPEX and hull assumptions: printed p. 21",
+          "Policy scenarios and fuel-price assumptions: printed pp. 25–26",
+          "TCO results: printed pp. 27–29",
+          "Speed-power-CAPEX explanation and study limitations: printed pp. 31–32"
+        ]
+      },
+      "known_cost_limitations": [
+        "Nuclear-specific insurance is not included.",
+        "Reactor-specific maintenance is not included.",
+        "Hull-integration costs are not included.",
+        "Decommissioning is included only as a rough estimate.",
+        "UCL states these gaps are likely to understate nuclear shipping costs."
       ]
     },
     {
@@ -65,8 +154,41 @@
       "inference_limits": [
         "Modeled maximum gains are not achieved fleet performance.",
         "The case cannot be generalized to all containership sizes, speeds or routes.",
-        "The result must not be treated as directly inconsistent with UCL until system boundaries and assumptions are reconciled."
-      ]
+        "The result must not be treated as directly inconsistent with UCL until system boundaries and assumptions are reconciled.",
+        "LR reports a scenario-specific modeled 15,000 TEU / 25-knot case; its public summary is insufficient to independently reconstruct all annual TCO inputs.",
+        "LR's total-system-cost threshold in USD/kW is not directly interchangeable with UCL's reactor CAPEX in USD/kWe.",
+        "The annual cargo-capacity uplift, voyage count and freed container-space figures are modeled claims, not observed fleet performance."
+      ],
+      "publication_metadata": {
+        "case_study_page_date": "2026-07-14",
+        "underlying_work_date": "2025-10"
+      },
+      "public_summary_details": {
+        "vessel_teu": 15000,
+        "nuclear_speed_knots": 25,
+        "relative_speed_increase_percent": 39,
+        "annual_round_voyages": {
+          "conventional": 5,
+          "nuclear_modeled": 6.3
+        },
+        "modeled_max_annual_cargo_capacity_increase_percent": 38,
+        "modeled_max_additional_container_space_percent": 5,
+        "route_dependent_bunker_savings_up_to_usd_per_year": 50000000,
+        "potential_carbon_penalty_savings_usd_per_year": 18000000,
+        "stated_viability_thresholds": {
+          "total_system_cost_below_usd_per_kw": 4000,
+          "fuel_cost_below_usd_per_mwh": 50
+        },
+        "production_learning_claim": {
+          "order_volume_above": 1000,
+          "order_period_years_min": 10,
+          "order_period_years_max": 15,
+          "modeled_production_cost_usd_per_kw_min": 750,
+          "modeled_production_cost_usd_per_kw_max": 1000
+        },
+        "fuel_cycle_years_approximately": 5,
+        "public_evidence_boundary": "Public case-study summary; detailed ship power, CAPEX, financing and full cost model inputs are not disclosed in the summary."
+      }
     },
     {
       "anchor_id": "PNEN-CONTAINERSHIP-ECON-2026",
@@ -187,7 +309,12 @@
     "Do not hard-code published conclusions into the economic calculator.",
     "A scenario may be technically possible but commercially infeasible because mandatory port, insurance, liability, emergency, fuel-cycle or licensing gates fail.",
     "Use UNKNOWN where evidence is missing; do not turn missing data into a favorable assumption.",
-    "Separate model outputs, industry estimates, regulator decisions, insurer decisions and observed vessel/plant performance."
+    "Separate model outputs, industry estimates, regulator decisions, insurer decisions and observed vessel/plant performance.",
+    "Reconcile the UCL and LR speed results by first freezing each study's speed-to-installed-power law, reactor CAPEX scaling, auxiliary load, annual voyage schedule, port dwell and transport-work denominator.",
+    "Do not equate UCL reactor CAPEX in USD/kWe with LR total-system cost thresholds in USD/kW.",
+    "Reproduce the UCL no-policy case as a mandatory negative control before testing any policy-supported or high-throughput case.",
+    "The UCL high-speed 25-knot case has over three times installed electrical power and higher TCO per tonne-nautical-mile than its 14.85-knot nuclear counterpart; do not claim speed inherently improves nuclear economics.",
+    "Separate annual cargo-capacity uplift, freed cargo volume, fuel cost savings, carbon-policy credits and delivered transport work to prevent double counting."
   ],
   "prohibited_inferences": [
     "Do not claim that commercial nuclear shipping is already generally cost competitive.",
@@ -195,5 +322,49 @@
     "Do not claim the LR 38% annual cargo capacity estimate is realized or universally applicable.",
     "Do not claim the academic scenario result demonstrates a commercial fleet.",
     "Do not equate the number of SMR projects with qualified, financeable or operating designs."
+  ],
+  "reconciliation_matrix": [
+    {
+      "dimension": "Vessel scope",
+      "ucl": "14,500–19,999 TEU class; 25-year assumed life",
+      "lr": "15,000 TEU scenario",
+      "status": "PARTIAL_MATCH; hull, deadweight and detailed configuration still need matching"
+    },
+    {
+      "dimension": "Speed and power",
+      "ucl": "14.85-knot base and 25-knot nuclear options; 35,971 to 115,061 kWe; cube-law power demand and linear reactor CAPEX per kWe",
+      "lr": "25-knot case, 39% faster than conventional reference; detailed power sizing not exposed in public summary",
+      "status": "PRIMARY_RECONCILIATION_GAP; obtain LR power sizing and run matched power/CAPEX scaling"
+    },
+    {
+      "dimension": "Service denominator",
+      "ucl": "annual TCO per tonne-nautical-mile; annual distance 81,811 vs 108,054 nm",
+      "lr": "annual cargo capacity, five vs 6.3 round voyages and up to 38% extra annual capacity",
+      "status": "NOT_DIRECTLY_COMPARABLE; reconstruct common loaded tonne-nm / transport-work denominator"
+    },
+    {
+      "dimension": "CAPEX scope",
+      "ucl": "2,578 / 12,434 USD/kWe reactor CAPEX low/high",
+      "lr": "total system cost threshold below 4,000 USD/kW; production learning estimate 750–1,000 USD/kW after >1,000 orders over 10–15 years",
+      "status": "NOT_COMPARABLE_UNTIL_SCOPE_BRIDGED; reactor vs system cost, power basis and production assumptions differ"
+    },
+    {
+      "dimension": "Policy",
+      "ucl": "NZF low/high biofuel plus no-policy case; surplus-unit revenue influences TCO",
+      "lr": "public summary includes avoided carbon penalties and future carbon-price assumptions but does not provide matching policy trajectory",
+      "status": "NOT_COMPARABLE_WITH_PUBLIC_DATA"
+    },
+    {
+      "dimension": "Cost scope",
+      "ucl": "Annualized CAPEX, non-fuel OPEX, fuel and policy cost; excludes nuclear-specific insurance, reactor maintenance and hull integration; rough decommissioning",
+      "lr": "LCO/lifecycle-cost comparison described; public summary does not disclose a fully aligned cost ledger",
+      "status": "PARTIAL_MATCH; request full cost inclusion matrix"
+    },
+    {
+      "dimension": "Fleet and production learning",
+      "ucl": "Per-vessel cost calculations; fleet-adoption outputs not used; low CAPEX assumes NOAK learning",
+      "lr": "Industry consortium and >1,000 unit production learning scenario",
+      "status": "DIFFERENT MODEL BOUNDARIES; do not transfer unit-volume assumptions"
+    }
   ]
 }
