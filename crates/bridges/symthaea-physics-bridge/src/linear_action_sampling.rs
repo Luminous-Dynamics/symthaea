@@ -1458,8 +1458,10 @@ mod tests {
         ];
         let canonical_quadratic = nalgebra::Matrix2::new(1.0, 0.0, 0.0, 1.2);
         let canonical_generator = nalgebra::Matrix2::new(0.0, -1.0, 1.0, 0.0);
-        let canonical_expression =
-            quadratic_form_expression(&canonical_quadratic, "x", "y");
+        let canonical_expression = Expr::Func(
+            UnaryFn::Sqrt,
+            Box::new(quadratic_form_expression(&canonical_quadratic, "x", "y")),
+        );
         let canonical_samples = samples(
             &canonical_states.map(|state| [state[0], state[1]]),
             [[1.0, 0.0], [0.0, 1.0]],
@@ -1498,8 +1500,10 @@ mod tests {
             }
             .try_admit(LinearGroupActionAdmissionProfileV1::default())
             .unwrap();
-            let transformed_expression =
-                quadratic_form_expression(&transformed_quadratic, "X", "Y");
+            let transformed_expression = Expr::Func(
+                UnaryFn::Sqrt,
+                Box::new(quadratic_form_expression(&transformed_quadratic, "X", "Y")),
+            );
 
             let transformed_samples: Vec<LinearActionSampleV1> = canonical_states
                 .iter()
