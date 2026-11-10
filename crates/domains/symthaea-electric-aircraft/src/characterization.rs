@@ -550,6 +550,110 @@ mod tests {
         }
     }
 
+    fn battery_grid(
+        id: &str,
+        evidence_id: &str,
+        values: Vec<Vec<f64>>,
+        uncertainty: f64,
+    ) -> ScalarGrid2D {
+        ScalarGrid2D {
+            id: id.into(),
+            x_axis: "state_of_charge".into(),
+            x_unit: "1".into(),
+            x_values: vec![0.2, 0.6, 0.95],
+            y_axis: "temperature".into(),
+            y_unit: "K".into(),
+            y_values: vec![273.0, 298.0, 323.0],
+            evidence: evidence(evidence_id),
+            values: values
+                .into_iter()
+                .map(|row| row.into_iter()
+                    .map(|value| ScalarGridPoint {
+                        value,
+                        absolute_uncertainty: uncertainty,
+                    })
+                    .collect())
+                .collect(),
+        }
+    }
+
+    fn battery_characterization() -> BatteryCharacterization {
+        BatteryCharacterization {
+            open_circuit_voltage: battery_grid(
+                "pack-ocv",
+                "pack-ocv-data",
+                vec![
+                    vec![340.0, 350.0, 345.0],
+                    vec![365.0, 375.0, 370.0],
+                    vec![385.0, 395.0, 390.0],
+                ],
+                1.5,
+            ),
+            internal_resistance: battery_grid(
+                "pack-resistance",
+                "pack-resistance-data",
+                vec![
+                    vec![0.070, 0.055, 0.070],
+                    vec![0.045, 0.030, 0.050],
+                    vec![0.050, 0.035, 0.055],
+                ],
+                0.002,
+            ),
+        }
+    }
+
+    #[test]
+    fn battery_grid_bilinearly_interpolates() {
+        let grid = battery_grid(
+            "ocv",
+            "ocv-data",
+            vec![
+                vec![340.0, 350.0, 345.0],
+                vec![365.0, 375.0, 370.0],
+                vec![385.0, 395.0, 390.0],
+            ],
+            1.5,
+        );
+        let sample = grid.sample(0.6, 298.0).unwrap();
+        assert!((sample.nominal_value - 375.0).abs() < 1e-12);
+        assert!((sample.conservative_lower_bound - 373.5).abs() < 1e-12);
+        assert!((sample.conservative_upper_bound - 376.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn battery_grid_rejects_out_of_domain_soc_or_temperature() {
+        let grid = battery_grid(
+            "ocv",
+            "ocv-data",
+            vec![
+                vec![340.0, 350.0, 345.0],
+                vec![365.0, 375.0, 370.0],
+                vec![385.0, 395.0, 390.0],
+            ],
+            1.5,
+        );
+        assert!(matches!(
+            grid.sample(0.1, 298.0),
+            Err(CharacterizationError::GridOutsideCalibrationDomain { .. })
+        ));
+        assert!(matches!(
+            grid.sample(0.6, 330.0),
+            Err(CharacterizationError::GridOutsideCalibrationDomain { .. })
+        ));
+    }
+
+    #[test]
+    fn battery_uses_low_voltage_and_high_resistance_bounds() {
+        let battery = battery_characterization();
+        let operating = battery.operating_point(0.6, 298.0).unwrap();
+        assert!((operating.open_circuit_voltage_v - 373.5).abs() < 1e-12);
+        assert!((operating.internal_resistance_ohm - 0.032).abs() < 1e-12);
+        assert_eq!(
+            battery.evidence_ids(),
+            vec!["pack-ocv-data", "pack-resistance-data"]
+        );
+    }
+
     #[test]
     fn curve_interpolates_nominal_and_uncertainty() {
         let c = curve(
