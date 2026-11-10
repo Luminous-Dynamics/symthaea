@@ -41,6 +41,31 @@ jobs:
       - name: Run complete Rust unit-test suite
         run: cargo test --manifest-path tools/marine-propulsion-validator/Cargo.toml
 
+      - name: Exercise synthetic vessel-case validators (INCOMPLETE expected)
+        shell: bash
+        run: |
+          set -e
+          run_expect_incomplete() {
+            set +e
+            cargo run --quiet --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+              --bin marine-propulsion-validator -- "$1" "$2"
+            status=$?
+            set -e
+            if [ "$status" -ne 2 ]; then
+              echo "Expected synthetic vessel case to exit 2 (INCOMPLETE); observed $status"
+              exit 1
+            fi
+          }
+          run_expect_incomplete \
+            docs/research/marine/marine-propulsion-case.schema.json \
+            docs/research/marine/fixtures/synthetic-waps-case-0001.json
+          run_expect_incomplete \
+            docs/research/marine/marine-propulsion-case-v0.2.0.schema.json \
+            docs/research/marine/fixtures/synthetic-waps-case-v0.2.0.json
+          run_expect_incomplete \
+            docs/research/marine/marine-propulsion-case-v0.3.0.schema.json \
+            docs/research/marine/fixtures/synthetic-waps-case-v0.3.0.json
+
       - name: Audit v0.1.0 regulatory rule register
         run: |
           cargo run --quiet --manifest-path tools/marine-propulsion-validator/Cargo.toml \
