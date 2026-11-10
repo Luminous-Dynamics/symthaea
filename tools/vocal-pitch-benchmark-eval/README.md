@@ -6,7 +6,7 @@ A dependency-free Rust evaluator for comparing monophonic pitch trackers against
 
 This tool consumes frame-aligned F0 observations. It does not read audio, resample, run trackers, choose confidence thresholds, infer voiced frames, or construct statistical confidence intervals.
 
-The primary track rejects score-conditioned pitch estimation. A tracker adapter must apply its frozen voicing policy and emit None for an unvoiced/abstained frame. The report binds the policy identifier, optional numeric confidence threshold, calibration receipt, calibration split ID and manifest digest, evaluation split ID and manifest digest, tracker artifact digest, reference-suite manifest digest, preprocessing manifest and frame-alignment policy. Calibration and evaluation split IDs must differ. The split manifests must also be independently checked for singer/song/session overlap; distinct labels alone do not prove statistical independence.
+The primary track rejects score-conditioned pitch estimation. A tracker adapter must apply its frozen voicing policy and emit None for an unvoiced/abstained frame. The report binds the policy identifier, optional numeric confidence threshold, calibration receipt, calibration split ID and manifest digest, evaluation split ID and manifest digest, tracker artifact digest, reference-suite manifest digest, preprocessing manifest and frame-alignment policy. Calibration and evaluation split IDs and manifest digests must differ. The split manifests must also be independently checked for singer/song/session overlap; distinct labels or hashes alone do not prove statistical independence.
 
 ## Metrics
 
