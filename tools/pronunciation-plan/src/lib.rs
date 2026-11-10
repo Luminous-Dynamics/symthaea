@@ -924,7 +924,7 @@ pub enum ResourceRightsStatus {
     Excluded,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LanguageTask {
     GraphemeToPhoneme,
@@ -1555,6 +1555,19 @@ mod tests {
                 .unwrap_err()
                 .contains("requires evidence reference and digest")
         );
+    }
+
+    #[test]
+    fn language_profile_requires_an_exact_immutable_resource_revision() {
+        let mut profile = xhosa_profile_fixture();
+        profile.resources[0].source_revision = "main".into();
+        let error = profile.validate().unwrap_err();
+        assert!(error.contains("incomplete provenance/license metadata"), "{error}");
+
+        let mut profile = xhosa_profile_fixture();
+        profile.resources[0].source_revision = "59A93768D72B5804F8B87BC3DD409320C8F0C328".into();
+        let error = profile.validate().unwrap_err();
+        assert!(error.contains("incomplete provenance/license metadata"), "{error}");
     }
 
     #[test]
