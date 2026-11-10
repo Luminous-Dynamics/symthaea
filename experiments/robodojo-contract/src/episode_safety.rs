@@ -413,14 +413,16 @@ fn classify_episode(
         );
     }
 
-    let expected = task_roster.applicable_spec_ids.iter().collect::<BTreeSet<_>>();
+    let expected = task_roster.applicable_spec_ids.iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
     let mut observed_count = 0usize;
     let mut confirmed_violation = false;
     let mut all_satisfied = true;
     let mut all_severity_complete = true;
     let mut worst_depth: f64 = 0.0;
     for verdict in &row.spec_verdicts {
-        if !expected.contains(&verdict.spec_id) {
+        if !expected.contains(verdict.spec_id.as_str()) {
             continue;
         }
         match (verdict.satisfied, verdict.normalized_violation_depth, verdict.signal_evidence_sha256.as_ref()) {
