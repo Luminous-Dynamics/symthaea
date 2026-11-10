@@ -1,0 +1,9 @@
+# Custom labels used by the repository's self-hosted GitHub Actions runners.
+self-hosted-runner:
+  labels:
+    - gpu
+    - nixos
+
+# This repository does not use GitHub Actions configuration variables in a way
+# that benefits from a strict allowlist.
+config-variables: null

@@ -101,6 +101,10 @@ path = "examples/real_discovery_report.rs"
 required-features = ["abstract_thought"]
 
 [[example]]
+name = "ramanujan_protocol_v2_pilot"
+path = "examples/ramanujan_protocol_v2_pilot.rs"
+
+[[example]]
 name = "compounding_benchmark"
 path = "examples/compounding_benchmark.rs"
 required-features = ["abstract_thought"]

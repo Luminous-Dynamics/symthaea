@@ -742,7 +742,7 @@ fn sampled_trajectory(
     t_max: f64,
     dt: f64,
 ) -> Option<Vec<Vec<f64>>> {
-    let (_t, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
+    let (_t, states) = rk4_trajectory(rhs, initial_state, t_max, dt);
     let n_samples = 200.min(states.len());
     if n_samples < 20 {
         return None;
