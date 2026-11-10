@@ -28,9 +28,9 @@ pub struct EditRegion {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EditLocalityThresholds {
-    /// Minimum target-region RMS sample delta, in normalized full-scale units.
+    /// Minimum target-region RMS sample delta, in the input amplitude units.
     pub minimum_target_rms_delta: f64,
-    /// Maximum allowed RMS sample delta in each protected region.
+    /// Maximum allowed RMS sample delta in each protected region, in input units.
     pub maximum_protected_rms_delta: f64,
 }
 
