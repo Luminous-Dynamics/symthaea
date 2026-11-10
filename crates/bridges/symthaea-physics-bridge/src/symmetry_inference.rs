@@ -274,6 +274,8 @@ pub struct MetricAwareLinearActionSampleProfileV1 {
     pub maximum_samples: usize,
     pub maximum_expression_nodes: usize,
     pub maximum_total_gradient_work: usize,
+    /// Maximum number of (generator, sample) pairs evaluated for matrix actions.
+    pub maximum_total_generator_sample_pairs: usize,
     pub minimum_informative_samples_per_generator: usize,
     /// Maximum squared cosine in metric-whitened coordinates.
     pub squared_cosine_tolerance: f64,
@@ -285,6 +287,7 @@ impl Default for MetricAwareLinearActionSampleProfileV1 {
             maximum_samples: 4096,
             maximum_expression_nodes: 16_384,
             maximum_total_gradient_work: 20_000_000,
+            maximum_total_generator_sample_pairs: 65_536,
             minimum_informative_samples_per_generator: 1,
             squared_cosine_tolerance: 1e-8,
         }
@@ -1371,6 +1374,7 @@ pub fn evaluate_metric_aware_linear_action_samples(
     if profile.maximum_samples == 0
         || profile.maximum_expression_nodes == 0
         || profile.maximum_total_gradient_work == 0
+        || profile.maximum_total_generator_sample_pairs == 0
         || profile.minimum_informative_samples_per_generator == 0
         || profile.minimum_informative_samples_per_generator > profile.maximum_samples
         || !profile.squared_cosine_tolerance.is_finite()
@@ -1474,6 +1478,16 @@ pub fn evaluate_metric_aware_linear_action_samples(
         .and_then(|count| count.checked_mul(complexity))
         .and_then(|count| count.checked_mul(variable_names.len()))
         .ok_or(MetricAwareLinearActionSampleErrorV1::InvalidProfile)?;
+    let generator_sample_pairs = sample_states
+        .len()
+        .checked_mul(declaration.generators.len())
+        .ok_or(MetricAwareLinearActionSampleErrorV1::InvalidProfile)?;
+    if generator_sample_pairs > profile.maximum_total_generator_sample_pairs {
+        return Err(MetricAwareLinearActionSampleErrorV1::TotalGradientWorkExceeded {
+            actual: generator_sample_pairs,
+            maximum: profile.maximum_total_generator_sample_pairs,
+        });
+    }
     if total_work > profile.maximum_total_gradient_work {
         return Err(
             MetricAwareLinearActionSampleErrorV1::TotalGradientWorkExceeded {
@@ -2146,6 +2160,19 @@ mod tests {
                 &states,
                 &[],
                 low_work
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::TotalGradientWorkExceeded { .. })
+        ));
+
+        let mut low_pair_budget = MetricAwareLinearActionSampleProfileV1::default();
+        low_pair_budget.maximum_total_generator_sample_pairs = 2;
+        assert!(matches!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                low_pair_budget
             ),
             Err(MetricAwareLinearActionSampleErrorV1::TotalGradientWorkExceeded { .. })
         ));
