@@ -163,7 +163,7 @@
             "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
             "feature_uses": [
               {
-                "feature_id": "self-reference-offset",
+                "feature_id": "per-cell-full-life-extrema",
                 "value_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
                 "latest_measurement_at_ms": 700,
                 "latest_received_at_ms": 710,
@@ -187,7 +187,7 @@
             "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f8",
             "feature_uses": [
               {
-                "feature_id": "self-reference-offset",
+                "feature_id": "per-cell-full-life-extrema",
                 "value_digest": "00000000000000000000000000000000000000000000000000000000000000cc",
                 "latest_measurement_at_ms": 700,
                 "latest_received_at_ms": 710,
@@ -488,7 +488,7 @@
             "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001fd",
             "feature_uses": [
               {
-                "feature_id": "self-reference-offset",
+                "feature_id": "per-cell-full-life-extrema",
                 "value_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
                 "latest_measurement_at_ms": 700,
                 "latest_received_at_ms": 710,
@@ -512,7 +512,7 @@
             "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001fe",
             "feature_uses": [
               {
-                "feature_id": "self-reference-offset",
+                "feature_id": "per-cell-full-life-extrema",
                 "value_digest": "00000000000000000000000000000000000000000000000000000000000000d2",
                 "latest_measurement_at_ms": 700,
                 "latest_received_at_ms": 710,
@@ -2009,7 +2009,7 @@
             "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001fd",
             "feature_uses": [
               {
-                "feature_id": "self-reference-offset",
+                "feature_id": "per-cell-full-life-extrema",
                 "value_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
                 "latest_measurement_at_ms": 700,
                 "latest_received_at_ms": 710,
@@ -2033,7 +2033,7 @@
             "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001fe",
             "feature_uses": [
               {
-                "feature_id": "self-reference-offset",
+                "feature_id": "per-cell-full-life-extrema",
                 "value_digest": "00000000000000000000000000000000000000000000000000000000000000d2",
                 "latest_measurement_at_ms": 700,
                 "latest_received_at_ms": 710,
