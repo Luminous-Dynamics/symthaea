@@ -165,7 +165,7 @@ pub fn infer_symmetry(expr: &Expr) -> SymmetryDescriptor {
 pub fn infer_symmetry_with_evidence(expr: &Expr) -> SymmetryInferenceReport {
     let numeric_profile = NumericLieDerivativeProfileV1::default();
 
-    if let Some((n, shared_coefficient)) = detect_sum_of_squares_with_coefficient(expr)
+    if let Some((n, shared_coefficient)) = detect_sum_of_squares(expr)
         && (2..=10).contains(&n)
     {
         return SymmetryInferenceReport {
@@ -414,11 +414,7 @@ fn flatten_add_only<'a>(expr: &'a Expr, out: &mut Vec<&'a Expr>) {
 /// If expr is `c * (x₁² + ... + xₖ²)` for k ≥ 2 distinct variables and one
 /// shared finite, nonzero coefficient c, return k. Unequal weights define an
 /// ellipsoid rather than an SO(k)-invariant quadratic form and are rejected.
-fn detect_sum_of_squares(expr: &Expr) -> Option<u8> {
-    detect_sum_of_squares_with_coefficient(expr).map(|(count, _)| count)
-}
-
-fn detect_sum_of_squares_with_coefficient(expr: &Expr) -> Option<(u8, f64)> {
+fn detect_sum_of_squares(expr: &Expr) -> Option<(u8, f64)> {
     let mut terms = Vec::new();
     flatten_add_only(expr, &mut terms);
     if terms.len() < 2 {
@@ -661,7 +657,7 @@ mod tests {
             mul(Expr::Const(2.5), pow2("x")),
             mul(Expr::Const(2.5), pow2("y")),
         );
-        assert_eq!(detect_sum_of_squares(&expr), Some(2));
+        assert_eq!(detect_sum_of_squares(&expr), Some((2, 2.5)));
         assert_eq!(infer_symmetry(&expr).lie_groups, vec![LieGroup::SO(2)]);
     }
 
@@ -671,7 +667,7 @@ mod tests {
             mul(Expr::Const(-3.0), pow2("x")),
             mul(Expr::Const(-3.0), pow2("y")),
         );
-        assert_eq!(detect_sum_of_squares(&expr), Some(2));
+        assert_eq!(detect_sum_of_squares(&expr), Some((2, -3.0)));
         assert_eq!(infer_symmetry(&expr).lie_groups, vec![LieGroup::SO(2)]);
     }
 
