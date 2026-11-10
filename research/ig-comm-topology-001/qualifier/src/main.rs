@@ -524,7 +524,9 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                         add(
                             errors,
                             context,
-                            format!("channel {channel_id} interval does not implement revoke at round {round}"),
+                            format!(
+                                "channel {channel_id} interval does not implement revoke at round {round}"
+                            ),
                         );
                     }
                 }
@@ -573,7 +575,9 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                         add(
                             errors,
                             context,
-                            format!("restore for {old_id} has no replacement with identical direction/endpoints"),
+                            format!(
+                                "restore for {old_id} has no replacement with identical direction/endpoints"
+                            ),
                         );
                         continue;
                     };
@@ -584,7 +588,9 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                         add(
                             errors,
                             context,
-                            format!("replacement channel {new_id} must activate at restore round {round}"),
+                            format!(
+                                "replacement channel {new_id} must activate at restore round {round}"
+                            ),
                         );
                     }
                 }
@@ -592,7 +598,10 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                     add(
                         errors,
                         context,
-                        "restore new_channel_ids do not map one-to-one to revoked directed channels",
+                        concat!(
+                            "restore new_channel_ids do not map one-to-one ",
+                            "to revoked directed channels"
+                        ),
                     );
                 }
             }
@@ -615,7 +624,9 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                     add(
                         errors,
                         context,
-                        format!("AgentInstanceId {id} node interval does not implement exit at round {round}"),
+                        format!(
+                            "AgentInstanceId {id} node interval does not implement exit at round {round}"
+                        ),
                     );
                 }
             }
@@ -642,14 +653,19 @@ fn validate_temporal_ledger(profile: &Value, errors: &mut Vec<String>) {
                     add(
                         errors,
                         context,
-                        "agent_rejoin requires a previously exited ID and a distinct new AgentInstanceId",
+                        concat!(
+                            "agent_rejoin requires a previously exited ID and ",
+                            "a distinct new AgentInstanceId"
+                        ),
                     );
                 }
                 if new_node["active_from_round"].as_u64() != Some(round) {
                     add(
                         errors,
                         context,
-                        format!("new AgentInstanceId {new_id} must activate at rejoin round {round}"),
+                        format!(
+                            "new AgentInstanceId {new_id} must activate at rejoin round {round}"
+                        ),
                     );
                 }
                 if field(old_node, "principal_ref") != field(new_node, "principal_ref") {
@@ -738,7 +754,9 @@ fn validate_profile(profile: &Value) -> Vec<String> {
                         add(
                             &mut errors,
                             context,
-                            format!("channel {id} outlives the active interval of endpoint {endpoint}"),
+                            format!(
+                                "channel {id} outlives the active interval of endpoint {endpoint}"
+                            ),
                         );
                     }
                 }
@@ -790,7 +808,10 @@ fn validate_manifest(manifest: &Value, schema: &Value) -> Result<Report, Vec<Str
     let mut errors = Vec::new();
     validate_schema_header(
         schema,
-        "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-comm-topology-001/COMMUNICATION_GRAPH_FIXTURES_V0_1.schema.json",
+        concat!(
+            "https://github.com/Luminous-Dynamics/symthaea/blob/main/",
+            "research/ig-comm-topology-001/COMMUNICATION_GRAPH_FIXTURES_V0_1.schema.json"
+        ),
         &mut errors,
     );
     if field(manifest, "schema_version") != Some("communication-graph-fixtures-v0.1")
@@ -933,7 +954,10 @@ fn main() -> ExitCode {
                 report.profiles, report.topology_families, report.fixtures
             );
             println!(
-                "NOT EXECUTED: channel reachability is not message delivery; no agent interaction was run."
+                concat!(
+                    "NOT EXECUTED: channel reachability is not message delivery; ",
+                    "no agent interaction was run."
+                )
             );
             ExitCode::SUCCESS
         }
