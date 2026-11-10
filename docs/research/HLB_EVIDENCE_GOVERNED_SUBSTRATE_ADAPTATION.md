@@ -66,6 +66,24 @@ The planner carries the remaining budget down every observation branch and makes
 
 This control does not validate causal identification, establish that an intervention is physically safe, or authorize execution. It constrains planning only after a caller supplies a defensible risk bound.
 
+### 2.1.2 Causal decision and policy-tree receipts
+
+The opt-in receipt-bearing API in HLB PR #11366 composes the existing causal diagnostic decision-problem validator with the budgeted sequential planner. Its decision-problem digest identifies:
+
+- typed causal action descriptors and their action-likelihood table digests;
+- hypothesis identities and priors;
+- exact action-conditioned likelihood tensors;
+- downstream loss tables and decision-policy weights/limits;
+- the caller's task-specification digest.
+
+The policy receipt additionally binds the cumulative-risk budget and external risk-semantics digest, planning horizon and expansion limit, selected policy tree, evaluation summary, modeled terminal-path count, and maximum path-wise sum of action-risk upper bounds.
+
+The receipt builder performs a structural audit while constructing the tree digest. It recomputes each positive-probability branch from the current posterior and action likelihoods, checks that every modeled positive-probability outcome appears exactly once, checks that zero-support outcomes do not appear as branches, verifies each Bayes posterior, recursively recomputes expected terminal risk and cost components, and rejects action reuse or a path above the declared cumulative budget.
+
+The public `verify_sequential_diagnostic_policy_receipt` function exposes the same audit for a supplied receipt and its original decision inputs. Its successful report means the supplied finite policy is structurally consistent, its modeled Bayes updates and objective accounting reproduce, and its modeled path-wise risk remains within the declared budget. It does **not** independently prove global policy optimality: that requires a separately implemented optimizer or exact reference oracle. It also does not authenticate external causal-identification, risk-calibration, or feasibility evidence.
+
+The policy tree covers outcomes with positive predictive probability under the declared finite hypothesis set. An observation outside all registered support is not a hidden continuation: a production adapter must treat it as a model-adequacy failure and abstain/replan rather than selecting a default branch. The finite-tree receipt is not an open-world or physical-safety certificate.
+
 ### 2.2 In-family uncertainty is not model adequacy
 
 Bayesian posterior concentration is conditional on the supplied generative family. It does not demonstrate that the family itself is adequate.
@@ -144,10 +162,11 @@ A candidate evaluation should be reproducible from:
 2. WeightProgram digest, typed target manifest, and edit-budget claims.
 3. Open-world adequacy report and gate-decision digest.
 4. Frozen evaluation-protocol digest, candidate-specific confirmatory-shard digest, and canonical confirmatory episode-manifest digest.
-5. Authenticated source-record identity for every episode ID, plus ordered paired episode IDs and baseline/candidate loss values.
-6. Sequential confidence-sequence report and digest.
-7. Protected-behavior, negative-control, rollback, and independent-verifier result manifests.
-8. Signed acceptance or rejection receipt.
+5. For diagnostic policies, the causal decision-problem digest, risk-budget digest, planning configuration, policy-tree digest, evaluation digest, and maximum path-risk bound.
+6. Authenticated source-record identity for every episode ID, plus ordered paired episode IDs and baseline/candidate loss values.
+7. Sequential confidence-sequence report and digest.
+8. Protected-behavior, negative-control, rollback, and independent-verifier result manifests.
+9. Signed acceptance or rejection receipt.
 
 A missing or mismatched link blocks acceptance. A queued workflow, incomplete experiment, or missing exact-head receipt is not evidence of success.
 
