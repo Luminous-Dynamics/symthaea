@@ -40,6 +40,10 @@ struct Scenario {
     decision_unit: String,
     horizon: usize,
     abstain_loss: f64,
+    prior_evidence_digest: String,
+    prior_evidence_class: String,
+    decision_loss_digest: String,
+    decision_loss_evidence_class: String,
     hypotheses: Vec<HypothesisPrior>,
     actions: Vec<DecisionAction>,
     tests: Vec<DiagnosticTest>,
@@ -68,6 +72,10 @@ struct DiagnosticTest {
     test_cost_digest: String,
     downtime_cost: f64,
     downtime_cost_digest: String,
+    likelihood_model_digest: String,
+    calibration_evidence_digest: String,
+    calibration_cohort_digest: String,
+    likelihood_evidence_class: String,
     prerequisites: Prerequisites,
     requires: Option<TestCondition>,
     outcomes: Vec<TestOutcome>,
@@ -111,6 +119,10 @@ pub struct TestReceipt {
     pub equipment_available: bool,
     pub protocol_digest: String,
     pub equipment_digest: String,
+    pub likelihood_model_digest: String,
+    pub calibration_evidence_digest: String,
+    pub calibration_cohort_digest: String,
+    pub likelihood_evidence_class: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -140,6 +152,10 @@ pub struct OneStepValue {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct PlanResult {
     pub scenario_id: String,
+    pub prior_evidence_digest: String,
+    pub prior_evidence_class: String,
+    pub decision_loss_digest: String,
+    pub decision_loss_evidence_class: String,
     pub root_choice: String,
     pub root_test_id: Option<String>,
     pub baseline_no_test_loss: f64,
@@ -253,11 +269,31 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
         }
         prior_sum += hypothesis.prior;
     }
-    if scenario.hypotheses.is_empty() || (prior_sum - 1.0).abs() > 1e-9 {
-        errors.push("hypothesis priors must be positive and sum to one".to_owned());
+    if scenario.hypotheses.is_empty() || scenario.hypotheses.len() > 32
+        || (prior_sum - 1.0).abs() > 1e-9
+    {
+        errors.push("hypothesis priors must be positive, bounded and sum to one".to_owned());
+    }
+    if !is_digest(&scenario.prior_evidence_digest)
+        || !is_digest(&scenario.decision_loss_digest)
+        || !matches!(
+            scenario.prior_evidence_class.as_str(),
+            "reference_test_measurement" | "derived_estimate" | "model_prediction"
+                | "simulation_output" | "synthetic_fixture" | "vendor_claim"
+        )
+        || !matches!(
+            scenario.decision_loss_evidence_class.as_str(),
+            "reference_test_measurement" | "derived_estimate" | "model_prediction"
+                | "simulation_output" | "synthetic_fixture" | "vendor_claim"
+        )
+    {
+        errors.push("prior or decision-loss evidence receipt is invalid".to_owned());
     }
 
     let mut action_ids = BTreeSet::new();
+    if scenario.actions.is_empty() || scenario.actions.len() > 32 {
+        errors.push("action catalog must contain 1..=32 entries".to_owned());
+    }
     for action in &scenario.actions {
         if !nonempty(&action.id) || !action_ids.insert(action.id.clone()) {
             errors.push(format!("action identity is empty or duplicated: {}", action.id));
@@ -298,6 +334,14 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
         }
         if !is_digest(&test.prerequisites.protocol_digest)
             || !is_digest(&test.prerequisites.equipment_digest)
+            || !is_digest(&test.likelihood_model_digest)
+            || !is_digest(&test.calibration_evidence_digest)
+            || !is_digest(&test.calibration_cohort_digest)
+            || !matches!(
+                test.likelihood_evidence_class.as_str(),
+                "reference_test_measurement" | "derived_estimate" | "model_prediction"
+                    | "simulation_output" | "synthetic_fixture" | "vendor_claim"
+            )
         {
             errors.push(format!(
                 "test {} has invalid protocol/equipment digest",
@@ -557,6 +601,10 @@ fn optimize_node(
                     equipment_available: test.prerequisites.equipment_available,
                     protocol_digest: test.prerequisites.protocol_digest.clone(),
                     equipment_digest: test.prerequisites.equipment_digest.clone(),
+                    likelihood_model_digest: test.likelihood_model_digest.clone(),
+                    calibration_evidence_digest: test.calibration_evidence_digest.clone(),
+                    calibration_cohort_digest: test.calibration_cohort_digest.clone(),
+                    likelihood_evidence_class: test.likelihood_evidence_class.clone(),
                 }),
                 terminal_action: None,
                 expected_total_loss: candidate_loss,
@@ -694,6 +742,10 @@ fn plan_scenario(scenario: &Scenario) -> Result<PlanResult, String> {
     }
     Ok(PlanResult {
         scenario_id: normalized.scenario_id,
+        prior_evidence_digest: normalized.prior_evidence_digest,
+        prior_evidence_class: normalized.prior_evidence_class,
+        decision_loss_digest: normalized.decision_loss_digest,
+        decision_loss_evidence_class: normalized.decision_loss_evidence_class,
         root_choice: policy.choice.clone(),
         root_test_id: policy.test_id.clone(),
         baseline_no_test_loss: baseline,
@@ -920,6 +972,23 @@ mod tests {
             Some(0.5)
         );
         assert!((planned.policy.branches["a1"].posterior["A1B1"] - 0.4).abs() < 1e-9);
+    }
+
+    #[test]
+    fn plan_and_test_receipts_bind_prior_losses_and_likelihood_calibration() {
+        let result = report();
+        let planned = result.payload.cases.iter()
+            .find(|case| case.case_id == "complementary-tests-positive-sequence")
+            .and_then(|case| case.plan.as_ref())
+            .expect("sequence plan");
+        assert_eq!(planned.prior_evidence_class, "synthetic_fixture");
+        assert!(is_digest(&planned.prior_evidence_digest));
+        assert_eq!(planned.decision_loss_evidence_class, "synthetic_fixture");
+        let receipt = planned.policy.selected_test_receipt.as_ref().unwrap();
+        assert!(is_digest(&receipt.likelihood_model_digest));
+        assert!(is_digest(&receipt.calibration_evidence_digest));
+        assert!(is_digest(&receipt.calibration_cohort_digest));
+        assert_eq!(receipt.likelihood_evidence_class, "synthetic_fixture");
     }
 
     #[test]
