@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-camera-driving-bridge"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+description = "Evidence-bound visual and proprioceptive HDC input for driving experiments"
+
+[dependencies]
+serde = { workspace = true }
+sha2 = { workspace = true }
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-vehicle = { path = "../domains/symthaea-vehicle" }
+symthaea-vision-manifold = { path = "../domains/symthaea-vision-manifold" }
