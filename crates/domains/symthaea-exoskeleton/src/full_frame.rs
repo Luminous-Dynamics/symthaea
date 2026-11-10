@@ -1,17 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Full-Frame Exoskeleton — Tier 0 Capstone.
+//! Full-frame articulated research model.
 //!
-//! A 20+ degree-of-freedom full-body exoskeleton modeling the entire
-//! human kinematic chain as articulated bodies within a symtropy PhysicsWorld.
+//! This is a simplified 20-joint rigid-body simulation scaffold. It is not a
+//! validated human biomechanics model, a complete human/exoskeleton co-dynamics
+//! model, an actuator controller, or a hardware interface.
 //!
-//! # Philosophy
+//! The synthetic human-load generator records candidate joint torques but does
+//! not currently inject those torques into the articulated physics world. Do not
+//! interpret its telemetry as a simulated wearer response.
 //!
-//! This is not just a robot — it is a "second nervous system" that shares
-//! motor authority with a human user. The defining feature: **the suit
-//! literally loses its strength when it loses its consciousness (Φ)**.
-//! No amount of hardcoded safety rules can match a machine whose force
-//! output is gated by a measurable information-integration metric.
+//! Physical forces, impulses, gravity, and contact friction remain properties of
+//! the physical plant. Experimental cognitive metrics must not scale or replace
+//! them. Physical safety admission and actuator authority require independent,
+//! platform-specific evidence and controls.
 //!
 //! # Topology: 20 Joints, 20 Degrees of Freedom
 //!
@@ -41,22 +43,13 @@
 //!
 //! Total: **20 joints, 20 DOF** (simplified from human's ~244 DOF)
 //!
-//! # Safety Architecture
+//! # Explicit limitations
 //!
-//! - **Φ ≥ 0.6 (Green)**: Full assist — suit amplifies human intent
-//! - **Φ ∈ [0.3, 0.6) (Yellow)**: Responsive — follows without amplification
-//! - **Φ ∈ [0.1, 0.3) (Orange)**: Transparent — minimal assistance, compliant
-//! - **Φ < 0.1 (Red)**: Gravity compensation only — fully backdrivable
-//!
-//! Combined with:
-//! - `MissionAuditProof` (ZKP) — cryptographically proves Φ was safe throughout
-//! - `RoboticCredential` (Ebbinghaus) — suit loses certification without periodic testing
-//! - `MoralGateInput` — ethics engine can force Red at any time
-//!
-//! # Gate Condition
-//!
-//! This module is unlocked by the Coffee Cup Gate (see
-//! `symthaea-manipulator/tests/coffee_cup_gate.rs`). All 5 gates pass.
+//! This module contains no physical-safety admission logic and no motor
+//! authority path. Its physics callback is intentionally an identity/no-op
+//! adapter: it preserves forces and impulses and leaves contact friction at
+//! the configured physical value. Passing its software tests does not qualify
+//! a wearable device, hardware adapter, or human trial.
 
 #![cfg(feature = "symtropy")]
 
@@ -150,14 +143,11 @@ impl HumanLoadModel {
     }
 }
 
-/// Consciousness-mediated full-frame callback.
+/// Identity callback for the articulated research plant.
 ///
-/// At high Φ: all 20 joints get full exo assistance.
-/// At low Φ: suit becomes transparent — human moves freely without assist.
-pub struct FullFrameCallback {
-    pub motor_gain: f32,
-    pub stiffness: f64,
-}
+/// It deliberately does not reinterpret cognitive metrics as physical forces,
+/// motor gains, or contact-friction parameters.
+pub struct FullFrameCallback;
 
 impl PhysicsCallback<3> for FullFrameCallback {
     fn apply_trauma(&mut self, _event: &CollisionEvent<3>) {}
@@ -166,19 +156,20 @@ impl PhysicsCallback<3> for FullFrameCallback {
         _body: BodyHandle,
         force: &nalgebra::SVector<f64, 3>,
     ) -> nalgebra::SVector<f64, 3> {
-        *force * self.motor_gain as f64 * self.stiffness
+        *force
     }
     fn modulate_impulse(&self, impulse: f64, _contact: &nalgebra::SVector<f64, 3>) -> f64 {
         impulse
     }
     fn friction_multiplier(&self, _contact: &nalgebra::SVector<f64, 3>, _body: BodyHandle) -> f64 {
-        0.3 + 0.7 * self.motor_gain as f64 // More backdrivable at low Φ
+        1.0
     }
     fn on_collision(&mut self, _event: &CollisionEvent<3>) {}
     fn record_dissipation(&mut self, _energy: f64) {}
 }
 
-/// Full-frame exoskeleton simulator with 20 DOF and human load model.
+/// Simplified 20-joint articulated research plant. Synthetic human torques are
+/// generated for study but are not currently coupled into the physics world.
 pub struct FullFrameSimulator {
     pub world: PhysicsWorld<3>,
     pub spine_chain: ArticulatedChain,
@@ -354,23 +345,8 @@ impl FullFrameSimulator {
             left_leg,
             right_leg,
             human: HumanLoadModel::standard_adult(),
-            callback: FullFrameCallback {
-                motor_gain: 1.0,
-                stiffness: 1.0,
-            },
+            callback: FullFrameCallback,
         }
-    }
-
-    /// Set consciousness-mediated impedance.
-    pub fn set_consciousness(&mut self, phi: f64) {
-        let gain = match phi {
-            p if p >= 0.6 => 1.0,
-            p if p >= 0.3 => 0.6,
-            p if p >= 0.1 => 0.3,
-            _ => 0.0,
-        };
-        self.callback.motor_gain = gain;
-        self.callback.stiffness = 0.5 + 0.5 * gain as f64;
     }
 
     /// Total joint count across all chains.
@@ -425,20 +401,15 @@ mod tests {
     }
 
     #[test]
-    fn test_consciousness_tiers() {
-        let mut sim = FullFrameSimulator::new();
+    fn physical_force_and_contact_properties_are_not_cognitive_metric_outputs() {
+        let callback = FullFrameCallback;
+        let body = BodyHandle(1);
+        let force = nalgebra::SVector::<f64, 3>::new(3.0, -9.81, 2.5);
+        let contact = nalgebra::SVector::<f64, 3>::new(0.0, 0.0, 1.0);
 
-        sim.set_consciousness(0.9); // Green
-        assert_eq!(sim.callback.motor_gain, 1.0);
-
-        sim.set_consciousness(0.5); // Yellow
-        assert_eq!(sim.callback.motor_gain, 0.6);
-
-        sim.set_consciousness(0.2); // Orange
-        assert_eq!(sim.callback.motor_gain, 0.3);
-
-        sim.set_consciousness(0.05); // Red
-        assert_eq!(sim.callback.motor_gain, 0.0);
+        assert_eq!(callback.modulate_force(body, &force), force);
+        assert_eq!(callback.modulate_impulse(12.5, &contact), 12.5);
+        assert_eq!(callback.friction_multiplier(&contact, body), 1.0);
     }
 
     #[test]
