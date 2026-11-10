@@ -558,6 +558,22 @@ mod tests {
     }
 
     #[test]
+    fn admits_large_metric_scale_without_intermediate_overflow() {
+        let mut action = canonical_so2();
+        action.metric = vec![vec![1e300, 0.0], vec![0.0, 1e300]];
+        let admitted = action.try_admit(profile()).unwrap();
+        assert_eq!(admitted.metric_scale(), 1e300);
+    }
+
+    #[test]
+    fn admits_tiny_nonzero_generator_without_absolute_magnitude_cutoff() {
+        let mut action = canonical_so2();
+        action.generators[0].matrix = vec![vec![0.0, -1e-300], vec![1e-300, 0.0]];
+        let admitted = action.try_admit(profile()).unwrap();
+        assert_eq!(admitted.dimension(), 2);
+    }
+
+    #[test]
     fn rejects_non_finite_or_negative_admission_tolerances() {
         let mut invalid = profile();
         invalid.metric_skew_relative_tolerance = f64::NAN;
