@@ -30,8 +30,8 @@ jobs:
         run: |
           cargo run --manifest-path tools/ev-field-evidence-audit/Cargo.toml -- --schema schemas/transport/ev_field_evidence_registry_entry_v0_1.schema.json --corpus fixtures/ev_battery/field_evidence_registry_scenarios_v0_1.json > "$RUNNER_TEMP/ev-field-evidence-report.json"
           jq -e '
-            .case_count == 13 and
-            .accepted_count == 5 and
-            .rejected_count == 8 and
+            .case_count == 17 and
+            .accepted_count == 6 and
+            .rejected_count == 11 and
             (.report_sha256 | test("^[a-f0-9]{64}$"))
           ' "$RUNNER_TEMP/ev-field-evidence-report.json"
