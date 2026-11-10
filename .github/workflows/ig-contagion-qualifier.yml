@@ -41,4 +41,6 @@ jobs:
             research/ig-contagion-001/IG_CONTAGION_001_PROTOCOL_V0_1.json \
             research/ig-contagion-001/IG_CONTAGION_001_PROTOCOL_V0_1.schema.json \
             research/ig-contagion-001/IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.json \
-            research/ig-contagion-001/IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.schema.json
+            research/ig-contagion-001/IG_CONTAGION_001_SCENARIO_MATRIX_V0_1.schema.json \
+            research/ig-contagion-001/IG_CONTAGION_001_MATCHED_CONTENT_V0_1.json \
+            research/ig-contagion-001/IG_CONTAGION_001_MATCHED_CONTENT_V0_1.schema.json
