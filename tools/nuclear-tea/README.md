@@ -7,6 +7,7 @@ A small Rust reference package for the Luminous nuclear port/marine techno-econo
 This package currently provides:
 
 - structural validation of the frozen South African port shore-power / spare-capacity source dataset;
+- structural validation of the UCL/Lloyd's Register literature registry, including unique anchor IDs, source locators, explicit inference limits, required model inputs and matched-comparison dimensions;
 - SHA-256 input identity in a machine-readable verification receipt;
 - discounted lifecycle-cost and discounted delivered-service calculations;
 - explicit real/nominal cash-flow and discount-rate basis matching;
@@ -28,6 +29,8 @@ cargo run --release --manifest-path tools/nuclear-tea/Cargo.toml -- research/nuc
 The executable prints a JSON receipt with the exact input SHA-256, package version, build commit (when run under GitHub Actions), row counts and the limited validation status. It exits nonzero on parsing or validation failure.
 
 ## Calculation semantics
+
+The test suite parses and checks both frozen reference JSON datasets. The marine registry check establishes only structural completeness of its eight anchors, source locators, detailed UCL/LR model inputs and seven reconciliation dimensions; it does not verify the truth of the literature claims or reproduce either study.
 
 The first annual flow is project year 0. Costs and delivered service are discounted using the declared rate. All flows must use one declared price basis. Real cash flows require a real discount rate; nominal cash flows require a nominal rate. The code refuses mixed bases.
 
