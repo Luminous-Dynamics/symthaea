@@ -75,7 +75,8 @@
               "operation": {
                 "enum": [
                   "set",
-                  "remove"
+                  "remove",
+                  "set_all"
                 ]
               },
               "path": {
