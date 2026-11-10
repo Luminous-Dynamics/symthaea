@@ -128,7 +128,7 @@ pub fn validate_port_reference(
             errors.push(ValidationError::new(field.clone(), "port must not be empty"));
         }
         if !demand_ports.insert(row.port.trim().to_ascii_lowercase()) {
-            errors.push(ValidationError::new(&field, "duplicate port identifier"));
+            errors.push(ValidationError::new(field.clone(), "duplicate port identifier"));
         }
         if !row.average_maximum_mw.is_finite()
             || !row.absolute_maximum_mw.is_finite()
@@ -141,7 +141,7 @@ pub fn validate_port_reference(
             ));
         } else if row.absolute_maximum_mw < row.average_maximum_mw {
             errors.push(ValidationError::new(
-                &field,
+                field.clone(),
                 "absolute maximum must be greater than or equal to average maximum",
             ));
         }
@@ -158,13 +158,13 @@ pub fn validate_port_reference(
     {
         let field = format!("estimated_spare_port_intake_capacity[{index}]");
         if row.port.trim().is_empty() {
-            errors.push(ValidationError::new(&field, "port must not be empty"));
+            errors.push(ValidationError::new(field.clone(), "port must not be empty"));
         }
         if !capacity_ports.insert(row.port.trim().to_ascii_lowercase()) {
-            errors.push(ValidationError::new(&field, "duplicate port identifier"));
+            errors.push(ValidationError::new(field.clone(), "duplicate port identifier"));
         }
         if !ranks.insert(row.rank) {
-            errors.push(ValidationError::new(&field, "duplicate rank"));
+            errors.push(ValidationError::new(field.clone(), "duplicate rank"));
         }
         if !row.spare_mva.is_finite()
             || !row.spare_mw.is_finite()
@@ -172,12 +172,12 @@ pub fn validate_port_reference(
             || row.spare_mw < 0.0
         {
             errors.push(ValidationError::new(
-                &field,
+                field.clone(),
                 "spare capacity values must be finite and nonnegative",
             ));
         } else if (row.spare_mw - 0.9 * row.spare_mva).abs() > 1e-9 {
             errors.push(ValidationError::new(
-                &field,
+                field.clone(),
                 "spare MW must equal 0.9 times spare MVA under the source's stated conversion",
             ));
         } else {
@@ -185,7 +185,7 @@ pub fn validate_port_reference(
         }
         if !risk_labels.contains(&row.connection_risk_label.as_str()) {
             errors.push(ValidationError::new(
-                &field,
+                field.clone(),
                 "connection_risk_label must be LOW, MEDIUM or HIGH",
             ));
         }
@@ -397,7 +397,7 @@ impl EconomicSeries {
             }
             if !flow.delivered_service.is_finite() || flow.delivered_service < 0.0 {
                 return Err(ValidationError::new(
-                    &field,
+                    field.clone(),
                     "delivered_service must be finite and nonnegative",
                 ));
             }
