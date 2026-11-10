@@ -17,8 +17,9 @@ use crate::rhythm::Duration;
 use crate::score::{PartId, Score};
 
 pub const SCORE_EDIT_SCHEMA_V1: &str = "score-edit-plan-v1";
-/// Must match the exact domain-separated digest emitted by Muse's
-/// ScoreDemandProfile; changing the digest recipe requires a new version.
+/// Must match the canonical SHA-256 of serde_json Score bytes emitted by
+/// Muse's ScoreDemandProfile and Muse genealogy; changing the recipe requires
+/// a new schema version.
 pub const SCORE_EDIT_INPUT_DIGEST_SCHEMA_V1: &str = "muse-score-serde-json-sha256-v1";
 pub const MAX_SCORE_EDIT_OPERATIONS_V1: usize = 128;
 pub const MAX_PROTECTED_WINDOWS_V1: usize = 512;
