@@ -224,9 +224,36 @@
               "$ref": "#/$defs/provenance"
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "unit",
+            "not_applicable_reason",
+            "provenance"
+          ],
+          "properties": {
+            "value": {
+              "type": "null"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "not_applicable_reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "provenance": {
+              "$ref": "#/$defs/provenance"
+            }
+          },
+          "description": "An explicitly not-applicable quantity. This is distinct from an unknown value and from a missing field."
         }
       ],
-      "description": "A known finite value with explicit unit/provenance/uncertainty, or an explicit unknown with a reason. Cross-field dimensional consistency is enforced by the semantic validator, not inferred from free-text unit labels."
+      "description": "A known finite value with uncertainty, an explicit unknown with a reason, or an explicit not-applicable value with a reason. Unknown, not-applicable and absent fields are distinct states."
     },
     "identity": {
       "type": "object",
