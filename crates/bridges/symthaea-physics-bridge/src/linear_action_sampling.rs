@@ -118,7 +118,9 @@ pub struct LinearActionSampledInvarianceReportV1 {
     pub expression_blake3: String,
     /// BLAKE3 of the exact action declaration, including metric and generators.
     pub declared_action_blake3: String,
-    /// BLAKE3 of ordered sample IDs, states and finite-difference directions.
+    /// BLAKE3 of the A1 admission profile that produced the admitted action.
+    pub action_admission_profile_blake3: String,
+    /// BLAKE3 of ordered variable names, sample IDs, states and directions.
     pub sample_batch_blake3: String,
     /// BLAKE3 of the complete sampling profile.
     pub sampling_profile_blake3: String,
@@ -314,9 +316,28 @@ fn action_declaration_blake3(action: &crate::linear_group_action::LinearGroupAct
     hasher.finalize().to_hex().to_string()
 }
 
-fn sample_batch_blake3(samples: &[LinearActionSampleV1]) -> String {
+fn action_admission_profile_blake3(
+    profile: crate::linear_group_action::LinearGroupActionAdmissionProfileV1,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-linear-group-action-admission-profile-v1");
+    hash_usize(&mut hasher, profile.maximum_dimension);
+    hash_usize(&mut hasher, profile.maximum_generators);
+    hash_f64(&mut hasher, profile.metric_symmetry_relative_tolerance);
+    hash_f64(&mut hasher, profile.metric_skew_relative_tolerance);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn sample_batch_blake3(
+    variable_names: &[String],
+    samples: &[LinearActionSampleV1],
+) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-linear-action-sample-batch-v1");
+    hash_usize(&mut hasher, variable_names.len());
+    for name in variable_names {
+        hash_str(&mut hasher, name);
+    }
     hash_usize(&mut hasher, samples.len());
     for sample in samples {
         hash_str(&mut hasher, &sample.sample_id);
@@ -974,7 +995,8 @@ pub fn evaluate_linear_action_samples(
         profile,
         expression_blake3: expression_blake3(expr),
         declared_action_blake3: action_declaration_blake3(action.declared_action()),
-        sample_batch_blake3: sample_batch_blake3(samples),
+        action_admission_profile_blake3: action_admission_profile_blake3(*action.profile()),
+        sample_batch_blake3: sample_batch_blake3(&variable_names, samples),
         sampling_profile_blake3: sampling_profile_blake3(profile),
         estimated_expression_evaluation_cost,
         sample_ids: samples.iter().map(|sample| sample.sample_id.clone()).collect(),
