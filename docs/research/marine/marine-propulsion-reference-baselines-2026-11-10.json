@@ -1854,6 +1854,39 @@
         "WAPS full-scale performance claim",
         "Commercial model training or derivative dataset release without separate rights"
       ]
+    },
+    {
+      "source_id": "IMO-SDC12-STEERING-MANOEUVRABILITY-ROADMAP-2026",
+      "title": "IMO SDC 12: goal-based steering/propulsion amendments and draft International Ship Manoeuvrability Standards",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-01-23",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/sdc-12.aspx",
+      "evidence_class": "official_subcommittee_outcome_and_forward_workplan",
+      "scope": {
+        "meeting": "SDC 12, 19–23 January 2026",
+        "steering_propulsion": "Continued development of goal-based amendments to SOLAS Chapter II-1 (Part C) and Chapter V, including application dates, ship steering performance and steering-system failure tolerance; intended to cover traditional and non-traditional propulsion/steering.",
+        "manoeuvrability_standards": "Discussed draft new International Ship Manoeuvrability Standards for new ships subject to the new goal-based SOLAS regulations; agreed fundamental principles in principle, with further technical development required.",
+        "roadmap": [
+          "SDC 13 in 2027 to continue technical work",
+          "Expected adoption around 2029 per current roadmap",
+          "Target entry into force 1 January 2032 per current roadmap"
+        ],
+        "existing_ships": "Current MSC.137(76) standards remain the reference for existing ships under the stated roadmap."
+      },
+      "limitations": [
+        "Draft ISSM and SOLAS amendments are not adopted/effective requirements as of the 10 November 2026 snapshot.",
+        "Roadmap dates can change; confirm subsequent MSC/SDC decisions and formal instruments.",
+        "Ship-specific applicability, existing-ship/new-ship transition, build contract, keel-laying and delivery dates require legal/Administration review."
+      ],
+      "eligible_use": [
+        "Dated regulatory scenario tracking",
+        "New-ship design requirements horizon",
+        "Manoeuvrability trial data contribution planning"
+      ],
+      "ineligible_use": [
+        "Treating draft ISSM as binding law",
+        "Declaring compliance from a research manoeuvring benchmark"
+      ]
     }
   ]
 }
