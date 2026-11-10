@@ -1055,7 +1055,8 @@
         "claim_ceiling": "Observable elicited state transition only; no hidden belief, psychological state, or causal attribution is established."
       },
       "expected_violations": [
-        "open_world_or_pluralism_cannot_have_correctness_outcome"
+        "open_world_or_pluralism_cannot_have_correctness_outcome",
+        "open_world_or_pluralism_must_not_bind_single_answer_space"
       ]
     },
     {
