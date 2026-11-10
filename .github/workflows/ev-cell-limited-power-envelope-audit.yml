@@ -1,0 +1,38 @@
+name: EV cell-limited power envelope v0.1 audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_CELL_LIMITED_POWER_ENVELOPE_V0_1.md"
+      - "schemas/transport/ev_cell_limited_power_envelope_v0_1.schema.json"
+      - "fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_1.json"
+      - "tools/ev-cell-limited-power-envelope/**"
+      - ".github/workflows/ev-cell-limited-power-envelope-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-cell-limited-power-envelope/Cargo.toml -- --check
+      - name: Run power-envelope and mutation tests
+        run: cargo test --manifest-path tools/ev-cell-limited-power-envelope/Cargo.toml
+      - name: Audit frozen synthetic cases
+        run: |
+          cargo run --manifest-path tools/ev-cell-limited-power-envelope/Cargo.toml -- --schema schemas/transport/ev_cell_limited_power_envelope_v0_1.schema.json --corpus fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_1.json > "$RUNNER_TEMP/ev-cell-limited-power-report.json"
+          jq -e '
+            .case_count == 9 and
+            .computed_count == 4 and
+            .no_discharge_count == 1 and
+            .rejected_count == 4 and
+            (.report_sha256 | test("^[a-f0-9]{64}$"))
+          ' "$RUNNER_TEMP/ev-cell-limited-power-report.json"
