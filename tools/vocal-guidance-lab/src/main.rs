@@ -302,6 +302,28 @@ mod tests {
     }
 
     #[test]
+    fn combined_projected_direction_is_not_antagonistic_to_either_original_objective() {
+        let cases = [
+            (vec![1.0, 0.0], vec![-1.0, 1.0]),
+            (vec![2.0, 1.0], vec![-1.0, 2.0]),
+            (vec![0.5, -2.0, 1.0], vec![-1.0, 0.25, 2.0]),
+        ];
+        for (phoneme, pitch) in cases {
+            let report = evaluate(input(phoneme.clone(), pitch.clone())).unwrap();
+            if report.two_objective_guidance_direction_available {
+                assert!(
+                    dot(&phoneme, &report.combined_guidance) >= -EPSILON,
+                    "combined direction opposes phoneme objective: {report:?}"
+                );
+                assert!(
+                    dot(&pitch, &report.combined_guidance) >= -EPSILON,
+                    "combined direction opposes pitch objective: {report:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn antiparallel_objectives_report_no_joint_direction_instead_of_hiding_conflict() {
         let report = evaluate(input(vec![1.0, 0.0], vec![-2.0, 0.0])).unwrap();
         assert!(matches!(
