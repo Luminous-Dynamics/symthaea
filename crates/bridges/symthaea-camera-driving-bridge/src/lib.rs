@@ -99,7 +99,7 @@ pub struct CapturedDrivingObservation<'a> {
     pub vehicle_state: &'a VehicleState,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BridgeError {
     InvalidConfig(&'static str),
     MissingIdentity(&'static str),
@@ -208,7 +208,7 @@ pub struct CameraDrivingBridge {
 }
 
 impl CameraDrivingBridge {
-    pub fn try_new(config: BridgeConfig, mut vision_config: VisionConfig) -> Result<Self, BridgeError> {
+    pub fn try_new(config: BridgeConfig, vision_config: VisionConfig) -> Result<Self, BridgeError> {
         config.validate()?;
         if vision_config.hdc_dim != HDC_DIMENSION {
             return Err(BridgeError::HdcDimensionMismatch);
@@ -293,7 +293,13 @@ impl CameraDrivingBridge {
             return Err(BridgeError::NonFinitePerceptionOutput);
         }
 
-        let vision_telemetry = VisionTelemetryReceipt::try_from(&telemetry)?;
+        let vision_telemetry = match VisionTelemetryReceipt::try_from(&telemetry) {
+            Ok(receipt) => receipt,
+            Err(error) => {
+                self.faulted = true;
+                return Err(error);
+            }
+        };
         let raw_frame_sha256 = digest_bytes(observation.pixels);
         let visual_state_sha256 = digest_hv(&visual_state);
         let vehicle_state_sha256 = digest_vehicle_state(observation.vehicle_state, &state_channels);
@@ -399,7 +405,8 @@ impl CameraDrivingBridge {
 }
 
 fn digest_bytes(bytes: &[u8]) -> String {
-    digest_to_hex(Sha256::digest(bytes).as_slice())
+    let digest = Sha256::digest(bytes);
+    digest_to_hex(&digest)
 }
 
 fn digest_hv(hv: &ContinuousHV) -> String {
@@ -505,15 +512,6 @@ mod tests {
         }
     }
 
-    fn frame(value: u8, sequence: u64, timestamp_us: u64, state: &VehicleState) -> CapturedDrivingObservation<'_> {
-        let pixels = vec![value; 16 * 16 * 3];
-        // This helper's return value must borrow the supplied pixels, so each test
-        // constructs its observation inline via observation().
-        let _ = pixels;
-        let _ = (sequence, timestamp_us, state);
-        unreachable!("use observation() so the frame buffer outlives the bridge call")
-    }
-
     fn observation<'a>(
         pixels: &'a [u8],
         sequence: u64,
@@ -616,10 +614,10 @@ mod tests {
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
         bridge.observe(observation(&pixels, 4, 10_000, &state)).unwrap();
-        assert_eq!(
+        assert!(matches!(
             bridge.observe(observation(&pixels, 4, 20_000, &state)),
             Err(BridgeError::SequenceRegression)
-        );
+        ));
         let result = bridge.observe(observation(&pixels, 5, 20_000, &state)).unwrap();
         assert_eq!(result.receipt.derived_dt_us, 10_000);
         assert_eq!(bridge.frames_processed(), 2);
@@ -631,10 +629,10 @@ mod tests {
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
         bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
-        assert_eq!(
+        assert!(matches!(
             bridge.observe(observation(&pixels, 2, 9_000, &state)),
             Err(BridgeError::TimestampRegression)
-        );
+        ));
         assert_eq!(bridge.frames_processed(), 1);
         let result = bridge.observe(observation(&pixels, 2, 20_000, &state)).unwrap();
         assert_eq!(result.receipt.derived_dt_us, 10_000);
@@ -646,10 +644,10 @@ mod tests {
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
         bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
-        assert_eq!(
+        assert!(matches!(
             bridge.observe(observation(&pixels, 2, 200_001, &state)),
             Err(BridgeError::FrameGapTooLarge)
-        );
+        ));
         assert_eq!(bridge.frames_processed(), 1);
     }
 
@@ -658,10 +656,10 @@ mod tests {
         let mut bridge = bridge();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 12];
-        assert_eq!(
+        assert!(matches!(
             bridge.observe(observation(&pixels, 1, 10_000, &state)),
             Err(BridgeError::FrameLengthMismatch)
-        );
+        ));
         assert_eq!(bridge.frames_processed(), 0);
     }
 
@@ -672,10 +670,10 @@ mod tests {
         let pixels = vec![128; 16 * 16 * 3];
         let mut item = observation(&pixels, 1, 10_000, &state);
         item.vehicle_state_timestamp_us = 20_000;
-        assert_eq!(
+        assert!(matches!(
             bridge.observe(item),
             Err(BridgeError::SensorClockSkewExceeded)
-        );
+        ));
         assert_eq!(bridge.frames_processed(), 0);
     }
 
@@ -685,10 +683,10 @@ mod tests {
         let mut state = VehicleState::cruising(10.0);
         state.yaw_rate = f64::NAN;
         let pixels = vec![128; 16 * 16 * 3];
-        assert_eq!(
+        assert!(matches!(
             bridge.observe(observation(&pixels, 1, 10_000, &state)),
             Err(BridgeError::NonFiniteVehicleState)
-        );
+        ));
         assert_eq!(bridge.frames_processed(), 0);
     }
 
