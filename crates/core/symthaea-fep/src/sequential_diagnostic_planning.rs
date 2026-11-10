@@ -1276,6 +1276,85 @@ mod tests {
         }
     }
 
+    // Small exhaustive reference implementation kept deliberately separate
+    // from solve_node/plan_after_action. It returns only the optimum scalar
+    // value, not a policy tree or receipt.
+    fn exhaustive_reference_value(
+        hypotheses: &[DecisionHypothesis],
+        actions: &[DiagnosticAction],
+        posterior: &[f64],
+        config: DecisionDiagnosticConfig,
+        remaining_steps: usize,
+        used_actions: u64,
+        cumulative_risk: f64,
+        risk_budget: f64,
+    ) -> f64 {
+        let decision_count = hypotheses[0].loss_by_final_decision.len();
+        let stop_value = (0..decision_count)
+            .map(|decision| {
+                hypotheses
+                    .iter()
+                    .zip(posterior)
+                    .map(|(hypothesis, probability)| {
+                        probability * hypothesis.loss_by_final_decision[decision]
+                    })
+                    .sum::<f64>()
+            })
+            .fold(f64::INFINITY, f64::min);
+        if remaining_steps == 0 {
+            return stop_value;
+        }
+
+        let mut best = stop_value;
+        for (action_index, action) in actions.iter().enumerate() {
+            let action_bit = 1_u64 << action_index;
+            let next_risk = cumulative_risk + action.safety_risk;
+            if used_actions & action_bit != 0
+                || action.safety_risk > config.maximum_safety_risk
+                || next_risk > risk_budget + RISK_TOLERANCE
+            {
+                continue;
+            }
+
+            let outcome_count =
+                hypotheses[0].outcome_probabilities_by_action[action_index].len();
+            let mut candidate = config.observation_cost_weight * action.observation_cost
+                + config.safety_risk_weight * action.safety_risk;
+            for outcome_index in 0..outcome_count {
+                let mut outcome_mass = 0.0;
+                for (hypothesis, prior) in hypotheses.iter().zip(posterior) {
+                    outcome_mass += prior
+                        * hypothesis.outcome_probabilities_by_action[action_index][outcome_index];
+                }
+                if outcome_mass == 0.0 {
+                    continue;
+                }
+                let next_posterior: Vec<f64> = hypotheses
+                    .iter()
+                    .zip(posterior)
+                    .map(|(hypothesis, prior)| {
+                        prior
+                            * hypothesis.outcome_probabilities_by_action[action_index][outcome_index]
+                            / outcome_mass
+                    })
+                    .collect();
+                candidate += outcome_mass
+                    * exhaustive_reference_value(
+                        hypotheses,
+                        actions,
+                        &next_posterior,
+                        config,
+                        remaining_steps - 1,
+                        used_actions | action_bit,
+                        next_risk,
+                        risk_budget,
+                    );
+            }
+            best = best.min(candidate);
+        }
+        best
+    }
+
     #[test]
     fn two_complementary_probes_have_zero_myopic_evsi_but_positive_sequential_value() {
         let (hypotheses, actions) = xor_complementary_probes();
@@ -1315,6 +1394,53 @@ mod tests {
             for terminal in &continuation.branches {
                 assert_eq!(terminal.continuation.selected_action_index, None);
             }
+        }
+    }
+
+    #[test]
+    fn cumulative_budget_planner_matches_separate_exhaustive_reference() {
+        let (hypotheses, mut actions) = xor_complementary_probes();
+        for action in &mut actions {
+            action.safety_risk = 0.35;
+        }
+        let config = DecisionDiagnosticConfig {
+            safety_risk_weight: 0.1,
+            maximum_safety_risk: 0.5,
+            ..decision_config()
+        };
+        let prior: Vec<f64> = hypotheses
+            .iter()
+            .map(|hypothesis| hypothesis.prior_probability)
+            .collect();
+        let planning = SequentialDiagnosticConfig {
+            horizon: 2,
+            max_policy_expansions: 64,
+        };
+
+        for (budget, expected) in [(0.6, 0.5), (0.7, 0.07)] {
+            let reference = exhaustive_reference_value(
+                &hypotheses,
+                &actions,
+                &prior,
+                config,
+                planning.horizon,
+                0,
+                0.0,
+                budget,
+            );
+            let result = evaluate_sequential_decision_diagnostics_with_safety_budget(
+                &hypotheses,
+                &actions,
+                config,
+                planning,
+                SequentialDiagnosticSafetyBudget {
+                    maximum_cumulative_risk: budget,
+                    risk_semantics_digest: "a".repeat(64),
+                },
+            )
+            .expect("budgeted plan");
+            assert!((reference - expected).abs() < 1e-12);
+            assert!((result.evaluation.expected_total_cost - reference).abs() < 1e-12);
         }
     }
 
