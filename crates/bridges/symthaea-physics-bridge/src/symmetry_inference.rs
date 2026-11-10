@@ -413,6 +413,404 @@ fn collect_var_names(expr: &Expr, out: &mut Vec<String>) {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExactPolynomialError {
+    UnsupportedExpression,
+    ResourceLimitExceeded,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ExactRational {
+    numerator: i128,
+    denominator: i128,
+}
+
+impl ExactRational {
+    const ZERO: Self = Self { numerator: 0, denominator: 1 };
+    const ONE: Self = Self { numerator: 1, denominator: 1 };
+
+    fn new(mut numerator: i128, mut denominator: i128) -> Option<Self> {
+        if denominator == 0 {
+            return None;
+        }
+        if numerator == 0 {
+            return Some(Self::ZERO);
+        }
+        if denominator < 0 {
+            numerator = numerator.checked_neg()?;
+            denominator = denominator.checked_neg()?;
+        }
+        let divisor = exact_gcd(numerator.unsigned_abs(), denominator as u128);
+        let divisor = i128::try_from(divisor).ok()?;
+        Some(Self {
+            numerator: numerator / divisor,
+            denominator: denominator / divisor,
+        })
+    }
+
+    fn from_f64(value: f64, maximum_denominator_power: u32) -> Option<Self> {
+        if !value.is_finite() {
+            return None;
+        }
+        if value == 0.0 {
+            return Some(Self::ZERO);
+        }
+
+        // Decode the exact binary rational represented by this IEEE-754 value.
+        let bits = value.to_bits();
+        let negative = (bits >> 63) != 0;
+        let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+        let fraction = bits & ((1_u64 << 52) - 1);
+        let (mut significand, mut binary_exponent) = if exponent_bits == 0 {
+            (fraction, -1022 - 52)
+        } else {
+            (fraction | (1_u64 << 52), exponent_bits - 1023 - 52)
+        };
+        if significand == 0 {
+            return Some(Self::ZERO);
+        }
+
+        let trailing_zeros = significand.trailing_zeros();
+        significand >>= trailing_zeros;
+        binary_exponent += trailing_zeros as i32;
+
+        let magnitude = i128::from(significand);
+        if binary_exponent >= 0 {
+            let shift = u32::try_from(binary_exponent).ok()?;
+            if shift > 126 {
+                return None;
+            }
+            let scale = 1_i128.checked_shl(shift)?;
+            let numerator = magnitude.checked_mul(scale)?;
+            let numerator = if negative { numerator.checked_neg()? } else { numerator };
+            Self::new(numerator, 1)
+        } else {
+            let denominator_power = u32::try_from(-binary_exponent).ok()?;
+            if denominator_power > maximum_denominator_power || denominator_power > 126 {
+                return None;
+            }
+            let denominator = 1_i128.checked_shl(denominator_power)?;
+            let numerator = if negative { magnitude.checked_neg()? } else { magnitude };
+            Self::new(numerator, denominator)
+        }
+    }
+
+    fn checked_add(self, other: Self) -> Option<Self> {
+        let left = self.numerator.checked_mul(other.denominator)?;
+        let right = other.numerator.checked_mul(self.denominator)?;
+        let numerator = left.checked_add(right)?;
+        let denominator = self.denominator.checked_mul(other.denominator)?;
+        Self::new(numerator, denominator)
+    }
+
+    fn checked_mul(self, other: Self) -> Option<Self> {
+        let numerator = self.numerator.checked_mul(other.numerator)?;
+        let denominator = self.denominator.checked_mul(other.denominator)?;
+        Self::new(numerator, denominator)
+    }
+
+    fn checked_neg(self) -> Option<Self> {
+        Some(Self {
+            numerator: self.numerator.checked_neg()?,
+            denominator: self.denominator,
+        })
+    }
+
+    fn is_zero(self) -> bool {
+        self.numerator == 0
+    }
+}
+
+fn exact_gcd(mut a: u128, mut b: u128) -> u128 {
+    while b != 0 {
+        let remainder = a % b;
+        a = b;
+        b = remainder;
+    }
+    a.max(1)
+}
+
+type ExactPolynomial = BTreeMap<Vec<u8>, ExactRational>;
+
+fn check_monomial(
+    monomial: &[u8],
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<(), ExactPolynomialError> {
+    let degree: usize = monomial.iter().map(|power| usize::from(*power)).sum();
+    if degree > profile.maximum_total_degree {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    Ok(())
+}
+
+fn polynomial_add_term(
+    polynomial: &mut ExactPolynomial,
+    monomial: Vec<u8>,
+    coefficient: ExactRational,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<(), ExactPolynomialError> {
+    check_monomial(&monomial, profile)?;
+    if coefficient.is_zero() {
+        return Ok(());
+    }
+
+    if let Some(existing) = polynomial.get(&monomial).copied() {
+        let combined = existing
+            .checked_add(coefficient)
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        if combined.is_zero() {
+            polynomial.remove(&monomial);
+        } else {
+            polynomial.insert(monomial, combined);
+        }
+    } else {
+        polynomial.insert(monomial, coefficient);
+    }
+
+    if polynomial.len() > profile.maximum_terms {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    Ok(())
+}
+
+fn polynomial_constant(
+    dimension: usize,
+    coefficient: ExactRational,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut polynomial = ExactPolynomial::new();
+    polynomial_add_term(&mut polynomial, vec![0; dimension], coefficient, profile)?;
+    Ok(polynomial)
+}
+
+fn polynomial_add(
+    left: &ExactPolynomial,
+    right: &ExactPolynomial,
+    negate_right: bool,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut result = left.clone();
+    for (monomial, coefficient) in right {
+        let coefficient = if negate_right {
+            coefficient.checked_neg().ok_or(ExactPolynomialError::ResourceLimitExceeded)?
+        } else {
+            *coefficient
+        };
+        polynomial_add_term(&mut result, monomial.clone(), coefficient, profile)?;
+    }
+    Ok(result)
+}
+
+fn polynomial_multiply(
+    left: &ExactPolynomial,
+    right: &ExactPolynomial,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut result = ExactPolynomial::new();
+    for (left_monomial, left_coefficient) in left {
+        for (right_monomial, right_coefficient) in right {
+            let mut monomial = Vec::with_capacity(left_monomial.len());
+            for (left_power, right_power) in left_monomial.iter().zip(right_monomial) {
+                monomial.push(
+                    left_power
+                        .checked_add(*right_power)
+                        .ok_or(ExactPolynomialError::ResourceLimitExceeded)?,
+                );
+            }
+            let coefficient = left_coefficient
+                .checked_mul(*right_coefficient)
+                .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+            polynomial_add_term(&mut result, monomial, coefficient, profile)?;
+        }
+    }
+    Ok(result)
+}
+
+fn polynomial_power(
+    base: &ExactPolynomial,
+    exponent: u32,
+    dimension: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    if exponent > profile.maximum_power {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    let mut result = polynomial_constant(dimension, ExactRational::ONE, profile)?;
+    let mut factor = base.clone();
+    let mut remaining = exponent;
+    while remaining > 0 {
+        if remaining & 1 == 1 {
+            result = polynomial_multiply(&result, &factor, profile)?;
+        }
+        remaining >>= 1;
+        if remaining > 0 {
+            factor = polynomial_multiply(&factor, &factor, profile)?;
+        }
+    }
+    Ok(result)
+}
+
+fn parse_exact_polynomial(
+    expr: &Expr,
+    variable_names: &[String],
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let dimension = variable_names.len();
+    match expr {
+        Expr::Const(value) => {
+            let coefficient = ExactRational::from_f64(
+                *value,
+                profile.maximum_dyadic_denominator_power,
+            )
+            .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+            polynomial_constant(dimension, coefficient, profile)
+        }
+        Expr::Var(name) => {
+            let index = variable_names
+                .iter()
+                .position(|candidate| candidate == name)
+                .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+            let mut monomial = vec![0; dimension];
+            monomial[index] = 1;
+            let mut polynomial = ExactPolynomial::new();
+            polynomial_add_term(&mut polynomial, monomial, ExactRational::ONE, profile)?;
+            Ok(polynomial)
+        }
+        Expr::BinOp(BinOp::Add, left, right) => {
+            let left = parse_exact_polynomial(left, variable_names, profile)?;
+            let right = parse_exact_polynomial(right, variable_names, profile)?;
+            polynomial_add(&left, &right, false, profile)
+        }
+        Expr::BinOp(BinOp::Sub, left, right) => {
+            let left = parse_exact_polynomial(left, variable_names, profile)?;
+            let right = parse_exact_polynomial(right, variable_names, profile)?;
+            polynomial_add(&left, &right, true, profile)
+        }
+        Expr::BinOp(BinOp::Mul, left, right) => {
+            let left = parse_exact_polynomial(left, variable_names, profile)?;
+            let right = parse_exact_polynomial(right, variable_names, profile)?;
+            polynomial_multiply(&left, &right, profile)
+        }
+        Expr::BinOp(BinOp::Pow, base, exponent) => {
+            let Expr::Const(exponent) = exponent.as_ref() else {
+                return Err(ExactPolynomialError::UnsupportedExpression);
+            };
+            if !exponent.is_finite() || exponent.fract() != 0.0 || *exponent < 0.0 {
+                return Err(ExactPolynomialError::UnsupportedExpression);
+            }
+            let exponent = u32::try_from(*exponent as u64)
+                .map_err(|_| ExactPolynomialError::ResourceLimitExceeded)?;
+            let base = parse_exact_polynomial(base, variable_names, profile)?;
+            polynomial_power(&base, exponent, dimension, profile)
+        }
+        Expr::BinOp(BinOp::Div, _, _) | Expr::Func(_, _) | Expr::Sum(_, _) => {
+            Err(ExactPolynomialError::UnsupportedExpression)
+        }
+    }
+}
+
+fn polynomial_derivative(
+    polynomial: &ExactPolynomial,
+    variable_index: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut result = ExactPolynomial::new();
+    for (monomial, coefficient) in polynomial {
+        let exponent = monomial[variable_index];
+        if exponent == 0 {
+            continue;
+        }
+        let scaled = coefficient
+            .checked_mul(ExactRational::new(i128::from(exponent), 1).unwrap())
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        let mut reduced = monomial.clone();
+        reduced[variable_index] -= 1;
+        polynomial_add_term(&mut result, reduced, scaled, profile)?;
+    }
+    Ok(result)
+}
+
+fn polynomial_multiply_variable(
+    polynomial: &ExactPolynomial,
+    variable_index: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut result = ExactPolynomial::new();
+    for (monomial, coefficient) in polynomial {
+        let mut multiplied = monomial.clone();
+        multiplied[variable_index] = multiplied[variable_index]
+            .checked_add(1)
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        polynomial_add_term(&mut result, multiplied, *coefficient, profile)?;
+    }
+    Ok(result)
+}
+
+/// Exact Lie derivative for the SO(n) generator with δx_i=-x_j, δx_j=x_i.
+fn exact_polynomial_lie_derivative_is_zero(
+    polynomial: &ExactPolynomial,
+    i: usize,
+    j: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<bool, ExactPolynomialError> {
+    let derivative_i = polynomial_derivative(polynomial, i, profile)?;
+    let derivative_j = polynomial_derivative(polynomial, j, profile)?;
+    let term_i = polynomial_multiply_variable(&derivative_i, j, profile)?;
+    let term_j = polynomial_multiply_variable(&derivative_j, i, profile)?;
+    let residual = polynomial_add(&term_j, &term_i, true, profile)?;
+    Ok(residual.is_empty())
+}
+
+fn exact_polynomial_symmetry_candidate(
+    expr: &Expr,
+    variable_names: &[String],
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<Option<(LieGroup, Vec<String>, usize)>, ExactPolynomialError> {
+    if variable_names.len() < 2 {
+        return Ok(None);
+    }
+    if variable_names.len() > profile.maximum_variables {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    let polynomial = parse_exact_polynomial(expr, variable_names, profile)?;
+    let dimension = variable_names.len();
+    let generator_count = dimension * (dimension - 1) / 2;
+
+    let mut all_generators_invariant = true;
+    for i in 0..dimension {
+        for j in (i + 1)..dimension {
+            if !exact_polynomial_lie_derivative_is_zero(&polynomial, i, j, profile)? {
+                all_generators_invariant = false;
+                break;
+            }
+        }
+        if !all_generators_invariant {
+            break;
+        }
+    }
+    if all_generators_invariant {
+        return Ok(Some((
+            LieGroup::SO(dimension as u8),
+            variable_names.to_vec(),
+            generator_count,
+        )));
+    }
+
+    if profile.pairwise_so2_search {
+        for i in 0..dimension {
+            for j in (i + 1)..dimension {
+                if exact_polynomial_lie_derivative_is_zero(&polynomial, i, j, profile)? {
+                    return Ok(Some((
+                        LieGroup::SO(2),
+                        vec![variable_names[i].clone(), variable_names[j].clone()],
+                        1,
+                    )));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
 /// Central-difference gradient of `expr` at `state`, w.r.t. `var_names` (same
 /// binding order as `state`). Mirrors
 /// `conjecture_engine::gp_support::fd_gradient`, reimplemented locally since
