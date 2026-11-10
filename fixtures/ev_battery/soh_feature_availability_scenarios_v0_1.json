@@ -1851,6 +1851,216 @@
           ]
         }
       }
+    },
+    {
+      "case_id": "fixed-transform-fit-after-split-freeze-rejected",
+      "expectation": "reject",
+      "expected_claim_ceiling": null,
+      "manifest": {
+        "protocol_version": "ev-soh-feature-availability/0.1",
+        "manifest_id": "strict-online-same-cell-prefix",
+        "evaluation_mode": "strict_online",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "model_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "split_frozen_at_ms": 1000,
+        "test_accessed_at_ms": 1200,
+        "train_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "test_group_identity_digests": [
+          "0000000000000000000000000000000000000000000000000000000000000014",
+          "0000000000000000000000000000000000000000000000000000000000000015",
+          "0000000000000000000000000000000000000000000000000000000000000016"
+        ],
+        "feature_definitions": [
+          {
+            "feature_id": "self-reference-offset",
+            "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "implementation_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "transform_ref": "raw-cycle-feature",
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "fit_scope": "fixed_predeclared",
+            "fit_at_ms": 1050,
+            "fit_group_identity_digests": [],
+            "predeclared_at_ms": 900,
+            "predeclaration_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+            "reference_kind": "same_asset_prefix",
+            "reference_policy_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "uses_test_labels": false,
+            "uses_future_observations": false
+          }
+        ],
+        "prediction_rows": [
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+            "asset_identity_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+            "decision_at_ms": 1100,
+            "target_value": 0.87,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
+            "feature_uses": [
+              {
+                "feature_id": "self-reference-offset",
+                "value_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+                "latest_measurement_at_ms": 800,
+                "latest_received_at_ms": 810,
+                "derived_at_ms": 850,
+                "reference_kind": "same_asset_prefix",
+                "reference_identity_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+                "reference_population_digest": null,
+                "reference_measurement_at_ms": 700,
+                "reference_received_at_ms": 710,
+                "used_target_label": false,
+                "used_future_observation": false,
+                "availability_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d"
+              }
+            ]
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+            "asset_identity_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+            "decision_at_ms": 1100,
+            "target_value": 0.8400000000000001,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
+            "feature_uses": [
+              {
+                "feature_id": "self-reference-offset",
+                "value_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+                "latest_measurement_at_ms": 800,
+                "latest_received_at_ms": 810,
+                "derived_at_ms": 850,
+                "reference_kind": "same_asset_prefix",
+                "reference_identity_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+                "reference_population_digest": null,
+                "reference_measurement_at_ms": 700,
+                "reference_received_at_ms": 710,
+                "used_target_label": false,
+                "used_future_observation": false,
+                "availability_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012e"
+              }
+            ]
+          }
+        ],
+        "reference_randomization": {
+          "status": "not_applicable",
+          "method_ref": "randomized-reference-pairing",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+          "assignment_digest": null,
+          "seed": null,
+          "derangement_count": 0,
+          "schedule_frozen_at_ms": null,
+          "arms": []
+        }
+      }
+    },
+    {
+      "case_id": "offline-full-life-reference-without-time-receipt-rejected",
+      "expectation": "reject",
+      "expected_claim_ceiling": null,
+      "manifest": {
+        "protocol_version": "ev-soh-feature-availability/0.1",
+        "manifest_id": "full-history-offline-oracle",
+        "evaluation_mode": "offline_oracle",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "model_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "split_frozen_at_ms": 1000,
+        "test_accessed_at_ms": 1600,
+        "train_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "test_group_identity_digests": [
+          "0000000000000000000000000000000000000000000000000000000000000014",
+          "0000000000000000000000000000000000000000000000000000000000000015",
+          "0000000000000000000000000000000000000000000000000000000000000016"
+        ],
+        "feature_definitions": [
+          {
+            "feature_id": "per-cell-full-life-extrema",
+            "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "implementation_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "transform_ref": "raw-cycle-feature",
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "fit_scope": "full_trajectory",
+            "fit_at_ms": 700,
+            "fit_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000000a",
+              "000000000000000000000000000000000000000000000000000000000000000b",
+              "000000000000000000000000000000000000000000000000000000000000000c"
+            ],
+            "predeclared_at_ms": null,
+            "predeclaration_digest": null,
+            "reference_kind": "full_lifetime_extrema",
+            "reference_policy_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "uses_test_labels": false,
+            "uses_future_observations": true
+          }
+        ],
+        "prediction_rows": [
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000199",
+            "asset_identity_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+            "decision_at_ms": 1100,
+            "target_value": 0.63,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001fd",
+            "feature_uses": [
+              {
+                "feature_id": "self-reference-offset",
+                "value_digest": "00000000000000000000000000000000000000000000000000000000000000d1",
+                "latest_measurement_at_ms": 700,
+                "latest_received_at_ms": 710,
+                "derived_at_ms": 1500,
+                "reference_kind": "full_lifetime_extrema",
+                "reference_identity_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+                "reference_population_digest": null,
+                "reference_measurement_at_ms": null,
+                "reference_received_at_ms": null,
+                "used_target_label": false,
+                "used_future_observation": true,
+                "availability_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000135"
+              }
+            ]
+          },
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000019a",
+            "asset_identity_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+            "decision_at_ms": 1100,
+            "target_value": 0.6000000000000001,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001fe",
+            "feature_uses": [
+              {
+                "feature_id": "self-reference-offset",
+                "value_digest": "00000000000000000000000000000000000000000000000000000000000000d2",
+                "latest_measurement_at_ms": 700,
+                "latest_received_at_ms": 710,
+                "derived_at_ms": 1500,
+                "reference_kind": "full_lifetime_extrema",
+                "reference_identity_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+                "reference_population_digest": null,
+                "reference_measurement_at_ms": null,
+                "reference_received_at_ms": null,
+                "used_target_label": false,
+                "used_future_observation": true,
+                "availability_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000136"
+              }
+            ]
+          }
+        ],
+        "reference_randomization": {
+          "status": "not_applicable",
+          "method_ref": "randomized-reference-pairing",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+          "assignment_digest": null,
+          "seed": null,
+          "derangement_count": 0,
+          "schedule_frozen_at_ms": null,
+          "arms": []
+        }
+      }
     }
   ]
 }
