@@ -72,7 +72,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -91,7 +93,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -110,7 +114,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -129,7 +135,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -148,7 +156,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -167,7 +177,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b58",
@@ -186,11 +198,28 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000001b5c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 11000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": "INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE"
     },
@@ -264,7 +293,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -283,7 +314,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -302,7 +335,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -321,7 +356,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -340,7 +377,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -359,11 +398,28 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": "SUPPORT_STRATUM_UNDERCOVERAGE_DETECTED"
     },
@@ -437,7 +493,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -456,7 +514,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -475,7 +535,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -494,7 +556,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -513,7 +577,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -532,11 +598,28 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": null
     },
@@ -610,7 +693,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -629,7 +714,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -648,7 +735,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -667,7 +756,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -686,7 +777,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -705,11 +798,28 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": null
     },
@@ -783,7 +893,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -802,7 +914,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -821,7 +935,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -840,7 +956,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -859,7 +977,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -878,11 +998,28 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": null
     },
@@ -956,7 +1093,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -975,7 +1114,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -994,7 +1135,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -1013,7 +1156,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -1032,7 +1177,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -1051,11 +1198,28 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": null
     },
@@ -1129,7 +1293,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012c",
@@ -1148,7 +1314,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -1167,7 +1335,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -1186,7 +1356,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -1205,7 +1377,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -1224,11 +1398,28 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": null
     },
@@ -1302,7 +1493,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -1321,7 +1514,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -1340,7 +1535,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -1359,7 +1556,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -1378,7 +1577,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -1397,11 +1598,28 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": null
     },
@@ -1475,7 +1693,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -1494,7 +1714,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -1513,7 +1735,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -1532,7 +1756,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -1551,7 +1777,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -1570,11 +1798,28 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": null
     },
@@ -1648,7 +1893,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -1667,7 +1914,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -1686,7 +1935,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -1705,7 +1956,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -1724,7 +1977,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -1743,11 +1998,28 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": null
     },
@@ -1821,7 +2093,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -1840,7 +2114,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -1859,7 +2135,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -1878,7 +2156,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -1897,7 +2177,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -1916,11 +2198,28 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": "OOD_MISDETECTION_AND_UNDERCOVERAGE"
     },
@@ -1994,7 +2293,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
@@ -2013,7 +2314,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
@@ -2032,7 +2335,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
@@ -2051,7 +2356,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
@@ -2070,7 +2377,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
@@ -2089,7 +2398,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b58",
@@ -2108,11 +2419,28 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000001b5c",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 11000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 2
+        "minimum_independent_groups_per_stratum": 2,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": null
     },
@@ -2186,7 +2514,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000200b",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000200c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000200d",
@@ -2205,7 +2535,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002010",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002011",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 11000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000002012",
@@ -2224,7 +2556,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002015",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002016",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 12000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000002017",
@@ -2243,7 +2577,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000201a",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000201b",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000201c",
@@ -2262,7 +2598,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000201f",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002020",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 11000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000002021",
@@ -2281,7 +2619,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002024",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002025",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 12000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000002026",
@@ -2300,7 +2640,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002029",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000202a",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000202b",
@@ -2319,7 +2661,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000202e",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000202f",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 11000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000002030",
@@ -2338,7 +2682,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002033",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002034",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 12000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000002035",
@@ -2357,7 +2703,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002038",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002039",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000203a",
@@ -2376,7 +2724,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000203d",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000203e",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 11000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000203f",
@@ -2395,7 +2745,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002042",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002043",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 12000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000002044",
@@ -2414,7 +2766,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002047",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002048",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000002049",
@@ -2433,7 +2787,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000204c",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000204d",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 11000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000204e",
@@ -2452,7 +2808,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002051",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002052",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 12000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000002053",
@@ -2471,7 +2829,9 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002056",
             "reference_support_state": "in_support",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002057",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
           },
           {
             "sample_digest": "0000000000000000000000000000000000000000000000000000000000002058",
@@ -2490,7 +2850,9 @@
             "prediction_digest": "000000000000000000000000000000000000000000000000000000000000205b",
             "reference_support_state": "boundary",
             "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000205c",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 11000
           },
           {
             "sample_digest": "000000000000000000000000000000000000000000000000000000000000205d",
@@ -2509,14 +2871,694 @@
             "prediction_digest": "0000000000000000000000000000000000000000000000000000000000002060",
             "reference_support_state": "extrapolation",
             "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002061",
-            "reference_support_evidence_class": "synthetic_fixture"
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 12000
           }
         ],
         "test_accessed_at_ms": 1200,
-        "minimum_independent_groups_per_stratum": 30
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
       },
       "expected_audit_status": "INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE",
       "expected_support_detector_failed": false
+    },
+    {
+      "case_id": "duplicate-observation-time-within-physical-cell-rejected",
+      "expectation": "reject",
+      "expected_extrapolation_undercovered": null,
+      "manifest": {
+        "protocol_version": "ev-soh-support-calibration/0.1",
+        "manifest_id": "support-conditioned-calibration-within-tolerance",
+        "benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "model_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+        "evaluation_mode": "unseen_cell",
+        "split_frozen_at_ms": 1000,
+        "train_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b"
+        ],
+        "validation_group_identity_digests": [
+          "0000000000000000000000000000000000000000000000000000000000000014",
+          "0000000000000000000000000000000000000000000000000000000000000015"
+        ],
+        "support_scoring": {
+          "method_ref": "train-support-mahalanobis",
+          "method_digest": "000000000000000000000000000000000000000000000000000000000000001e",
+          "feature_schema_digest": "000000000000000000000000000000000000000000000000000000000000001f",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "score_definition": "whitened feature-space distance to training-cell centroid/covariance",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 900,
+          "risk_coverage_cutoffs": [
+            0.5,
+            1.5,
+            3
+          ],
+          "threshold_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000020"
+        },
+        "calibration": {
+          "method_ref": "group-disjoint-validation-conformal-residual",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000000028",
+          "partition": "validation_only",
+          "calibration_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015"
+          ],
+          "calibration_split_digest": "0000000000000000000000000000000000000000000000000000000000000029",
+          "external_source_digest": null,
+          "fitted_at_ms": 1100
+        },
+        "test_entries": [
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "support_score": 0.1,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000190",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.92,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.915,
+            "lower_90": 0.895,
+            "upper_90": 0.935,
+            "lower_95": 0.88,
+            "upper_95": 0.9500000000000001,
+            "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+            "reference_support_state": "in_support",
+            "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "support_score": 0.4,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.9,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.905,
+            "lower_90": 0.885,
+            "upper_90": 0.925,
+            "lower_95": 0.87,
+            "upper_95": 0.9400000000000001,
+            "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
+            "reference_support_state": "in_support",
+            "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "support_score": 0.8,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.87,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.865,
+            "lower_90": 0.845,
+            "upper_90": 0.885,
+            "lower_95": 0.83,
+            "upper_95": 0.9,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
+            "reference_support_state": "boundary",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "support_score": 1.2,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.84,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.845,
+            "lower_90": 0.825,
+            "upper_90": 0.865,
+            "lower_95": 0.8099999999999999,
+            "upper_95": 0.88,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+            "reference_support_state": "boundary",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000068",
+            "support_score": 2,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.72,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f8",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.715,
+            "lower_90": 0.695,
+            "upper_90": 0.735,
+            "lower_95": 0.6799999999999999,
+            "upper_95": 0.75,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
+            "reference_support_state": "extrapolation",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000069",
+            "support_score": 2.5,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000195",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.64,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f9",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.645,
+            "lower_90": 0.625,
+            "upper_90": 0.665,
+            "lower_95": 0.61,
+            "upper_95": 0.68,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
+            "reference_support_state": "extrapolation",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b58",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "support_score": 2.2,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b59",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.85,
+            "target_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.855,
+            "lower_90": 0.835,
+            "upper_90": 0.875,
+            "lower_95": 0.825,
+            "upper_95": 0.885,
+            "prediction_digest": "0000000000000000000000000000000000000000000000000000000000001b5c",
+            "reference_support_state": "extrapolation",
+            "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
+          }
+        ],
+        "test_accessed_at_ms": 1200,
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
+      },
+      "expected_audit_status": null
+    },
+    {
+      "case_id": "reference-support-state-score-mismatch-rejected",
+      "expectation": "reject",
+      "expected_extrapolation_undercovered": null,
+      "manifest": {
+        "protocol_version": "ev-soh-support-calibration/0.1",
+        "manifest_id": "support-conditioned-calibration-within-tolerance",
+        "benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "model_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+        "evaluation_mode": "unseen_cell",
+        "split_frozen_at_ms": 1000,
+        "train_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b"
+        ],
+        "validation_group_identity_digests": [
+          "0000000000000000000000000000000000000000000000000000000000000014",
+          "0000000000000000000000000000000000000000000000000000000000000015"
+        ],
+        "support_scoring": {
+          "method_ref": "train-support-mahalanobis",
+          "method_digest": "000000000000000000000000000000000000000000000000000000000000001e",
+          "feature_schema_digest": "000000000000000000000000000000000000000000000000000000000000001f",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "score_definition": "whitened feature-space distance to training-cell centroid/covariance",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 900,
+          "risk_coverage_cutoffs": [
+            0.5,
+            1.5,
+            3
+          ],
+          "threshold_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000020"
+        },
+        "calibration": {
+          "method_ref": "group-disjoint-validation-conformal-residual",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000000028",
+          "partition": "validation_only",
+          "calibration_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015"
+          ],
+          "calibration_split_digest": "0000000000000000000000000000000000000000000000000000000000000029",
+          "external_source_digest": null,
+          "fitted_at_ms": 1100
+        },
+        "test_entries": [
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "support_score": 0.1,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000190",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.92,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.915,
+            "lower_90": 0.895,
+            "upper_90": 0.935,
+            "lower_95": 0.88,
+            "upper_95": 0.9500000000000001,
+            "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+            "reference_support_state": "in_support",
+            "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "support_score": 0.4,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.9,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.905,
+            "lower_90": 0.885,
+            "upper_90": 0.925,
+            "lower_95": 0.87,
+            "upper_95": 0.9400000000000001,
+            "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
+            "reference_support_state": "in_support",
+            "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "support_score": 0.8,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.87,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.865,
+            "lower_90": 0.845,
+            "upper_90": 0.885,
+            "lower_95": 0.83,
+            "upper_95": 0.9,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
+            "reference_support_state": "boundary",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "support_score": 1.2,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.84,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.845,
+            "lower_90": 0.825,
+            "upper_90": 0.865,
+            "lower_95": 0.8099999999999999,
+            "upper_95": 0.88,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+            "reference_support_state": "boundary",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000068",
+            "support_score": 2,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.72,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f8",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.715,
+            "lower_90": 0.695,
+            "upper_90": 0.735,
+            "lower_95": 0.6799999999999999,
+            "upper_95": 0.75,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
+            "reference_support_state": "extrapolation",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000069",
+            "support_score": 2.5,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000195",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.64,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f9",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.645,
+            "lower_90": 0.625,
+            "upper_90": 0.665,
+            "lower_95": 0.61,
+            "upper_95": 0.68,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
+            "reference_support_state": "extrapolation",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b58",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "support_score": 2.2,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b59",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.85,
+            "target_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.855,
+            "lower_90": 0.835,
+            "upper_90": 0.875,
+            "lower_95": 0.825,
+            "upper_95": 0.885,
+            "prediction_digest": "0000000000000000000000000000000000000000000000000000000000001b5c",
+            "reference_support_state": "extrapolation",
+            "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 11000
+          }
+        ],
+        "test_accessed_at_ms": 1200,
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": false,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
+      },
+      "expected_audit_status": null
+    },
+    {
+      "case_id": "reference-support-method-uses-target-labels-rejected",
+      "expectation": "reject",
+      "expected_extrapolation_undercovered": null,
+      "manifest": {
+        "protocol_version": "ev-soh-support-calibration/0.1",
+        "manifest_id": "support-conditioned-calibration-within-tolerance",
+        "benchmark_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "model_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+        "evaluation_mode": "unseen_cell",
+        "split_frozen_at_ms": 1000,
+        "train_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b"
+        ],
+        "validation_group_identity_digests": [
+          "0000000000000000000000000000000000000000000000000000000000000014",
+          "0000000000000000000000000000000000000000000000000000000000000015"
+        ],
+        "support_scoring": {
+          "method_ref": "train-support-mahalanobis",
+          "method_digest": "000000000000000000000000000000000000000000000000000000000000001e",
+          "feature_schema_digest": "000000000000000000000000000000000000000000000000000000000000001f",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "score_definition": "whitened feature-space distance to training-cell centroid/covariance",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 900,
+          "risk_coverage_cutoffs": [
+            0.5,
+            1.5,
+            3
+          ],
+          "threshold_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000020"
+        },
+        "calibration": {
+          "method_ref": "group-disjoint-validation-conformal-residual",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000000028",
+          "partition": "validation_only",
+          "calibration_group_identity_digests": [
+            "0000000000000000000000000000000000000000000000000000000000000014",
+            "0000000000000000000000000000000000000000000000000000000000000015"
+          ],
+          "calibration_split_digest": "0000000000000000000000000000000000000000000000000000000000000029",
+          "external_source_digest": null,
+          "fitted_at_ms": 1100
+        },
+        "test_entries": [
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012c",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "support_score": 0.1,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000190",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.92,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.915,
+            "lower_90": 0.895,
+            "upper_90": 0.935,
+            "lower_95": 0.88,
+            "upper_95": 0.9500000000000001,
+            "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+            "reference_support_state": "in_support",
+            "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002328",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "support_score": 0.4,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.9,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.905,
+            "lower_90": 0.885,
+            "upper_90": 0.925,
+            "lower_95": 0.87,
+            "upper_95": 0.9400000000000001,
+            "prediction_digest": "0000000000000000000000000000000000000000000000000000000000000259",
+            "reference_support_state": "in_support",
+            "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002329",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 0.2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012e",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "support_score": 0.8,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.87,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.865,
+            "lower_90": 0.845,
+            "upper_90": 0.885,
+            "lower_95": 0.83,
+            "upper_95": 0.9,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025a",
+            "reference_support_state": "boundary",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232a",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "support_score": 1.2,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.84,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f7",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.845,
+            "lower_90": 0.825,
+            "upper_90": 0.865,
+            "lower_95": 0.8099999999999999,
+            "upper_95": 0.88,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025b",
+            "reference_support_state": "boundary",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232b",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 1,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000068",
+            "support_score": 2,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.72,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f8",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.715,
+            "lower_90": 0.695,
+            "upper_90": 0.735,
+            "lower_95": 0.6799999999999999,
+            "upper_95": 0.75,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025c",
+            "reference_support_state": "extrapolation",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232c",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000131",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000069",
+            "support_score": 2.5,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000195",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.64,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f9",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.645,
+            "lower_90": 0.625,
+            "upper_90": 0.665,
+            "lower_95": 0.61,
+            "upper_95": 0.68,
+            "prediction_digest": "000000000000000000000000000000000000000000000000000000000000025d",
+            "reference_support_state": "extrapolation",
+            "reference_support_evidence_digest": "000000000000000000000000000000000000000000000000000000000000232d",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 10000
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b58",
+            "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "support_score": 2.2,
+            "support_score_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b59",
+            "support_score_evidence_class": "synthetic_fixture",
+            "target_value": 0.85,
+            "target_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+            "target_evidence_class": "synthetic_fixture",
+            "predicted_mean": 0.855,
+            "lower_90": 0.835,
+            "upper_90": 0.875,
+            "lower_95": 0.825,
+            "upper_95": 0.885,
+            "prediction_digest": "0000000000000000000000000000000000000000000000000000000000001b5c",
+            "reference_support_state": "extrapolation",
+            "reference_support_evidence_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
+            "reference_support_evidence_class": "synthetic_fixture",
+            "reference_support_score": 2,
+            "observation_time_ms": 11000
+          }
+        ],
+        "test_accessed_at_ms": 1200,
+        "minimum_independent_groups_per_stratum": 30,
+        "reference_support": {
+          "method_ref": "frozen-train-reference-support-envelope",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000011558",
+          "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000011559",
+          "fit_scope": "train_only",
+          "reference_partition": "train",
+          "uses_validation_or_test_labels": false,
+          "uses_test_targets": true,
+          "score_definition": "independent Mahalanobis/support envelope fitted on the training feature distribution; target values are excluded",
+          "score_direction": "higher_is_less_supported",
+          "in_support_max_score": 0.5,
+          "extrapolation_min_score": 1.5,
+          "thresholds_frozen_at_ms": 800,
+          "threshold_evidence_digest": "000000000000000000000000000000000000000000000000000000000001155a"
+        }
+      },
+      "expected_audit_status": null
     }
   ]
 }
