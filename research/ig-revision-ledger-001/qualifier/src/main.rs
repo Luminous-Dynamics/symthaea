@@ -1,4 +1,5 @@
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
     env, fs,
@@ -7,7 +8,7 @@ use std::{
 
 const LEDGER_ID: &str = "IG-REVISION-LEDGER-001";
 const MANIFEST_SCHEMA_VERSION: &str = "ig-revision-ledger-fixtures-v0.1";
-const EXPECTED_FIXTURES: usize = 21;
+const EXPECTED_FIXTURES: usize = 22;
 
 #[derive(Debug, PartialEq, Eq)]
 struct Report {
@@ -25,6 +26,22 @@ fn is_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Hash compact serde_json bytes after removing the state_sha256 field.
+/// Default serde_json maps use sorted keys because preserve_order is disabled.
+fn state_content_sha256(state: &Value) -> Option<String> {
+    let mut content = state.clone();
+    content.as_object_mut()?.remove("state_sha256")?;
+    let bytes = serde_json::to_vec(&content).ok()?;
+    let digest = Sha256::digest(bytes);
+    Some(format!("{digest:x}"))
+}
+
+fn state_content_without_digest(state: &Value) -> Option<Value> {
+    let mut content = state.clone();
+    content.as_object_mut()?.remove("state_sha256")?;
+    Some(content)
 }
 
 fn add(errors: &mut Vec<String>, context: &str, message: impl AsRef<str>) {
@@ -239,8 +256,11 @@ fn validate_state(state: &Value, context: &str, errors: &mut Vec<String>) {
     if state.is_null() {
         return;
     }
-    if !is_sha256(field(state, "state_sha256").unwrap_or_default()) {
+    let declared_digest = field(state, "state_sha256").unwrap_or_default();
+    if !is_sha256(declared_digest) {
         add(errors, context, "state_sha256 must be a 64-character hexadecimal digest");
+    } else if state_content_sha256(state).as_deref() != Some(declared_digest) {
+        add(errors, context, "state_content_digest_mismatch");
     }
     if field(state, "stance").is_none() {
         add(errors, context, "state stance must be non-empty");
@@ -317,15 +337,25 @@ fn validate_record(record: &Value) -> Vec<String> {
         Some("Changed") => {
             if previous.is_null() || next.is_null() {
                 add(&mut errors, &context, "Changed requires previous and next states");
-            } else if field(previous, "state_sha256") == field(next, "state_sha256") {
-                add(&mut errors, &context, "changed_state_digest_unchanged");
+            } else {
+                if field(previous, "state_sha256") == field(next, "state_sha256") {
+                    add(&mut errors, &context, "changed_state_digest_unchanged");
+                }
+                if state_content_without_digest(previous) == state_content_without_digest(next) {
+                    add(&mut errors, &context, "changed_transition_no_semantic_delta");
+                }
             }
         }
         Some("NoChange") => {
             if previous.is_null() || next.is_null() {
                 add(&mut errors, &context, "NoChange requires previous and next states");
-            } else if field(previous, "state_sha256") != field(next, "state_sha256") {
-                add(&mut errors, &context, "no_change_state_digest_mismatch");
+            } else {
+                if field(previous, "state_sha256") != field(next, "state_sha256") {
+                    add(&mut errors, &context, "no_change_state_digest_mismatch");
+                }
+                if state_content_without_digest(previous) != state_content_without_digest(next) {
+                    add(&mut errors, &context, "no_change_state_content_mismatch");
+                }
             }
         }
         Some("Abstained") => {
@@ -436,16 +466,40 @@ fn validate_record(record: &Value) -> Vec<String> {
         }
     }
 
+    let mut seen_message_ids = BTreeSet::new();
+    let mut seen_channel_event_ids = BTreeSet::new();
+    let mut previous_delivery_sequence = 0_u64;
     for message in record["delivered_messages"].as_array().into_iter().flatten() {
-        if field(message, "message_id").is_none()
-            || field(message, "channel_event_id").is_none()
+        let message_id = field(message, "message_id");
+        let channel_event_id = field(message, "channel_event_id");
+        let sender = field(message, "sender_agent_instance_id");
+        let recipient = field(message, "recipient_agent_instance_id");
+        let sequence = message["delivery_sequence"].as_u64();
+        if message_id.is_none()
+            || channel_event_id.is_none()
             || !is_sha256(field(message, "payload_sha256").unwrap_or_default())
         {
-            add(
-                &mut errors,
-                &context,
-                "delivered_message_missing_channel_event",
-            );
+            add(&mut errors, &context, "delivered_message_missing_channel_event");
+        }
+        if !is_sha256(field(message, "channel_event_sha256").unwrap_or_default())
+            || !is_sha256(field(message, "communication_graph_sha256").unwrap_or_default())
+        {
+            add(&mut errors, &context, "delivered_message_missing_graph_or_event_digest");
+        }
+        if sender.is_none() || recipient.is_none() || sender == recipient {
+            add(&mut errors, &context, "delivered_message_identity_invalid");
+        }
+        if recipient != field(record, "agent_instance_id") {
+            add(&mut errors, &context, "delivered_message_recipient_mismatch");
+        }
+        if message_id.is_some_and(|id| !seen_message_ids.insert(id.to_string()))
+            || channel_event_id.is_some_and(|id| !seen_channel_event_ids.insert(id.to_string()))
+        {
+            add(&mut errors, &context, "delivered_message_identity_duplicate");
+        }
+        match sequence {
+            Some(value) if value > previous_delivery_sequence => previous_delivery_sequence = value,
+            _ => add(&mut errors, &context, "delivered_message_order_invalid"),
         }
     }
 
@@ -484,13 +538,14 @@ fn validate_record(record: &Value) -> Vec<String> {
     let outcome = field(oracle, "outcome");
     match task_profile {
         Some("SyntheticKnownAnswer") => {
-            if outcome != Some("NotApplicable") {
-                if !is_sha256(field(oracle, "answer_space_sha256").unwrap_or_default()) {
-                    add(&mut errors, &context, "synthetic_oracle_missing_answer_space");
-                }
-                if !is_sha256(field(oracle, "oracle_receipt_sha256").unwrap_or_default()) {
-                    add(&mut errors, &context, "synthetic_oracle_missing_receipt");
-                }
+            if outcome == Some("NotApplicable") {
+                add(&mut errors, &context, "synthetic_known_answer_outcome_not_applicable");
+            }
+            if !is_sha256(field(oracle, "answer_space_sha256").unwrap_or_default()) {
+                add(&mut errors, &context, "synthetic_oracle_missing_answer_space");
+            }
+            if !is_sha256(field(oracle, "oracle_receipt_sha256").unwrap_or_default()) {
+                add(&mut errors, &context, "synthetic_oracle_missing_receipt");
             }
         }
         Some("OpenWorld" | "NormativePluralism") => {
@@ -591,7 +646,19 @@ fn validate_record(record: &Value) -> Vec<String> {
             let varied_factor = &causal["varied_factor"];
             let treatment_factor = field(varied_factor, "treatment_sha256");
             let control_factor = field(varied_factor, "control_sha256");
-            if field(varied_factor, "id").is_none()
+            let allowed_factors = [
+                "persuasion_exposure",
+                "communication_placement",
+                "confidence_policy",
+                "debate_method",
+                "evidence_availability",
+                "message_order",
+                "agent_diversity",
+                "abstention_policy",
+                "loss_profile",
+                "retrieval_policy",
+            ];
+            if field(varied_factor, "id").is_none_or(|id| !allowed_factors.contains(&id))
                 || treatment_factor.is_none_or(|value| !is_sha256(value))
                 || control_factor.is_none_or(|value| !is_sha256(value))
             {
@@ -652,16 +719,44 @@ fn validate_record(record: &Value) -> Vec<String> {
         .into_iter()
         .chain(string_set(&evidence_delta["newly_available"]))
         .collect::<BTreeSet<_>>();
+    let mut usable_evidence = known_evidence.clone();
+    for unavailable in string_set(&evidence_delta["newly_unavailable"])
+        .into_iter()
+        .chain(string_set(&evidence_delta["invalidated"]))
+    {
+        usable_evidence.remove(&unavailable);
+    }
+    let mut known_claims = BTreeSet::new();
+    if !previous.is_null() {
+        known_claims.extend(string_set(&previous["claim_ids"]));
+    }
+    if !next.is_null() {
+        known_claims.extend(string_set(&next["claim_ids"]));
+    }
+    let current_claims = if next.is_null() {
+        BTreeSet::new()
+    } else {
+        string_set(&next["claim_ids"])
+    };
     for link in record["claim_evidence_links"].as_array().into_iter().flatten() {
-        if field(link, "claim_id").is_none()
-            || field(link, "evidence_id")
-                .is_none_or(|evidence| !known_evidence.contains(evidence))
-        {
-            add(
-                &mut errors,
-                &context,
-                "claim_evidence_link_not_bound_to_available_evidence",
-            );
+        let claim_id = field(link, "claim_id");
+        let evidence_id = field(link, "evidence_id");
+        if claim_id.is_none_or(|claim| !known_claims.contains(claim)) {
+            add(&mut errors, &context, "claim_evidence_link_claim_not_bound_to_revision");
+        }
+        if evidence_id.is_none_or(|evidence| !known_evidence.contains(evidence)) {
+            add(&mut errors, &context, "claim_evidence_link_not_bound_to_available_evidence");
+        }
+        match field(link, "relationship") {
+            Some("supports") => {
+                if claim_id.is_none_or(|claim| !current_claims.contains(claim))
+                    || evidence_id.is_none_or(|evidence| !usable_evidence.contains(evidence))
+                {
+                    add(&mut errors, &context, "claim_support_link_not_bound_to_current_usable_state");
+                }
+            }
+            Some("contradicts" | "qualifies" | "contextualizes") => {}
+            _ => add(&mut errors, &context, "claim_evidence_link_relationship_invalid"),
         }
     }
 
@@ -901,6 +996,73 @@ mod tests {
     }
 
     #[test]
+    fn state_content_digest_is_recomputed_from_canonical_state() {
+        let record = parsed(MANIFEST)["fixtures"][1]["record"].clone();
+        let state = &record["next_state"];
+        assert_eq!(state_content_sha256(state).as_deref(), field(state, "state_sha256"));
+    }
+
+    #[test]
+    fn state_content_tampering_is_rejected_even_with_valid_digest_shape() {
+        let mut record = parsed(MANIFEST)["fixtures"][21]["record"].clone();
+        record["next_state"]["stance"] = Value::String("tampered-after-commitment".into());
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"state_content_digest_mismatch".to_string()));
+    }
+
+    #[test]
+    fn changed_transition_requires_semantic_state_change() {
+        let mut record = parsed(MANIFEST)["fixtures"][0]["record"].clone();
+        record["transition"] = Value::String("Changed".into());
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"changed_transition_no_semantic_delta".to_string()));
+    }
+
+    #[test]
+    fn delivered_message_must_bind_recipient_graph_and_channel_event() {
+        let mut record = parsed(MANIFEST)["fixtures"][2]["record"].clone();
+        record["delivered_messages"][0]["recipient_agent_instance_id"] =
+            Value::String("AGENT-OTHER".into());
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"delivered_message_recipient_mismatch".to_string()));
+    }
+
+    #[test]
+    fn duplicate_delivered_message_ids_are_rejected() {
+        let mut record = parsed(MANIFEST)["fixtures"][2]["record"].clone();
+        let first = record["delivered_messages"][0].clone();
+        record["delivered_messages"].as_array_mut().unwrap().push(first);
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"delivered_message_identity_duplicate".to_string()));
+    }
+
+    #[test]
+    fn support_links_must_bind_current_claims_and_usable_evidence() {
+        let mut record = parsed(MANIFEST)["fixtures"][1]["record"].clone();
+        record["claim_evidence_links"][0]["claim_id"] =
+            Value::String("UNRELATED-CLAIM".into());
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"claim_evidence_link_claim_not_bound_to_revision".to_string()));
+    }
+
+    #[test]
+    fn synthetic_known_answer_cannot_be_marked_not_applicable() {
+        let mut record = parsed(MANIFEST)["fixtures"][1]["record"].clone();
+        record["oracle"]["outcome"] = Value::String("NotApplicable".into());
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"synthetic_known_answer_outcome_not_applicable".to_string()));
+    }
+
+    #[test]
+    fn matched_pair_varied_factor_must_be_registered() {
+        let mut record = parsed(MANIFEST)["fixtures"][9]["record"].clone();
+        record["causal_attribution"]["varied_factor"]["id"] =
+            Value::String("invented-causal-factor".into());
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"causal_estimate_missing_matched_pair".to_string()));
+    }
+
+    #[test]
     fn schemas_are_recursively_checked_and_applied_to_every_record() {
         let mut manifest_schema = parsed(MANIFEST_SCHEMA);
         manifest_schema["properties"]["optional_probe"] =
@@ -955,14 +1117,14 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_twenty_one_fixture_oracles_validate() {
+    fn checked_in_twenty_two_fixture_oracles_validate() {
         let report = validate_manifest(
             &parsed(MANIFEST),
             &parsed(MANIFEST_SCHEMA),
             &parsed(RECORD_SCHEMA),
         )
         .expect("manifest and event fixtures must validate");
-        assert_eq!(report.fixtures, 21);
+        assert_eq!(report.fixtures, 22);
         assert_eq!(report.valid_controls, 10);
         assert_eq!(report.negative_controls, 11);
     }
