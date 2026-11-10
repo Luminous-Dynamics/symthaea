@@ -860,13 +860,19 @@ fn compose_with_spec_and_form_and_grammar_impl(
             &mut score,
             GENERAL_BASS_PART_V1,
             GENERAL_HARMONY_PART_V1,
+            GENERAL_MELODY_PART_V1,
             key,
         );
     } else if tx.drone {
         // After intro/coda so the pedal covers the FULL span they extend
         // — a drone that dropped out for the intro or coda would stop
         // being a drone.
-        apply_drone_pedal(&mut score, GENERAL_BASS_PART_V1, key);
+        apply_drone_pedal(
+            &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_MELODY_PART_V1,
+            key,
+        );
     }
     // LAST, so intro shifts and the coda's own cadence are included: the
     // style's phrase rhetoric — the conversational layer the second
@@ -1986,7 +1992,7 @@ fn apply_additive_process(
 /// point of a drone: it's the fixed ground a modal melody floats over, the
 /// harmony moving freely against it. Runs LAST, after every other bass
 /// note is in place, and simply replaces them all.
-fn apply_drone_pedal(score: &mut Score, part_id: PartId, key: Key) {
+fn apply_drone_pedal(score: &mut Score, part_id: PartId, melody_part_id: PartId, key: Key) {
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -2001,7 +2007,7 @@ fn apply_drone_pedal(score: &mut Score, part_id: PartId, key: Key) {
     let melody_track: Vec<(f64, f32)> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.role == VoiceRole::Melody && n.part == melody_part_id)
         .map(|n| (n.onset.beats(), n.section_intensity))
         .collect();
     let intensity_near = |t: f64| -> f32 {
@@ -2055,9 +2061,10 @@ fn apply_full_drone(
     score: &mut Score,
     bass_part_id: PartId,
     harmony_part_id: PartId,
+    melody_part_id: PartId,
     key: Key,
 ) {
-    apply_drone_pedal(score, bass_part_id, key);
+    apply_drone_pedal(score, bass_part_id, melody_part_id, key);
     let total_bars = (score.total_beats.beats() / score.meter as f64).ceil() as i64;
     if total_bars <= 0 {
         return;
@@ -2070,7 +2077,7 @@ fn apply_full_drone(
     let melody_track: Vec<(f64, f32)> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.role == VoiceRole::Melody && n.part == melody_part_id)
         .map(|n| (n.onset.beats(), n.section_intensity))
         .collect();
     let intensity_near = |t: f64| -> f32 {
@@ -3891,7 +3898,7 @@ fn append_transformed_coda(
     let mut fragment: Vec<Pitch> = score
         .notes
         .iter()
-        .filter(|n| n.role == VoiceRole::Melody)
+        .filter(|n| n.role == VoiceRole::Melody && n.part == melody_part_id)
         .take(4)
         .map(|n| n.pitch)
         .collect();
@@ -4377,7 +4384,7 @@ pub(crate) fn realize_melody_for_part(
         let climax_idx = score
             .notes
             .iter()
-            .position(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax);
+            .position(|n| n.role == VoiceRole::Melody && n.part == part_id && n.emphasis == Emphasis::Climax);
         if let Some(ci) = climax_idx {
             let climax_onset = score.notes[ci].onset;
             let climax_pitch = score.notes[ci].pitch;
@@ -4394,6 +4401,7 @@ pub(crate) fn realize_melody_for_part(
                 .find(|p| key.scale().contains(p.pitch_class()));
             let prev = score.notes.iter().position(|n| {
                 n.role == VoiceRole::Melody
+                    && n.part == part_id
                     && n.onset + n.duration == climax_onset
                     && n.duration.beats() >= 0.75
             });
@@ -5352,6 +5360,81 @@ mod tests {
         apply_roll_ornaments(&mut score, PartId(44), key, &dna, 13);
         assert_eq!(score.notes.len(), 5);
         assert!(score.notes.iter().all(|note| note.part == PartId(44)));
+    }
+
+    #[test]
+    fn transformed_coda_quotes_only_its_source_melody_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ScoreNote {
+            part: PartId(99),
+            pitch: Pitch::from_midi(86),
+            onset: Duration::zero(),
+            duration: Duration::quarter(),
+            velocity: 0.8,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        for (midi, onset) in [(79u8, 0i64), (76, 1), (74, 2), (71, 3)] {
+            score.push(ScoreNote {
+                part: PartId(1),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::quarter(),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        assert!(append_transformed_coda(
+            &mut score,
+            PartId(1),
+            PartId(2),
+            PartId(3),
+            key,
+            4.0,
+            &MusicalIntent::default(),
+            2,
+        ));
+        let first_coda_note = score.notes.iter()
+            .find(|note| note.role == VoiceRole::Melody && note.onset.beats() >= 4.0)
+            .expect("transformed coda melody must be appended");
+        assert_eq!(first_coda_note.part, PartId(1));
+        assert_eq!(first_coda_note.pitch.midi(), 67, "G5 must be quoted down an octave as G4");
+    }
+
+    #[test]
+    fn drone_dynamic_envelope_reads_only_its_own_melody_part() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        score.push(ScoreNote {
+            part: PartId(1),
+            pitch: Pitch::from_midi(72),
+            onset: Duration::zero(),
+            duration: Duration::new(4, 1),
+            velocity: 0.4,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 0.3,
+        });
+        score.push(ScoreNote {
+            part: PartId(99),
+            pitch: Pitch::from_midi(84),
+            onset: Duration::zero(),
+            duration: Duration::new(4, 1),
+            velocity: 0.9,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 0.9,
+        });
+        apply_drone_pedal(&mut score, PartId(2), PartId(1), key);
+        let bass: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::Bass && note.part == PartId(2))
+            .collect();
+        assert_eq!(bass.len(), 2);
+        assert!(bass.iter().all(|note| (note.section_intensity - 0.3).abs() < 1e-6));
     }
 
     #[test]
