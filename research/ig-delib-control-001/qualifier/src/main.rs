@@ -215,7 +215,9 @@ fn validate_scenario(scenario: &Value) -> Vec<String> {
         add(&mut errors, "expected_action_invalid");
     }
     // Invalid values do not get a second, misleading baseline-consistency diagnosis.
-    if let Some(value) = agreement.filter(|value| value.is_finite() && (0.0..=1.0).contains(value)) {
+    if let Some(value) = agreement.filter(|value| {
+        value.is_finite() && (0.0..=1.0).contains(value)
+    }) {
         if scenario["expected_agreement_baseline_stop"].as_bool()
             != Some(value >= AGREEMENT_THRESHOLD)
         {
@@ -381,7 +383,10 @@ fn validate_manifest(scenarios: &Value, controls: &Value) -> Vec<String> {
     }
     for fixture in &negative {
         let target_id = field(fixture, "target_fixture_id").unwrap_or_default();
-        let Some(target) = rows.iter().find(|row| field(row, "fixture_id") == Some(target_id)) else {
+        let Some(target) = rows
+            .iter()
+            .find(|row| field(row, "fixture_id") == Some(target_id))
+        else {
             errors.push(format!(
                 "{}:negative_control_target_missing",
                 field(fixture, "fixture_id").unwrap_or("unknown")
