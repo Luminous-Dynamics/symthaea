@@ -143,7 +143,7 @@ pub struct SequentialVerifierAttestationClaims {
     pub statistical_verification_report_digest: String,
     /// Qualified all-families non-inferiority report digest.
     pub family_guardrail_report_digest: String,
-    /// False is a signed rejection, A verifier must never sign true before all
+    /// False is a signed rejection. A verifier must never sign true before all
     /// required tests and negative controls have completed.
     pub accepted: bool,
 }
@@ -1366,6 +1366,26 @@ mod tests {
             ),
             Err(SequentialWeightProgramError::VerifierAttestationMismatch(
                 "statistical_verification_report_digest"
+            ))
+        ));
+
+        let mut wrong_family_report = correctly_bound.clone();
+        wrong_family_report.claims.family_guardrail_report_digest = digest('2');
+        let message = sequential_verifier_attestation_message(&wrong_family_report.claims)
+            .expect("message for re-signed mismatched family guardrail report");
+        wrong_family_report.signature = signing_key.sign(&message).to_bytes().to_vec();
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &evidence_binding,
+                &wrong_family_report,
+                &pinned_key,
+            ),
+            Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                "family_guardrail_report_digest"
             ))
         ));
 
