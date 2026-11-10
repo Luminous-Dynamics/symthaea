@@ -234,21 +234,27 @@ fn walk_semantics(value: &Value, path: &str, f: &mut Findings) {
                     }
                 }
                 if map.get("value").is_some_and(Value::is_null) {
-                    if map
+                    let not_applicable = map
+                        .get("not_applicable_reason")
+                        .and_then(Value::as_str)
+                        .is_some_and(|reason| !reason.trim().is_empty());
+                    let unknown = map
                         .get("unknown_reason")
                         .and_then(Value::as_str)
-                        .is_none_or(|s| s.trim().is_empty())
-                    {
-                        f.push(
-                            pointer_child(path, "unknown_reason"),
-                            "INVALID",
-                            "an unknown quantity must retain an explicit reason",
-                        );
-                    } else {
+                        .is_some_and(|reason| !reason.trim().is_empty());
+                    if not_applicable {
+                        // Explicit non-applicability is a declared state, not missing data.
+                    } else if unknown {
                         f.push(
                             path,
                             "INCOMPLETE",
                             "quantity is explicitly unknown; no numeric default is inferred",
+                        );
+                    } else {
+                        f.push(
+                            path,
+                            "INVALID",
+                            "a null quantity must carry unknown_reason or not_applicable_reason",
                         );
                     }
                 }
@@ -1370,6 +1376,26 @@ mod tests {
         let left: Value = serde_json::from_str(r#"{"b":2,"a":{"d":4,"c":3}}"#).unwrap();
         let right: Value = serde_json::from_str(r#"{"a":{"c":3,"d":4},"b":2}"#).unwrap();
         assert_eq!(canonical_json_sha256(&left), canonical_json_sha256(&right));
+    }
+
+    #[test]
+    fn explicit_not_applicable_quantity_is_not_misclassified_as_unknown() {
+        let mut findings = Findings::default();
+        let quantity = serde_json::json!({
+            "value": null,
+            "unit": "tonne",
+            "not_applicable_reason": "This contract uses TEU transport work.",
+            "provenance": {
+                "class":"synthetic",
+                "source_id":"SYNTHETIC-WAPS-FIXTURE-ONLY",
+                "method":"test",
+                "limitations":["test-only"],
+                "rights_status":"not_applicable"
+            }
+        });
+        walk_semantics(&quantity, "/service/annual_delivered_cargo_mass", &mut findings);
+        assert!(!findings.invalid);
+        assert!(!findings.incomplete);
     }
 
     #[test]
