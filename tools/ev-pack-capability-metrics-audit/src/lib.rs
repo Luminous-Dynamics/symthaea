@@ -89,6 +89,7 @@ struct ReferenceConditions {
 #[serde(deny_unknown_fields)]
 struct CapacityCondition {
     condition_ref: String,
+    condition_digest: String,
     temperature_c: f64,
     maximum_measurement_skew_ms: u64,
     c_rate: f64,
@@ -157,6 +158,8 @@ struct SocSnapshot {
     snapshot_ref: String,
     pack_configuration_digest: String,
     condition_ref: String,
+    protocol_digest: String,
+    condition_digest: String,
     maximum_sample_skew_ms: u64,
     maximum_soh_measurement_age_ms: u64,
     snapshot_digest: String,
@@ -406,6 +409,7 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
     if !nonempty(&capacity.condition_ref)
         || !nonempty(&capacity.protocol_ref)
         || !is_digest(&capacity.protocol_digest)
+        || !is_digest(&capacity.condition_digest)
         || !capacity.temperature_c.is_finite()
         || capacity.maximum_measurement_skew_ms == 0
         || !capacity.c_rate.is_finite()
@@ -517,6 +521,8 @@ fn validate_profile(profile: &Profile) -> Vec<String> {
             || !is_digest(&snapshot.snapshot_digest)
             || snapshot.pack_configuration_digest != profile.asset.pack_configuration_digest
             || !nonempty(&snapshot.condition_ref)
+            || !is_digest(&snapshot.protocol_digest)
+            || !is_digest(&snapshot.condition_digest)
             || snapshot.maximum_sample_skew_ms == 0
         {
             errors.push(
@@ -778,6 +784,41 @@ fn calculate_metrics(
     soh_distribution: &DistributionSummary,
 ) -> InconsistencyMetrics {
     let population_scope = scope(profile);
+    let asset_evidence = || {
+        vec![
+            metric_evidence(
+                "vehicle_configuration".to_owned(),
+                profile.asset.vehicle_configuration_digest.clone(),
+                None,
+            ),
+            metric_evidence(
+                "pack_configuration".to_owned(),
+                profile.asset.pack_configuration_digest.clone(),
+                None,
+            ),
+        ]
+    };
+    let method_evidence = || {
+        vec![metric_evidence(
+            "analysis_method".to_owned(),
+            profile.provenance.analysis_method_digest.clone(),
+            None,
+        )]
+    };
+    let capacity_condition_evidence = || {
+        vec![
+            metric_evidence(
+                "capacity_protocol".to_owned(),
+                profile.reference_conditions.capacity.protocol_digest.clone(),
+                None,
+            ),
+            metric_evidence(
+                "capacity_reference_condition".to_owned(),
+                profile.reference_conditions.capacity.condition_digest.clone(),
+                None,
+            ),
+        ]
+    };
     let soh_evidence: Vec<MetricEvidence> = profile
         .units
         .iter()
@@ -798,6 +839,9 @@ fn calculate_metrics(
             profile.population.inventory_digest.clone(),
             None,
         )))
+        .chain(asset_evidence())
+        .chain(method_evidence())
+        .chain(capacity_condition_evidence())
         .collect();
 
     let topology_evidence = || {
@@ -912,6 +956,13 @@ fn calculate_metrics(
                             lifetime.efc_method_digest.clone(),
                             None,
                         )))
+                        .chain(std::iter::once(metric_evidence(
+                            "lifetime_pack_configuration".to_owned(),
+                            lifetime.pack_configuration_digest.clone(),
+                            None,
+                        )))
+                        .chain(asset_evidence())
+                        .chain(method_evidence())
                         .chain(topology_evidence())
                         .collect();
                     computed(value, "ratio", &population_scope, lifetime_evidence)
@@ -983,6 +1034,16 @@ fn calculate_metrics(
                             snapshot.snapshot_digest.clone(),
                             None,
                         )))
+                        .chain(std::iter::once(metric_evidence(
+                            "soc_protocol".to_owned(),
+                            snapshot.protocol_digest.clone(),
+                            None,
+                        )))
+                        .chain(std::iter::once(metric_evidence(
+                            "soc_reference_condition".to_owned(),
+                            snapshot.condition_digest.clone(),
+                            None,
+                        )))
                         .chain(snapshot.observations.iter().map(|row| {
                             let unit = profile.units.iter()
                                 .find(|unit| unit.unit_ref == row.unit_ref)
@@ -994,6 +1055,8 @@ fn calculate_metrics(
                             )
                         }))
                         .chain(soh_evidence.iter().cloned())
+                        .chain(asset_evidence())
+                        .chain(method_evidence())
                         .chain(topology_evidence())
                         .collect();
                     computed(
@@ -1278,6 +1341,29 @@ mod tests {
             item.role == "end_of_charge_soc:cell-001"
                 && item.evidence_class.as_deref() == Some("synthetic_fixture")
         }));
+    }
+
+    #[test]
+    fn computed_metrics_bind_asset_method_and_reference_protocol_evidence() {
+        let audited = report();
+        let complete = audited.payload.cases.iter()
+            .find(|case| case.case_id == "complete-qualified-series-pack")
+            .and_then(|case| case.summary.as_ref())
+            .expect("complete pack summary");
+        for metric in [
+            &complete.inconsistency_metrics.sigma_soh,
+            &complete.inconsistency_metrics.beta_soh,
+            &complete.inconsistency_metrics.beta_life,
+            &complete.inconsistency_metrics.beta_soc,
+        ] {
+            assert!(metric.evidence.iter().any(|item| item.role == "pack_configuration"));
+            assert!(metric.evidence.iter().any(|item| item.role == "vehicle_configuration"));
+            assert!(metric.evidence.iter().any(|item| item.role == "analysis_method"));
+        }
+        assert!(complete.inconsistency_metrics.sigma_soh.evidence.iter()
+            .any(|item| item.role == "capacity_protocol"));
+        assert!(complete.inconsistency_metrics.beta_soc.evidence.iter()
+            .any(|item| item.role == "soc_protocol"));
     }
 
     #[test]
