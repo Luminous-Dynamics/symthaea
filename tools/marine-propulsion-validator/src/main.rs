@@ -813,7 +813,7 @@ fn check_trial(case: &Value, f: &mut Findings) {
                     .and_then(Value::as_str);
                 match (sample_rate, sample_rate_unit.and_then(frequency_to_hz)) {
                     (Some(rate), Some(scale)) if rate > 0.0 => {
-                        let duration_ns = window_end.signed_duration_since(*window_start).num_nanoseconds();
+                        let duration_ns = window_end.signed_duration_since(window_start.clone()).num_nanoseconds();
                         match duration_ns {
                             Some(duration_ns) if duration_ns > 0 => {
                                 let expected_from_rate = duration_ns as f64 / 1_000_000_000.0 * rate * scale;
@@ -1501,6 +1501,10 @@ mod tests {
         include_str!("../../../docs/research/marine/marine-propulsion-case-v0.2.0.schema.json");
     const SYNTHETIC_CASE_V2: &str =
         include_str!("../../../docs/research/marine/fixtures/synthetic-waps-case-v0.2.0.json");
+    const MARINE_SCHEMA_V3: &str =
+        include_str!("../../../docs/research/marine/marine-propulsion-case-v0.3.0.schema.json");
+    const SYNTHETIC_CASE_V3: &str =
+        include_str!("../../../docs/research/marine/fixtures/synthetic-waps-case-v0.3.0.json");
     const SERVICE_FINGERPRINT_VECTOR_V1: &str =
         include_str!("../../../docs/research/marine/fixtures/service-fingerprint-v1-vector-0001.json");
 
@@ -1666,6 +1670,71 @@ mod tests {
         assert!(validator.is_valid(&fixture));
         let mut findings = Findings::default();
         check_unique_scopes(&fixture, &mut findings);
+        check_trial(&fixture, &mut findings);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn v0_3_schema_and_fixture_validate_with_provenance_and_sampling_policy() {
+        let schema: Value = serde_json::from_str(MARINE_SCHEMA_V3).expect("v0.3 schema JSON");
+        let fixture: Value = serde_json::from_str(SYNTHETIC_CASE_V3).expect("v0.3 fixture JSON");
+        assert!(jsonschema::draft202012::meta::is_valid(&schema));
+        let validator = jsonschema::draft202012::options()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("v0.3 schema compiles");
+        assert!(validator.is_valid(&fixture));
+        let mut findings = Findings::default();
+        check_unique_scopes(&fixture, &mut findings);
+        check_trial(&fixture, &mut findings);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+        assert!(findings.incomplete); // synthetic evidence and rights remain non-qualifying
+    }
+
+    #[test]
+    fn v0_3_unknown_certificate_rights_are_incomplete() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V3).expect("v0.3 fixture JSON");
+        fixture["trial_evidence"]["calibration_records"][0]["rights_status"] =
+            serde_json::json!("unknown");
+        let mut findings = Findings::default();
+        check_trial(&fixture, &mut findings);
+        assert!(findings.incomplete);
+        assert!(!findings.invalid);
+    }
+
+    #[test]
+    fn v0_3_unresolved_calibration_evidence_source_is_invalid() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V3).expect("v0.3 fixture JSON");
+        fixture["trial_evidence"]["calibration_records"][0]["evidence_source_id"] =
+            serde_json::json!("MISSING-SOURCE-RECORD");
+        let mut findings = Findings::default();
+        check_trial(&fixture, &mut findings);
+        assert!(findings.invalid);
+    }
+
+    #[test]
+    fn v0_3_declared_sample_count_must_agree_with_rate_and_window() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V3).expect("v0.3 fixture JSON");
+        fixture["trial_evidence"]["channels"][0]["sample_rate_hz"]["value"] =
+            serde_json::json!(2);
+        let mut findings = Findings::default();
+        check_trial(&fixture, &mut findings);
+        assert!(findings.invalid);
+    }
+
+    #[test]
+    fn compatible_time_units_are_compared_after_explicit_conversion() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V3).expect("v0.3 fixture JSON");
+        fixture["trial_evidence"]["timebases"][0]["synchronization_uncertainty"]["value"] =
+            serde_json::json!(2);
+        fixture["trial_evidence"]["timebases"][0]["synchronization_uncertainty"]["unit"] =
+            serde_json::json!("ms");
+        // Channel uncertainty remains 0.002 s; the physical uncertainties are equal.
+        let mut findings = Findings::default();
         check_trial(&fixture, &mut findings);
         assert!(!findings.invalid, "{:?}", findings.diagnostics);
     }
