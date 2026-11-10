@@ -379,6 +379,8 @@ Every public result must state the exact vessel/configuration, mission, environm
 - [Route/service robustness specification](./MARINE-SERVICE-ROBUSTNESS-001.md)
 - [Operational prediction benchmark](./MARINE-OPERATIONAL-PREDICTION-BENCHMARK-001.md)
 - [Hydrodynamic validation specification](./MARINE-HYDRODYNAMIC-VALIDATION-001.md)
+- [Canonical service fingerprint profile](./MARINE-SERVICE-FINGERPRINT-PROFILE-001.md)
+- [Canonical service fingerprint vector](./fixtures/service-fingerprint-v1-vector-0001.json)
 
 The registry now has 23 source records. The v0.1.0 schema remains unchanged; v0.2.0 introduces resolvable calibration/timebase registries, explicit sample completeness, a versioned canonical service fingerprint and a distinct not-applicable quantity state. The validator recomputes the service fingerprint from the declared service/route/loading payload using Symthaea's existing `symthaea-canonical-json-sha256-v1` profile (not RFC 8785); weather/metocean realization remains a separate counterfactual boundary. The v0.2.0 fixture carries a known-answer digest. A standalone Rust validator and integration/adversarial tests are committed. JSON artifacts have been retrieved and structurally inspected, but full JSON Schema meta-schema validation and Rust compilation/test execution have not been run in this environment. The isolated Rust crate still needs a generated Cargo.lock. Fixtures contain synthetic data and placeholder evidence digests; they are not vessel configurations or physical measurements.
 
