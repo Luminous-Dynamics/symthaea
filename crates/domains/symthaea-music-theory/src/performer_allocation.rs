@@ -99,7 +99,7 @@ pub struct PerformanceAllocationPlanV2 {
     pub performer_capabilities: Vec<PerformerCapabilityV2>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PerformanceAllocationIssueCodeV2 {
     InvalidSchema,
@@ -189,7 +189,22 @@ impl PerformanceAllocationReportV2 {
 
     fn finish(mut self) -> Self {
         self.valid = self.issues.is_empty() && self.orchestration_report.valid;
-        self.performer_peak_load.sort_by(|a, b| a.performer_id.cmp(&b.performer_id));
+        self.performer_peak_load.sort_by(|a, b| {
+            a.performer_id.cmp(&b.performer_id)
+                .then_with(|| a.setup_id.cmp(&b.setup_id))
+                .then_with(|| format!("{:?}", a.instrument_kind).cmp(&format!("{:?}", b.instrument_kind)))
+        });
+        // load_events is a HashMap for its non-Ord instrument-kind key.
+        // Normalize all findings before returning so identical frozen inputs
+        // produce byte-stable report ordering.
+        self.issues.sort_by(|a, b| {
+            a.code.cmp(&b.code)
+                .then_with(|| a.unit_id.cmp(&b.unit_id))
+                .then_with(|| a.performer_id.cmp(&b.performer_id))
+                .then_with(|| a.part_id.cmp(&b.part_id))
+                .then_with(|| a.note_index.cmp(&b.note_index))
+                .then_with(|| a.message.cmp(&b.message))
+        });
         self
     }
 }
@@ -953,6 +968,65 @@ mod tests {
             &digest(),
         );
         assert!(report.valid, "{:?}", report.issues);
+    }
+
+    #[test]
+    fn performer_load_is_qualified_per_setup_not_from_another_sequential_setup() {
+        let mut source = score();
+        source.notes[0].duration = Duration::new(2, 1);
+        source.notes[1].onset = Duration::new(2, 1);
+        source.notes[1].duration = Duration::new(2, 1);
+        let timed = OrchestrationTimelineV1 {
+            schema: ORCHESTRATION_TIMELINE_SCHEMA_V1.into(),
+            score_digest_schema: ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
+            score_sha256: digest(),
+            segments: vec![
+                OrchestrationSegmentV1 {
+                    id: "melody".into(),
+                    part_id: 0,
+                    instrument_id: "piano-1".into(),
+                    start: RationalBeatV1 { numerator: 0, denominator: 1 },
+                    end: RationalBeatV1 { numerator: 2, denominator: 1 },
+                    musical_function: "melody".into(),
+                    handoff: None,
+                },
+                OrchestrationSegmentV1 {
+                    id: "bass".into(),
+                    part_id: 1,
+                    instrument_id: "piano-1".into(),
+                    start: RationalBeatV1 { numerator: 2, denominator: 1 },
+                    end: RationalBeatV1 { numerator: 4, denominator: 1 },
+                    musical_function: "bass".into(),
+                    handoff: None,
+                },
+            ],
+        };
+        let report = validate_performance_allocation_v2(
+            &source,
+            &timed,
+            &[instrument()],
+            &plan(
+                vec![
+                    unit("melody-unit", "melody", "performer", "two-hand",
+                        PerformanceAllocationModeV2::Solo, None),
+                    unit("bass-unit", "bass", "performer", "one-hand",
+                        PerformanceAllocationModeV2::Solo, None),
+                ],
+                vec![
+                    profile("performer", "two-hand", 8, 1),
+                    profile("performer", "one-hand", 1, 1),
+                ],
+            ),
+            &digest(),
+        );
+        assert!(report.valid, "{:?}", report.issues);
+        assert_eq!(report.performer_peak_load.len(), 2);
+        assert!(report.performer_peak_load.iter().any(|load| {
+            load.setup_id == "two-hand" && load.declared_note_budget == 8
+        }));
+        assert!(report.performer_peak_load.iter().any(|load| {
+            load.setup_id == "one-hand" && load.declared_note_budget == 1
+        }));
     }
 
     #[test]
