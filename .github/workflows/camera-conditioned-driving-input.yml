@@ -1,0 +1,38 @@
+name: camera-conditioned-driving-input
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-camera-driving-bridge/**"
+      - ".github/workflows/camera-conditioned-driving-input.yml"
+  push:
+    paths:
+      - "crates/bridges/symthaea-camera-driving-bridge/**"
+      - ".github/workflows/camera-conditioned-driving-input.yml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/bridges/symthaea-camera-driving-bridge/Cargo.toml -- --check
+
+      - name: Run known-answer and adversarial tests
+        run: cargo test --locked --manifest-path crates/bridges/symthaea-camera-driving-bridge/Cargo.toml
+
+      - name: Run strict Clippy
+        run: cargo clippy --locked --manifest-path crates/bridges/symthaea-camera-driving-bridge/Cargo.toml --all-targets --all-features -- -D warnings
