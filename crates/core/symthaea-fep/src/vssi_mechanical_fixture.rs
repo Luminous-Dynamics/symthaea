@@ -156,6 +156,20 @@ pub struct VssiExperimentResult {
 impl VssiExperimentReceipt {
     /// Recompute the receipt's claim digest without trusting its stored digest.
     pub fn validate(&self) -> Result<(), VssiFixtureError> {
+        let expected_budget_after = (self.budget_before - self.observation_cost).max(0.0);
+        if self.scenario_id.trim().is_empty()
+            || self.experiment_index == 0
+            || !self.observation_cost.is_finite()
+            || self.observation_cost < 0.0
+            || !self.budget_before.is_finite()
+            || self.budget_before < 0.0
+            || !self.budget_after.is_finite()
+            || self.budget_after < 0.0
+            || self.observation_cost > self.budget_before + 1e-12
+            || (self.budget_after - expected_budget_after).abs() > 1e-12
+        {
+            return Err(VssiFixtureError::InvalidReceiptClaims);
+        }
         if !is_sha256_hex(&self.public_task_digest)
             || !is_sha256_hex(&self.observations_digest)
             || !is_sha256_hex(&self.receipt_digest)
@@ -198,6 +212,43 @@ impl VssiExperimentResult {
         }
         Ok(())
     }
+}
+
+/// Validate sequence continuity and the hash chain for one environment ledger.
+///
+/// This establishes internal integrity and ordering, not signer authenticity:
+/// the fixture does not hold a signing key or provide an OS process sandbox.
+pub fn validate_vssi_experiment_receipt_chain(
+    receipts: &[VssiExperimentReceipt],
+) -> Result<(), VssiFixtureError> {
+    for (index, receipt) in receipts.iter().enumerate() {
+        receipt.validate()?;
+        if receipt.experiment_index != index as u64 + 1 {
+            return Err(VssiFixtureError::ReceiptChainMismatch {
+                index: receipt.experiment_index,
+            });
+        }
+        if index == 0 {
+            if receipt.previous_receipt_digest.is_some() {
+                return Err(VssiFixtureError::ReceiptChainMismatch {
+                    index: receipt.experiment_index,
+                });
+            }
+        } else {
+            let previous = &receipts[index - 1];
+            if receipt.scenario_id != previous.scenario_id
+                || receipt.public_task_digest != previous.public_task_digest
+                || receipt.previous_receipt_digest.as_deref()
+                    != Some(previous.receipt_digest.as_str())
+                || (receipt.budget_before - previous.budget_after).abs() > 1e-12
+            {
+                return Err(VssiFixtureError::ReceiptChainMismatch {
+                    index: receipt.experiment_index,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -260,6 +311,10 @@ pub enum VssiFixtureError {
     BudgetExceeded { remaining: f64, requested: f64 },
     #[error("failed to serialize deterministic experiment evidence for hashing")]
     ReceiptSerialization,
+    #[error("receipt contains invalid sequence, cost, or budget claims")]
+    InvalidReceiptClaims,
+    #[error("receipt sequence or previous-digest link is inconsistent at index {index}")]
+    ReceiptChainMismatch { index: u64 },
     #[error("receipt contains a malformed SHA-256 digest")]
     InvalidReceiptDigest,
     #[error("experiment receipt digest does not match its claims")]
@@ -418,13 +473,16 @@ impl VssiMechanicalEnvironment {
             receipt_digest,
         };
 
-        self.spent_observation_cost += spec.observation_cost;
-        self.completed_experiments.push(kind);
-        self.experiment_receipts.push(receipt.clone());
-        Ok(VssiExperimentResult {
+        let result = VssiExperimentResult {
             observations,
             receipt,
-        })
+        };
+        result.validate()?;
+
+        self.spent_observation_cost += spec.observation_cost;
+        self.completed_experiments.push(kind);
+        self.experiment_receipts.push(result.receipt.clone());
+        Ok(result)
     }
 
     /// Receipts for all successful experiments, in immutable execution order.
@@ -792,6 +850,14 @@ mod tests {
             environment.experiment_receipts()[1].receipt_digest,
             second.receipt.receipt_digest
         );
+        validate_vssi_experiment_receipt_chain(environment.experiment_receipts()).unwrap();
+
+        let mut reordered = environment.experiment_receipts().to_vec();
+        reordered.swap(0, 1);
+        assert!(matches!(
+            validate_vssi_experiment_receipt_chain(&reordered),
+            Err(VssiFixtureError::ReceiptChainMismatch { .. })
+        ));
     }
 
     #[test]
@@ -817,7 +883,7 @@ mod tests {
         altered_receipt.receipt.budget_after += 0.01;
         assert_eq!(
             altered_receipt.validate(),
-            Err(VssiFixtureError::ReceiptDigestMismatch)
+            Err(VssiFixtureError::InvalidReceiptClaims)
         );
     }
 
