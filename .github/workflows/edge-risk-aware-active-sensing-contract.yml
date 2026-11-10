@@ -1,0 +1,43 @@
+name: Edge Risk-Aware Active-Sensing Contract
+
+on:
+  pull_request:
+    branches: [research/edge-active-sensing-voi-v0.1]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/edge-risk-aware-active-sensing-contract.yml"
+      - "research/temporal-bench/src/lib.rs"
+      - "research/temporal-bench/src/active_sensing.rs"
+      - "research/temporal-bench/src/risk_aware_active_sensing.rs"
+      - "research/temporal-bench/src/digest.rs"
+      - "research/temporal-bench/Cargo.toml"
+  push:
+    branches: [research/edge-risk-aware-active-sensing-v0.1]
+    paths:
+      - ".github/workflows/edge-risk-aware-active-sensing-contract.yml"
+      - "research/temporal-bench/src/lib.rs"
+      - "research/temporal-bench/src/active_sensing.rs"
+      - "research/temporal-bench/src/risk_aware_active_sensing.rs"
+      - "research/temporal-bench/src/digest.rs"
+      - "research/temporal-bench/Cargo.toml"
+
+permissions:
+  contents: read
+
+jobs:
+  risk-aware-active-sensing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format temporal benchmark crate
+        run: cargo fmt --manifest-path research/temporal-bench/Cargo.toml -- --check
+      - name: Test decision-focused and risk-aware sensing modules
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path research/temporal-bench/Cargo.toml active_sensing:: -- --nocapture
+          cargo test --manifest-path research/temporal-bench/Cargo.toml risk_aware_active_sensing::tests -- --nocapture
