@@ -366,42 +366,113 @@
       ]
     },
     {
-      "rule_id": "NE-ATLANTIC-ECA-2026",
-      "title": "North-East Atlantic Emission Control Area",
       "authority": "International Maritime Organization",
       "instrument": "MARPOL Annex VI amendment adopted at MEPC 84",
-      "revision_or_resolution": "MEPC 84, 27 April–1 May 2026",
+      "revision_or_resolution": "Resolution MEPC.407(84)",
       "rule_status": "adopted",
       "legal_character": "adopted_amendment_future_application",
+      "source_ids": [
+        "IMO-NE-ATLANTIC-ECA-2026"
+      ],
+      "limitations": [
+        "Adoption is distinct from entry into force and application. Route geometry alone does not establish ship/engine compliance; authoritative coordinates and certification evidence are required."
+      ],
+      "rule_id": "NE-ATLANTIC-NOX-ECA-2026",
+      "title": "North-East Atlantic NOx ECA — Tier III new-ship applicability",
+      "dates": {
+        "adopted_on": "2026-05-01",
+        "entry_into_force_on": "2027-09-01",
+        "applies_from": "2027-09-01"
+      },
+      "applicability": {
+        "ship_scope": "Ships operating in the designated North-East Atlantic NOx ECA, with relevant marine diesel engines of more than 130 kW and qualifying construction/delivery dates.",
+        "geographic_scope": "Exclusive economic zones and territorial seas extending up to 200 nautical miles from baselines of Greenland, Iceland, the Faroe Islands, Ireland, the mainland United Kingdom, France, Spain and Portugal, as described in the MEPC 84 outcome; authoritative adopted coordinates/chart data are still required.",
+        "voyage_scope": "Operation of qualifying ships and engines within the ECA on or after 1 September 2027.",
+        "engine_power_kw_min_exclusive": 130,
+        "ship_construction_triggers": [
+          {
+            "milestone": "building_contract_placed",
+            "threshold_date": "2027-01-01",
+            "meaning": "Building contract placed on or after 1 January 2027."
+          },
+          {
+            "milestone": "keel_laid_or_similar_stage",
+            "threshold_date": "2027-07-01",
+            "meaning": "Where no building contract exists, keel laid or similar stage of construction on or after 1 July 2027."
+          },
+          {
+            "milestone": "ship_delivery",
+            "threshold_date": "2031-01-01",
+            "meaning": "Ship delivered on or after 1 January 2031."
+          }
+        ],
+        "conditions": [
+          "The amendment enters into force on 1 September 2027.",
+          "Tier III applicability requires ECA operation, a relevant marine diesel engine above 130 kW and at least one alternative construction/delivery trigger.",
+          "Construction/delivery triggers are alternatives, not cumulative."
+        ],
+        "exclusions_or_unknowns": [
+          "Do not apply Tier III to every existing ship merely because it enters the ECA.",
+          "Confirm construction milestones, engine power, EIAPP certification and ship scope against MEPC.407(84) and flag/class records.",
+          "Official adopted ECA polygon coordinates are still required for geospatial classification."
+        ]
+      },
+      "output_scope": [
+        "NOx Tier III new-ship applicability",
+        "engine power threshold",
+        "construction/delivery trigger qualification",
+        "ECA route-segment intersection"
+      ],
+      "calculation_contract": {
+        "metric_id": "nea_nox_tier_iii_applicability",
+        "formula_or_method": "Applicable only when the ship operates inside the official ECA on or after 2027-09-01, a relevant marine diesel engine is >130 kW, and at least one alternative build/delivery trigger is satisfied. Evaluate triggers against evidenced construction records and engine certification."
+      }
+    },
+    {
+      "authority": "International Maritime Organization",
+      "instrument": "MARPOL Annex VI amendment adopted at MEPC 84",
+      "revision_or_resolution": "Resolution MEPC.407(84)",
+      "rule_status": "adopted",
+      "legal_character": "adopted_amendment_future_application",
+      "source_ids": [
+        "IMO-NE-ATLANTIC-ECA-2026"
+      ],
+      "limitations": [
+        "Adoption is distinct from entry into force and application. Route geometry alone does not establish ship/engine compliance; authoritative coordinates and certification evidence are required."
+      ],
+      "rule_id": "NE-ATLANTIC-SOX-PM-ECA-2026",
+      "title": "North-East Atlantic SOx/PM ECA — 0.10% fuel sulphur limit",
       "dates": {
         "adopted_on": "2026-05-01",
         "entry_into_force_on": "2027-09-01",
         "applies_from": "2028-09-01"
       },
       "applicability": {
-        "ship_scope": "Ships subject to MARPOL Annex VI sulphur requirements while operating within the designated ECA.",
+        "ship_scope": "Ships subject to MARPOL Annex VI regulation 14 fuel-sulphur requirements while operating within the designated North-East Atlantic SOx ECA.",
         "geographic_scope": "Exclusive economic zones and territorial seas extending up to 200 nautical miles from baselines of Greenland, Iceland, the Faroe Islands, Ireland, the mainland United Kingdom, France, Spain and Portugal, as described in the MEPC 84 outcome; authoritative adopted coordinates/chart data are still required.",
-        "voyage_scope": "Voyage legs and port/operational segments within the ECA after the effective application date.",
+        "voyage_scope": "Use of fuel oil on operational/voyage segments within the ECA on or after 1 September 2028.",
         "conditions": [
-          "The ECA enters into force on 1 September 2027 and takes effect 12 months later, on 1 September 2028.",
-          "Within ECAs, fuel sulphur content must not exceed 0.10%.",
-          "The adopted North-East Atlantic ECA establishes additional NOx, SOx and particulate matter emission-control requirements."
+          "The amendment enters into force on 1 September 2027.",
+          "The one-year delayed SOx/PM operational requirement applies from 1 September 2028.",
+          "Fuel oil used within the ECA must meet the applicable sulphur limit of 0.10% m/m, subject to permitted exceptions/equivalent methods."
         ],
         "exclusions_or_unknowns": [
-          "Exact implementation date and charted coordinates must be read from the adopted MARPOL amendment and official charts.",
-          "This is a local air-pollution requirement, not a WtW GHG factor."
+          "Do not apply the 0.10% sulphur limit from 1 September 2027; it applies from 1 September 2028.",
+          "Confirm official ECA coordinates, permitted equivalent methods and applicable ship/operation scope from current MARPOL Annex VI.",
+          "This is a local air-pollution requirement, not a lifecycle-GHG factor."
         ]
       },
       "output_scope": [
-        "fuel sulphur limit",
-        "ECA geographic segment classification"
+        "SOx/PM ECA applicability",
+        "0.10% m/m fuel-sulphur requirement",
+        "geographic route-segment classification"
       ],
-      "source_ids": [
-        "IMO-NE-ATLANTIC-ECA-2026"
-      ],
-      "limitations": [
-        "Adoption is distinct from application; route geometry alone does not establish fuel compliance."
-      ]
+      "calculation_contract": {
+        "metric_id": "nea_sox_pm_sulphur_limit",
+        "reference_value": 0.1,
+        "reference_unit": "percent_mass_sulphur",
+        "formula_or_method": "For operation within the official ECA from 2028-09-01, evaluate fuel sulphur against 0.10% m/m, subject to permitted exceptions/equivalent methods in current MARPOL Annex VI."
+      }
     },
     {
       "rule_id": "IMO-NETZERO-FRAMEWORK-STATUS-2026-11-10",
@@ -571,7 +642,7 @@
     },
     {
       "source_id": "IMO-NE-ATLANTIC-ECA-2026",
-      "title": "North-East Atlantic ECA adopted at MEPC 84",
+      "title": "Resolution MEPC.407(84): North-East Atlantic NOx, SOx and PM ECA",
       "publisher": "IMO",
       "uri": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
       "publication_date": "2026-05-01",
