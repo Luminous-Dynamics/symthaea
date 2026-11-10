@@ -171,6 +171,8 @@ pub struct PlannedStageV1 {
     pub dependencies: Vec<String>,
     pub required_preconditions: Vec<String>,
     pub required_postconditions: Vec<String>,
+    pub maximum_allowed_scope: LocalityScopeV1,
+    pub maximum_allowed_nondeterminism: DeterminismV1,
     pub operator_id: String,
     pub operator_version: String,
     pub operator_artifact_sha256: String,
@@ -188,6 +190,11 @@ pub struct CompiledEditPlanV1 {
     pub schema: String,
     pub request_id: String,
     pub registry_snapshot_sha256: String,
+    /// Exact initial source artifacts and hashes used to compile the plan.
+    pub initial_artifacts: Vec<ArtifactRefV1>,
+    pub budget: PlanBudgetV1,
+    pub objective_weights: ObjectiveWeightsV1,
+    pub maximum_nondeterminism: DeterminismV1,
     /// Stages are emitted in deterministic topological order.
     pub stages: Vec<PlannedStageV1>,
     pub total_compute_units: f64,
@@ -312,6 +319,8 @@ pub fn compile_edit_plan(
             dependencies: stage.dependencies.clone(),
             required_preconditions: stage.required_preconditions.clone(),
             required_postconditions: stage.required_postconditions.clone(),
+            maximum_allowed_scope: stage.maximum_affected_scope,
+            maximum_allowed_nondeterminism: request.maximum_nondeterminism,
             operator_id: selected_operator.operator_id.clone(),
             operator_version: selected_operator.version.clone(),
             operator_artifact_sha256: selected_operator.artifact_sha256.clone(),
@@ -358,6 +367,10 @@ pub fn compile_edit_plan(
         schema: EDIT_PLAN_SCHEMA_V1.to_owned(),
         request_id: request.request_id.clone(),
         registry_snapshot_sha256: request.registry_snapshot_sha256.clone(),
+        initial_artifacts: request.initial_artifacts.clone(),
+        budget: request.budget.clone(),
+        objective_weights: request.objective_weights.clone(),
+        maximum_nondeterminism: request.maximum_nondeterminism,
         stages: planned_stages,
         total_compute_units: total_compute,
         total_latency_ms: total_latency,
@@ -941,6 +954,17 @@ mod tests {
         assert_eq!(plan.schema, EDIT_PLAN_SCHEMA_V1);
         assert_eq!(plan.stages.len(), 1);
         assert_eq!(plan.stages[0].operator_id, "formant-local-editor");
+        assert_eq!(plan.initial_artifacts, request().initial_artifacts);
+        assert_eq!(plan.budget, request().budget);
+        assert_eq!(plan.objective_weights, request().objective_weights);
+        assert_eq!(
+            plan.stages[0].maximum_allowed_scope,
+            LocalityScopeV1::Phrase
+        );
+        assert_eq!(
+            plan.stages[0].maximum_allowed_nondeterminism,
+            DeterminismV1::Seeded
+        );
         assert_eq!(plan.stages[0].observers.len(), 2);
         assert!(plan.stages[0]
             .observers
