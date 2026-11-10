@@ -1,0 +1,45 @@
+name: Vocal edit locality evaluator
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-edit-locality-eval/**"
+      - ".github/workflows/vocal-edit-locality-eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  edit-locality-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_EDIT_LOCALITY_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check standalone evaluator
+        run: cargo +1.96.0 fmt --check --manifest-path tools/vocal-edit-locality-eval/Cargo.toml
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/vocal-edit-locality-eval/Cargo.toml
+
+      - name: Test synthetic locality controls on exact head
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-edit-locality-eval/Cargo.toml
