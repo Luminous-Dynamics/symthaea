@@ -29,6 +29,13 @@ const CASES: &[(&str, &str)] = &[
     ("ugt_elongation", "soooo this is reallly good"),
     ("ugt_slang", "tho cuz wanna hafta"),
     ("ugt_digit_homophone", "gr8 2 c u"),
+    ("ugt_a1_vowel_drop", "ppl pls"),
+    ("ugt_a2_other_drop", "bc k"),
+    ("ugt_a3_phrase_shortening", "smh imo"),
+    ("ugt_b2_iteration", "waitwait"),
+    ("ugt_c1_eye_direct", "luv"),
+    ("ugt_c2_regular", "droppin"),
+    ("ugt_c4_pronounceable", "rofl"),
 ];
 
 fn main() {
