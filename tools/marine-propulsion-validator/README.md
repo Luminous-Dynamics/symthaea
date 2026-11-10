@@ -4,13 +4,21 @@ A small, standalone Rust CLI for the MARINE-WAPS-CO-DESIGN-001 case contract.
 
 ## Run
 
-From this directory, test both the legacy v0.1.0 contract and the v0.2.0 trial-evidence contract:
+From this directory, test the retained v0.1.0, v0.2.0 and v0.3.0 contracts:
 
 ~~~sh
 cargo test
 ~~~
 
-Validate the v0.2.0 fixture:
+Validate the v0.3.0 trial-evidence fixture:
+
+~~~sh
+cargo run -- \
+  ../../docs/research/marine/marine-propulsion-case-v0.3.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-waps-case-v0.3.0.json
+~~~
+
+Validate a v0.2.0 case:
 
 ~~~sh
 cargo run -- \
@@ -57,6 +65,12 @@ cargo run -- <schema.json> <baseline.json> <candidate.json>
 - v0.2.0 normalized calibration/timebase registry resolution, sensor identity and unit
   matching, validity-window coverage, sample-count arithmetic and a predeclared
   sample-completeness threshold.
+- v0.3.0 calibration procedure, evidence-source, certificate digest, reviewer and rights/access
+  requirements; timebase evidence-source/rights binding; nominal-vs-measured sample-rate basis;
+  start-inclusive/end-exclusive windows; explicit rate/count tolerance and sample-rate/window
+  consistency checks.
+- v0.3.0 timebase uncertainty comparison uses reviewed conversion between seconds, milliseconds,
+  microseconds, minutes and hours rather than requiring identical unit strings.
 
 ## Canonical service fingerprint
 
@@ -68,8 +82,12 @@ The v0.2.0 profile is documented in `docs/research/marine/MARINE-SERVICE-FINGERP
   reinterpreted or overwritten.
 - marine-propulsion-case-v0.2.0.schema.json adds normalized calibration and timebase
   registries, expected/observed sample counts and an explicit sample-completeness policy.
-- The v0.2.0 fixture is synthetic. Its registry entries are test data, not calibration,
-  metrology or operational evidence. Its service fingerprint is a known-answer software test vector.
+- marine-propulsion-case-v0.3.0.schema.json adds calibration evidence source, certificate
+  digest, reviewer, method and rights metadata; timebase evidence/rights metadata; sample-rate
+  basis; and a declared half-open sample-window convention with count/rate tolerance.
+- v0.2.0 and v0.3.0 fixtures are synthetic. Their registry entries are software-test data,
+  not calibration, metrology or operational evidence. The v0.2.0 service fingerprint is a
+  known-answer software test vector.
 - The service fingerprint distinguishes numeric zero, explicit unknown, explicit not-applicable,
   and omitted optional fields. Required transport work and route distance cannot be not-applicable.
 
@@ -90,4 +108,6 @@ the validator's declared comparability checks. It is not evidence of physical su
 safe operation, seaworthiness, classification, flag approval or regulatory compliance.
 
 A Cargo.lock has not yet been generated for this standalone crate. Generate and commit it
-after running cargo test with the repository's approved toolchain.
+after running cargo test with the repository's approved toolchain. As of the current work
+session, the v0.3.0 source and tests are committed but have not been compiled or executed;
+the documentation does not imply a test pass.
