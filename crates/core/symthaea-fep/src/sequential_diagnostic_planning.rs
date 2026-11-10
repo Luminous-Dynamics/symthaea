@@ -252,10 +252,6 @@ pub fn evaluate_sequential_decision_diagnostics_with_safety_budget(
     })
 }
 
-/// Compute a canonical, domain-separated SHA-256 digest for a path safety budget.
-///
-/// The digest binds the exact IEEE-754 bit pattern of the maximum cumulative
-/// risk together with the external risk-semantics/calibration digest.
 /// Evaluate a budgeted sequential policy and bind it to the exact causal decision problem.
 ///
 /// The decision-problem receipt covers typed action semantics, action-likelihood
@@ -348,7 +344,7 @@ fn compute_sequential_diagnostic_policy_receipt(
     );
 
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea-budgeted-sequential-diagnostic-policy-receipt-v1\\0");
+    hasher.update(b"symthaea-budgeted-sequential-diagnostic-policy-receipt-v1\0");
     hash_receipt_field(
         &mut hasher,
         "decision_problem_digest",
@@ -398,7 +394,7 @@ fn compute_sequential_diagnostic_policy_receipt(
 
 fn compute_planning_config_digest(config: SequentialDiagnosticConfig) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea-sequential-diagnostic-planning-config-v1\\0");
+    hasher.update(b"symthaea-sequential-diagnostic-planning-config-v1\0");
     hasher.update((config.horizon as u64).to_le_bytes());
     hasher.update((config.max_policy_expansions as u64).to_le_bytes());
     format!("{:x}", hasher.finalize())
@@ -415,7 +411,7 @@ fn compute_policy_tree_digest(
     }
     let outcome_counts = &hypotheses[0].outcome_probabilities_by_action;
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea-sequential-diagnostic-policy-tree-v1\\0");
+    hasher.update(b"symthaea-sequential-diagnostic-policy-tree-v1\0");
     let (maximum_path_risk, terminal_path_count) = hash_policy_node(
         &mut hasher,
         plan,
@@ -440,7 +436,7 @@ fn hash_policy_node(
     risk_before_node: f64,
     used_actions: u64,
 ) -> Result<(f64, usize), SequentialDiagnosticError> {
-    hasher.update(b"node-v1\\0");
+    hasher.update(b"node-v1\0");
     let (risk_after_node, next_used_actions) = match node.selected_action_index {
         Some(action_index) => {
             let action = actions
@@ -556,7 +552,7 @@ fn compute_policy_evaluation_digest(
     policy_tree_digest: &str,
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea-sequential-diagnostic-evaluation-v1\\0");
+    hasher.update(b"symthaea-sequential-diagnostic-evaluation-v1\0");
     hasher.update((evaluation.horizon as u64).to_le_bytes());
     hasher.update((evaluation.expansions as u64).to_le_bytes());
     hasher.update(evaluation.no_probe_bayes_risk.to_bits().to_le_bytes());
@@ -599,6 +595,10 @@ fn hash_receipt_field(hasher: &mut Sha256, name: &str, value: &[u8]) {
     hasher.update(value);
 }
 
+/// Compute a canonical, domain-separated SHA-256 digest for a path safety budget.
+///
+/// The digest binds the exact IEEE-754 bit pattern of the maximum cumulative
+/// risk together with the external risk-semantics/calibration digest.
 pub fn compute_sequential_diagnostic_safety_budget_digest(
     safety_budget: &SequentialDiagnosticSafetyBudget,
 ) -> Result<String, SequentialDiagnosticError> {
