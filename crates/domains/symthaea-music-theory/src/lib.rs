@@ -57,6 +57,7 @@ pub mod live;
 pub mod melodic_contour_identity;
 pub mod meter;
 pub mod material_lineage;
+pub mod score_event_remap;
 pub mod modal_arc;
 pub mod motif;
 pub mod motif_family;
