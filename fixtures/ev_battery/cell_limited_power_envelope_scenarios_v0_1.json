@@ -18,7 +18,8 @@
           "pack_ref": "pack-equal-series-reference",
           "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
           "chemistry": "nmc",
-          "declared_cell_count": 3
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
         },
         "topology": {
           "status": "qualified",
@@ -164,7 +165,8 @@
           "pack_ref": "pack-weak-cell-voltage-limited",
           "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
           "chemistry": "nmc",
-          "declared_cell_count": 3
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
         },
         "topology": {
           "status": "qualified",
@@ -310,7 +312,8 @@
           "pack_ref": "pack-thermal-limited",
           "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
           "chemistry": "nmc",
-          "declared_cell_count": 3
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
         },
         "topology": {
           "status": "qualified",
@@ -456,7 +459,8 @@
           "pack_ref": "pack-current-rating-limited",
           "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
           "chemistry": "nmc",
-          "declared_cell_count": 3
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
         },
         "topology": {
           "status": "qualified",
@@ -602,7 +606,8 @@
           "pack_ref": "pack-soc-domain-rejected",
           "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
           "chemistry": "nmc",
-          "declared_cell_count": 3
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
         },
         "topology": {
           "status": "qualified",
@@ -748,7 +753,8 @@
           "pack_ref": "pack-temperature-domain-rejected",
           "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
           "chemistry": "nmc",
-          "declared_cell_count": 3
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
         },
         "topology": {
           "status": "qualified",
@@ -894,7 +900,8 @@
           "pack_ref": "pack-unsupported-topology-rejected",
           "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
           "chemistry": "nmc",
-          "declared_cell_count": 3
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
         },
         "topology": {
           "status": "qualified",
@@ -1040,7 +1047,8 @@
           "pack_ref": "pack-invalid-calibration-rejected",
           "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
           "chemistry": "nmc",
-          "declared_cell_count": 3
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
         },
         "topology": {
           "status": "qualified",
@@ -1186,7 +1194,8 @@
           "pack_ref": "pack-equal-series-reference",
           "pack_configuration_digest": "000000000000000000000000000000000000000000000000000000000000000b",
           "chemistry": "nmc",
-          "declared_cell_count": 3
+          "declared_cell_count": 3,
+          "cell_inventory_digest": "0000000000000000000000000000000000000000000000000000000000000014"
         },
         "topology": {
           "status": "qualified",
