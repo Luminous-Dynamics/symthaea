@@ -1,0 +1,58 @@
+name: Vocal guidance conflict lab
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-guidance-lab/**"
+      - ".github/workflows/vocal-guidance-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guidance-conflict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR revision
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_GUIDANCE_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check isolated research tool
+        run: rustfmt +1.96.0 --edition 2024 --check tools/vocal-guidance-lab/src/main.rs
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/vocal-guidance-lab/Cargo.toml
+
+      - name: Run gradient conflict contract tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-guidance-lab/Cargo.toml
+
+      - name: Evaluate frozen synthetic gradient fixture
+        run: |
+          cargo +1.96.0 run --locked --manifest-path tools/vocal-guidance-lab/Cargo.toml -- \
+            --input tools/vocal-guidance-lab/fixtures/conflicting-gradients.json \
+            --output vocal-guidance-conflict-report.json
+
+      - name: Upload conflict receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocal-guidance-conflict-\${{ github.event.pull_request.head.sha || github.sha }}
+          path: vocal-guidance-conflict-report.json
+          if-no-files-found: error
