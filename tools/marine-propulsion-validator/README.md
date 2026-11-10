@@ -50,8 +50,10 @@ cargo run -- <schema.json> <baseline.json> <candidate.json>
 - Source and model reference resolution against case evidence registries.
 - Trial service-fingerprint binding, RFC3339 time-window ordering, positive sample rate,
   calibration disposition, channel identity/reference checks and derived-channel cycle checks.
-- Reciprocal baseline/candidate pairing, exact service fingerprint and declared
+- Reciprocal baseline/candidate pairing, recomputed service fingerprint and declared
   service/route/environment/power-boundary/lifecycle comparison.
+- Versioned canonical service fingerprint is recomputed from the service/route/loading payload using Symthaea's existing `symthaea-canonical-json-sha256-v1` encoding profile. Weather/metocean realization is kept outside the commercial service identity and compared as a separate environment/counterfactual boundary.
+- Quantity states are distinct: a known zero, an explicit unknown reason, an explicit not-applicable reason, and an omitted field produce different canonical payloads. v0.2.0 supports the explicit not-applicable quantity variant.
 - v0.2.0 normalized calibration/timebase registry resolution, sensor identity and unit
   matching, validity-window coverage, sample-count arithmetic and a predeclared
   sample-completeness threshold.
@@ -63,7 +65,7 @@ cargo run -- <schema.json> <baseline.json> <candidate.json>
 - marine-propulsion-case-v0.2.0.schema.json adds normalized calibration and timebase
   registries, expected/observed sample counts and an explicit sample-completeness policy.
 - The v0.2.0 fixture is synthetic. Its registry entries are test data, not calibration,
-  metrology or operational evidence.
+  metrology or operational evidence. Its service fingerprint is a known-answer software test vector.
 
 ## Deliberate limits
 
