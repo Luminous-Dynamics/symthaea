@@ -46,11 +46,30 @@ struct Manifest {
     split_frozen_at_ms: u64,
     test_accessed_at_ms: u64,
     minimum_independent_groups_per_stratum: usize,
+    reference_support: ReferenceSupport,
     train_group_identity_digests: Vec<String>,
     validation_group_identity_digests: Vec<String>,
     support_scoring: SupportScoring,
     calibration: Calibration,
     test_entries: Vec<TestEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReferenceSupport {
+    method_ref: String,
+    method_digest: String,
+    feature_schema_digest: String,
+    fit_scope: String,
+    reference_partition: String,
+    uses_validation_or_test_labels: bool,
+    uses_test_targets: bool,
+    score_definition: String,
+    score_direction: String,
+    in_support_max_score: f64,
+    extrapolation_min_score: f64,
+    thresholds_frozen_at_ms: u64,
+    threshold_evidence_digest: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,6 +119,8 @@ struct TestEntry {
     lower_95: f64,
     upper_95: f64,
     prediction_digest: String,
+    observation_time_ms: u64,
+    reference_support_score: f64,
     reference_support_state: String,
     reference_support_evidence_digest: String,
     reference_support_evidence_class: String,
@@ -306,6 +327,27 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
         errors.push("train and validation physical group identities overlap".to_owned());
     }
 
+    let reference = &manifest.reference_support;
+    if !nonempty(&reference.method_ref)
+        || !is_digest(&reference.method_digest)
+        || !is_digest(&reference.feature_schema_digest)
+        || reference.fit_scope != "train_only"
+        || reference.reference_partition != "train"
+        || reference.uses_validation_or_test_labels
+        || reference.uses_test_targets
+        || !nonempty(&reference.score_definition)
+        || reference.score_direction != "higher_is_less_supported"
+        || !reference.in_support_max_score.is_finite()
+        || !reference.extrapolation_min_score.is_finite()
+        || reference.in_support_max_score < 0.0
+        || reference.extrapolation_min_score <= reference.in_support_max_score
+        || reference.thresholds_frozen_at_ms == 0
+        || reference.thresholds_frozen_at_ms >= manifest.split_frozen_at_ms
+        || !is_digest(&reference.threshold_evidence_digest)
+    {
+        errors.push("offline reference-support method must be train-fitted, target-blind, and frozen before the split".to_owned());
+    }
+
     let support = &manifest.support_scoring;
     if !nonempty(&support.method_ref)
         || !is_digest(&support.method_digest)
@@ -380,6 +422,7 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
 
     let mut sample_ids = BTreeSet::new();
     let mut test_groups = BTreeSet::new();
+    let mut observation_times: BTreeMap<String, Vec<u64>> = BTreeMap::new();
     let mut rows_by_stratum: BTreeMap<String, Vec<&TestEntry>> = BTreeMap::new();
     for entry in &manifest.test_entries {
         if !is_digest(&entry.sample_digest) || !sample_ids.insert(entry.sample_digest.clone()) {
@@ -424,11 +467,37 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
 
         // Reference support state belongs to each observation, not permanently
         // to a physical cell. A trajectory may cross support boundaries as it ages.
+        if entry.observation_time_ms == 0
+            || !entry.reference_support_score.is_finite()
+            || entry.reference_support_score < 0.0
+        {
+            errors.push("reference-support observation time or numeric score is invalid".to_owned());
+        }
+        let expected_reference_state = if entry.reference_support_score <= reference.in_support_max_score {
+            "in_support"
+        } else if entry.reference_support_score < reference.extrapolation_min_score {
+            "boundary"
+        } else {
+            "extrapolation"
+        };
+        if entry.reference_support_state != expected_reference_state {
+            errors.push("reference-support categorical state does not replay from its independent numeric score".to_owned());
+        }
+        observation_times
+            .entry(entry.group_identity_digest.clone())
+            .or_default()
+            .push(entry.observation_time_ms);
         let stratum = entry.reference_support_state.clone();
         test_groups.insert(entry.group_identity_digest.clone());
         rows_by_stratum.entry(stratum).or_default().push(entry);
     }
 
+    for (group, times) in &mut observation_times {
+        times.sort_unstable();
+        if times.windows(2).any(|pair| pair[0] == pair[1]) {
+            errors.push(format!("physical group {group} has duplicate observation timestamps"));
+        }
+    }
     if test_groups.is_empty() {
         errors.push("test set contains no physical group identities".to_owned());
     }
@@ -1103,6 +1172,29 @@ mod tests {
             stratum.distinct_group_count < 30
                 && stratum.evidence_status == "INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE"
         }));
+    }
+
+    #[test]
+    fn reference_support_scores_replay_categories_and_cannot_use_targets() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "reference-support-state-score-mismatch-rejected")
+            .expect("reference score/state mismatch");
+        assert!(!case.accepted);
+        let leakage = report.payload.cases.iter()
+            .find(|case| case.case_id == "reference-support-method-uses-target-labels-rejected")
+            .expect("reference support target leakage");
+        assert!(!leakage.accepted);
+    }
+
+    #[test]
+    fn physical_observation_times_must_be_unique_within_each_group() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "duplicate-observation-time-within-physical-cell-rejected")
+            .expect("duplicate observation time control");
+        assert!(!case.accepted);
+        assert!(case.errors.iter().any(|error| error.contains("duplicate observation timestamps")));
     }
 
     #[test]
