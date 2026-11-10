@@ -147,7 +147,10 @@ pub struct LinearGroupActionAdmissionDiagnosticsV1 {
 /// separately avoids overflow from factoring a valid metric with very large units.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AdmittedLinearGroupActionV1 {
+    /// Effective declaration; its metric is the symmetric part admitted by the profile.
     action: LinearGroupActionV1,
+    /// Exact unmodified input declaration, retained for audit.
+    declared_action: LinearGroupActionV1,
     profile: LinearGroupActionAdmissionProfileV1,
     diagnostics: LinearGroupActionAdmissionDiagnosticsV1,
     metric_scale: f64,
@@ -155,9 +158,17 @@ pub struct AdmittedLinearGroupActionV1 {
 }
 
 impl AdmittedLinearGroupActionV1 {
-    /// The immutable declaration that was admitted.
+    /// Effective admitted declaration. Its metric is exactly symmetric.
+    ///
+    /// When a slightly asymmetric input metric is admitted within tolerance,
+    /// this returns its symmetric part; see declared_action() for the exact input.
     pub fn action(&self) -> &LinearGroupActionV1 {
         &self.action
+    }
+
+    /// The exact, unmodified declaration supplied to try_admit().
+    pub fn declared_action(&self) -> &LinearGroupActionV1 {
+        &self.declared_action
     }
 
     /// Number of coordinates in the declared representation.
@@ -294,6 +305,19 @@ impl LinearGroupActionV1 {
             maximum_scaled_cholesky_diagonal = maximum_scaled_cholesky_diagonal.max(diagonal);
         }
 
+        // Use the exact symmetric part as the admitted metric. A small
+        // antisymmetric input component is tolerated only as measurement /
+        // serialization noise; it is never propagated as a physical metric.
+        let mut admitted_action = self.clone();
+        for (row_index, row) in admitted_action.metric.iter_mut().enumerate() {
+            for (column_index, value) in row.iter_mut().enumerate() {
+                let symmetric_scaled = 0.5
+                    * (self.metric[row_index][column_index] / metric_scale
+                        + self.metric[column_index][row_index] / metric_scale);
+                *value = symmetric_scaled * metric_scale;
+            }
+        }
+
         let mut generator_ids = BTreeSet::new();
         let mut generator_metric_skew = Vec::with_capacity(self.generators.len());
         for (index, generator) in self.generators.iter().enumerate() {
@@ -333,7 +357,8 @@ impl LinearGroupActionV1 {
         }
 
         Ok(AdmittedLinearGroupActionV1 {
-            action: self.clone(),
+            action: admitted_action,
+            declared_action: self.clone(),
             profile,
             diagnostics: LinearGroupActionAdmissionDiagnosticsV1 {
                 metric_symmetry_relative_defect: metric_symmetry_defect,
@@ -647,6 +672,18 @@ mod tests {
         };
         let admitted = action.try_admit(profile()).unwrap();
         assert_eq!(admitted.dimension(), 2);
+    }
+
+    #[test]
+    fn admitted_action_canonicalizes_metric_but_preserves_exact_declaration() {
+        let mut action = canonical_so2();
+        action.metric = vec![vec![1.0, 5.0e-13], vec![-5.0e-13, 1.0]];
+        let admitted = action.try_admit(profile()).unwrap();
+
+        assert_eq!(admitted.declared_action().metric, action.metric);
+        assert_eq!(admitted.action().metric[0][1], admitted.action().metric[1][0]);
+        assert!((admitted.diagnostics().metric_symmetry_relative_defect - 5.0e-13).abs() < 1.0e-15);
+        assert_eq!(admitted.action().metric, vec![vec![1.0, 0.0], vec![0.0, 1.0]]);
     }
 
     #[test]
