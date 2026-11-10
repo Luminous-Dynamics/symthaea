@@ -101,6 +101,7 @@ pub enum ScoreEventRemapIssueCodeV1 {
     ResourceLimitExceeded,
     SourceEventCountMismatch,
     CandidateEventCountMismatch,
+    ScoreMetadataChanged,
     MissingSourceDisposition,
     SourceIndexOutOfRange,
     DuplicateSourceDisposition,
