@@ -151,6 +151,13 @@ impl TrajectoryOutcome {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ProgressCheck {
+    Progress,
+    NoProgress,
+    Regression,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TargetMetricResultV1 {
     pub metric_id: String,
@@ -253,13 +260,14 @@ pub fn evaluate_trajectory(
                 TrajectoryOutcome::Indeterminate | TrajectoryOutcome::Noncompliant
             ) {
                 let previous_targets = &results[expected_index - 1].targets;
-                let progress = check_target_progress(
+                match check_target_progress(
                     &spec.targets,
                     previous_targets,
                     &targets,
-                )?;
-                if !progress {
-                    outcome = TrajectoryOutcome::Stalled;
+                )? {
+                    ProgressCheck::Progress => {}
+                    ProgressCheck::NoProgress => outcome = TrajectoryOutcome::Stalled,
+                    ProgressCheck::Regression => outcome = TrajectoryOutcome::Noncompliant,
                 }
             }
         }
@@ -731,7 +739,7 @@ fn check_target_progress(
     constraints: &[TargetConstraintV1],
     previous: &[TargetMetricResultV1],
     current: &[TargetMetricResultV1],
-) -> Result<bool, TrajectoryError> {
+) -> Result<ProgressCheck, TrajectoryError> {
     if constraints.len() != previous.len() || constraints.len() != current.len() {
         return Err(TrajectoryError::new(
             "target result cardinality changed between iterations",
@@ -751,10 +759,7 @@ fn check_target_progress(
 
         if before.decision == TargetMetricDecision::Compliant {
             if after.decision != TargetMetricDecision::Compliant {
-                return Err(TrajectoryError::new(format!(
-                    "previously compliant target {} regressed",
-                    constraint.metric_id
-                )));
+                return Ok(ProgressCheck::Regression);
             }
             continue;
         }
@@ -780,10 +785,7 @@ fn check_target_progress(
         })?;
 
         if after_distance > before_distance + constraint.maximum_allowed_regression {
-            return Err(TrajectoryError::new(format!(
-                "target {} regressed beyond its declared allowance",
-                constraint.metric_id
-            )));
+            return Ok(ProgressCheck::Regression);
         }
 
         if after.decision == TargetMetricDecision::Compliant
@@ -792,7 +794,11 @@ fn check_target_progress(
             any_progress = true;
         }
     }
-    Ok(any_progress)
+    Ok(if any_progress {
+        ProgressCheck::Progress
+    } else {
+        ProgressCheck::NoProgress
+    })
 }
 
 fn validate_digest(value: &str, field: &str) -> Result<(), TrajectoryError> {
@@ -988,7 +994,7 @@ mod tests {
                     1,
                     'b',
                     'd',
-                    (12.0, 13.0),
+                    (13.0, 14.0),
                     (3.0, 4.0),
                     (-0.1, 0.1),
                 ),
@@ -1172,7 +1178,7 @@ mod tests {
                     1,
                     'b',
                     'd',
-                    (12.0, 13.0),
+                    (13.0, 14.0),
                     (3.0, 4.0),
                     (0.0, 0.0),
                 ),
@@ -1196,7 +1202,7 @@ mod tests {
                     1,
                     'b',
                     'd',
-                    (12.0, 13.0),
+                    (13.0, 14.0),
                     (3.0, 4.0),
                     (0.0, 0.0),
                 ),
