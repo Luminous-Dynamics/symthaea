@@ -305,13 +305,8 @@ fn validate_audio_path(value: &str) -> Result<(), ExportError> {
 fn resolve_regular_audio(root: &Path, relative: &str) -> Result<std::path::PathBuf, ExportError> {
     validate_audio_path(relative)?;
     let mut current = root.to_path_buf();
-    let parts: Vec<_> = Path::new(relative).components().collect();
-    for (index, component) in parts.iter().enumerate() {
-        let Component::Normal(part) = component else {
-            return Err(ExportError::new(format!(
-                "audio_path has an invalid component: {relative}"
-            )));
-        };
+    let parts: Vec<&str> = relative.split('/').collect();
+    for (index, part) in parts.iter().enumerate() {
         current.push(part);
         let metadata = fs::symlink_metadata(&current).map_err(|error| {
             ExportError::new(format!(
@@ -521,6 +516,24 @@ mod tests {
         assert_eq!(first.manifest_sha256, second.manifest_sha256);
         assert!(!first.already_present);
         assert!(second.already_present);
+    }
+
+    #[test]
+    fn rejects_duplicate_expected_ids() {
+        let (directory, mut expected, mappings) = fixture();
+        expected[1] = expected[0].clone();
+        assert!(export_submission_manifest(&expected, &mappings, &directory.0).is_err());
+    }
+
+    #[test]
+    fn rejects_manifest_larger_than_official_one_mib_limit() {
+        let (directory, mut expected, mut mappings) = fixture();
+        for index in 0..REQUIRED_SAMPLE_COUNT {
+            let extended_id = format!("sample-{index:03}-{}", "x".repeat(2200));
+            expected[index] = extended_id.clone();
+            mappings[index].sample_id = extended_id;
+        }
+        assert!(export_submission_manifest(&expected, &mappings, &directory.0).is_err());
     }
 
     #[test]
