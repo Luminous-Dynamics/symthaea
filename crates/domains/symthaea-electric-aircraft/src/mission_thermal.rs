@@ -47,9 +47,10 @@ pub struct ThermalDeratingPoint {
 
 /// A derating curve bound to one physical thermal node and one power boundary.
 ///
-/// Temperatures must be strictly increasing. Maximum power must be non-increasing
-/// with temperature. Values between measured points are linearly interpolated;
-/// temperatures outside the characterized domain are rejected (no extrapolation).
+/// Temperatures must be strictly increasing. Power limits may be non-monotonic so
+/// measured cold-side and hot-side derating can both be represented. Values
+/// between measured points are linearly interpolated; temperatures outside the
+/// characterized domain are rejected (no extrapolation).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ThermalDeratingCurve {
     pub component_id: String,
@@ -72,22 +73,19 @@ impl ThermalDeratingCurve {
             });
         }
         let mut previous_temperature = f64::NEG_INFINITY;
-        let mut previous_power = f64::INFINITY;
         for point in &self.points {
             if !point.temperature_k.is_finite()
                 || point.temperature_k <= 0.0
                 || !point.maximum_power_w.is_finite()
                 || point.maximum_power_w < 0.0
                 || point.temperature_k <= previous_temperature
-                || point.maximum_power_w > previous_power
             {
                 return Err(MissionThermalError::InvalidCurve {
                     component_id: self.component_id.clone(),
-                    reason: "temperatures must increase strictly and nonnegative power limits must not increase",
+                    reason: "temperatures must increase strictly and power limits must be finite and nonnegative",
                 });
             }
             previous_temperature = point.temperature_k;
-            previous_power = point.maximum_power_w;
         }
         Ok(())
     }
@@ -948,17 +946,20 @@ mod tests {
     }
 
     #[test]
-    fn power_derating_curve_must_not_improve_with_temperature() {
-        let invalid = ThermalDeratingCurve {
+    fn derating_curve_preserves_cold_and_hot_power_limits() {
+        let battery_curve = ThermalDeratingCurve {
             component_id: "battery".into(),
             node_id: "battery".into(),
             power_basis: ComponentPowerBasis::BatteryTerminal,
             points: vec![
-                ThermalDeratingPoint { temperature_k: 280.0, maximum_power_w: 10_000.0 },
-                ThermalDeratingPoint { temperature_k: 350.0, maximum_power_w: 12_000.0 },
+                ThermalDeratingPoint { temperature_k: 270.0, maximum_power_w: 10_000.0 },
+                ThermalDeratingPoint { temperature_k: 300.0, maximum_power_w: 90_000.0 },
+                ThermalDeratingPoint { temperature_k: 390.0, maximum_power_w: 65_000.0 },
             ],
         };
-        assert!(matches!(invalid.validate(), Err(MissionThermalError::InvalidCurve { .. })));
+        battery_curve.validate().unwrap();
+        assert!((battery_curve.available_power_w(285.0).unwrap() - 50_000.0).abs() < 1e-9);
+        assert!((battery_curve.available_power_w(390.0).unwrap() - 65_000.0).abs() < 1e-9);
     }
 
     #[test]
