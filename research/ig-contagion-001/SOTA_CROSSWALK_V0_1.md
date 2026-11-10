@@ -17,6 +17,11 @@ This document is a research design crosswalk. Published values below are reporte
 | *Demystifying Multi-Agent Debate*, Findings ACL 2026 | Diversity-aware initial answers and confidence-modulated updates across six reasoning benchmarks | Add initial-diversity and calibrated-confidence treatment arms | Confidence is not evidence; QA improvements do not establish civic legitimacy |
 | *Free-MAD*, Findings ACL 2026 | Consensus-free debate, full-trajectory scoring and anti-conformity; reports lower round/token cost | Add a trajectory-scoring and consensus-free baseline under equal model/token budgets | Majority resistance can still erase minorities if trajectory scoring is opaque or miscalibrated |
 
+| ACIArena, ACL 2026 | 1,356 cases over six MAS implementations; external-input, agent-profile and inter-agent-message attacks; topology alone insufficient | Add role/profile/message attack layers and transfer tests; do not reduce security to topology | Not a like-for-like accuracy benchmark for our synthetic stance protocol |
+| *Beyond Consensus*, Findings EMNLP 2026 | On tested subjective scoring tasks, single-judge baselines had stronger human alignment than consensus MAD; asymmetric strict roles induced downward bias | Include blind-human reference, single-judge baseline, symmetric-MAD control and role-asymmetry ablation | Does not imply single judges always outperform multi-judge systems or justify removing human adjudication |
+| *The Value of Variance*, ICML 2026 | Separates intra-agent, inter-agent and system-level uncertainty as debate-collapse diagnostics | Record hierarchical uncertainty and self-contradiction / peer-conflict signals | Disagreement is not automatically collapse; legitimate minority reasoning must be preserved |
+| Agent Red Teaming (ART), UK AISI 2026 | Public competition across 22 agents / 44 deployment scenarios, 1.8m attack submissions and 60k+ observed policy violations in that competition | Add effect-boundary adversarial testing for reads, writes, exfiltration and policy violations under adaptive query budgets | These competition figures are not our baseline and must not be compared as a raw percentage |
+
 Links:
 - https://proceedings.colm.cc/paper_files/paper/2026/hash/871ed095b734818cfba48db6aeb25a62-Abstract-Conference.html
 - https://aclanthology.org/2026.tacl-1.58/
@@ -60,6 +65,9 @@ Use the same task instances, model family/revision, agent count, token/tool budg
 | A7 — confidence/diversity | Diverse initial answer sets and calibrated confidence reporting | Does this improve evidence-selective revision without turning confidence into authority? |
 | A8 — Free-MAD trajectory scoring | Preserve initial/intermediate/final answers; use a consensus-free trajectory scorer and anti-conformity condition | Does full-trajectory selection reduce conformity and token cost without losing minority information? |
 | A9 — MADBench security taxonomy | Matched attacks at prompt, resource, coordination and orchestrator layers | Does the protocol fail safely across the wider debate-security lifecycle? |
+| A10 — role-symmetry / human alignment | Single-judge baseline, symmetric-MAD and asymmetric strict/lenient roles against blind human ratings | Does consensus improve alignment with human judgments, or merely enforce role-induced bias? |
+| A11 — hierarchical uncertainty | Measure intra-agent, inter-agent and system-output uncertainty separately | Can collapse be detected without treating justified disagreement as failure? |
+| A12 — cascading injection / effect security | Attack external inputs, agent profiles and inter-agent messages; test read/write/exfiltration outcomes in a contained environment | Does topology-aware debate also resist cross-agent instruction propagation and unauthorized effects? |
 
 A2 and A3 separate the two DReaMAD design levers. A7 mirrors the confidence/diversity factors studied in Findings ACL 2026. A8 tests Free-MAD's trajectory-level, consensus-free alternative. A9 composes MADBench's threat taxonomy but requires a separate resource/tool/orchestrator harness; it is not represented by the current five persuasive-message bundles. A4/A5 remain candidate Symthaea interventions, not assumed wins. A6 uses the five frozen message/evidence/agent/topology pairs in the scenario matrix.
 
@@ -88,6 +96,24 @@ A2 and A3 separate the two DReaMAD design levers. A7 mirrors the confidence/dive
 - claim-source provenance;
 - response to valid correction after misinformation;
 - unsupported claims treated as unresolved rather than silently accepted.
+
+### Evaluator validity and human alignment
+- blind human ratings, inter-rater variance and adjudication provenance;
+- single-judge versus symmetric-MAD versus role-asymmetric-MAD human alignment;
+- strict/lenient role directional bias and order/position effects;
+- calibration, selective risk/coverage and unresolved disagreement.
+
+### Hierarchical uncertainty
+- intra-agent uncertainty;
+- inter-agent disagreement/interaction uncertainty;
+- system-output uncertainty;
+- self-contradiction and debate-collapse indicators.
+
+### Operational security
+- unauthorized read/write attempts versus completed effects;
+- instruction hijacking, task disruption and information exfiltration;
+- cross-agent propagation, role confusion and orchestration compromise;
+- benign false-block rate and operator burden.
 
 ### Normative pluralism (no single answer)
 - participant-preference / value-position representation;
@@ -135,7 +161,7 @@ A numerical target should be set only after a reproduced baseline, variance esti
 2. Run deterministic non-LLM fixture-oracle checks before invoking any model.
 3. Implement a runner adapter that records exact model/provider/revision/prompt/budget/evidence/topology and separates recorded-trace replay from stochastic regeneration.
 4. Reproduce A0 and A1 on a small pilot matrix; freeze confirmatory design only after variance and runtime are understood.
-5. Run A2–A9 as separate treatments; preserve failures and incomplete runs.
+5. Run A2–A12 as separate treatments; preserve failures and incomplete runs.
 6. Publish raw multi-axis receipts and counterexample traces; no aggregate "alignment contagion" score.
 7. Only after synthetic evidence is stable, consider separately authorized human-group experiments under Mycelix #5999 and independent ethics review.
 
@@ -161,3 +187,12 @@ The topology axis in this programme is a **CommunicationGraph**, not the delegat
 - An optional principal binding on a communication node is metadata only. Multiple AgentInstanceIds per PrincipalId remain distinct unless a declared experiment transformation explicitly aggregates them.
 
 The five matched centrality controls require strongly connected reciprocal directed graphs, unweighted hop-count shortest paths, minimum/maximum tie-set capture and deterministic AgentInstanceId tie-breaking. A disconnected or unsupported graph remains Unsupported; the runner does not manufacture a centrality result.
+
+
+## Evaluator and effect-security boundary
+
+A multi-judge consensus is not a reference oracle. For subjective/rubric tasks, compare single-judge and symmetric/role-asymmetric panels against blind human reference ratings, preserve inter-rater disagreement and publish role/order ablations. [Beyond Consensus (Findings EMNLP 2026)](https://aclanthology.org/2026.findings-emnlp.243/) reports that role asymmetry can introduce directional downward bias and that consensus did not repair it in the tested tasks. Compose with #9431's judge calibration/dependence programme rather than creating a second evaluator ensemble.
+
+Topology is not a complete security evaluation. [ACIArena (ACL 2026)](https://aclanthology.org/2026.acl-long.457/) spans external inputs, agent profiles and inter-agent messages across six MAS implementations; it reports that topology alone is insufficient. [ART, UK AISI 2026](https://www.aisi.gov.uk/research/security-challenges-in-ai-agent-deployment-insights-from-a-large-scale-public-competition) provides an operational attack/effect benchmark context. Compose the attack surfaces and effect-level outcomes with #1872; do not import those public competition figures as our result.
+
+Uncertainty is hierarchical. [The Value of Variance (ICML 2026)](https://proceedings.mlr.press/v306/tang26n.html) motivates separately recording within-agent, between-agent and system uncertainty. The benchmark must not optimize away valid disagreement or minority dissent by rewarding consensus.
