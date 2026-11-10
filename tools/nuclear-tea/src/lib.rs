@@ -489,7 +489,14 @@ pub fn evaluate_mandatory_gates(findings: &[GateFinding]) -> GateDisposition {
     if mandatory.iter().any(|item| item.state == GateState::Fail) {
         return GateDisposition::NoGo;
     }
-    if mandatory.iter().any(|item| item.state == GateState::Unknown) {
+    if mandatory.iter().any(|item| {
+        item.state == GateState::Unknown
+            || item.gate_id.trim().is_empty()
+            || item
+                .evidence_ref
+                .as_deref()
+                .is_none_or(|reference| reference.trim().is_empty())
+    }) {
         return GateDisposition::Unknown;
     }
     GateDisposition::EligibleForEconomicComparison
@@ -701,6 +708,27 @@ mod tests {
         }];
         assert_eq!(evaluate_mandatory_gates(&findings), GateDisposition::Unknown);
     }
+
+    #[test]
+    fn mandatory_pass_without_evidence_reference_is_unknown() {
+        let findings = vec![GateFinding {
+            gate_id: "insurance_pathway".to_string(),
+            mandatory: true,
+            state: GateState::Pass,
+            evidence_ref: None,
+        }];
+        assert_eq!(evaluate_mandatory_gates(&findings), GateDisposition::Unknown);
+    }
+
+    #[test]
+    fn direct_comparison_requires_the_same_discount_rate() {
+        let left = exact_series("left");
+        let mut right = exact_series("right");
+        right.discount_rate = 0.08;
+        let gates = passing_gates();
+        assert!(compare_eligible_series(&left, &gates, &right, &gates).is_err());
+    }
+
 
     #[test]
     fn comparison_requires_matching_service_scope_and_passing_gates() {
