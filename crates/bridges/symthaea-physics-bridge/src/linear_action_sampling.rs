@@ -1309,7 +1309,7 @@ mod tests {
             LinearActionSampleV1 {
                 sample_id: "tiny-0".to_string(),
                 state: states[0].to_vec(),
-                direction_basis: vec![vec![1e-320, 0.0], vec![0.0, 1.0]],
+                direction_basis: vec![vec![1e-320, 0.0], vec![0.0, 1e-320]],
             },
             LinearActionSampleV1 {
                 sample_id: "tiny-1".to_string(),
@@ -1335,7 +1335,6 @@ mod tests {
                 sampling_profile()
             ),
             Err(LinearActionSamplingErrorV1::ZeroDisplacementDirection { .. })
-                | Err(LinearActionSamplingErrorV1::DirectionBasisIllConditioned { .. })
         ));
     }
 
