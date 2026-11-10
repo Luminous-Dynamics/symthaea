@@ -92,6 +92,39 @@ The engineering assurance fabric must be compared against the relevant capabilit
 
 The comparison must use the actual version, modules, connectors, configuration, data rights and export scope tested. Inaccessible proprietary behavior is `UNASSESSED`, not a competitor failure.
 
+### 2.2.1 Competitive reality: what is already solved, and where to compete
+
+The following public capability descriptions are the baseline for the benchmark design; they are vendor descriptions, not independent quality assessments.
+
+- **Siemens Teamcenter:** already positions itself as PLM spanning plan, develop and deliver, with a digital thread connecting product development, manufacturing, service and suppliers. We must not claim that lifecycle continuity or supplier collaboration is new.
+  Source: [Siemens Teamcenter](https://www.siemens.com/en-us/products/teamcenter/).
+- **Bentley iTwin:** already offers an infrastructure digital-twin application platform with open APIs, synchronized engineering/reality/IoT/enterprise data, change tracking, access control and third-party integration. We must not claim that an API-connected infrastructure twin is unique.
+  Source: [Bentley iTwin Platform](https://www.bentley.com/en/products/itwin-platform/).
+- **Autodesk Forma + Revit:** Autodesk is explicitly moving toward connected, cloud-based, outcome-based BIM workflows while maintaining Revit for detailed authoring and coordination; its public direction emphasizes preserving project context between early design exploration and detailed design. We must not claim that connected design context or early option analysis is new.
+  Source: [Autodesk, Forma and Revit (30 June 2026)](https://adsknews.autodesk.com/en/views/forma-revit-evolution/).
+- **Ansys Twin Builder / System Architecture Modeler:** already supports validated system models, physics/data reduced-order models, virtual prototypes, lifecycle/predictive-maintenance use cases and SysML v2/open-ecosystem architecture workflows. We should integrate qualified specialist tools, not attempt to replace them.
+  Sources: [Ansys MBSE and Twin Builder](https://www.ansys.com/applications/mbse).
+- **Hexagon Q-DAS:** already provides statistical process control, quality-data management, process capability analysis and measurement-system analysis. Our role is to preserve the relationship between those quality records and the exact configuration, design claim, material lot and acceptance obligation—not to replace metrology or SPC.
+  Source: [Hexagon Q-DAS](https://hexagon.com/products/q-das).
+- **Palantir Foundry Ontology:** already integrates data, logic and actions into enterprise decision workflows, connects to existing systems, exposes APIs/SDKs and provides model/operational governance. We must not reduce it to a passive data lake or claim that an ontology, operational bus or governed AI workflow is unique.
+  Source: [Palantir Foundry platform overview](https://www.palantir.com/docs/foundry/platform-overview).
+
+**The defensible gap to test is narrower and harder:** across independently owned engineering systems, can we prove that a particular claim applies to the exact asset/configuration/revision, context of use, model version, authority, evidence validity window and downstream obligations—and identify exactly which claims must be reopened when one dependency changes? The customer should retain its source CAD, PLM, simulation, ERP, MES, BIM, QMS and operational systems. Luminous should provide a portable assurance and decision-evidence layer over them, not demand wholesale migration.
+
+This yields a fair set of competitive tests:
+1. **Interop fidelity:** ingest/export native and open records; quantify lost fields, changed units, broken links, identity collisions and provenance loss. A valid file exchange is not yet semantic equivalence.
+2. **Configuration-aware evidence:** exact configuration and revision matching, material/lot identity, validity/currentness, issuing authority and scope. Friendly-name matches never count.
+3. **Change-impact completeness:** introduce a component, supplier, material, interface, solver or standard revision; measure false negatives (missed revalidation obligations), false positives (unnecessary reopening), and reviewer effort against an independent dependency oracle.
+4. **Independent model credibility:** preserve each solver's context of use, calibration/validation data, uncertainty and model discrepancy through composition. A deterministic coupled run is not proof of physical fidelity.
+5. **Cross-enterprise sovereignty:** prove purpose-limited disclosure, provider-owned authority, revocation, offline/partition behavior, and source ownership without creating a duplicate enterprise identity or authorization system.
+6. **Decision productivity:** under matched inputs and users, measure time to answer evidence questions, engineering review hours, time to identify impacted assets, integration effort, rework and schedule/maintenance outcomes.
+
+For manufacturing validation, NIST AM-Bench is a stronger reference than synthetic simulation-only benchmarks: it publishes controlled measurements and challenge problems for modelers to compare simulation with experimental data. NIST says the 2025 cycle includes eight metal and one polymer benchmark sets and that AM-Bench 2028 is planned to shift toward higher-TRL components designed with industry. Compose these datasets where relevant; do not represent a Luminous-generated dataset as an AM-Bench result.
+Source: [NIST Additive Manufacturing Benchmark Test Series](https://www.nist.gov/ambench).
+
+**Competitive claim gate:** no generic claim of being “better than Siemens/Bentley/Ansys/Autodesk/Hexagon/Palantir.” Publish a matched workflow matrix, exact product/version/modules, connectors and licenses tested, identical input corpus and compute/user budgets, independent gold results, and capability-by-capability outcomes. Mark inaccessible product behavior `UNASSESSED`. Demonstrate a specific customer workflow where the composed evidence layer improves correctness or total workflow cost; then generalize only to the tested scope.
+
+
 The relevant Luminous competitive crosswalks already exist:
 - [Sol-Atlas matched assurance benchmark #502](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/502)
 - [Sol-Atlas AEC design-to-operations industry crosswalk #600](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/600)
