@@ -5,13 +5,14 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 const SCHEMA_ID: &str =
-    "https://luminousdynamics.io/schemas/transport/ev-sequential-diagnostic-scenario/0.1";
-const CORPUS_VERSION: &str = "ev-sequential-diagnostic-corpus/0.1";
-const SCENARIO_VERSION: &str = "ev-sequential-diagnostic/0.1";
+    "https://luminousdynamics.io/schemas/transport/ev-sequential-diagnostic-scenario/0.2";
+const CORPUS_VERSION: &str = "ev-sequential-diagnostic-corpus/0.2";
+const SCENARIO_VERSION: &str = "ev-sequential-diagnostic/0.2";
 const EPSILON: f64 = 1e-12;
 const MAX_HORIZON: usize = 8;
 const MAX_OUTCOMES: usize = 8;
 const MAX_POLICY_NODES: usize = 4096;
+const MAX_JOINT_ASSIGNMENT_ROWS: usize = 4096;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -47,6 +48,16 @@ struct Scenario {
     hypotheses: Vec<HypothesisPrior>,
     actions: Vec<DecisionAction>,
     tests: Vec<DiagnosticTest>,
+    likelihood_mode: String,
+    joint_likelihoods: Vec<JointLikelihoodRow>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct JointLikelihoodRow {
+    hypothesis_id: String,
+    outcome_assignment: BTreeMap<String, String>,
+    probability: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -262,6 +273,25 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
     if !scenario.abstain_loss.is_finite() || scenario.abstain_loss < 0.0 {
         errors.push("abstain loss must be finite and non-negative".to_owned());
     }
+    if !matches!(
+        scenario.likelihood_mode.as_str(),
+        "conditional_independent" | "joint_assignment"
+    ) {
+        errors.push("likelihood mode must be conditional_independent or joint_assignment".to_owned());
+    }
+    if scenario.joint_likelihoods.len() > MAX_JOINT_ASSIGNMENT_ROWS {
+        errors.push(format!(
+            "joint likelihood table exceeds deterministic row cap {MAX_JOINT_ASSIGNMENT_ROWS}"
+        ));
+    }
+    if scenario.likelihood_mode == "conditional_independent"
+        && !scenario.joint_likelihoods.is_empty()
+    {
+        errors.push("conditional_independent mode must not carry a joint assignment table".to_owned());
+    }
+    if scenario.likelihood_mode == "joint_assignment" && scenario.joint_likelihoods.is_empty() {
+        errors.push("joint_assignment mode requires a frozen joint likelihood table".to_owned());
+    }
 
     let mut hypothesis_ids = BTreeSet::new();
     let mut prior_sum = 0.0;
@@ -408,6 +438,121 @@ fn validate_scenario(scenario: &Scenario) -> Vec<String> {
         }
     }
 
+    if scenario.likelihood_mode == "joint_assignment" {
+        let mut seen_assignments = BTreeSet::new();
+        let mut probability_sums: BTreeMap<String, f64> = hypothesis_ids
+            .iter()
+            .map(|id| (id.clone(), 0.0))
+            .collect();
+        let mut joint_marginals: BTreeMap<(String, String, String), f64> = BTreeMap::new();
+
+        for row in &scenario.joint_likelihoods {
+            if !hypothesis_ids.contains(&row.hypothesis_id) {
+                errors.push(format!(
+                    "joint assignment references unknown hypothesis {}",
+                    row.hypothesis_id
+                ));
+                continue;
+            }
+            if row.outcome_assignment.len() != test_ids.len()
+                || row.outcome_assignment.keys().any(|id| !test_ids.contains(id))
+            {
+                errors.push(
+                    "every joint assignment must specify exactly one outcome for every test"
+                        .to_owned(),
+                );
+                continue;
+            }
+            if !row.probability.is_finite()
+                || row.probability < 0.0
+                || row.probability > 1.0
+            {
+                errors.push("joint assignment probability must be finite and in [0,1]".to_owned());
+                continue;
+            }
+
+            let assignment_key = serde_json::to_string(&(
+                &row.hypothesis_id,
+                &row.outcome_assignment,
+            ));
+            let assignment_key = match assignment_key {
+                Ok(key) => key,
+                Err(error) => {
+                    errors.push(format!("joint assignment canonicalization failed: {error}"));
+                    continue;
+                }
+            };
+            if !seen_assignments.insert(assignment_key) {
+                errors.push(
+                    "joint likelihood table contains a duplicate hypothesis/assignment row"
+                        .to_owned(),
+                );
+            }
+
+            let mut valid_row = true;
+            for test in &scenario.tests {
+                let Some(outcome_id) = row.outcome_assignment.get(&test.id) else {
+                    valid_row = false;
+                    continue;
+                };
+                if !test.outcomes.iter().any(|outcome| outcome.id == *outcome_id) {
+                    errors.push(format!(
+                        "joint assignment uses unknown outcome {outcome_id} for test {}",
+                        test.id
+                    ));
+                    valid_row = false;
+                }
+            }
+            if !valid_row {
+                continue;
+            }
+
+            *probability_sums
+                .entry(row.hypothesis_id.clone())
+                .or_default() += row.probability;
+            for (test_id, outcome_id) in &row.outcome_assignment {
+                *joint_marginals
+                    .entry((
+                        row.hypothesis_id.clone(),
+                        test_id.clone(),
+                        outcome_id.clone(),
+                    ))
+                    .or_default() += row.probability;
+            }
+        }
+
+        for hypothesis_id in &hypothesis_ids {
+            let total = probability_sums.get(hypothesis_id).copied().unwrap_or(0.0);
+            if (total - 1.0).abs() > 1e-9 {
+                errors.push(format!(
+                    "joint assignment probabilities for hypothesis {hypothesis_id} sum to {total}, not one"
+                ));
+            }
+        }
+
+        for test in &scenario.tests {
+            for outcome in &test.outcomes {
+                for hypothesis_id in &hypothesis_ids {
+                    let joint = joint_marginals
+                        .get(&(hypothesis_id.clone(), test.id.clone(), outcome.id.clone()))
+                        .copied()
+                        .unwrap_or(0.0);
+                    let declared = outcome
+                        .likelihood_by_hypothesis
+                        .get(hypothesis_id)
+                        .copied()
+                        .unwrap_or(f64::NAN);
+                    if !declared.is_finite() || (joint - declared).abs() > 1e-9 {
+                        errors.push(format!(
+                            "joint marginal for {}/{}/{} differs from its declared likelihood",
+                            hypothesis_id, test.id, outcome.id
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
     for test in &scenario.tests {
         if let Some(condition) = &test.requires {
             if !test_ids.contains(&condition.test_id) || condition.test_id == test.id {
@@ -470,6 +615,53 @@ fn dependency_cycle(tests: &[DiagnosticTest]) -> bool {
     dependencies
         .keys()
         .any(|id| visit_dependency(id, &dependencies, &mut visiting, &mut visited))
+}
+
+fn conditional_outcome_likelihood(
+    scenario: &Scenario,
+    test_id: &str,
+    outcome_id: &str,
+    hypothesis_id: &str,
+    history: &BTreeMap<String, String>,
+) -> f64 {
+    if scenario.likelihood_mode == "conditional_independent" {
+        return scenario
+            .tests
+            .iter()
+            .find(|test| test.id == test_id)
+            .and_then(|test| test.outcomes.iter().find(|outcome| outcome.id == outcome_id))
+            .and_then(|outcome| outcome.likelihood_by_hypothesis.get(hypothesis_id))
+            .copied()
+            .unwrap_or(0.0);
+    }
+
+    let mut history_probability = 0.0;
+    let mut history_and_outcome_probability = 0.0;
+    for row in scenario
+        .joint_likelihoods
+        .iter()
+        .filter(|row| row.hypothesis_id == hypothesis_id)
+    {
+        let history_matches = history.iter().all(|(prior_test, prior_outcome)| {
+            row.outcome_assignment.get(prior_test) == Some(prior_outcome)
+        });
+        if !history_matches {
+            continue;
+        }
+        history_probability += row.probability;
+        if row
+            .outcome_assignment
+            .get(test_id)
+            .is_some_and(|value| value.as_str() == outcome_id)
+        {
+            history_and_outcome_probability += row.probability;
+        }
+    }
+    if history_probability <= EPSILON {
+        0.0
+    } else {
+        history_and_outcome_probability / history_probability
+    }
 }
 
 fn terminal_action(scenario: &Scenario, posterior: &BTreeMap<String, f64>) -> (String, f64) {
@@ -558,7 +750,13 @@ fn optimize_node(
             let marginal = posterior
                 .iter()
                 .map(|(hypothesis, probability)| {
-                    probability * outcome.likelihood_by_hypothesis[hypothesis]
+                    probability * conditional_outcome_likelihood(
+                        scenario,
+                        &test.id,
+                        &outcome.id,
+                        hypothesis,
+                        history,
+                    )
                 })
                 .sum::<f64>();
             if marginal <= EPSILON {
@@ -569,7 +767,15 @@ fn optimize_node(
                 .map(|(hypothesis, probability)| {
                     (
                         hypothesis.clone(),
-                        probability * outcome.likelihood_by_hypothesis[hypothesis] / marginal,
+                        probability
+                            * conditional_outcome_likelihood(
+                                scenario,
+                                &test.id,
+                                &outcome.id,
+                                hypothesis,
+                                history,
+                            )
+                            / marginal,
                     )
                 })
                 .collect();
@@ -670,7 +876,13 @@ fn one_step_candidates(
             let marginal = prior
                 .iter()
                 .map(|(hypothesis, probability)| {
-                    probability * outcome.likelihood_by_hypothesis[hypothesis]
+                    probability * conditional_outcome_likelihood(
+                        scenario,
+                        &test.id,
+                        &outcome.id,
+                        hypothesis,
+                        &BTreeMap::new(),
+                    )
                 })
                 .sum::<f64>();
             if marginal <= EPSILON {
@@ -681,7 +893,15 @@ fn one_step_candidates(
                 .map(|(hypothesis, probability)| {
                     (
                         hypothesis.clone(),
-                        probability * outcome.likelihood_by_hypothesis[hypothesis] / marginal,
+                        probability
+                            * conditional_outcome_likelihood(
+                                scenario,
+                                &test.id,
+                                &outcome.id,
+                                hypothesis,
+                                &BTreeMap::new(),
+                            )
+                            / marginal,
                     )
                 })
                 .collect::<BTreeMap<String, f64>>();
@@ -801,6 +1021,17 @@ fn canonicalize_corpus(value: &mut Value) {
                     left.get("id")
                         .and_then(Value::as_str)
                         .cmp(&right.get("id").and_then(Value::as_str))
+                });
+            }
+            if let Some(rows) = scenario.get_mut("joint_likelihoods").and_then(Value::as_array_mut) {
+                rows.sort_by(|left, right| {
+                    let left_hypothesis = left.get("hypothesis_id").and_then(Value::as_str);
+                    let right_hypothesis = right.get("hypothesis_id").and_then(Value::as_str);
+                    let left_assignment = left.get("outcome_assignment").map(Value::to_string);
+                    let right_assignment = right.get("outcome_assignment").map(Value::to_string);
+                    left_hypothesis
+                        .cmp(&right_hypothesis)
+                        .then_with(|| left_assignment.cmp(&right_assignment))
                 });
             }
             if let Some(tests) = scenario.get_mut("tests").and_then(Value::as_array_mut) {
@@ -936,20 +1167,20 @@ mod tests {
     use serde_json::Value;
 
     const SCHEMA: &[u8] =
-        include_bytes!("../../../schemas/transport/ev_sequential_diagnostic_scenario_v0_1.schema.json");
+        include_bytes!("../../../schemas/transport/ev_sequential_diagnostic_scenario_v0_2.schema.json");
     const CORPUS: &[u8] =
-        include_bytes!("../../../fixtures/ev_battery/sequential_diagnostic_scenarios_v0_1.json");
+        include_bytes!("../../../fixtures/ev_battery/sequential_diagnostic_scenarios_v0_2.json");
 
     fn report() -> CorpusReport {
         audit_corpus(SCHEMA, CORPUS).expect("frozen sequential diagnostic corpus")
     }
 
     #[test]
-    fn frozen_corpus_plans_nine_cases_and_rejects_two_controls() {
+    fn frozen_corpus_plans_ten_cases_and_rejects_five_controls() {
         let report = report();
-        assert_eq!(report.payload.case_count, 11);
-        assert_eq!(report.payload.planned_count, 9);
-        assert_eq!(report.payload.rejected_count, 2);
+        assert_eq!(report.payload.case_count, 15);
+        assert_eq!(report.payload.planned_count, 10);
+        assert_eq!(report.payload.rejected_count, 5);
     }
 
     #[test]
@@ -1041,6 +1272,78 @@ mod tests {
         assert_eq!(receipt.test_id, "test-eis");
         assert_eq!(receipt.test_cost, 0.2);
         assert_eq!(receipt.downtime_cost, 0.1);
+    }
+
+    #[test]
+    fn joint_likelihoods_stop_redundant_correlated_test_and_avoid_double_counting() {
+        let audited = report();
+        let planned = audited.payload.cases.iter()
+            .find(|case| case.case_id == "perfectly-correlated-repeat-test-do-not-double-count")
+            .and_then(|case| case.plan.as_ref())
+            .expect("joint-likelihood correlated test plan");
+        assert_eq!(planned.root_choice, "TEST");
+        assert_eq!(planned.root_test_id.as_deref(), Some("test-a"));
+        assert!((planned.net_value - 0.5).abs() < 1e-9);
+        assert!((planned.expected_tests - 1.0).abs() < 1e-9);
+        assert_eq!(planned.policy.branches["negative"].choice, "NO_TEST");
+        assert_eq!(planned.policy.branches["positive"].choice, "NO_TEST");
+        assert_eq!(planned.policy.branches["negative"].test_id, None);
+        assert_eq!(planned.policy.branches["positive"].test_id, None);
+    }
+
+    #[test]
+    fn malformed_joint_tables_and_marginal_mismatches_are_rejected() {
+        let audited = report();
+        for case_id in [
+            "joint-duplicate-assignment-rejected",
+            "joint-marginal-mismatch-rejected",
+            "joint-incomplete-assignment-rejected",
+        ] {
+            let case = audited.payload.cases.iter()
+                .find(|case| case.case_id == case_id)
+                .expect("joint likelihood mutation control");
+            assert!(!case.accepted);
+            assert!(case.plan.is_none());
+        }
+    }
+
+    #[test]
+    fn joint_assignment_table_cap_is_enforced_before_policy_expansion() {
+        let corpus: Value = serde_json::from_slice(CORPUS).expect("corpus JSON");
+        let scenario_value = corpus["cases"].as_array().unwrap().iter()
+            .find(|value| value["case_id"] == "perfectly-correlated-repeat-test-do-not-double-count")
+            .expect("correlated fixture")["scenario"].clone();
+        let mut scenario: Scenario = serde_json::from_value(scenario_value).expect("scenario");
+        let row = scenario.joint_likelihoods[0].clone();
+        scenario.joint_likelihoods = vec![row; MAX_JOINT_ASSIGNMENT_ROWS + 1];
+        let errors = validate_scenario(&scenario);
+        assert!(errors.iter().any(|error| error.contains("exceeds deterministic row cap")));
+    }
+
+    #[test]
+    fn joint_conditional_likelihood_is_deterministic_after_correlated_observation() {
+        let corpus: Value = serde_json::from_slice(CORPUS).expect("corpus JSON");
+        let scenario_value = corpus["cases"].as_array().unwrap().iter()
+            .find(|value| value["case_id"] == "perfectly-correlated-repeat-test-do-not-double-count")
+            .expect("correlated fixture")["scenario"].clone();
+        let scenario: Scenario = serde_json::from_value(scenario_value).expect("scenario");
+        let history = BTreeMap::from([("test-a".to_owned(), "negative".to_owned())]);
+        assert_eq!(
+            conditional_outcome_likelihood(&scenario, "test-b", "negative", "H0", &history),
+            1.0
+        );
+        assert_eq!(
+            conditional_outcome_likelihood(&scenario, "test-b", "positive", "H0", &history),
+            0.0
+        );
+        assert_eq!(
+            conditional_outcome_likelihood(&scenario, "test-b", "negative", "H1", &history),
+            1.0
+        );
+        assert_eq!(
+            conditional_outcome_likelihood(&scenario, "test-b", "positive", "H1", &history),
+            0.0
+        );
     }
 
     #[test]

@@ -1,0 +1,1724 @@
+{
+  "corpus_version": "ev-sequential-diagnostic-corpus/0.2",
+  "schema_id": "https://luminousdynamics.io/schemas/transport/ev-sequential-diagnostic-scenario/0.2",
+  "cases": [
+    {
+      "case_id": "complementary-tests-positive-sequence",
+      "expectation": "plan",
+      "expected_root_choice": "TEST",
+      "expected_root_test_id": "test-a",
+      "expected_net_value": 1.175,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "complementary-tests",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 2,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "A0B0",
+            "prior": 0.2
+          },
+          {
+            "id": "A1B0",
+            "prior": 0.3
+          },
+          {
+            "id": "A0B1",
+            "prior": 0.3
+          },
+          {
+            "id": "A1B1",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "hold",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "A0B0": 0,
+              "A1B0": 0,
+              "A0B1": 0,
+              "A1B1": 12
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "A0B0": 5,
+              "A1B0": 5,
+              "A0B1": 5,
+              "A1B1": 5
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-a",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c2",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000326",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036b0",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036b1",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036b2"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "a0",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 1,
+                  "A1B0": 0,
+                  "A0B1": 1,
+                  "A1B1": 0
+                }
+              },
+              {
+                "id": "a1",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 0,
+                  "A1B0": 1,
+                  "A0B1": 0,
+                  "A1B1": 1
+                }
+              }
+            ],
+            "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011170",
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011171",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002afa",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002afc",
+            "likelihood_evidence_class": "synthetic_fixture"
+          },
+          {
+            "id": "test-b",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c2",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000326",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036b3",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036b4",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036b5"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "b0",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 1,
+                  "A1B0": 1,
+                  "A0B1": 0,
+                  "A1B1": 0
+                }
+              },
+              {
+                "id": "b1",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 0,
+                  "A1B0": 0,
+                  "A0B1": 1,
+                  "A1B1": 1
+                }
+              }
+            ],
+            "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011172",
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011173",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002afd",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002afe",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002aff",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002af8",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002af9",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "conditional-second-test-only-after-a1",
+      "expectation": "plan",
+      "expected_root_choice": "TEST",
+      "expected_root_test_id": "test-a",
+      "expected_net_value": 1.175,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "conditional-second-test",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 2,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "A0B0",
+            "prior": 0.2
+          },
+          {
+            "id": "A1B0",
+            "prior": 0.3
+          },
+          {
+            "id": "A0B1",
+            "prior": 0.3
+          },
+          {
+            "id": "A1B1",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "hold",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "A0B0": 0,
+              "A1B0": 0,
+              "A0B1": 0,
+              "A1B1": 12
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "A0B0": 5,
+              "A1B0": 5,
+              "A0B1": 5,
+              "A1B1": 5
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-a",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c2",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000326",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036b6",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036b7",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036b8"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "a0",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 1,
+                  "A1B0": 0,
+                  "A0B1": 1,
+                  "A1B1": 0
+                }
+              },
+              {
+                "id": "a1",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 0,
+                  "A1B0": 1,
+                  "A0B1": 0,
+                  "A1B1": 1
+                }
+              }
+            ],
+            "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011174",
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011175",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b02",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b03",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b04",
+            "likelihood_evidence_class": "synthetic_fixture"
+          },
+          {
+            "id": "test-b",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c2",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000326",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036b9",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036ba",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036bb"
+            },
+            "requires": {
+              "test_id": "test-a",
+              "outcome": "a1"
+            },
+            "outcomes": [
+              {
+                "id": "b0",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 1,
+                  "A1B0": 1,
+                  "A0B1": 0,
+                  "A1B1": 0
+                }
+              },
+              {
+                "id": "b1",
+                "likelihood_by_hypothesis": {
+                  "A0B0": 0,
+                  "A1B0": 0,
+                  "A0B1": 1,
+                  "A1B1": 1
+                }
+              }
+            ],
+            "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011176",
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011177",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b05",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b06",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b07",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b00",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b01",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "positive-one-step-evsi",
+      "expectation": "plan",
+      "expected_root_choice": "TEST",
+      "expected_root_test_id": "test-eis",
+      "expected_net_value": 1.1,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "positive-one-step-evsi",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "healthy",
+            "prior": 0.8
+          },
+          {
+            "id": "faulty",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 0,
+              "faulty": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 3,
+              "faulty": 3
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-eis",
+            "test_cost": 0.2,
+            "downtime_cost": 0.1,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036bc",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036bd",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036be"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "normal",
+                "likelihood_by_hypothesis": {
+                  "healthy": 1,
+                  "faulty": 0
+                }
+              },
+              {
+                "id": "fault",
+                "likelihood_by_hypothesis": {
+                  "healthy": 0,
+                  "faulty": 1
+                }
+              }
+            ],
+            "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011178",
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011179",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b0a",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b0b",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b0c",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b08",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b09",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "high-information-zero-decision-value",
+      "expectation": "plan",
+      "expected_root_choice": "NO_TEST",
+      "expected_root_test_id": null,
+      "expected_net_value": 0,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "high-information-zero-decision-value",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "state-0",
+            "prior": 0.5
+          },
+          {
+            "id": "state-1",
+            "prior": 0.5
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "state-0": 0,
+              "state-1": 0
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "state-0": 8,
+              "state-1": 8
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "perfect-but-useless",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002cf",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000333",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036bf",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036c0",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036c1"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "reveals-0",
+                "likelihood_by_hypothesis": {
+                  "state-0": 1,
+                  "state-1": 0
+                }
+              },
+              {
+                "id": "reveals-1",
+                "likelihood_by_hypothesis": {
+                  "state-0": 0,
+                  "state-1": 1
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000001117a",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000001117b",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b0f",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b10",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b11",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b0d",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b0e",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "safety-prerequisite-blocks-high-value-test",
+      "expectation": "plan",
+      "expected_root_choice": "NO_TEST",
+      "expected_root_test_id": null,
+      "expected_net_value": 0,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "high-value-test-without-safety-approval",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "healthy",
+            "prior": 0.8
+          },
+          {
+            "id": "faulty",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 0,
+              "faulty": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 3,
+              "faulty": 3
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-eis",
+            "test_cost": 0.2,
+            "downtime_cost": 0.1,
+            "prerequisites": {
+              "safety_approved": false,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036c2",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036c3",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036c4"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "normal",
+                "likelihood_by_hypothesis": {
+                  "healthy": 1,
+                  "faulty": 0
+                }
+              },
+              {
+                "id": "fault",
+                "likelihood_by_hypothesis": {
+                  "healthy": 0,
+                  "faulty": 1
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000001117c",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000001117d",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b14",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b15",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b16",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b12",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b13",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "likelihood-normalization-rejected",
+      "expectation": "reject",
+      "expected_root_choice": null,
+      "expected_root_test_id": null,
+      "expected_net_value": null,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "likelihood-normalization-rejected",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "state-0",
+            "prior": 0.5
+          },
+          {
+            "id": "state-1",
+            "prior": 0.5
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "state-0": 0,
+              "state-1": 0
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "state-0": 8,
+              "state-1": 8
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "perfect-but-useless",
+            "test_cost": 0.1,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002cf",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000333",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036c5",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036c6",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036c7"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "reveals-0",
+                "likelihood_by_hypothesis": {
+                  "state-0": 0.9,
+                  "state-1": 0
+                }
+              },
+              {
+                "id": "reveals-1",
+                "likelihood_by_hypothesis": {
+                  "state-0": 0,
+                  "state-1": 1
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000001117e",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000001117f",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b19",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b1a",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b1b",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b17",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b18",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "no-admissible-terminal-action-abstains",
+      "expectation": "plan",
+      "expected_root_choice": "NO_TEST",
+      "expected_root_test_id": null,
+      "expected_net_value": 0,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "no-admissible-terminal-action-abstains",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 0,
+        "abstain_loss": 12,
+        "hypotheses": [
+          {
+            "id": "faulty",
+            "prior": 1
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": false,
+            "loss_by_hypothesis": {
+              "faulty": 0
+            }
+          }
+        ],
+        "tests": [],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b1c",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b1d",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "invalid-calibration-blocks-test",
+      "expectation": "plan",
+      "expected_root_choice": "NO_TEST",
+      "expected_root_test_id": null,
+      "expected_net_value": 0,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "invalid-calibration-blocks-test",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "healthy",
+            "prior": 0.8
+          },
+          {
+            "id": "faulty",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 0,
+              "faulty": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 3,
+              "faulty": 3
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-eis",
+            "test_cost": 0.2,
+            "downtime_cost": 0.1,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": false,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036bc",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036bd",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036be"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "normal",
+                "likelihood_by_hypothesis": {
+                  "healthy": 1,
+                  "faulty": 0
+                }
+              },
+              {
+                "id": "fault",
+                "likelihood_by_hypothesis": {
+                  "healthy": 0,
+                  "faulty": 1
+                }
+              }
+            ],
+            "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011178",
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011179",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b0a",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b0b",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b0c",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b08",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b09",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "unsupported-domain-blocks-test",
+      "expectation": "plan",
+      "expected_root_choice": "NO_TEST",
+      "expected_root_test_id": null,
+      "expected_net_value": 0,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "unsupported-domain-blocks-test",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "healthy",
+            "prior": 0.8
+          },
+          {
+            "id": "faulty",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 0,
+              "faulty": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 3,
+              "faulty": 3
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-eis",
+            "test_cost": 0.2,
+            "downtime_cost": 0.1,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": false,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036bc",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036bd",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036be"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "normal",
+                "likelihood_by_hypothesis": {
+                  "healthy": 1,
+                  "faulty": 0
+                }
+              },
+              {
+                "id": "fault",
+                "likelihood_by_hypothesis": {
+                  "healthy": 0,
+                  "faulty": 1
+                }
+              }
+            ],
+            "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011178",
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011179",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b0a",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b0b",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b0c",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b08",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b09",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "unavailable-equipment-blocks-test",
+      "expectation": "plan",
+      "expected_root_choice": "NO_TEST",
+      "expected_root_test_id": null,
+      "expected_net_value": 0,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "unavailable-equipment-blocks-test",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "healthy",
+            "prior": 0.8
+          },
+          {
+            "id": "faulty",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 0,
+              "faulty": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 3,
+              "faulty": 3
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-eis",
+            "test_cost": 0.2,
+            "downtime_cost": 0.1,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": false,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036bc",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036bd",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036be"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "normal",
+                "likelihood_by_hypothesis": {
+                  "healthy": 1,
+                  "faulty": 0
+                }
+              },
+              {
+                "id": "fault",
+                "likelihood_by_hypothesis": {
+                  "healthy": 0,
+                  "faulty": 1
+                }
+              }
+            ],
+            "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011178",
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011179",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b0a",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b0b",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b0c",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b08",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b09",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "missing-domain-scope-evidence-rejected",
+      "expectation": "reject",
+      "expected_root_choice": null,
+      "expected_root_test_id": null,
+      "expected_net_value": null,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "missing-domain-scope-evidence-rejected",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 1,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "healthy",
+            "prior": 0.8
+          },
+          {
+            "id": "faulty",
+            "prior": 0.2
+          }
+        ],
+        "actions": [
+          {
+            "id": "continue",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 0,
+              "faulty": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "healthy": 3,
+              "faulty": 3
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-eis",
+            "test_cost": 0.2,
+            "downtime_cost": 0.1,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036bc",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036bd",
+              "domain_scope_digest": "not-a-digest"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "normal",
+                "likelihood_by_hypothesis": {
+                  "healthy": 1,
+                  "faulty": 0
+                }
+              },
+              {
+                "id": "fault",
+                "likelihood_by_hypothesis": {
+                  "healthy": 0,
+                  "faulty": 1
+                }
+              }
+            ],
+            "test_cost_digest": "0000000000000000000000000000000000000000000000000000000000011178",
+            "downtime_cost_digest": "0000000000000000000000000000000000000000000000000000000000011179",
+            "likelihood_model_digest": "0000000000000000000000000000000000000000000000000000000000002b0a",
+            "calibration_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b0b",
+            "calibration_cohort_digest": "0000000000000000000000000000000000000000000000000000000000002b0c",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "0000000000000000000000000000000000000000000000000000000000002b08",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "0000000000000000000000000000000000000000000000000000000000002b09",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "conditional_independent",
+        "joint_likelihoods": []
+      }
+    },
+    {
+      "case_id": "perfectly-correlated-repeat-test-do-not-double-count",
+      "expectation": "plan",
+      "expected_root_choice": "TEST",
+      "expected_root_test_id": "test-a",
+      "expected_net_value": 0.5,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "perfectly-correlated-repeat-test",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 2,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "H0",
+            "prior": 0.5
+          },
+          {
+            "id": "H1",
+            "prior": 0.5
+          }
+        ],
+        "actions": [
+          {
+            "id": "keep",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "H0": 0,
+              "H1": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "H0": 4,
+              "H1": 0
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-a",
+            "test_cost": 0.05,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036bc",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036bd",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036be"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "negative",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.8,
+                  "H1": 0.2
+                }
+              },
+              {
+                "id": "positive",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.2,
+                  "H1": 0.8
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000000a029",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000000a411",
+            "likelihood_model_digest": "000000000000000000000000000000000000000000000000000000000000a7f9",
+            "calibration_evidence_digest": "000000000000000000000000000000000000000000000000000000000000abe1",
+            "calibration_cohort_digest": "000000000000000000000000000000000000000000000000000000000000afc9",
+            "likelihood_evidence_class": "synthetic_fixture"
+          },
+          {
+            "id": "test-b",
+            "test_cost": 0.05,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "000000000000000000000000000000000000000000000000000000000000b3b2",
+              "equipment_digest": "000000000000000000000000000000000000000000000000000000000000b79a",
+              "safety_approval_digest": "000000000000000000000000000000000000000000000000000000000000bb82",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "000000000000000000000000000000000000000000000000000000000000bf6a",
+              "domain_scope_digest": "000000000000000000000000000000000000000000000000000000000000c352"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "negative",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.8,
+                  "H1": 0.2
+                }
+              },
+              {
+                "id": "positive",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.2,
+                  "H1": 0.8
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000000a02a",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000000a412",
+            "likelihood_model_digest": "000000000000000000000000000000000000000000000000000000000000a7fa",
+            "calibration_evidence_digest": "000000000000000000000000000000000000000000000000000000000000abe2",
+            "calibration_cohort_digest": "000000000000000000000000000000000000000000000000000000000000afca",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "000000000000000000000000000000000000000000000000000000000000c739",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "000000000000000000000000000000000000000000000000000000000000c73a",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "joint_assignment",
+        "joint_likelihoods": [
+          {
+            "hypothesis_id": "H0",
+            "outcome_assignment": {
+              "test-a": "negative",
+              "test-b": "negative"
+            },
+            "probability": 0.8
+          },
+          {
+            "hypothesis_id": "H0",
+            "outcome_assignment": {
+              "test-a": "positive",
+              "test-b": "positive"
+            },
+            "probability": 0.2
+          },
+          {
+            "hypothesis_id": "H1",
+            "outcome_assignment": {
+              "test-a": "negative",
+              "test-b": "negative"
+            },
+            "probability": 0.2
+          },
+          {
+            "hypothesis_id": "H1",
+            "outcome_assignment": {
+              "test-a": "positive",
+              "test-b": "positive"
+            },
+            "probability": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "joint-duplicate-assignment-rejected",
+      "expectation": "reject",
+      "expected_root_choice": null,
+      "expected_root_test_id": null,
+      "expected_net_value": null,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "joint-duplicate-assignment-rejected",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 2,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "H0",
+            "prior": 0.5
+          },
+          {
+            "id": "H1",
+            "prior": 0.5
+          }
+        ],
+        "actions": [
+          {
+            "id": "keep",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "H0": 0,
+              "H1": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "H0": 4,
+              "H1": 0
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-a",
+            "test_cost": 0.05,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036bc",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036bd",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036be"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "negative",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.8,
+                  "H1": 0.2
+                }
+              },
+              {
+                "id": "positive",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.2,
+                  "H1": 0.8
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000000a029",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000000a411",
+            "likelihood_model_digest": "000000000000000000000000000000000000000000000000000000000000a7f9",
+            "calibration_evidence_digest": "000000000000000000000000000000000000000000000000000000000000abe1",
+            "calibration_cohort_digest": "000000000000000000000000000000000000000000000000000000000000afc9",
+            "likelihood_evidence_class": "synthetic_fixture"
+          },
+          {
+            "id": "test-b",
+            "test_cost": 0.05,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "000000000000000000000000000000000000000000000000000000000000b3b2",
+              "equipment_digest": "000000000000000000000000000000000000000000000000000000000000b79a",
+              "safety_approval_digest": "000000000000000000000000000000000000000000000000000000000000bb82",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "000000000000000000000000000000000000000000000000000000000000bf6a",
+              "domain_scope_digest": "000000000000000000000000000000000000000000000000000000000000c352"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "negative",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.8,
+                  "H1": 0.2
+                }
+              },
+              {
+                "id": "positive",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.2,
+                  "H1": 0.8
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000000a02a",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000000a412",
+            "likelihood_model_digest": "000000000000000000000000000000000000000000000000000000000000a7fa",
+            "calibration_evidence_digest": "000000000000000000000000000000000000000000000000000000000000abe2",
+            "calibration_cohort_digest": "000000000000000000000000000000000000000000000000000000000000afca",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "000000000000000000000000000000000000000000000000000000000000c739",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "000000000000000000000000000000000000000000000000000000000000c73a",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "joint_assignment",
+        "joint_likelihoods": [
+          {
+            "hypothesis_id": "H0",
+            "outcome_assignment": {
+              "test-a": "negative",
+              "test-b": "negative"
+            },
+            "probability": 0.8
+          },
+          {
+            "hypothesis_id": "H0",
+            "outcome_assignment": {
+              "test-a": "positive",
+              "test-b": "positive"
+            },
+            "probability": 0.2
+          },
+          {
+            "hypothesis_id": "H1",
+            "outcome_assignment": {
+              "test-a": "negative",
+              "test-b": "negative"
+            },
+            "probability": 0.2
+          },
+          {
+            "hypothesis_id": "H1",
+            "outcome_assignment": {
+              "test-a": "positive",
+              "test-b": "positive"
+            },
+            "probability": 0.8
+          },
+          {
+            "hypothesis_id": "H0",
+            "outcome_assignment": {
+              "test-a": "negative",
+              "test-b": "negative"
+            },
+            "probability": 0
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "joint-marginal-mismatch-rejected",
+      "expectation": "reject",
+      "expected_root_choice": null,
+      "expected_root_test_id": null,
+      "expected_net_value": null,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "joint-marginal-mismatch-rejected",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 2,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "H0",
+            "prior": 0.5
+          },
+          {
+            "id": "H1",
+            "prior": 0.5
+          }
+        ],
+        "actions": [
+          {
+            "id": "keep",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "H0": 0,
+              "H1": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "H0": 4,
+              "H1": 0
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-a",
+            "test_cost": 0.05,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036bc",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036bd",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036be"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "negative",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.8,
+                  "H1": 0.2
+                }
+              },
+              {
+                "id": "positive",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.2,
+                  "H1": 0.8
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000000a029",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000000a411",
+            "likelihood_model_digest": "000000000000000000000000000000000000000000000000000000000000a7f9",
+            "calibration_evidence_digest": "000000000000000000000000000000000000000000000000000000000000abe1",
+            "calibration_cohort_digest": "000000000000000000000000000000000000000000000000000000000000afc9",
+            "likelihood_evidence_class": "synthetic_fixture"
+          },
+          {
+            "id": "test-b",
+            "test_cost": 0.05,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "000000000000000000000000000000000000000000000000000000000000b3b2",
+              "equipment_digest": "000000000000000000000000000000000000000000000000000000000000b79a",
+              "safety_approval_digest": "000000000000000000000000000000000000000000000000000000000000bb82",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "000000000000000000000000000000000000000000000000000000000000bf6a",
+              "domain_scope_digest": "000000000000000000000000000000000000000000000000000000000000c352"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "negative",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.2,
+                  "H1": 0.8
+                }
+              },
+              {
+                "id": "positive",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.8,
+                  "H1": 0.2
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000000a02a",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000000a412",
+            "likelihood_model_digest": "000000000000000000000000000000000000000000000000000000000000a7fa",
+            "calibration_evidence_digest": "000000000000000000000000000000000000000000000000000000000000abe2",
+            "calibration_cohort_digest": "000000000000000000000000000000000000000000000000000000000000afca",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "000000000000000000000000000000000000000000000000000000000000c739",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "000000000000000000000000000000000000000000000000000000000000c73a",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "joint_assignment",
+        "joint_likelihoods": [
+          {
+            "hypothesis_id": "H0",
+            "outcome_assignment": {
+              "test-a": "negative",
+              "test-b": "negative"
+            },
+            "probability": 0.8
+          },
+          {
+            "hypothesis_id": "H0",
+            "outcome_assignment": {
+              "test-a": "positive",
+              "test-b": "positive"
+            },
+            "probability": 0.2
+          },
+          {
+            "hypothesis_id": "H1",
+            "outcome_assignment": {
+              "test-a": "negative",
+              "test-b": "negative"
+            },
+            "probability": 0.2
+          },
+          {
+            "hypothesis_id": "H1",
+            "outcome_assignment": {
+              "test-a": "positive",
+              "test-b": "positive"
+            },
+            "probability": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "joint-incomplete-assignment-rejected",
+      "expectation": "reject",
+      "expected_root_choice": null,
+      "expected_root_test_id": null,
+      "expected_net_value": null,
+      "scenario": {
+        "schema_version": "ev-sequential-diagnostic/0.2",
+        "scenario_id": "joint-incomplete-assignment-rejected",
+        "decision_unit": "synthetic_loss_units",
+        "horizon": 2,
+        "abstain_loss": 20,
+        "hypotheses": [
+          {
+            "id": "H0",
+            "prior": 0.5
+          },
+          {
+            "id": "H1",
+            "prior": 0.5
+          }
+        ],
+        "actions": [
+          {
+            "id": "keep",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "H0": 0,
+              "H1": 10
+            }
+          },
+          {
+            "id": "replace",
+            "admissible": true,
+            "loss_by_hypothesis": {
+              "H0": 4,
+              "H1": 0
+            }
+          }
+        ],
+        "tests": [
+          {
+            "id": "test-a",
+            "test_cost": 0.05,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "00000000000000000000000000000000000000000000000000000000000002c4",
+              "equipment_digest": "0000000000000000000000000000000000000000000000000000000000000328",
+              "safety_approval_digest": "00000000000000000000000000000000000000000000000000000000000036bc",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "00000000000000000000000000000000000000000000000000000000000036bd",
+              "domain_scope_digest": "00000000000000000000000000000000000000000000000000000000000036be"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "negative",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.8,
+                  "H1": 0.2
+                }
+              },
+              {
+                "id": "positive",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.2,
+                  "H1": 0.8
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000000a029",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000000a411",
+            "likelihood_model_digest": "000000000000000000000000000000000000000000000000000000000000a7f9",
+            "calibration_evidence_digest": "000000000000000000000000000000000000000000000000000000000000abe1",
+            "calibration_cohort_digest": "000000000000000000000000000000000000000000000000000000000000afc9",
+            "likelihood_evidence_class": "synthetic_fixture"
+          },
+          {
+            "id": "test-b",
+            "test_cost": 0.05,
+            "downtime_cost": 0.05,
+            "prerequisites": {
+              "safety_approved": true,
+              "calibration_valid": true,
+              "domain_supported": true,
+              "equipment_available": true,
+              "protocol_digest": "000000000000000000000000000000000000000000000000000000000000b3b2",
+              "equipment_digest": "000000000000000000000000000000000000000000000000000000000000b79a",
+              "safety_approval_digest": "000000000000000000000000000000000000000000000000000000000000bb82",
+              "safety_authority_ref": "authority://synthetic-safety-review",
+              "calibration_record_digest": "000000000000000000000000000000000000000000000000000000000000bf6a",
+              "domain_scope_digest": "000000000000000000000000000000000000000000000000000000000000c352"
+            },
+            "requires": null,
+            "outcomes": [
+              {
+                "id": "negative",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.8,
+                  "H1": 0.2
+                }
+              },
+              {
+                "id": "positive",
+                "likelihood_by_hypothesis": {
+                  "H0": 0.2,
+                  "H1": 0.8
+                }
+              }
+            ],
+            "test_cost_digest": "000000000000000000000000000000000000000000000000000000000000a02a",
+            "downtime_cost_digest": "000000000000000000000000000000000000000000000000000000000000a412",
+            "likelihood_model_digest": "000000000000000000000000000000000000000000000000000000000000a7fa",
+            "calibration_evidence_digest": "000000000000000000000000000000000000000000000000000000000000abe2",
+            "calibration_cohort_digest": "000000000000000000000000000000000000000000000000000000000000afca",
+            "likelihood_evidence_class": "synthetic_fixture"
+          }
+        ],
+        "prior_evidence_digest": "000000000000000000000000000000000000000000000000000000000000c739",
+        "prior_evidence_class": "synthetic_fixture",
+        "decision_loss_digest": "000000000000000000000000000000000000000000000000000000000000c73a",
+        "decision_loss_evidence_class": "synthetic_fixture",
+        "likelihood_mode": "joint_assignment",
+        "joint_likelihoods": [
+          {
+            "hypothesis_id": "H0",
+            "outcome_assignment": {
+              "test-a": "negative"
+            },
+            "probability": 0.8
+          },
+          {
+            "hypothesis_id": "H0",
+            "outcome_assignment": {
+              "test-a": "positive",
+              "test-b": "positive"
+            },
+            "probability": 0.2
+          },
+          {
+            "hypothesis_id": "H1",
+            "outcome_assignment": {
+              "test-a": "negative",
+              "test-b": "negative"
+            },
+            "probability": 0.2
+          },
+          {
+            "hypothesis_id": "H1",
+            "outcome_assignment": {
+              "test-a": "positive",
+              "test-b": "positive"
+            },
+            "probability": 0.8
+          }
+        ]
+      }
+    }
+  ]
+}
