@@ -1,0 +1,41 @@
+name: Electric Aircraft Kernel
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-electric-aircraft/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/electric-aircraft-kernel.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: electric-aircraft-kernel-\${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Format, test, and lint electric-aircraft kernel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check crate formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-electric-aircraft/Cargo.toml -- --check
+
+      - name: Run electric-aircraft tests
+        run: cargo test --locked -p symthaea-electric-aircraft
+
+      - name: Run electric-aircraft Clippy
+        run: cargo clippy --locked -p symthaea-electric-aircraft --all-targets -- -D warnings
