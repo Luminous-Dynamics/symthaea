@@ -247,17 +247,32 @@ pub struct QualificationTrustPolicyV1 {
     pub approved_records: BTreeSet<(String, String, String)>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Opaque, materializer-issued capability receipt. Fields are crate-visible
+/// for the planner, but external callers cannot construct or deserialize a
+/// claimed-qualified value. External consumers use the read-only accessors.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct QualifiedInstrumentCapabilityV1 {
-    pub capability: InstrumentCapabilityV1,
-    pub profile_sha256: String,
-    pub profile_digest_schema: String,
-    pub performance_scope: CapabilityScopeV1,
-    pub renderer_scope: Option<CapabilityScopeV1>,
-    pub claim_ids: Vec<String>,
-    pub evidence_ids: Vec<String>,
-    pub qualification_record_ids: Vec<String>,
-    pub qualification_record_sha256s: Vec<String>,
+    pub(crate) capability: InstrumentCapabilityV1,
+    pub(crate) profile_sha256: String,
+    pub(crate) profile_digest_schema: String,
+    pub(crate) performance_scope: CapabilityScopeV1,
+    pub(crate) renderer_scope: Option<CapabilityScopeV1>,
+    pub(crate) claim_ids: Vec<String>,
+    pub(crate) evidence_ids: Vec<String>,
+    pub(crate) qualification_record_ids: Vec<String>,
+    pub(crate) qualification_record_sha256s: Vec<String>,
+}
+
+impl QualifiedInstrumentCapabilityV1 {
+    pub fn capability(&self) -> &InstrumentCapabilityV1 { &self.capability }
+    pub fn profile_sha256(&self) -> &str { &self.profile_sha256 }
+    pub fn profile_digest_schema(&self) -> &str { &self.profile_digest_schema }
+    pub fn performance_scope(&self) -> &CapabilityScopeV1 { &self.performance_scope }
+    pub fn renderer_scope(&self) -> Option<&CapabilityScopeV1> { self.renderer_scope.as_ref() }
+    pub fn claim_ids(&self) -> &[String] { &self.claim_ids }
+    pub fn evidence_ids(&self) -> &[String] { &self.evidence_ids }
+    pub fn qualification_record_ids(&self) -> &[String] { &self.qualification_record_ids }
+    pub fn qualification_record_sha256s(&self) -> &[String] { &self.qualification_record_sha256s }
 }
 
 pub fn instrument_capability_profile_sha256_v1(
