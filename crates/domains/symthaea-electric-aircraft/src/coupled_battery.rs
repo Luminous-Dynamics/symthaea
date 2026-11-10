@@ -15,7 +15,7 @@
 use std::fmt;
 
 use crate::characterization::{
-    BatteryCharacterization, BatteryOperatingPoint, CharacterizationError, EvidenceRecord,
+    BatteryCharacterization, CharacterizationError, EvidenceRecord,
 };
 use crate::thermal_network::{
     ThermalNetwork, ThermalNetworkError, ThermalState,
@@ -109,6 +109,7 @@ impl std::error::Error for CoupledBatteryStepError {}
 /// point, electrical identity, reserve, component limits and both energy
 /// balances pass. Out-of-domain characterization and non-convergence fail
 /// closed; there is no stale-point or nominal-value fallback.
+#[allow(clippy::too_many_arguments)] // Each argument names a distinct physical input or numerical contract.
 pub fn solve_coupled_battery_substep(
     battery: &BatteryConfig,
     characterization: &BatteryCharacterization,
@@ -313,6 +314,7 @@ pub fn solve_coupled_battery_substep(
     })
 }
 
+#[allow(clippy::too_many_arguments)] // Validation covers the same explicit substep boundary inputs.
 fn validate_inputs(
     battery: &BatteryConfig,
     characterization: &BatteryCharacterization,
