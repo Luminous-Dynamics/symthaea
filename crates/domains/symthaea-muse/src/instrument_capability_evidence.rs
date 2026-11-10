@@ -138,6 +138,7 @@ pub struct CapabilityClaimV1 {
     /// Record identifying the independent qualification/review decision.
     /// Merely setting disposition=qualified is not sufficient.
     pub qualification_record_id: Option<String>,
+    pub qualification_record_sha256: Option<String>,
     pub evidence: EvidenceProvenanceV1,
 }
 
@@ -163,6 +164,7 @@ pub enum CapabilityEvidenceIssueCodeV1 {
     InvalidScope,
     InvalidCapabilityValue,
     MalformedContentDigest,
+    MalformedQualificationRecordDigest,
     AssetDigestMismatch,
     QualifiedAssetWithoutLicense,
     EmptyClaims,
@@ -411,6 +413,17 @@ fn validate_evidence(
                 CapabilityEvidenceIssueCodeV1::QualifiedClaimWithoutReviewRecord,
                 Some(&claim.claim_id),
                 "qualified claims require an independent qualification_record_id",
+            );
+        }
+        if !claim
+            .qualification_record_sha256
+            .as_ref()
+            .is_some_and(|digest| valid_sha256_hex_v1(digest))
+        {
+            report.push(
+                CapabilityEvidenceIssueCodeV1::MalformedQualificationRecordDigest,
+                Some(&claim.claim_id),
+                "qualified claims require a 64-character lowercase SHA-256 of the qualification record",
             );
         }
         if matches!(
@@ -765,6 +778,7 @@ mod tests {
             scope,
             disposition: QualificationDispositionV1::Qualified,
             qualification_record_id: Some(format!("review-{claim_id}")),
+            qualification_record_sha256: Some(sha('d')),
             evidence,
         }
     }
