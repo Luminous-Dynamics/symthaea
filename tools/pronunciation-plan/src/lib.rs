@@ -550,6 +550,16 @@ pub struct SyllableNoteBinding {
     pub melisma_phone_index: Option<usize>,
 }
 
+/// Explicit lexical boundary at a score rest. The boundary is the index
+/// of the first pronunciation syllable after the rest. A rest never carries
+/// a phone, and a melisma may not jump across it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RestSyllableBoundary {
+    pub event_index: usize,
+    pub syllable_boundary: usize,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VocalPhraseSpan {
@@ -849,6 +859,298 @@ impl VocalScoreAlignment {
         }
         Ok(())
     }
+
+    /// Construct a deterministic score alignment from selected pronunciation,
+    /// explicit rest-to-lyric boundaries and caller-supplied syllable-duration
+    /// weights. This is an alignment proposal, not a linguistic inference:
+    /// callers must supply the pronunciation selection and choose each rest
+    /// boundary deliberately.
+    ///
+    /// Within each uninterrupted run of sung notes, the run's active duration
+    /// is divided among its assigned syllables in proportion to
+    /// `syllable_duration_weights`. A syllable crossing one or more adjacent
+    /// note events becomes a melisma on its final vowel. Multiple syllables
+    /// may instead occupy disjoint intervals inside one long note. Explicit
+    /// Rest events terminate a run and require a RestSyllableBoundary receipt.
+    pub fn from_duration_weights(
+        pronunciation: &PronunciationPlan,
+        events: &[ScoreEvent],
+        phrases: Vec<VocalPhraseSpan>,
+        rest_boundaries: &[RestSyllableBoundary],
+        syllable_duration_weights: &[f32],
+    ) -> Result<Self, String> {
+        const EPSILON_S: f32 = 0.000_01;
+
+        pronunciation.validate_renderable()?;
+        if events.is_empty() {
+            return Err("score alignment planner requires at least one event".into());
+        }
+
+        let mut syllables = Vec::new();
+        for (word_index, word) in pronunciation.words.iter().enumerate() {
+            let selected_id = word.selected_candidate_id.as_deref().ok_or_else(|| {
+                format!("word {word_index} has no selected pronunciation")
+            })?;
+            let selected = word
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == selected_id)
+                .ok_or_else(|| format!("word {word_index} selects a missing candidate"))?;
+            for (syllable_index, syllable) in selected.syllables.iter().enumerate() {
+                syllables.push((word_index, syllable_index, syllable));
+            }
+        }
+        if syllables.is_empty() || syllable_duration_weights.len() != syllables.len() {
+            return Err(format!(
+                "duration weight count {} must equal selected pronunciation syllable count {}",
+                syllable_duration_weights.len(),
+                syllables.len()
+            ));
+        }
+        if syllable_duration_weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight <= 0.0)
+        {
+            return Err("syllable duration weights must be finite and positive".into());
+        }
+
+        let mut previous_end = 0.0f32;
+        for (event_index, event) in events.iter().enumerate() {
+            if !event.start_s.is_finite()
+                || event.start_s < 0.0
+                || !event.duration_s.is_finite()
+                || event.duration_s <= 0.0
+            {
+                return Err(format!("score event {event_index} has invalid timing"));
+            }
+            let end = event.start_s + event.duration_s;
+            if !end.is_finite() || end <= event.start_s {
+                return Err(format!("score event {event_index} has invalid end time"));
+            }
+            if event_index == 0 && event.start_s.abs() > EPSILON_S {
+                return Err("score must begin at time zero; use an explicit opening Rest event".into());
+            }
+            if event_index > 0 && (event.start_s - previous_end).abs() > EPSILON_S {
+                return Err(format!(
+                    "score event {event_index} has an implicit gap or overlap; represent gaps as explicit Rest events"
+                ));
+            }
+            if let ScoreEventKind::SungNote { frequency_hz, velocity } = event.kind {
+                if !frequency_hz.is_finite()
+                    || frequency_hz <= 0.0
+                    || !velocity.is_finite()
+                    || !(0.0..=1.0).contains(&velocity)
+                {
+                    return Err(format!("sung score event {event_index} has invalid pitch/velocity"));
+                }
+            }
+            previous_end = end;
+        }
+
+        let actual_rests: Vec<usize> = events
+            .iter()
+            .enumerate()
+            .filter_map(|(index, event)| {
+                matches!(event.kind, ScoreEventKind::Rest).then_some(index)
+            })
+            .collect();
+        if actual_rests.len() != rest_boundaries.len()
+            || actual_rests
+                .iter()
+                .zip(rest_boundaries)
+                .any(|(event_index, boundary)| *event_index != boundary.event_index)
+        {
+            return Err(
+                "every explicit Rest event requires exactly one ordered syllable-boundary receipt"
+                    .into(),
+            );
+        }
+
+        let mut bindings = Vec::with_capacity(syllables.len());
+        let mut current_run = Vec::new();
+        let mut current_syllable_start = 0usize;
+        let mut rest_cursor = 0usize;
+
+        for (event_index, event) in events.iter().enumerate() {
+            match event.kind {
+                ScoreEventKind::SungNote { .. } => current_run.push(event_index),
+                ScoreEventKind::Rest => {
+                    let boundary = rest_boundaries[rest_cursor].syllable_boundary;
+                    rest_cursor += 1;
+                    if boundary < current_syllable_start || boundary > syllables.len() {
+                        return Err(format!(
+                            "rest event {event_index} has a non-monotonic or out-of-range syllable boundary"
+                        ));
+                    }
+                    if current_run.is_empty() {
+                        if boundary != current_syllable_start {
+                            return Err(format!(
+                                "rest event {event_index} assigns syllables to an empty note run"
+                            ));
+                        }
+                    } else {
+                        if boundary == current_syllable_start {
+                            return Err(format!(
+                                "note run before rest event {event_index} has no assigned syllables"
+                            ));
+                        }
+                        allocate_syllable_run(
+                            events,
+                            &current_run,
+                            current_syllable_start,
+                            boundary,
+                            &syllables,
+                            syllable_duration_weights,
+                            &mut bindings,
+                        )?;
+                        current_syllable_start = boundary;
+                        current_run.clear();
+                    }
+                }
+            }
+        }
+
+        if current_run.is_empty() {
+            if current_syllable_start != syllables.len() {
+                return Err("score ends without assigning every pronunciation syllable".into());
+            }
+        } else {
+            if current_syllable_start >= syllables.len() {
+                return Err("final note run has no assigned pronunciation syllables".into());
+            }
+            allocate_syllable_run(
+                events,
+                &current_run,
+                current_syllable_start,
+                syllables.len(),
+                &syllables,
+                syllable_duration_weights,
+                &mut bindings,
+            )?;
+        }
+
+        let alignment = Self {
+            schema_version: 1,
+            events: events.to_vec(),
+            syllable_bindings: bindings,
+            phrases,
+        };
+        alignment.validate_against(pronunciation)?;
+        Ok(alignment)
+    }
+
+    /// Build a renderer-compatible alignment from beat-domain source events.
+    /// Rest boundary event indices refer to the unchanged source event order.
+    pub fn from_beat_domain_score(
+        pronunciation: &PronunciationPlan,
+        score: &BeatDomainScore,
+        phrases: Vec<VocalPhraseSpan>,
+        rest_boundaries: &[RestSyllableBoundary],
+        syllable_duration_weights: &[f32],
+    ) -> Result<Self, String> {
+        let events = score.materialize_seconds()?;
+        Self::from_duration_weights(
+            pronunciation,
+            &events,
+            phrases,
+            rest_boundaries,
+            syllable_duration_weights,
+        )
+    }
+}
+
+/// Divide each uninterrupted run of sung notes among its assigned syllables.
+/// The explicit weights are timing priors from the caller, not learned truth.
+fn allocate_syllable_run(
+    events: &[ScoreEvent],
+    event_indices: &[usize],
+    syllable_start: usize,
+    syllable_end: usize,
+    syllables: &[(usize, usize, &PronunciationSyllable)],
+    weights: &[f32],
+    output: &mut Vec<SyllableNoteBinding>,
+) -> Result<(), String> {
+    const EPSILON_S: f32 = 0.000_01;
+    if event_indices.is_empty() || syllable_start >= syllable_end {
+        return Err("cannot allocate an empty note run or empty syllable range".into());
+    }
+
+    let first_event = &events[event_indices[0]];
+    let last_event = &events[*event_indices.last().expect("non-empty run")];
+    let run_start = first_event.start_s;
+    let run_end = last_event.start_s + last_event.duration_s;
+    let run_duration = run_end - run_start;
+    let run_weights = &weights[syllable_start..syllable_end];
+    let weight_sum: f32 = run_weights.iter().sum();
+    if !run_duration.is_finite()
+        || run_duration <= 0.0
+        || !weight_sum.is_finite()
+        || weight_sum <= 0.0
+    {
+        return Err("note run duration or syllable weight sum is invalid".into());
+    }
+
+    let mut cumulative_weight = 0.0f32;
+    for syllable_index in syllable_start..syllable_end {
+        let (word_index, local_syllable_index, syllable) = syllables[syllable_index];
+        let next_weight = cumulative_weight + weights[syllable_index];
+        let start_s = run_start + run_duration * (cumulative_weight / weight_sum);
+        let end_s = if syllable_index + 1 == syllable_end {
+            run_end
+        } else {
+            run_start + run_duration * (next_weight / weight_sum)
+        };
+        if !start_s.is_finite() || !end_s.is_finite() || end_s - start_s <= EPSILON_S {
+            return Err(format!(
+                "syllable {syllable_index} receives no representable score duration"
+            ));
+        }
+
+        let mut spans = Vec::new();
+        for event_index in event_indices {
+            let event = &events[*event_index];
+            let event_start = event.start_s;
+            let event_end = event.start_s + event.duration_s;
+            let intersection_start = start_s.max(event_start);
+            let intersection_end = end_s.min(event_end);
+            if intersection_end - intersection_start > EPSILON_S {
+                spans.push(ScoreEventSpan {
+                    event_index: *event_index,
+                    start_offset_s: (intersection_start - event_start).max(0.0),
+                    end_offset_s: (intersection_end - event_start).min(event.duration_s),
+                });
+            }
+        }
+        if spans.is_empty() {
+            return Err(format!(
+                "syllable {syllable_index} does not intersect a sung score event"
+            ));
+        }
+
+        let melisma_phone_index = if spans.len() > 1 {
+            Some(
+                syllable
+                    .phones
+                    .iter()
+                    .rposition(|phone| phone.kind == PhoneKind::Vowel)
+                    .ok_or_else(|| {
+                        format!(
+                            "syllable {syllable_index} crosses note events but has no vowel for melisma"
+                        )
+                    })?,
+            )
+        } else {
+            None
+        };
+        output.push(SyllableNoteBinding {
+            word_index,
+            syllable_index: local_syllable_index,
+            spans,
+            melisma_phone_index,
+        });
+        cumulative_weight = next_weight;
+    }
+    Ok(())
 }
 
 /// Typed articulatory/phonological features attached to a language-specific
