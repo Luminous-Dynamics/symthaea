@@ -1176,11 +1176,11 @@ mod tests {
     }
 
     #[test]
-    fn frozen_corpus_plans_nine_cases_and_rejects_two_controls() {
+    fn frozen_corpus_plans_ten_cases_and_rejects_five_controls() {
         let report = report();
-        assert_eq!(report.payload.case_count, 11);
-        assert_eq!(report.payload.planned_count, 9);
-        assert_eq!(report.payload.rejected_count, 2);
+        assert_eq!(report.payload.case_count, 15);
+        assert_eq!(report.payload.planned_count, 10);
+        assert_eq!(report.payload.rejected_count, 5);
     }
 
     #[test]
