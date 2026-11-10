@@ -90,6 +90,8 @@ pub mod weight_space_program;
 pub mod sequential_weight_program;
 /// Anytime-valid statistical verification for frozen WeightProgram candidates.
 pub mod sequential_weight_verification;
+/// Simultaneous non-inferiority guardrails for critical task families.
+pub mod family_noninferiority;
 /// Integrated Information (Phi) calculation engine.
 #[allow(missing_docs)]
 pub mod phi_engine;
