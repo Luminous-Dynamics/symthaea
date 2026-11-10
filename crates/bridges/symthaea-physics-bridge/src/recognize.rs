@@ -452,7 +452,7 @@ mod tests {
         assert!(matches!(
             report.symmetry_inference.evidence,
             Some(crate::symmetry_inference::SymmetryInferenceEvidence::StructuralPatternMatch {
-                pattern: crate::symmetry_inference::StructuralSymmetryPattern::EqualCoefficientSumOfSquares,
+                pattern: crate::symmetry_inference::StructuralSymmetryPattern::EqualCoefficientSumOfSquares { .. },
             })
         ));
     }
