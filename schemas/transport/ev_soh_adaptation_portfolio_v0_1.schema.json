@@ -159,7 +159,8 @@
               "available_at_ms",
               "requires_target_labels",
               "evidence_digest",
-              "evidence_class"
+              "evidence_class",
+              "derived_from_target_labels"
             ],
             "properties": {
               "feature_id": {
@@ -194,6 +195,9 @@
                   "synthetic_fixture",
                   "vendor_claim"
                 ]
+              },
+              "derived_from_target_labels": {
+                "const": false
               }
             }
           }
