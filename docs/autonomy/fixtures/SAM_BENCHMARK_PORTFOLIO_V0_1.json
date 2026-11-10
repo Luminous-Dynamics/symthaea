@@ -1,0 +1,2099 @@
+{
+  "schema": "sam-benchmark-evidence-registry-v0.1",
+  "snapshot_date": "2026-11-10",
+  "parent_issue": "Luminous-Dynamics/symthaea#6256",
+  "semantics": {
+    "source_status": [
+      "upstream_reported",
+      "secondary_leaderboard_snapshot",
+      "independently_reproduced",
+      "sam_reproduced",
+      "sam_proposed_internal_contract"
+    ],
+    "rights_status": [
+      "rights_unverified",
+      "academic_only_unless_authorized",
+      "code_noncommercial_license_data_rights_separate",
+      "source_terms_to_check",
+      "internal_synthetic_fixture"
+    ],
+    "comparability_rule": "Only compare raw scores when task, protocol, output type, metric, unit, data split, observation/action privilege, compute, latency and evaluator match.",
+    "no_composite_score": true,
+    "missingness": "Missing, timeout, censored, unsupported and failed outcomes retain distinct typed dispositions."
+  },
+  "model_design_descriptors": [
+    "state_abstraction",
+    "temporal_dynamics",
+    "uncertainty_source_and_treatment",
+    "structural_prior",
+    "observation_modality",
+    "decision_coupling"
+  ],
+  "external_evidence_coordinates": [
+    "capability_target",
+    "evaluation_protocol",
+    "metric_family",
+    "evaluation_data_source"
+  ],
+  "benchmarks": [
+    {
+      "id": "alpamayo-2-super-2026",
+      "name": "NVIDIA Alpamayo 2 Super",
+      "category": "external_black_box_model",
+      "capability_target": [
+        "trajectory_prediction",
+        "causal_reasoning",
+        "VLA_action_generation"
+      ],
+      "protocol": {
+        "kind": "vendor_named_evaluations",
+        "parameter_count_billions": 34,
+        "backbone_billions": 32,
+        "action_expert_billions": 2,
+        "camera_count_max": 7,
+        "camera_coverage": "360_degree",
+        "open_loop_samples": 1434,
+        "closed_loop_reconstructed_scenes": 913
+      },
+      "metrics": [
+        "minADE6_at_6_4s",
+        "reasoning_score",
+        "LingoQA",
+        "AlpaSimScore"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "minADE6_m": 0.911,
+        "reasoning_score": 0.433,
+        "LingoQA": 79.2,
+        "AlpaSimScore": 1.5,
+        "AlpaSimScore_std": 0.13,
+        "AlpaSimScore_sample_count": 913,
+        "reasoning_comparator_GPT_5_5": 0.502,
+        "Alpamayo_1_5_Nano_AlpaSimScore": 1.37,
+        "Alpamayo_1_5_Nano_AlpaSimScore_std": 0.1
+      },
+      "caveats": [
+        "Vendor-reported open-loop results on 1,434 named challenging samples and a separate AlpaSim closed-loop result on 913 reconstructed scenes; do not mix denominators.",
+        "The vendor table lists GPT-5.5 at 0.502 versus Alpamayo 2 Super at 0.433 on the OOD reasoning benchmark; it does not lead every reasoning metric.",
+        "AlpaSim Score is a distinct evaluator and is not directly comparable to NAVSIM EPDMS, Bench2Drive DS or real-world crash rates.",
+        "Published inference path is BF16 for a 34B model; compare compute, precision, hardware, sensor privilege and latency before treating it as a deployment baseline.",
+        "Not directly comparable to Bench2Drive, Fail2Drive, Waymo Motion or Waymo operational outcome data.",
+        "NVIDIA describes Alpamayo models as cloud-side teacher models, not in-vehicle runtimes; use this 34B model as a teacher/reasoning/data-generation comparator and evaluate edge deployment under a separate hardware, memory, power, precision and p95/p99 latency budget."
+      ],
+      "sources": [
+        "https://developer.nvidia.com/blog/generate-trajectories-reasoning-traces-and-auto-labels-with-nvidia-alpamayo-2-super/",
+        "https://www.nvidia.com/en-us/solutions/autonomous-vehicles/alpamayo/llm-info/",
+        "https://developer.nvidia.com/drive/downloads"
+      ]
+    },
+    {
+      "id": "bench2drive-v0.0.4",
+      "name": "Bench2Drive",
+      "category": "driving_closed_loop",
+      "capability_target": [
+        "route_completion",
+        "closed_loop_driving",
+        "infractions"
+      ],
+      "protocol": {
+        "kind": "closed_loop",
+        "route_count": 220,
+        "scenario_types": 44,
+        "routes_per_scenario": 5,
+        "release": "0.0.4"
+      },
+      "metrics": [
+        "DrivingScore",
+        "SuccessRate",
+        "Efficiency",
+        "Comfort",
+        "per_route_events"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "LEAD": {
+          "DS": 95.59,
+          "SR": 87.28
+        },
+        "Simlingo": {
+          "DS": 86.55,
+          "SR": 70.45
+        },
+        "Drive-Pi0": {
+          "DS": 69.71,
+          "SR": 45.91
+        },
+        "DriveTransformer": {
+          "DS": 60.2,
+          "SR": 35.91
+        },
+        "DriveAdapter": {
+          "DS": 54.96,
+          "SR": 30.45
+        }
+      },
+      "caveats": [
+        "Upstream-published; not reproduced by SAM.",
+        "Do not mix 0.0.3 and 0.0.4.",
+        "Efficiency and comfort remain separate metrics."
+      ],
+      "sources": [
+        "https://github.com/Thinklab-SJTU/Bench2Drive/tree/0.0.4"
+      ]
+    },
+    {
+      "id": "carla-leaderboard-2.1",
+      "name": "CARLA Leaderboard",
+      "category": "driving_closed_loop",
+      "capability_target": [
+        "route_completion",
+        "infraction_robustness"
+      ],
+      "protocol": {
+        "kind": "closed_loop",
+        "version": "2.1"
+      },
+      "metrics": [
+        "route_completion",
+        "driving_score",
+        "linear_infraction_penalty"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Version 2.1 documents early-stop score exploit and scoring change.",
+        "Pin CARLA and ScenarioRunner revisions."
+      ],
+      "sources": [
+        "https://leaderboard.carla.org/"
+      ]
+    },
+    {
+      "id": "causaldrivebench-2026",
+      "name": "CausalDriveBench",
+      "category": "causal_vla_understanding",
+      "capability_target": [
+        "causal_scene_qa",
+        "counterfactual_trajectory_reasoning"
+      ],
+      "protocol": {
+        "kind": "curated_and_synthetic_counterfactual",
+        "qa_pairs": 7285,
+        "counterfactual_trajectories": 1000,
+        "frequency_hz": 2,
+        "initial_scope": "urban nuScenes Boston/Singapore"
+      },
+      "metrics": [
+        "causal_QA_accuracy",
+        "CTE",
+        "trajectory_error_by_rung"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "best_QA_accuracy_percent": 70.6,
+        "models_below_chance": 4,
+        "total_models": 13
+      },
+      "caveats": [
+        "Paper reports no statistical correlation between QA and trajectory accuracy.",
+        "R3 trajectories are planner/LLM-synthesized and audited, not observed human counterfactuals."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2609.32157"
+      ]
+    },
+    {
+      "id": "colt-drive-2026",
+      "name": "CoLT-Drive",
+      "category": "counterfactual_driving_affordance",
+      "capability_target": [
+        "rare_object_affordance",
+        "longitudinal_lateral_meta_action"
+      ],
+      "protocol": {
+        "kind": "counterfactual_curated",
+        "samples": 3536
+      },
+      "metrics": [
+        "acceptable_action_pair_accuracy",
+        "per_object_family_accuracy"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "KPA_pair_accuracy_percent": 60.8,
+        "Qwen3_VL_2B_pair_accuracy_percent": 50.3,
+        "LoRA_SFT_pair_accuracy_percent": 32.4
+      },
+      "caveats": [
+        "Pair accuracy does not prove action-domain completeness or safety.",
+        "Use to stress SAM #10338, not as a regret certificate."
+      ],
+      "sources": [
+        "https://aclanthology.org/2026.findings-emnlp.545/",
+        "https://arxiv.org/abs/2609.00242"
+      ]
+    },
+    {
+      "id": "driving-world-model-counterfactual-2026",
+      "name": "How Can Driving World Models Do Counterfactual Prediction?",
+      "category": "episode_specific_counterfactual",
+      "capability_target": [
+        "factual_continuation_abduction",
+        "event_preservation",
+        "counterfactual_visual_fidelity"
+      ],
+      "protocol": {
+        "kind": "controlled_carla",
+        "cases": 186,
+        "placements": 72,
+        "towns": 3,
+        "scenario_types": 3,
+        "arms": [
+          "factual",
+          "counterfactual",
+          "event_free_null"
+        ]
+      },
+      "metrics": [
+        "event_recovered_fraction",
+        "event_identity",
+        "event_timing",
+        "LPIPS"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "direct_prediction_recovered_fraction_range": [
+          0.23,
+          0.45
+        ],
+        "factual_evidence_AAP_range": [
+          0.64,
+          0.7
+        ]
+      },
+      "caveats": [
+        "Values are paper-specific metrics on two tested backbones.",
+        "Other actors are open-loop scripted; does not test interactive actor response.",
+        "Reproduce exact encoder and scoring before comparison."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2608.11601"
+      ]
+    },
+    {
+      "id": "drivinggen-iclr-2026",
+      "name": "DrivingGen",
+      "category": "generative_driving_world_model_benchmark",
+      "capability_target": [
+        "generated_video_distribution_quality",
+        "automotive_visual_quality",
+        "scene_and_agent_temporal_consistency",
+        "trajectory_plausibility",
+        "ego_trajectory_controllability"
+      ],
+      "protocol": {
+        "kind": "two_track_generative_video_evaluation",
+        "paper_release": "ICLR 2026",
+        "paper_samples_total": 400,
+        "paper_samples_per_track": 200,
+        "tracks": [
+          "open_domain",
+          "ego_conditioned"
+        ],
+        "hosted_dataset_card_eval_examples_per_track": 222,
+        "hosted_dataset_card_total_rows": 22866,
+        "hosted_card_paper_count_difference": "Unresolved: paper says 200 evaluation samples per track; current HF README card says 222 examples per track and the page shows 22,866 rows. Pin dataset repo revision and split/sample IDs; do not assume these counts describe the same unit/release.",
+        "source_datasets_ego_conditioned": [
+          "ZOD",
+          "DrivingDojo",
+          "COVLA",
+          "nuPlan",
+          "Waymo Open Motion Dataset"
+        ],
+        "open_domain_sources": "internet-sourced driving video across global regions",
+        "inference_video_shape": "101 frames at 10 fps, 576x1024 per upstream repository example",
+        "trajectory_extraction": [
+          "UniDepthV2",
+          "visual SLAM",
+          "YOLOv10 agent detection/depth"
+        ]
+      },
+      "metrics": [
+        "FVD",
+        "FTD",
+        "CLIP-IQA+ subjective visual quality",
+        "IEEE P2020 automotive imaging quality",
+        "DINOv3 scene consistency",
+        "agent appearance consistency",
+        "agent disappearance/missing-detection consistency",
+        "LPIPS",
+        "SSIM",
+        "ADE",
+        "FDE",
+        "success rate",
+        "Hausdorff distance",
+        "DTW",
+        "comfort score (jerk, acceleration, yaw rate)",
+        "curvature RMS",
+        "speed score",
+        "velocity consistency",
+        "acceleration consistency"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "code_apache_2_dataset_card_declares_apache_2_source_video_provenance_review_required",
+      "snapshot": {
+        "models_evaluated": 14,
+        "leaderboard_status": "project_website_says_leaderboard_coming",
+        "geographic_coverage_open_domain": {
+          "North_America_percent": 20.7,
+          "East_Asia_and_Pacific_percent": 22.1,
+          "Europe_and_Central_Asia_percent": 26.6,
+          "Middle_East_and_North_Africa_percent": 12.1,
+          "Latin_America_and_Caribbean_percent": 6.3,
+          "South_Asia_percent": 6.8,
+          "Sub_Saharan_Africa_percent": 5.4
+        },
+        "open_domain_weather_percent": {
+          "normal": 51.8,
+          "rain": 22.5,
+          "snow": 13.1,
+          "fog": 12.6
+        },
+        "open_domain_time_of_day_percent": {
+          "day": 50.5,
+          "night": 26.1,
+          "sunrise_sunset": 23.4
+        }
+      },
+      "caveats": [
+        "ICLR 2026 paper reports 400 evaluation clips (200 per track); current Hugging Face dataset card lists 222 eval examples per track and the dataset page displays 22,866 rows. Resolve dataset commit, split semantics and sample IDs before reproduction.",
+        "The benchmark measures video distribution, visual quality, temporal/agent consistency and trajectory alignment. It does not evaluate downstream planner task success or closed-loop driving outcomes.",
+        "Ego and agent trajectories are derived through visual SLAM/depth/detection pipelines; they are not direct ground-truth measurements for every video frame. Report extraction failures and estimator uncertainty.",
+        "Open-domain track draws on internet-sourced videos. Code repository declares Apache-2.0 and dataset card declares Apache-2.0, but preserve source provenance and review third-party footage rights / dataset terms before commercial use or redistribution.",
+        "Sub-Saharan Africa is 5.4% of the paper's open-domain geographic mix; this is not country-specific South African coverage and does not demonstrate right-hand-drive / left-hand-traffic coverage.",
+        "FVD / visual preference scores alone do not establish metric physical correctness, controllability, causal actor response, decision value or safety.",
+        "All figures are author-reported; SAM has not reproduced this benchmark."
+      ],
+      "sources": [
+        "https://proceedings.iclr.cc/paper_files/paper/2026/hash/a940e52cc37f63cd067c52265d1701cd-Abstract-Conference.html",
+        "https://drivinggen-bench.github.io/",
+        "https://github.com/youngzhou1999/DrivingGen",
+        "https://huggingface.co/datasets/yangzhou99/DrivingGen"
+      ]
+    },
+    {
+      "id": "fail2drive-2026",
+      "name": "Fail2Drive",
+      "category": "driving_distribution_shift",
+      "capability_target": [
+        "ood_robustness",
+        "paired_success_degradation"
+      ],
+      "protocol": {
+        "kind": "paired_closed_loop",
+        "paired_routes": 200,
+        "shift_classes": 17
+      },
+      "metrics": [
+        "IDSuccessRate",
+        "OODSuccessRate",
+        "PairedDegradation",
+        "family_macro_degradation"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "paper_reported_average_success_degradation_percent": 22.8
+      },
+      "caveats": [
+        "22.8% is specific to evaluated models and study protocol.",
+        "Simulation degradation is not real-world crash probability."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2604.08535"
+      ]
+    },
+    {
+      "id": "hidrive-2026",
+      "name": "HiDrive",
+      "category": "driving_closed_loop_long_tail",
+      "capability_target": [
+        "rare_objects",
+        "legal_compliance",
+        "norm_sensitive_decisions",
+        "emergency_response"
+      ],
+      "protocol": {
+        "kind": "closed_loop",
+        "routes": 330,
+        "approx_route_length_m": 150,
+        "ability_categories": 30,
+        "scenario_instantiations": 94,
+        "simulator": "CARLA UE5"
+      },
+      "metrics": [
+        "DriveScore",
+        "RouteCompletion",
+        "LegalScore",
+        "EthicsScore"
+      ],
+      "score_definition": "Per route: DS_i = RC_i * LS_i * ES_i. Split-level DS is mean_i(DS_i); split-level RC and LS are means over all valid routes; split-level ES is averaged only over the ethics-applicable route subset.",
+      "source_status": "upstream_reported",
+      "rights_status": "academic_only_unless_authorized",
+      "snapshot": {
+        "TCP": {
+          "DS": 18.4,
+          "RC": 23.7,
+          "LS": 27.8,
+          "ES": 89.3
+        },
+        "UniAD-Base": {
+          "DS": 21.9,
+          "RC": 26.6,
+          "LS": 32.1,
+          "ES": 91.6
+        },
+        "VAD": {
+          "DS": 20.1,
+          "RC": 24.3,
+          "LS": 30.7,
+          "ES": 89.3
+        },
+        "ThinkTwice": {
+          "DS": 28.3,
+          "RC": 35.6,
+          "LS": 38.9,
+          "ES": 92.4
+        },
+        "DriveAdapter": {
+          "DS": 29.5,
+          "RC": 40,
+          "LS": 40.3,
+          "ES": 92.4
+        },
+        "DriveTransformer": {
+          "DS": 31,
+          "RC": 40.3,
+          "LS": 43.1,
+          "ES": 91.9
+        },
+        "ORION": {
+          "DS": 37.4,
+          "RC": 65.3,
+          "LS": 54.8,
+          "ES": 93.5
+        },
+        "DiffusionDrive": {
+          "DS": 34.2,
+          "RC": 58.3,
+          "LS": 49.1,
+          "ES": 91.4
+        },
+        "SimLingo": {
+          "DS": 42.3,
+          "RC": 70.5,
+          "LS": 63.3,
+          "ES": 94.8
+        },
+        "KnowVal": {
+          "DS": 46.6,
+          "RC": 73.8,
+          "LS": 69.3,
+          "ES": 97.4
+        }
+      },
+      "caveats": [
+        "Report RC/LS/ES separately; DS is a product.",
+        "Repository says academic research only unless commercial permission is obtained.",
+        "EthicsScore is benchmark-defined, not universal ethical truth.",
+        "Do not multiply the published aggregate RC, LS and ES columns to reconstruct aggregate DS; DS is averaged after per-route multiplication and ES has a subset denominator.",
+        "The paper's table includes nine baselines: TCP, UniAD-Base, VAD, ThinkTwice, DriveAdapter, DriveTransformer, ORION, DiffusionDrive, SimLingo and KnowVal."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2605.09972",
+        "https://github.com/VDIGPKU/HiDrive"
+      ],
+      "aggregation": {
+        "per_route_formula": "DS_i = RC_i * LS_i * ES_i",
+        "split_level": {
+          "DS": "mean(DS_i) over all valid routes",
+          "RC": "mean(RC_i) over all valid routes",
+          "LS": "mean(LS_i) over all valid routes",
+          "ES": "mean(ES_i) over ethics-applicable routes only"
+        },
+        "implication": "Aggregate DS is not generally equal to aggregate RC * aggregate LS * aggregate ES because the product is taken per route before averaging, and ES can use a different denominator."
+      },
+      "metric_semantics": [
+        "RC is usually passed-waypoints / total-waypoints, but selected dilemma scenarios may set RC=1 after their safety-critical primary objective is completed.",
+        "LS is affected by legal events, collisions and route-lane events; it is not a pure traffic-law-only score.",
+        "Brake-aware relief changes selected collision penalty coefficients when braking occurred within the declared two-frame window.",
+        "ES includes social/normative events and its split-level mean is computed only over ethics-applicable routes."
+      ]
+    },
+    {
+      "id": "icr-drive-2026",
+      "name": "ICR-Drive",
+      "category": "instruction_counterfactual_robustness",
+      "capability_target": [
+        "instruction_robustness",
+        "goal_preservation",
+        "misleading_instruction_resistance"
+      ],
+      "protocol": {
+        "kind": "matched_closed_loop",
+        "route_and_seed_fixed": true,
+        "perturbation_families": [
+          "paraphrase",
+          "ambiguity",
+          "noise",
+          "misleading_conflict"
+        ]
+      },
+      "metrics": [
+        "route_outcomes",
+        "per_family_degradation",
+        "goal_adherence",
+        "rule_outcomes"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Instruction perturbation is separate from scene-physics distribution shift.",
+        "Robustness must not be achieved by ignoring legitimate goals."
+      ],
+      "sources": [
+        "https://openaccess.thecvf.com/content/CVPR2026W/WDFM-EAI/html/Hamid_ICR-Drive_Instruction_Counterfactual_Robustness_for_End-to-End_Language-Driven_Autonomous_Driving_CVPRW_2026_paper.html"
+      ]
+    },
+    {
+      "id": "mrsq-icml-2026",
+      "name": "MRS.Q",
+      "category": "model_based_rl_search",
+      "capability_target": [
+        "search_value_bias",
+        "model_use_incremental_return"
+      ],
+      "protocol": {
+        "kind": "closed_loop_model_based_rl",
+        "environment_families": [
+          "Gym",
+          "DMC",
+          "HumanoidBench"
+        ]
+      },
+      "metrics": [
+        "return",
+        "lower_tail_return",
+        "value_overestimation_gap",
+        "search_regret",
+        "compute_cost"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "code_noncommercial_license_data_rights_separate",
+      "caveats": [
+        "Paper reports search can degrade performance even with accurate models.",
+        "Minimum ensemble value aggregation is a task-specific pessimism baseline.",
+        "Code CC BY-NC 4.0; data and environment terms separate."
+      ],
+      "sources": [
+        "https://proceedings.mlr.press/v306/chang26a.html",
+        "https://github.com/facebookresearch/MRSQ"
+      ]
+    },
+    {
+      "id": "navsim-v2-epdms-2026",
+      "name": "NAVSIM v2 / Extended Predictive Driver Model Score",
+      "category": "planning_pseudo_simulation",
+      "capability_target": [
+        "trajectory_planning",
+        "pseudo_simulated_outcome",
+        "component_safety_comfort_progress"
+      ],
+      "protocol": {
+        "kind": "two_stage_pseudo_simulation_non_interactive_with_reactive_agent_support",
+        "official_devkit": "not_pinned_for_secondary_SOTA2_snapshot",
+        "first_stage_horizon_seconds": 4,
+        "followup_scene_horizon_seconds": 4,
+        "followup_weighting": "precomputed_followup_scenes_weighted_by_proximity_to_planner_first_stage_endpoint",
+        "version_matrix": [
+          {
+            "release": "v2.1",
+            "role": "introduced two-stage pseudo-simulation and support for reactive traffic-agent policies"
+          },
+          {
+            "release": "v2.1.2",
+            "role": "updated EPDMS for the Hugging Face Warmup leaderboard; released navhard_two_stage"
+          },
+          {
+            "release": "v2.2",
+            "role": "official devkit version for AGC2025; added private_test_hard"
+          }
+        ],
+        "live_reciprocal_online_loop": false,
+        "sequential_interaction": false,
+        "reactive_traffic_agent_policy_support": true
+      },
+      "metrics": [
+        "NC",
+        "DAC",
+        "DDC",
+        "TLC",
+        "EP",
+        "TTC",
+        "LK",
+        "HC",
+        "EC",
+        "EPDMS"
+      ],
+      "source_status": "secondary_leaderboard_snapshot",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "secondary_board": "SOTA2",
+        "snapshot_date": "2026-11-10",
+        "leaderboard_version": "SOTA2 NAVSIM v2 display crawled 2026-11-10; secondary page does not expose exact evaluator/split",
+        "methods": [
+          {
+            "name": "Human Agent",
+            "NC": 100,
+            "DAC": 100,
+            "DDC": 99.8,
+            "TLC": 100,
+            "EP": 87.4,
+            "TTC": 100,
+            "LK": 100,
+            "HC": 98.1,
+            "EC": 90.1,
+            "EPDMS": 90.3
+          },
+          {
+            "name": "TPS-Drive",
+            "NC": 98.5,
+            "DAC": 98.6,
+            "DDC": 99.7,
+            "TLC": 99.8,
+            "EP": 87.6,
+            "TTC": 98,
+            "LK": 97.1,
+            "HC": 98.3,
+            "EC": 82.5,
+            "EPDMS": 86.7
+          },
+          {
+            "name": "CdDrive",
+            "NC": 98.3,
+            "DAC": 97.4,
+            "DDC": 99.6,
+            "TLC": 99.8,
+            "EP": 88.4,
+            "TTC": 97.9,
+            "LK": 97.5,
+            "HC": 98.4,
+            "EC": 88.2,
+            "EPDMS": 86.4
+          },
+          {
+            "name": "DriveVLA-W0",
+            "NC": 98.5,
+            "DAC": 99.1,
+            "DDC": 98,
+            "TLC": 99.7,
+            "EP": 86.4,
+            "TTC": 98.1,
+            "LK": 93.2,
+            "HC": 97.9,
+            "EC": 58.9,
+            "EPDMS": 86.1
+          },
+          {
+            "name": "HydraMDP++",
+            "NC": 98.5,
+            "DAC": 98.5,
+            "DDC": 99.5,
+            "TLC": 99.7,
+            "EP": 87.4,
+            "TTC": 97.9,
+            "LK": 95.8,
+            "HC": 98.2,
+            "EC": 75.7,
+            "EPDMS": 85.6
+          },
+          {
+            "name": "ResAD",
+            "NC": 97.8,
+            "DAC": 97.2,
+            "DDC": 99.5,
+            "TLC": 99.8,
+            "EP": 88.2,
+            "TTC": 96.9,
+            "LK": 97,
+            "HC": 98.4,
+            "EC": 88.2,
+            "EPDMS": 85.5
+          },
+          {
+            "name": "DiffusionDrive",
+            "NC": 98.2,
+            "DAC": 95.9,
+            "DDC": 99.4,
+            "TLC": 99.8,
+            "EP": 87.5,
+            "TTC": 97.3,
+            "LK": 96.8,
+            "HC": 98.3,
+            "EC": 87.7,
+            "EPDMS": 84.5
+          },
+          {
+            "name": "PRIX",
+            "NC": 98,
+            "DAC": 95.6,
+            "DDC": 99.5,
+            "TLC": 99.8,
+            "EP": 87.4,
+            "TTC": 97.2,
+            "LK": 97.1,
+            "HC": 98.3,
+            "EC": 87.6,
+            "EPDMS": 84.2
+          },
+          {
+            "name": "ARTEMIS",
+            "NC": 98.3,
+            "DAC": 95.1,
+            "DDC": 98.6,
+            "TLC": 99.8,
+            "EP": 81.5,
+            "TTC": 97.4,
+            "LK": 96.5,
+            "HC": 98.3,
+            "EC": null,
+            "EPDMS": 83.1
+          }
+        ],
+        "unit": "percentage points unless the upstream table defines otherwise; use upstream evaluator for exact semantics",
+        "snapshot_devkit_version": "unknown_not_exposed_by_secondary_board",
+        "snapshot_split": "unknown_not_exposed_by_secondary_board"
+      },
+      "caveats": [
+        "SOTA2 is a secondary leaderboard and the 2026-11-10 displayed table is not independently verified by SAM; values are discovery references only.",
+        "NAVSIM v2 includes two-stage pseudo-closed-loop evaluation and reactive traffic-agent policy support, but the official README states pseudo-simulation is neither sequential nor interactive; do not describe it as a reciprocal online ego/actor policy loop.",
+        "The secondary SOTA2 snapshot does not expose a verifiable exact devkit release or split. Pin those before reproducing or comparing scores.",
+        "EPDMS aggregates multiple component metrics; report NC, DAC, DDC, TLC, EP, TTC, LK, HC and EC separately.",
+        "Exact evaluator revision, filtering, checkpoint, data split, observation privilege and rights must be pinned before reproducing or comparing numbers."
+      ],
+      "sources": [
+        "https://github.com/autonomousvision/navsim/blob/main/README.md",
+        "https://github.com/autonomousvision/navsim",
+        "https://github.com/autonomousvision/navsim/releases",
+        "https://papers.nips.cc/paper_files/paper/2024/file/32768f7faf1995026ef9821c696f3404-Abstract-Datasets_and_Benchmarks_Track.html",
+        "https://www.sota2.com/research/sota/autonomous-driving-planning-on-navsim-v2"
+      ]
+    },
+    {
+      "id": "nist-mavs-2026",
+      "name": "NIST Measurement Science for Automated Vehicles",
+      "category": "measurement_framework_not_leaderboard",
+      "capability_target": [
+        "surrogate_measurement",
+        "outcome_prediction",
+        "counterfactual_action_measurement",
+        "recurring_deviation_diagnosis"
+      ],
+      "protocol": {
+        "kind": "four_tier_measurement_framework",
+        "tiers": [
+          "surrogate_metrics",
+          "outcome_prediction",
+          "counterfactual_action_comparison",
+          "recurring_deviation_diagnosis"
+        ]
+      },
+      "metrics": [
+        "tier_specific_measurands"
+      ],
+      "source_status": "framework_reference",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Alignment target only; no NIST endorsement or conformance claim."
+      ],
+      "sources": [
+        "https://www.nist.gov/programs-projects/measurement-science-automated-vehicles-0"
+      ]
+    },
+    {
+      "id": "physical-ai-world-model-survey-2026",
+      "name": "A survey of world models for physical AI with uncertainty representation and control",
+      "category": "survey_not_benchmark",
+      "capability_target": [
+        "model_design_taxonomy",
+        "closed_loop_control_synthesis"
+      ],
+      "protocol": {
+        "kind": "survey",
+        "published": "2026-09-03",
+        "design_axes": [
+          "state_abstraction",
+          "temporal_dynamics",
+          "uncertainty_source_and_treatment",
+          "structural_prior",
+          "observation_modality",
+          "decision_coupling"
+        ]
+      },
+      "metrics": [
+        "taxonomy_descriptors"
+      ],
+      "source_status": "peer_reviewed_survey",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Use as design taxonomy, not an empirical performance benchmark."
+      ],
+      "sources": [
+        "https://link.springer.com/article/10.1007/s44163-026-02122-1"
+      ]
+    },
+    {
+      "id": "reactsim-bench-2026",
+      "name": "ReactSim-Bench",
+      "category": "reactive_agent_world_model",
+      "capability_target": [
+        "reactive_surrounding_agent_simulation",
+        "ego_conditioned_actor_response",
+        "interaction_safety_and_feasibility"
+      ],
+      "protocol": {
+        "kind": "ego_deviation_conditioned_reactive_agent_evaluation",
+        "dataset": "nuPlan",
+        "test_scenarios": 2636,
+        "scenario_duration_seconds": 9,
+        "history_seconds": 1,
+        "future_seconds": 8,
+        "sampling_hz": 10,
+        "deviation_categories": {
+          "longitudinal": 937,
+          "directional": 799,
+          "lateral": 900
+        },
+        "ego_control": "pre-generated ego behavior deviations; agents are simulated separately"
+      },
+      "metrics": [
+        "AV_Agent_Collision_Count",
+        "AV_Agent_Risky_Count",
+        "Agent_Agent_Collision_Percent",
+        "Offroad_Percent",
+        "Direction_Violation_Percent",
+        "Acceleration_Infeasibility_Percent",
+        "Steering_Infeasibility_Percent"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "selected_method": "SMART",
+        "AV_Agent_Collision_Count": 0.1419,
+        "AV_Agent_Risky_Count": 0.3976,
+        "Agent_Agent_Collision_Percent": 2.23,
+        "Offroad_Percent": 0.68,
+        "Direction_Violation_Percent": 1.09,
+        "Acceleration_Infeasibility_Percent": 9.74,
+        "Steering_Infeasibility_Percent": 4.83
+      },
+      "caveats": [
+        "Numbers are reported in the benchmark repository and have not been independently reproduced by SAM.",
+        "Metrics have distinct units and denominators; do not collapse them into one score.",
+        "The ego deviations are scenario inputs. The benchmark is not, by itself, a fully reciprocal online ego/actor policy loop.",
+        "Use Symtropy #3532 for the complementary reciprocal interaction research track."
+      ],
+      "sources": [
+        "https://github.com/Thinklab-SJTU/ReactSim-Bench",
+        "https://arxiv.org/abs/2606.14058",
+        "https://huggingface.co/datasets/zzzy0729/ReactSim-Bench-Data"
+      ]
+    },
+    {
+      "id": "sam-traffic-convention-mirror-v0.1",
+      "name": "SAM Traffic Convention Mirror Metamorphic",
+      "category": "synthetic_metamorphic_conformance",
+      "capability_target": [
+        "traffic_side_profile_admission",
+        "lane_side_semantics",
+        "RHD_LHT_transform_equivariance",
+        "steering_sign_equivariance"
+      ],
+      "protocol": {
+        "kind": "paired_synthetic_metamorphic",
+        "scene_pairs": 1,
+        "traffic_profiles": 3,
+        "traffic_sides": [
+          "left",
+          "right"
+        ],
+        "steering_layout_control": true,
+        "map_rule_profile_match_required": true
+      },
+      "metrics": [
+        "paired_transform_invariant_pass_rate",
+        "rule_profile_conflict_rejection_rate",
+        "lane_role_preservation_rate",
+        "steering_sign_equivariance_rate",
+        "unknown_rule_abstention_rate"
+      ],
+      "source_status": "sam_proposed_internal_contract",
+      "rights_status": "internal_synthetic_fixture",
+      "caveats": [
+        "The initial fixture is synthetic and contains one mirrored crossing-actor pair plus a same-traffic-side steering-layout control.",
+        "No country-specific rule profile is marked verified.",
+        "This is a semantic/metamorphic conformance test, not a driving leaderboard or a real-road performance measure.",
+        "Targets are prospective and have not yet been independently reproduced."
+      ],
+      "sources": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11123"
+      ]
+    },
+    {
+      "id": "waymo-open-motion-2025",
+      "name": "Waymo Open Motion Dataset",
+      "category": "open_loop_motion_forecasting",
+      "capability_target": [
+        "multi_agent_motion_forecasting",
+        "trajectory_prediction"
+      ],
+      "protocol": {
+        "kind": "open_loop",
+        "segments": 103354,
+        "segment_seconds": 20,
+        "frequency_hz": 10,
+        "hours": 574,
+        "last_official_page_update": "2025-10"
+      },
+      "metrics": [
+        "minADE",
+        "minFDE",
+        "miss_rate",
+        "calibration_if_defined"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Recorded factual futures are not episode-specific counterfactual ground truth.",
+        "Not a closed-loop decision benchmark."
+      ],
+      "sources": [
+        "https://www.waymo.com/open/about/"
+      ]
+    },
+    {
+      "id": "world-in-world-2026",
+      "name": "World-In-World",
+      "category": "non_driving_closed_loop_embodied",
+      "capability_target": [
+        "world_model_incremental_task_value",
+        "controllability"
+      ],
+      "protocol": {
+        "kind": "closed_loop",
+        "tasks": [
+          "active_recognition",
+          "active_embodied_QA",
+          "image_goal_navigation",
+          "robotic_manipulation"
+        ]
+      },
+      "metrics": [
+        "task_success",
+        "active_recognition_success",
+        "QA_score",
+        "navigation_success",
+        "SPL",
+        "manipulation_success"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Non-driving embodied track; do not combine scores with AV benchmarks.",
+        "Paper emphasizes controllability and action-observation post-training over visual quality alone."
+      ],
+      "sources": [
+        "https://world-in-world.github.io/",
+        "https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html"
+      ]
+    },
+    {
+      "id": "world-model-benchmark-survey-2026",
+      "name": "A Survey of World Model Benchmarks",
+      "category": "survey_not_benchmark",
+      "capability_target": [
+        "benchmark_taxonomy",
+        "evidence_protocol_coverage"
+      ],
+      "protocol": {
+        "kind": "systematic_benchmark_survey",
+        "benchmark_count": 130,
+        "final_snapshot": "2026-11-09"
+      },
+      "metrics": [
+        "protocol_coverage",
+        "metric_level_coverage",
+        "data_source_categories"
+      ],
+      "source_status": "survey_coded_snapshot",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "closed_loop_benchmarks": 13,
+        "downstream_outcome_benchmarks": 14,
+        "web_snapshot_date": "2026-11-09"
+      },
+      "caveats": [
+        "Survey-specific coding counts, not a universal census.",
+        "The live survey page now displays 130 coded representative benchmark entries; category counts overlap and this is not an exhaustive census of all autonomy benchmarks."
+      ],
+      "sources": [
+        "https://world-model-benchmarks.github.io/"
+      ]
+    },
+    {
+      "id": "wosac-2025",
+      "name": "Waymo Open Sim Agents Challenge",
+      "category": "interactive_agent_simulation",
+      "capability_target": [
+        "multi_agent_realism",
+        "interactivity",
+        "kinematics",
+        "map_adherence"
+      ],
+      "protocol": {
+        "kind": "simulated_multi_agent",
+        "release": "2025 challenge"
+      },
+      "metrics": [
+        "realism",
+        "kinematics",
+        "interactivity",
+        "map_adherence"
+      ],
+      "source_status": "secondary_leaderboard_snapshot",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "SMART_R1": {
+          "realism": 78.58,
+          "kinematics": 49.44,
+          "interactivity": 81.1,
+          "map_adherence": 92.01
+        }
+      },
+      "caveats": [
+        "SOTA2 is secondary leaderboard signal, not independently verified official score.",
+        "Do not infer human behavior validity or ego-controller safety."
+      ],
+      "sources": [
+        "https://www.sota2.com/research/sota/motion-simulation-on-waymo-open-sim-agents-challenge-2025"
+      ]
+    },
+    {
+      "id": "nuplan-r-2026",
+      "name": "nuPlan-R: Reactive Multi-Agent Closed-Loop Planning",
+      "category": "closed_loop_reactive_multi_agent_planning",
+      "capability_target": [
+        "online_ego_agent_feedback",
+        "reactive_multi_agent_simulation",
+        "interaction_realism_and_diversity",
+        "long_tail_closed_loop_planning"
+      ],
+      "protocol": {
+        "kind": "reciprocal_reactive_closed_loop",
+        "base_benchmark": "nuPlan",
+        "splits": [
+          "Test14-Random",
+          "Test14-Hard"
+        ],
+        "ego_policy_update_hz": 10,
+        "surrounding_agent_update_hz": 10,
+        "reactive_agents": "noise-decoupled diffusion agent for interaction-selected top-k actors",
+        "background_agents": "log-replay for actors outside selected top-k",
+        "vehicle_tracking": "LQR controller with kinematic bicycle model",
+        "agent_model_realism_horizon_seconds": 8
+      },
+      "metrics": [
+        "TTC_JSD",
+        "Cluster_Trajectory_FID",
+        "Trajectory_Geometry_Shannon_Entropy",
+        "Offroad_Percent",
+        "Other_Other_Collision_Percent",
+        "Ego_Other_Collision_Percent",
+        "Closed_Loop_Score",
+        "Success_Rate",
+        "All_Core_Pass_Rate"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "date": "2026-11-08",
+        "agent_model_test14_hard": {
+          "nuPlan_R": {
+            "TTC_JSD_x1e_minus_2": 1.49,
+            "Cluster_Trajectory_FID": 1.84,
+            "Shannon_Entropy": 0.987,
+            "Offroad_Percent": 4.79,
+            "Other_Other_Collision_Percent": 0.44,
+            "Ego_Other_Collision_Percent": 1.45
+          },
+          "IDM": {
+            "TTC_JSD_x1e_minus_2": 6.15,
+            "Cluster_Trajectory_FID": 2.52,
+            "Shannon_Entropy": 0.841,
+            "Offroad_Percent": 0,
+            "Other_Other_Collision_Percent": 0.17,
+            "Ego_Other_Collision_Percent": 2.33
+          },
+          "Nexus": {
+            "TTC_JSD_x1e_minus_2": 1.8,
+            "Cluster_Trajectory_FID": 2.17,
+            "Shannon_Entropy": 0.975,
+            "Offroad_Percent": 5.53,
+            "Other_Other_Collision_Percent": 0.42,
+            "Ego_Other_Collision_Percent": 1.75
+          }
+        },
+        "planner_test14_hard": {
+          "Diffusion_Planner_nuPlan_R": {
+            "Closed_Loop_Score": 75.7,
+            "Success_Rate_Percent": 84.19,
+            "All_Core_Pass_Rate_Percent": 64.7
+          },
+          "Diffusion_Planner_original_nuPlan_IDM": {
+            "Closed_Loop_Score": 68.83
+          }
+        }
+      },
+      "caveats": [
+        "Values are author-reported from arXiv:2511.10403 / IEEE IV 2026 and have not been independently reproduced by SAM.",
+        "nuPlan-R uses top-k interaction selection for full reactive rollouts; other surrounding actors follow log replay.",
+        "The planner benchmark uses LQR trajectory tracking and a kinematic bicycle model; it is not a complete perception-to-actuation physical vehicle qualification.",
+        "The agent-model realism scores do not establish human behavioral fidelity or physical simulator validity.",
+        "The author-linked GitHub URL was not retrievable through the current GitHub file connector; pin the repository commit and verify access/license directly before attempting reproduction."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2511.10403",
+        "https://doi.org/10.1109/IV66570.2026.11623929",
+        "https://github.com/Pemixing/nuPlan-R",
+        "https://www.nuscenes.org/nuplan"
+      ]
+    },
+    {
+      "id": "wod-e2e-long-tail-2026",
+      "name": "WOD-E2E — Waymo Open Dataset for End-to-End Driving in Challenging Long-tail Scenarios",
+      "category": "open_loop_long_tail_trajectory_preference",
+      "capability_target": [
+        "long_tail_trajectory_prediction",
+        "expert_preference_alignment",
+        "multi_camera_scene_understanding"
+      ],
+      "protocol": {
+        "kind": "open_loop_trajectory_preference_evaluation",
+        "segments_total": 4021,
+        "duration_hours_approx": 12,
+        "reported_occurrence_frequency_below_percent": 0.03,
+        "camera_count": 8,
+        "split": {
+          "train": 2037,
+          "validation": 479,
+          "test": 1505
+        },
+        "test_context_seconds": 12,
+        "test_future_prediction_seconds": 5,
+        "test_future_labels": "withheld",
+        "preference_labels": "expert_rater_feedback"
+      },
+      "metrics": [
+        "RFS_Overall",
+        "RFS_Spotlight",
+        "ADE_3s",
+        "ADE_5s"
+      ],
+      "source_status": "secondary_leaderboard_snapshot",
+      "rights_status": "dataset_terms_to_check",
+      "snapshot": {
+        "secondary_board": "SOTA2",
+        "snapshot_observed_date": "2026-11-09",
+        "page_last_updated_relative": "about five months ago",
+        "top_displayed_method": "DriveMA-4B",
+        "RFS_Overall": 8.079,
+        "RFS_Spotlight": 7.169,
+        "ADE_5s_m": 2.67,
+        "ADE_3s_m": 1.166
+      },
+      "caveats": [
+        "The score snapshot is from a secondary leaderboard page that reports an update about five months ago; it is not a fresh independent reproduction.",
+        "Official WOD-E2E RFS evaluates expert trajectory preference on recorded scenes; it is open-loop and does not establish reciprocal actor response or closed-loop intervention outcomes.",
+        "Use the official split, camera inputs, rater labels, trajectory horizon and evaluator revision; don't infer missing labels or compare data-privileged methods against sensor-limited methods without a separate track.",
+        "Report overall, Spotlight, scenario-cluster and ADE dimensions separately; RFS is not a safety metric.",
+        "Do not infer public-road safety, physical sensor qualification, or counterfactual correctness from benchmark performance."
+      ],
+      "sources": [
+        "https://www.waymo.jp/intl/jp/open/data/e2e/",
+        "https://openaccess.thecvf.com/content/CVPR2026/html/Xu_WOD-E2E_Waymo_Open_Dataset_for_End-to-End_Driving_in_Challenging_Long-tail_CVPR_2026_paper.html",
+        "https://www.sota2.com/research/sota/autonomous-driving-planning-on-wod-e2e"
+      ]
+    },
+    {
+      "id": "wod-e2e-driving-challenge-board-2026",
+      "name": "WOD-E2E Driving Challenge leaderboard view — separate SOTA2 task display",
+      "category": "open_loop_e2e_driving_leaderboard_view",
+      "capability_target": [
+        "end_to_end_trajectory_prediction",
+        "expert_rater_preference_alignment"
+      ],
+      "protocol": {
+        "kind": "secondary_leaderboard_view_protocol_unresolved",
+        "dataset_family": "Waymo Open Dataset E2E",
+        "view_title": "End-to-End Driving on Waymo E2E Driving Challenge",
+        "exact_split": "not established from the secondary page",
+        "evaluator_revision": "not established from the secondary page",
+        "submission_protocol": "not established from the secondary page"
+      },
+      "metrics": [
+        "RFS_Overall",
+        "ADE_5s",
+        "ADE_3s"
+      ],
+      "source_status": "secondary_leaderboard_snapshot",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "secondary_board": "SOTA2",
+        "snapshot_observed_date": "2026-11-09",
+        "page_last_updated_relative": "about five months ago",
+        "top_displayed_method": "OpenEMMA (Qwen backbone, 2026.05)",
+        "RFS_Overall": 6.3162,
+        "ADE_5s_m": 4.1078,
+        "ADE_3s_m": 1.8663,
+        "comparison_entry": {
+          "name": "Waymo Baseline",
+          "RFS_Overall": 7.5281,
+          "ADE_5s_m": 3.0182,
+          "ADE_3s_m": 1.32
+        }
+      },
+      "caveats": [
+        "This is a separate SOTA2 page from the WOD-E2E long-tail planning leaderboard; do not compare its scores directly to DriveMA-4B RFS 8.079 on the other page.",
+        "Exact official split, evaluation labels, evaluator revision, checkpoint and submission protocol are not established by the secondary page snapshot.",
+        "Do not infer missing RFS Spotlight or other fields; missing metrics are not zero.",
+        "A secondary leaderboard display is not an official independent reproduction and does not establish closed-loop safety or real-world generalization."
+      ],
+      "sources": [
+        "https://www.sota2.com/research/sota/end-to-end-driving-on-waymo-e2e-driving-challenge-leaderboard",
+        "https://waymo.com/open/challenges/"
+      ]
+    },
+    {
+      "id": "navsim-v2-closed-loop-planning-display-2026",
+      "name": "NAVSIM v2 — SOTA2 closed-loop-planning display (separate task view)",
+      "category": "planning_pseudo_simulation",
+      "capability_target": [
+        "trajectory_planning",
+        "component_safety_comfort_progress",
+        "secondary_leaderboard_comparison"
+      ],
+      "protocol": {
+        "kind": "NAVSIM_v2_two_stage_pseudo_simulation_non_interactive",
+        "leaderboard_view": "SOTA2 Closed-loop Planning on NAVSIM v2",
+        "devkit_version": "not_exposed_by_secondary_board",
+        "official_protocol_note": "NAVSIM v2 pseudo-simulation is not sequential or interactive; a leaderboard title using closed-loop wording does not make it reciprocal online simulation.",
+        "shares_base_protocol_with": "navsim-v2-epdms-2026",
+        "component_metrics": [
+          "NC",
+          "DAC",
+          "DDC",
+          "TLC",
+          "EP",
+          "TTC",
+          "LK",
+          "HC",
+          "EC",
+          "EPDMS"
+        ]
+      },
+      "metrics": [
+        "NC",
+        "DAC",
+        "DDC",
+        "TLC",
+        "EP",
+        "TTC",
+        "LK",
+        "HC",
+        "EC",
+        "EPDMS"
+      ],
+      "source_status": "secondary_leaderboard_snapshot",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "secondary_board": "SOTA2",
+        "snapshot_observed_date": "2026-11-09",
+        "board_last_updated_relative": "about five months ago",
+        "methods": [
+          {
+            "name": "CLEAR",
+            "backbone": "ViT/L",
+            "release_label": "2026.06",
+            "NC": 99,
+            "DAC": 98.7,
+            "DDC": 99.6,
+            "TLC": 96.9,
+            "EP": 91,
+            "TTC": 98.4,
+            "LK": 92.9,
+            "HC": 96.4,
+            "EC": 79.5,
+            "EPDMS": 88.6
+          },
+          {
+            "name": "Drive-JEPA",
+            "backbone": "ResNet34",
+            "release_label": "2026.06",
+            "NC": 98.8,
+            "DAC": 97.4,
+            "DDC": 99,
+            "TLC": 99.8,
+            "EP": 83.5,
+            "TTC": 98,
+            "LK": 96.2,
+            "HC": 98.1,
+            "EC": 85.6,
+            "EPDMS": 85.4
+          }
+        ],
+        "unit": "percentage points unless upstream evaluator specifies otherwise"
+      },
+      "caveats": [
+        "This is a separate SOTA2 task display from the NAVSIM v2 planning page already recorded under navsim-v2-epdms-2026. Do not merge submission tables or assume identical evaluator settings.",
+        "The NAVSIM v2 protocol is two-stage pseudo-simulation with precomputed follow-up scenes; it is not reciprocal online ego/actor policy simulation, despite the display title.",
+        "Values are secondary leaderboard snapshots and have not been reproduced by SAM.",
+        "Exact devkit version, test split, observation privilege, filtering and evaluator revision are not exposed by the secondary page and must be pinned before comparisons.",
+        "Report all component metrics; EPDMS alone does not expose the metric profile."
+      ],
+      "sources": [
+        "https://www.sota2.com/research/sota/closed-loop-planning-on-navsim-v2",
+        "https://github.com/autonomousvision/navsim/blob/main/README.md",
+        "https://github.com/autonomousvision/navsim/releases"
+      ]
+    },
+    {
+      "id": "bench2drive-robust-2026",
+      "name": "Bench2Drive-Robust: Closed-Loop Autonomous Driving under Deployment Perturbations",
+      "category": "closed_loop_deployment_robustness",
+      "capability_target": [
+        "closed_loop_robustness",
+        "sensor_stream_fault_response",
+        "localization_error_robustness",
+        "compute_latency_robustness",
+        "speed_estimation_robustness"
+      ],
+      "protocol": {
+        "kind": "bench2drive_compatible_closed_loop_fixed_policy_perturbation",
+        "simulator": "CARLA 0.9.15",
+        "compatibility": "upstream states Bench2Drive route/scenario compatibility; exact route asset revision to be pinned during reproduction",
+        "robustness_finetuning_during_evaluation": false,
+        "evaluated_models": [
+          "SimLingo-base",
+          "TCP-traj",
+          "UniAD",
+          "VAD"
+        ],
+        "perturbations": [
+          {
+            "type": "gps_localization_noise",
+            "settings_m": [
+              5,
+              15
+            ]
+          },
+          {
+            "type": "inference_control_latency",
+            "settings_ms": [
+              100,
+              200,
+              500
+            ],
+            "mechanism": "FIFO action buffering"
+          },
+          {
+            "type": "cached_burst_camera_frame_drop",
+            "settings_ticks": [
+              20,
+              60
+            ]
+          },
+          {
+            "type": "partial_camera_observation",
+            "settings_percent": [
+              50,
+              80
+            ],
+            "mechanism": "random rectangular occlusion"
+          },
+          {
+            "type": "multiplicative_ego_speed_noise",
+            "settings": [
+              "eta~N(0.5,0.2^2)",
+              "eta~N(0.2,0.2^2)"
+            ]
+          }
+        ]
+      },
+      "metrics": [
+        "closed_loop_route_outcomes",
+        "success_rate",
+        "driving_score",
+        "efficiency",
+        "comfort",
+        "per_perturbation_degradation"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "The authors test fixed policies without robustness fine-tuning.",
+        "Upstream README states CARLA 0.9.15 and Bench2Drive route/scenario compatibility; exact route files and all revisions must be pinned before reproduction.",
+        "Perturbation values are benchmark settings, not universal sensor-fault severities.",
+        "This is not physical sensor qualification, a vehicle safety case, or real-world crash-risk evidence.",
+        "SAM has not reproduced this benchmark."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2605.18059",
+        "https://github.com/Thinklab-SJTU/Bench2Drive-Robust"
+      ]
+    }
+  ],
+  "prospective_targets": {
+    "bench2drive-v0.0.4": "Exceed the strongest reproduced DS without regressing SR, efficiency, comfort or scenario-family outcomes.",
+    "hidrive-2026": "Improve DS without regression in RC, LS or ES; report all 30 ability categories; require commercial authorization before commercial asset use.",
+    "fail2drive-2026": "At least 25% lower relative paired OOD degradation than strongest reproduced baseline with ID SR within 1 percentage point.",
+    "colt-drive-2026": "Exceed 60.8% action-pair accuracy at matched split/input privilege and report worst rare-object-family errors.",
+    "driving-world-model-counterfactual-2026": "At least +0.15 absolute event recovered fraction over direct prediction on exact same cases, with identity/timing/geometry non-inferior.",
+    "mrsq-icml-2026": "Reduce search-induced optimism/regret at matched compute without worsening tail performance, feasibility or deadlines.",
+    "navsim_v2_epdms_2026": "Reproduce the current strongest matched EPDMS baseline first; then improve the aggregate and individual NC/DAC/DDC/TLC/EP/TTC/LK/HC/EC dimensions on sealed slices without worsening worst-family results.",
+    "reactsim_bench_2026": "Beat strongest reproduced actor-world-model baselines on matched ego-deviation inputs, preserving AV-agent risk, agent-agent collision, off-road, direction and kinematic feasibility metrics separately; qualify reciprocal online interaction separately.",
+    "sam-traffic-convention-mirror-v0.1": "100% of exact paired geometric/control sign invariants; 100% of missing/stale/map-rule-mismatch negatives reject or remain unresolved; 0 silent inference of traffic side from steering-wheel layout, GPS, map appearance or image pixel orientation.",
+    "drivinggen_iclr_2026": "Reproduce the exact 400-paper-sample or separately frozen hosted-card release with pinned sample IDs, then improve worst-stratum scene/agent temporal consistency, automotive imaging quality, trajectory feasibility and ego-control alignment without regressions. Add a distinct decision-value experiment: counterfactual planner outcome and reactive-agent response under matched action/call budgets; do not treat visual scores as downstream safety.",
+    "nuplan_r_2026": "Reproduce the exact nuPlan-R Diffusion-Planner Test14-Hard baseline first. Stretch target: +2 CLS points and +2 percentage points Success Rate at matched settings, with no regression in All-Core Pass Rate, worst-family collision/off-road, agent realism/diversity or p99 latency. All thresholds are prospective and require paired family-cluster uncertainty intervals."
+  },
+  "global_rules": [
+    "No composite score across non-comparable benchmark families.",
+    "Author-reported, secondary-board, independently-reproduced and SAM-reproduced result states remain distinct.",
+    "A public code license does not automatically grant dataset/asset rights.",
+    "Missing, timeout, censored and unsupported scenarios remain in the denominator with typed status.",
+    "Benchmark adapters do not constitute benchmark reproduction.",
+    "All target thresholds are prospective, not measured Symthaea results.",
+    "NAVSIM v2 is a non-reactive pseudo-simulation profile; do not describe it as fully interactive closed-loop traffic simulation.",
+    "ReactSim-Bench evaluates surrounding-agent responses to pre-generated ego deviations; it is not a complete reciprocal online ego/actor policy loop.",
+    "System architecture references (for example Autoware 2.0) are not benchmark results and are stored separately from benchmark entries.",
+    "SAM-developed synthetic conformance crucibles are stored separately from external benchmark leaderboard records; a passing synthetic suite is not external benchmark reproduction or physical-safety evidence.",
+    "nuPlan-R is a reciprocal reactive loop at the planner/actor layer, but interaction-selected top-k agents receive diffusion rollouts while remaining agents follow log replay; distinguish this from all-agent reciprocal re-planning and from physical vehicle validation.",
+    "World-model benchmark-landscape counts are cross-domain taxonomy data, not driving-only counts; preserve target-specific denominators and distinguish closed-loop protocol from downstream outcome metrics.",
+    "SAM-developed Follow oracle/observation-domain experiments remain in internal_conformance_crucibles until exact-head tests and frozen scenario/action metrics are executed; no authored test is a result.",
+    "WOD-E2E is an open-loop expert-preference / long-tail trajectory benchmark; RFS is not a closed-loop safety or counterfactual outcome metric.",
+    "Different secondary leaderboard pages for WOD-E2E are distinct benchmark views until exact split, label, evaluator and submission protocols are proven identical; never compare scores across those views directly.",
+    "Research method references (for example SURE-Plan) are distinct from benchmark records; do not invent leaderboard values or infer a matched SOTA comparison from abstract-level claims.",
+    "Observation-constrained future option preservation is stored as a SAM-developed synthetic falsification crucible, not an external benchmark result; a common continuation across a declared finite envelope is not a global viability or physical safety proof."
+  ],
+  "system_references": [
+    {
+      "id": "autoware-2.0.0-2026",
+      "name": "Autoware 2.0.0",
+      "category": "open_source_autonomy_architecture_reference",
+      "reference_date": "2026-11-02",
+      "architecture": [
+        "generator_selector_design",
+        "rule_based_planner",
+        "diffusion_planner"
+      ],
+      "implementation_status": {
+        "rule_based_stack": "default",
+        "diffusion_planner": "selectable_at_launch",
+        "multiple_generators_parallel": "architecture_goal_not_released_2_0_0_behavior",
+        "selector_node": "documented_but_not_launched_in_2_0_0"
+      },
+      "comparison_use": "Architecture comparator only; not a benchmark score.",
+      "sources": [
+        "https://github.com/autowarefoundation/autoware/releases",
+        "https://autoware.org/autoware-foundation-releases-autoware-2-0-to-expand-ai-support-for-open-source-autonomous-driving/",
+        "https://docs.autoware.org/main/design/autoware-architecture-v2/"
+      ]
+    }
+  ],
+  "operational_outcome_references": [
+    {
+      "id": "waymo-safety-impact-through-june-2026",
+      "name": "Waymo Safety Impact",
+      "category": "operational_outcome_comparison_not_benchmark",
+      "measurement_window": "through_2026-06-30",
+      "published_update": "2026-09-24",
+      "source_status": "company_reported_operational_outcome",
+      "exposure": {
+        "release_reported_fully_autonomous_miles_lower_bound": 270000000,
+        "data_hub_rider_only_miles": 271300000,
+        "geographies": [
+          "Atlanta",
+          "Austin",
+          "Los Angeles",
+          "Phoenix",
+          "San Francisco"
+        ],
+        "measurement_window": "through_2026-06-30",
+        "definition_note": "The September release describes over 270 million fully autonomous operating miles; the Safety Impact data hub separately displays 271.3 million rider-only miles. Preserve the source-specific definitions and publication snapshots; do not treat rounded release and live dashboard values as exactly identical measures."
+      },
+      "metrics": {
+        "all_locations_serious_injury_or_worse_crashes_per_million_miles": {
+          "waymo": 0.01,
+          "human_benchmark": 0.21
+        },
+        "all_locations_any_injury_reported_crashes_per_million_miles": {
+          "waymo": 0.67,
+          "human_benchmark": 3.77
+        },
+        "estimated_injury_causing_crashes_avoided": 841
+      },
+      "rights_status": "publicly_downloadable_data_terms_to_review",
+      "caveats": [
+        "Company-reported operational data; not independently reproduced by SAM.",
+        "Geographic, mileage, outcome-definition, benchmark-adjustment and methodology assumptions are material.",
+        "Do not compare directly with simulation benchmark scores or extrapolate to a different ODD.",
+        "Reproduction requires the downloadable safety data, methodology, outcome definitions, release notes and geography/exposure denominators.",
+        "The 841 avoided-crash figure is an estimate against the stated human benchmark, not a directly observed counterfactual count.",
+        "The September release says over 270 million fully autonomous miles, while the current data hub separately displays 271.3 million rider-only miles. Preserve source-specific definitions and snapshots rather than conflating them."
+      ],
+      "sources": [
+        "https://waymo.com/safety/impact/",
+        "https://blog.waymo.com/blog/shorts/safetydata-september26/"
+      ]
+    }
+  ],
+  "internal_conformance_crucibles": [
+    {
+      "id": "sam-scene-traffic-evidence-bundle-v0.1",
+      "name": "SAM Scene Evidence + Traffic Convention Mirror Bundle v0.1",
+      "category": "synthetic_contract_conformance",
+      "capability_target": [
+        "metric_scene_evidence_admission",
+        "jurisdiction_parametric_lane_semantics",
+        "left_right_traffic_mirror_equivariance",
+        "cross_contract_frame_and_profile_closure",
+        "fail_closed_negative_controls",
+        "source_role_domain_separation"
+      ],
+      "protocol": {
+        "kind": "paired_synthetic_metamorphic_scene",
+        "paired_scene_count": 2,
+        "traffic_profiles": [
+          {
+            "traffic_side": "left",
+            "steering_wheel_position": "right"
+          },
+          {
+            "traffic_side": "right",
+            "steering_wheel_position": "left"
+          },
+          {
+            "traffic_side": "left",
+            "steering_wheel_position": "left"
+          }
+        ],
+        "coordinate_transform": "x'=x; y'=-y; z'=z",
+        "signed_state_transforms": [
+          "heading",
+          "curvature",
+          "lateral_offset",
+          "lateral_velocity",
+          "yaw_rate",
+          "steering_angle",
+          "steering_command"
+        ],
+        "cross_contract_validation": true,
+        "source_roles": [
+          "local_sensor_observation",
+          "synthetic_sensor_observation",
+          "remote_cooperative_claim",
+          "simulator_oracle",
+          "map_prior",
+          "derived_estimate",
+          "unknown"
+        ]
+      },
+      "metrics": [
+        "validator_test_pass_count",
+        "mirror_equivariance_pass_rate",
+        "invalid_profile_rejection_rate",
+        "wrong_frame_profile_rejection_rate",
+        "untransformed_steering_rejection_rate",
+        "unknown_passing_authority_rejection_rate",
+        "source_role_cross_domain_rejection_rate"
+      ],
+      "source_status": "sam_reproduced",
+      "rights_status": "synthetic_no_external_dataset",
+      "validation_result": {
+        "exact_head": "3f31696570b273c40ec9649dc6598590931e7bf9",
+        "workflow_run_id": 42656397728,
+        "unit_tests_total": 50,
+        "unit_tests_passed": 50,
+        "unit_tests_failed": 0,
+        "format": "passed",
+        "scene_schema_and_fixture": "passed",
+        "traffic_profile_schema_and_fixture": "passed",
+        "cross_contract_profile_resolution": "passed",
+        "cross_contract_road_frame_closure": "passed",
+        "source_role_domain_separation": "passed",
+        "strict_clippy": "passed",
+        "follow_target_geometry_time_provenance": "passed",
+        "left_right_mirror_equivariance": "passed"
+      },
+      "caveats": [
+        "This is a SAM-authored synthetic conformance suite, not an external leaderboard.",
+        "Two paired synthetic scenes and three synthetic traffic profiles do not represent broad road-jurisdiction or scenario coverage.",
+        "The 50 tests include structural and semantic fixtures, not 50 independent driving episodes or a statistical sample of road interactions.",
+        "Passing tests do not establish national traffic-law correctness, local sensor accuracy, map fidelity, real-road generalization, roadworthiness or safety.",
+        "The paired-scene count and all control-family denominators must accompany future pass-rate claims."
+      ],
+      "sources": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11111",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11123",
+        "https://github.com/Luminous-Dynamics/symthaea/actions/runs/42485276624",
+        "https://www.iso.org/standard/78951.html",
+        "https://saemobilus.sae.org/standards/j3164_202301-ontology-lexicon-automated-driving-system-ads-operated-vehicle-behaviors-maneuvers-routine-normal-operating-scenarios"
+      ]
+    },
+    {
+      "id": "sam-follow-oracle-observation-separation-v0.1",
+      "name": "SAM Follow Oracle / Student-Teacher Privilege Separation v0.3",
+      "category": "synthetic_training_information_privilege",
+      "capability_target": [
+        "simulator_truth_source_separation",
+        "observation_time_alignment",
+        "same_road_lead_selection",
+        "fail_closed_target_freshness",
+        "privileged_teacher_vs_observed_input_distinction",
+        "teacher_blend_vs_supervision_separation",
+        "student_teacher_action_gap_measurement",
+        "frozen_policy_teacher_free_evaluation",
+        "evaluator_only_shadow_teacher",
+        "teacher_reference_only_classification"
+      ],
+      "protocol": {
+        "kind": "synthetic_action_teacher_and_target_admission",
+        "ego_time_policy": "select latest peer history snapshot at or before ego observation time; never future",
+        "target_selection": [
+          "positive_forward_gap",
+          "same_road_projection",
+          "lateral_corridor",
+          "maximum_range",
+          "maximum_age"
+        ],
+        "consumer": "training_teacher_and_follow_reward",
+        "student_input_layout": "legacy_20_channel_vehicle_state_unchanged",
+        "missing_or_stale_target": "baseline_cruise_teacher_and_zero_follow_gap_reward",
+        "evidence_domains": [
+          "simulator_oracle_truth",
+          "delayed_mesh_aggregate",
+          "local_tracked_object_observation",
+          "remote_cooperative_v2x_claim"
+        ],
+        "training_information_flow": {
+          "student_input": "existing simulated 20D VehicleState",
+          "privileged_teacher_target": "typed SimulatorOracleFollowTarget may be consumed by PD teacher",
+          "teacher_uses": [
+            "action_blending_when_pd_weight_positive",
+            "BPTT_supervision_on_train_every_steps"
+          ],
+          "explicit_flags": [
+            "teacher_action_used_for_blend",
+            "teacher_action_used_for_supervision",
+            "teacher_action_evaluation_only",
+            "follow_oracle_used_for_policy",
+            "teacher_action_reference_only"
+          ]
+        },
+        "action_trace": [
+          "student_raw_proposal",
+          "teacher_target",
+          "post_blend_pre_exploration",
+          "executed_simulator_command"
+        ],
+        "action_difference_metric": "mean absolute delta across steering/throttle/brake, named student_teacher_action_delta_l1",
+        "frozen_evaluation": {
+          "api": [
+            "VehicleTrainer::run_evaluation_episode_with_sim",
+            "VehicleTrainer::run_evaluation_episode"
+          ],
+          "teacher_action_blend_weight": 0,
+          "bptt_updates": false,
+          "replay_buffer_updates": false,
+          "exploration_noise": false,
+          "controller_output_projection_must_remain_unchanged": true,
+          "shadow_teacher": "optional telemetry-only reference; teacher_action_evaluation_only=true and teacher_action_reference_only=true; never blended or supervised",
+          "simulator_oracle": "may be retained for outcome/reward scoring; must not influence the policy",
+          "gradient_updates": false,
+          "replay_updates": false,
+          "trainable_controller_parameters_mutate": false,
+          "output_projection_immutability_test": true,
+          "recurrent_hidden_state_evolution": true,
+          "periodic_state_normalization": true,
+          "fep_state_dependent_tau_modulation": true,
+          "interpretation": "No teacher-driven or gradient-based parameter updates; recurrent state and declared FEP runtime modulation remain active inference-time behavior."
+        }
+      },
+      "metrics": [
+        "valid_target_availability_fraction",
+        "target_snapshot_age_ms_p50_p95_p99",
+        "future_snapshot_rejection_count",
+        "stale_target_rejection_count",
+        "off_corridor_rejection_count",
+        "behind_or_out_of_range_rejection_count",
+        "wrong_actor_selection_count",
+        "gap_residual_m",
+        "relative_speed_residual_mps",
+        "teacher_action_delta",
+        "no_target_fallback_fraction",
+        "selector_latency_us_p50_p95_p99",
+        "student_teacher_action_delta_l1",
+        "teacher_action_used_for_blend_steps",
+        "teacher_action_used_for_supervision_steps",
+        "teacher_action_evaluation_only_steps",
+        "teacher_free_eval_teacher_blend_count_zero",
+        "teacher_free_eval_bptt_update_count_zero",
+        "teacher_free_eval_replay_update_count_zero",
+        "teacher_free_eval_controller_weight_delta_zero",
+        "teacher_free_eval_executed_vs_blended_command_delta",
+        "telemetry_csv_column_arity",
+        "teacher_action_reference_only_steps",
+        "fep_tau_modulation_active_steps",
+        "state_normalization_active_steps"
+      ],
+      "source_status": "implementation_in_review_not_yet_executed",
+      "rights_status": "synthetic_simulator_only",
+      "current_artifacts": {
+        "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11149",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
+        "source_branch": "research/sam-follow-oracle-evidence-v0-1",
+        "latest_inspected_commit": "0d55939b00789ebf04d608c081d4a95ed5215acb",
+        "csv_header_columns": 37,
+        "csv_format_placeholders": 37,
+        "structural_source_check": "passed_during_authoring",
+        "rust_tests_status": "authored_not_yet_confirmed_by_current_exact_head_ci"
+      },
+      "caveats": [
+        "The student still consumes the existing simulated 20D VehicleState, including synthetic mesh-derived peer channels; this is not local sensor-only input.",
+        "A zero PD action blend in curriculum Phase 4 does not mean teacher-free learning: BPTT supervision may still consume the teacher on train_every steps.",
+        "Frozen evaluation removes the explicit PD/oracle teacher from blending, BPTT supervision, replay updates and exploration noise; it can compute a shadow teacher only for evaluator telemetry.",
+        "Simulator truth may remain available to score outcomes, but the student policy must not consume the explicit Follow oracle target.",
+        "The evaluation path still uses the bicycle-model simulator and existing simulated state vector; it does not establish a camera/LiDAR/radar-only perception result.",
+        "Exact-head CI and tests for the latest implementation are not yet confirmed; authored tests and source audit are not counted as passes.",
+        "This internal synthetic training/evaluation crucible is not an external leaderboard result or road-safety measure.",
+        "Episode CSV currently has 37 named columns; a regression checks every emitted row has the same width as its header. This is an authored test and source-authoring check, not yet an executed Rust pass.",
+        "Frozen evaluation does not freeze recurrent hidden state or FEP time-constant modulation: these inference-time dynamics remain active. The tested immutability property is output-projection equality and absence of BPTT/replay update calls, not static hidden state."
+      ],
+      "sources": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11149",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11109",
+        "https://www.nist.gov/programs-projects/measurement-science-automated-vehicles-0"
+      ]
+    },
+    {
+      "id": "sam-follow-privilege-separation-v0.1",
+      "name": "SAM Follow Privilege-Separation Benchmark v0.1",
+      "category": "privilege_aware_internal_evaluation",
+      "source_status": "implementation_authored_ci_pending",
+      "rights_status": "synthetic_no_external_dataset_required_for_initial_arms",
+      "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11258",
+      "implementation_refs": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11258",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11260"
+      ],
+      "capability_target": [
+        "policy_observation_privilege_separation",
+        "teacher_action_blending_measurement",
+        "teacher_supervision_measurement",
+        "evaluator_truth_noninterference",
+        "frozen_weight_invariance",
+        "inference_state_evolution_reporting",
+        "source_age_and_availability"
+      ],
+      "comparison_arms": [
+        {
+          "id": "A",
+          "name": "legacy_privileged",
+          "status": "initial_simulation_arm"
+        },
+        {
+          "id": "B",
+          "name": "masked_observation_teacher",
+          "status": "initial_simulation_arm"
+        },
+        {
+          "id": "C",
+          "name": "no_teacher_frozen",
+          "status": "initial_simulation_arm"
+        },
+        {
+          "id": "D",
+          "name": "local_perception_follow",
+          "status": "blocked_until_scene_admission_qualified"
+        },
+        {
+          "id": "E",
+          "name": "cooperative_v2x_advisory",
+          "status": "non_authoritative_remote_claim"
+        }
+      ],
+      "metrics": [
+        "oracle_observation_leakage_rate",
+        "teacher_blend_rate",
+        "teacher_supervision_rate",
+        "evaluator_to_policy_contamination_rate",
+        "frozen_parameter_digest_invariance",
+        "recurrent_state_evolution_rate",
+        "follow_target_availability_rate",
+        "stale_target_rate",
+        "missing_target_rate",
+        "gap_error_median",
+        "gap_error_p95",
+        "gap_error_worst_family",
+        "minimum_separation",
+        "minimum_ttc",
+        "contact_count",
+        "avoidability_classification",
+        "route_progress",
+        "intervention_rate",
+        "no_admissible_target_rate",
+        "false_intervention_rate",
+        "runtime_p50_ms",
+        "runtime_p95_ms",
+        "runtime_p99_ms",
+        "deadline_miss_rate"
+      ],
+      "negative_controls": [
+        "oracle_sidecar_mutation_invariant_under_local_only_profile",
+        "v2x_mutation_does_not_change_local_track",
+        "post_commit_shadow_teacher_cannot_change_committed_action",
+        "zero_blend_with_bptt_remains_supervised",
+        "unused_teacher_is_reference_only",
+        "frozen_weights_distinct_from_recurrent_state_evolution",
+        "disabled_teacher_update_replay_exploration_preserve_digests",
+        "missing_or_stale_target_has_no_peer_fallback",
+        "wrong_frame_scenario_future_or_stale_oracle_rejected",
+        "csv_header_row_width_integrity"
+      ],
+      "prospective_targets": {
+        "negative_control_pass_rate": 1,
+        "evaluator_to_policy_leakage_rate": 0,
+        "undeclared_teacher_use_in_arm_c": 0,
+        "arm_c_parameter_digest_change": 0
+      },
+      "validation_result": null,
+      "caveats": [
+        "Schema, fixture, validator and 17 Rust tests are authored in PR #11260; exact-head workflow is queued and no pass is claimed yet.",
+        "The canonical report fixture remains specification_only with zero trials.",
+        "Arms A-C are simulation-only; Arm D is blocked until local metric tracks satisfy SAM scene admission.",
+        "A no-teacher/no-gradient-update run may still evolve recurrent/FEP state and must report these dynamics.",
+        "A student may still observe simulator-derived peer channels even when teacher actions are not used.",
+        "This is an internal SAM experiment, not an external leaderboard or vehicle safety demonstration."
+      ],
+      "sources": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11258",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11186",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11213",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11109"
+      ],
+      "validator": {
+        "schema": "docs/autonomy/SAM_FOLLOW_PRIVILEGE_BENCHMARK_SCHEMA_V0_1.json",
+        "fixture": "docs/autonomy/fixtures/SAM_FOLLOW_PRIVILEGE_BENCHMARK_V0_1.json",
+        "tool": "tools/sam-follow-privilege-check",
+        "dedicated_workflow": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/42619481023",
+        "authored_rust_test_count": 17,
+        "exact_head": "7eb335423e6cee74d0293d50bfca1125ed83cfa1"
+      }
+    },
+    {
+      "id": "sam-world-model-decision-utility-gate-v0.1",
+      "name": "SAM World-Model Decision-Utility Promotion Gate v0.1",
+      "category": "world_model_promotion_and_downstream_utility",
+      "source_status": "specification_only",
+      "rights_status": "benchmark_specific_rights_review_required",
+      "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9010",
+      "artifacts": [
+        "docs/autonomy/SAM_WORLD_MODEL_DECISION_UTILITY_GATE_V0_1.md",
+        "docs/autonomy/fixtures/SAM_WORLD_MODEL_DECISION_UTILITY_GATE_V0_1.json"
+      ],
+      "comparison_arms": [
+        "direct_reactive",
+        "direct_plus_same_memory",
+        "model_assisted",
+        "shuffled_dynamics_control",
+        "stale_model_control",
+        "qualified_oracle_evaluator_only",
+        "distilled_student"
+      ],
+      "evaluation_layers": [
+        "scene_fidelity",
+        "trajectory_prediction_coverage_and_residuals",
+        "counterfactual_decision_lift",
+        "interactive_closed_loop_outcomes",
+        "compute_and_resource_cost"
+      ],
+      "promotion_requirements": [
+        "matched_budget_decision_lift_or_regret_reduction",
+        "prediction_set_coverage_and_sharpness_qualified",
+        "horizon_residual_and_model_exploitation_audit",
+        "qualified_reference_disagreement_retained",
+        "held_out_interaction_family_improvement",
+        "no_worst_family_hard_constraint_regression",
+        "latency_memory_energy_and_deadline_profile",
+        "no_evaluator_or_teacher_privilege_leakage"
+      ],
+      "validation_result": null,
+      "caveats": [
+        "Specification only; no controller or model has passed this promotion gate.",
+        "DrivingGen measures visual/scene fidelity and trajectory controllability, not downstream closed-loop task success.",
+        "World-In-World is a non-driving embodied benchmark and is used as methodological context, not an AV score.",
+        "WOD-E2E, NAVSIM v2, ReactSim-Bench, nuPlan-R and Symtropy reciprocal policy loop are distinct protocol classes and must not be pooled.",
+        "A passing synthetic or benchmark promotion report is not physical vehicle safety or public-road qualification."
+      ],
+      "sources": [
+        "https://proceedings.iclr.cc/paper_files/paper/2026/hash/a940e52cc37f63cd067c52265d1701cd-Abstract-Conference.html",
+        "https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html",
+        "https://github.com/autonomousvision/navsim/blob/main/README.md",
+        "https://arxiv.org/abs/2606.14058",
+        "https://arxiv.org/abs/2511.10403",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/9010"
+      ]
+    },
+    {
+      "id": "sam-option-preservation-clairvoyance-trap-v0.1",
+      "name": "SAM Observation-Constrained Future Option Preservation — Clairvoyance Trap v0.1",
+      "category": "synthetic_falsification_conformance",
+      "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11291",
+      "capability_target": [
+        "observation_constrained_recoverability",
+        "hidden_state_indistinguishability",
+        "clairvoyance_gap",
+        "finite_manifest_integrity",
+        "fail_closed_incomplete_evidence"
+      ],
+      "protocol": {
+        "kind": "two_hidden_state_one_observation_analytic_counterexample",
+        "parent_action_set": [
+          "continue"
+        ],
+        "continuation_action_set": [
+          "brake",
+          "coast"
+        ],
+        "observation_classes": 1,
+        "hidden_state_cells": 2,
+        "observation_equivalence": "both hidden states share one exact delivered-observation receipt",
+        "hidden_state_a": {
+          "brake": "feasible",
+          "coast": "infeasible"
+        },
+        "hidden_state_b": {
+          "brake": "infeasible",
+          "coast": "feasible"
+        },
+        "expected_robust_lower_set": [],
+        "expected_possible_upper_set": [],
+        "expected_clairvoyant_union": [
+          "brake",
+          "coast"
+        ],
+        "expected_clairvoyance_gap": 2
+      },
+      "metrics": [
+        "robust_option_width",
+        "possible_option_width",
+        "clairvoyance_gap",
+        "parent_action_status",
+        "observation_class_status",
+        "missing_cell_count",
+        "missing_action_outcome_count",
+        "duplicate_execution_receipt_rejection",
+        "manifest_digest_mismatch_rejection",
+        "evaluator_latency_p50_p95_p99"
+      ],
+      "source_status": "implementation_authored_exact_head_ci_pending",
+      "rights_status": "synthetic_analytic_fixture_no_external_dataset",
+      "implementation": {
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/11299",
+        "exact_head": "126edced4206b9ba37233b6dd8cd19f7a18469d1",
+        "fixture": "docs/autonomy/fixtures/SAM_OPTION_PRESERVATION_CLAIRVOYANCE_TRAP_V0_1.json",
+        "authored_rust_test_functions": 19,
+        "dedicated_workflow_run_id": 42766701368,
+        "dedicated_workflow_status_at_snapshot": "queued"
+      },
+      "validation_result": null,
+      "caveats": [
+        "The dedicated exact-head Rust format/test/Clippy workflow is queued; authored tests are not recorded as passed.",
+        "This fixture checks a two-cell set-intersection result, not statistical performance across real traffic.",
+        "The canonical manifest digest detects mutation/order ambiguity but does not prove that the declared successor-cell universe is complete.",
+        "Upstream receipt identities are passed through and status-gated; this evaluator does not authenticate receipts or independently qualify the action domain, references, execution or observation partition.",
+        "No probabilities are inferred from cell/action counts and no physical safety or roadworthiness claim is implied."
+      ],
+      "sources": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/11299",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11291",
+        "https://github.com/Luminous-Dynamics/symthaea/actions/runs/42766701368"
+      ]
+    }
+  ],
+  "world_model_benchmark_landscape_snapshot": {
+    "date": "2026-11-08",
+    "survey_name": "A Survey of World Model Benchmarks",
+    "representative_benchmarks": 130,
+    "cross_category_benchmarks": 108,
+    "control_fidelity_interactive_dynamics": {
+      "benchmark_tracks": 74,
+      "includes_closed_loop_interaction": 6,
+      "includes_closed_loop_interaction_percent": 8.1,
+      "includes_downstream_outcome_metrics": 4,
+      "includes_downstream_outcome_metrics_percent": 5.4
+    },
+    "scope_note": "Counts refer to the survey's Control Fidelity & Interactive Dynamics target across world-model domains; they are not driving-only counts.",
+    "source_status": "upstream_survey_coding",
+    "source": "https://world-model-benchmarks.github.io/World-Model-Benchmarks/"
+  },
+  "research_method_references": [
+    {
+      "id": "sure-plan-2026",
+      "name": "SURE-Plan: spatio-temporal uncertainty-aware reachable-set planning",
+      "category": "research_method_reference_not_benchmark",
+      "publication_window": "2026-09",
+      "venue": "Transportation Research Part C: Emerging Technologies",
+      "doi": "10.1016/j.trc.2026.105800",
+      "reported_method": {
+        "uncertainty_model": "single-pass deep evidential learning for aleatoric and epistemic uncertainty",
+        "planning_constraint": "spatio-temporal driving corridor constructed through reachability analysis",
+        "objective": "uncertainty-driven cost balancing robustness and efficiency",
+        "evaluation_domains": [
+          "CommonRoad",
+          "SIND",
+          "nuPlan"
+        ]
+      },
+      "reported_numerical_results": null,
+      "comparison_to_sam": "Reachable-set constraint method comparator. SAM #11291 measures observation-constrained common feasible continuation actions across hidden-state/reference cells; complementary construct, not same metric.",
+      "source_status": "peer_reviewed_paper_metadata_and_abstract",
+      "rights_status": "paper_code_and_dataset_terms_to_check",
+      "sources": [
+        "https://doi.org/10.1016/j.trc.2026.105800",
+        "https://www.sciencedirect.com/science/article/pii/S0968090X26002883"
+      ],
+      "caveats": [
+        "Do not infer or reproduce headline numerical claims from abstract-only metadata.",
+        "No SURE-Plan score is a SAM result.",
+        "A matched comparison requires exact paper protocol, dataset split, checkpoint, evaluator, sensor privilege and compute budget."
+      ]
+    }
+  ]
+}

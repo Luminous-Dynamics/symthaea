@@ -1,0 +1,247 @@
+{
+  "manifest_schema": "luminous.sam.drivinggen-reproduction-manifest",
+  "manifest_version": "0.1.0",
+  "status": "protocol_frozen_not_reproduced",
+  "snapshot_date": "2026-11-08",
+  "benchmark": {
+    "id": "drivinggen-iclr-2026",
+    "name": "DrivingGen: A Comprehensive Benchmark for Generative Video World Models in Autonomous Driving",
+    "venue": "ICLR 2026",
+    "paper": "https://proceedings.iclr.cc/paper_files/paper/2026/hash/a940e52cc37f63cd067c52265d1701cd-Abstract-Conference.html",
+    "arxiv": "https://arxiv.org/abs/2601.01528"
+  },
+  "upstream": {
+    "code_repository": "https://github.com/youngzhou1999/DrivingGen",
+    "code_default_branch": "main",
+    "code_readme_blob_sha": "aa194e4926ba04eac073b57a47c90a80d93bbec0",
+    "license_file_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+    "code_license_declared": "Apache-2.0",
+    "dataset_repository": "https://huggingface.co/datasets/yangzhou99/DrivingGen",
+    "dataset_revision": "935e0a40cd489305a206abe89f31d8854495098b",
+    "dataset_revision_note": "Pinned to the immutable HF commit whose README card declares 222 eval examples in each of open_domain and ego_condition. The dataset page separately displays 22,866 rows; these may represent image/frame rows rather than clips. The paper reports 200 evaluation samples per track. Keep the count discrepancy open until the revision's actual files are enumerated and mapped to unique video/clip IDs.",
+    "dataset_license_declared": "Apache-2.0",
+    "third_party_provenance_review": "required",
+    "third_party_provenance_note": "Open-domain samples are internet-sourced; ego-conditioned samples aggregate multiple source datasets. Review source-video redistribution and commercial-use rights separately from repository/card license metadata.",
+    "code_commit": "48ed35695855ef17d7a7cbd4adc0e8bd5fcc8223",
+    "code_commit_url": "https://github.com/youngzhou1999/DrivingGen/commit/48ed35695855ef17d7a7cbd4adc0e8bd5fcc8223",
+    "code_commit_date": "2026-03-12T17:33:49Z",
+    "dataset_revision_type": "immutable_hugging_face_dataset_commit",
+    "dataset_revision_url": "https://huggingface.co/datasets/yangzhou99/DrivingGen/commit/935e0a40cd489305a206abe89f31d8854495098b"
+  },
+  "protocol": {
+    "tracks": {
+      "open_domain": {
+        "purpose": "open-domain generalization across geography, weather, time of day and diverse driving interactions",
+        "paper_reported_evaluation_clips": 200,
+        "hosted_card_reported_evaluation_examples": 222,
+        "input_fields": [
+          "front_view_rgb",
+          "scene_caption"
+        ]
+      },
+      "ego_conditioned": {
+        "purpose": "controllability of generated video trajectories relative to supplied ego motion",
+        "paper_reported_evaluation_clips": 200,
+        "hosted_card_reported_evaluation_examples": 222,
+        "input_fields": [
+          "front_view_rgb",
+          "scene_caption",
+          "ego_motion"
+        ],
+        "source_datasets": [
+          "ZOD",
+          "DrivingDojo",
+          "COVLA",
+          "nuPlan",
+          "Waymo Open Motion Dataset"
+        ]
+      }
+    },
+    "paper_total_evaluation_clips": 400,
+    "hosted_card_eval_examples_total": 444,
+    "hosted_page_total_rows": 22866,
+    "sample_count_discrepancy": {
+      "status": "unresolved",
+      "description": "Paper describes 200 samples per track (400 total); the current Hugging Face README metadata reports 222 eval examples for each track; the dataset page also shows 22,866 rows. These quantities may refer to different revisions or row/frame/sample units.",
+      "required_resolution": [
+        "pin immutable dataset revision",
+        "enumerate exact video/sample IDs per track",
+        "record row-to-video grouping",
+        "reconcile paper sample IDs vs hosted dataset card IDs",
+        "retain missing/extra IDs as typed outcomes",
+        "compare exact files and parent commit for pinned HF revision 935e0a40cd489305a206abe89f31d8854495098b"
+      ],
+      "row_count_diagnostic": {
+        "hosted_page_rows": 22866,
+        "hosted_card_eval_examples_per_track": 222,
+        "exact_ratio_rows_per_track_card_example": 103,
+        "arithmetic_observation": "22,866 / 222 = 103 exactly.",
+        "hypothesis": "The viewer's 22,866 rows may represent flattened frame-level or row-level data associated with 222 clip-level examples; this is not established by the card metadata or directory listing.",
+        "relationship_to_paper_video_example": "The upstream repository shows a 101-frame generation example; the numerical difference is not explained and must not be silently attributed to two extra frames.",
+        "resolution": "Inspect the pinned ZIP/dataset builder and HF viewer feature schema to determine row units and whether rows are clips, frames, image entries, or a flattened representation."
+      }
+    },
+    "generation_example": {
+      "video_frames": 101,
+      "frames_per_second": 10,
+      "resolution": [
+        576,
+        1024
+      ],
+      "source": "upstream repository Wan2.2-14B example; not assumed universal for every model"
+    },
+    "trajectory_extraction": {
+      "ego": [
+        "UniDepthV2",
+        "visual SLAM"
+      ],
+      "agents": [
+        "YOLOv10 detection",
+        "depth estimation"
+      ],
+      "provenance_warning": "Extracted trajectories are estimates from generated video, not perfect physical ground truth. Record estimator version, confidence, failures, tracking switches and invalid segments separately from generative model metrics."
+    },
+    "metrics": {
+      "distribution": [
+        "FVD",
+        "FTD"
+      ],
+      "video_quality": [
+        "CLIP-IQA+",
+        "IEEE P2020 imaging factors",
+        "LPIPS",
+        "SSIM"
+      ],
+      "scene_temporal_consistency": [
+        "DINOv3 scene consistency",
+        "video consistency"
+      ],
+      "agent_consistency": [
+        "agent appearance consistency",
+        "agent disappearance / missing-detection consistency"
+      ],
+      "trajectory_alignment": [
+        "ADE",
+        "FDE",
+        "success rate",
+        "Hausdorff distance",
+        "DTW"
+      ],
+      "trajectory_quality": [
+        "jerk",
+        "acceleration",
+        "yaw rate",
+        "comfort score",
+        "curvature RMS",
+        "speed score"
+      ],
+      "trajectory_temporal_consistency": [
+        "velocity consistency",
+        "acceleration consistency"
+      ]
+    },
+    "authors_evaluated_models": {
+      "general_video_world_models": [
+        "Gen-3",
+        "Kling",
+        "CogVideoX",
+        "Wan",
+        "HunyuanVideo",
+        "LTX-Video",
+        "SkyReels"
+      ],
+      "physical_world_models": [
+        "Cosmos-Predict1",
+        "Cosmos-Predict2"
+      ],
+      "driving_specific_models": [
+        "Vista",
+        "DrivingDojo",
+        "GEM",
+        "VaViM",
+        "UniFuture"
+      ],
+      "reported_total": 14
+    },
+    "open_domain_city_sample_audit": {
+      "pinned_dataset_revision": "935e0a40cd489305a206abe89f31d8854495098b",
+      "audit_status": "two_city_labelled_image_caption_pairs_confirmed_from_immutable_tree; caption text reviewed; image pixels not visually inspected",
+      "examples": [
+        {
+          "file": "open_domain/imgs/cape_town.png",
+          "sha256": "8ee006e20747e6c9a3033b54b67ea9c54a030f5c6971fd3795e91a328363a4da",
+          "xet_hash": "6073160048c69b88de8306651b187e7ac8eb59911fc6053e49e1f23261bb1ba6",
+          "caption_file": "open_domain/caption/cape_town.txt",
+          "caption_summary": "Forward-facing car-mounted camera on a highway; vehicles pass or are overtaken in steady traffic; buildings and palm trees appear roadside.",
+          "caption_bytes": 411,
+          "evidence_of_traffic_side": "none",
+          "size_reported": "495 kB"
+        },
+        {
+          "file": "open_domain/imgs/cape_town_2.png",
+          "sha256": "727d72b69c233c333724cf988092810e4e7b39ff48637b4d305d77c1c0b00f4d",
+          "xet_hash": "666ecb116227071a4481fd9a770d4452268b4fe067915ab8d67e5ee01d3337d5",
+          "caption_file": "open_domain/caption/cape_town_2.txt",
+          "caption_summary": "Forward-facing car-mounted camera with steady traffic; greenery on the left and a coastal view on the right; overcast weather.",
+          "caption_bytes": 340,
+          "evidence_of_traffic_side": "none",
+          "size_reported": "710 kB"
+        }
+      ],
+      "interpretation": {
+        "confirmed": "The pinned open_domain tree contains two matching Cape Town-labelled image/caption file pairs; the caption text was reviewed but image pixels were not visually inspected.",
+        "not_confirmed": [
+          "exact GPS position",
+          "South African LHT rule profile",
+          "steering-wheel position",
+          "lawful passing side",
+          "lane-direction ground truth",
+          "Johannesburg or other South African city coverage",
+          "that the images visibly show a left-hand-traffic scene"
+        ],
+        "use": "A small qualitative South African scene-audit seed only. Do not treat filenames or captions as jurisdiction labels or a statistically representative LHT sample."
+      }
+    }
+  },
+  "comparability_controls": {
+    "downstream_planner_task_evaluation_in_paper_table": false,
+    "reciprocal_online_actor_replanning": false,
+    "required_before_comparison": [
+      "exact model/checkpoint",
+      "dataset revision and sample IDs",
+      "metric implementation commit",
+      "video generation config and prompt",
+      "inference hardware/latency",
+      "trajectory extraction versions",
+      "split-specific metrics",
+      "failure/missing sample denominator"
+    ],
+    "claim_boundary": "Generative video and trajectory metrics do not by themselves establish downstream planner utility, causal actor response, closed-loop driving safety or operational outcomes."
+  },
+  "prospective_sam_experiment": {
+    "arms": [
+      "direct planner on admitted scene",
+      "planner with generated future-scene hypotheses at matched compute and latency"
+    ],
+    "metrics": [
+      "feasible-action set overlap",
+      "counterfactual decision regret",
+      "actor collision/risky interaction",
+      "metric geometry/identity consistency",
+      "prediction-set coverage",
+      "worst-stratum temporal consistency",
+      "p95/p99 inference latency"
+    ],
+    "compose_with": [
+      "SAM #10237",
+      "SAM #10256",
+      "SAM #10257",
+      "SAM #10320",
+      "SAM #10012",
+      "ReactSim-Bench",
+      "Symtropy #3532"
+    ],
+    "success_condition": "show downstream decision value at matched compute without degrading feasibility, actor identity, uncertainty calibration, tail strata or runtime/fallback constraints",
+    "status": "prospective_not_measured"
+  }
+}
