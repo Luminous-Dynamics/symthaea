@@ -599,6 +599,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     if tx.hook_cell {
         apply_hook_memory(
             &mut score,
+            GENERAL_MELODY_PART_V1,
             &form,
             meter_beats,
             crate::hook::HookCell::generate_with(&spec.melody, intent.seed, meter_beats)
@@ -653,8 +654,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
             intent,
         );
         if tx.held_arrivals && tx.hook_cell {
-            apply_counter_hook_echoes(
+            apply_counter_hook_echoes_for_part(
                 &mut score,
+                GENERAL_COUNTERMELODY_PART_V1,
                 &form,
                 meter_beats,
                 intent,
@@ -2958,6 +2960,24 @@ fn apply_counter_hook_echoes(
     intent: &MusicalIntent,
     hook: &crate::hook::HookCell,
 ) {
+    apply_counter_hook_echoes_for_part(
+        score,
+        PartId::UNASSIGNED,
+        form,
+        meter_beats,
+        intent,
+        hook,
+    );
+}
+
+fn apply_counter_hook_echoes_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+    hook: &crate::hook::HookCell,
+) {
     let vel = (0.30 + intent.energy.clamp(0.0, 1.0) * 0.25).clamp(0.15, 0.55);
     // The echo's total span (constant across every hold — it's the same
     // hook cell every time), needed to clear its own window in the
@@ -3012,11 +3032,13 @@ fn apply_counter_hook_echoes(
             // notes: exact-duplicate onsets/pitches or straight overlap.
             score.notes.retain(|n| {
                 !(n.role == VoiceRole::CounterMelody
+                    && n.part == part_id
                     && n.onset.beats() >= echo_start - 1e-9
                     && n.onset.beats() < echo_end - 1e-9)
             });
             for n in score.notes.iter_mut() {
                 if n.role == VoiceRole::CounterMelody
+                    && n.part == part_id
                     && n.onset.beats() < echo_start - 1e-9
                     && (n.onset + n.duration).beats() > echo_start + 1e-9
                 {
@@ -3033,7 +3055,7 @@ fn apply_counter_hook_echoes(
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch,
                     onset: Duration::new((t * 4.0).round() as i64, 4),
                     duration: halved,
@@ -3060,6 +3082,7 @@ fn apply_counter_hook_echoes(
 /// return stays a verbatim memory — the engine's native temperament.
 fn apply_hook_memory(
     score: &mut Score,
+    melody_part_id: PartId,
     form: &Form,
     meter_beats: f64,
     hook_len: usize,
@@ -3090,7 +3113,7 @@ fn apply_hook_memory(
                 score.notes[idx].velocity = (score.notes[idx].velocity + 0.05).clamp(0.1, 1.0);
             }
         } else {
-            alter_statement(score, *key, w0, hook_len, att);
+            alter_statement(score, melody_part_id, *key, w0, hook_len, att);
         }
     }
 }
@@ -3114,6 +3137,7 @@ fn statement_indices(score: &Score, w0: f64, hook_len: usize) -> Vec<usize> {
 /// [`apply_hook_memory`] for what each attitude does to what it remembers.
 fn alter_statement(
     score: &mut Score,
+    melody_part_id: PartId,
     key: Key,
     w0: f64,
     hook_len: usize,
@@ -3193,7 +3217,7 @@ fn alter_statement(
                 let vel = (score.notes[peak].velocity * 0.8).clamp(0.1, 1.0);
                 let intensity = score.notes[peak].section_intensity;
                 score.notes.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: melody_part_id,
                     pitch: above,
                     onset: peak_onset.saturating_sub(grace),
                     duration: grace,
@@ -3245,6 +3269,16 @@ fn apply_hidden_bass_quote(
     };
     let quote_start = (start_bar + bars / 2) as f64 * meter_beats;
     let span = 2.0 * hook.beats();
+    let bass_part_id = score
+        .notes
+        .iter()
+        .find(|note| {
+            note.role == VoiceRole::Bass
+                && note.onset.beats() < quote_start + span
+                && (note.onset + note.duration).beats() > quote_start
+        })
+        .map(|note| note.part)
+        .unwrap_or(PartId::UNASSIGNED);
     // Clear the window (overlap-aware, per the exposed-climax lesson).
     score.notes.retain(|n| {
         !(n.role == VoiceRole::Bass
@@ -3264,7 +3298,7 @@ fn apply_hidden_bass_quote(
     for &(deg, dur) in &hook.notes {
         let augmented = dur.scale(2, 1);
         score.push(ScoreNote {
-            part: PartId::UNASSIGNED,
+            part: bass_part_id,
             pitch: key.scale().degree_pitch(deg, 2),
             onset: Duration::new((t * 2.0).round() as i64, 2),
             duration: augmented,
