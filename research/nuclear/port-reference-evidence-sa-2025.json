@@ -54,6 +54,21 @@
         "Estimated spare capacity at a port intake is not an allocation, connection offer or guarantee of firm capacity."
       ],
       "relevant_page": 34
+    },
+    {
+      "source_id": "DEE-IRP-2025",
+      "title": "Integrated Resource Plan 2025",
+      "publisher": "South African Department of Electricity and Energy",
+      "published_at": "2025-10",
+      "source_url": "https://www.dmpr.gov.za/Portals/0/Energy%20Resources/IRP/IRP%202025/User-Friendly-IRP-2025.pdf?ver=d278hZ0IzvO7hIWLiwLoaQ%3D%3D",
+      "method": [
+        "National electricity system planning document"
+      ],
+      "limitations": [
+        "The SMR availability statement is a dated national planning projection, not a vendor delivery commitment, procurement award, licensing determination or guarantee of deployment.",
+        "The statement does not establish that SMRs are suitable for a specific port, city or industrial customer."
+      ],
+      "relevant_page": 13
     }
   ],
   "shore_power_demand_estimates": [
@@ -202,5 +217,15 @@
     "Utility/municipality/Eskom load-flow and N-1 connection study for each candidate configuration.",
     "Port-wide industrial, city, cold-chain, water, shore-power and future expansion load profiles.",
     "Tariff, demand-charge, curtailment, power-quality and connection-cost data with currency/base year."
-  ]
+  ],
+  "national_policy_context": {
+    "source_id": "DEE-IRP-2025",
+    "statement": "The October 2025 IRP states that SMRs were not yet commercially viable at publication time, cites commercial deployment post-2030 in EPRI's estimate, and projects South African availability post-2035 because the regulatory framework needs development.",
+    "use": "Scenario timing and regulatory-readiness assumption only.",
+    "prohibited_inferences": [
+      "Not a vendor delivery date or project schedule.",
+      "Not a procurement decision or site-specific authorization.",
+      "Not a conclusion that no SMR-related preparatory work may occur before 2035."
+    ]
+  }
 }
