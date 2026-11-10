@@ -6,7 +6,7 @@ on:
       - "docs/transport/EV_CELL_LIMITED_POWER_ENVELOPE_V0_1.md"
       - "docs/transport/EV_CELL_LIMITED_POWER_ENVELOPE_V0_2.md"
       - "schemas/transport/ev_cell_limited_power_envelope_v0_1.schema.json"
-      - "fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_1.json"
+      - "fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_2.json"
       - "tools/ev-cell-limited-power-envelope/**"
       - ".github/workflows/ev-cell-limited-power-envelope-audit.yml"
 
