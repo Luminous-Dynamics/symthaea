@@ -108,16 +108,23 @@ For intent-directed edits, score the *requested transformation* separately from 
 
 The public MMAE development set contains 2,000 examples and 17,741 atomic rubrics. The Audio Editing Challenge announced a held-out challenge set of 500 examples each for its Single Model and Agent tracks, with submissions opening November 10, 2026. Its primary ranking metric is EMR, with IFR then CR as tie-breakers. Use the challenge's official test split and SDK for any leaderboard claim; do not report development-set scores as held-out results.
 
-Initial Melothaea engineering targets on the public development protocol:
+Separate the constrained music-native domain from general-purpose audio editing. The official AEC/MMAE overview reports existing systems below 5% overall EMR, with complex mixed-modality tasks reaching 0% in its reported evaluations. These figures describe the broad benchmark, not Melothaea's music-only slice.
+
+**Music-native, score-grounded editing subset** (known source score, stable part identities, explicit event mappings, supported renderer, and edits expressible in the score graph):
 
 | Metric | Initial target | Stretch |
 |---|---:|---:|
-| IFR | ≥ 0.90 | ≥ 0.95 |
-| CR | ≥ 0.95 | ≥ 0.98 |
-| EMR | ≥ 0.80 | ≥ 0.90 |
-| Protected invariant violations | 0 | 0 |
+| IFR | ≥ 0.95 | ≥ 0.99 |
+| CR | ≥ 0.99 | ≥ 0.995 |
+| EMR | ≥ 0.90 | ≥ 0.97 |
+| Protected symbolic-event violations | 0 | 0 |
+| Unrequested score-event changes | 0 | 0 |
 
-These are targets, not current results and not claims about the current leaderboard.
+These high targets apply only to the explicitly constrained, machine-checkable subset. They are not targets for arbitrary natural-language audio edits.
+
+**General MMAE / AEC Agent Track:** first require a statistically defensible improvement over the published agent baseline on the same official split; use ≥10% overall EMR as an ambitious first milestone and ≥20% as a stretch. Report IFR and CR by audio modality and complexity; do not claim a general-audio win from music-only results. Use the official held-out test set and SDK for leaderboard claims.
+
+All values above are engineering targets, not current results or leaderboard claims. The published baseline numbers are not guarantees of the next challenge release's ranking; rerun the official baselines on the exact evaluation split before claiming superiority.
 
 ### 5.3 Finished-music quality
 
@@ -134,6 +141,8 @@ Report:
 - Long-range structure, motif return, harmonic/contrapuntal correctness, orchestration balance and performance playability.
 
 WildSongBench's September 12, 2026 snapshot evaluates 192 prompts and 17 settings. It reports YuE2 standard at 6.7316 SongBench average and YuE2 best-of-8 at 6.9632. The best-of-8 selection procedure is different from the standard setting and other systems' selection budgets are not uniformly matched. Report single-generation and best-of-k results independently.
+
+**Melothaea target:** first exceed 6.7316 on the same single-generation protocol; separately target >6.9632 on a matched best-of-8 protocol, with the same candidate count and selection rules for every comparator. A stretch objective is >7.0 SongBench average plus a statistically significant blind human preference advantage. None of these thresholds alone proves general musical superiority; publish per-metric results and confidence intervals.
 
 ### 5.4 Orchestration and score quality
 
