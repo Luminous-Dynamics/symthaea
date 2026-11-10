@@ -151,6 +151,12 @@ fn run() -> Result<(), String> {
 
     let store_hash = hash_vectors(store.iter().map(|hv| &hv.0));
     let query_hash = hash_vectors(queries.iter().map(|query| &query.vector.0));
+    // Export the exact bytes used by this run so an independent native FAISS
+    // baseline can consume the same frozen corpus without regenerating it.
+    let store_vector_bytes = binary_vector_bytes(&store);
+    let query_vector_bytes = binary_vector_bytes(
+        &queries.iter().map(|query| query.vector).collect::<Vec<_>>()
+    );
     let manifest = json!({
         "manifest_version": "neuro-silicon-003-input-v0.1",
         "generation": {
@@ -169,6 +175,13 @@ fn run() -> Result<(), String> {
         "query_batch_size": config.batch_size,
         "store_vectors_sha256": store_hash,
         "query_vectors_sha256": query_hash,
+        "binary_interchange": {
+            "format": "raw-concatenated-uint8-row-major",
+            "vector_bytes": VECTOR_BYTES,
+            "bit_order": "BinaryHV byte representation is preserved verbatim",
+            "store_file": "store_vectors.bin",
+            "query_file": "query_vectors.bin"
+        },
         "queries": queries.iter().map(|query| json!({
             "query_index": query.index,
             "expected_target_id": query.target_id
@@ -186,6 +199,8 @@ fn run() -> Result<(), String> {
     let expected_sha = sha256(&expected_bytes);
     let manifest_artifact = write_artifact(&output_dir, "input_manifest.json", &manifest_bytes)?;
     let expected_artifact = write_artifact(&output_dir, "expected_results.json", &expected_bytes)?;
+    let store_vectors_artifact = write_artifact(&output_dir, "store_vectors.bin", &store_vector_bytes)?;
+    let query_vectors_artifact = write_artifact(&output_dir, "query_vectors.bin", &query_vector_bytes)?;
 
     // Warm-up runs are intentionally not part of the measured population.
     for _ in 0..config.warmup {
@@ -474,7 +489,7 @@ fn run() -> Result<(), String> {
             "malformed_frames_accepted": Value::Null
         },
         "metrics": metrics,
-        "artifacts": [manifest_artifact, expected_artifact, raw_artifact],
+        "artifacts": [manifest_artifact, expected_artifact, store_vectors_artifact, query_vectors_artifact, raw_artifact],
         "limitations": limitations
     });
     validate_receipt(&receipt, &output_dir)?;
@@ -804,6 +819,15 @@ fn metric(
     })
 }
 
+/// Flatten canonical BinaryHV values to the byte-for-byte interchange format
+/// consumed by independent exact-binary baselines such as FAISS IndexBinaryFlat.
+fn binary_vector_bytes(vectors: &[BinaryHV]) -> Vec<u8> {
+    vectors
+        .iter()
+        .flat_map(|vector| vector.0.iter().copied())
+        .collect()
+}
+
 fn hash_vectors<'a>(vectors: impl Iterator<Item = &'a [u8; VECTOR_BYTES]>) -> String {
     let mut hasher = Sha256::new();
     for vector in vectors {
@@ -829,7 +853,7 @@ fn write_artifact(output_dir: &Path, name: &str, bytes: &[u8]) -> Result<Value, 
     Ok(json!({
         "path": name,
         "sha256": sha256(bytes),
-        "media_type": "application/json",
+        "media_type": if name.ends_with(".bin") { "application/octet-stream" } else { "application/json" },
         "size_bytes": bytes.len()
     }))
 }
@@ -865,6 +889,21 @@ fn detect_cpu_identity() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn binary_export_preserves_row_major_vector_bytes_and_digest() {
+        let vectors = vec![BinaryHV::random(11), BinaryHV::random(22), BinaryHV::random(33)];
+        let bytes = binary_vector_bytes(&vectors);
+        assert_eq!(bytes.len(), vectors.len() * VECTOR_BYTES);
+        for (index, vector) in vectors.iter().enumerate() {
+            let start = index * VECTOR_BYTES;
+            assert_eq!(&bytes[start..start + VECTOR_BYTES], &vector.0);
+        }
+        assert_eq!(
+            sha256(&bytes),
+            hash_vectors(vectors.iter().map(|vector| &vector.0))
+        );
+    }
 
     #[test]
     fn perturbation_is_deterministic_and_has_declared_hamming_distance() {
