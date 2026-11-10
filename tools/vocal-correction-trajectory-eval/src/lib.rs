@@ -241,6 +241,7 @@ pub fn evaluate_trajectory(
 
     let mut results: Vec<IterationResultV1> = Vec::with_capacity(evidence.len());
     let mut previous_output_digest: Option<&str> = None;
+    let mut seen_output_digests = BTreeSet::new();
     let mut corrections_used = 0usize;
     let mut final_outcome = TrajectoryOutcome::NeedsCorrection;
 
@@ -264,9 +265,9 @@ pub fn evaluate_trajectory(
 
             if iteration.action_norm > spec.maximum_action_norm {
                 outcome = TrajectoryOutcome::Noncompliant;
-            } else if iteration.output_digest
-                == iteration.parent_output_digest.as_deref().unwrap_or_default()
-            {
+            } else if seen_output_digests.contains(&iteration.output_digest) {
+                // A repeated output digest is a render-state cycle (including
+                // the immediate no-op case), even if analyzer noise changes.
                 outcome = TrajectoryOutcome::Stalled;
             } else if !matches!(
                 outcome,
@@ -306,6 +307,7 @@ pub fn evaluate_trajectory(
             )));
         }
 
+        seen_output_digests.insert(iteration.output_digest.clone());
         previous_output_digest = Some(iteration.output_digest.as_str());
     }
 
@@ -758,8 +760,8 @@ fn aggregate_metric_decisions(
     }
 }
 
-/// Return true when every target is non-regressing and at least one unsatisfied
-/// target achieves its declared minimum progress or becomes compliant.
+/// Classify per-target progress without allowing regressions to be hidden
+/// by improvements on other target metrics.
 fn check_target_progress(
     constraints: &[TargetConstraintV1],
     previous: &[TargetMetricResultV1],
@@ -1168,6 +1170,35 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.outcome, TrajectoryOutcome::Stalled);
+    }
+
+    #[test]
+    fn returning_to_a_prior_output_is_stalled_even_if_metrics_appear_to_improve() {
+        let report = evaluate_trajectory(
+            &spec(),
+            &[
+                baseline((16.0, 17.0), (5.0, 6.0), (0.0, 0.0)),
+                correction(
+                    1,
+                    'b',
+                    'd',
+                    (13.0, 14.0),
+                    (3.0, 4.0),
+                    (0.0, 0.0),
+                ),
+                correction(
+                    2,
+                    'd',
+                    'b',
+                    (9.0, 11.0),
+                    (-1.0, 1.0),
+                    (0.0, 0.0),
+                ),
+            ],
+        )
+        .unwrap();
+        assert_eq!(report.outcome, TrajectoryOutcome::Stalled);
+        assert_eq!(report.iterations[2].output_digest, digest('b'));
     }
 
     #[test]
