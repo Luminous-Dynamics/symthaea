@@ -1,0 +1,4029 @@
+{
+  "schema_version": "communication-graph-fixtures-v0.1",
+  "contract_id": "IG-COMM-TOPOLOGY-001",
+  "status": "synthetic_graph_profiles_unexecuted",
+  "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
+  "delegation_graph_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11248",
+  "topology_count": 8,
+  "profile_count": 8,
+  "fixture_count": 30,
+  "profiles": [
+    {
+      "profile_id": "IG-COMM-TOPOLOGY-001/chain/v0.1",
+      "profile_version": "0.1",
+      "topology_family": "chain",
+      "node_identity": "AgentInstanceId",
+      "edge_semantics": "directed_message_channel",
+      "rng_algorithm": "luminous-lcg32-v1",
+      "seed": 1016,
+      "nodes": [
+        {
+          "agent_instance_id": "AGENT-00",
+          "principal_ref": "PRINCIPAL-00",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-01",
+          "principal_ref": "PRINCIPAL-01",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-02",
+          "principal_ref": "PRINCIPAL-02",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-03",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-04",
+          "principal_ref": "PRINCIPAL-04",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-05",
+          "principal_ref": "PRINCIPAL-05",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-06",
+          "principal_ref": "PRINCIPAL-06",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-07",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        }
+      ],
+      "edges": [
+        {
+          "channel_id": "CHAIN-0-1-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-0-1-R",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-1-2-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-1-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-2-3-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-2-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-3-4-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-3-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-4-5-F",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-4-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-5-6-F",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-5-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-6-7-F",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHAIN-6-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        }
+      ],
+      "graph_state": "static_snapshot",
+      "snapshot_round": 0,
+      "temporal_events": [],
+      "self_loops": false,
+      "extra": {},
+      "centrality_reference": {
+        "status": "Pass",
+        "algorithm_id": "normalized_betweenness_v1",
+        "direction": "directed",
+        "weights": "unweighted",
+        "distance": "hop_count",
+        "normalization": "(n-1)(n-2)",
+        "values": [
+          {
+            "agent_instance_id": "AGENT-00",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-01",
+            "score": 0.28571429
+          },
+          {
+            "agent_instance_id": "AGENT-02",
+            "score": 0.47619048
+          },
+          {
+            "agent_instance_id": "AGENT-03",
+            "score": 0.57142857
+          },
+          {
+            "agent_instance_id": "AGENT-04",
+            "score": 0.57142857
+          },
+          {
+            "agent_instance_id": "AGENT-05",
+            "score": 0.47619048
+          },
+          {
+            "agent_instance_id": "AGENT-06",
+            "score": 0.28571429
+          },
+          {
+            "agent_instance_id": "AGENT-07",
+            "score": 0
+          }
+        ],
+        "minimum_score": 0,
+        "maximum_score": 0.57142857,
+        "minimum_tie_set": [
+          "AGENT-00",
+          "AGENT-07"
+        ],
+        "maximum_tie_set": [
+          "AGENT-03",
+          "AGENT-04"
+        ],
+        "minimum_selected_agent_instance_id": "AGENT-00",
+        "maximum_selected_agent_instance_id": "AGENT-03"
+      },
+      "graph_sha256": "ceae4d221d2efebd93c0d24375ffaa935960ef39c7fcac9576a8a077552b89ad"
+    },
+    {
+      "profile_id": "IG-COMM-TOPOLOGY-001/star/v0.1",
+      "profile_version": "0.1",
+      "topology_family": "star",
+      "node_identity": "AgentInstanceId",
+      "edge_semantics": "directed_message_channel",
+      "rng_algorithm": "luminous-lcg32-v1",
+      "seed": 1017,
+      "nodes": [
+        {
+          "agent_instance_id": "AGENT-00",
+          "principal_ref": "PRINCIPAL-00",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-01",
+          "principal_ref": "PRINCIPAL-01",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-02",
+          "principal_ref": "PRINCIPAL-02",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-03",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-04",
+          "principal_ref": "PRINCIPAL-04",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-05",
+          "principal_ref": "PRINCIPAL-05",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-06",
+          "principal_ref": "PRINCIPAL-06",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-07",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        }
+      ],
+      "edges": [
+        {
+          "channel_id": "STAR-0-1-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-2-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-3-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-4-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-5-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-6-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-7-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-1-R",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STAR-0-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        }
+      ],
+      "graph_state": "static_snapshot",
+      "snapshot_round": 0,
+      "temporal_events": [],
+      "self_loops": false,
+      "extra": {},
+      "centrality_reference": {
+        "status": "Pass",
+        "algorithm_id": "normalized_betweenness_v1",
+        "direction": "directed",
+        "weights": "unweighted",
+        "distance": "hop_count",
+        "normalization": "(n-1)(n-2)",
+        "values": [
+          {
+            "agent_instance_id": "AGENT-00",
+            "score": 1
+          },
+          {
+            "agent_instance_id": "AGENT-01",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-02",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-03",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-04",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-05",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-06",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-07",
+            "score": 0
+          }
+        ],
+        "minimum_score": 0,
+        "maximum_score": 1,
+        "minimum_tie_set": [
+          "AGENT-01",
+          "AGENT-02",
+          "AGENT-03",
+          "AGENT-04",
+          "AGENT-05",
+          "AGENT-06",
+          "AGENT-07"
+        ],
+        "maximum_tie_set": [
+          "AGENT-00"
+        ],
+        "minimum_selected_agent_instance_id": "AGENT-01",
+        "maximum_selected_agent_instance_id": "AGENT-00"
+      },
+      "graph_sha256": "e8028a024c82c789385e47e6cf23d4c5771f486701cd195a23bacf248791a2ea"
+    },
+    {
+      "profile_id": "IG-COMM-TOPOLOGY-001/balanced_tree/v0.1",
+      "profile_version": "0.1",
+      "topology_family": "balanced_tree",
+      "node_identity": "AgentInstanceId",
+      "edge_semantics": "directed_message_channel",
+      "rng_algorithm": "luminous-lcg32-v1",
+      "seed": 1018,
+      "nodes": [
+        {
+          "agent_instance_id": "AGENT-00",
+          "principal_ref": "PRINCIPAL-00",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-01",
+          "principal_ref": "PRINCIPAL-01",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-02",
+          "principal_ref": "PRINCIPAL-02",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-03",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-04",
+          "principal_ref": "PRINCIPAL-04",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-05",
+          "principal_ref": "PRINCIPAL-05",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-06",
+          "principal_ref": "PRINCIPAL-06",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-07",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        }
+      ],
+      "edges": [
+        {
+          "channel_id": "BALANCED_TREE-0-1-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-0-2-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-0-1-R",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-1-3-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-1-4-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-0-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-2-5-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-2-6-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-1-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-3-7-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-3-7-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-1-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-2-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-2-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-3-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "BALANCED_TREE-3-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        }
+      ],
+      "graph_state": "static_snapshot",
+      "snapshot_round": 0,
+      "temporal_events": [],
+      "self_loops": false,
+      "extra": {},
+      "centrality_reference": {
+        "status": "Pass",
+        "algorithm_id": "normalized_betweenness_v1",
+        "direction": "directed",
+        "weights": "unweighted",
+        "distance": "hop_count",
+        "normalization": "(n-1)(n-2)",
+        "values": [
+          {
+            "agent_instance_id": "AGENT-00",
+            "score": 0.57142857
+          },
+          {
+            "agent_instance_id": "AGENT-01",
+            "score": 0.66666667
+          },
+          {
+            "agent_instance_id": "AGENT-02",
+            "score": 0.52380952
+          },
+          {
+            "agent_instance_id": "AGENT-03",
+            "score": 0.28571429
+          },
+          {
+            "agent_instance_id": "AGENT-04",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-05",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-06",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-07",
+            "score": 0
+          }
+        ],
+        "minimum_score": 0,
+        "maximum_score": 0.66666667,
+        "minimum_tie_set": [
+          "AGENT-04",
+          "AGENT-05",
+          "AGENT-06",
+          "AGENT-07"
+        ],
+        "maximum_tie_set": [
+          "AGENT-01"
+        ],
+        "minimum_selected_agent_instance_id": "AGENT-04",
+        "maximum_selected_agent_instance_id": "AGENT-01"
+      },
+      "graph_sha256": "4c743ccec547317f633398dd48cd4753e36f6e5c397b12601b016b62c6168df4"
+    },
+    {
+      "profile_id": "IG-COMM-TOPOLOGY-001/complete/v0.1",
+      "profile_version": "0.1",
+      "topology_family": "complete",
+      "node_identity": "AgentInstanceId",
+      "edge_semantics": "directed_message_channel",
+      "rng_algorithm": "luminous-lcg32-v1",
+      "seed": 1019,
+      "nodes": [
+        {
+          "agent_instance_id": "AGENT-00",
+          "principal_ref": "PRINCIPAL-00",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-01",
+          "principal_ref": "PRINCIPAL-01",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-02",
+          "principal_ref": "PRINCIPAL-02",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-03",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-04",
+          "principal_ref": "PRINCIPAL-04",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-05",
+          "principal_ref": "PRINCIPAL-05",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-06",
+          "principal_ref": "PRINCIPAL-06",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-07",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        }
+      ],
+      "edges": [
+        {
+          "channel_id": "COMPLETE-0-1-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-2-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-3-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-4-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-5-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-6-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-7-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-1-R",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-2-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-3-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-4-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-5-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-6-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-7-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-2-3-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-2-4-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-2-5-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-2-6-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-2-7-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-2-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-3-4-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-3-5-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-3-6-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-3-7-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-2-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-3-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-4-5-F",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-4-6-F",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-4-7-F",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-2-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-3-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-4-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-5-6-F",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-5-7-F",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-2-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-3-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-4-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-5-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-6-7-F",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-0-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-1-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-2-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-3-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-4-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-5-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "COMPLETE-6-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        }
+      ],
+      "graph_state": "static_snapshot",
+      "snapshot_round": 0,
+      "temporal_events": [],
+      "self_loops": false,
+      "extra": {},
+      "centrality_reference": {
+        "status": "Unsupported",
+        "algorithm_id": "normalized_betweenness_v1",
+        "direction": "directed",
+        "weights": "unweighted",
+        "distance": "hop_count",
+        "normalization": "(n-1)(n-2)",
+        "values": [
+          {
+            "agent_instance_id": "AGENT-00",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-01",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-02",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-03",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-04",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-05",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-06",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-07",
+            "score": 0
+          }
+        ],
+        "minimum_score": 0,
+        "maximum_score": 0,
+        "minimum_tie_set": [
+          "AGENT-00",
+          "AGENT-01",
+          "AGENT-02",
+          "AGENT-03",
+          "AGENT-04",
+          "AGENT-05",
+          "AGENT-06",
+          "AGENT-07"
+        ],
+        "maximum_tie_set": [
+          "AGENT-00",
+          "AGENT-01",
+          "AGENT-02",
+          "AGENT-03",
+          "AGENT-04",
+          "AGENT-05",
+          "AGENT-06",
+          "AGENT-07"
+        ],
+        "minimum_selected_agent_instance_id": "AGENT-00",
+        "maximum_selected_agent_instance_id": "AGENT-00"
+      },
+      "graph_sha256": "4f6c2b8546e3b03ef6cf81bdae4371a181c66571a667a8f900e19daff8c02187"
+    },
+    {
+      "profile_id": "IG-COMM-TOPOLOGY-001/sparse_random/v0.1",
+      "profile_version": "0.1",
+      "topology_family": "sparse_random",
+      "node_identity": "AgentInstanceId",
+      "edge_semantics": "directed_message_channel",
+      "rng_algorithm": "luminous-lcg32-v1",
+      "seed": 2026,
+      "nodes": [
+        {
+          "agent_instance_id": "AGENT-00",
+          "principal_ref": "PRINCIPAL-00",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-01",
+          "principal_ref": "PRINCIPAL-01",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-02",
+          "principal_ref": "PRINCIPAL-02",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-03",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-04",
+          "principal_ref": "PRINCIPAL-04",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-05",
+          "principal_ref": "PRINCIPAL-05",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-06",
+          "principal_ref": "PRINCIPAL-06",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-07",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        }
+      ],
+      "edges": [
+        {
+          "channel_id": "SPARSE_RANDOM-0-1-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-5-0-R",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-7-0-R",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-0-1-R",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-1-2-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-1-4-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-1-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-2-3-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-7-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-2-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-3-4-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-3-6-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-1-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-3-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-4-5-F",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-5-0-F",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-4-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-5-6-F",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-3-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-5-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-6-7-F",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-7-0-F",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-7-2-F",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "SPARSE_RANDOM-6-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        }
+      ],
+      "graph_state": "static_snapshot",
+      "snapshot_round": 0,
+      "temporal_events": [],
+      "self_loops": false,
+      "extra": {},
+      "centrality_reference": {
+        "status": "Unsupported",
+        "algorithm_id": "normalized_betweenness_v1",
+        "direction": "directed",
+        "weights": "unweighted",
+        "distance": "hop_count",
+        "normalization": "(n-1)(n-2)",
+        "values": [
+          {
+            "agent_instance_id": "AGENT-00",
+            "score": 0.11904762
+          },
+          {
+            "agent_instance_id": "AGENT-01",
+            "score": 0.11904762
+          },
+          {
+            "agent_instance_id": "AGENT-02",
+            "score": 0.11904762
+          },
+          {
+            "agent_instance_id": "AGENT-03",
+            "score": 0.11904762
+          },
+          {
+            "agent_instance_id": "AGENT-04",
+            "score": 0.11904762
+          },
+          {
+            "agent_instance_id": "AGENT-05",
+            "score": 0.11904762
+          },
+          {
+            "agent_instance_id": "AGENT-06",
+            "score": 0.11904762
+          },
+          {
+            "agent_instance_id": "AGENT-07",
+            "score": 0.11904762
+          }
+        ],
+        "minimum_score": 0.11904762,
+        "maximum_score": 0.11904762,
+        "minimum_tie_set": [
+          "AGENT-00",
+          "AGENT-01",
+          "AGENT-02",
+          "AGENT-03",
+          "AGENT-04",
+          "AGENT-05",
+          "AGENT-06",
+          "AGENT-07"
+        ],
+        "maximum_tie_set": [
+          "AGENT-00",
+          "AGENT-01",
+          "AGENT-02",
+          "AGENT-03",
+          "AGENT-04",
+          "AGENT-05",
+          "AGENT-06",
+          "AGENT-07"
+        ],
+        "minimum_selected_agent_instance_id": "AGENT-00",
+        "maximum_selected_agent_instance_id": "AGENT-00"
+      },
+      "graph_sha256": "103f18bb9803992f2a8a3245b69ee97cf7d7f329ef2217191cacc00b0085cb9b"
+    },
+    {
+      "profile_id": "IG-COMM-TOPOLOGY-001/stochastic_block/v0.1",
+      "profile_version": "0.1",
+      "topology_family": "stochastic_block",
+      "node_identity": "AgentInstanceId",
+      "edge_semantics": "directed_message_channel",
+      "rng_algorithm": "luminous-lcg32-v1",
+      "seed": 1020,
+      "nodes": [
+        {
+          "agent_instance_id": "AGENT-00",
+          "principal_ref": "PRINCIPAL-00",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-01",
+          "principal_ref": "PRINCIPAL-01",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-02",
+          "principal_ref": "PRINCIPAL-02",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-03",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-04",
+          "principal_ref": "PRINCIPAL-04",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-05",
+          "principal_ref": "PRINCIPAL-05",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-06",
+          "principal_ref": "PRINCIPAL-06",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-07",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        }
+      ],
+      "edges": [
+        {
+          "channel_id": "STOCHASTIC_BLOCK-0-1-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-0-2-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-0-3-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-0-1-R",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-1-2-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-1-3-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-0-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-1-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-2-3-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-0-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-1-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-2-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-3-4-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-3-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-4-5-F",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-4-6-F",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-4-7-F",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-4-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-5-6-F",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-5-7-F",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-4-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-5-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-6-7-F",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-4-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-5-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "STOCHASTIC_BLOCK-6-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        }
+      ],
+      "graph_state": "static_snapshot",
+      "snapshot_round": 0,
+      "temporal_events": [],
+      "self_loops": false,
+      "extra": {},
+      "centrality_reference": {
+        "status": "Pass",
+        "algorithm_id": "normalized_betweenness_v1",
+        "direction": "directed",
+        "weights": "unweighted",
+        "distance": "hop_count",
+        "normalization": "(n-1)(n-2)",
+        "values": [
+          {
+            "agent_instance_id": "AGENT-00",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-01",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-02",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-03",
+            "score": 0.57142857
+          },
+          {
+            "agent_instance_id": "AGENT-04",
+            "score": 0.57142857
+          },
+          {
+            "agent_instance_id": "AGENT-05",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-06",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-07",
+            "score": 0
+          }
+        ],
+        "minimum_score": 0,
+        "maximum_score": 0.57142857,
+        "minimum_tie_set": [
+          "AGENT-00",
+          "AGENT-01",
+          "AGENT-02",
+          "AGENT-05",
+          "AGENT-06",
+          "AGENT-07"
+        ],
+        "maximum_tie_set": [
+          "AGENT-03",
+          "AGENT-04"
+        ],
+        "minimum_selected_agent_instance_id": "AGENT-00",
+        "maximum_selected_agent_instance_id": "AGENT-03"
+      },
+      "graph_sha256": "07c2601902d77ea3b969c6a759ba6d6c3d053a06c5abe9a25c6939d1d64823b1"
+    },
+    {
+      "profile_id": "IG-COMM-TOPOLOGY-001/core_periphery/v0.1",
+      "profile_version": "0.1",
+      "topology_family": "core_periphery",
+      "node_identity": "AgentInstanceId",
+      "edge_semantics": "directed_message_channel",
+      "rng_algorithm": "luminous-lcg32-v1",
+      "seed": 1021,
+      "nodes": [
+        {
+          "agent_instance_id": "AGENT-00",
+          "principal_ref": "PRINCIPAL-00",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-01",
+          "principal_ref": "PRINCIPAL-01",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-02",
+          "principal_ref": "PRINCIPAL-02",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-03",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-04",
+          "principal_ref": "PRINCIPAL-04",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-05",
+          "principal_ref": "PRINCIPAL-05",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-06",
+          "principal_ref": "PRINCIPAL-06",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-07",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        }
+      ],
+      "edges": [
+        {
+          "channel_id": "CORE_PERIPHERY-0-1-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-0-2-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-0-3-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-0-4-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-0-6-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-0-1-R",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-1-2-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-1-3-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-1-5-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-1-7-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-0-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-1-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-2-4-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-2-5-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-2-6-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-2-7-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-0-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-1-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-0-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-2-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-1-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-2-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-0-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-2-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-1-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CORE_PERIPHERY-2-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        }
+      ],
+      "graph_state": "static_snapshot",
+      "snapshot_round": 0,
+      "temporal_events": [],
+      "self_loops": false,
+      "extra": {},
+      "centrality_reference": {
+        "status": "Pass",
+        "algorithm_id": "normalized_betweenness_v1",
+        "direction": "directed",
+        "weights": "unweighted",
+        "distance": "hop_count",
+        "normalization": "(n-1)(n-2)",
+        "values": [
+          {
+            "agent_instance_id": "AGENT-00",
+            "score": 0.19047619
+          },
+          {
+            "agent_instance_id": "AGENT-01",
+            "score": 0.19047619
+          },
+          {
+            "agent_instance_id": "AGENT-02",
+            "score": 0.33333333
+          },
+          {
+            "agent_instance_id": "AGENT-03",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-04",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-05",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-06",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-07",
+            "score": 0
+          }
+        ],
+        "minimum_score": 0,
+        "maximum_score": 0.33333333,
+        "minimum_tie_set": [
+          "AGENT-03",
+          "AGENT-04",
+          "AGENT-05",
+          "AGENT-06",
+          "AGENT-07"
+        ],
+        "maximum_tie_set": [
+          "AGENT-02"
+        ],
+        "minimum_selected_agent_instance_id": "AGENT-03",
+        "maximum_selected_agent_instance_id": "AGENT-02"
+      },
+      "graph_sha256": "7c1dc4e072860ff230caa90c17f8860a0dd30dbb78f06cfd5d0a745b72269b69"
+    },
+    {
+      "profile_id": "IG-COMM-TOPOLOGY-001/temporal_churn/v0.1",
+      "profile_version": "0.1",
+      "topology_family": "temporal_churn",
+      "node_identity": "AgentInstanceId",
+      "edge_semantics": "directed_message_channel",
+      "rng_algorithm": "luminous-lcg32-v1",
+      "seed": 3001,
+      "nodes": [
+        {
+          "agent_instance_id": "AGENT-00",
+          "principal_ref": "PRINCIPAL-00",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-01",
+          "principal_ref": "PRINCIPAL-01",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-02",
+          "principal_ref": "PRINCIPAL-02",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-03",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-04",
+          "principal_ref": "PRINCIPAL-04",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-05",
+          "principal_ref": "PRINCIPAL-05",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-06",
+          "principal_ref": "PRINCIPAL-06",
+          "role": "participant"
+        },
+        {
+          "agent_instance_id": "AGENT-07",
+          "principal_ref": "PRINCIPAL-03",
+          "role": "participant"
+        }
+      ],
+      "edges": [
+        {
+          "channel_id": "CHURN-0-1-F",
+          "sender": "AGENT-00",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-0-1-R",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-00",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-1-2-F",
+          "sender": "AGENT-01",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-1-2-R",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-01",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-2-3-F",
+          "sender": "AGENT-02",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-2-3-R",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-02",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-3-4-F",
+          "sender": "AGENT-03",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-3-4-R",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-03",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-4-5-F",
+          "sender": "AGENT-04",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-4-5-R",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-04",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-5-6-F",
+          "sender": "AGENT-05",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-5-6-R",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-05",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-6-7-F",
+          "sender": "AGENT-06",
+          "recipient": "AGENT-07",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        },
+        {
+          "channel_id": "CHURN-6-7-R",
+          "sender": "AGENT-07",
+          "recipient": "AGENT-06",
+          "message_classes": [
+            "claim",
+            "evidence",
+            "challenge"
+          ],
+          "active_from_round": 0,
+          "active_until_round": null,
+          "capacity_per_round": 4,
+          "latency_ticks": 0
+        }
+      ],
+      "graph_state": "event_sourced",
+      "snapshot_round": 0,
+      "temporal_events": [
+        {
+          "event_id": "CHURN-001",
+          "round": 2,
+          "kind": "revoke_channel",
+          "channel_ids": [
+            "CHURN-3-4-F",
+            "CHURN-3-4-R"
+          ]
+        },
+        {
+          "event_id": "CHURN-002",
+          "round": 4,
+          "kind": "restore_channel",
+          "channel_ids": [
+            "CHURN-3-4-F",
+            "CHURN-3-4-R"
+          ],
+          "new_channel_ids": [
+            "CHURN-3-4-F-R2",
+            "CHURN-3-4-R-R2"
+          ]
+        },
+        {
+          "event_id": "CHURN-003",
+          "round": 6,
+          "kind": "agent_exit",
+          "agent_instance_id": "AGENT-07"
+        },
+        {
+          "event_id": "CHURN-004",
+          "round": 8,
+          "kind": "agent_rejoin",
+          "agent_instance_id": "AGENT-07",
+          "new_agent_instance_id": "AGENT-07-R2"
+        }
+      ],
+      "self_loops": false,
+      "extra": {
+        "rejoin_creates_new_agent_instance": true
+      },
+      "centrality_reference": {
+        "status": "Pass",
+        "algorithm_id": "normalized_betweenness_v1",
+        "direction": "directed",
+        "weights": "unweighted",
+        "distance": "hop_count",
+        "normalization": "(n-1)(n-2)",
+        "values": [
+          {
+            "agent_instance_id": "AGENT-00",
+            "score": 0
+          },
+          {
+            "agent_instance_id": "AGENT-01",
+            "score": 0.28571429
+          },
+          {
+            "agent_instance_id": "AGENT-02",
+            "score": 0.47619048
+          },
+          {
+            "agent_instance_id": "AGENT-03",
+            "score": 0.57142857
+          },
+          {
+            "agent_instance_id": "AGENT-04",
+            "score": 0.57142857
+          },
+          {
+            "agent_instance_id": "AGENT-05",
+            "score": 0.47619048
+          },
+          {
+            "agent_instance_id": "AGENT-06",
+            "score": 0.28571429
+          },
+          {
+            "agent_instance_id": "AGENT-07",
+            "score": 0
+          }
+        ],
+        "minimum_score": 0,
+        "maximum_score": 0.57142857,
+        "minimum_tie_set": [
+          "AGENT-00",
+          "AGENT-07"
+        ],
+        "maximum_tie_set": [
+          "AGENT-03",
+          "AGENT-04"
+        ],
+        "minimum_selected_agent_instance_id": "AGENT-00",
+        "maximum_selected_agent_instance_id": "AGENT-03"
+      },
+      "graph_sha256": "6b220afcf8b1638336ca0565b8b3a0bdb5bf47440123c471a1c001575003380c"
+    }
+  ],
+  "fixtures": [
+    {
+      "fixture_id": "COMM-001",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/chain/v0.1",
+      "kind": "golden_profile",
+      "expected_status": "Pass",
+      "assertions": [
+        "nodes_unique",
+        "channel_ids_unique",
+        "edge_endpoints_resolve",
+        "no_self_loops",
+        "graph_digest_reproduces"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-002",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/star/v0.1",
+      "kind": "golden_profile",
+      "expected_status": "Pass",
+      "assertions": [
+        "nodes_unique",
+        "channel_ids_unique",
+        "edge_endpoints_resolve",
+        "no_self_loops",
+        "graph_digest_reproduces"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-003",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/balanced_tree/v0.1",
+      "kind": "golden_profile",
+      "expected_status": "Pass",
+      "assertions": [
+        "nodes_unique",
+        "channel_ids_unique",
+        "edge_endpoints_resolve",
+        "no_self_loops",
+        "graph_digest_reproduces"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-004",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/complete/v0.1",
+      "kind": "golden_profile",
+      "expected_status": "Pass",
+      "assertions": [
+        "nodes_unique",
+        "channel_ids_unique",
+        "edge_endpoints_resolve",
+        "no_self_loops",
+        "graph_digest_reproduces"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-005",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/sparse_random/v0.1",
+      "kind": "golden_profile",
+      "expected_status": "Pass",
+      "assertions": [
+        "nodes_unique",
+        "channel_ids_unique",
+        "edge_endpoints_resolve",
+        "no_self_loops",
+        "graph_digest_reproduces"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-006",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/stochastic_block/v0.1",
+      "kind": "golden_profile",
+      "expected_status": "Pass",
+      "assertions": [
+        "nodes_unique",
+        "channel_ids_unique",
+        "edge_endpoints_resolve",
+        "no_self_loops",
+        "graph_digest_reproduces"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-007",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/core_periphery/v0.1",
+      "kind": "golden_profile",
+      "expected_status": "Pass",
+      "assertions": [
+        "nodes_unique",
+        "channel_ids_unique",
+        "edge_endpoints_resolve",
+        "no_self_loops",
+        "graph_digest_reproduces"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-008",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/temporal_churn/v0.1",
+      "kind": "golden_profile",
+      "expected_status": "Pass",
+      "assertions": [
+        "nodes_unique",
+        "channel_ids_unique",
+        "edge_endpoints_resolve",
+        "no_self_loops",
+        "graph_digest_reproduces"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-009",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/chain/v0.1",
+      "kind": "centrality_known_answer",
+      "expected_status": "Pass",
+      "assertions": [
+        "strongly_connected",
+        "normalized_betweenness_matches_reference",
+        "minimum_tie_set_matches",
+        "maximum_tie_set_matches",
+        "selected_nodes_follow_stable_lexical_tie_break"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-010",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/star/v0.1",
+      "kind": "centrality_known_answer",
+      "expected_status": "Pass",
+      "assertions": [
+        "strongly_connected",
+        "normalized_betweenness_matches_reference",
+        "minimum_tie_set_matches",
+        "maximum_tie_set_matches",
+        "selected_nodes_follow_stable_lexical_tie_break"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-011",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/balanced_tree/v0.1",
+      "kind": "centrality_known_answer",
+      "expected_status": "Pass",
+      "assertions": [
+        "strongly_connected",
+        "normalized_betweenness_matches_reference",
+        "minimum_tie_set_matches",
+        "maximum_tie_set_matches",
+        "selected_nodes_follow_stable_lexical_tie_break"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-012",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/stochastic_block/v0.1",
+      "kind": "centrality_known_answer",
+      "expected_status": "Pass",
+      "assertions": [
+        "strongly_connected",
+        "normalized_betweenness_matches_reference",
+        "minimum_tie_set_matches",
+        "maximum_tie_set_matches",
+        "selected_nodes_follow_stable_lexical_tie_break"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-013",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/core_periphery/v0.1",
+      "kind": "centrality_known_answer",
+      "expected_status": "Pass",
+      "assertions": [
+        "strongly_connected",
+        "normalized_betweenness_matches_reference",
+        "minimum_tie_set_matches",
+        "maximum_tie_set_matches",
+        "selected_nodes_follow_stable_lexical_tie_break"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-014",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/temporal_churn/v0.1",
+      "kind": "temporal_churn_event_order",
+      "expected_status": "Pass",
+      "assertions": [
+        "event_rounds_monotonic",
+        "revocation_precedes_delivery_denial",
+        "restore_uses_new_channel_identity",
+        "rejoin_uses_new_agent_instance"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-015",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/complete/v0.1",
+      "kind": "complete_graph_centrality_control",
+      "expected_status": "Unsupported",
+      "assertions": [
+        "all_nodes_equal_centrality",
+        "no_distinct_minimum_maximum_selection"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-016",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/chain/v0.1",
+      "kind": "delegation_non_equivalence_control",
+      "expected_status": "Pass",
+      "assertions": [
+        "delegation_edges_not_communication_channels",
+        "no_vote_weight_field_in_channel_edge"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-017",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/chain/v0.1",
+      "kind": "message_delivery_is_event_bound",
+      "expected_status": "Pass",
+      "assertions": [
+        "reachability_not_delivery",
+        "channel_event_required_for_delivery"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-018",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/star/v0.1",
+      "kind": "principal_multiplicity_control",
+      "expected_status": "Pass",
+      "assertions": [
+        "agent_instance_nodes_remain_distinct",
+        "shared_principal_metadata_does_not_merge_nodes"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-019",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/chain/v0.1",
+      "kind": "self_loop_negative_control",
+      "expected_status": "Fail",
+      "assertions": [
+        "self_loop_rejected"
+      ],
+      "expected_violations": [
+        "self_loop_not_permitted"
+      ]
+    },
+    {
+      "fixture_id": "COMM-020",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/chain/v0.1",
+      "kind": "duplicate_channel_id_negative_control",
+      "expected_status": "Fail",
+      "assertions": [
+        "duplicate_channel_id_rejected"
+      ],
+      "expected_violations": [
+        "duplicate_channel_id"
+      ]
+    },
+    {
+      "fixture_id": "COMM-021",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/chain/v0.1",
+      "kind": "unknown_endpoint_negative_control",
+      "expected_status": "Fail",
+      "assertions": [
+        "unknown_agent_endpoint_rejected"
+      ],
+      "expected_violations": [
+        "unknown_agent_endpoint"
+      ]
+    },
+    {
+      "fixture_id": "COMM-022",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/chain/v0.1",
+      "kind": "duplicate_agent_instance_negative_control",
+      "expected_status": "Fail",
+      "assertions": [
+        "duplicate_agent_instance_id_rejected"
+      ],
+      "expected_violations": [
+        "duplicate_agent_instance_id"
+      ]
+    },
+    {
+      "fixture_id": "COMM-023",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/temporal_churn/v0.1",
+      "kind": "out_of_order_temporal_event_negative_control",
+      "expected_status": "Fail",
+      "assertions": [
+        "out_of_order_temporal_events_rejected"
+      ],
+      "expected_violations": [
+        "temporal_event_order_invalid"
+      ]
+    },
+    {
+      "fixture_id": "COMM-024",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/temporal_churn/v0.1",
+      "kind": "stale_channel_replay_negative_control",
+      "expected_status": "Fail",
+      "assertions": [
+        "revoked_channel_replay_rejected"
+      ],
+      "expected_violations": [
+        "revoked_channel_delivery"
+      ]
+    },
+    {
+      "fixture_id": "COMM-025",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/temporal_churn/v0.1",
+      "kind": "implicit_restore_negative_control",
+      "expected_status": "Fail",
+      "assertions": [
+        "revocation_cannot_be_cleared_without_new_channel_identity"
+      ],
+      "expected_violations": [
+        "implicit_channel_restore"
+      ]
+    },
+    {
+      "fixture_id": "COMM-026",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/chain/v0.1",
+      "kind": "reciprocity_negative_control",
+      "expected_status": "Pass",
+      "assertions": [
+        "reverse_edge_must_be_explicit",
+        "single_arc_does_not_imply_reciprocity"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-027",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/stochastic_block/v0.1",
+      "kind": "community_bridge_removal_control",
+      "expected_status": "Unsupported",
+      "assertions": [
+        "disconnected_snapshot_has_no_global_betweenness_result"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-028",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/core_periphery/v0.1",
+      "kind": "core_periphery_centrality_control",
+      "expected_status": "Pass",
+      "assertions": [
+        "centrality_is_descriptive_only",
+        "no_authority_transfer"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-029",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/sparse_random/v0.1",
+      "kind": "seed_replay_control",
+      "expected_status": "Pass",
+      "assertions": [
+        "same_seed_same_canonical_graph_bytes",
+        "changed_seed_changes_profile_identity"
+      ],
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "COMM-030",
+      "profile_ref": "IG-COMM-TOPOLOGY-001/balanced_tree/v0.1",
+      "kind": "centrality_tie_break_control",
+      "expected_status": "Pass",
+      "assertions": [
+        "full_tie_sets_recorded",
+        "lexical_id_tie_break_deterministic"
+      ],
+      "expected_violations": []
+    }
+  ],
+  "claim_ceiling": "These are deterministic synthetic communication graph fixtures and expected structural properties. They do not represent observed human networks, prove real-world exposure, or infer delivered messages from reachability."
+}
