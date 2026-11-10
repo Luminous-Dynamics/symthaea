@@ -128,7 +128,7 @@ fn no_detection_cannot_be_promoted_to_positive_support() {
 fn observed_property_requires_a_linked_evidence_record() {
     let mut candidate = profile();
     candidate.findings.push(finding(
-        Property::AdaptiveResponse,
+        Property::Adaptation,
         PropertyAssessment::SupportedWithinScope,
         &[],
     ));
