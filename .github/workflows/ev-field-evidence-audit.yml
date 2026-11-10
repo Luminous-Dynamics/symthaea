@@ -32,6 +32,6 @@ jobs:
           jq -e '
             .case_count == 17 and
             .accepted_count == 6 and
-            .rejected_count == 11 and
+            .rejected_count == 12 and
             (.report_sha256 | test("^[a-f0-9]{64}$"))
           ' "$RUNNER_TEMP/ev-field-evidence-report.json"
