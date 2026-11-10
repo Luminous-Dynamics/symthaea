@@ -55,6 +55,16 @@ cargo run --bin marine-regulatory-rule-audit -- \
 
 The retained v0.1.0 snapshot remains available for historical comparison. v0.2.0 separates emissions year from surrender year, statutory voyage-coverage fraction from surrender phase-in, and EU MRV gas-monitoring years from EU ETS gas-surrender years.
 
+Audit a WAPS wind-energy evidence record:
+
+~~~sh
+cargo run --bin marine-wind-energy-evidence-audit -- \
+  ../../docs/research/marine/marine-wind-energy-evidence-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-wind-energy-evidence-v0.1.0.json
+~~~
+
+The wind-energy audit keeps regulatory-method wind energy, engineering research estimates and counterfactual avoided propulsion energy separate. Its synthetic fixture must remain NOT_READY because COM(2026)620 is a proposal and the future implementing-act method is not yet defined.
+
 Audit a preregistered causal study protocol:
 
 ~~~sh
@@ -117,7 +127,7 @@ The v0.2.0 profile is documented in `docs/research/marine/MARINE-SERVICE-FINGERP
   basis; and a declared half-open sample-window convention with count/rate tolerance.
 - `marine-regulatory-rule-register-v0.2.0.schema.json` and its dated register are the preferred current snapshot; they keep emissions year, surrender year, route coverage and gas-scope years separate.
 - `marine-causal-study-protocol-v0.1.0.schema.json` defines preregistered estimands, treatment states, confounders, battery boundaries, identification gates and negative controls. Its synthetic fixture is deliberately NOT_READY.
-- The package also contains standalone audit binaries for the regulatory register and causal-study protocol. They check contract/readiness conditions only; neither is a regulatory decision nor a causal estimator.
+- The package also contains standalone audit binaries for the regulatory register, causal-study protocol and WAPS wind-energy evidence. They check contract/readiness conditions only; neither is a regulatory decision nor a causal estimator.
 - v0.2.0 and v0.3.0 fixtures are synthetic. Their registry entries are software-test data,
   not calibration, metrology or operational evidence. The v0.2.0 service fingerprint is a
   known-answer software test vector.
