@@ -1526,6 +1526,331 @@
           "arms": []
         }
       }
+    },
+    {
+      "case_id": "receive-timestamp-precedes-measurement-rejected",
+      "expectation": "reject",
+      "expected_claim_ceiling": null,
+      "manifest": {
+        "protocol_version": "ev-soh-feature-availability/0.1",
+        "manifest_id": "strict-online-same-cell-prefix",
+        "evaluation_mode": "strict_online",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "model_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "split_frozen_at_ms": 1000,
+        "test_accessed_at_ms": 1200,
+        "train_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "test_group_identity_digests": [
+          "0000000000000000000000000000000000000000000000000000000000000014",
+          "0000000000000000000000000000000000000000000000000000000000000015",
+          "0000000000000000000000000000000000000000000000000000000000000016"
+        ],
+        "feature_definitions": [
+          {
+            "feature_id": "self-reference-offset",
+            "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "implementation_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "transform_ref": "raw-cycle-feature",
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "fit_scope": "train_only",
+            "fit_at_ms": 700,
+            "fit_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000000a",
+              "000000000000000000000000000000000000000000000000000000000000000b",
+              "000000000000000000000000000000000000000000000000000000000000000c"
+            ],
+            "predeclared_at_ms": null,
+            "predeclaration_digest": null,
+            "reference_kind": "same_asset_prefix",
+            "reference_policy_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "uses_test_labels": false,
+            "uses_future_observations": false
+          }
+        ],
+        "prediction_rows": [
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+            "asset_identity_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+            "decision_at_ms": 1100,
+            "target_value": 0.87,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
+            "feature_uses": [
+              {
+                "feature_id": "self-reference-offset",
+                "value_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+                "latest_measurement_at_ms": 800,
+                "latest_received_at_ms": 790,
+                "derived_at_ms": 850,
+                "reference_kind": "same_asset_prefix",
+                "reference_identity_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+                "reference_population_digest": null,
+                "reference_measurement_at_ms": 700,
+                "reference_received_at_ms": 710,
+                "used_target_label": false,
+                "used_future_observation": false,
+                "availability_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d"
+              }
+            ]
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+            "asset_identity_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+            "decision_at_ms": 1100,
+            "target_value": 0.8400000000000001,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
+            "feature_uses": [
+              {
+                "feature_id": "self-reference-offset",
+                "value_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+                "latest_measurement_at_ms": 800,
+                "latest_received_at_ms": 810,
+                "derived_at_ms": 850,
+                "reference_kind": "same_asset_prefix",
+                "reference_identity_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+                "reference_population_digest": null,
+                "reference_measurement_at_ms": 700,
+                "reference_received_at_ms": 710,
+                "used_target_label": false,
+                "used_future_observation": false,
+                "availability_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012e"
+              }
+            ]
+          }
+        ],
+        "reference_randomization": {
+          "status": "not_applicable",
+          "method_ref": "randomized-reference-pairing",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+          "assignment_digest": null,
+          "seed": null,
+          "derangement_count": 0,
+          "schedule_frozen_at_ms": null,
+          "arms": []
+        }
+      }
+    },
+    {
+      "case_id": "feature-derived-before-input-arrival-rejected",
+      "expectation": "reject",
+      "expected_claim_ceiling": null,
+      "manifest": {
+        "protocol_version": "ev-soh-feature-availability/0.1",
+        "manifest_id": "strict-online-same-cell-prefix",
+        "evaluation_mode": "strict_online",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "model_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "split_frozen_at_ms": 1000,
+        "test_accessed_at_ms": 1200,
+        "train_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "test_group_identity_digests": [
+          "0000000000000000000000000000000000000000000000000000000000000014",
+          "0000000000000000000000000000000000000000000000000000000000000015",
+          "0000000000000000000000000000000000000000000000000000000000000016"
+        ],
+        "feature_definitions": [
+          {
+            "feature_id": "self-reference-offset",
+            "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "implementation_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "transform_ref": "raw-cycle-feature",
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "fit_scope": "train_only",
+            "fit_at_ms": 700,
+            "fit_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000000a",
+              "000000000000000000000000000000000000000000000000000000000000000b",
+              "000000000000000000000000000000000000000000000000000000000000000c"
+            ],
+            "predeclared_at_ms": null,
+            "predeclaration_digest": null,
+            "reference_kind": "same_asset_prefix",
+            "reference_policy_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "uses_test_labels": false,
+            "uses_future_observations": false
+          }
+        ],
+        "prediction_rows": [
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+            "asset_identity_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+            "decision_at_ms": 1100,
+            "target_value": 0.87,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f5",
+            "feature_uses": [
+              {
+                "feature_id": "self-reference-offset",
+                "value_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+                "latest_measurement_at_ms": 800,
+                "latest_received_at_ms": 810,
+                "derived_at_ms": 850,
+                "reference_kind": "same_asset_prefix",
+                "reference_identity_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+                "reference_population_digest": null,
+                "reference_measurement_at_ms": 700,
+                "reference_received_at_ms": 710,
+                "used_target_label": false,
+                "used_future_observation": false,
+                "availability_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012d"
+              }
+            ]
+          },
+          {
+            "sample_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+            "asset_identity_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+            "decision_at_ms": 1100,
+            "target_value": 0.8400000000000001,
+            "target_evidence_digest": "00000000000000000000000000000000000000000000000000000000000001f6",
+            "feature_uses": [
+              {
+                "feature_id": "self-reference-offset",
+                "value_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+                "latest_measurement_at_ms": 800,
+                "latest_received_at_ms": 810,
+                "derived_at_ms": 800,
+                "reference_kind": "same_asset_prefix",
+                "reference_identity_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+                "reference_population_digest": null,
+                "reference_measurement_at_ms": 700,
+                "reference_received_at_ms": 710,
+                "used_target_label": false,
+                "used_future_observation": false,
+                "availability_evidence_digest": "000000000000000000000000000000000000000000000000000000000000012e"
+              }
+            ]
+          }
+        ],
+        "reference_randomization": {
+          "status": "not_applicable",
+          "method_ref": "randomized-reference-pairing",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+          "assignment_digest": null,
+          "seed": null,
+          "derangement_count": 0,
+          "schedule_frozen_at_ms": null,
+          "arms": []
+        }
+      }
+    },
+    {
+      "case_id": "peer-reference-received-before-measurement-rejected",
+      "expectation": "reject",
+      "expected_claim_ceiling": null,
+      "manifest": {
+        "protocol_version": "ev-soh-feature-availability/0.1",
+        "manifest_id": "peer-reference-randomization-preregistered",
+        "evaluation_mode": "strict_online",
+        "dataset_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+        "model_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+        "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+        "split_frozen_at_ms": 1000,
+        "test_accessed_at_ms": 1200,
+        "train_group_identity_digests": [
+          "000000000000000000000000000000000000000000000000000000000000000a",
+          "000000000000000000000000000000000000000000000000000000000000000b",
+          "000000000000000000000000000000000000000000000000000000000000000c"
+        ],
+        "test_group_identity_digests": [
+          "0000000000000000000000000000000000000000000000000000000000000014",
+          "0000000000000000000000000000000000000000000000000000000000000015",
+          "0000000000000000000000000000000000000000000000000000000000000016"
+        ],
+        "feature_definitions": [
+          {
+            "feature_id": "peer-baseline",
+            "feature_schema_digest": "0000000000000000000000000000000000000000000000000000000000000064",
+            "implementation_digest": "0000000000000000000000000000000000000000000000000000000000000065",
+            "transform_ref": "raw-cycle-feature",
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000066",
+            "fit_scope": "train_only",
+            "fit_at_ms": 700,
+            "fit_group_identity_digests": [
+              "000000000000000000000000000000000000000000000000000000000000000a",
+              "000000000000000000000000000000000000000000000000000000000000000b",
+              "000000000000000000000000000000000000000000000000000000000000000c"
+            ],
+            "predeclared_at_ms": null,
+            "predeclaration_digest": null,
+            "reference_kind": "peer_asset",
+            "reference_policy_digest": "0000000000000000000000000000000000000000000000000000000000000067",
+            "uses_test_labels": false,
+            "uses_future_observations": false
+          }
+        ],
+        "prediction_rows": [
+          {
+            "sample_digest": "00000000000000000000000000000000000000000000000000000000000001a1",
+            "asset_identity_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+            "decision_at_ms": 1100,
+            "target_value": 0.39,
+            "target_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000205",
+            "feature_uses": [
+              {
+                "feature_id": "peer-baseline",
+                "value_digest": "00000000000000000000000000000000000000000000000000000000000000d9",
+                "latest_measurement_at_ms": 800,
+                "latest_received_at_ms": 810,
+                "derived_at_ms": 850,
+                "reference_kind": "peer_asset",
+                "reference_identity_digest": "000000000000000000000000000000000000000000000000000000000000000a",
+                "reference_population_digest": null,
+                "reference_measurement_at_ms": 600,
+                "reference_received_at_ms": 590,
+                "used_target_label": false,
+                "used_future_observation": false,
+                "availability_evidence_digest": "000000000000000000000000000000000000000000000000000000000000013d"
+              }
+            ]
+          },
+          {
+            "sample_digest": "00000000000000000000000000000000000000000000000000000000000001a2",
+            "asset_identity_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+            "decision_at_ms": 1100,
+            "target_value": 0.36,
+            "target_evidence_digest": "0000000000000000000000000000000000000000000000000000000000000206",
+            "feature_uses": [
+              {
+                "feature_id": "peer-baseline",
+                "value_digest": "00000000000000000000000000000000000000000000000000000000000000da",
+                "latest_measurement_at_ms": 800,
+                "latest_received_at_ms": 810,
+                "derived_at_ms": 850,
+                "reference_kind": "peer_asset",
+                "reference_identity_digest": "000000000000000000000000000000000000000000000000000000000000000b",
+                "reference_population_digest": null,
+                "reference_measurement_at_ms": 600,
+                "reference_received_at_ms": 610,
+                "used_target_label": false,
+                "used_future_observation": false,
+                "availability_evidence_digest": "000000000000000000000000000000000000000000000000000000000000013e"
+              }
+            ]
+          }
+        ],
+        "reference_randomization": {
+          "status": "pre_registered",
+          "method_ref": "randomized-reference-pairing",
+          "method_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+          "assignment_digest": "0000000000000000000000000000000000000000000000000000000000000259",
+          "seed": 42,
+          "derangement_count": 100,
+          "schedule_frozen_at_ms": 900,
+          "arms": [
+            "true_pair",
+            "randomized_derangement",
+            "affine_negative_control"
+          ]
+        }
+      }
     }
   ]
 }
