@@ -255,15 +255,6 @@ fn unique_digest_set(values: &[String], label: &str, errors: &mut Vec<String>) -
     output
 }
 
-fn stratum_for(score: f64, scoring: &SupportScoring) -> &'static str {
-    if score <= scoring.in_support_max_score {
-        "in_support"
-    } else if score < scoring.extrapolation_min_score {
-        "boundary"
-    } else {
-        "extrapolation"
-    }
-}
 
 fn validate_manifest(manifest: &Manifest) -> Vec<String> {
     let mut errors = Vec::new();
