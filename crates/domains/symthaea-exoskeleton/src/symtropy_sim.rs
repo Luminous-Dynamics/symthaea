@@ -1,13 +1,15 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Symtropy-physics exoskeleton: human-robot co-embodiment with consciousness-mediated impedance.
+//! Experimental Symtropy-physics coupling model for exoskeleton research.
 //!
-//! Two parallel 3-joint chains (human legs + exo legs) coupled at the hip.
-//! At high Φ: exo actively assists (stiff, high motor force).
-//! At low Φ: exo becomes transparent (compliant, low impedance, backdrivable).
+//! Two parallel 3-joint research chains are used to explore metric-conditioned
+//! simulation behavior. The experimental callback changes simulated force and
+//! contact-friction behavior; this is an artificial coupling experiment, not a
+//! calibrated human biomechanics model or an actuator-control/safety policy.
 //!
-//! This is the unique consciousness-coupling demo — no other framework offers
-//! adaptive impedance driven by a measurable consciousness metric.
+//! This module must remain isolated from physical hardware adapters. A
+//! consciousness-related metric is not evidence of physical safety,
+//! authorization, competence, or permission to increase actuator authority.
 
 #![cfg(feature = "symtropy")]
 
@@ -20,10 +22,10 @@ use symtropy_physics::{CollisionEvent, PhysicsCallback};
 use crate::simulator::ExoskeletonPhysicsSimulator;
 use crate::types::{ExoskeletonCommand, ExoskeletonState, NUM_ACTUATORS, NUM_JOINTS};
 
-/// Consciousness-mediated impedance callback.
+/// Experimental metric-coupling callback for this simulation only.
 ///
-/// High Φ → stiff assist (motor_gain=1.0, high friction).
-/// Low Φ → transparent compliance (motor_gain→0, low friction = backdrivable).
+/// Its outputs intentionally alter the research plant and must not be reused
+/// as physical actuator authority, safety admission, or hardware calibration.
 pub struct ConsciousnessExoCallback {
     pub motor_gain: f32,
     pub stiffness_factor: f64,
@@ -136,7 +138,8 @@ impl SymtropyExoskeletonSimulator {
         }
     }
 
-    /// Set consciousness-mediated impedance.
+    /// Set explicit experimental simulation-coupling parameters. These values
+    /// are not motor-safety or hardware-authority inputs.
     pub fn set_consciousness_impedance(&mut self, motor_gain: f32, stiffness: f64) {
         self.callback.motor_gain = motor_gain;
         self.callback.stiffness_factor = stiffness;
