@@ -90,7 +90,7 @@ pub struct NumericLieDerivativeProfileV1 {
     pub samples_per_generator: usize,
     pub finite_difference_step: f64,
     /// Maximum squared cosine between the expression gradient and group-orbit tangent.
-    /// Dimensionless and invariant to nonzero scalar rescaling of the expression.
+    /// Dimensionless and invariant to nonzero expression and uniform coordinate rescaling.
     pub normalized_squared_residual_tolerance: f64,
     pub sample_min_inclusive: f64,
     pub sample_max_exclusive: f64,
@@ -1063,10 +1063,10 @@ fn sample_states(dim: usize, profile: NumericLieDerivativeProfileV1) -> Vec<Vec<
 /// `algebra`, acting on the variables at `active_indices` (all other
 /// variables held fixed). Requires the normalized squared Lie derivative to
 /// be below tolerance at every sampled point, for every generator. The residual
-/// is the squared cosine between the expression gradient and the group-orbit
-/// tangent, so rescaling the expression cannot make a non-invariant candidate
-/// appear invariant. Samples with a zero gradient or zero orbit tangent are
-/// uninformative and are skipped.
+/// is the squared cosine between the expression gradient and group-orbit tangent.
+/// Unlike |L_A f|² / ||grad f||², it is dimensionless and does not depend on the
+/// magnitude/units of the orbit vector. Samples with a zero gradient or zero
+/// orbit tangent are uninformative and are skipped.
 fn is_lie_invariant(
     expr: &Expr,
     var_names: &[String],
@@ -1096,11 +1096,10 @@ fn is_lie_invariant(
             }
 
             // Normalize both vectors before taking their dot product. The prior
-            // |L_A f|² / ||grad f||² metric scaled with the arbitrary amplitude of
-            // f and could accept an anisotropic expression merely by multiplying
-            // it by a small constant. hypot keeps norm accumulation stable; the
-            // normalized dot product avoids forming an unscaled Lie derivative
-            // or multiplying the two norms.
+            // |L_A f|² / ||grad f||² metric equals ||A x||² cos²(theta), so its
+            // threshold depends on coordinate magnitude/units. hypot keeps norm
+            // accumulation stable; the normalized dot product avoids forming an
+            // unscaled Lie derivative or multiplying the two norms.
             let gradient_norm = active_indices
                 .iter()
                 .fold(0.0_f64, |norm, &vi| norm.hypot(grad[vi]));
@@ -1340,39 +1339,58 @@ mod tests {
         );
     }
 
-    #[test]
-    fn sampled_symmetry_decision_is_invariant_under_expression_rescaling() {
-        // Exercise the numeric lane directly. A nonzero scalar changes the
-        // expression amplitude, not its symmetry group.
-        let radial = add(pow2("x"), pow2("y"));
-        let radial_report = infer_symmetry_numeric_with_evidence(&radial);
-        let scaled_radial = mul(Expr::Const(5e-200), radial.clone());
-        let scaled_radial_report = infer_symmetry_numeric_with_evidence(&scaled_radial);
-        assert_eq!(
-            radial_report.candidate.as_ref().map(|candidate| candidate.lie_groups.clone()),
-            Some(vec![LieGroup::SO(2)])
-        );
-        assert_eq!(
-            scaled_radial_report.candidate.as_ref().map(|candidate| candidate.lie_groups.clone()),
-            Some(vec![LieGroup::SO(2)])
-        );
+    fn numeric_profile_with_coordinate_scale(scale: f64) -> NumericLieDerivativeProfileV1 {
+        let mut profile = NumericLieDerivativeProfileV1::default();
+        profile.sample_min_inclusive *= scale;
+        profile.sample_max_exclusive *= scale;
+        profile.finite_difference_step *= scale;
+        profile
+    }
 
-        // x² + 2y² is anisotropic for every nonzero scalar. Under the previous
-        // gradient-only normalization, this 5e-4 rescaling reduced the sampled
-        // residual below tolerance and produced a false SO(2) candidate.
-        let anisotropic = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
-        let anisotropic_report = infer_symmetry_numeric_with_evidence(&anisotropic);
-        assert!(anisotropic_report.candidate.is_none());
-        assert!(anisotropic_report.evidence.is_none());
-        for scale in [5e-4, 5e-200, 5e200] {
-            let scaled_anisotropic = mul(Expr::Const(scale), anisotropic.clone());
-            let scaled_report = infer_symmetry_numeric_with_evidence(&scaled_anisotropic);
-            assert!(
-                scaled_report.candidate.is_none(),
-                "anisotropic expression was falsely accepted at scale {scale}"
+    #[test]
+    fn sampled_symmetry_is_robust_to_expression_and_coordinate_scales() {
+        // The numeric lane must not abstain merely because a valid expression
+        // is represented at a very small or large amplitude. The old absolute
+        // minimum-gradient cutoff rejected both extremes.
+        let radial = sqrt_of(add(pow2("x"), pow2("y")));
+        for amplitude in [5e-200, 5e200] {
+            let scaled = mul(Expr::Const(amplitude), radial.clone());
+            let report = infer_symmetry_numeric_with_evidence(&scaled);
+            assert_eq!(
+                report.candidate.as_ref().map(|candidate| candidate.lie_groups.clone()),
+                Some(vec![LieGroup::SO(2)]),
+                "radial symmetry should survive expression amplitude {amplitude}"
             );
-            assert!(scaled_report.evidence.is_none());
         }
+
+        // Coordinate units also matter. Let X = c*x, Y = c*y and express the
+        // same anisotropic function as sqrt((X² + 2Y²) / c²). With c=1e-4,
+        // the old residual ||A X||² cos²(theta) falls below 1e-6 on the frozen
+        // sample box and can falsely accept SO(2), despite unchanged geometry.
+        // The dimensionless squared-cosine residual remains above threshold.
+        let anisotropic = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
+        let baseline = infer_symmetry_numeric_with_evidence(&sqrt_of(anisotropic.clone()));
+        assert!(baseline.candidate.is_none());
+
+        let coordinate_scale = 1e-4;
+        let inverse_scale_squared = 1.0 / (coordinate_scale * coordinate_scale);
+        let scaled_coordinates_expr = sqrt_of(mul(
+            Expr::Const(inverse_scale_squared),
+            anisotropic,
+        ));
+        let scaled_profile = numeric_profile_with_coordinate_scale(coordinate_scale);
+        let scaled_report = infer_symmetry_numeric_with_profile(
+            &scaled_coordinates_expr,
+            scaled_profile,
+            ExactPolynomialLieProfileV1::default(),
+            ExactPolynomialSearchStatus::NotRequested,
+        );
+        assert!(scaled_report.candidate.is_none());
+        assert!(scaled_report.evidence.is_none());
+        assert_eq!(
+            scaled_report.search_status,
+            SymmetryInferenceSearchStatus::NumericSearchCompleted
+        );
     }
 
     #[test]
