@@ -35,7 +35,7 @@ For a complete, cell-resolution, qualified series-single-parallel pack:
 
 The topology restriction is intentional: these formulas encode the paper's series-connected single-parallel assumption. v0.2 must not generalize β_SOH, β_life or β_SOC to arbitrary module, parallel-group or reconfigurable pack arrangements.
 
-EFC and EOL evidence are supplied per physical cell, not inferred from pack age or mileage. A right-censored or unknown EOL record makes β_life NOT_COMPUTABLE; records are never silently removed.
+EFC and EOL evidence are supplied per physical cell, not inferred from pack age or mileage. The paper uses a declared SOH EOL threshold of 0.85 for its studied fleet because the vehicles had not yet reached the commonly used 0.80 threshold; v0.2 does not hard-code either value. The threshold and rule are part of the evidence record. A right-censored or unknown EOL record makes β_life NOT_COMPUTABLE; records are never silently removed.
 
 β_power remains NOT_COMPUTABLE. Resistance dispersion is not a power estimate. The paper's power metric needs cell and pack power over an explicit prediction horizon, current/voltage limits, ECM parameters and a valid model domain.
 
@@ -45,7 +45,7 @@ EFC and EOL evidence are supplied per physical cell, not inferred from pack age 
 
 Every computed metric carries status, value, unit, population scope and source evidence digests. Non-computable metrics carry a stable reason code. No single weighted battery-health score is emitted. Hard topology, coverage and EOL gates are not compensable.
 
-The SOC snapshot binds the exact pack configuration, end-of-charge event, reference condition, evidence digest and a maximum sample-skew window. A snapshot missing any declared cell or exceeding the synchronization window cannot produce β_SOC.
+The SOC snapshot binds the exact pack configuration, end-of-charge event, reference condition, evidence digest and a maximum sample-skew window. The synchronization tolerance is declared in the fixture/protocol; it is not silently widened to accommodate late or stale samples. A snapshot missing any declared cell or exceeding the synchronization window cannot produce β_SOC.
 
 The lifetime contract binds the EOL rule, threshold, per-cell EFC, EOL event and evidence digest. A censored/unknown unit is retained and prevents β_life.
 
