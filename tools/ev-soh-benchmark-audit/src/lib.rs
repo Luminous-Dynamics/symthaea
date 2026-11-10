@@ -77,6 +77,7 @@ struct Evaluation {
     generalization_claim: String,
     split_manifest_digest: String,
     split_frozen_at_ms: u64,
+    prediction_regime: String,
 }
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -106,6 +107,15 @@ struct Entity {
     domain_digest: Option<String>,
     observation_start_ms: u64,
     observation_end_ms: u64,
+    feature_set_ref: String,
+    feature_set_digest: String,
+    feature_window_kind: String,
+    feature_acquisition_mode: String,
+    feature_window_start_ms: u64,
+    feature_window_end_ms: u64,
+    feature_available_at_ms: u64,
+    prediction_time_ms: u64,
+    target_reference_time_ms: u64,
 }
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -301,6 +311,59 @@ fn collect_groups(split: &Split, level: &str) -> Result<BTreeSet<String>, Vec<St
     }
     if errors.is_empty() { Ok(groups) } else { Err(errors) }
 }
+fn validate_feature_availability(m: &Manifest, errors: &mut Vec<String>) {
+    let regime = m.evaluation.prediction_regime.as_str();
+    if !matches!(regime, "online_early_charge" | "online_operation" | "retrospective_full_cycle" | "service_bay") {
+        errors.push("unknown prediction regime".to_owned());
+        return;
+    }
+    for (split_name, split) in [
+        ("train", &m.splits.train),
+        ("validation", &m.splits.validation),
+        ("test", &m.splits.test),
+    ] {
+        for entity in &split.entities {
+            if !nonempty(&entity.feature_set_ref)
+                || !is_digest(&entity.feature_set_digest)
+                || entity.feature_window_start_ms > entity.feature_window_end_ms
+                || entity.feature_window_start_ms < entity.observation_start_ms
+                || entity.feature_window_end_ms > entity.observation_end_ms
+                || entity.feature_window_end_ms > entity.feature_available_at_ms
+                || entity.feature_available_at_ms > entity.prediction_time_ms
+                || entity.target_reference_time_ms < entity.prediction_time_ms
+            {
+                errors.push(format!(
+                    "{split_name} sample has invalid feature availability, prediction cutoff or target-reference chronology"
+                ));
+            }
+            let compatible = match regime {
+                "online_early_charge" => {
+                    entity.feature_acquisition_mode == "streaming"
+                        && entity.feature_window_kind == "partial_charge"
+                }
+                "online_operation" => {
+                    entity.feature_acquisition_mode == "streaming"
+                        && matches!(entity.feature_window_kind.as_str(), "partial_charge" | "routine_bms")
+                }
+                "retrospective_full_cycle" => {
+                    entity.feature_acquisition_mode == "retrospective"
+                        && entity.feature_window_kind == "full_discharge"
+                }
+                "service_bay" => {
+                    entity.feature_acquisition_mode == "service_bay"
+                        && entity.feature_window_kind == "service_bay"
+                }
+                _ => false,
+            };
+            if !compatible {
+                errors.push(format!(
+                    "{split_name} sample feature kind/acquisition mode is incompatible with prediction regime {regime}"
+                ));
+            }
+        }
+    }
+}
+
 fn validate_manifest(m: &Manifest) -> Vec<String> {
     let mut errors = Vec::new();
     if m.protocol_version != PROTOCOL_VERSION || !nonempty(&m.benchmark_id) {
@@ -333,6 +396,7 @@ fn validate_manifest(m: &Manifest) -> Vec<String> {
     validate_split("train",&m.splits.train,&mut errors);
     validate_split("validation",&m.splits.validation,&mut errors);
     validate_split("test",&m.splits.test,&mut errors);
+    validate_feature_availability(m, &mut errors);
 
     let mut samples=BTreeSet::new();
     for (name,split) in [("train",&m.splits.train),("validation",&m.splits.validation),("test",&m.splits.test)] {
@@ -760,8 +824,30 @@ mod tests {
 
     #[test]
     fn frozen_corpus_accepts_four_and_rejects_eleven_controls(){
-        let report=report();assert_eq!(report.payload.case_count,15);assert_eq!(report.payload.accepted_count,4);assert_eq!(report.payload.rejected_count,11);
+        let report=report();assert_eq!(report.payload.case_count,19);assert_eq!(report.payload.accepted_count,5);assert_eq!(report.payload.rejected_count,14);
     }
+    #[test]
+    fn early_charge_estimates_must_use_streaming_partial_charge_features() {
+        let r = report();
+        assert!(r.payload.cases.iter()
+            .find(|c| c.case_id == "early-charge-partial-window-valid")
+            .unwrap().accepted);
+        assert!(!r.payload.cases.iter()
+            .find(|c| c.case_id == "early-charge-full-discharge-feature-leakage-rejected")
+            .unwrap().accepted);
+    }
+
+    #[test]
+    fn features_must_be_available_before_prediction_and_label_reference_after_prediction() {
+        let r = report();
+        for id in [
+            "online-feature-arrives-after-prediction-rejected",
+            "target-reference-precedes-online-prediction-rejected",
+        ] {
+            assert!(!r.payload.cases.iter().find(|c| c.case_id == id).unwrap().accepted);
+        }
+    }
+
     #[test]
     fn metric_strata_are_bound_to_test_physical_groups_and_aggregate_values() {
         let r = report();
