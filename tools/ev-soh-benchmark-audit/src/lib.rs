@@ -548,7 +548,7 @@ pub fn audit_corpus(schema_bytes:&[u8],corpus_bytes:&[u8])->Result<CorpusReport,
             Err(errors)=>{rejected_count+=1;(None,errors)}
         };
         let claim_ceiling=match manifest.as_ref().map(|m|m.evidence_class.as_str()) {
-            Some("physical_observation"|"derived_from_physical")=>"protocol_bounded_physical_evidence",
+            Some("physical_observation"|"derived_from_physical")=>"producer_declared_physical_protocol_not_independently_attested",
             Some("simulation")=>"simulation_only",
             Some("synthetic_fixture")=>"synthetic_software_validation_only",
             Some("vendor_claim")=>"vendor_claim_only",
