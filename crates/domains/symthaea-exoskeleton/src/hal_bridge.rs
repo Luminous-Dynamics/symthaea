@@ -89,8 +89,13 @@ pub fn run_software_stub_session(
                 .all(|value| value.is_finite())
                 && body.linear_velocity.iter().all(|value| value.is_finite())
                 && body.angular_velocity.is_finite()
-                && body.transform.rotation.orthogonality_error().is_finite()
-                && body.transform.rotation.determinant().is_finite()
+                && body.force_accumulator.iter().all(|value| value.is_finite())
+                && body.torque_accumulator.is_finite()
+                && body.inertia.iter().all(|value| value.is_finite())
+                && body.inv_inertia.iter().all(|value| value.is_finite())
+                && body.mass.is_finite()
+                && body.inv_mass.is_finite()
+                && body.transform.rotation.is_proper_rotation(1e-8)
         });
     report
 }
