@@ -889,6 +889,33 @@ fn main() {
 mod tests {
     use super::*;
 
+    const MARINE_SCHEMA: &str =
+        include_str!("../../../docs/research/marine/marine-propulsion-case.schema.json");
+    const SYNTHETIC_CASE: &str =
+        include_str!("../../../docs/research/marine/fixtures/synthetic-waps-case-0001.json");
+
+    #[test]
+    fn committed_schema_and_fixture_pass_structural_validation() {
+        let schema: Value = serde_json::from_str(MARINE_SCHEMA).expect("committed schema JSON");
+        let fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE).expect("committed fixture JSON");
+        assert!(jsonschema::draft202012::meta::is_valid(&schema));
+        let validator = jsonschema::draft202012::options()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("schema compiles");
+        assert!(validator.is_valid(&fixture));
+    }
+
+    #[test]
+    fn synthetic_fixture_is_never_a_performance_qualification() {
+        let fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE).expect("committed fixture JSON");
+        let mut findings = Findings::default();
+        validate_semantics(&fixture, &mut findings, false);
+        assert_eq!(findings.disposition(), "INCOMPLETE");
+    }
+
     #[test]
     fn reviewed_units_have_explicit_dimensions() {
         assert_eq!(unit_dimension("kW"), Some("power"));
