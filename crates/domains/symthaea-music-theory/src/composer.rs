@@ -667,6 +667,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     apply_development_style(
         &mut score,
         GENERAL_MELODY_PART_V1,
+        GENERAL_BASS_PART_V1,
         &form,
         spec.development,
         &motif,
@@ -689,6 +690,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
     }
     apply_pivot_modulations(
         &mut score,
+        GENERAL_MELODY_PART_V1,
         GENERAL_BASS_PART_V1,
         GENERAL_HARMONY_PART_V1,
         &form,
@@ -992,6 +994,7 @@ fn apply_parallel_planing(
 fn apply_development_style(
     score: &mut Score,
     part_id: PartId,
+    bass_part_id: PartId,
     form: &Form,
     dna: crate::spec::DevelopmentDna,
     motif: &crate::motif::Motif,
@@ -1014,7 +1017,9 @@ fn apply_development_style(
     let climax_span = score
         .notes
         .iter()
-        .find(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
+        .find(|n| n.role == VoiceRole::Melody
+            && n.part == part_id
+            && n.emphasis == Emphasis::Climax)
         .map(|n| (n.onset.beats(), (n.onset + n.duration).beats()));
     for (si, section) in form.sections.iter().enumerate() {
         if !matches!(
@@ -1033,7 +1038,10 @@ fn apply_development_style(
             .notes
             .iter()
             .filter(|n| {
-                n.role == VoiceRole::Bass && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi
+                n.role == VoiceRole::Bass
+                    && n.part == bass_part_id
+                    && n.onset.beats() >= lo - 1e-9
+                    && n.onset.beats() < hi
             })
             .map(|n| crate::counterpoint::CantusEvent {
                 onset: n.onset.beats(),
@@ -1059,7 +1067,11 @@ fn apply_development_style(
         // Clear the antecedent melody EXCEPT the climax's own bar(s); the
         // device line replaces the rest.
         score.notes.retain(|n| {
-            if n.role != VoiceRole::Melody || n.onset.beats() < lo - 1e-9 || n.onset.beats() >= hi {
+            if n.role != VoiceRole::Melody
+                || n.part != part_id
+                || n.onset.beats() < lo - 1e-9
+                || n.onset.beats() >= hi
+            {
                 return true;
             }
             let this_bar = ((n.onset.beats() - lo) / meter_beats) as i64;
@@ -1086,6 +1098,7 @@ fn apply_development_style(
                     );
                     for n in score.notes.iter_mut() {
                         if n.role == VoiceRole::Melody
+                            && n.part == part_id
                             && n.onset.beats() >= bar_lo - 1e-9
                             && n.onset.beats() < bar_hi
                         {
@@ -1206,12 +1219,14 @@ fn apply_development_style(
     if !score
         .notes
         .iter()
-        .any(|n| n.role == VoiceRole::Melody && n.emphasis == Emphasis::Climax)
+        .any(|n| n.role == VoiceRole::Melody
+                && n.part == part_id
+                && n.emphasis == Emphasis::Climax)
         && let Some(peak_idx) = score
             .notes
             .iter()
             .enumerate()
-            .filter(|(_, n)| n.role == VoiceRole::Melody)
+            .filter(|(_, n)| n.role == VoiceRole::Melody && n.part == part_id)
             .max_by_key(|(_, n)| n.pitch.midi())
             .map(|(i, _)| i)
     {
@@ -1869,7 +1884,10 @@ fn apply_additive_process(
         let scale = section.key.scale();
         let intensity = section.role.intensity();
         score.notes.retain(|n| {
-            !(n.role == VoiceRole::Melody && n.onset.beats() >= lo - 1e-9 && n.onset.beats() < hi)
+            !(n.role == VoiceRole::Melody
+                && n.part == part_id
+                && n.onset.beats() >= lo - 1e-9
+                && n.onset.beats() < hi)
         });
         let mut t = lo;
         let mut k: usize = 1;
@@ -2061,6 +2079,7 @@ fn apply_full_drone(
 /// The fugue keeps its documented no-modulation limit (its own pipeline).
 fn apply_pivot_modulations(
     score: &mut Score,
+    melody_part_id: PartId,
     bass_part_id: PartId,
     harmony_part_id: PartId,
     form: &Form,
@@ -2115,7 +2134,13 @@ fn apply_pivot_modulations(
         for j in 0..score.notes.len() {
             let n = &score.notes[j];
             let (on, off) = (n.onset.beats(), (n.onset + n.duration).beats());
-            if !(on < win_hi - 1e-9 && off > win_lo + 1e-9) {
+            let belongs_to_target_line = match n.role {
+                VoiceRole::Melody => n.part == melody_part_id,
+                VoiceRole::Bass => n.part == bass_part_id,
+                VoiceRole::Harmony => n.part == harmony_part_id,
+                _ => false,
+            };
+            if !belongs_to_target_line || !(on < win_hi - 1e-9 && off > win_lo + 1e-9) {
                 continue;
             }
             match n.role {
