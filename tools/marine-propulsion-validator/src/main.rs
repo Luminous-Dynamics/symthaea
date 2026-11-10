@@ -1615,6 +1615,21 @@ mod tests {
     }
 
     #[test]
+    fn route_segment_order_is_part_of_service_identity() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V2).expect("v0.2 fixture JSON");
+        let mut second = fixture["route"]["segments"][0].clone();
+        second["segment_id"] = serde_json::json!("SEG-002");
+        second["distance"]["value"] = serde_json::json!(1200);
+        second["port_or_waypoint_id"] = serde_json::json!("SYNTHETIC-PORT-002");
+        fixture["route"]["segments"].as_array_mut().expect("segments").push(second);
+        let forward = compute_service_fingerprint(&fixture).expect("forward route digest");
+        fixture["route"]["segments"].as_array_mut().expect("segments").reverse();
+        let reverse = compute_service_fingerprint(&fixture).expect("reverse route digest");
+        assert_ne!(forward, reverse);
+    }
+
+    #[test]
     fn changed_route_with_recomputed_hash_is_incomparable() {
         let (baseline, mut candidate) = synthetic_matched_pair();
         candidate["route"]["segments"][0]["target_speed"]["value"] =
