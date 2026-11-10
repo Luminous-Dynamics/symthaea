@@ -85,6 +85,30 @@ Distributed propulsion, hybrid-electric systems, and VTOL are hypotheses to eval
 6. **Closed-loop fleet learning:** turn field observations into versioned model updates, test campaigns, inspection requirements, and controlled design changes. A fleet anomaly must not automatically mutate aircraft software or hardware.
 7. **Interoperable infrastructure:** design chargers, energy management, telemetry, and maintenance interfaces for more than one aircraft vendor while keeping each operator's data and authority under its control.
 
+## Competitive position and route beyond current practice
+
+The field is not waiting for electric propulsion. Luminous must not claim to be ahead of companies that already have flight-tested systems, certified components, production infrastructure, and regulatory programmes.
+
+### Current reference positions
+
+- **Pipistrel / Textron eAviation:** the Velis Electro is an EASA type-certified light-electric trainer. Its published configuration provides a disciplined certification and operations baseline: 24.8 kWh nominal battery system, two liquid-cooled packs, charging times, 50-minute endurance plus VFR reserve, a published initial 500-hour battery limit, and 2,000-hour motor TBO. It shows that certification and local-flight training operations are achievable, while battery throughput and turn time remain important economic constraints.
+- **BETA Technologies:** a strong integrated-aircraft-and-infrastructure competitor. Its reported strategy links battery packs, motors, avionics, aircraft, charging products and airport deployment. It uses five common modular packs on CX300; the company reports its packs may need replacement every 12–24 months depending on use. Its shared CX300/A250 components simplify some manufacturing and evidence reuse, but IEEE notes that some shared geometry adds weight and drag to the fixed-wing aircraft. That is a genuine commonality-versus-mission-optimality trade, not a design rule to copy.
+- **Safran:** a useful example of electric propulsion moving through the established engine certification pathway. The ENGINeUS 100 B1's EASA type certificate shows why the Luminous programme should consider certified supplier components before attempting to design every component internally.
+- **NASA / OpenMDAO research:** current multidisciplinary propulsion studies join thermodynamic component models and aircraft-level optimization across conventional, turboelectric and turbogenerator architectures. We should compete through rigorous mission-level coupling and validation, not by claiming a new optimizer is superior without matched tests.
+
+### How Luminous should differentiate
+
+1. **Out-validate before out-performing.** Publish the test protocol, input data, uncertainty, failed cases and configuration hash. A smaller aircraft with a reproducible, correlated model is more credible than a spectacular uncorrelated range claim.
+2. **Optimize installed-system and lifecycle outcomes.** Include battery packs, cooling, structural reinforcement, wiring, protection, reserves, charging infrastructure, replacement cadence, maintenance and downtime. Compare Wh/payload-km and cost/payload-km under identical missions.
+3. **Use common modules where they create net value.** Share batteries, avionics, software interfaces, charger interfaces and manufacturing processes across aircraft families when the quantified benefit exceeds the aerodynamic, structural, mass, drag and certification penalty. Do not force one airframe to serve CTOL and VTOL if commonality damages either mission.
+4. **Make uncertainty and evidence executable.** A design point outside a measured map domain is incomplete; a missing source is unknown; a failed test remains failed. The new v0.2 characterization API begins this approach but does not yet verify artifact bytes or model multidimensional performance.
+5. **Exploit operating conditions as a design input.** The reference mission should cover hot ambient conditions, high density altitude, runway quality, local grid capacity, remote logistics, charging access and maintenance supply chains—not only ISA sea-level flight.
+6. **Build a component ecosystem before an aircraft factory.** Start with validated battery/propulsion modules, test services, engineering software and partner integration. A full airframe programme should follow demonstrated operator demand, supplier access, safety evidence, certification resources and funding.
+
+### Quantitative comparison protocol
+
+For each public competitor or candidate, store values as separate evidence classes: certified type data, physical measurement, manufacturer claim, published research, simulation, or Luminous research target. Every value must also carry the configuration, mass boundary, mission, operating conditions, source timestamp and uncertainty. Missing values remain missing. Do not infer usable battery energy from nominal capacity, continuous motor power from peak power, or battery life from a single calendar-time estimate.
+
 ## First implementation sequence
 
 ### A0 — software kernel and analytical oracle
@@ -101,8 +125,9 @@ Distributed propulsion, hybrid-electric systems, and VTOL are hypotheses to eval
 
 ### A2 — propulsion bench
 - Characterise motor, inverter, propeller, cooling, sensors, wiring, and protection over a controlled operating map.
-- Compare predicted and measured efficiency, temperature, vibration, and power.
-- Calibrate uncertainty on a held-out set.
+- Replace the v0.2 one-dimensional curves with measured multidimensional maps and explicit validity conditions.
+- Compare predicted and measured efficiency, temperature, vibration, torque, thrust and power.
+- Calibrate uncertainty on a held-out set; reject out-of-domain operating points.
 
 ### A3 — battery bench and safety
 - Measure capacity, OCV, DC resistance, thermal response, ageing, and power capability over SOC and temperature.
