@@ -1,0 +1,52 @@
+name: HLB VSSI Experiment Receipt Contract
+
+on:
+  pull_request:
+    branches: [research/hlb-vssi-mechanical-fixture-v0]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/core/symthaea-fep/src/vssi_mechanical_fixture.rs"
+      - ".github/workflows/hlb-vssi-experiment-receipt-contract.yml"
+  push:
+    branches: [research/hlb-vssi-experiment-receipts-v0]
+    paths:
+      - "crates/core/symthaea-fep/src/vssi_mechanical_fixture.rs"
+      - ".github/workflows/hlb-vssi-experiment-receipt-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hlb-vssi-experiment-receipts-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  receipt-contract:
+    name: VSSI experiment receipt contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check VSSI fixture formatting
+        run: rustfmt --edition 2024 --check crates/core/symthaea-fep/src/vssi_mechanical_fixture.rs
+
+      - name: Run VSSI fixture and receipt tests
+        run: cargo test --locked -p symthaea-fep --lib vssi_mechanical_fixture::tests -- --nocapture
+
+      - name: Check VSSI fixture with Clippy
+        run: cargo clippy --locked -p symthaea-fep --lib -- -D warnings
