@@ -53,7 +53,7 @@ pub struct LinearGroupActionAdmissionProfileV1 {
     pub maximum_dimension: usize,
     /// Maximum number of infinitesimal generators admitted in one declaration.
     pub maximum_generators: usize,
-    /// Relative symmetry defect allowed for the supplied metric.
+    /// Metric-whitened RMS Frobenius defect of the antisymmetric metric part.
     pub metric_symmetry_relative_tolerance: f64,
     /// Relative defect allowed for A^T G + G A = 0, generator by generator.
     pub metric_skew_relative_tolerance: f64,
@@ -270,8 +270,15 @@ impl LinearGroupActionV1 {
                 pivot_index: 0,
             });
         }
-        let metric_norm = scaled_frobenius_norm(&self.metric, metric_scale);
-        let metric_symmetry_defect = relative_symmetry_defect(&self.metric, metric_scale, metric_norm);
+        // Factor the symmetric part first. This provides the intrinsic
+        // metric scale used to measure the antisymmetric component.
+        let scaled_metric_cholesky_lower =
+            cholesky_lower_scaled_metric(&self.metric, metric_scale)?;
+        let metric_symmetry_defect = relative_symmetry_defect(
+            &self.metric,
+            metric_scale,
+            &scaled_metric_cholesky_lower,
+        );
         if !metric_symmetry_defect.is_finite()
             || metric_symmetry_defect > profile.metric_symmetry_relative_tolerance
         {
@@ -279,9 +286,6 @@ impl LinearGroupActionV1 {
                 relative_defect: metric_symmetry_defect,
             });
         }
-
-        let scaled_metric_cholesky_lower =
-            cholesky_lower_scaled_metric(&self.metric, metric_scale)?;
         let mut minimum_scaled_cholesky_diagonal = f64::INFINITY;
         let mut maximum_scaled_cholesky_diagonal = 0.0_f64;
         for (index, row) in scaled_metric_cholesky_lower.iter().enumerate() {
@@ -430,16 +434,68 @@ fn scaled_frobenius_norm(matrix: &[Vec<f64>], scale: f64) -> f64 {
 fn relative_symmetry_defect(
     metric: &[Vec<f64>],
     scale: f64,
-    metric_norm_scaled: f64,
+    scaled_metric_cholesky_lower: &[Vec<f64>],
 ) -> f64 {
-    let mut defect_norm = 0.0_f64;
+    // Split G into symmetric S and antisymmetric W. Cholesky-whiten the
+    // symmetric part S = scale * L * L^T and measure
+    // L^-1 W L^-T. Under a coordinate congruence, this whitened
+    // antisymmetric form changes only by orthogonal conjugation, making its
+    // Frobenius norm independent of the chosen coordinate representation.
+    let dimension = metric.len();
+    let mut antisymmetric = vec![vec![0.0_f64; dimension]; dimension];
     for (row_index, row) in metric.iter().enumerate() {
         for (column_index, value) in row.iter().enumerate() {
-            let difference = *value / scale - metric[column_index][row_index] / scale;
-            defect_norm = defect_norm.hypot(difference);
+            antisymmetric[row_index][column_index] =
+                0.5 * (*value / scale - metric[column_index][row_index] / scale);
         }
     }
-    defect_norm / (2.0 * metric_norm_scaled)
+
+    // First solve L * X = W one column at a time.
+    let mut left_whitened = vec![vec![0.0_f64; dimension]; dimension];
+    for (column_index, _) in metric.iter().enumerate() {
+        let mut solved_column = Vec::with_capacity(dimension);
+        for (row_index, _) in metric.iter().enumerate() {
+            let correction = solved_column
+                .iter()
+                .enumerate()
+                .map(|(inner_index, value)| {
+                    scaled_metric_cholesky_lower[row_index][inner_index] * value
+                })
+                .sum::<f64>();
+            let pivot = scaled_metric_cholesky_lower[row_index][row_index];
+            let value = (antisymmetric[row_index][column_index] - correction) / pivot;
+            if !value.is_finite() {
+                return f64::INFINITY;
+            }
+            solved_column.push(value);
+        }
+        for (row_index, value) in solved_column.iter().enumerate() {
+            left_whitened[row_index][column_index] = *value;
+        }
+    }
+
+    // Then solve Y * L^T = X one row at a time.
+    let mut whitened = vec![vec![0.0_f64; dimension]; dimension];
+    for (row_index, left_row) in left_whitened.iter().enumerate() {
+        let mut solved_row = Vec::with_capacity(dimension);
+        for (column_index, left_entry) in left_row.iter().enumerate() {
+            let correction = solved_row
+                .iter()
+                .zip(scaled_metric_cholesky_lower[column_index].iter())
+                .take(column_index)
+                .map(|(value, lower_value)| value * lower_value)
+                .sum::<f64>();
+            let pivot = scaled_metric_cholesky_lower[column_index][column_index];
+            let value = (*left_entry - correction) / pivot;
+            if !value.is_finite() {
+                return f64::INFINITY;
+            }
+            solved_row.push(value);
+        }
+        whitened[row_index] = solved_row;
+    }
+
+    scaled_frobenius_norm(&whitened, 1.0) / (dimension as f64).sqrt()
 }
 
 fn cholesky_lower_scaled_metric(
@@ -616,6 +672,43 @@ mod tests {
             admitted.diagnostics().maximum_scaled_cholesky_diagonal,
             1.0
         );
+    }
+
+    #[test]
+    fn metric_symmetry_admission_is_invariant_under_nonorthogonal_basis_change() {
+        // D = [[1, 1], [0, 1]] and G' = D^-T G D^-1. The same
+        // small antisymmetric perturbation must receive the same whitened
+        // metric-symmetry defect in both coordinate representations.
+        let tolerance = 5.0e-4;
+        let mut canonical = canonical_so2();
+        canonical.metric = vec![vec![1.0, 0.001], vec![-0.001, 1.0]];
+        let mut canonical_profile = profile();
+        canonical_profile.metric_symmetry_relative_tolerance = tolerance;
+        let transformed = LinearGroupActionV1 {
+            action_id: "so2-sheared-nonsymmetric-metric".to_string(),
+            coordinate_basis_id: "xy-sheared".to_string(),
+            coordinate_names: vec!["X".to_string(), "Y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, -0.999], vec![-1.001, 2.0]],
+            generators: vec![LinearGeneratorV1 {
+                id: "conjugated-J".to_string(),
+                matrix: vec![vec![1.0, -2.0], vec![1.0, -1.0]],
+            }],
+        };
+        let canonical_error = canonical.try_admit(canonical_profile).unwrap_err();
+        let transformed_error = transformed.try_admit(canonical_profile).unwrap_err();
+
+        let relative_defect = |error: LinearGroupActionAdmissionError| match error {
+            LinearGroupActionAdmissionError::MetricNotSymmetric { relative_defect } => {
+                relative_defect
+            }
+            other => panic!("expected metric-symmetry rejection, got {other:?}"),
+        };
+        let canonical_defect = relative_defect(canonical_error);
+        let transformed_defect = relative_defect(transformed_error);
+        assert!((canonical_defect - transformed_defect).abs() < 1.0e-12);
+        assert!(canonical_defect > tolerance);
+        assert!(transformed_defect > tolerance);
     }
 
     #[test]
