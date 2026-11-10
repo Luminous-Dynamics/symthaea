@@ -316,7 +316,7 @@ Specification: [MARINE-HYDRODYNAMIC-VALIDATION-001](./MARINE-HYDRODYNAMIC-VALIDA
 - [#11442 — ITTC uncertainty-qualified hydrodynamic validation](https://github.com/Luminous-Dynamics/symthaea/issues/11442)
 - [#11443 — canonical service fingerprint and comparison boundary](https://github.com/Luminous-Dynamics/symthaea/issues/11443)
 
-The current supplied service fingerprint is compared for equality but not yet recomputed from a formally versioned canonical payload. #11443 tracks this integrity gap. A digest must bind a declared payload, not merely be a 64-character string repeated across two cases.
+Schema v0.2.0 and the validator now implement `marine-service-payload-v1+symthaea-canonical-json-sha256-v1`: the validator projects declared service, loading and ordered route/port/speed fields into a versioned payload and recomputes the SHA-256 using Symthaea's existing named canonical-JSON encoding profile (not RFC 8785). The synthetic v0.2.0 fixture carries a known-answer vector and mutation/key-order tests. Environment/metocean realization remains a separate counterfactual fingerprint/boundary. Explicit zero, unknown, not-applicable and absent quantity states remain distinct. #11443 tracks completion of the cross-language vectors, comparator integration and adversarial pair tests; the Rust suite remains unexecuted here.
 
 ## 16. Claim ceiling
 
