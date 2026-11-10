@@ -26,6 +26,8 @@ pub(crate) enum SceneSourceRole {
 pub(crate) struct SceneSourceReceipt {
     source_id: String,
     source_event_id: String,
+    acquisition_tick_ns: u64,
+    receive_tick_ns: u64,
     role: SceneSourceRole,
     current: bool,
     calibration_current: bool,
@@ -389,14 +391,13 @@ pub(crate) fn admit_local_follow_target(
     for source in &receipt.sources {
         if source.source_id.is_empty()
             || source.source_event_id.is_empty()
-            || source.clock_transform_id != receipt.clock_transform_id
+            || source.frame_id.is_empty()
+            || source.clock_domain_id.is_empty()
+            || source.clock_transform_id.is_empty()
             || source.calibration_profile_id.is_empty()
             || source.extrinsic_profile_id.is_empty()
-            || source.frame_id != receipt.frame_id
-            || source.clock_domain_id != receipt.clock_domain_id
-            || !source.current
-            || !source.calibration_current
-            || source.role != SceneSourceRole::LocalSensorObservation
+            || source.acquisition_tick_ns > source.receive_tick_ns
+            || source.receive_tick_ns > receipt.evaluated_at_tick_ns
             || !source_ids.insert(source.source_id.as_str())
         {
             return Err(FollowEvidenceError::SceneAdmissionRejected);
@@ -450,10 +451,25 @@ pub(crate) fn admit_local_follow_target(
         return Err(FollowEvidenceError::SceneAdmissionRejected);
     }
     let mut unique_target_sources = BTreeSet::new();
-    if target.source_ids.iter().any(|source_id| {
-        !source_ids.contains(source_id.as_str()) || !unique_target_sources.insert(source_id.as_str())
-    }) {
-        return Err(FollowEvidenceError::MissingProvenance);
+    for source_id in &target.source_ids {
+        if !unique_target_sources.insert(source_id.as_str()) {
+            return Err(FollowEvidenceError::MissingProvenance);
+        }
+        let Some(source) = receipt
+            .sources
+            .iter()
+            .find(|source| source.source_id == *source_id)
+        else {
+            return Err(FollowEvidenceError::MissingProvenance);
+        };
+        if source.role != SceneSourceRole::LocalSensorObservation
+            || !source.current
+            || !source.calibration_current
+            || receipt.evaluated_at_tick_ns.saturating_sub(source.acquisition_tick_ns)
+                > (max_age_s * 1_000_000_000.0) as u64
+        {
+            return Err(FollowEvidenceError::SceneAdmissionRejected);
+        }
     }
     if target.distance_uncertainty_radius_m > max_uncertainty_m {
         return Err(FollowEvidenceError::ExcessiveDistanceErrorBound);
@@ -512,10 +528,15 @@ pub fn pd_cruise_with_admitted_local_target(
         || !target.relative_speed_mps.is_finite()
         || !state.timestamp.is_finite()
         || !target.evaluated_at_s.is_finite()
-        || state.timestamp < target.evaluated_at_s
-        || state.timestamp - target.evaluated_at_s > target.max_age_s
+        || !target.max_age_s.is_finite()
+        || target.max_age_s < 0.0
     {
         return Err(FollowEvidenceError::InvalidNumericValue);
+    }
+    if state.timestamp < target.evaluated_at_s
+        || state.timestamp - target.evaluated_at_s > target.max_age_s
+    {
+        return Err(FollowEvidenceError::StaleOrFutureObservation);
     }
     let gap_error = target.gap_lower_bound_m - target_gap;
     let speed_cmd = (target_speed + gap_error * 0.3).clamp(0.0, target_speed * 1.2);
@@ -557,6 +578,8 @@ mod tests {
             vec![SceneSourceReceipt {
                 source_id: "front-lidar".into(),
                 source_event_id: "lidar-scan-12".into(),
+                acquisition_tick_ns: 12_000_000_000,
+                receive_tick_ns: 12_001_000_000,
                 role: SceneSourceRole::LocalSensorObservation,
                 current: true,
                 calibration_current: true,
@@ -724,6 +747,48 @@ mod tests {
         assert_eq!(
             admit_local_follow_target(&receipt, &deployment_profile()),
             Err(FollowEvidenceError::SceneAdmissionRejected)
+        );
+    }
+
+    #[test]
+    fn unrelated_advisories_do_not_replace_a_local_sensor_track() {
+        let mut receipt = valid_receipt();
+        receipt.sources.push(SceneSourceReceipt {
+            source_id: "v2x-peer".into(),
+            source_event_id: "peer-event-4".into(),
+            acquisition_tick_ns: 12_000_000_000,
+            receive_tick_ns: 12_001_000_000,
+            role: SceneSourceRole::RemoteCooperativeClaim,
+            current: true,
+            calibration_current: true,
+            frame_id: "peer-frame".into(),
+            clock_domain_id: "peer-clock".into(),
+            clock_transform_id: "peer-to-vehicle-clock-v1".into(),
+            calibration_profile_id: "peer-claim-only".into(),
+            extrinsic_profile_id: "peer-claim-only".into(),
+        });
+        assert!(admit_local_follow_target(&receipt, &deployment_profile()).is_ok());
+        receipt.tracks[0].source_ids = vec!["v2x-peer".into()];
+        assert_eq!(
+            admit_local_follow_target(&receipt, &deployment_profile()),
+            Err(FollowEvidenceError::SceneAdmissionRejected)
+        );
+    }
+
+    #[test]
+    fn command_consumer_rejects_reused_or_future_scene_capability() {
+        let admitted =
+            admit_local_follow_target(&valid_receipt(), &deployment_profile()).unwrap();
+        let mut state = VehicleState::cruising(4.0);
+        state.timestamp = admitted.evaluated_at_s() + admitted.max_age_s() + 0.001;
+        assert_eq!(
+            pd_cruise_with_admitted_local_target(&state, 10.0, 0.0, 20.0, &admitted),
+            Err(FollowEvidenceError::StaleOrFutureObservation)
+        );
+        state.timestamp = admitted.evaluated_at_s() - 0.001;
+        assert_eq!(
+            pd_cruise_with_admitted_local_target(&state, 10.0, 0.0, 20.0, &admitted),
+            Err(FollowEvidenceError::StaleOrFutureObservation)
         );
     }
 
