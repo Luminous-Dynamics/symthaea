@@ -1584,10 +1584,10 @@ fn realize_core(
     let dialect = dialect_override.unwrap_or_else(|| dialect_for_spec(spec));
     let swing = spec.texture.swing as f64;
     // Same beat→seconds map as performance_voices builds internally —
-    // Rubato::from_score_with_dialect is deterministic, so the drum track
+    // swing-aware Rubato thresholds are deterministic, so the drum track
     // and total length stay sample-locked to the performed voices.
     let timeline = Timeline {
-        rubato: Rubato::from_score_with_dialect(score, dialect),
+        rubato: Rubato::from_score_with_dialect_and_swing(score, dialect, swing),
         swing,
     };
     let voices: Vec<Voice> = performance_voices_with_dialect(
