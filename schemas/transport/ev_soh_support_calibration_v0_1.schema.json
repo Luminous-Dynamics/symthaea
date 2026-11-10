@@ -17,7 +17,9 @@
     "validation_group_identity_digests",
     "support_scoring",
     "calibration",
-    "test_entries"
+    "test_entries",
+    "test_accessed_at_ms",
+    "minimum_independent_groups_per_stratum"
   ],
   "properties": {
     "protocol_version": {
@@ -219,7 +221,10 @@
           "upper_90",
           "lower_95",
           "upper_95",
-          "prediction_digest"
+          "prediction_digest",
+          "reference_support_state",
+          "reference_support_evidence_digest",
+          "reference_support_evidence_class"
         ],
         "properties": {
           "sample_digest": {
@@ -293,9 +298,37 @@
           "prediction_digest": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "reference_support_state": {
+            "enum": [
+              "in_support",
+              "boundary",
+              "extrapolation"
+            ]
+          },
+          "reference_support_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reference_support_evidence_class": {
+            "enum": [
+              "physical_observation",
+              "derived_from_physical",
+              "simulation",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
           }
         }
       }
+    },
+    "test_accessed_at_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minimum_independent_groups_per_stratum": {
+      "type": "integer",
+      "minimum": 2
     }
   }
 }
