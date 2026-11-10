@@ -441,36 +441,85 @@
       ]
     },
     {
-      "rule_id": "EU-ETS-TARGETED-REVISION-PROPOSAL-2026",
-      "title": "European Commission targeted revision proposal for EU ETS, including maritime provisions",
-      "authority": "European Commission",
-      "instrument": "Commission proposal for a targeted revision of the EU ETS and related maritime monitoring/reporting provisions",
-      "revision_or_resolution": "Proposal published 17 July 2026; legislative adoption status not established by this snapshot",
+      "rule_id": "EU-ETS-DIRECTIVE-REVISION-2026-0212",
+      "title": "EU ETS Directive targeted revision proposal — COM(2026) 616",
+      "authority": "European Commission / European Parliament / Council",
+      "instrument": "Proposal for a Directive amending Directive 2003/87/EC and Decision (EU) 2015/1814",
+      "revision_or_resolution": "COM(2026) 616 final; procedure 2026/0212(COD); published 17 July 2026",
       "rule_status": "proposed",
       "legal_character": "negotiation_proposal",
       "dates": {},
       "applicability": {
-        "ship_scope": "Potential changes to EU ETS and maritime MRV scope and rules; exact ship scope depends on final legislative text.",
-        "geographic_scope": "EU/EEA regulatory framework as defined in the eventual adopted instrument.",
-        "voyage_scope": "Scenario analysis only; no current voyage is reclassified by this proposal.",
+        "ship_scope": "Proposed changes to the EU ETS Directive including targeted maritime scope and offshore-operation provisions; exact ship categories and thresholds remain subject to legislative adoption.",
+        "geographic_scope": "EU ETS jurisdiction as defined by the final Directive.",
+        "voyage_scope": "Scenario analysis only; current EU ETS voyage coverage and surrender duties are not changed by this proposal.",
         "conditions": [
-          "The Commission announced a targeted revision proposal on 17 July 2026, including maritime transport provisions and linked MRV/ETS materials."
+          "Legislative proposal would extend EU ETS/MRV coverage to certain additional categories of ships to reinforce the level playing field.",
+          "Proposal includes tailored safeguards against evasion by vessels performing or supporting offshore operations.",
+          "Proposal includes review provisions concerning international IMO measures and interactions with ETS scope and double-payment risk."
         ],
         "exclusions_or_unknowns": [
-          "This is a proposal, not an adopted or applicable rule as of 10 November 2026.",
-          "Exact article-level amendments and effective dates must be taken from the legislative proposal and eventual adopted text."
+          "European Parliament procedure 2026/0212(COD) status is awaiting committee decision in the 10 November 2026 snapshot.",
+          "This proposal is not adopted law and must not alter current ETS liabilities.",
+          "Final ship scope, offshore definitions, reporting periods, exemptions and application dates depend on the adopted text."
         ]
       },
       "output_scope": [
-        "future_policy_scenario",
-        "regulatory_change_delta",
-        "investment_sensitivity"
+        "future_EU_ETS_scope_scenario",
+        "offshore_scope_sensitivity",
+        "IMO_interaction_scenario",
+        "legislative_delta"
       ],
       "source_ids": [
-        "EU-ETS-TARGETED-REVISION-PROPOSAL-2026"
+        "EU-ETS-DIRECTIVE-REVISION-2026-0212"
       ],
       "limitations": [
-        "Do not promote this proposal to an effective rule or apply it to current liability until formally adopted and applicable."
+        "Proposal published 17 July 2026; refresh after later parliamentary/Council decisions.",
+        "Do not treat proposed provisions as binding or applicable."
+      ]
+    },
+    {
+      "rule_id": "EU-MRV-FUELEU-REVISION-2026-0210",
+      "title": "Maritime MRV and FuelEU streamlining proposal — COM(2026) 620",
+      "authority": "European Commission / European Parliament / Council",
+      "instrument": "Proposal for a Regulation amending Regulations (EU) 2015/757 and (EU) 2023/1805",
+      "revision_or_resolution": "COM(2026) 620 final; procedure 2026/0210(COD); published 17 July 2026",
+      "rule_status": "proposed",
+      "legal_character": "negotiation_proposal",
+      "dates": {},
+      "applicability": {
+        "ship_scope": "Proposed changes to maritime MRV and FuelEU monitoring/reporting; proposal would extend MRV to additional ship categories including oil/chemical/gas/LNG tankers, Ro-Pax and passenger ships 400–5,000 GT from 2029, subject to final text.",
+        "geographic_scope": "EU/EEA maritime MRV and FuelEU scope as defined by adopted legislation.",
+        "voyage_scope": "Scenario analysis only until the regulation is adopted and applicable.",
+        "conditions": [
+          "Proposal seeks one aligned MRV system for GHG emissions, well-to-wake emissions and energy used on board, with a single monitoring plan and a single ship report.",
+          "Proposed definition of energy used on board is GJ for propulsion and onboard equipment at sea or at berth.",
+          "Proposed substitute energy sources include renewable energy generated on board, onshore power supply and wind-assisted propulsion systems.",
+          "Proposed definition of wind-assisted propulsion includes partial or full propulsion by wind energy harnessed through rotor sails, kites, hard/rigid sails, soft sails, suction wings or turbines.",
+          "Proposed monitoring method counts fuel use from all fuel consumers and energy from substitute sources; wind energy amount is to use international standards and certification references specified in future Commission implementing acts.",
+          "Proposal text requires transparent, reproducible monitoring records and proposes at least 10 years of data retention."
+        ],
+        "exclusions_or_unknowns": [
+          "European Parliament procedure 2026/0210(COD) status is awaiting committee decision in the 10 November 2026 snapshot.",
+          "The proposal itself does not specify the wind-energy calculation standard/certification method; future implementing acts are contemplated.",
+          "This is not an adopted rule and does not establish a current legal WAPS energy-accounting formula.",
+          "Do not equate modelled avoided fuel or shaft-energy displacement with regulatory wind-energy-used values without the future method."
+        ]
+      },
+      "output_scope": [
+        "future_WAPS_wind_energy_reporting_scenario",
+        "energy_used_on_board_GJ",
+        "single_MRV_monitoring_plan_scenario",
+        "well_to_tank_and_tank_to_wake_reporting_scenario",
+        "future_wind_measurement_certification"
+      ],
+      "source_ids": [
+        "EU-MRV-FUELEU-REVISION-2026-0210"
+      ],
+      "limitations": [
+        "Proposal published 17 July 2026; refresh as the ordinary legislative procedure progresses.",
+        "Standards/certification for wind-energy amount are future implementing acts and are not supplied by this record.",
+        "Do not infer that the proposal or its future methodology is in force."
       ]
     }
   ],
@@ -553,15 +602,27 @@
       ]
     },
     {
-      "source_id": "EU-ETS-TARGETED-REVISION-PROPOSAL-2026",
-      "title": "European Commission proposal for a targeted revision of the EU Emissions Trading System, 17 July 2026",
-      "publisher": "European Commission",
-      "uri": "https://climate.ec.europa.eu/areas-action/transport-decarbonisation/reducing-emissions-shipping-sector_en",
+      "source_id": "EU-ETS-DIRECTIVE-REVISION-2026-0212",
+      "title": "COM(2026) 616 final — EU ETS Directive and Market Stability Reserve targeted revision proposal",
+      "publisher": "European Commission / European Parliament",
+      "uri": "https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2026%2F0212%28COD%29",
       "publication_date": "2026-07-17",
-      "evidence_class": "official_legislative_proposal",
+      "evidence_class": "official_legislative_proposal_and_procedure_status",
       "limitations": [
-        "Proposal status only; do not treat proposed maritime revisions as effective law.",
-        "The page signals proposal scope but detailed effects must be read from the linked proposal texts and final adopted legal act."
+        "Procedure 2026/0212(COD) is a pending proposal, not adopted law.",
+        "Use the final adopted act for exact maritime scope and dates."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-FUELEU-REVISION-2026-0210",
+      "title": "COM(2026) 620 final — maritime MRV and FuelEU streamlining proposal",
+      "publisher": "European Commission / European Parliament",
+      "uri": "https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2026%2F0210%28COD%29",
+      "publication_date": "2026-07-17",
+      "evidence_class": "official_legislative_proposal_and_procedure_status",
+      "limitations": [
+        "Procedure 2026/0210(COD) is a pending proposal, not adopted law.",
+        "Wind-energy standards/certification are future implementing acts and are not specified by this source record."
       ]
     }
   ]
