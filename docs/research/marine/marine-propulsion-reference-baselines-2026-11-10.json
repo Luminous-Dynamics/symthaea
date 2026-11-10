@@ -1328,6 +1328,24 @@
         "Treating pending framework provisions as current law",
         "Using this status snapshot after later decisions without refresh"
       ]
+    },
+    {
+      "source_id": "EU-MRV-MARITIME-REG2015-757",
+      "title": "Regulation (EU) 2015/757 on monitoring, reporting and verification of maritime transport emissions, as amended",
+      "publisher": "European Union",
+      "publication_date": "2015-04-29",
+      "url": "https://eur-lex.europa.eu/eli/reg/2015/757/oj/eng",
+      "evidence_class": "binding_eu_regulation",
+      "scope": {
+        "CO2_from_emissions_year": 2018,
+        "CH4_N2O_from_emissions_year": 2024,
+        "additional_ship_scope_from_2025": "Offshore ships ≥5,000 GT and offshore/general cargo ships 400–5,000 GT, subject to legal scope.",
+        "role": "Monitoring/reporting/verification obligation. Distinct from EU ETS allowance surrender."
+      },
+      "limitations": [
+        "Use current consolidated Regulation and applicable implementation acts for reporting determinations.",
+        "EU MRV gas coverage and ship scope are not identical to EU ETS coverage/surrender scope."
+      ]
     }
   ]
 }
