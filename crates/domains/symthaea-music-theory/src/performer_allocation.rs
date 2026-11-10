@@ -126,6 +126,7 @@ pub enum PerformanceAllocationIssueCodeV2 {
     UnqualifiedPerformerProfile,
     InvalidPerformerCapacity,
     PerformerDoubleBooked,
+    SharedInstrumentWithoutDeclaredGroup,
     InvalidSharedPerformerGroup,
     InvalidSharedInstrumentGroup,
     PerformerPolyphonyExceeded,
@@ -146,6 +147,8 @@ pub struct PerformanceAllocationIssueV2 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PerformerPeakLoadV2 {
     pub performer_id: String,
+    pub instrument_kind: InstrumentKindV1,
+    pub setup_id: String,
     pub peak_simultaneous_notes: u8,
     pub declared_note_budget: u8,
     pub peak_simultaneous_parts: u8,
@@ -240,6 +243,13 @@ impl Moment {
 struct UnitWindow {
     start: Moment,
     end: Moment,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LoadBucketKey<'a> {
+    performer_id: &'a str,
+    instrument_kind: InstrumentKindV1,
+    setup_id: &'a str,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -387,6 +397,7 @@ pub fn validate_performance_allocation_v2(
     let mut seen_unit_ids = BTreeSet::new();
     let mut segment_allocations = BTreeSet::new();
     let mut units_by_performer: BTreeMap<&str, Vec<&PerformanceUnitV2>> = BTreeMap::new();
+    let mut units_by_instrument: BTreeMap<&str, Vec<&PerformanceUnitV2>> = BTreeMap::new();
     let mut shared_performer_groups: BTreeMap<(&str, &str, &str), Vec<&PerformanceUnitV2>> =
         BTreeMap::new();
     let mut shared_instrument_groups: BTreeMap<(&str, &str), Vec<&PerformanceUnitV2>> =
@@ -425,6 +436,7 @@ pub fn validate_performance_allocation_v2(
         let Some(instrument) = instrument_by_id.get(segment.instrument_id.as_str()) else {
             continue;
         };
+        units_by_instrument.entry(segment.instrument_id.as_str()).or_default().push(unit);
         let mut local_ids = BTreeSet::new();
         for performer_id in &unit.performer_ids {
             if !valid_identifier(performer_id) {
@@ -509,7 +521,7 @@ pub fn validate_performance_allocation_v2(
                 parts.insert(segment.part_id);
                 if segment.instrument_id != *instrument_id {
                     report.push(PerformanceAllocationIssueCodeV2::InvalidSharedPerformerGroup,
-                        Some(&unit.id), Some(performer), Some(segment.part_id), None,
+                        Some(&unit.id), Some(*performer), Some(segment.part_id), None,
                         "shared-performer parts must use the same instrument instance");
                 }
             }
@@ -517,7 +529,7 @@ pub fn validate_performance_allocation_v2(
                 if let Some(first) = first_window {
                     if !same_window(first, window) {
                         report.push(PerformanceAllocationIssueCodeV2::InvalidSharedPerformerGroup,
-                            Some(&unit.id), Some(performer), None, None,
+                            Some(&unit.id), Some(*performer), None, None,
                             "shared-performer parts must have the same exact score-time window");
                     }
                 } else {
@@ -527,7 +539,7 @@ pub fn validate_performance_allocation_v2(
             if let Some(setup) = first_setup {
                 if setup != unit.setup_id {
                     report.push(PerformanceAllocationIssueCodeV2::InvalidSharedPerformerGroup,
-                        Some(&unit.id), Some(performer), None, None,
+                        Some(&unit.id), Some(*performer), None, None,
                         "shared-performer parts must use the same setup");
                 }
             } else {
@@ -536,7 +548,7 @@ pub fn validate_performance_allocation_v2(
         }
         if units.len() < 2 || parts.len() < 2 {
             report.push(PerformanceAllocationIssueCodeV2::InvalidSharedPerformerGroup,
-                None, Some(performer), None, None,
+                None, Some(*performer), None, None,
                 format!("shared-performer group {group} must contain at least two distinct parts"));
         }
     }
@@ -588,6 +600,49 @@ pub fn validate_performance_allocation_v2(
         }
     }
 
+    // A physical instrument instance cannot be implicitly shared by
+    // different performers. All concurrent part allocations for one instance
+    // must opt into the same explicit shared-instrument group and setup.
+    for (instrument_id, units) in &units_by_instrument {
+        for (index, left) in units.iter().enumerate() {
+            let (Some(left_segment), Some(left_window)) = (
+                segment_by_id.get(left.orchestration_segment_id.as_str()),
+                windows.get(left.orchestration_segment_id.as_str()).copied(),
+            ) else { continue };
+            for right in units.iter().skip(index + 1) {
+                let (Some(right_segment), Some(right_window)) = (
+                    segment_by_id.get(right.orchestration_segment_id.as_str()),
+                    windows.get(right.orchestration_segment_id.as_str()).copied(),
+                ) else { continue };
+                if !windows_overlap(left_window, right_window) {
+                    continue;
+                }
+                let performers_are_distinct = left.performer_ids.first()
+                    != right.performer_ids.first();
+                let explicitly_shared =
+                    left.mode == PerformanceAllocationModeV2::SharedInstrumentMultiPerformer
+                    && right.mode == PerformanceAllocationModeV2::SharedInstrumentMultiPerformer
+                    && left.allocation_group_id.is_some()
+                    && left.allocation_group_id == right.allocation_group_id
+                    && left.setup_id == right.setup_id
+                    && performers_are_distinct
+                    && left_segment.part_id != right_segment.part_id;
+                if !explicitly_shared {
+                    report.push(
+                        PerformanceAllocationIssueCodeV2::SharedInstrumentWithoutDeclaredGroup,
+                        Some(&right.id),
+                        right.performer_ids.first().map(String::as_str),
+                        Some(right_segment.part_id),
+                        None,
+                        format!(
+                            "overlapping uses of instrument instance {instrument_id} require one explicit shared-instrument group, distinct performers, and one setup"
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
     // Any overlap for one performer must be covered by one explicit shared
     // performer group; switching instruments while simultaneous is forbidden.
     for (performer, units) in &units_by_performer {
@@ -621,12 +676,13 @@ pub fn validate_performance_allocation_v2(
 
     // Compute the actual simultaneous note and PartId workload per performer.
     // End events sort before start events at equal rational score time.
-    let mut load_events: BTreeMap<&str, Vec<LoadEvent>> = BTreeMap::new();
+    let mut load_events: HashMap<(&str, InstrumentKindV1, &str), Vec<LoadEvent>> = HashMap::new();
     for unit in &plan.units {
         let (Some(segment), Some(window)) = (
             segment_by_id.get(unit.orchestration_segment_id.as_str()),
             windows.get(unit.orchestration_segment_id.as_str()).copied(),
         ) else { continue };
+        let Some(instrument) = instrument_by_id.get(segment.instrument_id.as_str()) else { continue };
         for (note_index, note) in score.notes.iter().enumerate() {
             if note.part.0 != segment.part_id { continue; }
             let (Some(onset), Some(duration)) = (
@@ -646,15 +702,16 @@ pub fn validate_performance_allocation_v2(
             };
             if onset.less_than(window.start) || end.greater_than(window.end) { continue; }
             for performer in &unit.performer_ids {
-                let events = load_events.entry(performer.as_str()).or_default();
+                let key = (performer.as_str(), instrument.kind, unit.setup_id.as_str());
+                let events = load_events.entry(key).or_default();
                 events.push(LoadEvent { when: end, delta: -1, part_id: segment.part_id, note_index });
                 events.push(LoadEvent { when: onset, delta: 1, part_id: segment.part_id, note_index });
             }
         }
     }
 
-    let mut peak_by_performer = BTreeMap::<&str, PerformerPeakLoadV2>::new();
-    for (performer, events) in &mut load_events {
+    let mut peak_by_scope = Vec::new();
+    for ((performer, instrument_kind, setup_id), events) in &mut load_events {
         events.sort_by(|a, b| {
             a.when.compare(b.when)
                 .then_with(|| a.delta.cmp(&b.delta))
@@ -680,18 +737,13 @@ pub fn validate_performance_allocation_v2(
             peak_parts = peak_parts.max(active_parts.len() as u16);
         }
 
-        let mut matched_profile: Option<&PerformerCapabilityV2> = None;
-        for unit in units_by_performer.get(*performer).into_iter().flatten() {
-            let Some(segment) = segment_by_id.get(unit.orchestration_segment_id.as_str()) else { continue };
-            let Some(instrument) = instrument_by_id.get(segment.instrument_id.as_str()) else { continue };
-            if let Some(profile) = profile_by_key.get(&(*performer, instrument.kind, unit.setup_id.as_str())) {
-                matched_profile = Some(*profile);
-                break;
-            }
-        }
-        let Some(profile) = matched_profile else { continue };
+        let Some(profile) = profile_by_key.get(&(*performer, *instrument_kind, *setup_id)) else {
+            continue;
+        };
         let peak = PerformerPeakLoadV2 {
             performer_id: (*performer).to_owned(),
+            instrument_kind: *instrument_kind,
+            setup_id: (*setup_id).to_owned(),
             peak_simultaneous_notes: peak_notes.min(u16::from(u8::MAX)) as u8,
             declared_note_budget: profile.max_simultaneous_notes,
             peak_simultaneous_parts: peak_parts.min(u16::from(u8::MAX)) as u8,
@@ -699,19 +751,24 @@ pub fn validate_performance_allocation_v2(
         };
         if peak_notes > u16::from(profile.max_simultaneous_notes) {
             report.push(PerformanceAllocationIssueCodeV2::PerformerPolyphonyExceeded,
-                None, Some(performer), None, None,
+                None, Some(*performer), None, None,
                 format!("performer simultaneous-note demand {} exceeds qualified budget {}",
                     peak_notes, profile.max_simultaneous_notes));
         }
         if peak_parts > u16::from(profile.max_simultaneous_parts) {
             report.push(PerformanceAllocationIssueCodeV2::PerformerPartCapacityExceeded,
-                None, Some(performer), None, None,
+                None, Some(*performer), None, None,
                 format!("performer simultaneous-part demand {} exceeds qualified budget {}",
                     peak_parts, profile.max_simultaneous_parts));
         }
-        peak_by_performer.insert(*performer, peak);
+        peak_by_scope.push(peak);
     }
-    report.performer_peak_load = peak_by_performer.into_values().collect();
+    peak_by_scope.sort_by(|a, b| {
+        a.performer_id.cmp(&b.performer_id)
+            .then_with(|| a.setup_id.cmp(&b.setup_id))
+            .then_with(|| format!("{:?}", a.instrument_kind).cmp(&format!("{:?}", b.instrument_kind)))
+    });
+    report.performer_peak_load = peak_by_scope;
     report.finish()
 }
 
@@ -719,7 +776,6 @@ pub fn validate_performance_allocation_v2(
 mod tests {
     use super::*;
     use crate::harmony::Key;
-    use crate::orchestration::{SoundingRangeV1};
     use crate::orchestration_timeline::{
         OrchestrationSegmentV1, RationalBeatV1, ORCHESTRATION_TIMELINE_SCHEMA_V1,
     };
@@ -901,6 +957,22 @@ mod tests {
         );
         assert!(report.issues.iter().any(|issue| {
             issue.code == PerformanceAllocationIssueCodeV2::PerformerDoubleBooked
+        }));
+    }
+
+    #[test]
+    fn rejects_concurrent_physical_instrument_sharing_without_declared_group() {
+        let report = validate(&score(), vec![
+            unit("melody-unit", "melody", "pianist-a", "four-hand",
+                PerformanceAllocationModeV2::Solo, None),
+            unit("bass-unit", "bass", "pianist-b", "four-hand",
+                PerformanceAllocationModeV2::Solo, None),
+        ], vec![
+            profile("pianist-a", "four-hand", 8, 1),
+            profile("pianist-b", "four-hand", 8, 1),
+        ]);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == PerformanceAllocationIssueCodeV2::SharedInstrumentWithoutDeclaredGroup
         }));
     }
 
