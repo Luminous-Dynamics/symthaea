@@ -42,8 +42,6 @@ pub(crate) struct SceneSourceReceipt {
     role: SceneSourceRole,
     current: bool,
     calibration_current: bool,
-    current: bool,
-    calibration_current: bool,
 }
 
 /// Track state classification from the scene admission result.
