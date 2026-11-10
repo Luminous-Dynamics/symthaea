@@ -47,6 +47,10 @@ pub struct LinearActionSamplingProfileV1 {
     pub maximum_direction_basis_condition: f64,
 }
 
+/// Hard ceiling independent of caller configuration. This prevents a profile
+/// from accidentally removing the sampling resource bound entirely.
+const HARD_MAX_LINEAR_ACTION_SAMPLES: usize = 4096;
+
 impl Default for LinearActionSamplingProfileV1 {
     fn default() -> Self {
         Self {
@@ -361,6 +365,7 @@ pub fn evaluate_linear_action_samples(
         || !profile.squared_cosine_tolerance.is_finite()
         || !(0.0..=1.0).contains(&profile.squared_cosine_tolerance)
         || profile.maximum_samples == 0
+        || profile.maximum_samples > HARD_MAX_LINEAR_ACTION_SAMPLES
         || profile.minimum_informative_samples == 0
         || profile.minimum_informative_samples > profile.maximum_samples
         || !profile.maximum_direction_basis_condition.is_finite()
@@ -687,8 +692,8 @@ mod tests {
         .try_admit(LinearGroupActionAdmissionProfileV1::default())
         .unwrap();
         let transformed_expression = sub(
-            add(square("X"), mul(Expr::Const(1.2), square("Y"))),
-            mul(Expr::Const(2.4), mul(Expr::Var("X".to_string()), Expr::Var("Y".to_string()))),
+            add(square("X"), mul(Expr::Const(2.2), square("Y"))),
+            mul(Expr::Const(2.0), mul(Expr::Var("X".to_string()), Expr::Var("Y".to_string()))),
         );
         let transformed_directions = transform;
         let transformed_samples: Vec<LinearActionSampleV1> = canonical_states
@@ -758,6 +763,25 @@ mod tests {
                 sampling_profile()
             ),
             Err(LinearActionSamplingErrorV1::InsufficientInformativeSamples { .. })
+        ));
+    }
+
+    #[test]
+    fn sampled_linear_action_rejects_profile_that_exceeds_hard_sample_ceiling() {
+        let states = [[0.7, 1.1], [1.2, 0.8], [1.7, 2.1], [2.3, 1.4]];
+        let profile = LinearActionSamplingProfileV1 {
+            maximum_samples: HARD_MAX_LINEAR_ACTION_SAMPLES + 1,
+            minimum_informative_samples: 1,
+            ..sampling_profile()
+        };
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &add(square("x"), square("y")),
+                &canonical_action(),
+                &samples(&states, [[1.0, 0.0], [0.0, 1.0]]),
+                profile
+            ),
+            Err(LinearActionSamplingErrorV1::InvalidProfile)
         ));
     }
 
