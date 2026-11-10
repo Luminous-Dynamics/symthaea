@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 const SCHEMA_ID: &str =
     "https://luminousdynamics.io/schemas/transport/ev-cell-limited-power-envelope/0.1";
-const CORPUS_VERSION: &str = "ev-cell-limited-power-envelope-corpus/0.1";
+const CORPUS_VERSION: &str = "ev-cell-limited-power-envelope-corpus/0.2";
 const PROFILE_VERSION: &str = "ev-cell-limited-power-envelope/0.1";
 const EPSILON: f64 = 1e-12;
 
@@ -27,6 +27,7 @@ struct CorpusCase {
     expected_limiting_constraint: Option<String>,
     expected_max_current_a: Option<f64>,
     expected_power_w: Option<f64>,
+    expected_beta_power: Option<f64>,
     profile: Value,
 }
 
@@ -161,6 +162,9 @@ pub struct CellLimit {
     pub limiting_constraint: String,
     pub terminal_voltage_lower_v_at_selected_current: Option<f64>,
     pub temperature_upper_c_at_selected_current: Option<f64>,
+    pub individual_power_maximizing_current_a: f64,
+    pub individual_terminal_voltage_lower_v_at_maximum_power: f64,
+    pub individual_maximum_terminal_power_w: f64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -172,6 +176,10 @@ pub struct PowerEnvelope {
     pub selected_current_a: Option<f64>,
     pub pack_terminal_voltage_lower_v: Option<f64>,
     pub conservative_terminal_power_lower_w: Option<f64>,
+    pub sum_individual_cell_maximum_power_w: Option<f64>,
+    pub beta_power_model_estimate: Option<f64>,
+    pub beta_power_status: String,
+    pub beta_power_method_ref: String,
     pub limiting_cell: String,
     pub limiting_constraint: String,
     pub topology_qualification_ref: String,
@@ -201,6 +209,7 @@ struct ReportPayload {
     computed_count: usize,
     no_discharge_count: usize,
     rejected_count: usize,
+    beta_power_computed_count: usize,
     cases: Vec<CaseAudit>,
 }
 
@@ -432,6 +441,9 @@ struct RawCellLimit {
     thermal_limit_a: f64,
     admissible_limit_a: f64,
     limiting_constraint: String,
+    individual_power_maximizing_current_a: f64,
+    individual_terminal_voltage_lower_v_at_maximum_power: f64,
+    individual_maximum_terminal_power_w: f64,
 }
 
 fn cell_limit(cell: &Cell, profile: &Profile) -> RawCellLimit {
@@ -467,6 +479,11 @@ fn cell_limit(cell: &Cell, profile: &Profile) -> RawCellLimit {
                 .then_with(|| left.1.cmp(&right.1))
         })
         .expect("three cell constraints exist");
+    let individual_power_current =
+        selected.0.min(cell.ocv_lower_v / (2.0 * cell.resistance_upper_ohm)).max(0.0);
+    let individual_terminal_voltage =
+        (cell.ocv_lower_v - individual_power_current * cell.resistance_upper_ohm).max(0.0);
+    let individual_maximum_power = individual_power_current * individual_terminal_voltage;
     RawCellLimit {
         cell_ref: cell.cell_ref.clone(),
         voltage_limit_a: voltage_limit,
@@ -474,6 +491,9 @@ fn cell_limit(cell: &Cell, profile: &Profile) -> RawCellLimit {
         thermal_limit_a: thermal_limit,
         admissible_limit_a: selected.0,
         limiting_constraint: selected.2.to_owned(),
+        individual_power_maximizing_current_a: individual_power_current,
+        individual_terminal_voltage_lower_v_at_maximum_power: individual_terminal_voltage,
+        individual_maximum_terminal_power_w: individual_maximum_power,
     }
 }
 
@@ -605,6 +625,10 @@ fn compute(profile: &Profile) -> PowerEnvelope {
     let limiting = limits.first().expect("validated profile contains cells");
     let maximum_current = limiting.admissible_limit_a.max(0.0);
     let evidence = build_evidence(profile);
+    let individual_power_sum: f64 = limits
+        .iter()
+        .map(|limit| limit.individual_maximum_terminal_power_w)
+        .sum();
 
     if maximum_current <= EPSILON {
         let cells = limits
@@ -618,6 +642,10 @@ fn compute(profile: &Profile) -> PowerEnvelope {
                 limiting_constraint: limit.limiting_constraint.clone(),
                 terminal_voltage_lower_v_at_selected_current: None,
                 temperature_upper_c_at_selected_current: None,
+                individual_power_maximizing_current_a: limit.individual_power_maximizing_current_a,
+                individual_terminal_voltage_lower_v_at_maximum_power:
+                    limit.individual_terminal_voltage_lower_v_at_maximum_power,
+                individual_maximum_terminal_power_w: limit.individual_maximum_terminal_power_w,
             })
             .collect();
         return PowerEnvelope {
@@ -628,6 +656,11 @@ fn compute(profile: &Profile) -> PowerEnvelope {
             selected_current_a: None,
             pack_terminal_voltage_lower_v: None,
             conservative_terminal_power_lower_w: None,
+            sum_individual_cell_maximum_power_w: Some(individual_power_sum),
+            beta_power_model_estimate: None,
+            beta_power_status: "NOT_COMPUTABLE_NO_ADMISSIBLE_DISCHARGE".to_owned(),
+            beta_power_method_ref:
+                "matched_constant_current_thevenin_lumped_thermal_v0.2".to_owned(),
             limiting_cell: limiting.cell_ref.clone(),
             limiting_constraint: limiting.limiting_constraint.clone(),
             topology_qualification_ref: profile.topology.qualification.as_ref().unwrap().qualification_ref.clone(),
@@ -640,8 +673,7 @@ fn compute(profile: &Profile) -> PowerEnvelope {
     }
 
     let sum_ocv_lower: f64 = profile.cells.iter().map(|cell| cell.ocv_lower_v).sum();
-    let sum_resistance_upper: f64 = profile
-        .cells
+    let sum_resistance_upper: f64 = profile.cells
         .iter()
         .map(|cell| cell.resistance_upper_ohm)
         .sum();
@@ -652,6 +684,10 @@ fn compute(profile: &Profile) -> PowerEnvelope {
 
     let mut cells = Vec::new();
     for cell in &profile.cells {
+        let limit = limits
+            .iter()
+            .find(|row| row.cell_ref == cell.cell_ref)
+            .expect("validated profile has a limit for every cell");
         let temperature_upper = cell.temperature_estimate_c + cell.temperature_uncertainty_c;
         let baseline_temperature =
             temperature_upper.max(profile.pulse.ambient_temperature_upper_c);
@@ -663,20 +699,28 @@ fn compute(profile: &Profile) -> PowerEnvelope {
             + selected_current.powi(2) * thermal_gain;
         cells.push(CellLimit {
             cell_ref: cell.cell_ref.clone(),
-            voltage_limited_current_a: ((cell.ocv_lower_v - cell.minimum_voltage_v)
-                / cell.resistance_upper_ohm)
-                .max(0.0),
-            current_rating_limit_a: cell.maximum_discharge_current_lower_a,
-            thermal_limited_current_a: cell_limit(cell, profile).thermal_limit_a,
-            admissible_current_a: cell_limit(cell, profile).admissible_limit_a,
-            limiting_constraint: cell_limit(cell, profile).limiting_constraint,
+            voltage_limited_current_a: limit.voltage_limit_a,
+            current_rating_limit_a: limit.current_limit_a,
+            thermal_limited_current_a: limit.thermal_limit_a,
+            admissible_current_a: limit.admissible_limit_a,
+            limiting_constraint: limit.limiting_constraint.clone(),
             terminal_voltage_lower_v_at_selected_current: Some(
                 cell.ocv_lower_v - selected_current * cell.resistance_upper_ohm,
             ),
             temperature_upper_c_at_selected_current: Some(predicted_temperature),
+            individual_power_maximizing_current_a: limit.individual_power_maximizing_current_a,
+            individual_terminal_voltage_lower_v_at_maximum_power:
+                limit.individual_terminal_voltage_lower_v_at_maximum_power,
+            individual_maximum_terminal_power_w: limit.individual_maximum_terminal_power_w,
         });
     }
     cells.sort_by(|left, right| left.cell_ref.cmp(&right.cell_ref));
+
+    let (beta_power, beta_status) = if individual_power_sum <= EPSILON {
+        (None, "NOT_COMPUTABLE_ZERO_INDIVIDUAL_CELL_POWER_DENOMINATOR")
+    } else {
+        (Some(power_lower / individual_power_sum), "COMPUTED")
+    };
     PowerEnvelope {
         profile_id: profile.profile_id.clone(),
         status: "COMPUTED".to_owned(),
@@ -685,6 +729,11 @@ fn compute(profile: &Profile) -> PowerEnvelope {
         selected_current_a: Some(selected_current),
         pack_terminal_voltage_lower_v: Some(pack_voltage_lower),
         conservative_terminal_power_lower_w: Some(power_lower),
+        sum_individual_cell_maximum_power_w: Some(individual_power_sum),
+        beta_power_model_estimate: beta_power,
+        beta_power_status: beta_status.to_owned(),
+        beta_power_method_ref:
+            "matched_constant_current_thevenin_lumped_thermal_v0.2".to_owned(),
         limiting_cell: limiting.cell_ref.clone(),
         limiting_constraint: limiting.limiting_constraint.clone(),
         topology_qualification_ref: profile.topology.qualification.as_ref().unwrap().qualification_ref.clone(),
@@ -738,6 +787,7 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
     let mut computed_count = 0usize;
     let mut no_discharge_count = 0usize;
     let mut rejected_count = 0usize;
+    let mut beta_power_computed_count = 0usize;
     for case in corpus.cases {
         if !nonempty(&case.case_id) || !seen.insert(case.case_id.clone()) {
             return Err(format!("case identity is empty or duplicated: {}", case.case_id));
@@ -763,11 +813,14 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
                             envelope.selected_current_a,
                             envelope.pack_terminal_voltage_lower_v,
                             envelope.conservative_terminal_power_lower_w,
+                            envelope.sum_individual_cell_maximum_power_w,
+                            envelope.beta_power_model_estimate,
                         ];
                         if numeric_values
                             .iter()
                             .flatten()
                             .any(|value| !value.is_finite() || *value < 0.0)
+                            || envelope.beta_power_model_estimate.is_some_and(|value| value > 1.0 + 1e-9)
                         {
                             Err(vec![
                                 "power envelope contains a non-finite or negative output"
@@ -808,6 +861,14 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
                         (None, None) => false,
                         _ => true,
                     }
+                    || match (case.expected_beta_power, envelope.beta_power_model_estimate) {
+                        (Some(expected), Some(actual)) => {
+                            !expected.is_finite() || expected < 0.0 || expected > 1.0
+                                || (actual - expected).abs() > 1e-8
+                        }
+                        (None, None) => false,
+                        _ => true,
+                    }
                 {
                     return Err(format!(
                         "case {} known-truth disposition/limiting-cell/current/power mismatch",
@@ -816,6 +877,9 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
                 }
                 if envelope.status == "COMPUTED" {
                     computed_count += 1;
+                    if envelope.beta_power_model_estimate.is_some() {
+                        beta_power_computed_count += 1;
+                    }
                 } else {
                     no_discharge_count += 1;
                 }
@@ -827,6 +891,7 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
                     || case.expected_limiting_constraint.is_some()
                     || case.expected_max_current_a.is_some()
                     || case.expected_power_w.is_some()
+                    || case.expected_beta_power.is_some()
                 {
                     return Err(format!("case {} expected a valid envelope but input was rejected: {}", case.case_id, errors.join("; ")));
                 }
@@ -852,6 +917,7 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<CorpusRe
         computed_count,
         no_discharge_count,
         rejected_count,
+        beta_power_computed_count,
         cases,
     };
     let bytes =
@@ -870,7 +936,7 @@ mod tests {
     const SCHEMA: &[u8] =
         include_bytes!("../../../schemas/transport/ev_cell_limited_power_envelope_v0_1.schema.json");
     const CORPUS: &[u8] =
-        include_bytes!("../../../fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_1.json");
+        include_bytes!("../../../fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_2.json");
 
     fn report() -> CorpusReport {
         audit_corpus(SCHEMA, CORPUS).expect("frozen power-envelope corpus")
@@ -1002,6 +1068,58 @@ mod tests {
             row.role == "maximum_temperature_limit:cell-001"
                 && row.evidence_class.as_deref() == Some("synthetic_fixture")
         }));
+    }
+
+    #[test]
+    fn beta_power_matches_the_published_pack_to_cell_power_ratio() {
+        let result = report();
+        let lookup = |case_id: &str| {
+            result.payload.cases.iter()
+                .find(|case| case.case_id == case_id)
+                .and_then(|case| case.envelope.as_ref())
+                .expect("computed beta-power envelope")
+        };
+        let equal = lookup("equal-series-reference");
+        assert!((equal.beta_power_model_estimate.unwrap() - 1.0).abs() < 1e-8);
+        let weak = lookup("weak-cell-voltage-limited");
+        assert!((weak.beta_power_model_estimate.unwrap() - 0.5101673255969201).abs() < 1e-8);
+        assert!(weak.beta_power_model_estimate.unwrap() < 1.0);
+        let current = lookup("current-rating-limited");
+        assert!((current.beta_power_model_estimate.unwrap() - 0.7050993868496311).abs() < 1e-8);
+        assert!((weak.sum_individual_cell_maximum_power_w.unwrap()
+            - 363.71735791090623).abs() < 1e-6);
+    }
+
+    #[test]
+    fn every_individual_cell_power_is_at_least_its_power_at_the_pack_current() {
+        let result = report();
+        for case in result.payload.cases.iter().filter(|case| case.case_id != "no-admissible-discharge-when-thermal-margin-exhausted") {
+            let envelope = case.envelope.as_ref().expect("accepted envelope");
+            let pack_current = envelope.selected_current_a.unwrap();
+            for cell in &envelope.cells {
+                let profile_value: Value = serde_json::from_slice(CORPUS).unwrap();
+                let profile_case = profile_value["cases"].as_array().unwrap().iter()
+                    .find(|item| item["case_id"] == case.case_id).unwrap();
+                let source = profile_case["profile"]["cells"].as_array().unwrap().iter()
+                    .find(|item| item["cell_ref"] == cell.cell_ref).unwrap();
+                let common_power = pack_current
+                    * (source["ocv_lower_v"].as_f64().unwrap()
+                        - pack_current * source["resistance_upper_ohm"].as_f64().unwrap());
+                assert!(cell.individual_maximum_terminal_power_w + 1e-8 >= common_power);
+            }
+            assert!(envelope.beta_power_model_estimate.unwrap() <= 1.0 + 1e-9);
+        }
+    }
+
+    #[test]
+    fn beta_power_is_not_emitted_when_the_pack_has_no_admissible_discharge() {
+        let result = report();
+        let envelope = result.payload.cases.iter()
+            .find(|case| case.case_id == "no-admissible-discharge-when-thermal-margin-exhausted")
+            .and_then(|case| case.envelope.as_ref())
+            .expect("no-discharge envelope");
+        assert_eq!(envelope.beta_power_status, "NOT_COMPUTABLE_NO_ADMISSIBLE_DISCHARGE");
+        assert!(envelope.beta_power_model_estimate.is_none());
     }
 
     #[test]
