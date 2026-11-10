@@ -78,6 +78,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use symthaea_core::hdc::lie_theory::{self, LieAlgebra};
 
+use crate::linear_group_action::AdmittedLinearGroupActionV1;
 use crate::types::{LieGroup, SymmetryDescriptor};
 
 /// Fully specified numerical policy used by the bounded Lie-derivative fallback.
@@ -980,7 +981,7 @@ fn charge_exact_polynomial_operations(
     additional: usize,
     profile: ExactPolynomialLieProfileV1,
 ) -> Result<(), ExactPolynomialError> {
-    *operation_count = operation_count.saturating_add(additional);
+    *operation_count = (*operation_count).saturating_add(additional);
     if *operation_count > profile.maximum_term_products {
         return Err(ExactPolynomialError::ResourceLimitExceeded);
     }
