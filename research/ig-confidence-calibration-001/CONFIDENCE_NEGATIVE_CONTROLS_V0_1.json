@@ -248,23 +248,23 @@
     },
     {
       "fixture_id": "CONF-021",
-      "description": "A calibration report with no independent validator is not calibrated",
+      "description": "The calibration profile's model provider identity must be present.",
       "mutation": {
         "operation": "set",
-        "path": "/calibration_profile/validator/identity",
+        "path": "/calibration_profile/model_identity/provider",
         "value": ""
       },
       "expected_violations": [
-        "validator_identity_missing"
+        "model_identity_mismatch"
       ]
     },
     {
       "fixture_id": "CONF-022",
-      "description": "Fewer than the required evaluation rows is insufficient evidence",
+      "description": "The declared minimum test sample count cannot exceed the observed dataset size.",
       "mutation": {
-        "operation": "remove",
-        "path": "/observations/40",
-        "value": null
+        "operation": "set",
+        "path": "/minimum_observations",
+        "value": 60
       },
       "expected_violations": [
         "evaluation_observation_count_insufficient"
