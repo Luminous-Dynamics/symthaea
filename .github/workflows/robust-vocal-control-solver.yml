@@ -1,0 +1,46 @@
+name: Robust vocal control solver
+
+on:
+  pull_request:
+    paths:
+      - "tools/robust-vocal-control-solver/**"
+      - "docs/research/ROBUST_VOCAL_CONTROL_SOLVER_V1.md"
+      - ".github/workflows/robust-vocal-control-solver.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  robust-vocal-control-solver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VRCO_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check solver
+        run: cargo +1.96.0 fmt --check --manifest-path tools/robust-vocal-control-solver/Cargo.toml
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/robust-vocal-control-solver/Cargo.toml
+
+      - name: Run robust interval and actuator-bound controls
+        run: cargo +1.96.0 test --locked --manifest-path tools/robust-vocal-control-solver/Cargo.toml
