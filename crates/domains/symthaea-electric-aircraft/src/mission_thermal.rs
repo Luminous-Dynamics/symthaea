@@ -187,7 +187,23 @@ pub struct MissionThermalReport {
 impl MissionThermalReport {
     /// A report only exists when every modeled node and derating constraint passed.
     pub fn is_thermally_feasible(&self) -> bool {
-        true
+        self.minimum_power_margin_w.is_finite()
+            && self.minimum_power_margin_w >= -1e-8
+            && self.maximum_temperature_k.is_finite()
+            && self.maximum_temperature_k > 0.0
+            && self.maximum_absolute_energy_balance_residual_j.is_finite()
+            && self.maximum_absolute_energy_balance_residual_j >= 0.0
+            && self.final_state.temperatures_k.iter().all(|temperature| {
+                temperature.is_finite() && *temperature > 0.0
+            })
+            && self.segments.iter().all(|segment| {
+                segment.minimum_power_margin_w.is_finite()
+                    && segment.minimum_power_margin_w >= -1e-8
+                    && segment.maximum_temperature_k.is_finite()
+                    && segment.maximum_temperature_k > 0.0
+                    && segment.maximum_absolute_energy_balance_residual_j.is_finite()
+                    && segment.maximum_absolute_energy_balance_residual_j >= 0.0
+            })
     }
 }
 
@@ -650,7 +666,10 @@ fn validate_mission_report_pair(
             || resistance_ohm < 0.0
             || terminal_voltage_v <= 0.0
             || electrical_terminal_power_w < 0.0
+            || result.state_of_charge_end < battery.reserve_state_of_charge
+            || result.state_of_charge_end > 1.0
             || result.pack_temperature_end_k <= 0.0
+            || result.pack_temperature_end_k > battery.maximum_temperature_k
         {
             return Err(MissionThermalError::MissionReportInputMismatch {
                 segment_id: segment.id.clone(),
@@ -1076,6 +1095,30 @@ mod tests {
         battery_curve.validate().unwrap();
         assert!((battery_curve.available_power_w(285.0).unwrap() - 50_000.0).abs() < 1e-9);
         assert!((battery_curve.available_power_w(390.0).unwrap() - 65_000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn battery_current_and_voltage_identity_must_match_report() {
+        let mission = baseline_mission();
+        let mut energy = evaluate_mission(&mission).unwrap();
+        energy.segments[0].battery_current_a *= 0.99;
+
+        assert!(matches!(
+            evaluate_mission_thermal_overlay(&mission, &energy, &network(), &initial_state(), &config()),
+            Err(MissionThermalError::MissionReportInputMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn aggregate_soc_and_energy_totals_must_match_segment_records() {
+        let mission = baseline_mission();
+        let mut energy = evaluate_mission(&mission).unwrap();
+        energy.final_state_of_charge = (energy.final_state_of_charge - 0.01).max(0.0);
+
+        assert!(matches!(
+            evaluate_mission_thermal_overlay(&mission, &energy, &network(), &initial_state(), &config()),
+            Err(MissionThermalError::MissionReportInputMismatch { .. })
+        ));
     }
 
     #[test]
