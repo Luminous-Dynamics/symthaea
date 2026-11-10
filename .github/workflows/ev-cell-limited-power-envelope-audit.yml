@@ -29,7 +29,7 @@ jobs:
         run: cargo test --manifest-path tools/ev-cell-limited-power-envelope/Cargo.toml
       - name: Audit frozen synthetic cases
         run: |
-          cargo run --manifest-path tools/ev-cell-limited-power-envelope/Cargo.toml -- --schema schemas/transport/ev_cell_limited_power_envelope_v0_1.schema.json --corpus fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_1.json > "$RUNNER_TEMP/ev-cell-limited-power-report.json"
+          cargo run --manifest-path tools/ev-cell-limited-power-envelope/Cargo.toml -- --schema schemas/transport/ev_cell_limited_power_envelope_v0_1.schema.json --corpus fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_2.json > "$RUNNER_TEMP/ev-cell-limited-power-report.json"
           jq -e '
             .case_count == 11 and
             .computed_count == 4 and
