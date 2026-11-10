@@ -32,6 +32,10 @@ pub struct LinearLieAlgebraProfileV1 {
     pub maximum_jacobi_relative_defect: f64,
 }
 
+const HARD_MAX_LIE_GENERATORS: usize = 32;
+const HARD_MAX_PAIRWISE_BRACKETS: usize = 496;
+const HARD_MAX_JACOBI_SCALAR_OPERATIONS: usize = 25_000_000;
+
 impl Default for LinearLieAlgebraProfileV1 {
     fn default() -> Self {
         Self {
@@ -349,12 +353,11 @@ impl AdmittedLinearGroupActionV1 {
         let mut structure_constants = Vec::with_capacity(pair_count);
         let mut maximum_bracket_closure_relative_defect = 0.0_f64;
 
-        for left_index in 0..generator_count {
-            for right_index in (left_index + 1)..generator_count {
-                let commutator = matrix_commutator(
-                    &normalized_generators[left_index],
-                    &normalized_generators[right_index],
-                );
+        for (left_index, left_generator) in normalized_generators.iter().enumerate() {
+            for (right_index, right_generator) in
+                normalized_generators.iter().enumerate().skip(left_index + 1)
+            {
+                let commutator = matrix_commutator(left_generator, right_generator);
                 let commutator_vector = flatten_matrix(&commutator);
                 let commutator_norm = stable_norm(&commutator_vector);
                 let coefficients = if commutator_norm == 0.0 {
@@ -405,14 +408,14 @@ impl AdmittedLinearGroupActionV1 {
 
         let mut jacobi_diagnostics = Vec::with_capacity(jacobi_triple_count);
         let mut maximum_jacobi_relative_defect = 0.0_f64;
-        for first in 0..generator_count {
-            for second in (first + 1)..generator_count {
-                for third in (second + 1)..generator_count {
+        for (first, first_row) in bracket_tensor.iter().enumerate() {
+            for (second, _) in first_row.iter().enumerate().skip(first + 1) {
+                for (third, _) in first_row.iter().enumerate().skip(second + 1) {
                     let mut jacobi_norm = 0.0_f64;
                     let mut terms_norm = 0.0_f64;
-                    for output in 0..generator_count {
+                    for (output, _) in declaration.generators.iter().enumerate() {
                         let mut jacobi_component = 0.0_f64;
-                        for inner in 0..generator_count {
+                        for (inner, _) in declaration.generators.iter().enumerate() {
                             let term_one = bracket_tensor[second][third][inner]
                                 * bracket_tensor[first][inner][output];
                             let term_two = bracket_tensor[third][first][inner]
@@ -483,8 +486,11 @@ impl AdmittedLinearGroupActionV1 {
 
 fn validate_profile(profile: LinearLieAlgebraProfileV1) -> Result<(), LinearLieAlgebraQualificationErrorV1> {
     if profile.maximum_generators == 0
+        || profile.maximum_generators > HARD_MAX_LIE_GENERATORS
         || profile.maximum_pairwise_brackets == 0
+        || profile.maximum_pairwise_brackets > HARD_MAX_PAIRWISE_BRACKETS
         || profile.maximum_jacobi_scalar_operations == 0
+        || profile.maximum_jacobi_scalar_operations > HARD_MAX_JACOBI_SCALAR_OPERATIONS
         || !profile.relative_rank_tolerance.is_finite()
         || !(0.0..=1.0).contains(&profile.relative_rank_tolerance)
         || profile.relative_rank_tolerance == 0.0
@@ -951,6 +957,21 @@ mod tests {
         assert!(matches!(
             action.try_qualify_lie_algebra(jacobi_limited),
             Err(LinearLieAlgebraQualificationErrorV1::JacobiBudgetExceeded { .. })
+        ));
+
+        let mut over_hard_generator_ceiling = LinearLieAlgebraProfileV1::default();
+        over_hard_generator_ceiling.maximum_generators = HARD_MAX_LIE_GENERATORS + 1;
+        assert!(matches!(
+            action.try_qualify_lie_algebra(over_hard_generator_ceiling),
+            Err(LinearLieAlgebraQualificationErrorV1::InvalidProfile)
+        ));
+
+        let mut over_hard_jacobi_ceiling = LinearLieAlgebraProfileV1::default();
+        over_hard_jacobi_ceiling.maximum_jacobi_scalar_operations =
+            HARD_MAX_JACOBI_SCALAR_OPERATIONS + 1;
+        assert!(matches!(
+            action.try_qualify_lie_algebra(over_hard_jacobi_ceiling),
+            Err(LinearLieAlgebraQualificationErrorV1::InvalidProfile)
         ));
     }
 }
