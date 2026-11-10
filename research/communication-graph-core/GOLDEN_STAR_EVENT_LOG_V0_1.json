@@ -1,0 +1,46 @@
+{
+  "schema_version": "communication-event-log-v0.1",
+  "graph_sha256": "a75d0c019af19c790da272ffc113cc10dc7ab4eb0b6b2158f1dc7190fc50ddda",
+  "completeness": "complete",
+  "events": [
+    {
+      "sequence": 1,
+      "event_id": "EVENT-001",
+      "round": 1,
+      "message_id": "MESSAGE-001",
+      "channel_id": "A-B",
+      "sender": "AGENT-A",
+      "recipient": "AGENT-B",
+      "message_class": "evidence",
+      "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "payload_len_bytes": 20,
+      "outcome": "delivered"
+    },
+    {
+      "sequence": 2,
+      "event_id": "EVENT-002",
+      "round": 1,
+      "message_id": "MESSAGE-002",
+      "channel_id": "A-B",
+      "sender": "AGENT-A",
+      "recipient": "AGENT-B",
+      "message_class": "claim",
+      "payload_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "payload_len_bytes": 30,
+      "outcome": "delivered"
+    },
+    {
+      "sequence": 3,
+      "event_id": "EVENT-003",
+      "round": 1,
+      "message_id": "MESSAGE-003",
+      "channel_id": "A-B",
+      "sender": "AGENT-A",
+      "recipient": "AGENT-B",
+      "message_class": "challenge",
+      "payload_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "payload_len_bytes": 40,
+      "outcome": "rejected_capacity"
+    }
+  ]
+}
