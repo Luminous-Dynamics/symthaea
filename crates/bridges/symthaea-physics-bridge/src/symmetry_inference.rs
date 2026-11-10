@@ -59,6 +59,7 @@
 
 use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use symthaea_core::hdc::lie_theory::{self, LieAlgebra};
 
 use crate::types::{LieGroup, SymmetryDescriptor};
@@ -96,6 +97,47 @@ impl Default for NumericLieDerivativeProfileV1 {
     }
 }
 
+/// Resource-bounded exact-polynomial profile for symbolic Lie-derivative checks.
+///
+/// Float literals in the source AST are interpreted as their exact IEEE-754
+/// dyadic rational values. Coefficient arithmetic is then exact within checked
+/// `i128` numerator/denominator bounds. This establishes an algebraic identity
+/// for the represented polynomial; it is not a Lean proof or a physical-units proof.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExactPolynomialLieProfileV1 {
+    pub maximum_variables: usize,
+    pub maximum_terms: usize,
+    pub maximum_total_degree: usize,
+    pub maximum_power: u32,
+    pub maximum_dyadic_denominator_power: u32,
+    pub pairwise_so2_search: bool,
+}
+
+impl Default for ExactPolynomialLieProfileV1 {
+    fn default() -> Self {
+        Self {
+            maximum_variables: 6,
+            maximum_terms: 4096,
+            maximum_total_degree: 48,
+            maximum_power: 16,
+            maximum_dyadic_denominator_power: 126,
+            pairwise_so2_search: true,
+        }
+    }
+}
+
+/// Outcome of the bounded exact-polynomial parser and Lie-derivative search.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExactPolynomialSearchStatus {
+    NotRequested,
+    NotRunStructuralShortcut,
+    IdentityFound,
+    CompletedNoCandidate,
+    SkippedTooFewVariables,
+    UnsupportedExpression,
+    ResourceLimitExceeded,
+}
+
 /// Structural pattern that produced a symmetry candidate.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum StructuralSymmetryPattern {
@@ -117,7 +159,12 @@ pub enum StructuralSymmetryPattern {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SymmetryInferenceEvidence {
     StructuralPatternMatch { pattern: StructuralSymmetryPattern },
-    SampledLieDerivative {
+    ExactPolynomialLieDerivative {
+        profile: ExactPolynomialLieProfileV1,
+        acted_on_variables: Vec<String>,
+        group: LieGroup,
+        checked_generator_count: usize,
+    },    SampledLieDerivative {
         profile: NumericLieDerivativeProfileV1,
         acted_on_variables: Vec<String>,
         group: LieGroup,
@@ -129,6 +176,10 @@ pub enum SymmetryInferenceEvidence {
 pub enum SymmetryInferenceSearchStatus {
     /// An exact-shape structural detector matched; numeric search was short-circuited.
     StructuralMatchShortCircuit,
+    /// The bounded exact-polynomial Lie-derivative identity was zero for every searched generator.
+    ExactPolynomialIdentityFound,
+    /// The supported polynomial was checked exactly against the searched group families; none matched.
+    ExactPolynomialSearchCompletedNoCandidate,
     /// The bounded numerical search ran to completion.
     NumericSearchCompleted,
     /// The expression had fewer than two free variables, so numerical rotation search was skipped.
@@ -145,6 +196,8 @@ pub struct SymmetryInferenceReport {
     pub evidence: Option<SymmetryInferenceEvidence>,
     pub search_status: SymmetryInferenceSearchStatus,
     pub numeric_profile: NumericLieDerivativeProfileV1,
+    pub exact_polynomial_profile: ExactPolynomialLieProfileV1,
+    pub exact_polynomial_status: ExactPolynomialSearchStatus,
 }
 
 impl SymmetryInferenceReport {
