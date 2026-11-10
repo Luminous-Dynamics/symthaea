@@ -2,7 +2,7 @@ name: HLB FEP-WSP Factorial Contract
 
 on:
   pull_request:
-    branches: [main, research/swi-001-weight-space-introspection]
+    branches: [main, research/swi-001-weight-space-introspection, research/hlb-fep-wsp-factorial-v2]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
@@ -50,7 +50,7 @@ on:
       - "src/dynamics/cfc/mod.rs"
       - "src/dynamics/cfc/network.rs"
   push:
-    branches: [research/hlb-fep-wsp-factorial-v2]
+    branches: [research/hlb-fep-wsp-factorial-v2, research/hlb-correlated-gaussian-binary-v1]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - ".github/scripts/assert-hlb-test-discovery.sh"
@@ -66,6 +66,8 @@ on:
       - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
       - "crates/core/symthaea-fep/src/decision_relevant_information.rs"
       - "crates/core/symthaea-fep/src/gaussian_decision_diagnostic.rs"
+      - "crates/core/symthaea-fep/src/multivariate_gaussian_decision_diagnostic.rs"
+      - "crates/core/symthaea-fep/examples/hlb_multivariate_gaussian_known_answers.rs"
       - "crates/core/symthaea-fep/src/causal_diagnostic_semantics.rs"
       - "crates/core/symthaea-fep/src/open_world_robust_decision.rs"
       - "crates/core/symthaea-fep/src/sibson_alpha_information.rs"
