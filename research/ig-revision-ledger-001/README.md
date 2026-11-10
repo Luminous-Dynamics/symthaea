@@ -15,9 +15,9 @@ It does **not** inspect hidden model states or assert human-like beliefs.
 1. **Observed transition:** before/after elicited output-state digests and structured claim/stance deltas.
 2. **Evidence availability:** exact source/evidence IDs available before and newly exposed, unavailable, or invalidated before the next response.
 3. **Agent self-report:** an optional reason code and explanation digest. This is descriptive only; it does not establish cause.
-4. **Experimentally estimated effect:** a separately bound matched treatment/control run pair, analysis-plan digest and effect-estimate receipt. A single run cannot establish a causal effect.
+4. **Experimentally estimated effect:** a separately bound matched treatment/control run pair, equal commitments for ten shared input dimensions, a distinct declared intervention factor, pair-validator identity/receipt, analysis-plan digest and effect-estimate receipt. A single run cannot establish a causal effect.
 
-The Rust qualifier intentionally refuses a `MatchedPairEstimate` without a pair ID, distinct treatment/control run identities and analysis/effect digests. It never derives a causal label from the agent's own reason code.
+The Rust qualifier refuses a `MatchedPairEstimate` without a pair ID, distinct treatment/control run identities, equal treatment/control hashes for task, model, both prompts, evidence, communication graph, budget, decoding, RNG and evaluator, a distinct varied-factor digest, an independent pair-validator identity/receipt, and analysis/effect digests. The receipt is a required commitment, not self-authenticating proof; its verifier and underlying run manifests remain external evidence. It never derives a causal label from the agent's own reason code.
 
 ## Typed event
 
@@ -37,9 +37,9 @@ Delegation graph semantics remain separate: #11248 owns mandate/delegation edges
 
 ## Fixtures
 
-The v0.1 corpus contains 16 synthetic cases:
+The v0.1 corpus contains 17 synthetic cases:
 - Eight valid fixtures: repeat/no-change, evidence-supported revision, social exposure without evidence, abstention under uncertainty, matched-pair estimate, normative pluralism, missing measurement and source correction.
-- Eight negative controls: false Changed with identical state hashes, Missing with a post-state, causal estimate without a pair, overlapping claim deltas, delivered message without channel event, missing answer-space identity, open-world correctness score, and same-run treatment/control.
+- Eight negative controls: false Changed with identical state hashes, Missing with a post-state, causal estimate without a pair, overlapping claim deltas, delivered message without channel event, missing answer-space identity, open-world correctness score, same-run treatment/control, and a mismatched shared-input digest in a causal pair.
 
 Negative controls are expected to be rejected; they are not failed empirical experiments.
 
