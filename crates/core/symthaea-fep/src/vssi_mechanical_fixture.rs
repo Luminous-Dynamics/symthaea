@@ -153,6 +153,53 @@ pub struct VssiExperimentResult {
     pub receipt: VssiExperimentReceipt,
 }
 
+impl VssiExperimentReceipt {
+    /// Recompute the receipt's claim digest without trusting its stored digest.
+    pub fn validate(&self) -> Result<(), VssiFixtureError> {
+        if !is_sha256_hex(&self.public_task_digest)
+            || !is_sha256_hex(&self.observations_digest)
+            || !is_sha256_hex(&self.receipt_digest)
+            || self
+                .previous_receipt_digest
+                .as_ref()
+                .is_some_and(|digest| !is_sha256_hex(digest))
+        {
+            return Err(VssiFixtureError::InvalidReceiptDigest);
+        }
+        let claims = VssiExperimentReceiptClaims {
+            schema_version: "vssi-experiment-receipt-v1",
+            scenario_id: &self.scenario_id,
+            public_task_digest: &self.public_task_digest,
+            experiment_index: self.experiment_index,
+            kind: self.kind,
+            observation_cost: self.observation_cost,
+            budget_before: self.budget_before,
+            budget_after: self.budget_after,
+            observations_digest: &self.observations_digest,
+            previous_receipt_digest: self.previous_receipt_digest.as_deref(),
+        };
+        if sha256_serializable(b"symthaea-vssi-experiment-receipt-v1\\0", &claims)?
+            != self.receipt_digest
+        {
+            return Err(VssiFixtureError::ReceiptDigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+impl VssiExperimentResult {
+    /// Recompute both observation and receipt digests for this released batch.
+    pub fn validate(&self) -> Result<(), VssiFixtureError> {
+        self.receipt.validate()?;
+        let digest =
+            sha256_serializable(b"symthaea-vssi-observation-batch-v1\\0", &self.observations)?;
+        if digest != self.receipt.observations_digest {
+            return Err(VssiFixtureError::ObservationDigestMismatch);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Serialize)]
 struct VssiExperimentReceiptClaims<'a> {
     schema_version: &'static str,
@@ -213,6 +260,12 @@ pub enum VssiFixtureError {
     BudgetExceeded { remaining: f64, requested: f64 },
     #[error("failed to serialize deterministic experiment evidence for hashing")]
     ReceiptSerialization,
+    #[error("receipt contains a malformed SHA-256 digest")]
+    InvalidReceiptDigest,
+    #[error("experiment receipt digest does not match its claims")]
+    ReceiptDigestMismatch,
+    #[error("released observations do not match the experiment receipt digest")]
+    ObservationDigestMismatch,
 }
 
 impl VssiMechanicalEnvironment {
@@ -418,6 +471,13 @@ impl VssiMechanicalEnvironment {
                 && proposed == VssiDisposition::Abstain,
         }
     }
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn sha256_serializable<T: Serialize>(
@@ -707,6 +767,7 @@ mod tests {
         assert_eq!(first.receipt.previous_receipt_digest, None);
         assert_eq!(first.receipt.observations_digest.len(), 64);
         assert_eq!(first.receipt.public_task_digest.len(), 64);
+        first.validate().unwrap();
         assert_eq!(
             first.receipt.observations_digest,
             sha256_serializable(
@@ -730,6 +791,33 @@ mod tests {
         assert_eq!(
             environment.experiment_receipts()[1].receipt_digest,
             second.receipt.receipt_digest
+        );
+    }
+
+    #[test]
+    fn experiment_result_detects_observation_and_receipt_tampering() {
+        let mut environment = VssiMechanicalEnvironment::new(
+            "vssi-receipt-tamper-control",
+            VssiFixtureCase::HealthyControl,
+        )
+        .unwrap();
+        let result = environment
+            .observe_experiment_with_receipt(VssiExperimentKind::ThermalImpulse)
+            .unwrap();
+        result.validate().unwrap();
+
+        let mut altered_observations = result.clone();
+        altered_observations.observations[0].event_time += 0.25;
+        assert_eq!(
+            altered_observations.validate(),
+            Err(VssiFixtureError::ObservationDigestMismatch)
+        );
+
+        let mut altered_receipt = result;
+        altered_receipt.receipt.budget_after += 0.01;
+        assert_eq!(
+            altered_receipt.validate(),
+            Err(VssiFixtureError::ReceiptDigestMismatch)
         );
     }
 
