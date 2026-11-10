@@ -834,8 +834,8 @@ mod tests {
         assert_eq!(capability.claim_ids.len(), 3);
         assert_eq!(capability.evidence_ids.len(), 3);
         assert_eq!(capability.qualification_record_ids.len(), 3);
-        assert_eq!(capability.performance_scope, required_scope);
-        assert_eq!(capability.renderer_scope, Some(renderer_scope));
+        assert_eq!(capability.performance_scope, required_performance_scope);
+        assert_eq!(capability.renderer_scope, Some(renderer_scope.clone()));
     }
 
     #[test]
