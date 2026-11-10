@@ -175,6 +175,7 @@ pub enum CapabilityEvidenceIssueCodeV1 {
     MissingMeasuredEvidence,
     MissingSourceCitation,
     MissingDerivedLineage,
+    UnknownDerivedParent,
     QualifiedClaimWithoutReviewRecord,
     UnqualifiedEvidencePromoted,
     QualifiedClaimHasRestrictedReuse,
@@ -293,11 +294,16 @@ fn validate_scope(scope: &CapabilityScopeV1) -> bool {
     .into_iter()
     .all(|value| value.as_ref().is_none_or(|text| !text.trim().is_empty()));
     let patch_requires_renderer = scope.patch_id.is_none() || scope.renderer_id.is_some();
+    let asset_requires_renderer_patch = scope.asset_sha256.is_none()
+        || (scope.renderer_id.is_some() && scope.patch_id.is_some());
     let asset_digest_is_valid = scope
         .asset_sha256
         .as_ref()
         .is_none_or(|digest| valid_sha256_hex_v1(digest));
-    optional_text_is_valid && patch_requires_renderer && asset_digest_is_valid
+    optional_text_is_valid
+        && patch_requires_renderer
+        && asset_requires_renderer_patch
+        && asset_digest_is_valid
 }
 
 fn validate_value(value: &CapabilityValueV1) -> bool {
@@ -567,6 +573,23 @@ pub fn validate_instrument_capability_evidence_v1(
             );
         }
         validate_evidence(claim, &mut report);
+    }
+
+    // Derived claims must resolve every parent against the exact evidence
+    // records present in this profile. Merely listing arbitrary parent IDs is
+    // not a provenance chain.
+    for claim in &profile.claims {
+        if claim.evidence.evidence_class == EvidenceClassV1::Derived {
+            for parent in &claim.evidence.parent_evidence_ids {
+                if !evidence_records.contains_key(parent) {
+                    report.push(
+                        CapabilityEvidenceIssueCodeV1::UnknownDerivedParent,
+                        Some(&claim.claim_id),
+                        format!("derived evidence references unknown parent evidence ID {parent}"),
+                    );
+                }
+            }
+        }
     }
 
     report.finish()
@@ -1040,6 +1063,25 @@ mod tests {
             ),
             Err(CapabilityMaterializationErrorV1::ScopeMismatch)
         );
+    }
+
+    #[test]
+    fn derived_claim_rejects_unknown_parent_evidence_ids() {
+        let (mut profile, _, _) = valid_profile(false);
+        profile.claims[0].evidence.evidence_class = EvidenceClassV1::Derived;
+        profile.claims[0].evidence.parent_evidence_ids = vec!["not-in-profile".into()];
+        profile.claims[0].evidence.transformation_id = Some("range-transform-v1".into());
+        let report = validate_instrument_capability_evidence_v1(&profile);
+        assert!(report.issues.iter().any(|issue| {
+            issue.code == CapabilityEvidenceIssueCodeV1::UnknownDerivedParent
+        }));
+    }
+
+    #[test]
+    fn asset_scope_requires_exact_renderer_and_patch() {
+        let mut invalid = performance_scope();
+        invalid.asset_sha256 = Some(sha('a'));
+        assert!(!validate_scope(&invalid));
     }
 
     #[test]
