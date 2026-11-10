@@ -891,7 +891,7 @@ mod tests {
         let scalar = evaluate_mission(&input).unwrap();
         let mapped = evaluate_mission_characterized(&input, &characterization).unwrap();
 
-        assert_eq!(mapped.model_version, "electric-fixed-wing-energy-v0.2.0");
+        assert_eq!(mapped.model_version, "electric-fixed-wing-energy-v0.3.0");
         assert_eq!(
             mapped.characterization_evidence_ids,
             vec!["inverter-evidence", "motor-evidence", "propeller-evidence"]
