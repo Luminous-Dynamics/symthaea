@@ -154,7 +154,9 @@
         "protocol_ref",
         "protocol_digest",
         "calibration_digest",
-        "domain_scope_digest"
+        "domain_scope_digest",
+        "calibration_evidence_class",
+        "domain_scope_evidence_class"
       ],
       "properties": {
         "model_ref": {
@@ -210,6 +212,26 @@
         "domain_scope_digest": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "calibration_evidence_class": {
+          "enum": [
+            "reference_test_measurement",
+            "derived_estimate",
+            "model_prediction",
+            "simulation_output",
+            "synthetic_fixture",
+            "vendor_claim"
+          ]
+        },
+        "domain_scope_evidence_class": {
+          "enum": [
+            "reference_test_measurement",
+            "derived_estimate",
+            "model_prediction",
+            "simulation_output",
+            "synthetic_fixture",
+            "vendor_claim"
+          ]
         }
       }
     },
@@ -220,7 +242,8 @@
         "direction",
         "duration_s",
         "ambient_temperature_upper_c",
-        "ambient_evidence_digest"
+        "ambient_evidence_digest",
+        "ambient_evidence_class"
       ],
       "properties": {
         "direction": {
@@ -237,6 +260,16 @@
         "ambient_evidence_digest": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "ambient_evidence_class": {
+          "enum": [
+            "reference_test_measurement",
+            "derived_estimate",
+            "model_prediction",
+            "simulation_output",
+            "synthetic_fixture",
+            "vendor_claim"
+          ]
         }
       }
     },
@@ -274,7 +307,9 @@
           "thermal_evidence_digest",
           "thermal_evidence_class",
           "maximum_temperature_lower_c",
-          "cell_configuration_digest"
+          "cell_configuration_digest",
+          "voltage_limit_evidence_class",
+          "current_limit_evidence_class"
         ],
         "properties": {
           "cell_ref": {
@@ -418,6 +453,26 @@
           },
           "temperature_estimate_c": {
             "type": "number"
+          },
+          "voltage_limit_evidence_class": {
+            "enum": [
+              "reference_test_measurement",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          },
+          "current_limit_evidence_class": {
+            "enum": [
+              "reference_test_measurement",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
           }
         }
       }
