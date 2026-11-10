@@ -44,6 +44,7 @@ fn run_case(
         baseline_model_digest: "a".repeat(64),
         candidate_model_digest: "b".repeat(64),
         evaluation_protocol_digest: "c".repeat(64),
+        confirmatory_shard_digest: "e".repeat(64),
         confirmatory_episode_manifest_digest: plan.confirmatory_episode_manifest_digest(),
         precondition_gate_digest: "d".repeat(64),
         maximum_total_observations: plan.maximum_total_observations(),

@@ -205,6 +205,8 @@ pub struct FamilyGuardrailBinding {
     pub candidate_model_digest: String,
     /// Frozen task, split and loss protocol digest.
     pub evaluation_protocol_digest: String,
+    /// Exact parent sequential campaign confirmatory shard digest.
+    pub confirmatory_shard_digest: String,
     /// Exact parent ConfirmatoryEpisodeManifest digest.
     pub confirmatory_episode_manifest_digest: String,
     /// Existing open-world/model-adequacy precondition digest.
@@ -410,6 +412,7 @@ impl FamilyNonInferiorityGate {
             ("baseline_model_digest", &binding.baseline_model_digest),
             ("candidate_model_digest", &binding.candidate_model_digest),
             ("evaluation_protocol_digest", &binding.evaluation_protocol_digest),
+            ("confirmatory_shard_digest", &binding.confirmatory_shard_digest),
             ("confirmatory_episode_manifest_digest", &binding.confirmatory_episode_manifest_digest),
             ("precondition_gate_digest", &binding.precondition_gate_digest),
         ] {
@@ -656,6 +659,7 @@ pub fn validate_family_guardrail_report(
         || !is_lowercase_hex_digest(&report.binding.baseline_model_digest)
         || !is_lowercase_hex_digest(&report.binding.candidate_model_digest)
         || !is_lowercase_hex_digest(&report.binding.evaluation_protocol_digest)
+        || !is_lowercase_hex_digest(&report.binding.confirmatory_shard_digest)
         || !is_lowercase_hex_digest(&report.binding.confirmatory_episode_manifest_digest)
         || !is_lowercase_hex_digest(&report.binding.precondition_gate_digest)
         || !is_lowercase_hex_digest(&report.observation_stream_digest)
@@ -803,16 +807,38 @@ pub fn validate_family_guardrail_report(
 /// ledger and immutable candidate session. A content digest is not a signature.
 pub fn validate_family_guardrail_report_for_candidate(
     report: &FamilyGuardrailReport,
+    plan: &FamilyGuardrailPlan,
+    observations: &[FamilyGuardrailObservation],
     expected_binding: &FamilyGuardrailBinding,
     expected_candidate_index: u64,
-    expected_plan_digest: &str,
 ) -> Result<(), FamilyGuardrailError> {
     validate_family_guardrail_report(report)?;
+    plan.validate()?;
     if report.binding != *expected_binding
         || report.candidate_index != expected_candidate_index
-        || report.plan_digest != expected_plan_digest
+        || report.plan_digest != plan.plan_digest()
+        || expected_binding.confirmatory_episode_manifest_digest
+            != plan.confirmatory_episode_manifest_digest()
+        || expected_binding.maximum_total_observations != plan.maximum_total_observations()
     {
         return Err(FamilyGuardrailError::ReportBindingMismatch);
+    }
+
+    // Replay the ordered raw paired observations through a fresh collector.
+    // The independent verifier must still authenticate the source records and
+    // independently check the statistical implementation.
+    let mut replay = FamilyNonInferiorityGate::new(
+        plan.clone(),
+        report.campaign_alpha,
+        expected_candidate_index,
+        expected_binding.clone(),
+    )?;
+    let mut replayed_report = replay.report()?;
+    for observation in observations {
+        replayed_report = replay.observe(observation.clone())?;
+    }
+    if replayed_report != *report {
+        return Err(FamilyGuardrailError::ReportDigestMismatch);
     }
     Ok(())
 }
@@ -905,6 +931,7 @@ mod tests {
             baseline_model_digest: "a".repeat(64),
             candidate_model_digest: "b".repeat(64),
             evaluation_protocol_digest: "c".repeat(64),
+            confirmatory_shard_digest: "e".repeat(64),
             confirmatory_episode_manifest_digest: plan.confirmatory_episode_manifest_digest(),
             precondition_gate_digest: "d".repeat(64),
             maximum_total_observations: plan.maximum_total_observations(),
@@ -1173,9 +1200,8 @@ mod tests {
     fn family_report_must_match_the_exact_external_candidate_binding() {
         let plan = plan();
         let expected_binding = test_binding(&plan);
-        let plan_digest = plan.plan_digest().to_owned();
         let gate = FamilyNonInferiorityGate::new(
-            plan,
+            plan.clone(),
             0.05,
             1,
             expected_binding.clone(),
@@ -1184,18 +1210,20 @@ mod tests {
         let report = gate.report().unwrap();
         validate_family_guardrail_report_for_candidate(
             &report,
+            &plan,
+            &[],
             &expected_binding,
             1,
-            &plan_digest,
         )
         .unwrap();
 
         assert!(matches!(
             validate_family_guardrail_report_for_candidate(
                 &report,
+                &plan,
+                &[],
                 &expected_binding,
-                2,
-                &plan_digest
+                2
             ),
             Err(FamilyGuardrailError::ReportBindingMismatch)
         ));
@@ -1204,11 +1232,56 @@ mod tests {
         assert!(matches!(
             validate_family_guardrail_report_for_candidate(
                 &report,
+                &plan,
+                &[],
                 &wrong_binding,
-                1,
-                &plan_digest
+                1
             ),
             Err(FamilyGuardrailError::ReportBindingMismatch)
+        ));
+    }
+
+    #[test]
+    fn raw_family_observations_must_replay_the_exact_report() {
+        let plan = plan();
+        let binding = test_binding(&plan);
+        let observation = FamilyGuardrailObservation {
+            episode_id: "family-a-episode-0000".to_owned(),
+            family_id: "family-a".to_owned(),
+            baseline_loss: 0.8,
+            candidate_loss: 0.6,
+        };
+        let mut gate = FamilyNonInferiorityGate::new(
+            plan.clone(),
+            0.05,
+            1,
+            binding.clone(),
+        )
+        .unwrap();
+        let report = gate.observe(observation.clone()).unwrap();
+
+        validate_family_guardrail_report_for_candidate(
+            &report,
+            &plan,
+            &[observation.clone()],
+            &binding,
+            1,
+        )
+        .unwrap();
+
+        let tampered_observation = FamilyGuardrailObservation {
+            candidate_loss: 0.7,
+            ..observation
+        };
+        assert!(matches!(
+            validate_family_guardrail_report_for_candidate(
+                &report,
+                &plan,
+                &[tampered_observation],
+                &binding,
+                1
+            ),
+            Err(FamilyGuardrailError::ReportDigestMismatch)
         ));
     }
 

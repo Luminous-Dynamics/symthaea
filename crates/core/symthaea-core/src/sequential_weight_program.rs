@@ -13,6 +13,10 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::family_noninferiority::{
+    FamilyGuardrailObservation, FamilyGuardrailPlan, FamilyGuardrailReport,
+    FamilyGuardrailStatus, validate_family_guardrail_report_for_candidate,
+};
 use crate::sequential_weight_verification::{
     SequentialWeightVerificationError, SequentialWeightVerificationReport,
     validate_qualified_report,
@@ -105,6 +109,8 @@ pub struct SequentialStepReceipt {
     pub precondition_gate_digest: String,
     /// Anytime-valid paired-loss report bound into the signed verifier claims.
     pub statistical_verification_report_digest: String,
+    /// Simultaneous family non-inferiority report bound into the signed verifier claims.
+    pub family_guardrail_report_digest: String,
     pub previous_step_receipt_digest: Option<String>,
     pub cumulative_l2_path_after: f64,
     pub cumulative_parameter_change_events_after: usize,
@@ -138,6 +144,8 @@ pub struct SequentialVerifierAttestationClaims {
     pub precondition_gate_digest: String,
     /// Qualified anytime-valid paired-loss report digest.
     pub statistical_verification_report_digest: String,
+    /// Qualified simultaneous task-family non-inferiority report digest.
+    pub family_guardrail_report_digest: String,
     /// False is a signed rejection. A verifier must never sign true before all
     /// required tests and negative controls have completed.
     pub accepted: bool,
@@ -151,6 +159,7 @@ pub struct SequentialVerifierAttestationClaims {
 pub struct SequentialVerifierEvidenceBinding {
     precondition_gate_digest: String,
     statistical_verification_report_digest: String,
+    family_guardrail_report_digest: String,
 }
 
 impl SequentialVerifierEvidenceBinding {
@@ -163,6 +172,11 @@ impl SequentialVerifierEvidenceBinding {
     pub fn statistical_verification_report_digest(&self) -> &str {
         &self.statistical_verification_report_digest
     }
+
+    /// Digest of the family-level non-inferiority report required for acceptance.
+    pub fn family_guardrail_report_digest(&self) -> &str {
+        &self.family_guardrail_report_digest
+    }
 }
 
 /// Validate and bind a statistical report to the exact sequential edit candidate.
@@ -174,6 +188,9 @@ pub fn bind_sequential_verification_evidence(
     session: &SequentialEditSession,
     candidate_native_model_digest: &str,
     report: &SequentialWeightVerificationReport,
+    family_plan: &FamilyGuardrailPlan,
+    family_report: &FamilyGuardrailReport,
+    family_observations: &[FamilyGuardrailObservation],
 ) -> Result<SequentialVerifierEvidenceBinding, SequentialWeightProgramError> {
     validate_qualified_report(report)?;
     validate_digest(candidate_native_model_digest)?;
@@ -188,9 +205,43 @@ pub fn bind_sequential_verification_evidence(
         ));
     }
     validate_digest(&report.binding.precondition_gate_digest)?;
+
+    family_plan
+        .validate()
+        .map_err(|_| SequentialWeightProgramError::FamilyGuardrailEvidenceMismatch)?;
+    if family_report.status != FamilyGuardrailStatus::AllFamiliesNonInferior
+        || family_report.candidate_index != report.binding.candidate_index
+        || (family_report.campaign_alpha - report.config.campaign_alpha).abs() > 1e-12
+        || family_plan.confirmatory_episode_manifest_digest()
+            != report.binding.confirmatory_episode_manifest_digest
+    {
+        return Err(SequentialWeightProgramError::FamilyGuardrailEvidenceMismatch);
+    }
+    let expected_family_binding = crate::family_noninferiority::FamilyGuardrailBinding {
+        baseline_model_digest: session.latest_candidate_model_digest.clone(),
+        candidate_model_digest: candidate_native_model_digest.to_owned(),
+        evaluation_protocol_digest: report.binding.evaluation_protocol_digest.clone(),
+        confirmatory_shard_digest: report.binding.confirmatory_shard_digest.clone(),
+        confirmatory_episode_manifest_digest: report
+            .binding
+            .confirmatory_episode_manifest_digest
+            .clone(),
+        precondition_gate_digest: report.binding.precondition_gate_digest.clone(),
+        maximum_total_observations: family_plan.maximum_total_observations(),
+    };
+    validate_family_guardrail_report_for_candidate(
+        family_report,
+        family_plan,
+        family_observations,
+        &expected_family_binding,
+        report.binding.candidate_index,
+    )
+    .map_err(|_| SequentialWeightProgramError::FamilyGuardrailEvidenceMismatch)?;
+
     Ok(SequentialVerifierEvidenceBinding {
         precondition_gate_digest: report.binding.precondition_gate_digest.clone(),
         statistical_verification_report_digest: report.report_digest.clone(),
+        family_guardrail_report_digest: family_report.report_digest.clone(),
     })
 }
 
@@ -210,7 +261,7 @@ pub fn sequential_verifier_attestation_message(
         SequentialWeightProgramError::InvalidDigest("verifier claims serialization")
     })?;
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-sequential-verifier-attestation-v2\0");
+    hasher.update(b"symthaea-sequential-verifier-attestation-v3\0");
     hasher.update(&(encoded.len() as u64).to_le_bytes());
     hasher.update(&encoded);
     Ok(*hasher.finalize().as_bytes())
@@ -266,6 +317,8 @@ pub enum SequentialWeightProgramError {
     StatisticalEvidenceMismatch(&'static str),
     #[error(transparent)]
     StatisticalVerification(#[from] SequentialWeightVerificationError),
+    #[error("family non-inferiority evidence is missing, regressed, or bound to a different candidate")]
+    FamilyGuardrailEvidenceMismatch,
     #[error("cumulative L2 edit path exceeds the session budget")]
     CumulativeL2BudgetExceeded,
     #[error("cumulative parameter-change events exceed the session budget")]
@@ -421,7 +474,7 @@ pub fn accept_verified_sequential_candidate(
     }
     validate_digest(candidate_native_model_digest)?;
     let claims = &attestation.claims;
-    if claims.format_version != 2 {
+    if claims.format_version != 3 {
         return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
             "format_version",
         ));
@@ -468,6 +521,10 @@ pub fn accept_verified_sequential_candidate(
         (
             "statistical_verification_report_digest",
             claims.statistical_verification_report_digest.as_str(),
+        ),
+        (
+            "family_guardrail_report_digest",
+            claims.family_guardrail_report_digest.as_str(),
         ),
     ] {
         validate_digest(value)?;
@@ -550,6 +607,11 @@ pub fn accept_verified_sequential_candidate(
             claims.statistical_verification_report_digest.as_str(),
             evidence_binding.statistical_verification_report_digest(),
         ),
+        (
+            "family_guardrail_report_digest",
+            claims.family_guardrail_report_digest.as_str(),
+            evidence_binding.family_guardrail_report_digest(),
+        ),
     ] {
         if actual != expected {
             return Err(SequentialWeightProgramError::VerifierAttestationMismatch(
@@ -567,7 +629,7 @@ pub fn accept_verified_sequential_candidate(
         return Err(SequentialWeightProgramError::VerifierRejectedCandidate);
     }
     let verifier_receipt_digest =
-        hash_value(b"symthaea-sequential-verifier-envelope-v2\0", attestation)?;
+        hash_value(b"symthaea-sequential-verifier-envelope-v3\0", attestation)?;
     if candidate_native_model_digest == session.latest_candidate_model_digest {
         return Err(SequentialWeightProgramError::InvalidCandidateNativeDigest);
     }
@@ -600,7 +662,7 @@ pub fn accept_verified_sequential_candidate(
         .push(prepared.batch.evidence_batch_digest.clone());
 
     let mut receipt = SequentialStepReceipt {
-        format_version: 2,
+        format_version: 3,
         session_id: session.session_id.clone(),
         batch_index: prepared.batch.batch_index,
         template_digest: session.template_digest.clone(),
@@ -618,6 +680,7 @@ pub fn accept_verified_sequential_candidate(
         statistical_verification_report_digest: claims
             .statistical_verification_report_digest
             .clone(),
+        family_guardrail_report_digest: claims.family_guardrail_report_digest.clone(),
         previous_step_receipt_digest: session.previous_step_receipt_digest.clone(),
         cumulative_l2_path_after: cumulative_l2_path,
         cumulative_parameter_change_events_after: cumulative_parameter_change_events,
@@ -735,7 +798,7 @@ fn step_receipt_digest(
 ) -> Result<String, SequentialWeightProgramError> {
     let mut unsigned = receipt.clone();
     unsigned.step_receipt_digest.clear();
-    hash_value(b"symthaea-sequential-step-receipt-v2\0", &unsigned)
+    hash_value(b"symthaea-sequential-step-receipt-v3\0", &unsigned)
 }
 
 fn hash_value<T: Serialize>(
@@ -781,6 +844,10 @@ mod tests {
         session: &SequentialEditSession,
         candidate_native_model_digest: &str,
     ) -> SequentialVerifierEvidenceBinding {
+        use crate::family_noninferiority::{
+            FamilyGuardrailBinding, FamilyGuardrailObservation, FamilyGuardrailPlan,
+            FamilyGuardrailSpec, FamilyNonInferiorityGate,
+        };
         use crate::sequential_weight_verification::{
             ConfirmatoryEpisodeManifest, PairedLossObservation,
             SequentialWeightVerificationCampaign, SequentialWeightVerificationConfig,
@@ -795,10 +862,11 @@ mod tests {
             digest('8'),
         )
         .expect("valid statistical campaign");
+        let episode_ids = (0..600)
+            .map(|index| format!("confirmatory-{index}"))
+            .collect::<Vec<_>>();
         let confirmatory_episode_manifest = ConfirmatoryEpisodeManifest::new(
-            (0..600)
-                .map(|index| format!("confirmatory-{index}"))
-                .collect(),
+            episode_ids.clone(),
         )
         .expect("valid confirmatory episode manifest");
         let mut verifier = campaign
@@ -810,21 +878,78 @@ mod tests {
                 digest('5'),
             )
             .expect("fresh statistical candidate");
+
+        let family_plan = FamilyGuardrailPlan::new(vec![FamilyGuardrailSpec {
+            family_id: "all-protected-tasks".to_owned(),
+            non_inferiority_margin: 0.05,
+            minimum_observations: 2,
+            maximum_observations: 600,
+            episode_ids,
+        }])
+        .expect("valid family plan");
+        let family_binding = FamilyGuardrailBinding {
+            baseline_model_digest: session.latest_candidate_model_digest.clone(),
+            candidate_model_digest: candidate_native_model_digest.to_owned(),
+            evaluation_protocol_digest: digest('8'),
+            confirmatory_shard_digest: digest('6'),
+            confirmatory_episode_manifest_digest: family_plan
+                .confirmatory_episode_manifest_digest(),
+            precondition_gate_digest: digest('5'),
+            maximum_total_observations: family_plan.maximum_total_observations(),
+        };
+        let mut family_gate = FamilyNonInferiorityGate::new(
+            family_plan.clone(),
+            0.05,
+            1,
+            family_binding,
+        )
+        .expect("valid family non-inferiority gate");
+
         let mut report = verifier.report().expect("initial statistical report");
+        let mut family_report = family_gate.report().expect("initial family report");
+        let mut family_observations = Vec::new();
         for index in 0..600 {
+            let baseline_loss = 0.9;
+            let candidate_loss = 0.5;
             report = verifier
                 .observe(PairedLossObservation {
                     episode_id: format!("confirmatory-{index}"),
-                    baseline_loss: 0.9,
-                    candidate_loss: 0.5,
+                    baseline_loss,
+                    candidate_loss,
                 })
                 .expect("paired confirmatory observation");
-            if report.status == crate::sequential_weight_verification::SequentialWeightVerificationStatus::BenefitEstablished {
+            if !family_gate.is_terminal() {
+                let family_observation = FamilyGuardrailObservation {
+                    episode_id: format!("confirmatory-{index}"),
+                    family_id: "all-protected-tasks".to_owned(),
+                    baseline_loss,
+                    candidate_loss,
+                };
+                family_observations.push(family_observation.clone());
+                family_report = family_gate
+                    .observe(family_observation)
+                    .expect("paired family guardrail observation");
+            }
+            if report.status
+                == crate::sequential_weight_verification::SequentialWeightVerificationStatus::BenefitEstablished
+                && family_report.status == crate::family_noninferiority::FamilyGuardrailStatus::AllFamiliesNonInferior
+            {
                 break;
             }
         }
-        bind_sequential_verification_evidence(session, candidate_native_model_digest, &report)
-            .expect("statistical report bound to sequential edit candidate")
+        assert_eq!(
+            family_report.status,
+            crate::family_noninferiority::FamilyGuardrailStatus::AllFamiliesNonInferior
+        );
+        bind_sequential_verification_evidence(
+            session,
+            candidate_native_model_digest,
+            &report,
+            &family_plan,
+            &family_report,
+            &family_observations,
+        )
+        .expect("statistical and family reports bound to sequential edit candidate")
     }
 
     fn signed_attestation(
@@ -836,7 +961,7 @@ mod tests {
         signing_key: &SigningKey,
     ) -> SignedSequentialVerifierAttestation {
         let claims = SequentialVerifierAttestationClaims {
-            format_version: 2,
+            format_version: 3,
             verifier_id: "independent-test-verifier".into(),
             verification_protocol_digest: digest('8'),
             result_manifest_digest: digest('7'),
@@ -853,6 +978,9 @@ mod tests {
             precondition_gate_digest: evidence_binding.precondition_gate_digest().to_owned(),
             statistical_verification_report_digest: evidence_binding
                 .statistical_verification_report_digest()
+                .to_owned(),
+            family_guardrail_report_digest: evidence_binding
+                .family_guardrail_report_digest()
                 .to_owned(),
             accepted,
         };
@@ -993,6 +1121,12 @@ mod tests {
         assert_eq!(receipt.result_manifest_digest, digest('7'));
         assert_eq!(receipt.precondition_gate_digest, digest('5'));
         assert!(validate_digest(&receipt.statistical_verification_report_digest).is_ok());
+        assert!(validate_digest(&receipt.family_guardrail_report_digest).is_ok());
+        assert_eq!(
+            receipt.family_guardrail_report_digest,
+            evidence_binding.family_guardrail_report_digest()
+        );
+        assert_eq!(receipt.format_version, 3);
         assert_eq!(advanced.next_batch_index, 1);
         assert_eq!(advanced.latest_candidate_model_digest, digest('9'));
         assert_eq!(receipt.parent_candidate_model_digest, base.model_digest);
@@ -1214,6 +1348,26 @@ mod tests {
             ),
             Err(SequentialWeightProgramError::VerifierAttestationMismatch(
                 "statistical_verification_report_digest"
+            ))
+        ));
+
+        let mut wrong_family_guardrail = correctly_bound.clone();
+        wrong_family_guardrail.claims.family_guardrail_report_digest = digest('2');
+        let message = sequential_verifier_attestation_message(&wrong_family_guardrail.claims)
+            .expect("message for re-signed mismatched family guardrail");
+        wrong_family_guardrail.signature = signing_key.sign(&message).to_bytes().to_vec();
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &prepared,
+                &digest('9'),
+                &evidence_binding,
+                &wrong_family_guardrail,
+                &pinned_key,
+            ),
+            Err(SequentialWeightProgramError::VerifierAttestationMismatch(
+                "family_guardrail_report_digest"
             ))
         ));
 
