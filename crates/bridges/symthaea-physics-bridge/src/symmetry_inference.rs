@@ -2009,6 +2009,40 @@ mod tests {
             (base_residual - transformed_residual).abs() < 1e-24,
             "metric-aware residual changed under basis transform: {base_residual} vs {transformed_residual}"
         );
+
+        // Repeat the metamorphic comparison for a non-invariant quadratic:
+        // x² + 2y² transforms to X² - 2XY + 3Y².
+        let base_anisotropic = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
+        let transformed_anisotropic = sub(
+            add(pow2("X"), mul(Expr::Const(3.0), pow2("Y"))),
+            mul(Expr::Const(2.0), mul(var("X"), var("Y"))),
+        );
+        let base_negative = evaluate_metric_aware_linear_action_samples(
+            &base_anisotropic,
+            &metric_aware_so2_action(),
+            &base_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        let transformed_negative = evaluate_metric_aware_linear_action_samples(
+            &transformed_anisotropic,
+            &transformed_action,
+            &transformed_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert!(!base_negative.invariant_under_every_generator());
+        assert!(!transformed_negative.invariant_under_every_generator());
+        let base_negative_residual =
+            base_negative.generator_results[0].maximum_squared_residual;
+        let transformed_negative_residual =
+            transformed_negative.generator_results[0].maximum_squared_residual;
+        assert!(
+            (base_negative_residual - transformed_negative_residual).abs() < 1e-12,
+            "negative-control residual changed under basis transform: {base_negative_residual} vs {transformed_negative_residual}"
+        );
     }
 
     #[test]
