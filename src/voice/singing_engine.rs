@@ -1557,7 +1557,7 @@ mod tests {
             },
             Note {
                 frequency: 440.0,
-                start_time: 1.0,
+                start_time: 0.5,
                 duration: 0.5,
                 velocity: 0.7,
             },
@@ -1574,11 +1574,11 @@ mod tests {
         let second_phrase_onset = performance
             .pitch_curve
             .iter()
-            .find(|point| (point.time_s - 1.0).abs() < 1e-6)
+            .find(|point| (point.time_s - 0.5).abs() < 1e-6)
             .expect("second phrase onset must be represented in the pitch curve");
         assert_eq!(second_phrase_onset.frequency_hz, 440.0);
         assert_eq!(
-            performance.target_pitch_center_at(1.0),
+            performance.target_pitch_center_at(0.5),
             Some(440.0),
             "the canonical renderer/evaluator target must also reset at a phrase boundary"
         );
