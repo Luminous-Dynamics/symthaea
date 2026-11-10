@@ -155,7 +155,11 @@ ISO 15016:2025 describes an accepted speed/power-trial assessment procedure for 
 
 Du et al. (Applied Sciences, 15 May 2026, 16(10), 4940; DOI 10.3390/app16104940) describe an 8,000-DWT coastal general-cargo case with 14-knot service speed, 110 m LOA, 104 m Lpp, 18 m beam and 7 m design draft.
 
-Their optimized diesel-generator/DC-bus/motor/lithium-ion configuration reports approximately 19% fuel reduction, 20% CO2 reduction and 14% lifecycle-cost reduction relative to that study's mechanical baseline. The paper uses multi-year AIS/logbook-derived profiles, a degradation-aware ESS model and bi-level sizing plus dynamic-programming energy management. It also reports route-pattern differences and battery-life sensitivity.
+Their optimized diesel-generator/DC-bus/motor/lithium-ion configuration reports approximately 19% fuel reduction, 20% CO2 reduction and 14% lifecycle-cost reduction relative to that study's mechanical baseline. The reported route-pattern range is 16–21% fuel reduction, 17–20% CO2 reduction and 8–14% lifecycle-cost reduction. These numbers are specific to the coastal vessel, route profiles, components and model boundary.
+
+The study uses 24 months of AIS records from 2021–2022, reports more than 120 complete voyages and an average original sampling interval of 3 minutes, then extracts five statistically representative profiles for optimization. Gaps longer than 15 minutes are repaired using linear interpolation or speed extrapolation. The paper states that its supporting data and code are available from the corresponding author upon reasonable request, rather than providing a public raw-data download.
+
+Its lower-level DP controller assumes perfect knowledge of each voyage's future power profile. That is an offline design upper bound, not a deployable controller. The paper also identifies simplified resistance/propulsion modelling, incomplete hull-fouling/extreme-weather/manoeuvring representation, and laboratory-derived stationary battery cycle-life surfaces with pack-level scaling assumptions. These limitations define the next benchmark opportunity: test realistic forecast-based operation, held-out voyages/seasons, data-gap handling, power-model uncertainty and degradation transfer without claiming the source study is invalid.
 
 Treat this as a separate coastal replication case:
 1. transcribe published vessel, service, cost, component and policy assumptions with table/equation references;
@@ -163,7 +167,8 @@ Treat this as a separate coastal replication case:
 3. independently reproduce rounded tables and route-specific comparisons;
 4. disclose unavailable AIS/logbook inputs and undocumented parameters;
 5. test fuel price, battery cost, ageing, replacement and forecast-knowledge sensitivity;
-6. do not claim exact replication if source time series, component maps or controller inputs are unavailable.
+6. do not claim exact replication if source time series, component maps or controller inputs are unavailable;
+7. score any online controller against perfect-foresight DP as an upper bound, not as its operational baseline.
 
 The published 16–21% range belongs to this vessel, route and method. It is not a prediction for a deep-sea cargo ship or WAPS-equipped hull.
 
@@ -235,7 +240,43 @@ Do not add these concepts as undocumented JSON extensions. Evolve the schema wit
 8. Plan model/bench/sea trials with qualified naval architect, operator, test facility and class/flag stakeholders.
 9. Publish only the claim level supported by evidence: contract, published reproduction, solver V&V, controlled physical trial, in-service evidence or fleet transfer.
 
-## 14. Sources
+## 14. Fleet-level, reversible and cyber-physical design extensions
+
+### 14.1 Optimize the fleet's contracted service
+
+A single-vessel design can be an energy winner and still make the shipping service worse. Extend the unit of optimization from one hull to the fleet delivering a fixed annual service. Co-optimize vessel assignment, route rotations, speed schedules, port calls, berth windows, reserve capacity, maintenance slots and cargo allocation.
+
+Compare alternatives against the same annual delivered tonne-nautical-mile or TEU-nautical-mile, service windows and reliability. Include fleet size, repositioning, idle/anchorage time, cargo utilization, reserve vessels, port constraints and total fleet lifecycle cost. A slower ship that requires an extra vessel is not automatically more efficient. A faster or larger ship that cannot use available berths or cargo demand is not automatically better.
+
+A fleet-level result must retain vessel-level failure distributions and must not hide a weak ship behind a fleet average. Report both annual fleet service and per-vessel/route slices.
+
+### 14.2 Design a reversible energy platform, not a single-fuel bet
+
+Deep-sea vessel lives are long, while fuel availability, carbon pricing, port infrastructure, energy technology and regulations can change. Investigate modular, upgradeable interfaces for wind devices, shaft/PTO/PTI equipment, DC distribution, batteries and fuel systems.
+
+Candidate design options include standardized mechanical/electrical interfaces, accessible modular converter/generator bays, provisions for replaceable storage modules, serviceable WAPS foundations and stowage, and reserved mass/volume/structural margins. The design should permit staged retrofits without assuming that every future technology will be installed.
+
+Evaluate the option value against the actual cost of readiness: structural reinforcement, unused volume, mass, capital, maintenance complexity, shipyard time, downtime and lost cargo work. "Future-ready" provisions receive no free credit unless their future avoided cost and deployment probability are explicit.
+
+### 14.3 Make causal counterfactuals part of the ship's evidence thread
+
+A before/after fuel comparison is especially weak when route, loading, sea state, wind, speed, fouling, trim and machinery condition all change. Pre-register a matched-voyage protocol and record the service fingerprint and configuration revision for every segment.
+
+Where safe and operationally permitted, compare WAPS enabled/feathered states or controller policies under matched conditions. Otherwise use a declared counterfactual model with independently assessed error and uncertainty. Preserve raw traces, exclusions, calibration, clock alignment and environmental corrections. Separate measured effects from model-adjusted estimates; hold out voyages, seasons or route blocks before scoring.
+
+The counterfactual engine should emit the reason a segment is ineligible rather than fill gaps with nearest timestamps or silent interpolation. This becomes a key differentiator from a generic digital twin: the result is not merely a simulated alternative but a reproducible, bounded causal claim.
+
+### 14.4 Treat cyber resilience as an operational design constraint
+
+WAPS controls, battery-management systems, propulsion/power controls, route and forecast feeds, onboard sensors, telemetry and remote maintenance are coupled cyber-physical surfaces. Cyber failure can become loss of propulsion availability, unsafe device state, invalid measurement, loss of reserve policy or degraded manoeuvring.
+
+Evaluate local safe operation without cloud/shore connectivity, segmentation of bridge/machinery/energy/WAPS/corporate networks, least privilege, authenticated command paths, signed software/configuration updates, rollback, local interlocks, deterministic fallback and manual crew override. A research optimizer or shore-side fleet service must remain advisory; it must not bypass local safety interlocks or issue unqualified actuator commands.
+
+Include stale/forged wind or shaft data, GNSS/AIS anomalies, timebase drift, telemetry replay, forecast compromise, converter/BMS communication loss, remote-maintenance compromise, network partition and update rollback in the degraded-mode test matrix. Link cyber faults to the same service-availability and evidence dispositions as mechanical faults.
+
+Reference the current IMO Guidelines on Maritime Cyber Risk Management (MSC-FAL.1/Circ.3/Rev.4) and applicable IACS UR E26/E27 requirements. Applicability depends on vessel type, size, build contract, class, flag and equipment; this research document is not a compliance assessment or approval.
+
+## 15. Sources
 
 - Liu et al., 2026 wind-propelled ship deployment and technology review, International Journal of Naval Architecture and Ocean Engineering 18, 100785. https://doi.org/10.1016/j.ijnaoe.2026.100785
 - DLR, Odyssa / future-oriented ship design. https://www.dlr.de/en/ms/research-transfer/topics/design-and-optimization-of-future-oriented-ships
@@ -247,6 +288,6 @@ Do not add these concepts as undocumented JSON extensions. Evolve the schema wit
 - IMO MSC 111, 13–22 May 2026. https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-msc-111.aspx
 - IMO SDC 12 safety-framework work plan, 19–23 January 2026. https://www.imo.org/en/mediacentre/meetingsummaries/pages/sdc-12.aspx
 
-## 15. Claim ceiling
+## 16. Claim ceiling
 
 A route-policy experiment is not proof of safe autonomous navigation. A model reproduction is not a vessel trial. A schema or validator pass is not sensor authentication or physical qualification. A one-ship result does not establish fleet transfer. Every conclusion must identify vessel, configuration, service contract, route, season, operating envelope, dataset, models, source rights, uncertainty, trial stage and excluded conditions.
