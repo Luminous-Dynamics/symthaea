@@ -57,6 +57,8 @@ pub mod live;
 pub mod melodic_contour_identity;
 pub mod meter;
 pub mod material_lineage;
+pub mod ensemble_relations;
+pub mod relation_material_crosscheck;
 pub mod modal_arc;
 pub mod motif;
 pub mod motif_family;
