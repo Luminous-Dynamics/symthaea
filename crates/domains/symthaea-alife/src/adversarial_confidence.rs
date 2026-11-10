@@ -280,7 +280,7 @@ mod tests {
 
     impl ConfidenceModel for OneSymbolAttractor {
         fn confidence(&self, candidate: &[u8]) -> Result<f64, String> {
-            Ok(if candidate == [1] { 0.99 } else { 0.10 })
+            Ok(if candidate.len() == 1 && candidate[0] == 1 { 0.99 } else { 0.10 })
         }
     }
 
@@ -331,7 +331,7 @@ mod tests {
 
         // Ground truth is deliberately checked by a separate test-side oracle, after the
         // search. High model confidence does not imply functional replication.
-        let independently_verified_replicator = result.best_candidate == [0];
+        let independently_verified_replicator = result.best_candidate.as_slice() == [0];
         assert!(!independently_verified_replicator);
     }
 
