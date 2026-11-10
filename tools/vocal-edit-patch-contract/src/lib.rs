@@ -233,6 +233,9 @@ impl DependencyCone {
                 if !render_window.contains(target_window) {
                     return Err("render window must contain the target window".into());
                 }
+                if render_window.start_frame == 0 || render_window.end_frame == total_frames {
+                    return Err("a local render window cannot cover the whole audio stem".into());
+                }
                 if target_window.start_frame - render_window.start_frame != self.context_before_frames
                     || render_window.end_frame - target_window.end_frame != self.context_after_frames
                 {
@@ -261,6 +264,7 @@ impl DependencyCone {
 pub struct VocalEditPatch {
     pub schema_version: u32,
     pub patch_id: String,
+    pub renderer_id: String,
     pub base: ArtifactDigests,
     pub target: EditTarget,
     pub operation: VocalEditOperation,
@@ -276,6 +280,7 @@ impl VocalEditPatch {
             return Err(format!("unsupported vocal edit patch schema version {}", self.schema_version));
         }
         require_id(&self.patch_id, "patch_id")?;
+        require_id(&self.renderer_id, "renderer_id")?;
         require_id(&self.target.stable_id, "target.stable_id")?;
         require_id(&self.authorization.evidence_reference, "authorization.evidence_reference")?;
         self.base.validate()?;
@@ -332,6 +337,7 @@ pub enum RenderScope {
 #[serde(deny_unknown_fields)]
 pub struct PreservedNodeEvidence {
     pub node: EditTarget,
+    pub sample_window: FrameWindow,
     pub before_region_blake3: String,
     pub after_region_blake3: String,
     /// Exact f32 bit-pattern match fraction over this preserved region.
@@ -349,6 +355,7 @@ pub struct VocalEditReceipt {
     pub output_pronunciation_plan_blake3: String,
     pub output_score_alignment_blake3: String,
     pub output_audio_blake3: String,
+    pub output_voice_artifact_blake3: String,
     pub renderer_id: String,
     pub render_scope: RenderScope,
     pub actual_render_window: Option<FrameWindow>,
@@ -372,7 +379,23 @@ impl VocalEditReceipt {
         validate_digest(&self.output_pronunciation_plan_blake3, "output_pronunciation_plan_blake3")?;
         validate_digest(&self.output_score_alignment_blake3, "output_score_alignment_blake3")?;
         validate_digest(&self.output_audio_blake3, "output_audio_blake3")?;
+        validate_digest(&self.output_voice_artifact_blake3, "output_voice_artifact_blake3")?;
         require_id(&self.renderer_id, "renderer_id")?;
+        if self.renderer_id != patch.renderer_id {
+            return Err("receipt renderer identity differs from the requested renderer".into());
+        }
+        match &patch.operation {
+            VocalEditOperation::ReplaceVoiceArtifact { voice_artifact_blake3 } => {
+                if &self.output_voice_artifact_blake3 != voice_artifact_blake3 {
+                    return Err("receipt output voice artifact does not match the requested replacement".into());
+                }
+            }
+            _ => {
+                if self.output_voice_artifact_blake3 != patch.base.voice_artifact_blake3 {
+                    return Err("receipt changed voice artifact without a voice-replacement operation".into());
+                }
+            }
+        }
 
         if self.patch_blake3 != patch.patch_blake3()? || self.base != patch.base {
             return Err("receipt does not bind to this exact patch and base artifact set".into());
@@ -404,12 +427,28 @@ impl VocalEditReceipt {
                 for evidence in &self.preserved_nodes {
                     validate_digest(&evidence.before_region_blake3, "before_region_blake3")?;
                     validate_digest(&evidence.after_region_blake3, "after_region_blake3")?;
+                    evidence.sample_window.validate(patch.total_frames, "preserved sample window")?;
+                    if evidence.sample_window.start_frame < self.actual_render_window.unwrap().end_frame
+                        && evidence.sample_window.end_frame > self.actual_render_window.unwrap().start_frame
+                    {
+                        return Err("preserved sample window overlaps the rerender window".into());
+                    }
                     if !evidence.exact_sample_fraction.is_finite()
                         || !(0.0..=1.0).contains(&evidence.exact_sample_fraction)
                         || !evidence.rms_delta.is_finite()
                         || evidence.rms_delta < 0.0
                     {
                         return Err("preserved-region metrics are invalid".into());
+                    }
+                    if evidence.exact_sample_fraction == 1.0
+                        && evidence.before_region_blake3 != evidence.after_region_blake3
+                    {
+                        return Err("bit-exact preserved samples must have identical region digests".into());
+                    }
+                    if evidence.before_region_blake3 == evidence.after_region_blake3
+                        && evidence.exact_sample_fraction != 1.0
+                    {
+                        return Err("identical region digests require an exact sample fraction of 1".into());
                     }
                 }
             }
@@ -502,6 +541,7 @@ mod tests {
         VocalEditPatch {
             schema_version: 1,
             patch_id: "edit-word-0042".into(),
+            renderer_id: "formant-vocoder-resolved-plan-v1".into(),
             base: base(),
             target: node(EditTargetKind::Word, "word-0042"),
             operation: VocalEditOperation::SelectPronunciationCandidate {
@@ -540,12 +580,17 @@ mod tests {
             output_pronunciation_plan_blake3: DIGEST_C.into(),
             output_score_alignment_blake3: DIGEST_A.into(),
             output_audio_blake3: DIGEST_B.into(),
+            output_voice_artifact_blake3: patch.base.voice_artifact_blake3.clone(),
             renderer_id: "formant-vocoder-resolved-plan-v1".into(),
             render_scope: RenderScope::BoundedLocal,
             actual_render_window: patch.dependency_cone.render_window,
-            preserved_nodes: patch.dependency_cone.protected_nodes.iter().cloned().map(|node| {
+            preserved_nodes: patch.dependency_cone.protected_nodes.iter().cloned().enumerate().map(|(index, node)| {
                 PreservedNodeEvidence {
                     node,
+                    sample_window: FrameWindow {
+                        start_frame: 300 + index as u64 * 100,
+                        end_frame: 350 + index as u64 * 100,
+                    },
                     before_region_blake3: DIGEST_A.into(),
                     after_region_blake3: DIGEST_A.into(),
                     exact_sample_fraction: 1.0,
