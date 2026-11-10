@@ -466,7 +466,6 @@ impl CameraDrivingBridge {
         &self,
         observation: &CapturedDrivingObservation<'_>,
     ) -> Result<u64, BridgeError> {
-        self.validate_upstream_observation(observation)?;
         if observation.width == 0 || observation.height == 0 {
             return Err(BridgeError::InvalidGeometry);
         }
@@ -489,6 +488,7 @@ impl CameraDrivingBridge {
         if observation.pixels.len() != expected_len {
             return Err(BridgeError::FrameLengthMismatch);
         }
+        self.validate_upstream_observation(observation)?;
         if self.last_sequence.is_some_and(|last| observation.sequence <= last) {
             return Err(BridgeError::SequenceRegression);
         }
@@ -544,6 +544,9 @@ impl CameraDrivingBridge {
         if upstream.renderer_revision.len() > 128 {
             return Err(BridgeError::UpstreamReceiptMalformed);
         }
+        if upstream.sequence == 0 {
+            return Err(BridgeError::UpstreamSequenceMismatch);
+        }
         if upstream.episode_id != self.config.identity.episode_id
             || upstream.agent_id != self.config.identity.agent_id
             || upstream.camera_id != self.config.identity.camera_id
@@ -588,9 +591,11 @@ impl CameraDrivingBridge {
         } else if upstream
             .applied_action_receipt_id
             .as_deref()
-            .is_none_or(str::is_empty)
+            .is_none_or(|value| value.is_empty() || value.len() > MAX_ID_BYTES)
             || upstream
-                .applied_action_receipt_command_id_is_empty()
+                .applied_action_command_id
+                .as_deref()
+                .is_none_or(|value| value.is_empty() || value.len() > MAX_ID_BYTES)
             || upstream
                 .applied_action_receipt_sha256
                 .as_deref()
