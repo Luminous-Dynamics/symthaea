@@ -660,6 +660,7 @@ mod tests {
             finite_difference_step: 1e-5,
             squared_cosine_tolerance: 1e-8,
             maximum_samples: 32,
+            maximum_expression_variables: 64,
             minimum_informative_samples: 4,
             maximum_direction_basis_condition: 1e6,
         }
@@ -807,10 +808,9 @@ mod tests {
                     LinearActionSampleV1 {
                         sample_id: format!("paired-{sample_index}"),
                         state: vec![transformed_state[0], transformed_state[1]],
-                        direction_basis: (0..2)
-                            .map(|column| {
-                                vec![transform[(0, column)], transform[(1, column)]]
-                            })
+                        direction_basis: transform
+                            .column_iter()
+                            .map(|column| vec![column[0], column[1]])
                             .collect(),
                     }
                 })
