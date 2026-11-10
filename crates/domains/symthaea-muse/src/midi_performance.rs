@@ -271,6 +271,9 @@ fn validate_bindings(
         if binding.instrument_id.trim().is_empty()
             || binding.renderer_id.trim().is_empty()
             || binding.patch_id.trim().is_empty()
+            || binding.instrument_id.len() > MIDI_PERFORMANCE_MAX_TEXT_BYTES_V1
+            || binding.renderer_id.len() > MIDI_PERFORMANCE_MAX_TEXT_BYTES_V1
+            || binding.patch_id.len() > MIDI_PERFORMANCE_MAX_TEXT_BYTES_V1
             || binding.gm_program > 127
             || binding.asset_sha256.as_ref().is_some_and(|digest| !valid_sha256_hex(digest))
         {
