@@ -515,14 +515,43 @@ fn finite_difference_gradient(
         });
     }
 
-    let mut observed = Vec::with_capacity(dimension);
-    for direction in &sample.direction_basis {
+    // Use a common scale for every plus/minus function value. The common
+    // finite-difference factor 1/(2h) and this expression scale both cancel
+    // from the gradient direction required by a cosine residual. This avoids
+    // overflowing a quotient when h is tiny or when f has a huge amplitude.
+    let mut function_pairs = Vec::with_capacity(dimension);
+    let mut expression_value_scale = 0.0_f64;
+    for (direction_index, direction) in sample.direction_basis.iter().enumerate() {
         let mut plus = sample.state.clone();
         let mut minus = sample.state.clone();
+        let mut moved = false;
         for (action_index, &variable_index) in action_coordinate_indices.iter().enumerate() {
             let displacement = profile.finite_difference_step * direction[action_index];
-            plus[variable_index] += displacement;
-            minus[variable_index] -= displacement;
+            if !displacement.is_finite() {
+                return Err(LinearActionSamplingErrorV1::NonFinitePerturbation {
+                    sample_id: sample.sample_id.clone(),
+                    direction_index,
+                    coordinate_index: action_index,
+                });
+            }
+            let plus_value = plus[variable_index] + displacement;
+            let minus_value = minus[variable_index] - displacement;
+            if !plus_value.is_finite() || !minus_value.is_finite() {
+                return Err(LinearActionSamplingErrorV1::NonFinitePerturbation {
+                    sample_id: sample.sample_id.clone(),
+                    direction_index,
+                    coordinate_index: action_index,
+                });
+            }
+            moved |= plus_value != plus[variable_index] || minus_value != minus[variable_index];
+            plus[variable_index] = plus_value;
+            minus[variable_index] = minus_value;
+        }
+        if !moved {
+            return Err(LinearActionSamplingErrorV1::ZeroDisplacementDirection {
+                sample_id: sample.sample_id.clone(),
+                direction_index,
+            });
         }
         let plus_value = evaluate_expression(expr, variable_names, &plus);
         let minus_value = evaluate_expression(expr, variable_names, &minus);
@@ -531,19 +560,38 @@ fn finite_difference_gradient(
                 sample_id: sample.sample_id.clone(),
             });
         }
-        let directional_derivative =
-            (plus_value - minus_value) / (2.0 * profile.finite_difference_step);
-        if !directional_derivative.is_finite() {
-            return Err(LinearActionSamplingErrorV1::NonFiniteExpressionEvaluation {
-                sample_id: sample.sample_id.clone(),
-            });
-        }
-        observed.push(directional_derivative / direction_scale);
+        expression_value_scale = expression_value_scale
+            .max(plus_value.abs())
+            .max(minus_value.abs());
+        function_pairs.push((plus_value, minus_value));
     }
 
-    let observed_vector = DVector::from_vec(observed);
+    let observed = if expression_value_scale == 0.0 {
+        vec![0.0_f64; dimension]
+    } else {
+        function_pairs
+            .iter()
+            .map(|(plus, minus)| {
+                0.5 * (plus / expression_value_scale - minus / expression_value_scale)
+            })
+            .collect()
+    };
+    let observed_scale = observed
+        .iter()
+        .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+    let normalized_observed: Vec<f64> = if observed_scale == 0.0 {
+        vec![0.0_f64; dimension]
+    } else {
+        observed.iter().map(|value| value / observed_scale).collect()
+    };
+
+    // The direction matrix is normalized by direction_scale and the observed
+    // directional differences are normalized by one common positive scale.
+    // The recovered vector is therefore a positive scalar multiple of df,
+    // which is exactly what the metric cosine consumes.
+    let observed_vector = DVector::from_vec(normalized_observed);
     let solution = decomposition
-        .solve(&observed_vector, f64::EPSILON * (dimension as f64))
+        .solve(&observed_vector, f64::EPSILON * dimension as f64)
         .map_err(|_| LinearActionSamplingErrorV1::GradientReconstructionFailed {
             sample_id: sample.sample_id.clone(),
         })?;
