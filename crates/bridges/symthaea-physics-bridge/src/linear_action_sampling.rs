@@ -589,14 +589,21 @@ fn finite_difference_gradient(
         function_pairs.push((plus_value, minus_value));
     }
 
-    let observed = if expression_value_scale == 0.0 {
+    // Prefer raw pair differences: subtracting first preserves small changes
+    // on top of a large common function offset. If an opposite-sign pair would
+    // overflow, fall back to the common value scaling above.
+    let raw_differences: Vec<f64> = function_pairs
+        .iter()
+        .map(|(plus, minus)| plus - minus)
+        .collect();
+    let observed = if raw_differences.iter().all(|value| value.is_finite()) {
+        raw_differences
+    } else if expression_value_scale == 0.0 {
         vec![0.0_f64; dimension]
     } else {
         function_pairs
             .iter()
-            .map(|(plus, minus)| {
-                0.5 * (plus / expression_value_scale - minus / expression_value_scale)
-            })
+            .map(|(plus, minus)| plus / expression_value_scale - minus / expression_value_scale)
             .collect()
     };
     let observed_scale = observed
