@@ -4917,6 +4917,43 @@ mod tests {
     }
 
     #[test]
+    fn transformed_coda_preserves_source_melody_harmony_and_bass_parts() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for (part, midi, role) in [
+            (PartId(81), 60u8, VoiceRole::Melody),
+            (PartId(82), 64, VoiceRole::Harmony),
+            (PartId(83), 36, VoiceRole::Bass),
+        ] {
+            score.push(ScoreNote {
+                part,
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::zero(),
+                duration: Duration::new(1, 1),
+                velocity: 0.6,
+                role,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        let coda_start = score.total_beats;
+        append_coda(
+            &mut score,
+            key,
+            4.0,
+            &MusicalIntent::default(),
+            2,
+            true,
+        );
+        let coda: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.onset.beats() >= coda_start.beats())
+            .collect();
+        assert!(coda.iter().any(|note| note.role == VoiceRole::Melody && note.part == PartId(81)));
+        assert!(coda.iter().any(|note| note.role == VoiceRole::Harmony && note.part == PartId(82)));
+        assert!(coda.iter().any(|note| note.role == VoiceRole::Bass && note.part == PartId(83)));
+    }
+
+    #[test]
     fn role_identity_helper_abstains_when_a_role_contains_multiple_parts() {
         let key = Key::major(crate::pitch::PitchClass::C);
         let mut score = Score::new(key, 100.0, 4);
