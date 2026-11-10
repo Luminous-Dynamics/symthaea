@@ -241,14 +241,20 @@ fn valid_capability_receipt(
 }
 
 fn part_demand_is_valid(demand: &VoiceDemand) -> bool {
-    demand.part_id.is_some()
+    demand.part_id.is_some_and(|part_id| part_id != u16::MAX)
         && demand.identity_basis == DemandIdentityBasis::StablePartId
         && demand.note_count > 0
         && demand.min_midi <= demand.max_midi
         && demand.max_midi <= 127
+        && demand.pitch_span_semitones == demand.max_midi - demand.min_midi
         && !demand.roles.is_empty()
+        && demand.distinct_onset_count > 0
+        && demand.distinct_onset_count <= demand.note_count
         && demand.peak_simultaneous_notes > 0
+        && demand.peak_simultaneous_notes <= demand.note_count
         && demand.mean_midi.is_finite()
+        && demand.mean_midi >= demand.min_midi as f64
+        && demand.mean_midi <= demand.max_midi as f64
         && demand.mean_note_duration_beats.is_finite()
         && demand.mean_note_duration_beats > 0.0
         && demand.first_onset_beat.is_finite()
