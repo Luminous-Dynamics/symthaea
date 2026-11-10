@@ -60,12 +60,37 @@ impl MessageChannel {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TopologyFamily {
+    DirectedChain,
+    ReciprocalStar,
+    BalancedTree,
+    CompleteDirected,
+    SparseRandomDirected,
+    StochasticBlock,
+    CorePeriphery,
+    TemporalChurn,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct GeneratorProvenance {
+    pub generator_id: String,
+    pub generator_version: String,
+    pub rng_algorithm_id: String,
+    pub rng_seed: u64,
+    pub topology_family: TopologyFamily,
+    pub parameters: BTreeMap<String, u64>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CommunicationGraphProfile {
     pub schema_version: String,
     pub profile_id: String,
     pub profile_version: String,
+    pub generator: GeneratorProvenance,
     pub nodes: Vec<AgentNode>,
     pub channels: Vec<MessageChannel>,
 }
@@ -136,6 +161,7 @@ impl std::error::Error for ValidationErrors {}
 #[derive(Clone, Debug, PartialEq)]
 pub struct CentralityProfile {
     pub metric_id: &'static str,
+    pub evaluation_round: u64,
     pub graph_sha256: String,
     pub scores: BTreeMap<AgentInstanceId, f64>,
     pub minimum_tie_set: Vec<AgentInstanceId>,
@@ -162,6 +188,12 @@ impl CommunicationGraphProfile {
         }
         if self.profile_id.trim().is_empty() || self.profile_version.trim().is_empty() {
             findings.push("profile_identity_missing".to_string());
+        }
+        if self.generator.generator_id != "communication-graph-generator"
+            || self.generator.generator_version != "0.1.0"
+            || self.generator.rng_algorithm_id != "splitmix64-v1"
+        {
+            findings.push("generator_provenance_identity_mismatch".to_string());
         }
         if self.nodes.len() < 2 {
             findings.push("minimum_two_agent_nodes_required".to_string());
@@ -384,6 +416,7 @@ impl CommunicationEventLog {
 /// arc for centrality only. Scores normalize by (n-1)(n-2).
 pub fn normalized_betweenness_v1(
     graph: &CommunicationGraphProfile,
+    evaluation_round: u64,
 ) -> Result<CentralityProfile, ValidationErrors> {
     graph.validate()?;
     let count = graph.nodes.len();
@@ -399,7 +432,9 @@ pub fn normalized_betweenness_v1(
         adjacency.insert(node.clone(), BTreeSet::new());
     }
     for channel in &graph.channels {
-        adjacency.get_mut(&channel.sender).expect("validated sender").insert(channel.recipient.clone());
+        if channel.active_at(evaluation_round) {
+            adjacency.get_mut(&channel.sender).expect("validated sender").insert(channel.recipient.clone());
+        }
     }
 
     for (sender, recipients) in &adjacency {
@@ -513,6 +548,7 @@ pub fn normalized_betweenness_v1(
 
     Ok(CentralityProfile {
         metric_id: "normalized_betweenness_v1",
+        evaluation_round,
         graph_sha256: graph.sha256()?,
         scores,
         minimum_tie_set,
@@ -552,6 +588,14 @@ mod tests {
             schema_version: GRAPH_SCHEMA_VERSION.to_string(),
             profile_id: "test-star".to_string(),
             profile_version: "0.1.0".to_string(),
+            generator: GeneratorProvenance {
+                generator_id: "communication-graph-generator".to_string(),
+                generator_version: "0.1.0".to_string(),
+                rng_algorithm_id: "splitmix64-v1".to_string(),
+                rng_seed: 0,
+                topology_family: TopologyFamily::ReciprocalStar,
+                parameters: BTreeMap::from([("node_count".to_string(), 4)]),
+            },
             nodes: vec![
                 AgentNode { agent_instance_id: id("AGENT-A"), principal_ref: Some(principal("PRINCIPAL-X")) },
                 AgentNode { agent_instance_id: id("AGENT-B"), principal_ref: Some(principal("PRINCIPAL-X")) },
@@ -781,7 +825,7 @@ mod tests {
 
     #[test]
     fn centrality_known_answer_for_reciprocal_star() {
-        let profile = normalized_betweenness_v1(&star()).unwrap();
+        let profile = normalized_betweenness_v1(&star(), 1).unwrap();
         assert_eq!(profile.selected_maximum_node, id("AGENT-A"));
         assert!((profile.scores[&id("AGENT-A")] - 1.0).abs() < CENTRALITY_EPSILON);
         for leaf in ["AGENT-B", "AGENT-C", "AGENT-D"] {
@@ -791,7 +835,7 @@ mod tests {
 
     #[test]
     fn complete_graph_has_no_distinguishable_centrality_contrast() {
-        let error = normalized_betweenness_v1(&complete_graph()).unwrap_err();
+        let error = normalized_betweenness_v1(&complete_graph(), 1).unwrap_err();
         assert!(error.findings.contains(&"centrality_has_no_distinguishable_minimum_maximum_contrast".to_string()));
     }
 
@@ -799,8 +843,18 @@ mod tests {
     fn directed_graph_without_reciprocal_arcs_is_unsupported_for_v1() {
         let mut graph = star();
         graph.channels.retain(|channel| channel.channel_id != "B-A");
-        let error = normalized_betweenness_v1(&graph).unwrap_err();
+        let error = normalized_betweenness_v1(&graph, 1).unwrap_err();
         assert!(error.findings.iter().any(|item| item.contains("centrality_requires_reciprocal_arcs")));
+    }
+
+    #[test]
+    fn temporal_centrality_uses_the_requested_round_snapshot() {
+        let mut graph = star();
+        graph.channels.iter_mut().for_each(|channel| {
+            channel.active_until_round = Some(5);
+        });
+        assert!(normalized_betweenness_v1(&graph, 1).is_ok());
+        assert!(normalized_betweenness_v1(&graph, 5).is_err());
     }
 
     #[test]
@@ -811,6 +865,6 @@ mod tests {
             channel.sender.0 != "AGENT-C" && channel.recipient.0 != "AGENT-C"
                 && channel.sender.0 != "AGENT-D" && channel.recipient.0 != "AGENT-D"
         });
-        assert!(normalized_betweenness_v1(&graph).unwrap_err().findings.contains(&"centrality_requires_at_least_three_nodes".to_string()));
+        assert!(normalized_betweenness_v1(&graph, 1).unwrap_err().findings.contains(&"centrality_requires_at_least_three_nodes".to_string()));
     }
 }
