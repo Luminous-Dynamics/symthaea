@@ -4997,6 +4997,34 @@ mod tests {
     use crate::harmony::{Progression, Tonality};
     use crate::score::VoiceRole;
 
+    #[test]
+    fn general_composer_default_route_assigns_identity_to_every_generated_note() {
+        let intent = MusicalIntent {
+            seed: 41,
+            ..MusicalIntent::default()
+        };
+        let score = compose(&intent);
+        assert!(
+            score.has_part_identity(),
+            "the default general-composer route must not discard source-authored PartIds"
+        );
+        let parts: std::collections::BTreeSet<u16> =
+            score.parts().into_iter().map(|part| part.0).collect();
+        assert!(parts.contains(&GENERAL_MELODY_PART_V1.0));
+        assert!(parts.contains(&GENERAL_BASS_PART_V1.0));
+        assert!(parts.contains(&GENERAL_HARMONY_PART_V1.0));
+        assert!(
+            score.notes.iter().all(|note| match note.role {
+                VoiceRole::Melody => note.part == GENERAL_MELODY_PART_V1,
+                VoiceRole::Bass => note.part == GENERAL_BASS_PART_V1,
+                VoiceRole::Harmony => note.part == GENERAL_HARMONY_PART_V1
+                    || note.part == GENERAL_GRIEF_SUSPENSION_PART_V1,
+                VoiceRole::CounterMelody => note.part == GENERAL_COUNTERMELODY_PART_V1,
+            }),
+            "all generated events must map to the correct source-authored part"
+        );
+    }
+
     /// Regression test for the counter-melody overlap bugs fixed in
     /// `apply_counter_hook_echoes` and `DamageDevice::CounterShift`: a
     /// 300-seed sweep of `Style::Classical`'s default composition — the
@@ -7131,7 +7159,7 @@ mod tests {
         // A real cadence-free canvas: no existing melody to interfere with
         // (the pass removes whatever's there in its own window anyway).
         score.total_beats = Duration::new(24, 1); // 3 sections * 2*4 bars * 4 beats
-        apply_additive_process(&mut score, &form, 4, 4.0, seed);
+        apply_additive_process(&mut score, GENERAL_MELODY_PART_V1, &form, 4, 4.0, seed);
 
         let cell =
             crate::hook::HookCell::generate_with(&crate::spec::MelodicDna::default(), seed, 4.0);
@@ -8775,7 +8803,12 @@ mod tests {
                 section_intensity: 1.0,
             });
         }
-        apply_full_drone(&mut score, key);
+        apply_full_drone(
+            &mut score,
+            GENERAL_BASS_PART_V1,
+            GENERAL_HARMONY_PART_V1,
+            key,
+        );
         let tonic_pc = key.tonic;
         let fifth_pc = key.scale().degree_pitch_class(5);
         let harmony = score.voice(VoiceRole::Harmony);
