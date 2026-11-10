@@ -47,6 +47,9 @@ impl RiskContext {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectiveRiskSample {
     pub sample_id: String,
+    /// Pre-registered independent unit, e.g. one held-out scene/seed/episode
+    /// cluster. Repeated episodes from one unit must share this identity.
+    pub independence_unit_id: String,
     pub context: RiskContext,
     /// Forecast emitted before the episode outcome is known.
     pub predicted_success_probability: f64,
@@ -64,7 +67,7 @@ pub struct SelectiveRiskSample {
 
 impl SelectiveRiskSample {
     pub fn validate(&self) -> Result<(), RiskCertificateError> {
-        if self.sample_id.trim().is_empty() {
+        if self.sample_id.trim().is_empty() || self.independence_unit_id.trim().is_empty() {
             return Err(RiskCertificateError::EmptyIdentity);
         }
         self.context.validate()?;
@@ -131,6 +134,7 @@ pub enum RiskCertificateError {
     InvalidPolicy,
     SuccessOnInvalidRun,
     DuplicateSample,
+    DuplicateIndependenceUnit,
     MixedContext,
     InvalidRuntimeContext,
     RuntimeContextMismatch,
@@ -251,6 +255,7 @@ pub fn certify_selective_risk(
     let context = samples[0].context.clone();
     context.validate()?;
     let mut seen = BTreeSet::new();
+    let mut seen_independence_units = BTreeSet::new();
     let mut accepted_samples = 0usize;
     let mut accepted_valid_runs = 0usize;
     let mut accepted_task_failures = 0usize;
@@ -265,6 +270,9 @@ pub fn certify_selective_risk(
         }
         if !seen.insert(sample.sample_id.as_str()) {
             return Err(RiskCertificateError::DuplicateSample);
+        }
+        if !seen_independence_units.insert(sample.independence_unit_id.as_str()) {
+            return Err(RiskCertificateError::DuplicateIndependenceUnit);
         }
         if !policy.accepts(sample) {
             continue;
@@ -463,6 +471,7 @@ mod tests {
     fn sample(id: &str, success: bool, unsafe_event: bool) -> SelectiveRiskSample {
         SelectiveRiskSample {
             sample_id: id.to_owned(),
+            independence_unit_id: id.to_owned(),
             context: context("2"),
             predicted_success_probability: 0.95,
             predicted_unsafe_event_probability: 0.01,
@@ -630,6 +639,13 @@ mod tests {
         assert_eq!(
             certify_selective_risk(&duplicate, policy(), "4".repeat(64)),
             Err(RiskCertificateError::DuplicateSample)
+        );
+
+        let mut repeated_unit = safe_samples(100);
+        repeated_unit[1].independence_unit_id = repeated_unit[0].independence_unit_id.clone();
+        assert_eq!(
+            certify_selective_risk(&repeated_unit, policy(), "4".repeat(64)),
+            Err(RiskCertificateError::DuplicateIndependenceUnit)
         );
 
         let mut invalid = safe_samples(100);
