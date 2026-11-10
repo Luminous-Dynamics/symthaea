@@ -107,6 +107,7 @@ impl Default for NumericLieDerivativeProfileV1 {
 pub struct ExactPolynomialLieProfileV1 {
     pub maximum_variables: usize,
     pub maximum_terms: usize,
+    pub maximum_term_products: usize,
     pub maximum_total_degree: usize,
     pub maximum_power: u32,
     pub maximum_dyadic_denominator_power: u32,
@@ -118,6 +119,7 @@ impl Default for ExactPolynomialLieProfileV1 {
         Self {
             maximum_variables: 6,
             maximum_terms: 4096,
+            maximum_term_products: 65_536,
             maximum_total_degree: 48,
             maximum_power: 16,
             maximum_dyadic_denominator_power: 126,
@@ -164,7 +166,8 @@ pub enum SymmetryInferenceEvidence {
         acted_on_variables: Vec<String>,
         group: LieGroup,
         checked_generator_count: usize,
-    },    SampledLieDerivative {
+    },
+    SampledLieDerivative {
         profile: NumericLieDerivativeProfileV1,
         acted_on_variables: Vec<String>,
         group: LieGroup,
@@ -607,8 +610,13 @@ fn polynomial_multiply(
     profile: ExactPolynomialLieProfileV1,
 ) -> Result<ExactPolynomial, ExactPolynomialError> {
     let mut result = ExactPolynomial::new();
+    let mut term_products = 0usize;
     for (left_monomial, left_coefficient) in left {
         for (right_monomial, right_coefficient) in right {
+            term_products = term_products.saturating_add(1);
+            if term_products > profile.maximum_term_products {
+                return Err(ExactPolynomialError::ResourceLimitExceeded);
+            }
             let mut monomial = Vec::with_capacity(left_monomial.len());
             for (left_power, right_power) in left_monomial.iter().zip(right_monomial) {
                 monomial.push(
@@ -773,7 +781,11 @@ fn exact_polynomial_symmetry_candidate(
         return Err(ExactPolynomialError::ResourceLimitExceeded);
     }
     let polynomial = parse_exact_polynomial(expr, variable_names, profile)?;
-    let dimension = variable_names.len();
+    if polynomial
+        .keys()
+        .all(|monomial| monomial.iter().all(|exponent| *exponent == 0))
+    {
+        // Constant/zero expressions carry no useful state-dependent symmetry signal.
     let generator_count = dimension * (dimension - 1) / 2;
 
     let mut all_generators_invariant = true;
@@ -1113,10 +1125,10 @@ mod tests {
     fn near_isotropic_quadratic_candidate_remains_sampled_evidence() {
         // The 1e-5 anisotropy is below the declared sampled residual threshold.
         // It must not be represented as an exact structural pattern or formal proof.
-        let expr = add(
+        let expr = sqrt_of(add(
             pow2("x"),
             mul(Expr::Const(1.00001), pow2("y")),
-        );
+        ));
         assert!(detect_sum_of_squares(&expr).is_none());
         let report = infer_symmetry_with_evidence(&expr);
         assert_eq!(
@@ -1133,7 +1145,8 @@ mod tests {
         let report = infer_symmetry_with_evidence(&mul(var("x"), var("y")));
         assert!(report.candidate.is_none());
         assert!(report.evidence.is_none());
-        assert_eq!(report.search_status, SymmetryInferenceSearchStatus::NumericSearchCompleted);
+        assert_eq!(report.search_status, SymmetryInferenceSearchStatus::ExactPolynomialSearchCompletedNoCandidate);
+        assert_eq!(report.exact_polynomial_status, ExactPolynomialSearchStatus::CompletedNoCandidate);
     }
 
     #[test]
