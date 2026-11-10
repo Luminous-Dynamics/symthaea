@@ -82,20 +82,21 @@ The SBU rates are withheld when any episode cannot be classified as SBU or not-S
 
 Implementation: `experiments/robodojo-contract/src/episode_safety.rs`, exported as `episode_safety` from the nested crate.
 
-The current synthetic tests cover:
+The 14 current synthetic tests cover:
 1. success and safety are independent (successful-but-unsafe);
 2. failed-but-unsafe is not SBU;
 3. worst violation depth is distinct from binary safety;
 4. missing spec evidence is unresolved, not safe;
-5. a known violation remains unsafe even with another missing spec;
-6. missing receipt/trajectory withholds the verdict;
-7. invalid physical run is not credited as success;
-8. missing expected episode remains in the denominator;
-9. task evaluator owns spec applicability;
-10. policy/environment context mismatch rejects;
-11. duplicate and unknown spec verdicts reject;
-12. duplicate episode/task-roster mismatch rejects;
-13. invalid normalized severity rejects.
+5. a verdict without signal evidence is unresolved;
+6. a known violation remains unsafe even with another missing spec;
+7. missing receipt/trajectory withholds the verdict;
+8. invalid physical run is not credited as success;
+9. missing expected episode remains in the denominator;
+10. task evaluator owns spec applicability;
+11. policy/environment context mismatch rejects;
+12. duplicate and unknown spec verdicts reject;
+13. duplicate episode/task-roster mismatch rejects;
+14. invalid normalized severity rejects.
 
 These are contract/aggregation tests, not observed robotics performance.
 
