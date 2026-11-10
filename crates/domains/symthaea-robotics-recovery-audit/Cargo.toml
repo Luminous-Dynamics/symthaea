@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-robotics-recovery-audit"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Deterministic audit kernel for physically realizable robotic recovery evidence"
+publish = false
+
+[lib]
+path = "src/lib.rs"
