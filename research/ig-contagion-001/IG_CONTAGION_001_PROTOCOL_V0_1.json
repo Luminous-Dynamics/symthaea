@@ -235,7 +235,7 @@
     }
   ],
   "minimum_fixture_requirements": {
-    "fixture_count": 40,
+    "fixture_count": 45,
     "scenario_families": 8,
     "topology_families": 6,
     "include_no_discussion_repeat_controls": true,
