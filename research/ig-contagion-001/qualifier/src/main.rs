@@ -173,9 +173,12 @@ fn validate_protocol(protocol: &Value, errors: &mut Vec<String>) {
         );
     }
     let truth_profiles: BTreeSet<String> = protocol["task_truth_profiles"]
-        .as_array().into_iter().flatten()
+        .as_array()
+        .into_iter()
+        .flatten()
         .filter_map(|profile| field(profile, "id"))
-        .map(ToOwned::to_owned).collect();
+        .map(ToOwned::to_owned)
+        .collect();
     for profile in [
         "measurement_control_no_decision_truth",
         "synthetic_known_answer",
@@ -200,9 +203,17 @@ fn validate_protocol(protocol: &Value, errors: &mut Vec<String>) {
             "pluralistic normative disagreement condition is required",
         );
     }
-    let metric_ids: BTreeSet<String> = protocol["metrics"].as_array().into_iter().flatten()
-        .filter_map(|metric| field(metric, "id")).map(ToOwned::to_owned).collect();
-    for metric in ["revision_quality_and_distance", "normative_pluralism_preservation"] {
+    let metric_ids: BTreeSet<String> = protocol["metrics"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|metric| field(metric, "id"))
+        .map(ToOwned::to_owned)
+        .collect();
+    for metric in [
+        "revision_quality_and_distance",
+        "normative_pluralism_preservation",
+    ] {
         if !metric_ids.contains(metric) {
             add(
                 errors,
@@ -520,7 +531,11 @@ fn validate_matrix(
                     "dissent_and_tradeoffs_preserved",
                 ] {
                     if !properties.contains(required) {
-                        add(errors, &context, format!("normative pluralism requires '{required}'"));
+                        add(
+                            errors,
+                            &context,
+                            format!("normative pluralism requires '{required}'"),
+                        );
                     }
                 }
             }
@@ -588,7 +603,11 @@ fn validate_matrix(
                 }
             }
             if centrality_metric != Some("normalized_betweenness_v1") {
-                add(errors, &context, "centrality pairs must declare normalized_betweenness_v1");
+                add(
+                    errors,
+                    &context,
+                    "centrality pairs must declare normalized_betweenness_v1",
+                );
             }
             match (pair_id, content_ref) {
                 (Some(pair), Some(_)) => {
@@ -734,11 +753,16 @@ fn validate_matrix(
                 format!("paired block '{pair_id}' must declare normalized betweenness"),
             );
         }
-        if matches!(field(left, "topology_family"), Some("complete" | "temporal_churn")) {
+        if matches!(
+            field(left, "topology_family"),
+            Some("complete" | "temporal_churn")
+        ) {
             add(
                 errors,
                 "matrix.paired_blocks",
-                format!("paired block '{pair_id}' uses a topology without a frozen static centrality contrast"),
+                format!(
+                    "paired block '{pair_id}' uses a topology without a frozen static centrality contrast"
+                ),
             );
         }
     }
@@ -773,8 +797,13 @@ fn validate_matrix(
     }
     if !fixtures.iter().any(|fixture| {
         fixture["family_id"] == "normative_pluralism" && fixture["class"] == "pluralism_control"
-    }) || pluralism != 5 {
-        add(errors, "matrix.fixtures", "five normative-pluralism controls are required");
+    }) || pluralism != 5
+    {
+        add(
+            errors,
+            "matrix.fixtures",
+            "five normative-pluralism controls are required",
+        );
     }
     if paired_members.len() != 5 {
         add(
@@ -821,19 +850,36 @@ fn validate_content_bundle(
     check_schema_header(
         content_schema,
         "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-contagion-001/IG_CONTAGION_001_MATCHED_CONTENT_V0_1.schema.json",
-        &["schema_version", "status", "agent_profile", "evidence_packet", "paired_content"],
+        &[
+            "schema_version",
+            "status",
+            "agent_profile",
+            "evidence_packet",
+            "paired_content",
+        ],
         "matched_content_schema",
         errors,
     );
     if field(content, "schema_version") != Some("ig-contagion-matched-content-v0.1")
         || field(content, "status") != Some("synthetic_content_unexecuted")
     {
-        add(errors, "matched_content", "content bundle must be v0.1 and remain marked unexecuted");
+        add(
+            errors,
+            "matched_content",
+            "content bundle must be v0.1 and remain marked unexecuted",
+        );
     }
     if field(content, "canonicalization_profile")
-        != field(&protocol["paired_content_artifact"], "canonicalization_profile")
+        != field(
+            &protocol["paired_content_artifact"],
+            "canonicalization_profile",
+        )
     {
-        add(errors, "matched_content", "canonicalization profile must match the protocol");
+        add(
+            errors,
+            "matched_content",
+            "canonicalization profile must match the protocol",
+        );
     }
 
     let expected_agent = field(&protocol["paired_content_artifact"], "agent_profile_sha256");
@@ -841,19 +887,34 @@ fn validate_content_bundle(
     if actual_agent.as_deref() != field(content, "agent_profile_sha256")
         || actual_agent.as_deref() != expected_agent
     {
-        add(errors, "matched_content.agent_profile", "agent profile digest mismatch");
+        add(
+            errors,
+            "matched_content.agent_profile",
+            "agent profile digest mismatch",
+        );
     }
 
-    let expected_evidence = field(&protocol["paired_content_artifact"], "evidence_packet_sha256");
+    let expected_evidence = field(
+        &protocol["paired_content_artifact"],
+        "evidence_packet_sha256",
+    );
     let actual_evidence = sha256_value(&content["evidence_packet"]);
     if actual_evidence.as_deref() != field(content, "evidence_packet_sha256")
         || actual_evidence.as_deref() != expected_evidence
     {
-        add(errors, "matched_content.evidence_packet", "evidence packet digest mismatch");
+        add(
+            errors,
+            "matched_content.evidence_packet",
+            "evidence packet digest mismatch",
+        );
     }
 
     let Some(messages) = content["paired_content"].as_array() else {
-        add(errors, "matched_content.paired_content", "paired_content must be an array");
+        add(
+            errors,
+            "matched_content.paired_content",
+            "paired_content must be an array",
+        );
         return;
     };
     if messages.len() != 5 {
@@ -876,7 +937,10 @@ fn validate_content_bundle(
         if actual.as_deref() != declared {
             add(errors, &context, "message digest mismatch");
         }
-        if message_digests.insert(reference.to_string(), actual.unwrap_or_default()).is_some() {
+        if message_digests
+            .insert(reference.to_string(), actual.unwrap_or_default())
+            .is_some()
+        {
             add(errors, &context, "duplicate paired_content_ref");
         }
         if field(message, "expected_grounded_state") != Some("unsupported_and_false_under_packet") {
@@ -903,13 +967,25 @@ fn validate_content_bundle(
         if field(fixture, "paired_message_sha256")
             != message_digests.get(reference).map(String::as_str)
         {
-            add(errors, &context, "paired message SHA-256 does not match content bundle");
+            add(
+                errors,
+                &context,
+                "paired message SHA-256 does not match content bundle",
+            );
         }
         if field(fixture, "paired_agent_profile_sha256") != actual_agent.as_deref() {
-            add(errors, &context, "paired agent profile digest does not match content bundle");
+            add(
+                errors,
+                &context,
+                "paired agent profile digest does not match content bundle",
+            );
         }
         if field(fixture, "paired_evidence_packet_sha256") != actual_evidence.as_deref() {
-            add(errors, &context, "paired evidence packet digest does not match content bundle");
+            add(
+                errors,
+                &context,
+                "paired evidence packet digest does not match content bundle",
+            );
         }
     }
     let content_refs: BTreeSet<String> = message_digests.keys().cloned().collect();
@@ -1341,7 +1417,7 @@ mod tests {
         assert!(
             errors
                 .iter()
-                .any(|error| error.contains("must contrast leaf/periphery with hub/core"))
+                .any(|error| error.contains("must contrast minimum with maximum normalized betweenness placement"))
         );
     }
 
@@ -1404,23 +1480,38 @@ mod tests {
         let mut content = parsed(CONTENT);
         content["paired_content"][0]["message"] = Value::String("tampered message".into());
         let errors = validate(
-            &parsed(PROTOCOL), &parsed(PROTOCOL_SCHEMA),
-            &parsed(MATRIX), &parsed(MATRIX_SCHEMA),
-            &content, &parsed(CONTENT_SCHEMA),
-        ).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("message digest mismatch")));
+            &parsed(PROTOCOL),
+            &parsed(PROTOCOL_SCHEMA),
+            &parsed(MATRIX),
+            &parsed(MATRIX_SCHEMA),
+            &content,
+            &parsed(CONTENT_SCHEMA),
+        )
+        .unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("message digest mismatch"))
+        );
     }
 
     #[test]
     fn normative_pluralism_has_no_single_answer() {
         let mut matrix = parsed(MATRIX);
-        let fixture = matrix["fixtures"].as_array_mut().unwrap()
+        let fixture = matrix["fixtures"]
+            .as_array_mut()
+            .unwrap()
             .iter_mut()
-            .find(|fixture| fixture["family_id"] == "normative_pluralism").unwrap();
+            .find(|fixture| fixture["family_id"] == "normative_pluralism")
+            .unwrap();
         fixture["task_truth_profile"] = Value::String("synthetic_known_answer".into());
         let mut errors = Vec::new();
         validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
-        assert!(errors.iter().any(|error| error.contains("no-single-answer truth profile")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("no-single-answer truth profile"))
+        );
     }
 
     #[test]
