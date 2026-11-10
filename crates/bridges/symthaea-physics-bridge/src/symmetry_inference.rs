@@ -13,8 +13,8 @@
 //! Two narrow but high-value patterns that cover the Ramanujan Protocol
 //! showcase's canonical invariants:
 //!
-//! 1. **Sum of squared variables** — `x² + y²`, `x² + y² + z²`, `px² + py² + pz²`
-//!    → SO(n) where n = number of distinct squared variables.
+//! 1. **Equal-coefficient sum of squared variables** — `x² + y²`, `x² + y² + z²`, `px² + py² + pz²`
+//!    → SO(n) where n = number of distinct squared variables. A shared finite nonzero scalar is allowed; unequal per-variable weights are rejected.
 //!    Matches Harmonic Oscillator, kinetic energy, `r² = x² + y² + z²`.
 //!
 //! 2. **2D antisymmetric cross product** — `a·b - c·d` where `{a,c}` and
@@ -248,12 +248,9 @@ fn flatten_add_only<'a>(expr: &'a Expr, out: &mut Vec<&'a Expr>) {
     }
 }
 
-/// If `expr` is a sum of k ≥ 1 distinct squared variables (i.e.
-/// `Power(Var(xᵢ), 2)` with unique `xᵢ`), return k. Otherwise return None.
-///
-/// Accepts extra coefficients via `Mul(Const(c), Power(Var, 2))` but rejects
-/// any non-square term — so `x² + y²` matches (returns 2) but
-/// `x² + y² + y³` does not.
+/// If expr is `c * (x₁² + ... + xₖ²)` for k ≥ 2 distinct variables and one
+/// shared finite, nonzero coefficient c, return k. Unequal weights define an
+/// ellipsoid rather than an SO(k)-invariant quadratic form and are rejected.
 fn detect_sum_of_squares(expr: &Expr) -> Option<u8> {
     let mut terms = Vec::new();
     flatten_add_only(expr, &mut terms);
@@ -262,8 +259,22 @@ fn detect_sum_of_squares(expr: &Expr) -> Option<u8> {
     }
 
     let mut seen = Vec::new();
-    for t in terms {
-        let var = squared_var(t)?;
+    let mut common_coefficient: Option<f64> = None;
+    for term in terms {
+        let (var, coefficient) = squared_term(term)?;
+        if !coefficient.is_finite() || coefficient == 0.0 {
+            return None;
+        }
+        if let Some(common) = common_coefficient {
+            // Coefficients are AST literals: require exact equality rather
+            // than a tolerance that could promote an anisotropic form.
+            if coefficient != common {
+                return None;
+            }
+        } else {
+            common_coefficient = Some(coefficient);
+        }
+
         // Reject duplicates — they'd over-count the symmetry group dimension.
         if seen.contains(&var) {
             return None;
@@ -273,22 +284,25 @@ fn detect_sum_of_squares(expr: &Expr) -> Option<u8> {
     Some(seen.len() as u8)
 }
 
-/// If `expr` is `Power(Var(name), 2)` or `Const * Power(Var(name), 2)`,
-/// return the variable name; otherwise None.
-fn squared_var(expr: &Expr) -> Option<String> {
+/// Return (variable name, total scalar coefficient) for a squared variable.
+/// Nested scalar multiplications are accumulated, and non-finite products fail.
+fn squared_term(expr: &Expr) -> Option<(String, f64)> {
     match expr {
         Expr::BinOp(BinOp::Pow, base, exp) => {
             if let (Expr::Var(name), Expr::Const(k)) = (base.as_ref(), exp.as_ref())
                 && (*k - 2.0).abs() < 1e-12
             {
-                return Some(name.clone());
+                return Some((name.clone(), 1.0));
             }
             None
         }
         Expr::BinOp(BinOp::Mul, l, r) => {
-            // Allow Const · Power(Var, 2)
             match (l.as_ref(), r.as_ref()) {
-                (Expr::Const(_), other) | (other, Expr::Const(_)) => squared_var(other),
+                (Expr::Const(coefficient), other) | (other, Expr::Const(coefficient)) => {
+                    let (name, inner_coefficient) = squared_term(other)?;
+                    let total = *coefficient * inner_coefficient;
+                    total.is_finite().then_some((name, total))
+                }
                 _ => None,
             }
         }
@@ -377,6 +391,47 @@ mod tests {
         let expr = add(add(pow2("x"), pow2("y")), pow2("z"));
         let sym = infer_symmetry(&expr);
         assert_eq!(sym.lie_groups, vec![LieGroup::SO(3)]);
+    }
+
+    #[test]
+    fn unequal_quadratic_weights_do_not_infer_rotational_symmetry() {
+        // x² + 2y² is an ellipse, not an SO(2)-invariant radial form.
+        let expr = add(
+            mul(Expr::Const(1.0), pow2("x")),
+            mul(Expr::Const(2.0), pow2("y")),
+        );
+        assert!(detect_sum_of_squares(&expr).is_none());
+        assert!(infer_symmetry(&expr).lie_groups.is_empty());
+    }
+
+    #[test]
+    fn equal_nonzero_quadratic_weights_preserve_rotational_symmetry() {
+        let expr = add(
+            mul(Expr::Const(2.5), pow2("x")),
+            mul(Expr::Const(2.5), pow2("y")),
+        );
+        assert_eq!(detect_sum_of_squares(&expr), Some(2));
+        assert_eq!(infer_symmetry(&expr).lie_groups, vec![LieGroup::SO(2)]);
+    }
+
+    #[test]
+    fn negative_common_quadratic_weight_preserves_rotational_symmetry() {
+        let expr = add(
+            mul(Expr::Const(-3.0), pow2("x")),
+            mul(Expr::Const(-3.0), pow2("y")),
+        );
+        assert_eq!(detect_sum_of_squares(&expr), Some(2));
+        assert_eq!(infer_symmetry(&expr).lie_groups, vec![LieGroup::SO(2)]);
+    }
+
+    #[test]
+    fn zero_quadratic_weight_does_not_create_rotational_symmetry() {
+        let expr = add(
+            mul(Expr::Const(0.0), pow2("x")),
+            mul(Expr::Const(2.0), pow2("y")),
+        );
+        assert!(detect_sum_of_squares(&expr).is_none());
+        assert!(infer_symmetry(&expr).lie_groups.is_empty());
     }
 
     #[test]
