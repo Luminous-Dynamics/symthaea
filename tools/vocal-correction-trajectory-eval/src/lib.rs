@@ -269,7 +269,15 @@ pub fn evaluate_trajectory(
         } else {
             corrections_used += 1;
 
-            if iteration.action_norm > spec.maximum_action_norm {
+            // Preserve definite acoustic failures and indeterminate evidence.
+            // A cycle/stall diagnostic must never mask a protected-limit
+            // violation or an uncertainty boundary.
+            if matches!(
+                outcome,
+                TrajectoryOutcome::Indeterminate | TrajectoryOutcome::Noncompliant
+            ) {
+                // Keep the measurement-derived terminal outcome.
+            } else if iteration.action_norm > spec.maximum_action_norm {
                 outcome = TrajectoryOutcome::Noncompliant;
             } else if seen_control_state_digests.contains(&iteration.control_state_digest) {
                 // Detect parameter-state cycles even when stochastic renders
@@ -279,10 +287,7 @@ pub fn evaluate_trajectory(
                 // A repeated output digest is a render-state cycle (including
                 // the immediate no-op case), even if analyzer noise changes.
                 outcome = TrajectoryOutcome::Stalled;
-            } else if !matches!(
-                outcome,
-                TrajectoryOutcome::Indeterminate | TrajectoryOutcome::Noncompliant
-            ) {
+            } else {
                 let previous_targets = &results[expected_index - 1].targets;
                 match check_target_progress(
                     &spec.targets,
@@ -1233,6 +1238,50 @@ mod tests {
         assert_eq!(report.outcome, TrajectoryOutcome::Stalled);
         assert_eq!(report.iterations[2].output_digest, digest('b'));
         assert_eq!(report.iterations[2].control_state_digest, digest('e'));
+    }
+
+    #[test]
+    fn protected_violation_is_not_masked_by_a_repeated_control_state() {
+        let mut second = correction(
+            1,
+            'b',
+            'd',
+            (9.0, 11.0),
+            (-1.0, 1.0),
+            (0.8, 0.9),
+        );
+        second.control_state_digest = digest('b');
+        let report = evaluate_trajectory(
+            &spec(),
+            &[
+                baseline((14.0, 15.0), (4.0, 5.0), (0.0, 0.0)),
+                second,
+            ],
+        )
+        .unwrap();
+        assert_eq!(report.outcome, TrajectoryOutcome::Noncompliant);
+    }
+
+    #[test]
+    fn indeterminate_evidence_is_not_masked_by_a_repeated_control_state() {
+        let mut second = correction(
+            1,
+            'b',
+            'd',
+            (9.0, 11.0),
+            (-1.0, 1.0),
+            (0.4, 0.7),
+        );
+        second.control_state_digest = digest('b');
+        let report = evaluate_trajectory(
+            &spec(),
+            &[
+                baseline((14.0, 15.0), (4.0, 5.0), (0.0, 0.0)),
+                second,
+            ],
+        )
+        .unwrap();
+        assert_eq!(report.outcome, TrajectoryOutcome::Indeterminate);
     }
 
     #[test]
