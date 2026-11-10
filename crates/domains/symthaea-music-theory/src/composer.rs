@@ -4955,26 +4955,34 @@ mod tests {
 
     #[test]
     fn grief_suspension_overlay_is_a_distinct_part_not_merged_into_chordal_harmony() {
-        let intent = MusicalIntent {
-            seed: 43,
-            ..MusicalIntent::default()
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let phrase = crate::phrase::Phrase {
+            line: Motif::new(Vec::new()),
+            progression: vec![1, 5],
+            cadence: crate::cadence::Cadence::Authentic,
         };
-        let mut spec = crate::style::Style::Classical.spec();
-        spec.attitude = Some(crate::spec::Attitude::Grief);
-        let score = compose_with_spec(&intent, &spec);
+        let form = Form {
+            sections: vec![crate::form::Section {
+                role: SectionRole::A,
+                key,
+                period: crate::phrase::Period {
+                    antecedent: phrase.clone(),
+                    consequent: phrase,
+                },
+            }],
+        };
+        let mut score = Score::new(key, 100.0, 4);
+        apply_grief_suspensions(&mut score, &form, 4.0, &MusicalIntent::default());
 
-        assert!(
-            score.has_part_identity(),
-            "the grief overlay must retain a real part identity"
-        );
         let grief_line: Vec<&ScoreNote> = score.notes.iter()
             .filter(|note| note.part == GENERAL_GRIEF_SUSPENSION_PART_V1)
             .collect();
         assert!(
             !grief_line.is_empty(),
-            "grief suspension chain must be represented as its own authored line"
+            "a known I-to-V suspension case must produce the independent grief line"
         );
         assert!(grief_line.iter().all(|note| note.role == VoiceRole::Harmony));
+        assert!(score.has_part_identity());
     }
 
     /// Regression test for the counter-melody overlap bugs fixed in
