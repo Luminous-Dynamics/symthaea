@@ -28,7 +28,7 @@ For the full edit:
 - explicit target-change and protected-drift thresholds;
 - objective pass/fail.
 
-Thresholds are caller-supplied in normalized full-scale amplitude units. There is no universal safe tolerance: bit-exact cached regions can demand zero protected delta; nondeterministic neural renderers need a separately calibrated tolerance and human listening.
+Thresholds are caller-supplied in the same amplitude units as the input samples. Callers should use one documented, fixed audio normalization/downmix path across the before/after pair and record it with the case receipt. There is no universal safe tolerance: bit-exact cached regions can demand zero protected delta; nondeterministic neural renderers need a separately calibrated tolerance and human listening.
 
 ## What this measures—and does not
 
