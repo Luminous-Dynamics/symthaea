@@ -428,10 +428,24 @@ mod tests {
     #[test]
     fn invalid_efficiencies_are_rejected_without_defaults() {
         for efficiency in [0.0, -0.1, 1.01, f64::NAN, f64::INFINITY] {
-            let mut model = config();
-            model.motor_efficiency = efficiency;
+            let mut transmission = config();
+            transmission.transmission_efficiency = efficiency;
             assert!(matches!(
-                evaluate_drive(&model, input_for_power(10_000.0, 400.0, 1.0)),
+                evaluate_drive(&transmission, input_for_power(10_000.0, 400.0, 1.0)),
+                Err(DriveError::InvalidConfiguration(_))
+            ));
+
+            let mut motor = config();
+            motor.motor_efficiency = efficiency;
+            assert!(matches!(
+                evaluate_drive(&motor, input_for_power(10_000.0, 400.0, 1.0)),
+                Err(DriveError::InvalidConfiguration(_))
+            ));
+
+            let mut inverter = config();
+            inverter.inverter_efficiency = efficiency;
+            assert!(matches!(
+                evaluate_drive(&inverter, input_for_power(10_000.0, 400.0, 1.0)),
                 Err(DriveError::InvalidConfiguration(_))
             ));
         }
@@ -492,6 +506,42 @@ mod tests {
         model.transmission_efficiency = 1.0;
         let report = evaluate_drive(&model, input_for_power(10_000.0, 400.0, 1.0)).unwrap();
         assert_eq!(report.transmission_loss_w, 0.0);
+    }
+
+    #[test]
+    fn identical_frozen_inputs_produce_identical_reports() {
+        let mut model = config();
+        model.transmission_efficiency = 0.91;
+        model.motor_efficiency = 0.96;
+        model.inverter_efficiency = 0.985;
+        let input = input_for_power(18_500.0, 420.0, 7.5);
+        let first = evaluate_drive(&model, input).unwrap();
+        let second = evaluate_drive(&model, input).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn invalid_bus_limits_are_rejected() {
+        let mut model = config();
+        model.minimum_dc_bus_voltage_v = 0.0;
+        assert!(matches!(
+            evaluate_drive(&model, input_for_power(10_000.0, 400.0, 1.0)),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        model = config();
+        model.maximum_dc_bus_current_a = f64::INFINITY;
+        assert!(matches!(
+            evaluate_drive(&model, input_for_power(10_000.0, 400.0, 1.0)),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        model = config();
+        model.maximum_dc_bus_power_w = -1.0;
+        assert!(matches!(
+            evaluate_drive(&model, input_for_power(10_000.0, 400.0, 1.0)),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
     }
 
     #[test]
