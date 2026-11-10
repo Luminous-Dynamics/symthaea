@@ -21,7 +21,7 @@ Dataset: EVApeCognition, CC BY 4.0, https://doi.org/10.5281/zenodo.18846348.
 
 Study: Albiach-Serrano, Call & Barth (2010), *Great apes track hidden objects after changes in the objects' position and in subject's orientation*, DOI 10.1002/ajp.20790.
 
-Exact Git blob IDs are recorded in OLI_APE_SPATIAL_SOURCE_MANIFEST_V0_1.json. The DOI currently cited is the dataset concept DOI, not a version DOI; an immutable Zenodo version DOI and release tag must be frozen before a benchmark release.
+Exact Git blob IDs are recorded in OLI_APE_SPATIAL_SOURCE_MANIFEST_V0_1.json. The dataset concept DOI is 10.5281/zenodo.18846348. The immutable dataset DOI cited in reference 193 of the Scientific Data article and indexed by the NLM Dataset Catalog is 10.5281/zenodo.18849382. The corresponding GitHub release tag v1.0.4 was checked by fetching the YAML, data CSV, glossary CSV, domain definitions and README at that ref; all five Git blob SHAs match the source manifest. Use the version DOI for citation and the Git tag/blob SHAs for source-tree reproduction.
 
 ## 3. Data minimization
 
