@@ -2,13 +2,19 @@
 
 ## Model identity
 
-electric-fixed-wing-energy-v0.2.0 is a deterministic reduced-order estimator for steady mission segments. Its output is useful for screening architecture choices and exposing energy-budget assumptions. It is not validated against a flight-test article.
+electric-fixed-wing-energy-v0.3.0 is a deterministic reduced-order estimator for steady mission segments. Its output is useful for screening architecture choices and exposing energy-budget assumptions. It is not validated against a flight-test article.
 
 ## Characterized propulsion extension (v0.2)
 
 An optional characterized evaluation accepts three one-dimensional curves: motor efficiency versus shaft-load fraction, inverter efficiency versus inverter input-load fraction, and propeller efficiency versus advance ratio. Values and absolute uncertainty bounds are linearly interpolated only inside each supplied domain. The mission evaluator uses nominal efficiency minus the absolute bound and records dataset IDs. No extrapolation is permitted.
 
-This is an improvement over a single scalar efficiency, but it remains limited: the motor and inverter maps are one-dimensional projections, not full speed/torque/voltage/temperature maps; the propeller curve is not a full coefficient map over advance ratio, blade pitch, Reynolds number, Mach number and blade condition. The current code checks the SHA-256 string's syntax but does not obtain the dataset or calculate its digest. Evidence verification must happen in a separate trusted pipeline. The absolute uncertainty bound is not a statistical confidence interval.
+This is an improvement over a single scalar efficiency, but it remains limited: the motor and inverter maps are one-dimensional projections, not full speed/torque/voltage/temperature maps; the propeller curve is not a full coefficient map over advance ratio, blade pitch, Reynolds number, Mach number and blade condition. The current code checks the SHA-256 string's syntax but does not obtain the dataset or calculate its digest. Evidence verification must happen in a separate trusted pipeline. This applies to propulsion curves and battery grids. The absolute uncertainty bound is not a statistical confidence interval.
+
+## Battery characterization extension (v0.3)
+
+An optional pack-level characterization accepts bilinear grids for open-circuit voltage and DC resistance over SOC and pack temperature. Both grids must have identical axes and units. The solver subtracts absolute OCV uncertainty and adds absolute resistance uncertainty; it rejects points outside the characterized domain. The selected values are recorded per mission segment, and evidence dataset IDs are included in the mission report.
+
+This is still an equivalent-circuit screening model. It does not model cell-level behaviour, charge/discharge hysteresis, current-rate dependence, SOH-dependent OCV/resistance, transient polarization branches, cell imbalance, contactors/fuses, propagation, venting, or thermal runaway. SOC capacity remains a nominal capacity scaled by SOH; no temperature/rate-dependent usable-capacity surface is implemented. The thermal state remains a single lumped pack node.
 
 ## Current equations
 
