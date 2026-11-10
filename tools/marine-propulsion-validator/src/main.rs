@@ -1134,6 +1134,13 @@ fn check_trial(case: &Value, f: &mut Findings) {
                     {
                         let channel_seconds = time_to_seconds(channel_unit).map(|scale| channel_value * scale);
                         let base_clock_seconds = time_to_seconds(clock_unit).map(|scale| clock_value * scale);
+                        if channel_seconds.is_none() || base_clock_seconds.is_none() {
+                            f.push(
+                                pointer_child(path.clone(), "time_alignment_uncertainty"),
+                                "INVALID",
+                                "time alignment uncertainty units must be convertible using the reviewed time vocabulary",
+                            );
+                        }
                         let required_clock_seconds = if is_v4 {
                             match (
                                 base_clock_seconds,
@@ -1858,6 +1865,17 @@ mod tests {
         let mut findings = Findings::default();
         check_trial(&fixture, &mut findings);
         assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn v0_4_unsupported_time_unit_is_invalid() {
+        let mut fixture: Value =
+            serde_json::from_str(SYNTHETIC_CASE_V4).expect("v0.4 fixture JSON");
+        fixture["trial_evidence"]["channels"][0]["time_alignment_uncertainty"]["unit"] =
+            serde_json::json!("fortnight");
+        let mut findings = Findings::default();
+        check_trial(&fixture, &mut findings);
+        assert!(findings.invalid, "{:?}", findings.diagnostics);
     }
 
     #[test]
