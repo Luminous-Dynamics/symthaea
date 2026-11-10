@@ -55,6 +55,16 @@ cargo run --bin marine-regulatory-rule-audit -- \
 
 The retained v0.1.0 snapshot remains available for historical comparison. v0.2.0 separates emissions year from surrender year, statutory voyage-coverage fraction from surrender phase-in, and EU MRV gas-monitoring years from EU ETS gas-surrender years.
 
+Audit the deterministic integer energy-source ledger:
+
+~~~sh
+cargo run --bin marine-energy-source-ledger-audit -- \
+  ../../docs/research/marine/marine-energy-source-ledger-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-marine-energy-source-ledger-v0.1.0.json
+~~~
+
+The ledger includes only primary/substitute source inputs in its total. Generator output, battery discharge, shaft output and conversion losses are linked downstream flows and are not added again. Unknown inputs produce a known subtotal with no complete total.
+
 Audit a WAPS wind-energy evidence record:
 
 ~~~sh
@@ -127,7 +137,7 @@ The v0.2.0 profile is documented in `docs/research/marine/MARINE-SERVICE-FINGERP
   basis; and a declared half-open sample-window convention with count/rate tolerance.
 - `marine-regulatory-rule-register-v0.2.0.schema.json` and its dated register are the preferred current snapshot; they keep emissions year, surrender year, route coverage and gas-scope years separate.
 - `marine-causal-study-protocol-v0.1.0.schema.json` defines preregistered estimands, treatment states, confounders, battery boundaries, identification gates and negative controls. Its synthetic fixture is deliberately NOT_READY.
-- The package also contains standalone audit binaries for the regulatory register, causal-study protocol and WAPS wind-energy evidence. The wind-energy audit deliberately leaves statutory wind energy unknown until a valid implementing-act method is represented. They check contract/readiness conditions only; neither is a regulatory decision nor a causal estimator.
+- The package also contains standalone audit binaries for the regulatory register, causal-study protocol , WAPS wind-energy evidence and deterministic source-energy ledger. The wind-energy audit deliberately leaves statutory wind energy unknown until a valid implementing-act method is represented. They check contract/readiness conditions only; neither is a regulatory decision nor a causal estimator.
 - v0.2.0 and v0.3.0 fixtures are synthetic. Their registry entries are software-test data,
   not calibration, metrology or operational evidence. The v0.2.0 service fingerprint is a
   known-answer software test vector.
