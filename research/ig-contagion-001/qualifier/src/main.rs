@@ -1157,6 +1157,20 @@ mod tests {
     }
 
     #[test]
+    fn delegation_graph_cannot_satisfy_communication_graph_owner() {
+        let mut matrix = parsed(MATRIX);
+        matrix["fixtures"][0]["graph_generator_issue"] =
+            Value::String("https://github.com/Luminous-Dynamics/symthaea/issues/11248".into());
+        let mut errors = Vec::new();
+        validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("communication graph generator must compose with Symthaea #11337"))
+        );
+    }
+
+    #[test]
     fn checked_in_protocol_and_fifty_scenarios_validate() {
         let report = validate(
             &parsed(PROTOCOL),
