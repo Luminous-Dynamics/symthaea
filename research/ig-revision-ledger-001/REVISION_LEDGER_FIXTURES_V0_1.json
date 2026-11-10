@@ -1717,7 +1717,7 @@
         "agent_instance_id": "AGENT-01",
         "principal_ref": "PRINCIPAL-01",
         "stage": "PrivateContextReset",
-        "transition": "NoChange",
+        "transition": "Changed",
         "previous_state": {
           "state_sha256": "00000000000000000000000000000000000000000000000000000000000000c8",
           "stance": "A",
@@ -1808,7 +1808,7 @@
         "agent_instance_id": "AGENT-01",
         "principal_ref": "PRINCIPAL-01",
         "stage": "PrivateContextReset",
-        "transition": "NoChange",
+        "transition": "Changed",
         "previous_state": {
           "state_sha256": "00000000000000000000000000000000000000000000000000000000000000d2",
           "stance": "A",
