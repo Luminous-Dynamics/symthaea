@@ -43,13 +43,14 @@ The public `main` versions were fetched and inspected:
 - `crates/core/symthaea-fep/src/free_energy.rs` — blob `f4bb1e0f8629f9f36280f0f70350bee5c6d7bf1d`.
 - `crates/core/symthaea-fep/src/agent.rs` — blob `678a951162e0c56c8e9522ffe6307c4d00a7d4ac`.
 - `crates/core/symthaea-fep/src/generative_model.rs` — blob `a442654634f99a783e82582516a88a7feae2a8ed`.
+- `crates/core/symthaea-fep/src/types.rs` — blob `0a106e4e158e0337573b8bafeb59e25903349d41`.
 
 In the current path:
 1. `predict_next_state(state, action)` applies an action-conditioned transition to the predicted mean.
 2. The predicted precision update uses the same current precision and transition-precision formula for every action.
 3. Mode probabilities are copied unchanged.
-4. `HiddenState::entropy` uses precision and mode probabilities, not the mean.
-5. `compute_epistemic_value` is predicted entropy minus current entropy.
+4. `HiddenState::entropy` uses the continuous precision vector and dimensionality; it does not read the mean or mode probabilities. `mode_entropy` is a separate method and `total_uncertainty` combines continuous and discrete terms, but the current EFE epistemic selector calls `entropy`, not `total_uncertainty`.
+5. `compute_epistemic_value` is predicted continuous entropy minus current continuous entropy.
 
 Therefore, for a fixed current belief/model, the present entropy-difference epistemic term is action-invariant. The predicted mean and pragmatic prediction-error term may vary by action. The novelty bonus can also vary, but novelty is not expected information gain.
 
