@@ -1,6 +1,6 @@
 {
   "schema_version": "0.1.0",
-  "registry_id": "MARINE-PROPULSION-REFERENCE-BASELINES-2026-11-10",
+  "registry_id": "MARINE-PROPULSION-REFERENCE-BASELINES-2026-11-10-v2",
   "created_on": "2026-11-10",
   "purpose": "Source-attributed public reference corpus for cargo-vessel propulsion architecture research. Values are not transferable performance predictions.",
   "evidence_policy": {
@@ -473,6 +473,299 @@
       "ineligible_use": [
         "Universal vessel speed or throughput claim",
         "Direct economic comparison without source-specific reproduction"
+      ]
+    },
+    {
+      "source_id": "NORSEPOWER-SEA-CARGO-TRANS-HAV-SOL-2026",
+      "title": "Norsepower Rotor Sails support the launch of Sea-Cargo's Trans Hav and Trans Sol into full operations following major efficiency upgrade",
+      "publisher": "Norsepower / Sea-Cargo",
+      "publication_date": "2026-04-17",
+      "url": "https://www.norsepower.com/post/norsepower-rotor-sails-support-the-launch-of-sea-cargos-trans-hav-and-trans-sol-into-full-operations-following-major-efficiency-upgrade/",
+      "evidence_class": "vendor_press_release_with_operator_self_reported_figures",
+      "scope": {
+        "vessel_class": "Northern European short-sea cargo liner vessels",
+        "retrofit_devices": "Three Norsepower Rotor Sails per vessel",
+        "retrofit_timing": "Installations commissioned January-February 2026",
+        "co_installed_systems": [
+          "solar power",
+          "battery storage",
+          "advanced power management",
+          "optimized propulsion configurations"
+        ],
+        "service_context": "fixed liner operations"
+      },
+      "observations": [
+        {
+          "metric_id": "sea_cargo_reported_co2_reduction_per_tonne_transported",
+          "value": 35,
+          "unit": "percent",
+          "qualifier": "up_to",
+          "attribution": "Sea-Cargo own figures as quoted by Norsepower",
+          "statement": "The announcement attributes up to 35% lower CO2 emissions per tonne transported to the comprehensive rebuild programme."
+        },
+        {
+          "metric_id": "sea_cargo_reported_total_fleet_emissions_reduction",
+          "value": 50,
+          "unit": "percent",
+          "qualifier": "up_to",
+          "attribution": "Sea-Cargo own figures as quoted by Norsepower",
+          "statement": "The announcement reports up to 50% total emissions reduction across the upgraded fleet."
+        },
+        {
+          "metric_id": "rotor_sail_equivalent_thrust_under_favourable_wind",
+          "value": 7500,
+          "unit": "kW",
+          "qualifier": "approximate",
+          "attribution": "Norsepower company announcement",
+          "statement": "Norsepower states the rotor sails can generate thrust equivalent to approximately 7,500 kW under favourable wind conditions."
+        },
+        {
+          "metric_id": "mechanical_installation_duration",
+          "value": 2,
+          "unit": "working_days_per_vessel",
+          "qualifier": "as_little_as",
+          "attribution": "Norsepower company announcement",
+          "statement": "Norsepower states mechanical installation took as little as two working days per vessel."
+        }
+      ],
+      "limitations": [
+        "Vendor press release containing operator self-reported figures, not an independently audited performance dataset.",
+        "The CO2 reductions apply to a comprehensive retrofit including rotors, solar, batteries, power management and optimized propulsion; do not attribute the full figure to rotor sails alone.",
+        "The 7,500 kW figure is favourable-condition equivalent thrust, not annual average delivered propulsion power or a fuel-saving percentage.",
+        "No underlying voyage traces, counterfactual weather correction, uncertainty intervals or raw emissions accounting are supplied in the announcement.",
+        "Short-sea fixed liner operation is not a substitute for deep-sea container/bulk route validation."
+      ],
+      "eligible_use": [
+        "Commercial deployment and integration case study",
+        "Retrofit outage/installation-time benchmark question",
+        "Combined energy-system architecture example",
+        "Requirements for independent operational data"
+      ],
+      "ineligible_use": [
+        "Independent proof of 35% rotor-only CO2 reduction",
+        "Deep-sea savings prediction",
+        "Fleet-wide reliability claim"
+      ]
+    },
+    {
+      "source_id": "ABB-ECONOWIND-VENTOFOIL-ROUTING-2026",
+      "title": "How ABB and Econowind optimize the route to wind-assisted shipping",
+      "publisher": "ABB",
+      "publication_year": 2026,
+      "url": "https://www.abb.com/global/en/news/137533/how-abb-and-econowind-optimize-the-route-to-wind-assisted-shipping",
+      "evidence_class": "vendor_partnership_and_vendor_performance_claim",
+      "scope": {
+        "technology": "Econowind VentoFoil suction-based wing system with ABB SPOS routing",
+        "commercial_deployment": "2025 contract for approximately 150 VentoFoil units across 50 vessels",
+        "routing_platform_adoption": "ABB Ability SPOS reported adopted on more than 4,500 vessels",
+        "operating_method": "weather and route optimization by the ship's Master using routing tools"
+      },
+      "observations": [
+        {
+          "metric_id": "vendor_claimed_ventofoil_fuel_saving",
+          "minimum": 6,
+          "maximum": 10,
+          "unit": "percent",
+          "attribution": "ABB/Econowind public vendor statement",
+          "statement": "ABB reports VentoFoil can help maintain required transit speed on lower main-engine power, with claimed fuel reductions of 6-10%."
+        },
+        {
+          "metric_id": "ventofoil_units_in_supply_contract",
+          "value": 150,
+          "unit": "units",
+          "qualifier": "approximately",
+          "statement": "ABB reports a 2025 Econowind contract covering about 150 VentoFoil units for 50 vessels."
+        },
+        {
+          "metric_id": "sp_os_vessel_adoption",
+          "value": 4500,
+          "unit": "vessels",
+          "qualifier": "more_than",
+          "statement": "ABB reports SPOS has been adopted on more than 4,500 vessels."
+        }
+      ],
+      "limitations": [
+        "Vendor partnership publication; claimed fuel-savings range is not presented as an independent controlled trial result.",
+        "The 150 units/50 vessels is a supply-contract figure, not evidence that every unit is already installed or operating.",
+        "The 4,500-vessel SPOS adoption count is not the number of VentoFoil vessels.",
+        "Weather routing, VentoFoil and other vessel upgrades interact; their effects require a matched counterfactual.",
+        "Do not transfer 6-10% to a deep-sea cargo vessel without route, device count, apparent-wind and service matching."
+      ],
+      "eligible_use": [
+        "Vendor claims benchmark with attribution preserved",
+        "WAPS and voyage-routing integration case",
+        "Commercial rollout and installed-base questions"
+      ],
+      "ineligible_use": [
+        "Independent proof of net vessel fuel saving",
+        "VentoFoil installed-fleet count inferred from SPOS",
+        "Deep-sea performance guarantee"
+      ]
+    },
+    {
+      "source_id": "BAR-WINDWINGS-COMMERCIAL-2026",
+      "title": "WindWings commercial ship technology and performance specifications",
+      "publisher": "BAR Technologies",
+      "publication_year": 2026,
+      "url": "https://www.bartechnologies.uk/commercial-ships/windwings/",
+      "evidence_class": "vendor_product_specification_and_performance_claim",
+      "scope": {
+        "technology": "Three-element folding rigid wing sail with adjustable camber and angle of attack",
+        "large_variant": {
+          "span_m": 37.5,
+          "chord_m": 20,
+          "wing_area_m2": 750,
+          "most_suitable_vessel": "greater than 40,000 DWT"
+        },
+        "compact_variant": {
+          "span_m_range": [
+            20,
+            24
+          ],
+          "chord_m": "10m",
+          "deck_retraction": "tilts to deck level for pilotage/dockside operations"
+        }
+      },
+      "observations": [
+        {
+          "metric_id": "large_wing_vendor_average_fuel_saving",
+          "value": 1.5,
+          "unit": "tonnes_per_day",
+          "attribution": "BAR Technologies vendor page",
+          "statement": "BAR lists average fuel saving of 1.5 tonnes/day for the 37.5m variant."
+        },
+        {
+          "metric_id": "large_wing_vendor_achievable_fuel_saving",
+          "value": 2.1,
+          "unit": "tonnes_per_day",
+          "qualifier": "achievable",
+          "attribution": "BAR Technologies vendor page",
+          "statement": "BAR lists achievable fuel savings of 2.1 tonnes/day for the 37.5m variant."
+        },
+        {
+          "metric_id": "compact_wing_vendor_average_fuel_saving",
+          "value": 0.7,
+          "unit": "tonnes_per_day",
+          "attribution": "BAR Technologies vendor page",
+          "statement": "BAR lists average fuel saving of 0.7 tonnes/day for the 20-24m variant."
+        },
+        {
+          "metric_id": "compact_wing_vendor_achievable_fuel_saving",
+          "value": 0.9,
+          "unit": "tonnes_per_day",
+          "qualifier": "achievable",
+          "attribution": "BAR Technologies vendor page",
+          "statement": "BAR lists achievable fuel saving of 0.9 tonnes/day for the 20-24m variant."
+        }
+      ],
+      "limitations": [
+        "Product-page figures are vendor claims; detailed route/weather, vessel baseline, statistical variation and uncertainty are not supplied on this page.",
+        "Daily tonnes are not a transferable percentage and depend on baseline fuel consumption and operating conditions.",
+        "WindWings has specific folding/deck-space integration and structural requirements.",
+        "Compare net main-engine fuel after auxiliaries, route, installation mass/volume, cargo access, pilotage and availability."
+      ],
+      "eligible_use": [
+        "Commercial device geometry and integration reference",
+        "Vendor-claim replication questions",
+        "Physical installation mass/air-draft/deck-layout data requests"
+      ],
+      "ineligible_use": [
+        "Independent performance validation",
+        "Direct numerical comparison to rotor/suction devices without matched route and vessel"
+      ]
+    },
+    {
+      "source_id": "MTF-WAPS-SMS-GUIDELINES-2026",
+      "title": "Guidelines to Develop and Implement a Safety Management System for Ships Using Wind Assisted Propulsion Systems",
+      "publisher": "Maritime Technologies Forum",
+      "publication_date": "2026-03-30",
+      "url": "https://www.maritimetechnologiesforum.com/en/news-publications/maritime-technologies-forum-announces-new-guidelines-to-strengthen-safety-management-for-ships-using-wind-assisted-propulsion-systems",
+      "evidence_class": "flag_state_and_class_society_safety_management_guidance",
+      "scope": {
+        "ship_scope": "wind-assisted ships, not primary wind-propelled vessels",
+        "technologies": [
+          "rotor sails",
+          "suction sails",
+          "wing sails"
+        ],
+        "considerations": [
+          "operational risk management",
+          "technical integration",
+          "organization",
+          "crew procedures"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Safety management guidance, not a design rule, class approval or complete statutory code.",
+        "The scope is wind-assisted vessels rather than primary wind-powered vessels.",
+        "Project applicability must be checked with flag, class, operator and vessel-specific risk assessment."
+      ],
+      "eligible_use": [
+        "Safety-management requirements and risk register",
+        "Crew training, maintenance and operational procedure design",
+        "Incident, near-miss and non-conformity data requirements"
+      ],
+      "ineligible_use": [
+        "Proof of certification or approval",
+        "Replacement for vessel-specific hazard analysis"
+      ]
+    },
+    {
+      "source_id": "LR-GN-044-WAPS-2024",
+      "title": "LR-GN-044 Guidance Notes on Wind Assisted Propulsion Systems",
+      "publisher": "Lloyd's Register",
+      "publication_date": "2024-01-02",
+      "url": "https://www.lr.org/en/knowledge/lloyds-register-rules/guidance-notes/guidance-notes-on-wind-assisted-propulsion-systems/",
+      "evidence_class": "classification_society_guidance",
+      "scope": {
+        "topics": [
+          "WAPS construction and operation",
+          "supporting structures and foundations",
+          "deck plating and under-deck structure reinforcement"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Guidance notes are not by themselves a class approval for any specific installation.",
+        "Requires vessel-specific structural and integration assessment.",
+        "Applicable rule edition, approval path and notation must be confirmed with LR/class."
+      ],
+      "eligible_use": [
+        "WAPS structural-integration requirements",
+        "Foundation, local reinforcement and hull/deck design review questions"
+      ],
+      "ineligible_use": [
+        "Structural adequacy claim without calculations and approval"
+      ]
+    },
+    {
+      "source_id": "IMO-MSC111-GHG-SAFETY-WORKPLAN-2026",
+      "title": "Maritime Safety Committee 111 highlights: GHG safety framework under SDC",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-22",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-msc-111.aspx",
+      "evidence_class": "regulator_committee_decision_and_workplan",
+      "scope": {
+        "meeting": "MSC 111, 13-22 May 2026",
+        "decision": "endorsed work plan for safety regulatory framework under SDC",
+        "technology_families": [
+          "nuclear power",
+          "wind propulsion and wind-assisted power",
+          "lithium-ion batteries",
+          "swappable traction battery containers"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Endorsement of a work plan is not a completed safety code or an approval to operate a particular design.",
+        "Future work milestones and adoption dates can change; recheck the current IMO instrument status before legal or class decisions."
+      ],
+      "eligible_use": [
+        "Regulatory roadmap and design-risk tracking"
+      ],
+      "ineligible_use": [
+        "Claim that WAPS safety requirements are fully harmonized or approved"
       ]
     }
   ]
