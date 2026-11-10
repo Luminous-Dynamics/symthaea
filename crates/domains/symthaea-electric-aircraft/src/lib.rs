@@ -692,6 +692,7 @@ mod tests {
         let curve = |id: &str, axis: &str, points: Vec<EfficiencyPoint>| EfficiencyCurve {
             id: id.into(),
             x_axis: axis.into(),
+            x_unit: "dimensionless".into(),
             evidence: evidence(&format!("{id}-evidence")),
             points,
         };
