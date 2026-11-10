@@ -279,11 +279,14 @@ fn validate_manifest(manifest: &Manifest) -> (Vec<String>, String) {
             }
             "fixed_predeclared" => {
                 if definition.predeclared_at_ms.is_none_or(|time| {
-                    time == 0 || time >= manifest.split_frozen_at_ms
-                }) || definition
-                    .predeclaration_digest
-                    .as_deref()
-                    .is_none_or(|digest| !is_digest(digest))
+                    time == 0
+                        || time >= manifest.split_frozen_at_ms
+                        || definition.fit_at_ms > time
+                }) || definition.fit_at_ms >= manifest.split_frozen_at_ms
+                    || definition
+                        .predeclaration_digest
+                        .as_deref()
+                        .is_none_or(|digest| !is_digest(digest))
                     || !fit_groups.is_empty()
                 {
                     errors.push(format!(
@@ -503,6 +506,17 @@ fn validate_manifest(manifest: &Manifest) -> (Vec<String>, String) {
                     }
                 }
                 "full_lifetime_extrema" => {
+                    if feature_use.reference_measurement_at_ms.is_none()
+                        || feature_use.reference_received_at_ms.is_none()
+                        || feature_use.reference_received_at_ms
+                            .zip(feature_use.reference_measurement_at_ms)
+                            .is_some_and(|(received, measured)| received < measured)
+                    {
+                        errors.push(format!(
+                            "prediction {} feature {} lacks a chronologically valid full-lifetime reference receipt",
+                            row.sample_digest, feature_use.feature_id
+                        ));
+                    }
                     if manifest.evaluation_mode == "strict_online" {
                         errors.push(format!(
                             "prediction {} feature {} uses a full-lifetime reference in strict-online mode",
@@ -848,6 +862,20 @@ mod tests {
             let case = report.payload.cases.iter()
                 .find(|case| case.case_id == case_id)
                 .expect("timestamp chronology negative control");
+            assert!(!case.accepted);
+        }
+    }
+
+    #[test]
+    fn fixed_fit_must_precede_its_predeclaration_and_full_lifetime_refs_need_time_receipts() {
+        let report = report();
+        for case_id in [
+            "fixed-transform-fit-after-split-freeze-rejected",
+            "offline-full-life-reference-without-time-receipt-rejected",
+        ] {
+            let case = report.payload.cases.iter()
+                .find(|case| case.case_id == case_id)
+                .expect("reference/fit chronology control");
             assert!(!case.accepted);
         }
     }
