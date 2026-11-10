@@ -73,6 +73,155 @@ fn validate_schema_header(
     }
 }
 
+
+const SUPPORTED_SCHEMA_KEYWORDS: [&str; 17] = [
+    "$schema", "$id", "title", "description", "type", "additionalProperties",
+    "required", "properties", "minLength", "enum", "pattern", "uniqueItems",
+    "items", "minimum", "maximum", "const", "minItems",
+];
+
+fn validate_schema_definition(schema: &Value, context: &str, errors: &mut Vec<String>) {
+    let Some(object) = schema.as_object() else {
+        add(errors, context, "schema node must be an object");
+        return;
+    };
+    for keyword in object.keys() {
+        if !SUPPORTED_SCHEMA_KEYWORDS.contains(&keyword.as_str()) {
+            add(errors, context, format!("unsupported schema keyword '{keyword}'"));
+        }
+    }
+    if let Some(kind) = schema.get("type") {
+        let supported = ["object", "array", "string", "number", "integer", "boolean", "null"];
+        let types: Vec<&str> = if let Some(single) = kind.as_str() {
+            vec![single]
+        } else {
+            kind.as_array().into_iter().flatten().filter_map(Value::as_str).collect()
+        };
+        if types.is_empty() || types.iter().any(|item| !supported.contains(item)) {
+            add(errors, context, "schema type contains an unsupported value");
+        }
+    }
+    if let Some(pattern) = schema.get("pattern").and_then(Value::as_str) {
+        if pattern != "^[a-f0-9]{64}$" {
+            add(errors, context, format!("unsupported schema pattern '{pattern}'"));
+        }
+    }
+    if let Some(properties) = schema.get("properties") {
+        if let Some(properties) = properties.as_object() {
+            for (name, child) in properties {
+                validate_schema_definition(child, &format!("{context}.properties.{name}"), errors);
+            }
+        } else {
+            add(errors, context, "schema properties must be an object");
+        }
+    }
+    if let Some(items) = schema.get("items") {
+        validate_schema_definition(items, &format!("{context}.items"), errors);
+    }
+}
+
+fn json_type_matches(value: &Value, kind: &str) -> bool {
+    match kind {
+        "object" => value.is_object(),
+        "array" => value.is_array(),
+        "string" => value.is_string(),
+        "number" => value.is_number(),
+        "integer" => value.as_i64().is_some() || value.as_u64().is_some(),
+        "boolean" => value.is_boolean(),
+        "null" => value.is_null(),
+        _ => false,
+    }
+}
+
+fn validate_json_schema(value: &Value, schema: &Value, context: &str, errors: &mut Vec<String>) {
+    if let Some(kind) = schema.get("type") {
+        let matches = if let Some(single) = kind.as_str() {
+            json_type_matches(value, single)
+        } else {
+            kind.as_array().into_iter().flatten().filter_map(Value::as_str)
+                .any(|candidate| json_type_matches(value, candidate))
+        };
+        if !matches {
+            add(errors, context, format!("schema type mismatch: expected {kind}"));
+            return;
+        }
+    }
+    if let Some(expected) = schema.get("const") {
+        if value != expected {
+            add(errors, context, "schema const mismatch");
+        }
+    }
+    if let Some(variants) = schema.get("enum").and_then(Value::as_array) {
+        if !variants.contains(value) {
+            add(errors, context, "schema enum mismatch");
+        }
+    }
+    if let Some(text) = value.as_str() {
+        if let Some(minimum) = schema.get("minLength").and_then(Value::as_u64) {
+            if text.chars().count() < minimum as usize {
+                add(errors, context, "schema minLength violation");
+            }
+        }
+        if schema.get("pattern").is_some() && !is_sha256(text) {
+            add(errors, context, "schema pattern violation");
+        }
+    }
+    if let Some(number) = value.as_f64() {
+        if let Some(minimum) = schema.get("minimum").and_then(Value::as_f64) {
+            if number < minimum {
+                add(errors, context, "schema minimum violation");
+            }
+        }
+        if let Some(maximum) = schema.get("maximum").and_then(Value::as_f64) {
+            if number > maximum {
+                add(errors, context, "schema maximum violation");
+            }
+        }
+    }
+    if let Some(items) = value.as_array() {
+        if let Some(minimum) = schema.get("minItems").and_then(Value::as_u64) {
+            if items.len() < minimum as usize {
+                add(errors, context, "schema minItems violation");
+            }
+        }
+        if schema.get("uniqueItems").and_then(Value::as_bool) == Some(true) {
+            let serialized: BTreeSet<String> = items.iter().map(Value::to_string).collect();
+            if serialized.len() != items.len() {
+                add(errors, context, "schema uniqueItems violation");
+            }
+        }
+        if let Some(item_schema) = schema.get("items") {
+            for (index, item) in items.iter().enumerate() {
+                validate_json_schema(item, item_schema, &format!("{context}[{index}]"), errors);
+            }
+        }
+    }
+    if let Some(object) = value.as_object() {
+        if let Some(required) = schema.get("required").and_then(Value::as_array) {
+            for property in required.iter().filter_map(Value::as_str) {
+                if !object.contains_key(property) {
+                    add(errors, context, format!("schema required property '{property}' is missing"));
+                }
+            }
+        }
+        let properties = schema.get("properties").and_then(Value::as_object);
+        if schema.get("additionalProperties").and_then(Value::as_bool) == Some(false) {
+            for property in object.keys() {
+                if !properties.is_some_and(|known| known.contains_key(property)) {
+                    add(errors, context, format!("schema additional property '{property}' is not allowed"));
+                }
+            }
+        }
+        if let Some(properties) = properties {
+            for (name, child_schema) in properties {
+                if let Some(child_value) = object.get(name) {
+                    validate_json_schema(child_value, child_schema, &format!("{context}.{name}"), errors);
+                }
+            }
+        }
+    }
+}
+
 fn validate_state(state: &Value, context: &str, errors: &mut Vec<String>) {
     if state.is_null() {
         return;
@@ -216,10 +365,61 @@ fn validate_record(record: &Value) -> Vec<String> {
         }
     }
 
+    if !previous.is_null() && !next.is_null() {
+        let before = string_set(&previous["claim_ids"]);
+        let after = string_set(&next["claim_ids"]);
+        let added = string_set(&delta["added"]);
+        let removed = string_set(&delta["removed"]);
+        let retained = string_set(&delta["retained"]);
+        let contradicted = string_set(&delta["contradicted"]);
+        let retracted = string_set(&delta["retracted"]);
+        let actual_added: BTreeSet<String> = after.difference(&before).cloned().collect();
+        let actual_removed: BTreeSet<String> = before.difference(&after).cloned().collect();
+        let actual_retained: BTreeSet<String> = before.intersection(&after).cloned().collect();
+        let reported_removed: BTreeSet<String> = removed.union(&retracted).cloned().collect();
+
+        if added != actual_added || reported_removed != actual_removed || retained != actual_retained {
+            add(&mut errors, &context, "claim_delta_state_mismatch");
+        }
+        if !contradicted.is_subset(&before)
+            || !retracted.is_subset(&before)
+            || !retracted.is_subset(&reported_removed)
+        {
+            add(&mut errors, &context, "claim_contradiction_or_retraction_not_bound_to_previous_state");
+        }
+    }
+
     let evidence_delta = &record["evidence_delta"];
     for key in ["available_before", "newly_available", "newly_unavailable", "invalidated"] {
         if !evidence_delta[key].is_array() {
             add(&mut errors, &context, format!("evidence_delta.{key} must be an array"));
+        }
+    }
+
+    let available_before = string_set(&evidence_delta["available_before"]);
+    let newly_available = string_set(&evidence_delta["newly_available"]);
+    let newly_unavailable = string_set(&evidence_delta["newly_unavailable"]);
+    let invalidated = string_set(&evidence_delta["invalidated"]);
+    if !available_before.is_disjoint(&newly_available) {
+        add(&mut errors, &context, "evidence_available_before_overlaps_newly_available");
+    }
+    if !newly_available.is_disjoint(&newly_unavailable) {
+        add(&mut errors, &context, "evidence_newly_available_overlaps_newly_unavailable");
+    }
+    let available_during: BTreeSet<String> = available_before.union(&newly_available).cloned().collect();
+    if !invalidated.is_subset(&available_during) {
+        add(&mut errors, &context, "invalidated_evidence_not_previously_available");
+    }
+    if !previous.is_null() && !string_set(&previous["evidence_ids"]).is_subset(&available_before) {
+        add(&mut errors, &context, "previous_state_evidence_not_in_available_before");
+    }
+    if !next.is_null() {
+        let mut usable_after = available_during.clone();
+        for evidence in newly_unavailable.union(&invalidated) {
+            usable_after.remove(evidence);
+        }
+        if !string_set(&next["evidence_ids"]).is_subset(&usable_after) {
+            add(&mut errors, &context, "next_state_evidence_not_available_after_transition");
         }
     }
 
@@ -473,6 +673,10 @@ fn validate_manifest(
 ) -> Result<Report, Vec<String>> {
     let mut errors = Vec::new();
 
+    validate_schema_definition(manifest_schema, "manifest_schema", &mut errors);
+    validate_schema_definition(record_schema, "record_schema", &mut errors);
+    validate_json_schema(manifest, manifest_schema, "manifest", &mut errors);
+
     validate_schema_header(
         manifest_schema,
         "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-revision-ledger-001/REVISION_LEDGER_FIXTURES_V0_1.schema.json",
@@ -549,6 +753,7 @@ fn validate_manifest(
     }
 
     let mut ids = BTreeSet::new();
+    let mut revision_event_ids = BTreeSet::new();
     let mut valid_controls = 0;
     let mut negative_controls = 0;
 
@@ -559,6 +764,16 @@ fn validate_manifest(
             add(&mut errors, &context, "fixture_id must be non-empty and unique");
         }
 
+        validate_json_schema(
+            &fixture["record"],
+            record_schema,
+            &format!("{context}.record"),
+            &mut errors,
+        );
+        let revision_id = field(&fixture["record"], "revision_event_id").unwrap_or_default();
+        if revision_id.is_empty() || !revision_event_ids.insert(revision_id.to_string()) {
+            add(&mut errors, &context, "revision_event_id must be non-empty and unique across the corpus");
+        }
         let actual = validate_record(&fixture["record"]);
         let expected = string_array(&fixture["expected_violations"]);
         if actual != expected {
@@ -670,6 +885,60 @@ mod tests {
 
     fn parsed(text: &str) -> Value {
         serde_json::from_str(text).expect("checked-in JSON must parse")
+    }
+
+    #[test]
+    fn schemas_are_recursively_checked_and_applied_to_every_record() {
+        let mut manifest_schema = parsed(MANIFEST_SCHEMA);
+        manifest_schema["properties"]["optional_probe"] =
+            serde_json::json!({"type":"string","maxLength":12});
+        let errors = validate_manifest(
+            &parsed(MANIFEST),
+            &manifest_schema,
+            &parsed(RECORD_SCHEMA),
+        ).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("unsupported schema keyword 'maxLength'")));
+    }
+
+    #[test]
+    fn records_reject_undeclared_properties() {
+        let mut manifest = parsed(MANIFEST);
+        manifest["fixtures"][0]["record"]["unregistered"] = Value::Bool(true);
+        let errors = validate_manifest(
+            &manifest,
+            &parsed(MANIFEST_SCHEMA),
+            &parsed(RECORD_SCHEMA),
+        ).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("schema additional property 'unregistered'")));
+    }
+
+    #[test]
+    fn duplicate_revision_event_ids_are_rejected() {
+        let mut manifest = parsed(MANIFEST);
+        manifest["fixtures"][1]["record"]["revision_event_id"] =
+            manifest["fixtures"][0]["record"]["revision_event_id"].clone();
+        let errors = validate_manifest(
+            &manifest,
+            &parsed(MANIFEST_SCHEMA),
+            &parsed(RECORD_SCHEMA),
+        ).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("revision_event_id must be non-empty and unique")));
+    }
+
+    #[test]
+    fn claim_deltas_must_match_state_claim_sets() {
+        let mut record = parsed(MANIFEST)["fixtures"][1]["record"].clone();
+        record["claim_delta"]["added"] = serde_json::json!(["CLAIM-FABRICATED"]);
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"claim_delta_state_mismatch".to_string()));
+    }
+
+    #[test]
+    fn evidence_deltas_must_not_invent_invalidated_sources() {
+        let mut record = parsed(MANIFEST)["fixtures"][1]["record"].clone();
+        record["evidence_delta"]["invalidated"] = serde_json::json!(["NEVER-AVAILABLE"]);
+        let errors = validate_record(&record);
+        assert!(errors.contains(&"invalidated_evidence_not_previously_available".to_string()));
     }
 
     #[test]
