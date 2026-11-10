@@ -1279,7 +1279,7 @@ mod tests {
     }
 
     #[test]
-    fn frozen_corpus_accepts_six_cases_and_rejects_two_controls() {
+    fn frozen_corpus_accepts_seven_profiles_and_rejects_five_controls() {
         let report = report();
         assert_eq!(report.payload.case_count, 12);
         assert_eq!(report.payload.accepted_count, 7);
@@ -1470,6 +1470,21 @@ mod tests {
         );
         assert_eq!(row.inconsistency_metrics.beta_soh.status, "NOT_COMPUTABLE");
         assert_eq!(row.inconsistency_metrics.beta_soc.status, "NOT_COMPUTABLE");
+    }
+
+    #[test]
+    fn heterogeneous_nominal_capacity_keeps_beta_soh_uncomputed() {
+        let audited = report();
+        let case = audited.payload.cases.iter()
+            .find(|case| case.case_id == "heterogeneous-nominal-capacity-no-beta-soh")
+            .and_then(|case| case.summary.as_ref())
+            .expect("heterogeneous nominal capacity profile");
+        assert_eq!(case.inconsistency_metrics.sigma_soh.status, "COMPUTED");
+        assert_eq!(case.inconsistency_metrics.beta_soh.status, "NOT_COMPUTABLE");
+        assert_eq!(
+            case.inconsistency_metrics.beta_soh.reason.as_deref(),
+            Some("HOMOGENEOUS_NOMINAL_CELL_CAPACITY_REQUIRED")
+        );
     }
 
     #[test]
