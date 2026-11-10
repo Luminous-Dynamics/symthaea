@@ -70,6 +70,9 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Report-only, simulation-scoped effort-policy validation for assistive mobility.
+#[allow(missing_docs)]
+pub mod effort_policy;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
