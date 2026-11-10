@@ -118,7 +118,7 @@ Use VCRB/VNOC/VELB/VCCR for the control, no-op, locality and correction properti
 
 ### General instruction-based audio editing
 
-Use MMAE public development cases and the released Track 1/Track 2 inputs where useful. The official hidden-track baseline on the 500-case Track 1 set is IFR 40.33%, CR 74.70%, EMR 7.60%; Track 2's 500-case agent baseline is IFR 44.13%, CR 76.09%, EMR 8.00%. These two tracks have different scope and must not be compared as a model-vs-agent ablation.
+Use MMAE public development cases and the released Track 1/Track 2 inputs where useful. The official hidden-track baseline on the 500-case Track 1 set is AuK base with Prompt Enhancer disabled: IFR 40.33%, CR 74.70%, EMR 7.60%. Track 2's 500-case agent baseline uses DeepSeek-V4-Flash as a router over DSP tools, SAM-Audio-Large and AuK with Prompt Enhancer: IFR 44.13%, CR 76.09%, EMR 8.00%. These two tracks have different scope and must not be compared as a model-vs-agent ablation.
 
 The public baseline repository also reports a separate local Qwen3-Omni-judged result on the 2,000-example development benchmark (Agent: IFR 44.06%, CR 74.63%, EMR 7.45%; Single Model: 1003-example subset, IFR 42.12%, CR 75.78%, EMR 7.58%). Do not mix these results with the held-out track cards.
 
@@ -163,6 +163,17 @@ For a 500-case benchmark, report binomial uncertainty and paired test difference
 - #11356 renderer-neutral VocalEditPatch
 - #11402 versioned acoustic observation integration
 - #11525 CQEP-001 plan compiler issue
+
+## Primary references
+
+1. [ICASSP 2027 Audio Editing Challenge](https://audio-editing-challenge.github.io/) — task definitions, official metrics, evaluation protocol, eligibility and timeline.
+2. [Track 1 official test card](https://huggingface.co/datasets/ICASSP2027-AudioEditingChallenge/Track1-Single-Model) — 500 hidden-rubric single-complexity examples and AuK baseline.
+3. [Track 2 official test card](https://huggingface.co/datasets/ICASSP2027-AudioEditingChallenge/Track2-Agent) — 500 hidden-rubric agent examples, including multi-audio, multi-round and multi-hop, and official agent baseline.
+4. [Official challenge baseline repository](https://github.com/Audio-Editing-Challenge/Audio-Editing-Challenge-Baseline) — public 2,000-example development baseline and local evaluator results.
+5. [YingMusic-Singer / LyricEditBench paper](https://arxiv.org/abs/2603.24589) — melody-preserving lyric editing and six task families.
+6. [LyricEditBench dataset card](https://huggingface.co/datasets/ASLP-lab/LyricEditBench) — test composition and non-commercial licence.
+7. [SOTA2 singing-voice synthesis benchmark](https://www.sota2.com/research/task/singing-voice-synthesis) — published dataset-specific comparisons; not a universal cross-dataset ranking.
+8. [Official Audio Editing Challenge SDK](https://github.com/Audio-Editing-Challenge/Audio-Editing-Challenge-SDK) — submission mapping, WAV and USTAR validation, and credentialed upload boundary.
 
 ## Claim boundary
 
