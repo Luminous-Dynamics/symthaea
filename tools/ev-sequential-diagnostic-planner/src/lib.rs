@@ -945,7 +945,7 @@ mod tests {
     }
 
     #[test]
-    fn frozen_corpus_plans_five_cases_and_rejects_one() {
+    fn frozen_corpus_plans_nine_cases_and_rejects_two_controls() {
         let report = report();
         assert_eq!(report.payload.case_count, 11);
         assert_eq!(report.payload.planned_count, 9);
