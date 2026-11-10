@@ -631,14 +631,17 @@ impl VocalPerformance {
         const REST_EPSILON_S: f32 = 0.000_01;
         let mut previous_frequency: Option<f32> = None;
         let mut previous_end_s = 0.0f32;
+        let mut previous_phrase_index: Option<usize> = None;
 
         for syllable in &self.syllables {
+            let begins_new_phrase =
+                previous_phrase_index.is_some_and(|index| index != syllable.phrase_index);
             for note in syllable.notes() {
                 let note_start = note.start_time;
                 let note_end = note_start + note.duration;
                 if time_s >= note_start && time_s < note_end {
                     let gap_before = note_start - previous_end_s;
-                    let from_frequency = if gap_before > REST_EPSILON_S {
+                    let from_frequency = if begins_new_phrase || gap_before > REST_EPSILON_S {
                         note.frequency
                     } else {
                         previous_frequency.unwrap_or(note.frequency)
@@ -660,6 +663,7 @@ impl VocalPerformance {
                 previous_frequency = Some(note.frequency);
                 previous_end_s = note_end;
             }
+            previous_phrase_index = Some(syllable.phrase_index);
         }
         None
     }
@@ -1573,6 +1577,11 @@ mod tests {
             .find(|point| (point.time_s - 1.0).abs() < 1e-6)
             .expect("second phrase onset must be represented in the pitch curve");
         assert_eq!(second_phrase_onset.frequency_hz, 440.0);
+        assert_eq!(
+            performance.target_pitch_center_at(1.0),
+            Some(440.0),
+            "the canonical renderer/evaluator target must also reset at a phrase boundary"
+        );
     }
 
     #[test]
