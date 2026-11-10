@@ -423,7 +423,10 @@ fn validate_matrix(
         if family == "centrality_placement" {
             match (pair_id, content_ref) {
                 (Some(pair), Some(_)) => {
-                    paired_members.entry(pair.to_string()).or_default().push(fixture);
+                    paired_members
+                        .entry(pair.to_string())
+                        .or_default()
+                        .push(fixture);
                 }
                 _ => add(
                     errors,
@@ -461,7 +464,11 @@ fn validate_matrix(
 
     for family in &family_ids {
         let count = family_counts.get(family).copied().unwrap_or_default();
-        let expected = if family == "centrality_placement" { 10 } else { PER_FAMILY };
+        let expected = if family == "centrality_placement" {
+            10
+        } else {
+            PER_FAMILY
+        };
         if count != expected {
             add(
                 errors,
@@ -484,7 +491,9 @@ fn validate_matrix(
                 add(
                     errors,
                     "matrix.fixtures",
-                    format!("seed {seed} may be reused only by the two members of one centrality pair"),
+                    format!(
+                        "seed {seed} may be reused only by the two members of one centrality pair"
+                    ),
                 );
             }
         }
@@ -495,7 +504,10 @@ fn validate_matrix(
             add(
                 errors,
                 "matrix.paired_blocks",
-                format!("paired block '{pair_id}' must contain exactly two members; found {}", members.len()),
+                format!(
+                    "paired block '{pair_id}' must contain exactly two members; found {}",
+                    members.len()
+                ),
             );
             continue;
         }
@@ -529,14 +541,15 @@ fn validate_matrix(
             add(
                 errors,
                 "matrix.paired_blocks",
-                format!("paired block '{pair_id}' must contrast leaf/periphery with hub/core placement"),
+                format!(
+                    "paired block '{pair_id}' must contrast leaf/periphery with hub/core placement"
+                ),
             );
         }
     }
 
     if !fixtures.iter().any(|fixture| {
-        fixture["family_id"] == "no_discussion_repeat"
-            && fixture["class"] == "measurement_control"
+        fixture["family_id"] == "no_discussion_repeat" && fixture["class"] == "measurement_control"
     }) {
         add(
             errors,
@@ -555,8 +568,7 @@ fn validate_matrix(
         );
     }
     if !fixtures.iter().any(|fixture| {
-        fixture["family_id"] == "unsupported_social_influence"
-            && fixture["class"] == "red_team"
+        fixture["family_id"] == "unsupported_social_influence" && fixture["class"] == "red_team"
     }) {
         add(
             errors,
@@ -568,7 +580,10 @@ fn validate_matrix(
         add(
             errors,
             "matrix.fixtures",
-            format!("expected five matched centrality blocks, found {}", paired_members.len()),
+            format!(
+                "expected five matched centrality blocks, found {}",
+                paired_members.len()
+            ),
         );
     }
     if topologies.len() < MIN_TOPOLOGIES {
@@ -834,7 +849,11 @@ mod tests {
         let mut errors = Vec::new();
         let report = validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
         assert_eq!(report.fixtures, 44);
-        assert!(errors.iter().any(|error| error.contains("expected 45 fixtures")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("expected 45 fixtures"))
+        );
     }
 
     #[test]
@@ -858,7 +877,11 @@ mod tests {
         matrix["fixtures"][1]["seed"] = first;
         let mut errors = Vec::new();
         validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
-        assert!(errors.iter().any(|error| error.contains("may be reused only by the two members")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("may be reused only by the two members"))
+        );
     }
 
     #[test]
@@ -935,7 +958,11 @@ mod tests {
         second["graph_profile_ref"] = Value::String("IG-DATA-001/star/v0.1".into());
         let mut errors = Vec::new();
         validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
-        assert!(errors.iter().any(|error| error.contains("must match graph_profile_ref")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("must match graph_profile_ref"))
+        );
     }
 
     #[test]
@@ -950,7 +977,11 @@ mod tests {
         second["agent_placement"] = Value::String("leaf_or_periphery".into());
         let mut errors = Vec::new();
         validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
-        assert!(errors.iter().any(|error| error.contains("must contrast leaf/periphery with hub/core")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("must contrast leaf/periphery with hub/core"))
+        );
     }
 
     #[test]
