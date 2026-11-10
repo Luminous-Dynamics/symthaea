@@ -12,7 +12,7 @@ For policy π, the finite-horizon objective is the expected sum of test costs, d
 
 ## Hard eligibility
 
-A test is selectable only if safety approval, calibration validity, domain support and equipment availability are all true. Every test binds protocol and equipment digests. Conditional tests can require a specific earlier test outcome. Test IDs cannot be reused; dependency cycles are rejected; the horizon is capped at eight.
+A test is selectable only if safety approval, calibration validity, domain support and equipment availability are all true. Every test binds protocol and equipment digests, plus separate evidence digests for the test cost and downtime cost. Every selected policy node emits a receipt containing those digests, cost values and hard eligibility states. Conditional tests can require a specific earlier test outcome. Test IDs cannot be reused; dependency cycles are rejected; the horizon is capped at eight.
 
 Likelihoods must be finite, between zero and one, and sum to one over outcomes separately for every hypothesis. Invalid likelihoods are rejected, not renormalized.
 
@@ -28,11 +28,11 @@ A separate fixture makes test B conditionally available only after A=a1. The sel
 
 ## Frozen corpus
 
-Seven cases: complementary positive sequence, conditionally available second test, positive one-step test, perfect-information/zero-decision-value control, missing-safety-approval control, invalid-likelihood rejection, and no-admissible-terminal-action ABSTAIN.
+Seven cases: complementary positive sequence, conditionally available second test, positive one-step test, perfect-information/zero-decision-value control, missing-safety-approval control, invalid-likelihood rejection, and no-admissible-terminal-action ABSTAIN. The report includes posterior state and branch probability on each policy node.
 
 ## Benchmark tournament
 
-Compare no-test/current evidence, fixed periodic scheduling, random eligible testing, maximum entropy/information gain, greedy one-step EVSI, sequential EVSI, and an exact finite-horizon oracle (upper bound only). Report expected terminal decision loss/regret, net value, expected tests and downtime per asset, maximum tests per path, time-to-decision, false escalation, missed inspection and sensitivity to likelihood misspecification.
+Compare no-test/current evidence, fixed periodic scheduling, random eligible testing, maximum entropy/information gain, greedy one-step EVSI and sequential EVSI. Each report now exposes the best admissible greedy one-step choice, its net value, the sequential net value and the uplift over greedy. The exact finite-horizon optimizer is an oracle ceiling on the frozen model, not a deployable baseline. Report expected terminal decision loss/regret, net value, expected tests and downtime per asset, maximum tests per path, time-to-decision, false escalation, missed inspection and sensitivity to likelihood misspecification.
 
 Calibrate likelihoods on independent group-disjoint physical assets. Report Brier score, log score and reliability by chemistry, temperature, SOC, age and protocol before any physical diagnostic claims.
 
