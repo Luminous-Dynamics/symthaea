@@ -179,13 +179,8 @@ fn check_registry_semantics(register: &Value, findings: &mut Findings) {
                         "proposed/under-review status conflicts with adopted_on; resolve status before use",
                     );
                 }
-                if scheduled_from.is_none() && status == "under_review" {
-                    findings.push(
-                        format!("{path}/dates/review_scheduled_from"),
-                        "INCOMPLETE",
-                        "under-review rule has no dated review snapshot or scheduled review marker",
-                    );
-                }
+                // The registry-level snapshot_date is the authoritative dated status snapshot.
+                // A future meeting date is optional: do not invent one for an unscheduled review.
             }
             "adopted" => {
                 if valid_date(adopted).is_none() {
@@ -699,6 +694,18 @@ mod tests {
         assert!(conditions.iter().any(|x| x.as_str().unwrap().contains("1 January 2031")));
         let milestones = rule["calculation_contract"]["phase_in"].as_array().unwrap();
         assert!(milestones.iter().any(|x| x["year"] == 2028 && x["value"] == 0.10));
+    }
+
+    #[test]
+    fn dated_under_review_rule_need_not_invent_a_future_meeting_date() {
+        let mut register: Value = serde_json::from_str(RULE_REGISTER).expect("rule register JSON");
+        let item = register["rules"].as_array_mut().unwrap().iter_mut()
+            .find(|rule| rule["rule_id"] == "IMO-ISSM-NEW-SHIPS-DRAFT-2026")
+            .expect("draft ISSM rule");
+        item["dates"].as_object_mut().unwrap().remove("review_scheduled_from");
+        let mut findings = Findings::default();
+        check_registry_semantics(&register, &mut findings);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
     }
 
     #[test]
