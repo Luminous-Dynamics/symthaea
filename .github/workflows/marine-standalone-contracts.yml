@@ -64,6 +64,16 @@ jobs:
           test "$status" -eq 2
           jq -e '.disposition == "INCOMPLETE"' "$RUNNER_TEMP/marine-case-report.json"
 
+      - name: Regulatory rule register v0.1.0 retains split ECA timelines
+        run: |
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-regulatory-rule-audit -- \
+            docs/research/marine/marine-regulatory-rule-register-v0.1.0.schema.json \
+            docs/research/marine/marine-regulatory-rule-register-2026-11-10.json \
+            > "$RUNNER_TEMP/marine-regulatory-v0.1-report.json"
+          cat "$RUNNER_TEMP/marine-regulatory-v0.1-report.json"
+          jq -e '.disposition == "REGISTER_CONTRACT_VALID"' "$RUNNER_TEMP/marine-regulatory-v0.1-report.json"
+
       - name: Regulatory rule register returns REGISTER_CONTRACT_VALID
         run: |
           cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
@@ -73,6 +83,21 @@ jobs:
             > "$RUNNER_TEMP/marine-regulatory-report.json"
           cat "$RUNNER_TEMP/marine-regulatory-report.json"
           jq -e '.disposition == "REGISTER_CONTRACT_VALID"' "$RUNNER_TEMP/marine-regulatory-report.json"
+
+      - name: Engine-resolved CH4/N2O evidence remains explicitly INCOMPLETE when synthetic/uncertainty is unqualified
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-emissions-evidence-audit -- \
+            docs/research/marine/marine-emissions-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-gas-emissions-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-emissions-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-emissions-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .expected_gases == 2 and .observed_gases == 2' "$RUNNER_TEMP/marine-emissions-report.json"
 
       - name: Energy source ledger known subtotal remains incomplete when wind is unknown
         shell: bash
@@ -132,3 +157,4 @@ jobs:
             ${{ runner.temp }}/marine-causal-report.json
             ${{ runner.temp }}/marine-wind-energy-report.json
             ${{ runner.temp }}/marine-energy-ledger-report.json
+            ${{ runner.temp }}/marine-emissions-report.json
