@@ -1514,10 +1514,7 @@ pub mod part_aware_v1 {
         let serialized_score = serde_json::to_vec(score).map_err(|error| {
             PartAwareMidiExportErrorV1::ScoreSerialization(error.to_string())
         })?;
-        let actual_score_sha256 = domain_separated_sha256(
-            ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1,
-            &serialized_score,
-        );
+        let actual_score_sha256 = sha256_hex(&serialized_score);
         if actual_score_sha256 != expected_score_sha256 {
             return Err(PartAwareMidiExportErrorV1::ScoreDigestMismatch {
                 expected: expected_score_sha256.to_owned(),
@@ -1998,7 +1995,7 @@ pub mod part_aware_v1 {
 
         fn score_digest(score: &Score) -> String {
             let bytes = serde_json::to_vec(score).expect("test score serializes");
-            domain_separated_sha256(ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1, &bytes)
+            sha256_hex(&bytes)
         }
 
         fn note(part: u16, midi: u8, onset: Duration, duration: Duration) -> ScoreNote {
