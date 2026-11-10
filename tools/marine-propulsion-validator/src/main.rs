@@ -632,13 +632,13 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         ),
                         _ => {}
                     }
-                    if let Some((sample_start, sample_end)) = window {
+                    if let Some((sample_start, sample_end)) = window.clone() {
                         let valid_from = record.get("valid_from").and_then(Value::as_str)
                             .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
                         let valid_until = record.get("valid_until").and_then(Value::as_str)
                             .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
                         match (valid_from, valid_until) {
-                            (Some(from), Some(until)) if from < sample_start && until >= sample_end => {}
+                            (Some(from), Some(until)) if from <= sample_start && until >= sample_end => {}
                             (Some(from), Some(until)) if from >= until => f.push(
                                 &record_path,
                                 "INVALID",
@@ -672,13 +672,13 @@ fn check_trial(case: &Value, f: &mut Findings) {
                         "/trial_evidence/timebases/{}",
                         timebases.iter().position(|r| r.get("timebase_id").and_then(Value::as_str)==Some(timebase_id)).unwrap_or(0)
                     );
-                    if let Some((sample_start, sample_end)) = window {
+                    if let Some((sample_start, sample_end)) = window.clone() {
                         let valid_from = record.get("valid_from").and_then(Value::as_str)
                             .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
                         let valid_until = record.get("valid_until").and_then(Value::as_str)
                             .and_then(|v| DateTime::parse_from_rfc3339(v).ok());
                         match (valid_from, valid_until) {
-                            (Some(from), Some(until)) if from < sample_start && until >= sample_end => {}
+                            (Some(from), Some(until)) if from <= sample_start && until >= sample_end => {}
                             (Some(from), Some(until)) if from >= until => f.push(
                                 &record_path,
                                 "INVALID",
