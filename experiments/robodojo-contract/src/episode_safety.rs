@@ -146,6 +146,18 @@ pub struct EpisodeSafetyResult {
     pub worst_violation_depth: Option<f64>,
 }
 
+impl EpisodeSafetyResult {
+    /// Label for the selective-risk certificate's observed unsafe-event field.
+    /// Unresolved and NotApplicable do not become false/zero-risk outcomes.
+    pub fn observed_unsafe_event(&self) -> Option<bool> {
+        match self.safety_status {
+            EpisodeSafetyStatus::Compliant => Some(false),
+            EpisodeSafetyStatus::Violated => Some(true),
+            EpisodeSafetyStatus::Unresolved | EpisodeSafetyStatus::NotApplicable => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct EpisodeSafetySummary {
     pub task_id: Option<String>,
@@ -738,6 +750,26 @@ mod tests {
         assert_eq!(audit.overall.successful_but_unsafe_count, 1);
         assert_eq!(audit.overall.successful_but_unsafe_rate, Some(0.5));
         assert_eq!(audit.overall.successful_but_unsafe_among_successes, Some(0.5));
+    }
+
+    #[test]
+    fn safety_outcome_maps_to_selective_risk_label_without_collapsing_unknowns() {
+        let input = manifest();
+        let mut unresolved = observation(&input, 0, Some(true), false);
+        unresolved.spec_verdicts.pop();
+        let rows = vec![
+            observation(&input, 0, Some(true), true),
+            observation(&input, 1, Some(true), false),
+        ];
+        let audit = audit_episode_safety(&input, &rows).unwrap();
+        assert_eq!(audit.results[0].observed_unsafe_event(), Some(true));
+        assert_eq!(audit.results[1].observed_unsafe_event(), Some(false));
+
+        let unresolved_audit = audit_episode_safety(
+            &input,
+            &[unresolved, observation(&input, 1, Some(true), false)],
+        ).unwrap();
+        assert_eq!(unresolved_audit.results[0].observed_unsafe_event(), None);
     }
 
     #[test]
