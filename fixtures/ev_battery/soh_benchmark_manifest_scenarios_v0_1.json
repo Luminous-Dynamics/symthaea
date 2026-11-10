@@ -8,7 +8,7 @@
       "manifest": {
         "protocol_version": "ev-soh-benchmark-manifest/0.1",
         "benchmark_id": "unseen-cell-clean",
-        "evidence_class": "physical_observation",
+        "evidence_class": "synthetic_fixture",
         "dataset": {
           "source_id": "synthetic-public-benchmark",
           "version": "1.0",
@@ -181,7 +181,7 @@
       "manifest": {
         "protocol_version": "ev-soh-benchmark-manifest/0.1",
         "benchmark_id": "unseen-cell-shared-cell-leak",
-        "evidence_class": "physical_observation",
+        "evidence_class": "synthetic_fixture",
         "dataset": {
           "source_id": "synthetic-public-benchmark",
           "version": "1.0",
@@ -354,7 +354,7 @@
       "manifest": {
         "protocol_version": "ev-soh-benchmark-manifest/0.1",
         "benchmark_id": "preprocess-fit-on-test",
-        "evidence_class": "physical_observation",
+        "evidence_class": "synthetic_fixture",
         "dataset": {
           "source_id": "synthetic-public-benchmark",
           "version": "1.0",
@@ -527,7 +527,7 @@
       "manifest": {
         "protocol_version": "ev-soh-benchmark-manifest/0.1",
         "benchmark_id": "same-cell-time-forward",
-        "evidence_class": "physical_observation",
+        "evidence_class": "synthetic_fixture",
         "dataset": {
           "source_id": "synthetic-public-benchmark",
           "version": "1.0",
@@ -700,7 +700,7 @@
       "manifest": {
         "protocol_version": "ev-soh-benchmark-manifest/0.1",
         "benchmark_id": "duplicate-sample-cross-split",
-        "evidence_class": "physical_observation",
+        "evidence_class": "synthetic_fixture",
         "dataset": {
           "source_id": "synthetic-public-benchmark",
           "version": "1.0",
@@ -873,7 +873,7 @@
       "manifest": {
         "protocol_version": "ev-soh-benchmark-manifest/0.1",
         "benchmark_id": "unlabeled-target-adaptation-explicit",
-        "evidence_class": "physical_observation",
+        "evidence_class": "synthetic_fixture",
         "dataset": {
           "source_id": "synthetic-public-benchmark",
           "version": "1.0",
