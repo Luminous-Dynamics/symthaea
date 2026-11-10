@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::family_noninferiority::{
-    FamilyGuardrailError, FamilyGuardrailPlan, FamilyGuardrailReport, FamilyGuardrailStatus,
+    FamilyGuardrailPlan, FamilyGuardrailReport, FamilyGuardrailStatus,
     validate_family_guardrail_report_for_candidate,
 };
 use crate::sequential_weight_verification::{
@@ -205,7 +205,9 @@ pub fn bind_sequential_verification_evidence(
     }
     validate_digest(&report.binding.precondition_gate_digest)?;
 
-    family_plan.validate()?;
+    family_plan
+        .validate()
+        .map_err(|_| SequentialWeightProgramError::FamilyGuardrailEvidenceMismatch)?;
     if family_report.status != FamilyGuardrailStatus::AllFamiliesNonInferior
         || family_report.candidate_index != report.binding.candidate_index
         || (family_report.campaign_alpha - report.config.campaign_alpha).abs() > 1e-12
@@ -312,8 +314,6 @@ pub enum SequentialWeightProgramError {
     StatisticalEvidenceMismatch(&'static str),
     #[error(transparent)]
     StatisticalVerification(#[from] SequentialWeightVerificationError),
-    #[error(transparent)]
-    FamilyGuardrail(#[from] FamilyGuardrailError),
     #[error("family non-inferiority evidence is missing, regressed, or bound to a different candidate")]
     FamilyGuardrailEvidenceMismatch,
     #[error("cumulative L2 edit path exceeds the session budget")]
