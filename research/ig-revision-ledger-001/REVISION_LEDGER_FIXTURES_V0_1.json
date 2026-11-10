@@ -235,8 +235,8 @@
           "explanation_sha256": "000000000000000000000000000000000000000000000000000000000000000b"
         },
         "oracle": {
-          "task_profile": "SyntheticKnownAnswer",
-          "outcome": "NotApplicable",
+          "task_profile": "SocialClaimIntegrity",
+          "outcome": "Indeterminate",
           "answer_space_sha256": null,
           "oracle_receipt_sha256": null
         },
@@ -389,7 +389,7 @@
           "explanation_sha256": null
         },
         "oracle": {
-          "task_profile": "SyntheticKnownAnswer",
+          "task_profile": "MeasurementOnly",
           "outcome": "NotApplicable",
           "answer_space_sha256": null,
           "oracle_receipt_sha256": null
@@ -466,7 +466,7 @@
           "explanation_sha256": null
         },
         "oracle": {
-          "task_profile": "SyntheticKnownAnswer",
+          "task_profile": "MeasurementOnly",
           "outcome": "NotApplicable",
           "answer_space_sha256": null,
           "oracle_receipt_sha256": null
@@ -543,7 +543,7 @@
           "explanation_sha256": null
         },
         "oracle": {
-          "task_profile": "SyntheticKnownAnswer",
+          "task_profile": "MeasurementOnly",
           "outcome": "NotApplicable",
           "answer_space_sha256": null,
           "oracle_receipt_sha256": null
@@ -624,7 +624,7 @@
           "explanation_sha256": null
         },
         "oracle": {
-          "task_profile": "SyntheticKnownAnswer",
+          "task_profile": "MeasurementOnly",
           "outcome": "NotApplicable",
           "answer_space_sha256": null,
           "oracle_receipt_sha256": null
@@ -707,7 +707,7 @@
           "explanation_sha256": null
         },
         "oracle": {
-          "task_profile": "SyntheticKnownAnswer",
+          "task_profile": "MeasurementOnly",
           "outcome": "NotApplicable",
           "answer_space_sha256": null,
           "oracle_receipt_sha256": null
@@ -785,9 +785,9 @@
         },
         "oracle": {
           "task_profile": "SyntheticKnownAnswer",
-          "outcome": "NotApplicable",
-          "answer_space_sha256": null,
-          "oracle_receipt_sha256": null
+          "outcome": "Supported",
+          "answer_space_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "oracle_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         "descriptive_exposure": {
           "social_message_exposure": false,
@@ -1207,7 +1207,7 @@
           "explanation_sha256": null
         },
         "oracle": {
-          "task_profile": "SyntheticKnownAnswer",
+          "task_profile": "MeasurementOnly",
           "outcome": "NotApplicable",
           "answer_space_sha256": null,
           "oracle_receipt_sha256": null
@@ -1424,7 +1424,7 @@
           "explanation_sha256": null
         },
         "oracle": {
-          "task_profile": "SyntheticKnownAnswer",
+          "task_profile": "MeasurementOnly",
           "outcome": "NotApplicable",
           "answer_space_sha256": null,
           "oracle_receipt_sha256": null
