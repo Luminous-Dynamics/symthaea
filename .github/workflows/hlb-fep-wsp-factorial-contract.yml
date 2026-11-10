@@ -44,6 +44,7 @@ on:
       - "crates/core/symthaea-core/src/sequential_weight_program.rs"
       - "crates/core/symthaea-core/src/sequential_weight_verification.rs"
       - "crates/core/symthaea-core/src/family_noninferiority.rs"
+      - "crates/core/symthaea-core/examples/hlb_family_noninferiority_guardrails.rs"
       - "crates/core/symthaea-fep/src/open_world_weight_program_gate.rs"
       - "src/dynamics/cfc/weight_program_adapter.rs"
       - "src/dynamics/cfc/mod.rs"
@@ -153,6 +154,7 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/sequential_weight_program.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/sequential_weight_verification.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/family_noninferiority.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_family_noninferiority_guardrails.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/weight_program_adapter.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs crates/core/symthaea-fep/src/gaussian_model_information_gain.rs
@@ -238,6 +240,27 @@ jobs:
           cargo test --locked --release -p symthaea-core --lib hdc::structured_mixer::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_structured_mixer_benchmark -- --nocapture
 
+
+      - name: Run exact-head family non-inferiority known answers
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-core --example hlb_family_noninferiority_guardrails > research-results/hlb-family-noninferiority-known-answers.json
+          jq -e --arg source_sha "$SYMTHAEA_SOURCE_SHA" '
+            .schema_version == "hlb-family-noninferiority-known-answers-v1" and
+            .status == "synthetic_known_answer_fixture_only" and
+            .source_sha == $source_sha and
+            .campaign_alpha == 0.05 and
+            .candidate_ordinal == 1 and
+            .simultaneous_family_bounds == true and
+            (.cases | length == 3) and
+            .cases[0].status == "AllFamiliesNonInferior" and
+            .cases[1].status == "RegressionDetected" and
+            .cases[2].status == "InconclusiveAtBudget"
+          ' research-results/hlb-family-noninferiority-known-answers.json >/dev/null
+          cat research-results/hlb-family-noninferiority-known-answers.json
 
       - name: Run decision-focused diagnostic policy benchmark
         env:
