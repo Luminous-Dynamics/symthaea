@@ -38,7 +38,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -56,7 +57,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -68,7 +78,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -87,7 +106,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -106,7 +134,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
@@ -118,7 +155,16 @@
                 "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -374,7 +420,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -392,7 +439,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -404,7 +460,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -423,7 +488,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -442,7 +516,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -551,7 +634,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -569,7 +653,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -581,7 +674,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -600,7 +702,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -619,7 +730,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -728,7 +848,8 @@
           "group_level": "cell",
           "generalization_claim": "future_within_seen_cell",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -746,7 +867,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -758,7 +888,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -777,7 +916,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000001bbd",
@@ -789,7 +937,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -808,7 +965,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000001c21",
@@ -820,7 +986,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -1076,7 +1251,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -1094,7 +1270,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -1106,7 +1291,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -1125,7 +1319,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -1144,7 +1347,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -1253,7 +1465,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -1271,7 +1484,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -1283,7 +1505,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -1302,7 +1533,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -1321,7 +1561,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -1430,7 +1679,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -1448,7 +1698,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -1460,7 +1719,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -1479,7 +1747,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -1498,7 +1775,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -1607,7 +1893,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -1625,7 +1912,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -1637,7 +1933,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -1656,7 +1961,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -1675,7 +1989,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -1784,7 +2107,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -1802,7 +2126,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -1814,7 +2147,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -1833,7 +2175,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -1852,7 +2203,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
@@ -1864,7 +2224,16 @@
                 "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -2120,7 +2489,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -2138,7 +2508,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -2150,7 +2529,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -2169,7 +2557,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -2188,7 +2585,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
@@ -2200,7 +2606,16 @@
                 "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -2456,7 +2871,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -2474,7 +2890,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -2486,7 +2911,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -2505,7 +2939,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -2524,7 +2967,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
@@ -2536,7 +2988,16 @@
                 "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -2792,7 +3253,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -2810,7 +3272,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -2822,7 +3293,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -2841,7 +3321,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -2860,7 +3349,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
@@ -2872,7 +3370,16 @@
                 "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -3128,7 +3635,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -3146,7 +3654,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -3158,7 +3675,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -3177,7 +3703,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -3196,7 +3731,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
@@ -3208,7 +3752,16 @@
                 "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -3464,7 +4017,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -3482,7 +4036,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -3494,7 +4057,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -3513,7 +4085,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -3532,7 +4113,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
@@ -3544,7 +4134,16 @@
                 "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -3800,7 +4399,8 @@
           "group_level": "cell",
           "generalization_claim": "unseen_cell_transfer",
           "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
-          "split_frozen_at_ms": 50
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "retrospective_full_cycle"
         },
         "splits": {
           "train": {
@@ -3818,7 +4418,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
@@ -3830,7 +4439,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 100,
-                "observation_end_ms": 200
+                "observation_end_ms": 200,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 200,
+                "target_reference_time_ms": 201
               }
             ]
           },
@@ -3849,7 +4467,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 300,
-                "observation_end_ms": 400
+                "observation_end_ms": 400,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 400,
+                "target_reference_time_ms": 401
               }
             ]
           },
@@ -3868,7 +4495,16 @@
                 "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               },
               {
                 "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
@@ -3880,7 +4516,16 @@
                 "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
                 "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
                 "observation_start_ms": 500,
-                "observation_end_ms": 600
+                "observation_end_ms": 600,
+                "feature_set_ref": "full-discharge-diagnostics-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000708",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 600,
+                "target_reference_time_ms": 601
               }
             ]
           }
@@ -3983,6 +4628,1534 @@
               {
                 "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
                 "value": 0.044,
+                "sample_count": 60
+              }
+            ]
+          }
+        ],
+        "uncertainty": {
+          "status": "reported",
+          "method": "split_conformal",
+          "nominal_levels": [
+            0.9,
+            0.95
+          ],
+          "calibration_partition": "validation_only",
+          "domain_stratified": true,
+          "calibration_source_digest": null
+        },
+        "execution": {
+          "source_commit": "0123456789abcdef0123456789abcdef01234567",
+          "dependency_lock_digest": "0000000000000000000000000000000000000000000000000000000000000017",
+          "toolchain": "rustc 1.96.0",
+          "toolchain_digest": "0000000000000000000000000000000000000000000000000000000000000018",
+          "hardware": "synthetic-fixture-host",
+          "random_seeds": [
+            7,
+            11
+          ],
+          "wall_time_ms": 1500,
+          "peak_memory_bytes": 1048576,
+          "energy_wh": null,
+          "environment_digest": "0000000000000000000000000000000000000000000000000000000000000019"
+        }
+      }
+    },
+    {
+      "case_id": "early-charge-partial-window-valid",
+      "expectation": "accept",
+      "manifest": {
+        "protocol_version": "ev-soh-benchmark-manifest/0.1",
+        "benchmark_id": "early-charge-partial-window-valid",
+        "evidence_class": "synthetic_fixture",
+        "dataset": {
+          "source_id": "synthetic-public-benchmark",
+          "version": "1.0",
+          "source_ref": "https://example.invalid/dataset",
+          "source_digest": "000000000000000000000000000000000000000000000000000000000000000a",
+          "license_ref": "synthetic-open-license",
+          "retrieved_at": "2026-11-10",
+          "selected_subset_digest": "000000000000000000000000000000000000000000000000000000000000000b"
+        },
+        "target": {
+          "metric": "capacity_soh",
+          "definition_digest": "000000000000000000000000000000000000000000000000000000000000000c",
+          "numerator": "reference_capacity_Ah",
+          "denominator": "initial_measured_capacity_Ah",
+          "reference_protocol_digest": "000000000000000000000000000000000000000000000000000000000000000d",
+          "reference_condition_digest": "000000000000000000000000000000000000000000000000000000000000000e",
+          "unit": "fraction",
+          "label_uncertainty": {
+            "method": "repeat_reference_test_standard_uncertainty",
+            "standard_uncertainty": 0.005,
+            "unit": "fraction",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000000f"
+          }
+        },
+        "evaluation": {
+          "mode": "unseen_cell",
+          "group_level": "cell",
+          "generalization_claim": "unseen_cell_transfer",
+          "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "online_early_charge"
+        },
+        "splits": {
+          "train": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+            "window_start_ms": 100,
+            "window_end_ms": 200,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 100,
+                "observation_end_ms": 200,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 150,
+                "feature_available_at_ms": 150,
+                "prediction_time_ms": 151,
+                "target_reference_time_ms": 202
+              },
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012e",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 100,
+                "observation_end_ms": 200,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 150,
+                "feature_available_at_ms": 150,
+                "prediction_time_ms": 151,
+                "target_reference_time_ms": 202
+              }
+            ]
+          },
+          "validation": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+            "window_start_ms": 300,
+            "window_end_ms": 400,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 300,
+                "observation_end_ms": 400,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 350,
+                "feature_available_at_ms": 350,
+                "prediction_time_ms": 351,
+                "target_reference_time_ms": 402
+              }
+            ]
+          },
+          "test": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000016",
+            "window_start_ms": 500,
+            "window_end_ms": 600,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000cc",
+                "pack_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 500,
+                "observation_end_ms": 600,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 550,
+                "feature_available_at_ms": 550,
+                "prediction_time_ms": 551,
+                "target_reference_time_ms": 602
+              },
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "module_digest": "0000000000000000000000000000000000000000000000000000000000001f43",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000232b",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000002713",
+                "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "observation_start_ms": 500,
+                "observation_end_ms": 600,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 550,
+                "feature_available_at_ms": 550,
+                "prediction_time_ms": 551,
+                "target_reference_time_ms": 602
+              }
+            ]
+          }
+        },
+        "preprocessing": [
+          {
+            "transform_id": "standardize",
+            "method": "mean_std",
+            "fit_scope": "train_only",
+            "uses_validation_or_test_labels": false,
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000011",
+            "predeclared_at_ms": null,
+            "predeclaration_digest": null
+          }
+        ],
+        "target_adaptation": {
+          "mode": "none",
+          "unlabeled_target_budget": 0,
+          "labeled_target_budget": 0,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000012"
+        },
+        "metrics": [
+          {
+            "name": "mae",
+            "formula": "synthetic-known-truth-mae-macro_cell",
+            "unit": "fraction",
+            "aggregation": "macro_cell",
+            "value": 0.02,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032c9",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "value": 0.019,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "value": 0.021,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "rmse",
+            "formula": "synthetic-known-truth-rmse-macro_cell",
+            "unit": "fraction",
+            "aggregation": "macro_cell",
+            "value": 0.0275,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032ca",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "value": 0.025,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "value": 0.03,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "mae",
+            "formula": "synthetic-known-truth-mae-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.031,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cb",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.022,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.031,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "rmse",
+            "formula": "synthetic-known-truth-rmse-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.044,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cc",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.035,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.044,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_90",
+            "formula": "synthetic-known-truth-interval_coverage_90-macro_domain",
+            "unit": "fraction",
+            "aggregation": "macro_domain",
+            "value": 0.93,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cd",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.94,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.92,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_90",
+            "formula": "synthetic-known-truth-interval_coverage_90-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.92,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032ce",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.94,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.92,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_95",
+            "formula": "synthetic-known-truth-interval_coverage_95-macro_domain",
+            "unit": "fraction",
+            "aggregation": "macro_domain",
+            "value": 0.96,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cf",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.97,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.95,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_95",
+            "formula": "synthetic-known-truth-interval_coverage_95-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.95,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032d0",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.97,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.95,
+                "sample_count": 60
+              }
+            ]
+          }
+        ],
+        "uncertainty": {
+          "status": "reported",
+          "method": "split_conformal",
+          "nominal_levels": [
+            0.9,
+            0.95
+          ],
+          "calibration_partition": "validation_only",
+          "domain_stratified": true,
+          "calibration_source_digest": null
+        },
+        "execution": {
+          "source_commit": "0123456789abcdef0123456789abcdef01234567",
+          "dependency_lock_digest": "0000000000000000000000000000000000000000000000000000000000000017",
+          "toolchain": "rustc 1.96.0",
+          "toolchain_digest": "0000000000000000000000000000000000000000000000000000000000000018",
+          "hardware": "synthetic-fixture-host",
+          "random_seeds": [
+            7,
+            11
+          ],
+          "wall_time_ms": 1500,
+          "peak_memory_bytes": 1048576,
+          "energy_wh": null,
+          "environment_digest": "0000000000000000000000000000000000000000000000000000000000000019"
+        }
+      }
+    },
+    {
+      "case_id": "early-charge-full-discharge-feature-leakage-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-benchmark-manifest/0.1",
+        "benchmark_id": "early-charge-full-discharge-feature-leakage-rejected",
+        "evidence_class": "synthetic_fixture",
+        "dataset": {
+          "source_id": "synthetic-public-benchmark",
+          "version": "1.0",
+          "source_ref": "https://example.invalid/dataset",
+          "source_digest": "000000000000000000000000000000000000000000000000000000000000000a",
+          "license_ref": "synthetic-open-license",
+          "retrieved_at": "2026-11-10",
+          "selected_subset_digest": "000000000000000000000000000000000000000000000000000000000000000b"
+        },
+        "target": {
+          "metric": "capacity_soh",
+          "definition_digest": "000000000000000000000000000000000000000000000000000000000000000c",
+          "numerator": "reference_capacity_Ah",
+          "denominator": "initial_measured_capacity_Ah",
+          "reference_protocol_digest": "000000000000000000000000000000000000000000000000000000000000000d",
+          "reference_condition_digest": "000000000000000000000000000000000000000000000000000000000000000e",
+          "unit": "fraction",
+          "label_uncertainty": {
+            "method": "repeat_reference_test_standard_uncertainty",
+            "standard_uncertainty": 0.005,
+            "unit": "fraction",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000000f"
+          }
+        },
+        "evaluation": {
+          "mode": "unseen_cell",
+          "group_level": "cell",
+          "generalization_claim": "unseen_cell_transfer",
+          "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "online_early_charge"
+        },
+        "splits": {
+          "train": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+            "window_start_ms": 100,
+            "window_end_ms": 200,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 100,
+                "observation_end_ms": 200,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 201,
+                "target_reference_time_ms": 202
+              },
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012e",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 100,
+                "observation_end_ms": 200,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 200,
+                "feature_available_at_ms": 200,
+                "prediction_time_ms": 201,
+                "target_reference_time_ms": 202
+              }
+            ]
+          },
+          "validation": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+            "window_start_ms": 300,
+            "window_end_ms": 400,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 300,
+                "observation_end_ms": 400,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 400,
+                "feature_available_at_ms": 400,
+                "prediction_time_ms": 401,
+                "target_reference_time_ms": 402
+              }
+            ]
+          },
+          "test": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000016",
+            "window_start_ms": 500,
+            "window_end_ms": 600,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000cc",
+                "pack_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 500,
+                "observation_end_ms": 600,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 601,
+                "target_reference_time_ms": 602
+              },
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "module_digest": "0000000000000000000000000000000000000000000000000000000000001f43",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000232b",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000002713",
+                "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "observation_start_ms": 500,
+                "observation_end_ms": 600,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "full_discharge",
+                "feature_acquisition_mode": "retrospective",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 600,
+                "feature_available_at_ms": 600,
+                "prediction_time_ms": 601,
+                "target_reference_time_ms": 602
+              }
+            ]
+          }
+        },
+        "preprocessing": [
+          {
+            "transform_id": "standardize",
+            "method": "mean_std",
+            "fit_scope": "train_only",
+            "uses_validation_or_test_labels": false,
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000011",
+            "predeclared_at_ms": null,
+            "predeclaration_digest": null
+          }
+        ],
+        "target_adaptation": {
+          "mode": "none",
+          "unlabeled_target_budget": 0,
+          "labeled_target_budget": 0,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000012"
+        },
+        "metrics": [
+          {
+            "name": "mae",
+            "formula": "synthetic-known-truth-mae-macro_cell",
+            "unit": "fraction",
+            "aggregation": "macro_cell",
+            "value": 0.02,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032c9",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "value": 0.019,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "value": 0.021,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "rmse",
+            "formula": "synthetic-known-truth-rmse-macro_cell",
+            "unit": "fraction",
+            "aggregation": "macro_cell",
+            "value": 0.0275,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032ca",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "value": 0.025,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "value": 0.03,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "mae",
+            "formula": "synthetic-known-truth-mae-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.031,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cb",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.022,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.031,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "rmse",
+            "formula": "synthetic-known-truth-rmse-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.044,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cc",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.035,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.044,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_90",
+            "formula": "synthetic-known-truth-interval_coverage_90-macro_domain",
+            "unit": "fraction",
+            "aggregation": "macro_domain",
+            "value": 0.93,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cd",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.94,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.92,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_90",
+            "formula": "synthetic-known-truth-interval_coverage_90-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.92,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032ce",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.94,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.92,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_95",
+            "formula": "synthetic-known-truth-interval_coverage_95-macro_domain",
+            "unit": "fraction",
+            "aggregation": "macro_domain",
+            "value": 0.96,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cf",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.97,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.95,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_95",
+            "formula": "synthetic-known-truth-interval_coverage_95-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.95,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032d0",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.97,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.95,
+                "sample_count": 60
+              }
+            ]
+          }
+        ],
+        "uncertainty": {
+          "status": "reported",
+          "method": "split_conformal",
+          "nominal_levels": [
+            0.9,
+            0.95
+          ],
+          "calibration_partition": "validation_only",
+          "domain_stratified": true,
+          "calibration_source_digest": null
+        },
+        "execution": {
+          "source_commit": "0123456789abcdef0123456789abcdef01234567",
+          "dependency_lock_digest": "0000000000000000000000000000000000000000000000000000000000000017",
+          "toolchain": "rustc 1.96.0",
+          "toolchain_digest": "0000000000000000000000000000000000000000000000000000000000000018",
+          "hardware": "synthetic-fixture-host",
+          "random_seeds": [
+            7,
+            11
+          ],
+          "wall_time_ms": 1500,
+          "peak_memory_bytes": 1048576,
+          "energy_wh": null,
+          "environment_digest": "0000000000000000000000000000000000000000000000000000000000000019"
+        }
+      }
+    },
+    {
+      "case_id": "online-feature-arrives-after-prediction-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-benchmark-manifest/0.1",
+        "benchmark_id": "online-feature-arrives-after-prediction-rejected",
+        "evidence_class": "synthetic_fixture",
+        "dataset": {
+          "source_id": "synthetic-public-benchmark",
+          "version": "1.0",
+          "source_ref": "https://example.invalid/dataset",
+          "source_digest": "000000000000000000000000000000000000000000000000000000000000000a",
+          "license_ref": "synthetic-open-license",
+          "retrieved_at": "2026-11-10",
+          "selected_subset_digest": "000000000000000000000000000000000000000000000000000000000000000b"
+        },
+        "target": {
+          "metric": "capacity_soh",
+          "definition_digest": "000000000000000000000000000000000000000000000000000000000000000c",
+          "numerator": "reference_capacity_Ah",
+          "denominator": "initial_measured_capacity_Ah",
+          "reference_protocol_digest": "000000000000000000000000000000000000000000000000000000000000000d",
+          "reference_condition_digest": "000000000000000000000000000000000000000000000000000000000000000e",
+          "unit": "fraction",
+          "label_uncertainty": {
+            "method": "repeat_reference_test_standard_uncertainty",
+            "standard_uncertainty": 0.005,
+            "unit": "fraction",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000000f"
+          }
+        },
+        "evaluation": {
+          "mode": "unseen_cell",
+          "group_level": "cell",
+          "generalization_claim": "unseen_cell_transfer",
+          "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "online_early_charge"
+        },
+        "splits": {
+          "train": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+            "window_start_ms": 100,
+            "window_end_ms": 200,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 100,
+                "observation_end_ms": 200,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 150,
+                "feature_available_at_ms": 152,
+                "prediction_time_ms": 151,
+                "target_reference_time_ms": 202
+              },
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012e",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 100,
+                "observation_end_ms": 200,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 150,
+                "feature_available_at_ms": 152,
+                "prediction_time_ms": 151,
+                "target_reference_time_ms": 202
+              }
+            ]
+          },
+          "validation": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+            "window_start_ms": 300,
+            "window_end_ms": 400,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 300,
+                "observation_end_ms": 400,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 350,
+                "feature_available_at_ms": 352,
+                "prediction_time_ms": 351,
+                "target_reference_time_ms": 402
+              }
+            ]
+          },
+          "test": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000016",
+            "window_start_ms": 500,
+            "window_end_ms": 600,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000cc",
+                "pack_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 500,
+                "observation_end_ms": 600,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 550,
+                "feature_available_at_ms": 552,
+                "prediction_time_ms": 551,
+                "target_reference_time_ms": 602
+              },
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "module_digest": "0000000000000000000000000000000000000000000000000000000000001f43",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000232b",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000002713",
+                "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "observation_start_ms": 500,
+                "observation_end_ms": 600,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 550,
+                "feature_available_at_ms": 552,
+                "prediction_time_ms": 551,
+                "target_reference_time_ms": 602
+              }
+            ]
+          }
+        },
+        "preprocessing": [
+          {
+            "transform_id": "standardize",
+            "method": "mean_std",
+            "fit_scope": "train_only",
+            "uses_validation_or_test_labels": false,
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000011",
+            "predeclared_at_ms": null,
+            "predeclaration_digest": null
+          }
+        ],
+        "target_adaptation": {
+          "mode": "none",
+          "unlabeled_target_budget": 0,
+          "labeled_target_budget": 0,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000012"
+        },
+        "metrics": [
+          {
+            "name": "mae",
+            "formula": "synthetic-known-truth-mae-macro_cell",
+            "unit": "fraction",
+            "aggregation": "macro_cell",
+            "value": 0.02,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032c9",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "value": 0.019,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "value": 0.021,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "rmse",
+            "formula": "synthetic-known-truth-rmse-macro_cell",
+            "unit": "fraction",
+            "aggregation": "macro_cell",
+            "value": 0.0275,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032ca",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "value": 0.025,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "value": 0.03,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "mae",
+            "formula": "synthetic-known-truth-mae-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.031,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cb",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.022,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.031,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "rmse",
+            "formula": "synthetic-known-truth-rmse-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.044,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cc",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.035,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.044,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_90",
+            "formula": "synthetic-known-truth-interval_coverage_90-macro_domain",
+            "unit": "fraction",
+            "aggregation": "macro_domain",
+            "value": 0.93,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cd",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.94,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.92,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_90",
+            "formula": "synthetic-known-truth-interval_coverage_90-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.92,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032ce",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.94,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.92,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_95",
+            "formula": "synthetic-known-truth-interval_coverage_95-macro_domain",
+            "unit": "fraction",
+            "aggregation": "macro_domain",
+            "value": 0.96,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cf",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.97,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.95,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_95",
+            "formula": "synthetic-known-truth-interval_coverage_95-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.95,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032d0",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.97,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.95,
+                "sample_count": 60
+              }
+            ]
+          }
+        ],
+        "uncertainty": {
+          "status": "reported",
+          "method": "split_conformal",
+          "nominal_levels": [
+            0.9,
+            0.95
+          ],
+          "calibration_partition": "validation_only",
+          "domain_stratified": true,
+          "calibration_source_digest": null
+        },
+        "execution": {
+          "source_commit": "0123456789abcdef0123456789abcdef01234567",
+          "dependency_lock_digest": "0000000000000000000000000000000000000000000000000000000000000017",
+          "toolchain": "rustc 1.96.0",
+          "toolchain_digest": "0000000000000000000000000000000000000000000000000000000000000018",
+          "hardware": "synthetic-fixture-host",
+          "random_seeds": [
+            7,
+            11
+          ],
+          "wall_time_ms": 1500,
+          "peak_memory_bytes": 1048576,
+          "energy_wh": null,
+          "environment_digest": "0000000000000000000000000000000000000000000000000000000000000019"
+        }
+      }
+    },
+    {
+      "case_id": "target-reference-precedes-online-prediction-rejected",
+      "expectation": "reject",
+      "manifest": {
+        "protocol_version": "ev-soh-benchmark-manifest/0.1",
+        "benchmark_id": "target-reference-precedes-online-prediction-rejected",
+        "evidence_class": "synthetic_fixture",
+        "dataset": {
+          "source_id": "synthetic-public-benchmark",
+          "version": "1.0",
+          "source_ref": "https://example.invalid/dataset",
+          "source_digest": "000000000000000000000000000000000000000000000000000000000000000a",
+          "license_ref": "synthetic-open-license",
+          "retrieved_at": "2026-11-10",
+          "selected_subset_digest": "000000000000000000000000000000000000000000000000000000000000000b"
+        },
+        "target": {
+          "metric": "capacity_soh",
+          "definition_digest": "000000000000000000000000000000000000000000000000000000000000000c",
+          "numerator": "reference_capacity_Ah",
+          "denominator": "initial_measured_capacity_Ah",
+          "reference_protocol_digest": "000000000000000000000000000000000000000000000000000000000000000d",
+          "reference_condition_digest": "000000000000000000000000000000000000000000000000000000000000000e",
+          "unit": "fraction",
+          "label_uncertainty": {
+            "method": "repeat_reference_test_standard_uncertainty",
+            "standard_uncertainty": 0.005,
+            "unit": "fraction",
+            "evidence_digest": "000000000000000000000000000000000000000000000000000000000000000f"
+          }
+        },
+        "evaluation": {
+          "mode": "unseen_cell",
+          "group_level": "cell",
+          "generalization_claim": "unseen_cell_transfer",
+          "split_manifest_digest": "0000000000000000000000000000000000000000000000000000000000000010",
+          "split_frozen_at_ms": 50,
+          "prediction_regime": "online_early_charge"
+        },
+        "splits": {
+          "train": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000014",
+            "window_start_ms": 100,
+            "window_end_ms": 200,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000001",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000c9",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012d",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000191",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 100,
+                "observation_end_ms": 200,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 150,
+                "feature_available_at_ms": 150,
+                "prediction_time_ms": 151,
+                "target_reference_time_ms": 150
+              },
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000002",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000ca",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012e",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000192",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 100,
+                "observation_end_ms": 200,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 100,
+                "feature_window_end_ms": 150,
+                "feature_available_at_ms": 150,
+                "prediction_time_ms": 151,
+                "target_reference_time_ms": 150
+              }
+            ]
+          },
+          "validation": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000015",
+            "window_start_ms": 300,
+            "window_end_ms": 400,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000003",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000cb",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000012f",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000193",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 300,
+                "observation_end_ms": 400,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 300,
+                "feature_window_end_ms": 350,
+                "feature_available_at_ms": 350,
+                "prediction_time_ms": 351,
+                "target_reference_time_ms": 350
+              }
+            ]
+          },
+          "test": {
+            "split_digest": "0000000000000000000000000000000000000000000000000000000000000016",
+            "window_start_ms": 500,
+            "window_end_ms": 600,
+            "entities": [
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "module_digest": "00000000000000000000000000000000000000000000000000000000000000cc",
+                "pack_digest": "0000000000000000000000000000000000000000000000000000000000000130",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000000194",
+                "lab_digest": "00000000000000000000000000000000000000000000000000000000000001f4",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "observation_start_ms": 500,
+                "observation_end_ms": 600,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 550,
+                "feature_available_at_ms": 550,
+                "prediction_time_ms": 551,
+                "target_reference_time_ms": 550
+              },
+              {
+                "sample_digest": "0000000000000000000000000000000000000000000000000000000000001b5a",
+                "group_identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "cell_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "module_digest": "0000000000000000000000000000000000000000000000000000000000001f43",
+                "pack_digest": "000000000000000000000000000000000000000000000000000000000000232b",
+                "vehicle_digest": "0000000000000000000000000000000000000000000000000000000000002713",
+                "lab_digest": "0000000000000000000000000000000000000000000000000000000000002afb",
+                "domain_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "observation_start_ms": 500,
+                "observation_end_ms": 600,
+                "feature_set_ref": "partial-charge-voltage-window-v1",
+                "feature_set_digest": "0000000000000000000000000000000000000000000000000000000000000709",
+                "feature_window_kind": "partial_charge",
+                "feature_acquisition_mode": "streaming",
+                "feature_window_start_ms": 500,
+                "feature_window_end_ms": 550,
+                "feature_available_at_ms": 550,
+                "prediction_time_ms": 551,
+                "target_reference_time_ms": 550
+              }
+            ]
+          }
+        },
+        "preprocessing": [
+          {
+            "transform_id": "standardize",
+            "method": "mean_std",
+            "fit_scope": "train_only",
+            "uses_validation_or_test_labels": false,
+            "transform_digest": "0000000000000000000000000000000000000000000000000000000000000011",
+            "predeclared_at_ms": null,
+            "predeclaration_digest": null
+          }
+        ],
+        "target_adaptation": {
+          "mode": "none",
+          "unlabeled_target_budget": 0,
+          "labeled_target_budget": 0,
+          "protocol_digest": "0000000000000000000000000000000000000000000000000000000000000012"
+        },
+        "metrics": [
+          {
+            "name": "mae",
+            "formula": "synthetic-known-truth-mae-macro_cell",
+            "unit": "fraction",
+            "aggregation": "macro_cell",
+            "value": 0.02,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032c9",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "value": 0.019,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "value": 0.021,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "rmse",
+            "formula": "synthetic-known-truth-rmse-macro_cell",
+            "unit": "fraction",
+            "aggregation": "macro_cell",
+            "value": 0.0275,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032ca",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000004",
+                "value": 0.025,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000001b5b",
+                "value": 0.03,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "mae",
+            "formula": "synthetic-known-truth-mae-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.031,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cb",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.022,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.031,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "rmse",
+            "formula": "synthetic-known-truth-rmse-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.044,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cc",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.035,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.044,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_90",
+            "formula": "synthetic-known-truth-interval_coverage_90-macro_domain",
+            "unit": "fraction",
+            "aggregation": "macro_domain",
+            "value": 0.93,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cd",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.94,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.92,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_90",
+            "formula": "synthetic-known-truth-interval_coverage_90-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.92,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032ce",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.94,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.92,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_95",
+            "formula": "synthetic-known-truth-interval_coverage_95-macro_domain",
+            "unit": "fraction",
+            "aggregation": "macro_domain",
+            "value": 0.96,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032cf",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.97,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.95,
+                "sample_count": 60
+              }
+            ]
+          },
+          {
+            "name": "interval_coverage_95",
+            "formula": "synthetic-known-truth-interval_coverage_95-worst_domain",
+            "unit": "fraction",
+            "aggregation": "worst_domain",
+            "value": 0.95,
+            "sample_count": 120,
+            "result_digest": "00000000000000000000000000000000000000000000000000000000000032d0",
+            "strata": [
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000000258",
+                "value": 0.97,
+                "sample_count": 60
+              },
+              {
+                "identity_digest": "0000000000000000000000000000000000000000000000000000000000002ee3",
+                "value": 0.95,
                 "sample_count": 60
               }
             ]
