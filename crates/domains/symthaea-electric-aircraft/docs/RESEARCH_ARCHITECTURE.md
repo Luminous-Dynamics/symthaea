@@ -136,10 +136,11 @@ For each public competitor or candidate, store values as separate evidence class
 - Compare predicted and measured efficiency, temperature, vibration, torque, thrust and power.
 - Calibrate uncertainty on a held-out set; reject out-of-domain operating points.
 
-### A3 — battery bench and safety
-- Measure capacity, OCV and DC resistance surfaces over SOC and pack temperature; add charge/discharge direction, current-rate, SOH and relaxation-time dimensions as evidence permits. Measure pack thermal response, ageing, and power capability over the same operating envelope.
+### A3 — battery and integrated thermal bench
+- Measure capacity, OCV and DC resistance surfaces over SOC and pack temperature; add charge/discharge direction, current-rate, SOH and relaxation-time dimensions as evidence permits.
+- Characterize battery, inverter and motor thermal masses, interface conductances, cooling-loop flow/pressure drop, heat-exchanger performance and ambient dependence; correlate the thermal_network RC model against independent instrumented tests.
 - Test cell and pack faults, propagation, isolation, venting, contactors, insulation monitoring, and emergency shutdown with appropriate qualified facilities.
-- Do not use the v0.3 pack-level equivalent circuit or lumped thermal node as a battery safety argument.
+- Do not use the v0.3 pack-level equivalent circuit, one-node battery thermal model or new lumped thermal network as a battery safety argument.
 
 ### A4 — integrated subscale vehicle
 - Integrate the selected propulsion and energy subsystem with a controlled unmanned demonstrator.
