@@ -1,0 +1,299 @@
+{
+  "schema_version": "ig-confidence-negative-controls-v0.1",
+  "benchmark_id": "IG-CONFIDENCE-CALIBRATION-001",
+  "status": "synthetic_negative_controls_unexecuted",
+  "evaluation_bundle_path": "research/ig-confidence-calibration-001/CONFIDENCE_EVALUATION_V0_1.json",
+  "evaluation_schema_path": "research/ig-confidence-calibration-001/CONFIDENCE_EVALUATION_V0_1.schema.json",
+  "fixture_count": 24,
+  "fixtures": [
+    {
+      "fixture_id": "CONF-001",
+      "description": "Baseline valid bundle produces independently recomputable proper scores",
+      "mutation": null,
+      "expected_violations": []
+    },
+    {
+      "fixture_id": "CONF-002",
+      "description": "Self-reported confidence cannot claim a calibrated profile",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/status",
+        "value": "SelfReported"
+      },
+      "expected_violations": [
+        "profile_not_calibrated"
+      ]
+    },
+    {
+      "fixture_id": "CONF-003",
+      "description": "Calibration profile digest must be present",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/calibration_profile_sha256",
+        "value": ""
+      },
+      "expected_violations": [
+        "profile_digest_invalid"
+      ]
+    },
+    {
+      "fixture_id": "CONF-004",
+      "description": "Calibration report digest must be present",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/calibration_report_sha256",
+        "value": ""
+      },
+      "expected_violations": [
+        "report_digest_invalid"
+      ]
+    },
+    {
+      "fixture_id": "CONF-005",
+      "description": "A calibration profile cannot transfer across model revisions",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/model_identity/revision",
+        "value": "other-revision"
+      },
+      "expected_violations": [
+        "model_identity_mismatch"
+      ]
+    },
+    {
+      "fixture_id": "CONF-006",
+      "description": "A calibration profile cannot transfer across prompt families",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/prompt_family_sha256",
+        "value": "0000000000000000000000000000000000000000000000000000000000000068"
+      },
+      "expected_violations": [
+        "prompt_family_mismatch"
+      ]
+    },
+    {
+      "fixture_id": "CONF-007",
+      "description": "A calibration profile cannot transfer to normative-pluralism outcomes",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/task_scope",
+        "value": "normative_pluralism"
+      },
+      "expected_violations": [
+        "task_scope_mismatch"
+      ]
+    },
+    {
+      "fixture_id": "CONF-008",
+      "description": "Fit and validation task groups cannot overlap",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/calibration_data/validation_group_ids",
+        "value": [
+          "fit-domain-a"
+        ]
+      },
+      "expected_violations": [
+        "fit_validation_group_overlap"
+      ]
+    },
+    {
+      "fixture_id": "CONF-009",
+      "description": "Fit and evaluation task groups cannot overlap",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/calibration_data/evaluation_group_ids",
+        "value": [
+          "fit-domain-a"
+        ]
+      },
+      "expected_violations": [
+        "fit_evaluation_group_overlap"
+      ]
+    },
+    {
+      "fixture_id": "CONF-010",
+      "description": "Validation and evaluation task groups cannot overlap",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/calibration_data/evaluation_group_ids",
+        "value": [
+          "validation-domain-a"
+        ]
+      },
+      "expected_violations": [
+        "validation_evaluation_group_overlap"
+      ]
+    },
+    {
+      "fixture_id": "CONF-011",
+      "description": "Calibration sample count cannot be below the minimum",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/calibration_data/sample_count",
+        "value": 10
+      },
+      "expected_violations": [
+        "calibration_sample_count_insufficient"
+      ]
+    },
+    {
+      "fixture_id": "CONF-012",
+      "description": "The reported calibration method must be supported",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/method",
+        "value": "MagicCalibration"
+      },
+      "expected_violations": [
+        "calibration_method_unsupported"
+      ]
+    },
+    {
+      "fixture_id": "CONF-013",
+      "description": "The independent validator identity is required",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/validator/identity",
+        "value": ""
+      },
+      "expected_violations": [
+        "validator_identity_missing"
+      ]
+    },
+    {
+      "fixture_id": "CONF-014",
+      "description": "The independent validator version is required",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/validator/version",
+        "value": ""
+      },
+      "expected_violations": [
+        "validator_version_missing"
+      ]
+    },
+    {
+      "fixture_id": "CONF-015",
+      "description": "Evaluation observations must contain a unique sample ID",
+      "mutation": {
+        "operation": "set",
+        "path": "/observations/1/sample_id",
+        "value": "TEST-HIGH-01"
+      },
+      "expected_violations": [
+        "duplicate_sample_id"
+      ]
+    },
+    {
+      "fixture_id": "CONF-016",
+      "description": "A probability outside [0,1] is invalid",
+      "mutation": {
+        "operation": "set",
+        "path": "/observations/0/probability_correct",
+        "value": 1.01
+      },
+      "expected_violations": [
+        "probability_out_of_range"
+      ]
+    },
+    {
+      "fixture_id": "CONF-017",
+      "description": "A test example without a binary external outcome is not scorable",
+      "mutation": {
+        "operation": "set",
+        "path": "/observations/0/outcome_correct",
+        "value": null
+      },
+      "expected_violations": [
+        "binary_outcome_missing"
+      ]
+    },
+    {
+      "fixture_id": "CONF-018",
+      "description": "An evaluation row must come from the declared held-out groups",
+      "mutation": {
+        "operation": "set",
+        "path": "/observations/0/task_group_id",
+        "value": "unseen-side-channel"
+      },
+      "expected_violations": [
+        "evaluation_group_unbound"
+      ]
+    },
+    {
+      "fixture_id": "CONF-019",
+      "description": "Normative-pluralism evaluation cannot be coerced into binary factual correctness",
+      "mutation": {
+        "operation": "set",
+        "path": "/evaluation_identity/task_truth_profile",
+        "value": "NormativePluralism"
+      },
+      "expected_violations": [
+        "evaluation_truth_profile_unsupported"
+      ]
+    },
+    {
+      "fixture_id": "CONF-020",
+      "description": "A test dataset digest must bind the actual ordered observations",
+      "mutation": {
+        "operation": "set",
+        "path": "/evaluation_dataset_sha256",
+        "value": "00000000000000000000000000000000000000000000000000000000000003e7"
+      },
+      "expected_violations": [
+        "evaluation_dataset_digest_mismatch"
+      ]
+    },
+    {
+      "fixture_id": "CONF-021",
+      "description": "A calibration report with no independent validator is not calibrated",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/validator/identity",
+        "value": ""
+      },
+      "expected_violations": [
+        "validator_identity_missing"
+      ]
+    },
+    {
+      "fixture_id": "CONF-022",
+      "description": "Fewer than the required evaluation rows is insufficient evidence",
+      "mutation": {
+        "operation": "remove",
+        "path": "/observations/40",
+        "value": null
+      },
+      "expected_violations": [
+        "evaluation_observation_count_insufficient"
+      ]
+    },
+    {
+      "fixture_id": "CONF-023",
+      "description": "The probability scale must retain explicit correctness semantics",
+      "mutation": {
+        "operation": "set",
+        "path": "/calibration_profile/scale_id",
+        "value": "confidence_vibes"
+      },
+      "expected_violations": [
+        "confidence_scale_unsupported"
+      ]
+    },
+    {
+      "fixture_id": "CONF-024",
+      "description": "A task with only one observed outcome class cannot support calibration diagnostics",
+      "mutation": {
+        "operation": "set",
+        "path": "/observations/0/outcome_correct",
+        "value": true
+      },
+      "expected_violations": [
+        "single_outcome_class"
+      ]
+    }
+  ],
+  "claim_ceiling": "These fixtures verify metadata binding, deterministic metric code and fail-closed conditions only. They do not establish calibration of any real model."
+}
