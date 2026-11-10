@@ -29,7 +29,7 @@ Each curve records:
 
 Each point is a tuple (x, efficiency, absolute_uncertainty). Independent-variable values must be strictly increasing. Efficiency must be finite and in (0, 1]. Absolute uncertainty must be finite, nonnegative, and smaller than nominal efficiency.
 
-The current implementation validates the digest's 64-character hexadecimal syntax only. It does **not** download the referenced dataset, recompute the digest, verify a signature, or independently attest the source. Those checks belong in the surrounding evidence pipeline and must be completed before a map is treated as qualified input.
+Ordinary characterization evaluation validates the digest's 64-character hexadecimal syntax. PropulsionCharacterization::verify_evidence_payloads recomputes SHA-256 over caller-supplied immutable bytes and rejects missing or mismatched payloads; evaluate_mission_fully_verified applies this check to both propulsion and battery datasets. The crate does **not** download the referenced URI, verify signatures, authenticate publishers/authority, or approve configuration applicability. Those responsibilities remain in the surrounding evidence pipeline.
 
 ## Current map meanings
 
@@ -75,7 +75,7 @@ Unit tests use invented efficiency curves to verify:
 - interpolation of nominal efficiency and absolute uncertainty;
 - strict rejection of extrapolation;
 - invalid or duplicate independent-axis points;
-- digest syntax checks;
+- digest syntax checks and exact caller-supplied byte verification;
 - use of conservative lower bounds in the mission estimator;
 - dataset IDs recorded in the report;
 - characterized mission rejection when an operating point is outside the measured domain.
