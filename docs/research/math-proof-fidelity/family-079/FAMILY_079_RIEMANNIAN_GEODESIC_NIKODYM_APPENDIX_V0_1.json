@@ -1,0 +1,77 @@
+{
+  "schema_version": "luminous.math-proof-fidelity-geometry-appendix.v0.1",
+  "audit_id": "openai-math-family-079-riemannian-geodesic-nikodym-2026-11-10",
+  "source_repository": {
+    "repository": "openai/math",
+    "commit": "4eaee87548250b2682affda7d05d947c05554bae"
+  },
+  "result_family": "Euclidean Kakeya/Nikodym consequences and local Riemannian geodesic-tube estimates",
+  "source_files": [
+    {
+      "path": "lean/OAI/Geometry/Nikodym/Definitions.lean",
+      "blob_sha": "3c80562bca0377bfb05c5f10d6b04a98660c68cf",
+      "declarations": [
+        "OAI.Geometry.Nikodym.nikodymMaximal",
+        "OAI.Geometry.Nikodym.NikodymMaximalConjecture"
+      ],
+      "geometry": "Euclidean R^n unit-segment tubes and Euclidean volume",
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/Geometry/Nikodym/Definitions.lean"
+    },
+    {
+      "path": "lean/OAI/Geometry/Nikodym/ManifoldMaximalBound.lean",
+      "blob_sha": "7510d173a747367d7401b24f39e8bd52751b55a1",
+      "declarations": [
+        "OAI.Geometry.Nikodym.LocalBeltramiChart.ManifoldTubePatch.endpointNikodymMaximal",
+        "OAI.Geometry.Nikodym.LocalBeltramiChart.ManifoldTubePatch.endpointNikodymMaximal_bound_of_measurable"
+      ],
+      "geometry": "Local smooth Riemannian manifold patch, using a local Beltrami chart, the Riemannian bundle, local metric distortion and Riemannian volume",
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/Geometry/Nikodym/ManifoldMaximalBound.lean"
+    },
+    {
+      "path": "lean/OAI/Geometry/Nikodym/GeodesicDimension.lean",
+      "blob_sha": "6373422cb7e9ab2f9f0d5581748740369d7ac9e8",
+      "declarations": [
+        "OAI.Geometry.Nikodym.LocalBeltramiChart.ManifoldTubePatch.geodesic_incidence_dimension"
+      ],
+      "geometry": "Actual fixed-length local Riemannian geodesic images and Hausdorff-dimension conclusion inside a compact chart patch",
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/Geometry/Nikodym/GeodesicDimension.lean"
+    },
+    {
+      "path": "lean/OAI/Geometry/Nikodym/Literal.lean",
+      "blob_sha": "38da213a1ea83fc661c2733e25ce4947135fef55",
+      "declarations": [
+        "OAI.Geometry.Nikodym.LocalGeodesicNikodymEstimate",
+        "OAI.Geometry.Nikodym.LocalGeodesicNikodymDimension",
+        "OAI.Geometry.Nikodym.local_geodesic_nikodym"
+      ],
+      "geometry": "Constructs local chart/tube patches and establishes the stated local geodesic-Nikodym estimate/dimension conclusions when the abstract chart metric has constant sectional curvature",
+      "url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/Geometry/Nikodym/Literal.lean"
+    }
+  ],
+  "correspondence_and_scope": {
+    "formal_geodesic_tubes": "The formalization concerns genuine fixed-length geodesic images inside smooth Riemannian manifolds, with local chart and metric-volume comparison conditions.",
+    "euclidean_dependency": "The manifold maximal estimate transfers a Euclidean Nikodym maximal bound through a local Beltrami chart using controlled forward/inverse Lipschitz and volume comparison.",
+    "constant_curvature_scope": "The literal existence theorem constructs the required chart/tube patch under a constant-sectional-curvature hypothesis on the abstract chart metric.",
+    "theorem_boundary": "This is not a result for arbitrary Lorentzian manifolds, Kerr spacetime, null geodesic congruences, or relativistic optical Jacobi maps.",
+    "no_transfer_claim": "No Euclidean/Riemannian local-smoothing or Nikodym estimate is asserted for Kerr. Any application to black-hole null rays is a separate conjecture/benchmark requiring its own analytic hypotheses and independent numerical tests."
+  },
+  "relevance_to_luminous": {
+    "symthaea": "A formal-method source for reasoning about geodesic-tube concentration, chart distortion and assumption matching. Symthaea must classify the geometric signature and theorem hypotheses before proposing reuse.",
+    "symtropy": "Motivates a new caustic-aware Kerr ray-bundle benchmark, but does not prove its convergence or stability estimates.",
+    "sol_atlas": "Supports explicit chart, metric, tube and coordinate-provenance fields in a geodesic/caustic projection; does not authorize interpreting renderings as measurements.",
+    "mycelix": "Record the Euclidean theorem, Riemannian theorem, numerical Kerr experiment and any future Lorentzian theorem as distinct evidence objects."
+  },
+  "validation": {
+    "source_files_inspected_at_pinned_commit": true,
+    "clean_lean_rebuild": false,
+    "full_dependency_axiom_audit": false,
+    "independent_mathematical_review": false,
+    "Kerr_transfer_proved": false
+  },
+  "next_questions": [
+    "Which local Riemannian geodesic-tube hypotheses have Lorentzian analogues under a spacelike foliation or null optical geometry?",
+    "How do conjugate points, caustics, trapping and horizon boundary conditions alter the relevant tube estimates?",
+    "Can a ray-bundle/Jacobi-map numerical suite provide useful falsification evidence without being mistaken for a theorem?",
+    "Which local chart distortion, optical tidal matrix and screen-bundle quantities must be frozen for a reproducible Kerr experiment?"
+  ]
+}
