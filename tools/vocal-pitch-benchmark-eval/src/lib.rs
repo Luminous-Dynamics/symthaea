@@ -32,6 +32,13 @@ impl Display for PitchBenchmarkError {
 
 impl Error for PitchBenchmarkError {}
 
+/// One required corpus × recording-condition stratum in this benchmark run.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PitchConditionKeyV1 {
+    pub corpus_id: String,
+    pub recording_condition_id: String,
+}
+
 /// Exact algorithm, data and preprocessing identity for one tracker run.
 ///
 /// The voicing policy identifies the frozen rule that converts tracker
@@ -49,6 +56,11 @@ pub struct PitchBenchmarkSpecV1 {
     pub preprocessing_manifest_sha256: String,
     pub frame_alignment_policy_id: String,
     pub voicing_policy_id: String,
+    /// Complete, predeclared corpus × condition set. Every expected group must
+    /// occur in the evaluated segments exactly once as a group; missing or
+    /// unexpected groups reject the run rather than silently changing macro
+    /// weights.
+    pub expected_condition_groups: Vec<PitchConditionKeyV1>,
     pub frame_period_us: u32,
     pub gross_pitch_error_threshold_cents: f64,
     pub octave_error_tolerance_cents: f64,
@@ -186,6 +198,11 @@ pub fn evaluate_pitch_benchmark(
         ));
     }
 
+    let expected_groups: BTreeSet<(String, String)> = spec
+        .expected_condition_groups
+        .iter()
+        .map(|group| (group.corpus_id.clone(), group.recording_condition_id.clone()))
+        .collect();
     let mut seen_segments = BTreeSet::new();
     let mut segment_results = Vec::with_capacity(segments.len());
     let mut total_counts = PitchCountsV1::default();
@@ -199,6 +216,16 @@ pub fn evaluate_pitch_benchmark(
                 segment.metadata.segment_id
             )));
         }
+        let actual_group = (
+            segment.metadata.corpus_id.clone(),
+            segment.metadata.recording_condition_id.clone(),
+        );
+        if !expected_groups.contains(&actual_group) {
+            return Err(PitchBenchmarkError::new(format!(
+                "unexpected corpus/condition group: {}/{}",
+                actual_group.0, actual_group.1
+            )));
+        }
 
         let result = evaluate_segment(spec, segment)?;
         add_counts(&mut total_counts, &result.counts);
@@ -210,6 +237,18 @@ pub fn evaluate_pitch_benchmark(
         add_counts(&mut entry.0, &result.counts);
         entry.1 += 1;
         segment_results.push(result);
+    }
+
+    let actual_groups: BTreeSet<(String, String)> = grouped.keys().cloned().collect();
+    if actual_groups != expected_groups {
+        let missing: Vec<String> = expected_groups
+            .difference(&actual_groups)
+            .map(|(corpus, condition)| format!("{corpus}/{condition}"))
+            .collect();
+        return Err(PitchBenchmarkError::new(format!(
+            "missing expected corpus/condition groups: {}",
+            missing.join(", ")
+        )));
     }
 
     let groups: Vec<PitchConditionGroupV1> = grouped
@@ -286,6 +325,28 @@ fn validate_spec(spec: &PitchBenchmarkSpecV1) -> Result<(), PitchBenchmarkError>
     )?;
     require_non_empty(&spec.frame_alignment_policy_id, "frame_alignment_policy_id")?;
     require_non_empty(&spec.voicing_policy_id, "voicing_policy_id")?;
+    if spec.expected_condition_groups.is_empty() {
+        return Err(PitchBenchmarkError::new(
+            "expected_condition_groups must declare at least one corpus/condition stratum",
+        ));
+    }
+    let mut expected_groups = BTreeSet::new();
+    for group in &spec.expected_condition_groups {
+        require_non_empty(&group.corpus_id, "expected group corpus_id")?;
+        require_non_empty(
+            &group.recording_condition_id,
+            "expected group recording_condition_id",
+        )?;
+        if !expected_groups.insert((
+            group.corpus_id.as_str(),
+            group.recording_condition_id.as_str(),
+        )) {
+            return Err(PitchBenchmarkError::new(format!(
+                "duplicate expected corpus/condition group: {}/{}",
+                group.corpus_id, group.recording_condition_id
+            )));
+        }
+    }
 
     if spec.frame_period_us == 0 {
         return Err(PitchBenchmarkError::new(
@@ -546,6 +607,10 @@ mod tests {
             preprocessing_manifest_sha256: digest('c'),
             frame_alignment_policy_id: "16ms-center-aligned-v1".to_owned(),
             voicing_policy_id: "confidence>=0.5-calibrated-v1".to_owned(),
+            expected_condition_groups: vec![PitchConditionKeyV1 {
+                corpus_id: "corpus-a".to_owned(),
+                recording_condition_id: "clean".to_owned(),
+            }],
             frame_period_us: 16_000,
             gross_pitch_error_threshold_cents: 50.0,
             octave_error_tolerance_cents: 50.0,
@@ -771,6 +836,11 @@ mod tests {
 
     #[test]
     fn equal_group_weighting_differs_from_micro_frame_weighting() {
+        let mut spec = spec();
+        spec.expected_condition_groups.push(PitchConditionKeyV1 {
+            corpus_id: "corpus-b".to_owned(),
+            recording_condition_id: "noise".to_owned(),
+        });
         let long_clean = PitchSegmentInputV1 {
             metadata: metadata("long-clean", "corpus-a", "clean"),
             frames: vec![frame(0, Some(220.0), Some(220.0)); 100],
@@ -779,10 +849,33 @@ mod tests {
             metadata: metadata("short-noisy", "corpus-b", "noise"),
             frames: vec![frame(0, Some(220.0), Some(220.0 * 2.0_f64.powf(100.0 / 1200.0)))],
         };
-        let report = evaluate_pitch_benchmark(&spec(), &[long_clean, noisy_bad]).unwrap();
+        let report = evaluate_pitch_benchmark(&spec, &[long_clean, noisy_bad]).unwrap();
         assert!(report.macro_group_frame_error_rate > 0.0);
         assert!(report.micro_rates.frame_error_rate < report.macro_group_frame_error_rate);
         assert_eq!(report.groups.len(), 2);
+    }
+
+    #[test]
+    fn missing_expected_corpus_condition_group_is_rejected() {
+        let mut spec = spec();
+        spec.expected_condition_groups.push(PitchConditionKeyV1 {
+            corpus_id: "corpus-b".to_owned(),
+            recording_condition_id: "noise".to_owned(),
+        });
+        let only_clean = PitchSegmentInputV1 {
+            metadata: metadata("clip-01", "corpus-a", "clean"),
+            frames: vec![frame(0, Some(220.0), Some(220.0))],
+        };
+        assert!(evaluate_pitch_benchmark(&spec, &[only_clean]).is_err());
+    }
+
+    #[test]
+    fn unexpected_corpus_condition_group_is_rejected() {
+        let unexpected = PitchSegmentInputV1 {
+            metadata: metadata("clip-01", "corpus-z", "rain"),
+            frames: vec![frame(0, Some(220.0), Some(220.0))],
+        };
+        assert!(evaluate_pitch_benchmark(&spec(), &[unexpected]).is_err());
     }
 
     #[test]
