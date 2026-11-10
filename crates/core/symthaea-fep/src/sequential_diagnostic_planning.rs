@@ -107,6 +107,9 @@ pub struct SequentialDiagnosticPolicyVerificationReport {
     pub posterior_updates_verified: bool,
     pub objective_accounting_verified: bool,
     pub pathwise_risk_budget_verified: bool,
+    /// Exact replay against the canonical planner implementation used to create the receipt.
+    pub canonical_solver_replay_match: bool,
+    /// Always false for this verifier: an independent optimizer is still required.
     pub optimality_independently_reverified: bool,
 }
 
@@ -835,6 +838,20 @@ pub fn verify_sequential_diagnostic_policy_receipt(
         }
     }
 
+    // Replay the exact bounded optimizer to validate root action-value
+    // summaries and canonical policy selection. This is not an independent
+    // optimizer; that stronger check belongs to an external verifier.
+    let replayed_evaluation = evaluate_sequential_decision_diagnostics_with_safety_budget(
+        hypotheses,
+        actions,
+        decision_config,
+        planning_config,
+        expected_safety_budget.clone(),
+    )?;
+    if replayed_evaluation.evaluation != supplied.budgeted_evaluation.evaluation {
+        return Err(SequentialDiagnosticError::InvalidEvaluationSummary);
+    }
+
     let expected_policy_receipt = compute_sequential_diagnostic_policy_receipt(
         hypotheses,
         actions,
@@ -858,6 +875,7 @@ pub fn verify_sequential_diagnostic_policy_receipt(
         posterior_updates_verified: true,
         objective_accounting_verified: true,
         pathwise_risk_budget_verified: true,
+        canonical_solver_replay_match: true,
         optimality_independently_reverified: false,
     })
 }
