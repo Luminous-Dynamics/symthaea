@@ -118,6 +118,26 @@ fn remove_at_path(root: &mut Value, path: &str) -> bool {
     }
 }
 
+fn set_all_at_path(root: &mut Value, path: &str, replacement: Value) -> bool {
+    let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    if parts.len() != 3 || parts[1] != "*" {
+        return false;
+    }
+    let Some(rows) = root.get_mut(parts[0]).and_then(Value::as_array_mut) else {
+        return false;
+    };
+    for row in rows {
+        let Some(object) = row.as_object_mut() else {
+            return false;
+        };
+        if !object.contains_key(parts[2]) {
+            return false;
+        }
+        object.insert(parts[2].to_string(), replacement.clone());
+    }
+    true
+}
+
 fn digest_json(value: &Value) -> Option<String> {
     let bytes = serde_json::to_vec(value).ok()?;
     let hash = Sha256::digest(bytes);
@@ -350,6 +370,7 @@ fn apply_fixture(bundle: &mut Value, fixture: &Value) -> bool {
     match field(mutation, "operation") {
         Some("set") => set_at_path(bundle, path, mutation["value"].clone()),
         Some("remove") => remove_at_path(bundle, path),
+        Some("set_all") => set_all_at_path(bundle, path, mutation["value"].clone()),
         _ => false,
     }
 }
