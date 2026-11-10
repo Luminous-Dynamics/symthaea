@@ -416,7 +416,11 @@
         "treatment_run_id",
         "control_run_id",
         "analysis_plan_sha256",
-        "effect_estimate_sha256"
+        "effect_estimate_sha256",
+        "matched_inputs",
+        "varied_factor",
+        "pair_validator_id",
+        "pair_validation_receipt_sha256"
       ],
       "properties": {
         "status": {
@@ -452,6 +456,246 @@
           "pattern": "^[a-f0-9]{64}$"
         },
         "effect_estimate_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "matched_inputs": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "task_instance",
+            "model_profile",
+            "system_prompt",
+            "elicitation_prompt",
+            "evidence_packet",
+            "communication_graph",
+            "budget_profile",
+            "decoding_profile",
+            "rng_stream",
+            "evaluator_profile"
+          ],
+          "properties": {
+            "task_instance": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "model_profile": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "system_prompt": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "elicitation_prompt": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "evidence_packet": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "communication_graph": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "budget_profile": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "decoding_profile": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "rng_stream": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "evaluator_profile": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "varied_factor": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "treatment_sha256",
+            "control_sha256"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "treatment_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "control_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "pair_validator_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pair_validation_receipt_sha256": {
           "type": [
             "string",
             "null"
