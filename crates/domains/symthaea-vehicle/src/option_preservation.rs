@@ -120,6 +120,21 @@ pub struct ExpectedSuccessorCell {
     pub observation_equivalence_receipt_digest: String,
 }
 
+/// Compute the canonical BLAKE3 digest of the frozen expected-cell manifest.
+///
+/// Entries are sorted by the complete cell key before serialization, so the
+/// digest is invariant to caller ordering but sensitive to any declared cell
+/// or observation-equivalence receipt mutation.
+pub fn compute_expected_cell_manifest_digest(
+    expected_cells: &[ExpectedSuccessorCell],
+) -> Result<String, String> {
+    let mut canonical_cells = expected_cells.to_vec();
+    canonical_cells.sort_by(|left, right| left.key.cmp(&right.key));
+    let bytes = serde_json::to_vec(&canonical_cells)
+        .map_err(|error| format!("serialize expected-cell manifest: {error}"))?;
+    Ok(format!("blake3:{}", blake3::hash(&bytes).to_hex()))
+}
+
 /// Feasibility disposition for one continuation action in one successor cell.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "disposition", rename_all = "snake_case")]
@@ -608,6 +623,18 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
         &input.qualifications.observation_partition,
     );
 
+    let computed_manifest_digest =
+        match compute_expected_cell_manifest_digest(&input.expected_cells) {
+            Ok(digest) => Some(digest),
+            Err(error) => {
+                errors.push(error);
+                None
+            }
+        };
+    if computed_manifest_digest.as_deref() != Some(input.expected_cell_manifest_digest.as_str()) {
+        errors.push("expected_cell_manifest_digest does not match the canonical expected_cells manifest".into());
+    }
+
     let mut expected_by_key = BTreeSet::new();
     let mut observation_receipts: BTreeMap<(String, String), String> = BTreeMap::new();
     let mut observation_classes_by_receipt: BTreeMap<(String, String), String> = BTreeMap::new();
@@ -670,6 +697,7 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
 
     let mut observed_by_key = BTreeSet::new();
     let mut cell_receipts = BTreeSet::new();
+    let mut execution_receipts = BTreeSet::new();
     for (index, cell) in input.observed_cells.iter().enumerate() {
         validate_cell_key(errors, &format!("observed_cells[{index}].key"), &cell.key);
         require_non_empty(
@@ -710,6 +738,12 @@ fn validate_input(input: &OptionPreservationInput, errors: &mut Vec<String>) {
             errors.push(format!(
                 "observed_cells[{index}] duplicates cell receipt {}",
                 cell.cell_receipt_digest
+            ));
+        }
+        if !execution_receipts.insert(cell.execution_receipt_digest.clone()) {
+            errors.push(format!(
+                "observed_cells[{index}] duplicates execution receipt {}",
+                cell.execution_receipt_digest
             ));
         }
 
@@ -868,7 +902,9 @@ mod tests {
     }
 
     fn input(cells: Vec<ContinuationCell>) -> OptionPreservationInput {
-        let expected_cells = cells.iter().map(expected_from).collect();
+        let expected_cells = cells.iter().map(expected_from).collect::<Vec<_>>();
+        let expected_cell_manifest_digest =
+            compute_expected_cell_manifest_digest(&expected_cells).expect("manifest digest");
         OptionPreservationInput {
             contract_version: "sam.option-preservation.v0.1".into(),
             decision_id: "decision-01".into(),
@@ -878,7 +914,7 @@ mod tests {
             current_action_ids: vec!["continue".into()],
             continuation_action_set_digest: "continuation-set-v1".into(),
             continuation_action_ids: vec!["brake".into(), "coast".into()],
-            expected_cell_manifest_digest: "expected-cells-v1".into(),
+            expected_cell_manifest_digest,
             expected_cells,
             observed_cells: cells,
             evaluator_profile_digest: "evaluator-v1".into(),
@@ -1037,6 +1073,9 @@ mod tests {
         );
         let mut measurement = input(vec![first.clone()]);
         measurement.expected_cells.push(expected_from(&second));
+        measurement.expected_cell_manifest_digest =
+            compute_expected_cell_manifest_digest(&measurement.expected_cells)
+                .expect("updated manifest digest");
 
         let report = evaluate_option_preservation(&measurement).expect("valid input");
         let action = &report.parent_actions[0];
@@ -1078,6 +1117,80 @@ mod tests {
         );
         first.continuation_action_set_digest = "different-action-set".into();
         assert!(evaluate_option_preservation(&input(vec![first])).is_err());
+    }
+
+    #[test]
+    fn expected_cell_manifest_digest_is_order_invariant_and_content_sensitive() {
+        let first = cell(
+            "continue",
+            "obs-a",
+            "hidden-a",
+            "reference-a",
+            "observation-receipt-a",
+            &[("brake", "feasible"), ("coast", "infeasible")],
+            "cell-receipt-a",
+        );
+        let second = cell(
+            "continue",
+            "obs-a",
+            "hidden-b",
+            "reference-a",
+            "observation-receipt-a",
+            &[("brake", "feasible"), ("coast", "feasible")],
+            "cell-receipt-b",
+        );
+        let mut expected = vec![expected_from(&first), expected_from(&second)];
+        let digest = compute_expected_cell_manifest_digest(&expected).expect("manifest digest");
+        expected.reverse();
+        assert_eq!(
+            compute_expected_cell_manifest_digest(&expected).expect("permuted digest"),
+            digest
+        );
+        expected[0].observation_equivalence_receipt_digest = "mutated-receipt".into();
+        assert_ne!(
+            compute_expected_cell_manifest_digest(&expected).expect("mutated digest"),
+            digest
+        );
+    }
+
+    #[test]
+    fn mismatched_expected_cell_manifest_digest_is_rejected() {
+        let first = cell(
+            "continue",
+            "obs-a",
+            "hidden-a",
+            "reference-a",
+            "observation-receipt-a",
+            &[("brake", "feasible"), ("coast", "infeasible")],
+            "cell-receipt-a",
+        );
+        let mut measurement = input(vec![first]);
+        measurement.expected_cell_manifest_digest = "blake3:forged-manifest-digest".into();
+        assert!(evaluate_option_preservation(&measurement).is_err());
+    }
+
+    #[test]
+    fn duplicate_execution_receipts_are_rejected() {
+        let first = cell(
+            "continue",
+            "obs-a",
+            "hidden-a",
+            "reference-a",
+            "observation-receipt-a",
+            &[("brake", "feasible"), ("coast", "infeasible")],
+            "cell-receipt-a",
+        );
+        let mut second = cell(
+            "continue",
+            "obs-a",
+            "hidden-b",
+            "reference-a",
+            "observation-receipt-a",
+            &[("brake", "feasible"), ("coast", "feasible")],
+            "cell-receipt-b",
+        );
+        second.execution_receipt_digest = first.execution_receipt_digest.clone();
+        assert!(evaluate_option_preservation(&input(vec![first, second])).is_err());
     }
 
     #[test]
