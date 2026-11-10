@@ -68,6 +68,7 @@ pub mod obligation;
 pub mod opera;
 pub mod orchestration;
 pub mod orchestration_timeline;
+pub mod performer_allocation;
 pub mod passacaglia;
 pub mod phrase;
 pub mod pitch;
