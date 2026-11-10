@@ -238,8 +238,11 @@ Use paired prompts and identical evaluation subsets. Publish per-prompt data, co
 | YuE2 / SheetSage2 | Symbolic planning, score editing, covers and audio realization | Preserve source identities, edit preconditions, protected invariants, assignment evidence and execution receipts end-to-end |
 | NotaGen | Strong symbolic classical composition and human evaluation | Add performer/renderer feasibility, relationship realization and reversible editing |
 | MAGE | Multimodal conditioning and mixture-grounded audio editing | Ground each edit in explicit score parts/events and report what changed and what remained invariant |
-| Suno / Mureka | Strong finished-song quality and production | Compete on quality under matched budgets, while differentiating on inspectability and precise control |
+| Suno Studio 2.0 | Chat-directed creation/editing, MIDI clips and piano roll, synths, automation, effects, custom plugins, and stem workflows | Do not claim MIDI editing, stems or conversational project control as unique. Differentiate through source-event identity, qualified realization and independently checked preservation |
+| Mureka Studio / Mureka Co | Multitrack arrangement, up to 12 stem extraction, local phrase edits, MIDI export and conversational DAW operations | Match workflow breadth where practical; make every edit traceable to score events, protected regions and verifiable receipts |
 | Audio Editing Challenge / MMAE | Instruction following plus preservation scored by IFR, CR and EMR | Use the same rubric discipline and add score-native identity and provenance checks |
+
+Basic MIDI editing, stem extraction, local section replacement and natural-language production control are already present in commercial products. Suno Studio 2.0 documents MIDI clips/piano roll, synthesizers, automation, effects, custom plugins and stem separation; Mureka documents multitrack production, local edits, MIDI export and conversational DAW control. These are baseline expectations, not defensible unique selling points.
 
 The opportunity is not to assert that no competitor can preserve content. YuE2 already reports score-guided editing; MAGE demonstrates mixture-grounded editing. The opportunity is to make the entire transformation chain machine-auditable and independently replayable.
 
@@ -262,5 +265,8 @@ The paradigm shift is from “generate a plausible recording” to “execute a 
 - [WildSongBench results, September 12, 2026 snapshot](https://huggingface.co/datasets/m-a-p/WildSongBench/blob/main/benchmark/results.md)
 - [Audio Editing Challenge timeline, tracks and model release rules](https://audio-editing-challenge.github.io/)
 - [Audio Editing Challenge leaderboard and evaluation protocol](https://audio-editing-challenge.github.io/leaderboard/)
+- [Suno Studio 2.0 feature reference](https://help.suno.com/en/articles/13670529)
+- [Suno advanced stem separation](https://help.suno.com/en/articles/13925185)
+- [Mureka feature overview](https://www.mureka.ai/blog_en/mureka-features.html)
 - [MMAE / MAGE paper](https://arxiv.org/abs/2604.09803)
 - [NotaGen, IJCAI 2025](https://ijcai.org/proceedings/2025/1134)
