@@ -443,7 +443,7 @@ impl FamilyNonInferiorityGate {
             terminal: false,
             observation_hasher: {
                 let mut hasher = blake3::Hasher::new();
-                hasher.update(b"symthaea-family-noninferiority-observations-v1\\0");
+                hasher.update(b"symthaea-family-noninferiority-observations-v1\0");
                 hasher
             },
         })
