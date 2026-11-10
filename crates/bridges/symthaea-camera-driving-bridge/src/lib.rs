@@ -185,6 +185,10 @@ pub struct DrivingObservationReceipt {
     pub height: u32,
     pub channels: usize,
     pub visual_weight_ppm: u32,
+    pub vision_config_sha256: String,
+    pub vehicle_encoder_seed_sha256: String,
+    pub hdc_dimension: usize,
+    pub vehicle_encoder_levels: usize,
     pub raw_frame_sha256: String,
     pub visual_state_sha256: String,
     pub vehicle_state_sha256: String,
@@ -208,6 +212,8 @@ pub struct CameraDrivingBridge {
     config: BridgeConfig,
     vision: VisionManifold,
     vehicle_encoder: VehicleHdcEncoder,
+    vision_config_sha256: String,
+    vehicle_encoder_seed_sha256: String,
     last_sequence: Option<u64>,
     last_timestamp_us: Option<u64>,
     last_vehicle_timestamp_us: Option<u64>,
@@ -224,6 +230,10 @@ impl CameraDrivingBridge {
             return Err(BridgeError::DepthInputRequired);
         }
         vision_config.validate().map_err(|_| BridgeError::InvalidConfig("invalid VisionConfig"))?;
+        let vision_config_bytes = serde_json::to_vec(&vision_config)
+            .map_err(|_| BridgeError::InvalidConfig("VisionConfig serialization failed"))?;
+        let vision_config_sha256 = digest_bytes(&vision_config_bytes);
+        let vehicle_encoder_seed_sha256 = digest_bytes(config.vehicle_encoder_seed_phrase.as_bytes());
         let mut vision = VisionManifold::try_new(
             vision_config,
             config.max_width,
@@ -237,6 +247,8 @@ impl CameraDrivingBridge {
             config,
             vision,
             vehicle_encoder,
+            vision_config_sha256,
+            vehicle_encoder_seed_sha256,
             last_sequence: None,
             last_timestamp_us: None,
             last_vehicle_timestamp_us: None,
@@ -331,6 +343,10 @@ impl CameraDrivingBridge {
             height: observation.height,
             channels: observation.channels,
             visual_weight_ppm: self.config.visual_weight_ppm,
+            vision_config_sha256: self.vision_config_sha256.clone(),
+            vehicle_encoder_seed_sha256: self.vehicle_encoder_seed_sha256.clone(),
+            hdc_dimension: HDC_DIMENSION,
+            vehicle_encoder_levels: MAX_VEHICLE_ENCODER_LEVELS,
             raw_frame_sha256,
             visual_state_sha256,
             vehicle_state_sha256,
@@ -458,6 +474,8 @@ fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
         &receipt.identity.camera_id,
         &receipt.identity.simulator_revision,
         &receipt.identity.policy_revision,
+        &receipt.vision_config_sha256,
+        &receipt.vehicle_encoder_seed_sha256,
         &receipt.raw_frame_sha256,
         &receipt.visual_state_sha256,
         &receipt.vehicle_state_sha256,
@@ -476,6 +494,8 @@ fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
         u64::from(receipt.height),
         receipt.channels as u64,
         u64::from(receipt.visual_weight_ppm),
+        receipt.hdc_dimension as u64,
+        receipt.vehicle_encoder_levels as u64,
     ] {
         hasher.update(value.to_le_bytes());
     }
@@ -617,6 +637,37 @@ mod tests {
         assert_ne!(a.receipt.vehicle_state_sha256, b.receipt.vehicle_state_sha256);
         assert_ne!(a.receipt.proprioceptive_hv_sha256, b.receipt.proprioceptive_hv_sha256);
         assert_ne!(a.receipt.fused_policy_input_sha256, b.receipt.fused_policy_input_sha256);
+    }
+
+    #[test]
+    fn vehicle_encoder_seed_is_bound_to_receipt_and_policy_input() {
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut first_config = config();
+        let mut second_config = config();
+        second_config.vehicle_encoder_seed_phrase = "different-vehicle-seed".to_string();
+        let mut first = CameraDrivingBridge::try_new(first_config, VisionConfig::default()).unwrap();
+        let mut second = CameraDrivingBridge::try_new(second_config, VisionConfig::default()).unwrap();
+        let a = first.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        let b = second.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        assert_ne!(a.receipt.vehicle_encoder_seed_sha256, b.receipt.vehicle_encoder_seed_sha256);
+        assert_ne!(a.receipt.proprioceptive_hv_sha256, b.receipt.proprioceptive_hv_sha256);
+        assert_ne!(a.receipt.fused_policy_input_sha256, b.receipt.fused_policy_input_sha256);
+    }
+
+    #[test]
+    fn vision_configuration_is_bound_to_receipt_and_visual_representation() {
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut vision_a = VisionConfig::default();
+        let mut vision_b = VisionConfig::default();
+        vision_b.seed += 1;
+        let mut first = CameraDrivingBridge::try_new(config(), vision_a).unwrap();
+        let mut second = CameraDrivingBridge::try_new(config(), vision_b).unwrap();
+        let a = first.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        let b = second.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        assert_ne!(a.receipt.vision_config_sha256, b.receipt.vision_config_sha256);
+        assert_ne!(a.receipt.visual_state_sha256, b.receipt.visual_state_sha256);
     }
 
     #[test]
