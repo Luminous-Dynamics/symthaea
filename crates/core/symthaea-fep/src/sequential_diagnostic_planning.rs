@@ -357,6 +357,7 @@ fn compute_sequential_diagnostic_policy_receipt(
             actions,
             decision_config,
             budgeted_evaluation.safety_budget.maximum_cumulative_risk,
+            planning_config.horizon,
         )?;
     if maximum_path_risk_upper_bound
         > budgeted_evaluation.safety_budget.maximum_cumulative_risk + RISK_TOLERANCE
@@ -440,6 +441,7 @@ fn compute_policy_tree_digest(
     actions: &[DiagnosticAction],
     decision_config: DecisionDiagnosticConfig,
     maximum_cumulative_risk: f64,
+    planning_horizon: usize,
 ) -> Result<(String, f64, usize), SequentialDiagnosticError> {
     if hypotheses.is_empty() || actions.is_empty() || actions.len() > MAX_DIAGNOSTIC_ACTIONS {
         return Err(SequentialDiagnosticError::InvalidPolicyTree);
@@ -458,6 +460,7 @@ fn compute_policy_tree_digest(
         actions,
         decision_config,
         maximum_cumulative_risk,
+        planning_horizon,
         0.0,
         0,
     )?;
@@ -477,6 +480,7 @@ fn audit_policy_node(
     actions: &[DiagnosticAction],
     decision_config: DecisionDiagnosticConfig,
     maximum_cumulative_risk: f64,
+    remaining_steps: usize,
     risk_before_node: f64,
     used_actions: u64,
 ) -> Result<PolicyAuditSummary, SequentialDiagnosticError> {
@@ -526,6 +530,9 @@ fn audit_policy_node(
         });
     };
 
+    if remaining_steps == 0 {
+        return Err(SequentialDiagnosticError::InvalidPolicyTree);
+    }
     let action = actions
         .get(action_index)
         .ok_or(SequentialDiagnosticError::InvalidPolicyTree)?;
@@ -640,6 +647,7 @@ fn audit_policy_node(
             actions,
             decision_config,
             maximum_cumulative_risk,
+            remaining_steps - 1,
             risk_after_node,
             next_used_actions,
         )?;
@@ -761,7 +769,9 @@ pub fn verify_sequential_diagnostic_policy_receipt(
         decision_config,
         task_specification_digest,
     )?;
-    if supplied.decision_problem_receipt != expected_problem_receipt
+    if planning_config.horizon > actions.len()
+        || planning_config.max_policy_expansions == 0
+        || supplied.decision_problem_receipt != expected_problem_receipt
         || supplied.budgeted_evaluation.safety_budget != *expected_safety_budget
         || supplied.budgeted_evaluation.evaluation.horizon != planning_config.horizon
         || supplied.budgeted_evaluation.evaluation.expansions == 0
@@ -816,7 +826,7 @@ pub fn verify_sequential_diagnostic_policy_receipt(
             ];
             if (expected_eligible
                 && option_values.iter().any(|value| value.is_none_or(|x| !x.is_finite())))
-                || (!expected_eligible && option_values.iter().any(Option::is_some))
+                || (!expected_eligible && option_values.iter().any(|value| value.is_some()))
             {
                 return Err(SequentialDiagnosticError::InvalidEvaluationSummary);
             }
@@ -1681,6 +1691,89 @@ mod tests {
             result.policy_receipt.receipt_digest,
             changed_action_risk.policy_receipt.receipt_digest
         );
+    }
+
+    #[test]
+    fn public_policy_receipt_verifier_checks_branches_and_marks_optimality_unverified() {
+        let (hypotheses, mut actions) = xor_complementary_probes();
+        for action in &mut actions {
+            action.safety_risk = 0.35;
+        }
+        let config = DecisionDiagnosticConfig {
+            safety_risk_weight: 0.1,
+            maximum_safety_risk: 0.5,
+            ..decision_config()
+        };
+        let planning = SequentialDiagnosticConfig {
+            horizon: 2,
+            max_policy_expansions: 64,
+        };
+        let budget = SequentialDiagnosticSafetyBudget {
+            maximum_cumulative_risk: 0.7,
+            risk_semantics_digest: "c".repeat(64),
+        };
+        let descriptors = causal_descriptors(&hypotheses, &actions);
+        let supplied = evaluate_sequential_decision_diagnostics_with_policy_receipt(
+            &hypotheses,
+            &actions,
+            &descriptors,
+            config,
+            planning,
+            budget.clone(),
+            &"d".repeat(64),
+        )
+        .expect("receipt-bearing diagnostic policy");
+
+        let report = verify_sequential_diagnostic_policy_receipt(
+            &hypotheses,
+            &actions,
+            &descriptors,
+            config,
+            planning,
+            &budget,
+            &"d".repeat(64),
+            &supplied,
+        )
+        .expect("structurally verified receipt");
+        assert!(report.branch_probabilities_verified);
+        assert!(report.posterior_updates_verified);
+        assert!(report.objective_accounting_verified);
+        assert!(report.pathwise_risk_budget_verified);
+        assert!(!report.optimality_independently_reverified);
+        assert_eq!(report.receipt_digest, supplied.policy_receipt.receipt_digest);
+
+        let mut tampered = supplied.clone();
+        tampered.budgeted_evaluation.evaluation.plan.branches[0]
+            .outcome_probability += 0.01;
+        assert!(verify_sequential_diagnostic_policy_receipt(
+            &hypotheses,
+            &actions,
+            &descriptors,
+            config,
+            planning,
+            &budget,
+            &"d".repeat(64),
+            &tampered,
+        )
+        .is_err());
+
+        let changed_budget = SequentialDiagnosticSafetyBudget {
+            maximum_cumulative_risk: 0.6,
+            ..budget
+        };
+        assert!(matches!(
+            verify_sequential_diagnostic_policy_receipt(
+                &hypotheses,
+                &actions,
+                &descriptors,
+                config,
+                planning,
+                &changed_budget,
+                &"d".repeat(64),
+                &supplied,
+            ),
+            Err(SequentialDiagnosticError::PolicyReceiptMismatch)
+        ));
     }
 
     #[test]
