@@ -69,7 +69,7 @@ jobs:
 
       - name: Record exact source revision
         shell: bash
-        run: printf '%s\\n' "$VOCAL_GUIDANCE_REVISION" > vocal-guidance-source.revision
+        run: printf '%s\n' "$VOCAL_GUIDANCE_REVISION" > vocal-guidance-source.revision
 
       - name: Upload conflict receipt
         uses: actions/upload-artifact@v4
