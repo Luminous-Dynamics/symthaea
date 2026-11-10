@@ -26,7 +26,7 @@ It accepts an exact symbolic `Score`, an `OrchestrationTimelineV1`, instrument c
 
 It then:
 
-1. Recomputes the canonical score-demand SHA-256 over the exact serialized score bytes, and rejects stale or mismatched expected digests.
+1. Recomputes the canonical score-demand SHA-256 over the exact serialized score bytes (the schema ID labels the digest contract but is not prefixed into the hash), and rejects stale or mismatched expected digests.
 2. Runs the orchestration timeline validator before encoding.
 3. Requires every note to have a real generator-authored `PartId`.
 3. Allocates one MIDI track and stable MIDI channel per persistent part.
@@ -55,7 +55,7 @@ The next stage is renderer-backed audio realization: bind the exact renderer bui
 
 ## 4. Acceptance tests for this implementation
 
-The focused regression suite in the source currently covers:
+The source currently contains twelve focused regression tests covering:
 
 | Test | Required behavior |
 |---|---|
