@@ -18,6 +18,11 @@ use crate::rhythm::Duration;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
+/// Stable part slot reserved by the general composer for its independent
+/// return-section counterline. Other general-composer parts remain explicitly
+/// unassigned until their source generators are migrated under #11304.
+const GENERAL_COUNTERMELODY_PART_V1: PartId = PartId(3);
+
 /// A muse-independent expressive intent. muse maps its cognitive state onto
 /// this; the composer maps this onto structure.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -634,10 +639,17 @@ fn compose_with_spec_and_form_and_grammar_impl(
         );
     }
     if tx.counter_melody {
-        realize_counter_melody(&mut score, &form, meter_beats, intent);
+        realize_counter_melody_for_part(
+            &mut score,
+            GENERAL_COUNTERMELODY_PART_V1,
+            &form,
+            meter_beats,
+            intent,
+        );
         if tx.held_arrivals && tx.hook_cell {
-            apply_counter_hook_echoes(
+            apply_counter_hook_echoes_for_part(
                 &mut score,
+                GENERAL_COUNTERMELODY_PART_V1,
                 &form,
                 meter_beats,
                 intent,
@@ -2894,6 +2906,17 @@ fn apply_counter_hook_echoes(
     intent: &MusicalIntent,
     hook: &crate::hook::HookCell,
 ) {
+    apply_counter_hook_echoes_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent, hook);
+}
+
+fn apply_counter_hook_echoes_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+    hook: &crate::hook::HookCell,
+) {
     let vel = (0.30 + intent.energy.clamp(0.0, 1.0) * 0.25).clamp(0.15, 0.55);
     // The echo's total span (constant across every hold — it's the same
     // hook cell every time), needed to clear its own window in the
@@ -2948,11 +2971,13 @@ fn apply_counter_hook_echoes(
             // notes: exact-duplicate onsets/pitches or straight overlap.
             score.notes.retain(|n| {
                 !(n.role == VoiceRole::CounterMelody
+                    && n.part == part_id
                     && n.onset.beats() >= echo_start - 1e-9
                     && n.onset.beats() < echo_end - 1e-9)
             });
             for n in score.notes.iter_mut() {
                 if n.role == VoiceRole::CounterMelody
+                    && n.part == part_id
                     && n.onset.beats() < echo_start - 1e-9
                     && (n.onset + n.duration).beats() > echo_start + 1e-9
                 {
@@ -2969,7 +2994,7 @@ fn apply_counter_hook_echoes(
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
-                    part: PartId::UNASSIGNED,
+                    part: part_id,
                     pitch,
                     onset: Duration::new((t * 4.0).round() as i64, 4),
                     duration: halved,
@@ -4311,6 +4336,18 @@ pub(crate) fn realize_counter_melody(
     meter_beats: f64,
     intent: &MusicalIntent,
 ) {
+    realize_counter_melody_for_part(score, PartId::UNASSIGNED, form, meter_beats, intent);
+}
+
+/// Source-authored variant: the counterline is a genuinely independent
+/// continuing part, so its identity must be supplied by the composer owner.
+pub(crate) fn realize_counter_melody_for_part(
+    score: &mut Score,
+    part_id: PartId,
+    form: &Form,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+) {
     let counter_octave = 4;
     let base_vel = (0.28 + intent.energy.clamp(0.0, 1.0) * 0.28).clamp(0.12, 0.58);
     let bar = Duration::new(meter_beats as i64, 1);
@@ -4383,7 +4420,7 @@ pub(crate) fn realize_counter_melody(
                         1.1 - 0.3 * ((pos - 0.65) / 0.35)
                     };
                     score.push(ScoreNote {
-                        part: PartId::UNASSIGNED,
+                        part: part_id,
                         pitch: p,
                         onset,
                         duration: tone_dur,
@@ -4754,6 +4791,46 @@ mod tests {
     use super::*;
     use crate::harmony::{Progression, Tonality};
     use crate::score::VoiceRole;
+
+    #[test]
+    fn generated_counterline_uses_the_composer_authored_part_id() {
+        let key = Key::major(crate::pitch::PitchClass::C);
+        let mut score = Score::new(key, 100.0, 4);
+        for (midi, onset) in [(72u8, 0i64), (74, 2), (76, 4), (72, 6)] {
+            score.push(ScoreNote {
+                part: PartId(0),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::new(1, 1),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        let phrase = crate::phrase::Phrase {
+            line: Motif::new(Vec::new()),
+            progression: vec![1, 4, 5, 1],
+            cadence: crate::cadence::Cadence::Authentic,
+        };
+        let form = Form {
+            sections: vec![crate::form::Section {
+                role: SectionRole::ReturnA,
+                key,
+                period: crate::phrase::Period {
+                    antecedent: phrase.clone(),
+                    consequent: phrase,
+                },
+            }],
+        };
+        let part = PartId(37);
+        realize_counter_melody_for_part(&mut score, part, &form, 4.0, &MusicalIntent::default());
+        let counter: Vec<&ScoreNote> = score.notes.iter()
+            .filter(|note| note.role == VoiceRole::CounterMelody)
+            .collect();
+        assert!(!counter.is_empty(), "the return section should realize a counterline");
+        assert!(counter.iter().all(|note| note.part == part));
+    }
 
     #[test]
     fn suspension_and_resolution_inherit_the_replaced_harmony_part_identity() {
