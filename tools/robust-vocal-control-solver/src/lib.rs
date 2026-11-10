@@ -929,6 +929,16 @@ mod tests {
     }
 
     #[test]
+    fn does_not_return_partial_delta_when_optimizer_fails_to_converge() {
+        let mut request = request();
+        request.solver.maximum_iterations = 1;
+        request.solver.convergence_tolerance = 1e-20;
+        let error = solve_robust_vocal_control(&matrix(), &request).unwrap_err();
+        assert_eq!(error.kind, ControlSolveErrorKindV1::DidNotConverge);
+        assert!(error.predictions.is_empty());
+    }
+
+    #[test]
     fn rejects_zero_iteration_budget_and_invalid_regularization() {
         let mut request = request();
         request.solver.maximum_iterations = 0;
