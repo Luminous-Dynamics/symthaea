@@ -233,3 +233,68 @@ It has **not yet demonstrated state-of-the-art singing quality**. The immediate 
 - SOTA2 Research, “Singing Voice Synthesis on OpenCpop,” https://www.sota2.com/research/sota/singing-voice-synthesis-on-opencpop
 - SOTA2 Research, “Singing Voice Synthesis on M4Singer and OpenCpop (OD),” https://www.sota2.com/research/sota/singing-voice-synthesis-on-m4singer-and-opencpop-od
 - SOTA2 Research, “Singing Voice Synthesis,” task overview, https://www.sota2.com/research/task/singing-voice-synthesis
+
+
+---
+
+## Research update — 10 November 2026
+
+This addendum records newly available work. It expands the research agenda; it does not change the status of the existing results or establish a Muse SOTA claim.
+
+### New result: classifier-guided diffusion for joint pronunciation and pitch
+
+Li, Liu and Lu's *Singing Voice Synthesis via Guided Diffusion* was published in the Journal of the Audio Engineering Society on 10 November 2026 (74(11), 811–824; DOI: https://doi.org/10.17743/jaes.2026.0303).
+
+The published abstract describes an unconditional diffusion prior guided by two external classifiers: a phoneme classifier for pronunciation and a pitch classifier for musical alignment. It also describes gradient-conflict projection to reconcile competing classifier objectives, and compares guidance in noisy and clean feature spaces. The abstract does not report numerical results, named public test sets, or an independent reproduction; those details must be checked in the full paper before treating this as a proven improvement.
+
+**Muse research hypothesis:** retain the evidence-bearing performance compiler as the source of truth, then explore classifier guidance as an optional acoustic refinement stage. The phoneme and pitch objectives should remain separately observable and separately gated. Gradient conflict must not be "resolved" by silently relaxing an exact-phone or score constraint.
+
+Proposed ablation matrix on one frozen lyric/pronunciation/score corpus:
+
+1. Unguided acoustic baseline.
+2. Phoneme guidance only.
+3. Pitch guidance only.
+4. Naive joint phoneme + pitch guidance.
+5. Joint guidance with gradient-conflict projection.
+6. Clean-space versus noisy-space guidance.
+7. Guidance-scale sweep, including the no-guidance point.
+
+Report canonical PER and word accuracy, voiced-frame F0 error in cents, note-onset/duration error, rest leakage, lyric WER, naturalness and control-MOS, runtime, and memory. Additionally record the cosine similarity and norm ratio of the phoneme and pitch guidance gradients by diffusion step. Plot the pronunciation–pitch–naturalness Pareto frontier rather than reducing the result to one weighted score. Every run must use the same frozen plan, same score, same data split, and exact model/checkpoint digests.
+
+### New architecture reference: factorized speech/singing conditioning
+
+UniVoice (Zheng et al., arXiv:2606.05852, 4 June 2026) factorizes content, melody and timbre conditions and uses modality-appropriate encoders with a shared generation backbone. Its abstract reports 30,000 hours of speech plus 35,000 hours of singing, and singing PER of 16.22% against 24.72% for the cited Vevo1.5 unified baseline on its own evaluation setup.
+
+This is not directly comparable to the SOTA2 results above. It is nevertheless a useful architectural reference. Muse already separates lexical/pronunciation, score, and voice identity concepts in its compiler representation. The opportunity is to preserve that separation through model interfaces, cache keys, conditioning channels, and evaluation—not to imitate a large-model training recipe without the data or compute budget.
+
+### New open-system comparison: zero-shot singing and code-switching
+
+SoulX-Singer's 2026 report describes MIDI- or melody-conditioned controllable synthesis in Mandarin, English and Cantonese, trained on more than 42,000 hours of vocal data, with a separate zero-shot evaluation benchmark. Treat it as a strong external comparison candidate, not as a direct score until the evaluation corpus, voice rights, preprocessing, sample rate, and scoring protocol match.
+
+UniVocal (ACL 2026, https://aclanthology.org/2026.acl-long.1452/) introduces speech–singing code-switching synthesis and SCSBench. Its described approach infers vocal mode from text context and uses a cent-token representation to plan prosody. This suggests a valuable Muse challenge: a performance where speech, rap, and singing transitions are explicitly annotated, including language switches within a phrase. For Muse, mode inference should be optional; an explicit author-controlled mode track remains the deterministic reference.
+
+### Data stewardship is a benchmark property, not paperwork
+
+Cotton et al., *Revising research practices for singing data collection*, AI & Society (published 12 July 2026), analyzes power imbalances between singing-data contributors and data collectors, including contributors' lower control over access and downstream use despite greater exposure to non-consensual use harms.
+
+Accordingly, add data governance to the qualification record: consent scope, allowed model-training and synthesis uses, voice identity scope, retention/withdrawal process, derivative-use rules, and who can authorize each use. An asset with unknown or incompatible rights is ineligible for model training or synthesis, even when its technical quality is excellent.
+
+### Revised next experiments
+
+| Priority | Experiment | Decision it should enable | Promotion rule |
+|---|---|---|---|
+| P0 | Phrase-boundary pitch reset and breath timing | Prove that a phrase break does not inherit an unintended portamento from the preceding phrase | Exact target at phrase onset; breath intervals do not receive voiced pitch scoring |
+| P0 | Independent phoneme/pitch analyzer perturbation tests | Prove that intentional phone and pitch defects are detected independently | Negative controls must fail their corresponding metric |
+| P1 | Guided-diffusion multi-objective ablation | Test whether external linguistic and pitch guidance improves the Pareto frontier | No hard constraint regression; blinded human review; reproducible checkpoints |
+| P1 | SoulX-Singer and UniVoice reference adapters | Compare modern score-conditioned and unified systems with Muse on matched inputs | Same held-out score/lyrics, language profile, sample format and independent references |
+| P1 | Speech–rap–sing mode-switch corpus | Measure continuity and control across vocal modes and code-switches | Every source interval has a mode label or explicit unknown state; no inferred mode is silently treated as author intent |
+| P2 | Rights-cleared South African singing corpus | Qualify English, isiZulu, isiXhosa, Sesotho and Afrikaans singing profiles | Community review, explicit consent and task-specific rights before model use |
+| P2 | Constrained local edit benchmark | Prove that changing one word or note does not corrupt protected regions | Collateral drift reported separately from target-edit success |
+
+### References added
+
+- Li, Sijia; Liu, Shiguang; Lu, Wenhuan. “Singing Voice Synthesis via Guided Diffusion.” *Journal of the Audio Engineering Society*, 74(11), 811–824, November 2026. https://doi.org/10.17743/jaes.2026.0303
+- Zheng et al. “UniVoice: A Unified Model for Speech and Singing Voice Generation.” arXiv:2606.05852, 4 June 2026. https://arxiv.org/abs/2606.05852
+- Meng et al. “SoulX-Singer: Towards High-Quality Zero-Shot Singing Voice Synthesis.” arXiv:2602.07803, 2026. https://arxiv.org/abs/2602.07803
+- Shi et al. “UniVocal: Unified Speech-Singing Code-Switching Synthesis.” ACL 2026. https://aclanthology.org/2026.acl-long.1452/
+- Cotton et al. “Revising research practices for singing data collection.” *AI & Society*, 2026. https://doi.org/10.1007/s00146-026-03205-4
