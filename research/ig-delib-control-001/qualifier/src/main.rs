@@ -6,7 +6,7 @@ use std::{
 };
 
 const EXPECTED_SCENARIOS: usize = 40;
-const EXPECTED_NEGATIVE_CONTROLS: usize = 24;
+const EXPECTED_NEGATIVE_CONTROLS: usize = 30;
 const AGREEMENT_THRESHOLD: f64 = 0.8;
 
 fn field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
@@ -65,7 +65,7 @@ fn reference_action(state: &Value) -> &'static str {
     let unresolved = state["high_impact_unresolved_count"].as_u64().unwrap_or(0);
     let contradictions = state["contradictory_source_count"].as_u64().unwrap_or(0);
     let diverse = state["hypothesis_diversity_count"].as_u64().unwrap_or(0) >= 2;
-    let evidence_complete = state["evidence_complete"].as_bool() == Some(true);
+    let evidence_complete = field(state, "evidence_closure_status") == Some("Verified");
     let minority_verified = field(state, "minority_candidate_state") == Some("Verified");
     let minority_exists = field(state, "minority_candidate_state") != Some("None");
     let minority_preserved = state["minority_preserved"].as_bool() == Some(true);
@@ -144,8 +144,40 @@ fn validate_scenario(scenario: &Value) -> Vec<String> {
     if agreement.is_none_or(|value| !value.is_finite() || !(0.0..=1.0).contains(&value)) {
         add(&mut errors, "agent_agreement_out_of_range");
     }
-    if state["evidence_complete"].as_bool().is_none() {
-        add(&mut errors, "evidence_complete_invalid");
+    let closure_status = field(state, "evidence_closure_status");
+    if !matches!(closure_status, Some("NotAssessed" | "Incomplete" | "Verified")) {
+        add(&mut errors, "evidence_closure_status_invalid");
+    }
+    let closure_receipt = field(state, "evidence_closure_receipt_sha256");
+    let closure_validator = field(state, "evidence_closure_validator_id");
+    let closure_version = field(state, "evidence_closure_validator_version");
+    match closure_status {
+        Some("Verified") => {
+            if closure_receipt.is_none_or(|digest| {
+                digest.len() != 64
+                    || !digest.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+            }) {
+                add(&mut errors, "evidence_closure_receipt_missing");
+            }
+            if closure_validator.is_none() {
+                add(&mut errors, "evidence_closure_validator_identity_missing");
+            }
+            if closure_version.is_none() {
+                add(&mut errors, "evidence_closure_validator_version_missing");
+            }
+        }
+        Some("Incomplete" | "NotAssessed") => {
+            if closure_receipt.is_some() {
+                add(&mut errors, "evidence_closure_receipt_unexpected");
+            }
+            if closure_validator.is_some() {
+                add(&mut errors, "evidence_closure_validator_identity_unexpected");
+            }
+            if closure_version.is_some() {
+                add(&mut errors, "evidence_closure_validator_version_unexpected");
+            }
+        }
+        _ => {}
     }
     if state["high_impact_unresolved_count"].as_i64().is_none_or(|value| value < 0) {
         add(&mut errors, "unresolved_claim_count_invalid");
@@ -480,6 +512,27 @@ mod tests {
     fn checked_in_forty_scenarios_and_negative_controls_validate() {
         let errors = validate_manifest(&parsed(SCENARIOS), &parsed(CONTROLS));
         assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[test]
+    fn verified_evidence_closure_requires_receipt_and_validator_identity() {
+        let rows = parsed(SCENARIOS);
+        let row = &rows["scenarios"][0];
+        assert_eq!(row["state"]["evidence_closure_status"], "Verified");
+        assert!(field(&row["state"], "evidence_closure_receipt_sha256").is_some());
+        assert!(field(&row["state"], "evidence_closure_validator_id").is_some());
+        assert!(field(&row["state"], "evidence_closure_validator_version").is_some());
+    }
+
+    #[test]
+    fn an_unverified_boolean_cannot_authorize_supported_finalization() {
+        let rows = parsed(SCENARIOS);
+        let mut row = rows["scenarios"][1].clone();
+        row["state"]["evidence_closure_status"] = Value::String("Incomplete".into());
+        row["state"]["evidence_closure_receipt_sha256"] = Value::Null;
+        row["state"]["evidence_closure_validator_id"] = Value::Null;
+        row["state"]["evidence_closure_validator_version"] = Value::Null;
+        assert_ne!(reference_action(&row["state"]), "FinalizeSupported");
     }
 
     #[test]
