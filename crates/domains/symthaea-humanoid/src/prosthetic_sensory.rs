@@ -362,6 +362,32 @@ impl ProstheticFeedbackEncoder {
             ));
         }
 
+        // Untrusted or uncalibrated frames must not advance the replay
+        // watermark: otherwise a forged high sequence could suppress a later
+        // qualified observation.
+        if observation
+            .provenance_receipt_ref
+            .as_deref()
+            .is_none_or(|reference| reference.trim().is_empty())
+        {
+            return Ok(self.unavailable(
+                observation,
+                FeedbackUnavailableReason::MissingProvenanceReceipt,
+            ));
+        }
+
+        if observation.calibration != CalibrationDisposition::VerifiedCurrent
+            || observation
+                .calibration_ref
+                .as_deref()
+                .is_none_or(|reference| reference.trim().is_empty())
+        {
+            return Ok(self.unavailable(
+                observation,
+                FeedbackUnavailableReason::CalibrationNotCurrent,
+            ));
+        }
+
         if self
             .last_sequence
             .is_some_and(|previous| observation.sequence <= previous)
@@ -372,8 +398,8 @@ impl ProstheticFeedbackEncoder {
             ));
         }
 
-        // Consume the sequence before freshness/provenance/calibration gates.
-        // Repeated rejected frames must not repeatedly buzz the unavailable cue.
+        // Once the external provenance/calibration gate has admitted this
+        // sample, consume its sequence even if receive-time freshness fails.
         self.last_sequence = Some(observation.sequence);
 
         if now_monotonic_ns < observation.received_monotonic_ns {
@@ -389,22 +415,6 @@ impl ProstheticFeedbackEncoder {
             return Ok(self.unavailable(
                 observation,
                 FeedbackUnavailableReason::StaleReceiveTimestamp,
-            ));
-        }
-
-        if observation.provenance_receipt_ref.as_deref().is_none_or(str::is_empty) {
-            return Ok(self.unavailable(
-                observation,
-                FeedbackUnavailableReason::MissingProvenanceReceipt,
-            ));
-        }
-
-        if observation.calibration != CalibrationDisposition::VerifiedCurrent
-            || observation.calibration_ref.as_deref().is_none_or(str::is_empty)
-        {
-            return Ok(self.unavailable(
-                observation,
-                FeedbackUnavailableReason::CalibrationNotCurrent,
             ));
         }
 
@@ -472,7 +482,12 @@ impl ProstheticFeedbackEncoder {
         observation: &ProstheticSensoryObservationV1,
         reason: FeedbackUnavailableReason,
     ) -> ProstheticFeedbackFrameV1 {
-        let cues = if self.policy.emit_data_unavailable_cue {
+        // Replayed/out-of-order frames are deliberately silent. A repeated
+        // replay must not repeatedly buzz the wearer; the disposition remains
+        // available to logs and benchmark evaluation.
+        let cues = if self.policy.emit_data_unavailable_cue
+            && reason != FeedbackUnavailableReason::ReplayOrOutOfOrder
+        {
             vec![HapticCue {
                 code_id: self.codebook.data_unavailable_code,
                 semantic: HapticCueSemantic::DataUnavailable,
@@ -676,6 +691,53 @@ mod tests {
     }
 
     #[test]
+    fn unprovenanced_high_sequence_does_not_poison_qualified_sequence() {
+        let mut encoder = encoder();
+        let mut untrusted = observation(u64::MAX);
+        untrusted.provenance_receipt_ref = None;
+        let rejected = encoder.encode(&untrusted, 150).unwrap();
+        assert_eq!(
+            rejected.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::MissingProvenanceReceipt
+            )
+        );
+
+        let mut qualified = observation(1);
+        qualified.contacts.push(ContactReading {
+            digit: HandDigit::Thumb,
+            in_contact: true,
+            origin: ObservationOrigin::DirectMeasurement,
+        });
+        let accepted = encoder.encode(&qualified, 150).unwrap();
+        assert_eq!(accepted.disposition, FeedbackFrameDisposition::CuesEncoded);
+    }
+
+    #[test]
+    fn whitespace_provenance_and_calibration_references_are_rejected() {
+        let mut encoder = encoder();
+        let mut sample = observation(1);
+        sample.provenance_receipt_ref = Some("   ".into());
+        let missing_receipt = encoder.encode(&sample, 150).unwrap();
+        assert_eq!(
+            missing_receipt.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::MissingProvenanceReceipt
+            )
+        );
+
+        let mut sample = observation(2);
+        sample.calibration_ref = Some("  ".into());
+        let missing_calibration = encoder.encode(&sample, 150).unwrap();
+        assert_eq!(
+            missing_calibration.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::CalibrationNotCurrent
+            )
+        );
+    }
+
+    #[test]
     fn repeated_stale_frame_does_not_repeat_unavailable_cue() {
         let mut encoder = encoder();
         let mut sample = observation(1);
@@ -702,7 +764,7 @@ mod tests {
                 FeedbackUnavailableReason::ReplayOrOutOfOrder
             )
         );
-        assert_eq!(replay.cues.len(), 1);
+        assert!(replay.cues.is_empty());
     }
 
     #[test]
