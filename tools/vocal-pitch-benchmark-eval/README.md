@@ -6,7 +6,7 @@ A dependency-free Rust evaluator for comparing monophonic pitch trackers against
 
 This tool consumes frame-aligned F0 observations. It does not read audio, resample, run trackers, choose confidence thresholds, infer voiced frames, or construct statistical confidence intervals.
 
-The primary track rejects score-conditioned pitch estimation. A tracker adapter must apply its frozen voicing policy and emit None for an unvoiced/abstained frame. The policy identifier, tracker artifact digest, reference manifest digest, preprocessing manifest and frame-alignment policy are all bound into the report.
+The primary track rejects score-conditioned pitch estimation. A tracker adapter must apply its frozen voicing policy and emit None for an unvoiced/abstained frame. The report binds the policy identifier, optional numeric confidence threshold, calibration receipt, calibration split ID and manifest digest, evaluation split ID and manifest digest, tracker artifact digest, reference-suite manifest digest, preprocessing manifest and frame-alignment policy. Calibration and evaluation split IDs must differ. The split manifests must also be independently checked for singer/song/session overlap; distinct labels alone do not prove statistical independence.
 
 ## Metrics
 
@@ -34,7 +34,7 @@ The report preserves:
 - equal-weight macro metrics across those groups;
 - median per-segment FFE and VDE.
 
-The specification declares the complete expected corpus × condition group set. Missing or unexpected groups reject the run; a partial run cannot silently change the macro denominator. For the external mixed pitch benchmark's headline methodology, declare the eight non-clean conditions for each expected corpus and report clean audio separately. For Muse's singing-only study, define a separate group set appropriate to the licensed corpus.
+The specification declares the complete expected corpus × condition group set. Missing or unexpected groups reject the run; a partial run cannot silently change the macro denominator. Every segment binds its source WAV, reference-F0 track and estimated-F0 track digests. It also retains language, register, vocal-technique and SNR stratum IDs. For the external mixed pitch benchmark's headline methodology, declare the eight non-clean conditions for each expected corpus and report clean audio separately. For Muse's singing-only study, define a separate group set appropriate to the licensed corpus.
 
 Use group-level outputs for corpus/condition macro reporting. Do not use raw frames as independent bootstrap samples. Comparative confidence intervals should resample singer/song/session clusters and preserve matched source cases across trackers. The library intentionally does not emit confidence intervals because it does not own the sampling design or resampling policy.
 
