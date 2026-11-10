@@ -44,7 +44,7 @@ Budgets are counts of independent physical groups (e.g., cells for unseen-cell t
 
 - Split is frozen before router selection; adaptation/readiness completes before final test access.
 - Router training groups are a subset of declared source domains only.
-- Router features are label-free and available no later than selection time.
+- Router features are label-free, not derived from target reference labels, and available no later than selection time.
 - Target adaptation groups belong to the declared target support pool and are disjoint from final evaluation groups and source training groups.
 - Every candidate uses the same exact final evaluation group identities.
 - Zero-shot has zero target support groups, zero target labels and zero model updates.
@@ -56,7 +56,7 @@ Budgets are counts of independent physical groups (e.g., cells for unseen-cell t
 
 ## Frozen synthetic corpus
 
-Thirteen cases: five accepted portfolios (zero-shot, unlabeled TTA, supervised fine-tuning, few-shot MAML and explicit abstention) and eight rejected controls (router test-label leakage, adaptation/test overlap, expert evaluation-set mismatch, zero-shot budget inflation, unlabeled TTA claiming labels, missing fine-tuning label evidence, feature available after selection and MAML below its support minimum).
+Sixteen cases: five accepted portfolios (zero-shot, unlabeled TTA, supervised fine-tuning, few-shot MAML and explicit abstention) and eleven rejected controls (router test-label leakage, target-label-derived router features, adaptation/test overlap, expert evaluation-set mismatch, zero-shot budget inflation, unlabeled TTA claiming labels, missing fine-tuning label evidence, feature available after selection, adaptation completing after test access, MAML below its support minimum and an abstention that improperly claims a prediction result).
 
 These fixtures validate protocol gates only; they are not model-performance or physical battery evidence.
 
