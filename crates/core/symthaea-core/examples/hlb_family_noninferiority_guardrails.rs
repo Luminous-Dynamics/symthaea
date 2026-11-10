@@ -13,8 +13,8 @@
 
 use serde_json::json;
 use symthaea_core::family_noninferiority::{
-    FamilyGuardrailObservation, FamilyGuardrailPlan, FamilyGuardrailSpec,
-    FamilyGuardrailStatus, FamilyNonInferiorityGate,
+    FamilyGuardrailBinding, FamilyGuardrailObservation, FamilyGuardrailPlan,
+    FamilyGuardrailSpec, FamilyGuardrailStatus, FamilyNonInferiorityGate,
 };
 
 fn plan(prefix: &str) -> Result<FamilyGuardrailPlan, Box<dyn std::error::Error>> {
@@ -40,7 +40,15 @@ fn run_case(
     let prefix = format!("family-guardrail-known-answer-{name}");
     let plan = plan(&prefix)?;
     let family_ids = ["bearing.cross-load", "pump.low-flow"];
-    let mut gate = FamilyNonInferiorityGate::new(plan, 0.05, 1)?;
+    let binding = FamilyGuardrailBinding {
+        baseline_model_digest: "a".repeat(64),
+        candidate_model_digest: "b".repeat(64),
+        evaluation_protocol_digest: "c".repeat(64),
+        confirmatory_episode_manifest_digest: plan.confirmatory_episode_manifest_digest(),
+        precondition_gate_digest: "d".repeat(64),
+        maximum_total_observations: plan.maximum_total_observations(),
+    };
+    let mut gate = FamilyNonInferiorityGate::new(plan, 0.05, 1, binding)?;
     let mut final_report = gate.report()?;
 
     for (family_index, family_id) in family_ids.iter().enumerate() {
