@@ -52,7 +52,7 @@ A same-cell temporal test is valid when correctly ordered, but it does not estab
 
 ## Frozen synthetic corpus
 
-Eleven cases: valid unseen-cell and same-cell temporal designs; group-overlap leakage; preprocessing fit on all data; test-label selection; undeclared dataset digest; pooled-only metrics; relation/key mismatch; missing SOH denominator; duplicate observation ID; and unsupported uncertainty calibration.
+Twelve cases: valid unseen-cell and same-cell temporal designs; group-overlap leakage; preprocessing fit on all data; test-label selection; undeclared dataset digest; pooled-only metrics; relation/key mismatch; missing SOH denominator; duplicate observation ID; and unsupported uncertainty calibration.
 
 The corpus is synthetic protocol testing. It does not contain real battery measurements or train a model.
 
