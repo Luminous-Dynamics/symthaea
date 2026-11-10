@@ -959,6 +959,17 @@ mod tests {
     }
 
     #[test]
+    fn characterized_mission_rejects_noncanonical_dimensionless_axis_units() {
+        let input = baseline();
+        let mut characterization = propulsion_characterization();
+        characterization.propeller_efficiency_by_advance_ratio.x_unit = "dimensionless".into();
+        assert!(matches!(
+            evaluate_mission_characterized(&input, &characterization),
+            Err(ModelError::Characterization(CharacterizationError::InvalidCurve(_)))
+        ));
+    }
+
+    #[test]
     fn characterized_mission_rejects_unmeasured_operating_region() {
         let input = baseline();
         let mut characterization = propulsion_characterization();
