@@ -13,7 +13,7 @@
 //! must never be re-labelled as measured touch by a downstream adapter.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Evidence class inherited from the observation source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -22,6 +22,16 @@ pub enum SensoryEvidenceClass {
     Simulated,
     BenchMeasured,
     HumanObserved,
+}
+
+/// Provenance disposition supplied by an external verifier. A receipt
+/// reference without Verified disposition is never sufficient for cue encoding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProvenanceDisposition {
+    Verified,
+    Missing,
+    Invalid,
+    Indeterminate,
 }
 
 /// Calibration disposition supplied by an external qualification/verifier.
@@ -102,6 +112,7 @@ pub struct ProstheticSensoryObservationV1 {
     pub sequence: u64,
     pub sensor_id: String,
     pub provenance_receipt_ref: Option<String>,
+    pub provenance: ProvenanceDisposition,
     pub calibration_ref: Option<String>,
     pub calibration: CalibrationDisposition,
     pub evidence_class: SensoryEvidenceClass,
@@ -261,6 +272,7 @@ pub struct HapticCue {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FeedbackUnavailableReason {
     MissingProvenanceReceipt,
+    ProvenanceNotVerified,
     CalibrationNotCurrent,
     StaleReceiveTimestamp,
     FutureReceiveTimestamp,
@@ -322,7 +334,7 @@ pub enum PolicyValidationError {
 pub struct ProstheticFeedbackEncoder {
     policy: ProstheticFeedbackPolicyV1,
     codebook: HapticCodebookV1,
-    last_sequence: Option<u64>,
+    last_sequences: HashMap<(String, String), u64>,
 }
 
 impl ProstheticFeedbackEncoder {
@@ -339,12 +351,12 @@ impl ProstheticFeedbackEncoder {
         Ok(Self {
             policy,
             codebook,
-            last_sequence: None,
+            last_sequences: HashMap::new(),
         })
     }
 
     pub fn reset_replay_guard(&mut self) {
-        self.last_sequence = None;
+        self.last_sequences.clear();
     }
 
     pub fn encode(
@@ -365,6 +377,20 @@ impl ProstheticFeedbackEncoder {
         // Untrusted or uncalibrated frames must not advance the replay
         // watermark: otherwise a forged high sequence could suppress a later
         // qualified observation.
+        if observation.provenance != ProvenanceDisposition::Verified {
+            let reason = if observation.provenance == ProvenanceDisposition::Missing
+                || observation
+                    .provenance_receipt_ref
+                    .as_deref()
+                    .is_none_or(|reference| reference.trim().is_empty())
+            {
+                FeedbackUnavailableReason::MissingProvenanceReceipt
+            } else {
+                FeedbackUnavailableReason::ProvenanceNotVerified
+            };
+            return Ok(self.unavailable(observation, reason));
+        }
+
         if observation
             .provenance_receipt_ref
             .as_deref()
@@ -388,9 +414,16 @@ impl ProstheticFeedbackEncoder {
             ));
         }
 
+        // Sequence numbers are scoped to a sensor + source-clock stream.
+        // Multiple independent sensors must not suppress each other's frames.
+        let stream_key = (
+            observation.sensor_id.clone(),
+            observation.source_clock_profile_ref.clone(),
+        );
         if self
-            .last_sequence
-            .is_some_and(|previous| observation.sequence <= previous)
+            .last_sequences
+            .get(&stream_key)
+            .is_some_and(|previous| observation.sequence <= *previous)
         {
             return Ok(self.unavailable(
                 observation,
@@ -398,9 +431,10 @@ impl ProstheticFeedbackEncoder {
             ));
         }
 
-        // Once the external provenance/calibration gate has admitted this
-        // sample, consume its sequence even if receive-time freshness fails.
-        self.last_sequence = Some(observation.sequence);
+        // Once external provenance/calibration gates admit this sample,
+        // consume its sequence even if receive-time freshness fails.
+        self.last_sequences
+            .insert(stream_key, observation.sequence);
 
         if now_monotonic_ns < observation.received_monotonic_ns {
             return Ok(self.unavailable(
@@ -560,6 +594,7 @@ mod tests {
             sequence,
             sensor_id: "hand-sensor-array-1".into(),
             provenance_receipt_ref: Some("receipt:observation-1".into()),
+            provenance: ProvenanceDisposition::Verified,
             calibration_ref: Some("calibration:epoch-4".into()),
             calibration: CalibrationDisposition::VerifiedCurrent,
             evidence_class: SensoryEvidenceClass::BenchMeasured,
@@ -695,6 +730,7 @@ mod tests {
         let mut encoder = encoder();
         let mut untrusted = observation(u64::MAX);
         untrusted.provenance_receipt_ref = None;
+        untrusted.provenance = ProvenanceDisposition::Indeterminate;
         let rejected = encoder.encode(&untrusted, 150).unwrap();
         assert_eq!(
             rejected.disposition,
@@ -711,6 +747,51 @@ mod tests {
         });
         let accepted = encoder.encode(&qualified, 150).unwrap();
         assert_eq!(accepted.disposition, FeedbackFrameDisposition::CuesEncoded);
+    }
+
+    #[test]
+    fn nonempty_but_unverified_provenance_is_rejected() {
+        let mut encoder = encoder();
+        let mut sample = observation(1);
+        sample.provenance = ProvenanceDisposition::Indeterminate;
+        let frame = encoder.encode(&sample, 150).unwrap();
+        assert_eq!(
+            frame.disposition,
+            FeedbackFrameDisposition::DataUnavailable(
+                FeedbackUnavailableReason::ProvenanceNotVerified
+            )
+        );
+        assert!(frame
+            .cues
+            .iter()
+            .all(|cue| cue.origin == CueEvidenceOrigin::AvailabilityGate));
+    }
+
+    #[test]
+    fn replay_sequences_are_scoped_per_sensor_clock_stream() {
+        let mut encoder = encoder();
+        let mut sensor_a = observation(1);
+        sensor_a.contacts.push(ContactReading {
+            digit: HandDigit::Thumb,
+            in_contact: true,
+            origin: ObservationOrigin::DirectMeasurement,
+        });
+        assert_eq!(
+            encoder.encode(&sensor_a, 150).unwrap().disposition,
+            FeedbackFrameDisposition::CuesEncoded
+        );
+
+        let mut sensor_b = observation(1);
+        sensor_b.sensor_id = "hand-sensor-array-2".into();
+        sensor_b.contacts.push(ContactReading {
+            digit: HandDigit::Index,
+            in_contact: true,
+            origin: ObservationOrigin::DirectMeasurement,
+        });
+        assert_eq!(
+            encoder.encode(&sensor_b, 150).unwrap().disposition,
+            FeedbackFrameDisposition::CuesEncoded
+        );
     }
 
     #[test]
