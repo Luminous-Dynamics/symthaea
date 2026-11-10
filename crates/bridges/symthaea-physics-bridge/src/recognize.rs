@@ -46,7 +46,7 @@ use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 
 use crate::dimensional_inference::{UnitMap, infer_dimensions};
 use crate::query::{PhysicsSearchEngine, SearchWeights};
-use crate::symmetry_inference::infer_symmetry;
+use crate::symmetry_inference::{SymmetryInferenceReport, infer_symmetry_with_evidence};
 #[allow(unused_imports)] // DimensionalSignature is used in rustdoc links
 use crate::types::DimensionalSignature;
 use crate::types::{DiffOperator, EquationNode, PhysicsDomain, PhysicsEquation, SearchResult};
@@ -210,6 +210,8 @@ pub struct RecognitionReport {
     pub is_novel: bool,
     /// All top-k search results for inspection.
     pub all_results: Vec<SearchResult>,
+    /// Symmetry candidate and the method/search profile that produced it.
+    pub symmetry_inference: SymmetryInferenceReport,
 }
 
 impl RecognitionReport {
@@ -298,7 +300,8 @@ pub fn recognize_expr_with_units(
     // symmetry is `none()`, catalog entries claiming SO(n) suffer a ~0.20
     // penalty on the symmetry axis; this inference lets the query's symmetry
     // match its catalog cousin directly for the showcase invariants.
-    let symmetries = infer_symmetry(expr);
+    let symmetry_inference = infer_symmetry_with_evidence(expr);
+    let symmetries = symmetry_inference.descriptor_or_none();
 
     let query = PhysicsEquation {
         name: name.to_string(),
@@ -335,6 +338,7 @@ pub fn recognize_expr_with_units(
         best_domain,
         best_score,
         all_results: results,
+        symmetry_inference,
     }
 }
 
@@ -426,6 +430,63 @@ mod tests {
         }
     }
 
+    /// Recognition must preserve whether a symmetry came from an exact-shape
+    /// structural pattern or a sampled numeric fallback.
+    #[test]
+    fn recognition_report_preserves_structural_symmetry_evidence() {
+        let engine = PhysicsSearchEngine::new();
+        let expr = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("y".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let report = recognize_expr(&engine, &expr, "radial_quadratic_test");
+        assert!(matches!(
+            report.symmetry_inference.evidence,
+            Some(crate::symmetry_inference::SymmetryInferenceEvidence::StructuralPatternMatch {
+                pattern: crate::symmetry_inference::StructuralSymmetryPattern::EqualCoefficientSumOfSquares { .. },
+            })
+        ));
+    }
+    #[test]
+    fn recognition_report_preserves_exact_polynomial_symmetry_evidence() {
+        let engine = PhysicsSearchEngine::new();
+        let radial_squared = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("y".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let quartic = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(radial_squared),
+            Box::new(Expr::Const(2.0)),
+        );
+        let report = recognize_expr(&engine, &quartic, "radial_quartic_test");
+        assert!(matches!(
+            report.symmetry_inference.evidence,
+            Some(crate::symmetry_inference::SymmetryInferenceEvidence::ExactPolynomialLieDerivative {
+                group: crate::types::LieGroup::SO(2),
+                checked_generator_count: 1,
+                ..
+            })
+        ));
+    }
     /// End-to-end recognition: convert a Kepler energy skeleton and search the catalog.
     /// Does not assert a specific match — the catalog may or may not contain an
     /// exact Kepler entry — but asserts the search returns results without panicking.
