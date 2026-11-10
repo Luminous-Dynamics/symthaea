@@ -168,6 +168,9 @@ impl SceneAdmissionReceipt {
         x_axis_is_forward: bool,
         ego_position_x_m: f64,
         ego_velocity_x_mps: f64,
+        ego_orientation_yaw_rad: f64,
+        ego_extent_length_m: f64,
+        ego_extent_width_m: f64,
         lane_min_y_m: f64,
         lane_max_y_m: f64,
         sources: Vec<SceneSourceReceipt>,
@@ -187,6 +190,11 @@ impl SceneAdmissionReceipt {
                 && processing_tick_ns <= evaluated_at_tick_ns)
             || !ego_position_x_m.is_finite()
             || !ego_velocity_x_mps.is_finite()
+            || !ego_orientation_yaw_rad.is_finite()
+            || !ego_extent_length_m.is_finite()
+            || ego_extent_length_m <= 0.0
+            || !ego_extent_width_m.is_finite()
+            || ego_extent_width_m <= 0.0
             || !lane_min_y_m.is_finite()
             || !lane_max_y_m.is_finite()
             || lane_min_y_m >= lane_max_y_m
@@ -266,6 +274,9 @@ impl SceneAdmissionReceipt {
             x_axis_is_forward,
             ego_position_x_m,
             ego_velocity_x_mps,
+            ego_orientation_yaw_rad,
+            ego_extent_length_m,
+            ego_extent_width_m,
             lane_min_y_m,
             lane_max_y_m,
             sources,
