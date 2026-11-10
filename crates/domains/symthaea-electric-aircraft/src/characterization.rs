@@ -9,7 +9,10 @@
 //! interpolated; the conservative lower efficiency bound is used for mission
 //! energy estimates. Extrapolation is rejected rather than silently guessed.
 
+use std::collections::BTreeMap;
 use std::fmt;
+
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvidenceClass {
@@ -47,6 +50,31 @@ impl EvidenceRecord {
         }
         Ok(())
     }
+
+    /// Verify that caller-supplied immutable artifact bytes match this record's
+    /// SHA-256 digest. This does not fetch the URI or authenticate its publisher.
+    pub fn verify_bytes(&self, bytes: &[u8]) -> Result<(), CharacterizationError> {
+        self.validate()?;
+        let observed_sha256 = format!("{:x}", Sha256::digest(bytes));
+        if !observed_sha256.eq_ignore_ascii_case(&self.sha256) {
+            return Err(CharacterizationError::EvidenceDigestMismatch {
+                evidence_id: self.id.clone(),
+                expected_sha256: self.sha256.to_ascii_lowercase(),
+                observed_sha256,
+            });
+        }
+        Ok(())
+    }
+}
+
+fn verify_payload(
+    evidence: &EvidenceRecord,
+    payloads: &BTreeMap<String, Vec<u8>>,
+) -> Result<(), CharacterizationError> {
+    let bytes = payloads
+        .get(&evidence.id)
+        .ok_or_else(|| CharacterizationError::MissingEvidencePayload(evidence.id.clone()))?;
+    evidence.verify_bytes(bytes)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -88,6 +116,12 @@ pub enum CharacterizationError {
     },
     InvalidOperatingPoint(String),
     InvalidGrid(String),
+    MissingEvidencePayload(String),
+    EvidenceDigestMismatch {
+        evidence_id: String,
+        expected_sha256: String,
+        observed_sha256: String,
+    },
     GridOutsideCalibrationDomain {
         grid_id: String,
         x_observed: f64,
@@ -311,6 +345,19 @@ impl PropulsionCharacterization {
         ids.sort();
         ids.dedup();
         ids
+    }
+
+    /// Verify every curve against the exact caller-supplied artifact bytes.
+    /// URI resolution and publisher/signature trust remain external.
+    pub fn verify_evidence_payloads(
+        &self,
+        payloads: &BTreeMap<String, Vec<u8>>,
+    ) -> Result<(), CharacterizationError> {
+        self.validate()?;
+        verify_payload(&self.motor_efficiency_by_load.evidence, payloads)?;
+        verify_payload(&self.inverter_efficiency_by_load.evidence, payloads)?;
+        verify_payload(&self.propeller_efficiency_by_advance_ratio.evidence, payloads)?;
+        Ok(())
     }
 }
 
@@ -536,6 +583,18 @@ impl BatteryCharacterization {
         ids.dedup();
         ids
     }
+
+    /// Verify both battery grids against the exact caller-supplied artifact
+    /// bytes. URI resolution and publisher/signature trust remain external.
+    pub fn verify_evidence_payloads(
+        &self,
+        payloads: &BTreeMap<String, Vec<u8>>,
+    ) -> Result<(), CharacterizationError> {
+        self.validate()?;
+        verify_payload(&self.open_circuit_voltage.evidence, payloads)?;
+        verify_payload(&self.internal_resistance.evidence, payloads)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -709,6 +768,79 @@ mod tests {
             ],
         );
         assert!(matches!(c.validate(), Err(CharacterizationError::InvalidCurve(_))));
+    }
+
+    #[test]
+    fn evidence_record_verifies_exact_sha256_payload() {
+        let mut item = evidence("known-payload");
+        item.sha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".into();
+        item.verify_bytes(b"abc").unwrap();
+        assert!(matches!(
+            item.verify_bytes(b"abd"),
+            Err(CharacterizationError::EvidenceDigestMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn characterized_maps_require_all_evidence_payloads_and_verify_them() {
+        let mut propulsion = PropulsionCharacterization {
+            motor_efficiency_by_load: curve(
+                "motor",
+                "shaft_load_fraction",
+                vec![
+                    EfficiencyPoint { x: 0.1, efficiency: 0.92, absolute_uncertainty: 0.01 },
+                    EfficiencyPoint { x: 1.0, efficiency: 0.96, absolute_uncertainty: 0.01 },
+                ],
+            ),
+            inverter_efficiency_by_load: curve(
+                "inverter",
+                "input_load_fraction",
+                vec![
+                    EfficiencyPoint { x: 0.1, efficiency: 0.97, absolute_uncertainty: 0.005 },
+                    EfficiencyPoint { x: 1.0, efficiency: 0.985, absolute_uncertainty: 0.005 },
+                ],
+            ),
+            propeller_efficiency_by_advance_ratio: curve(
+                "propeller",
+                "advance_ratio",
+                vec![
+                    EfficiencyPoint { x: 0.4, efficiency: 0.80, absolute_uncertainty: 0.02 },
+                    EfficiencyPoint { x: 1.0, efficiency: 0.86, absolute_uncertainty: 0.02 },
+                ],
+            ),
+            motor_rated_shaft_power_w: 80_000.0,
+            inverter_rated_input_power_w: 90_000.0,
+            propeller_diameter_m: 1.6,
+            propeller_rpm: 2_400.0,
+        };
+        let hash = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        for record in [
+            &mut propulsion.motor_efficiency_by_load.evidence,
+            &mut propulsion.inverter_efficiency_by_load.evidence,
+            &mut propulsion.propeller_efficiency_by_advance_ratio.evidence,
+        ] {
+            record.sha256 = hash.into();
+        }
+        let payloads = BTreeMap::from([
+            ("motor-dataset".to_string(), b"abc".to_vec()),
+            ("inverter-dataset".to_string(), b"abc".to_vec()),
+            ("propeller-dataset".to_string(), b"abc".to_vec()),
+        ]);
+        propulsion.verify_evidence_payloads(&payloads).unwrap();
+
+        let mut missing = payloads.clone();
+        missing.remove("inverter-dataset");
+        assert!(matches!(
+            propulsion.verify_evidence_payloads(&missing),
+            Err(CharacterizationError::MissingEvidencePayload(id)) if id == "inverter-dataset"
+        ));
+
+        let mut corrupt = payloads;
+        corrupt.insert("propeller-dataset".into(), b"not-the-artifact".to_vec());
+        assert!(matches!(
+            propulsion.verify_evidence_payloads(&corrupt),
+            Err(CharacterizationError::EvidenceDigestMismatch { .. })
+        ));
     }
 
     #[test]
