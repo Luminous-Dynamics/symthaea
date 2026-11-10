@@ -414,9 +414,18 @@ fn validate_record(record: &Value) -> Vec<String> {
         }
     }
 
-    errors.sort();
-    errors.dedup();
-    errors
+    let mut violation_codes: Vec<String> = errors
+        .into_iter()
+        .map(|error| {
+            error
+                .split_once(": ")
+                .map(|(_, code)| code.to_string())
+                .unwrap_or(error)
+        })
+        .collect();
+    violation_codes.sort();
+    violation_codes.dedup();
+    violation_codes
 }
 
 fn validate_manifest(
@@ -626,7 +635,7 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_sixteen_fixture_oracles_validate() {
+    fn checked_in_seventeen_fixture_oracles_validate() {
         let report = validate_manifest(
             &parsed(MANIFEST),
             &parsed(MANIFEST_SCHEMA),
