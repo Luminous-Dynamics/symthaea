@@ -11,7 +11,11 @@
     "abstain_loss",
     "hypotheses",
     "actions",
-    "tests"
+    "tests",
+    "prior_evidence_digest",
+    "prior_evidence_class",
+    "decision_loss_digest",
+    "decision_loss_evidence_class"
   ],
   "properties": {
     "schema_version": {
@@ -55,7 +59,8 @@
             "maximum": 1
           }
         }
-      }
+      },
+      "maxItems": 32
     },
     "actions": {
       "type": "array",
@@ -88,7 +93,8 @@
             }
           }
         }
-      }
+      },
+      "maxItems": 32
     },
     "tests": {
       "type": "array",
@@ -103,7 +109,11 @@
           "downtime_cost_digest",
           "prerequisites",
           "requires",
-          "outcomes"
+          "outcomes",
+          "likelihood_model_digest",
+          "calibration_evidence_digest",
+          "calibration_cohort_digest",
+          "likelihood_evidence_class"
         ],
         "properties": {
           "id": {
@@ -211,9 +221,59 @@
                 }
               }
             }
+          },
+          "likelihood_model_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "calibration_evidence_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "calibration_cohort_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "likelihood_evidence_class": {
+            "enum": [
+              "reference_test_measurement",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
           }
         }
       }
+    },
+    "prior_evidence_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "prior_evidence_class": {
+      "enum": [
+        "reference_test_measurement",
+        "derived_estimate",
+        "model_prediction",
+        "simulation_output",
+        "synthetic_fixture",
+        "vendor_claim"
+      ]
+    },
+    "decision_loss_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "decision_loss_evidence_class": {
+      "enum": [
+        "reference_test_measurement",
+        "derived_estimate",
+        "model_prediction",
+        "simulation_output",
+        "synthetic_fixture",
+        "vendor_claim"
+      ]
     }
   }
 }
