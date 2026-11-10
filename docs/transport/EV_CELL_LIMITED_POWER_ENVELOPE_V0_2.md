@@ -90,4 +90,4 @@ It does not compute β_energy, authorize BMS action or establish safety/certific
 
 `cargo test --manifest-path tools/ev-cell-limited-power-envelope/Cargo.toml`
 
-`cargo run --manifest-path tools/ev-cell-limited-power-envelope/Cargo.toml -- --schema schemas/transport/ev_cell_limited_power_envelope_v0_1.schema.json --corpus fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_1.json`
+`cargo run --manifest-path tools/ev-cell-limited-power-envelope/Cargo.toml -- --schema schemas/transport/ev_cell_limited_power_envelope_v0_1.schema.json --corpus fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_2.json`
