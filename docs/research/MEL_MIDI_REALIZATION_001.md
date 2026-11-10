@@ -26,8 +26,9 @@ It accepts an exact symbolic `Score`, an `OrchestrationTimelineV1`, instrument c
 
 It then:
 
-1. Runs the orchestration timeline validator before encoding.
-2. Requires every note to have a real generator-authored `PartId`.
+1. Recomputes the canonical score-demand SHA-256 over the exact serialized score bytes, and rejects stale or mismatched expected digests.
+2. Runs the orchestration timeline validator before encoding.
+3. Requires every note to have a real generator-authored `PartId`.
 3. Allocates one MIDI track and stable MIDI channel per persistent part.
 4. Emits explicit program changes at time-indexed instrument handoffs.
 5. Preserves input-score note ordinals in a digest-scoped event map.
@@ -66,6 +67,9 @@ The focused regression suite in the source currently covers:
 | Sub-tick note duration | Reject; never silently stretch or drop |
 | MIDI delta beyond standard VLQ limit | Reject |
 | Rational tie quantization | Nearest-ties-to-even |
+| Stale expected score digest | Reject a changed score paired with an old digest |
+| Source overlap hidden by tick quantization | Reject using exact rational source-time overlap |
+| Quantized handoff collision | Reject different instrument instances collapsing to one MIDI tick |
 | Frozen input replay | Byte-identical MIDI and receipt hashes |
 
 **Verification status:** tests are authored but have not been compiled or executed in this environment. The focused CI workflow is included in this branch. A queued, skipped, or absent workflow is not a pass.
