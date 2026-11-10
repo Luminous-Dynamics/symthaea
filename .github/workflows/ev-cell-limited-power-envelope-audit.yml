@@ -30,9 +30,9 @@ jobs:
         run: |
           cargo run --manifest-path tools/ev-cell-limited-power-envelope/Cargo.toml -- --schema schemas/transport/ev_cell_limited_power_envelope_v0_1.schema.json --corpus fixtures/ev_battery/cell_limited_power_envelope_scenarios_v0_1.json > "$RUNNER_TEMP/ev-cell-limited-power-report.json"
           jq -e '
-            .case_count == 9 and
+            .case_count == 11 and
             .computed_count == 4 and
             .no_discharge_count == 1 and
-            .rejected_count == 4 and
+            .rejected_count == 6 and
             (.report_sha256 | test("^[a-f0-9]{64}$"))
           ' "$RUNNER_TEMP/ev-cell-limited-power-report.json"
