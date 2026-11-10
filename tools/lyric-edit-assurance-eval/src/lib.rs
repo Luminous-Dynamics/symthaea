@@ -409,8 +409,8 @@ pub fn evaluate_edit_benchmark(
             .difference(&actual_groups)
             .map(|group| {
                 format!(
-                    "{:?}/{}/{}",
-                    group.operation, group.language_id, group.timbre_mode as u8
+                    "{:?}/{}/{:?}",
+                    group.operation, group.language_id, group.timbre_mode
                 )
             })
             .collect();
