@@ -1776,6 +1776,28 @@ mod tests {
     }
 
     #[test]
+    fn exact_vector_field_equivariance_accepts_nonlinear_radial_dynamics() {
+        // F(x,y) = -(x^2+y^2) [x,y] is nonlinear but SO(2)-equivariant.
+        let radial_squared = add(pow2("x"), pow2("y"));
+        let vector_field = vec![
+            mul(Expr::Const(-1.0), mul(radial_squared.clone(), var("x"))),
+            mul(Expr::Const(-1.0), mul(radial_squared, var("y"))),
+        ];
+        let report = check_exact_linear_action_vector_field_equivariance(
+            &vector_field,
+            &admitted_so2_action(),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(
+            report.generator_results[0].component_residual_term_counts,
+            vec![0, 0]
+        );
+    }
+
+    #[test]
     fn exact_vector_field_equivariance_accepts_the_rotation_generator_field() {
         let vector_field = vec![mul(Expr::Const(-1.0), var("y")), var("x")];
         let report = check_exact_linear_action_vector_field_equivariance(
