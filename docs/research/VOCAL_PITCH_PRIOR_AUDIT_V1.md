@@ -1,7 +1,7 @@
 # VPA-001 — Score-prior-independent singing pitch audit
 
 **Date:** 9 November 2026  
-**Status:** score-independent broad-range autocorrelation cross-check, fail-closed audit fields, and synthetic positive/negative controls implemented on a main-based research branch. Exact-head CI pending. No natural-singing calibration or SOTA claim.
+**Status:** broad-range autocorrelation cross-check, YIN difference-function cross-check, fail-closed audit fields, and synthetic positive/negative controls implemented on a main-based research branch. Exact-head CI pending. No natural-singing calibration or SOTA claim.
 
 ## Finding
 
@@ -16,14 +16,12 @@ The integrated singing-quality analyzer now reports two separate F0 paths:
 1. **Score-conditioned F0:** retains the existing target-centered +/-300 cent search and its current note-local tracking metrics.
 2. **Score-independent F0:** runs a separate autocorrelation search over 40-1200 Hz without using the target pitch to constrain the search. This is a cross-check, not a replacement for robust pitch tracking.
 
-The report adds:
-- score-independent median pitch error in cents;
-- score-independent p95 pitch error;
-- score-independent valid fraction, computed only over frames where the score-conditioned tracker produced a valid pitch estimate;
-- high-confidence prior-mismatch frame count and fraction (a gross mismatch is currently defined as an absolute error greater than 300 cents);
-- optional audit status. It is None when independent pitch coverage is below 80%, false when more than 10% of independently supported matched frames show a gross mismatch, and true otherwise.
+The report adds two visibly distinct score-independent paths:
 
-The broad estimator searches 40-1200 Hz and does not receive the expected note. It uses autocorrelation with an earliest-credible-peak policy. This removes the narrow score prior, but it remains in the same algorithm family as the score-conditioned estimator. It is therefore a cross-check against prior-window bias, not proof of statistically independent F0 estimation.
+1. **Broad autocorrelation:** median/p95 cents error, valid coverage over frames accepted by the score-conditioned tracker, gross-mismatch count/fraction, and optional audit disposition. It searches 40-1200 Hz without seeing the expected note. A gross mismatch is currently >300 cents. Audit is None below 80% coverage, false above 10% gross mismatches, and true otherwise. This is a broad-prior cross-check but remains in the same autocorrelation family as the score-conditioned tracker.
+2. **YIN difference function:** median/p95 cents error, valid coverage, median CMNDF-derived confidence, and its own optional audit disposition. It operates on a smoothed 2:1 decimated waveform, computes the difference function and cumulative mean normalized difference, selects a trough, and applies parabolic lag refinement. It is a second estimator family relative to the autocorrelation peak search, though it still operates on the same waveform and is not an independent reference signal.
+
+Overall objective pass now requires both acoustic audit dispositions to be Some(true). Missing support from either path is undefined and does not pass.
 
 The provisional 10% mismatch guard is a diagnostic engineering threshold, not a perceptually calibrated universal constant. The overall objective pass now requires the independent audit to be Some(true). An undefined audit is not treated as a pass.
 
@@ -48,7 +46,7 @@ Synthetic 80 Hz and 800 Hz periodic signals check that the broad audit covers lo
 ## Limitations
 
 - Both estimators are autocorrelation-based and share the waveform; this is an independent search prior, not an independent algorithm family.
-- The broad search can still make octave errors on breathy, noisy, highly harmonic, polyphonic or formant-dominated signals.
+- Both estimators can still make octave errors on breathy, noisy, polyphonic or formant-dominated signals. The YIN path's threshold and decimation are provisional and need calibration against real vocals.
 - The estimator is not calibrated on a speaker- and song-disjoint human singing reference set.
 - This change does not prove note accuracy, lyric correctness, naturalness, identity consistency or musical preference.
 - The 40-1200 Hz range does not guarantee correct tracking of noisy, polyphonic, breathy, highly harmonic or formant-dominated signals.
@@ -64,4 +62,4 @@ Use licensed human and model-sung stems with independently reviewed F0 reference
 
 Report pitch RMSE and cents error, gross octave-error rate, voiced/unvoiced error, valid coverage, confidence calibration and error by register/phoneme/technique. Do not select the best estimator on the same held-out material used for the final result. Report failures and undefined regions rather than silently excluding them.
 
-The score prior may be used to disambiguate a tracker output, but the prior-conditioned measurement must remain visibly distinct from the broad-range acoustic observation. The current exact-head workflow tests the score-conditioned false-reassurance case (240 Hz target / 480 Hz waveform), silence with undefined independent support, and 80/800 Hz broad-range coverage. It also checks the exact singing-quality test filter, pinned Rust formatting, and frozen-lockfile integrity before the implementation is marked verified.
+The score prior may be used to disambiguate a tracker output, but the prior-conditioned measurement must remain visibly distinct from the broad-range acoustic observation. The current exact-head workflow tests the score-conditioned false-reassurance case (240 Hz target / 480 Hz waveform) through both independent estimators, silence with undefined support, 80/800 Hz broad-range coverage, and a harmonic-rich 220 Hz signal whose higher harmonics dominate the fundamental. It also checks the exact singing-quality test filter, pinned Rust formatting, and frozen-lockfile integrity before the implementation is marked verified.
