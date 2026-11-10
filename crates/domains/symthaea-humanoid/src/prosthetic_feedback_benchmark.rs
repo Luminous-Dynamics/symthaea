@@ -252,7 +252,11 @@ fn all_semantic_classes() -> Vec<HapticCueSemantic> {
 }
 
 fn ratio(numerator: u64, denominator: u64) -> Option<f64> {
-    (denominator > 0).then_some(numerator as f64 / denominator as f64)
+    if denominator == 0 {
+        None
+    } else {
+        Some(numerator as f64 / denominator as f64)
+    }
 }
 
 fn median(values: &mut [f64]) -> Option<f64> {
