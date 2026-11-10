@@ -1,0 +1,134 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_id": "ROB-FEP-THERMO-001-ENTROPY-EXERGY",
+  "status": "synthetic_known_answers_only",
+  "assumptions": [
+    "Two-reservoir cases use an idealized heat transfer Q from a hot reservoir to a cold reservoir.",
+    "Q is positive from hot to cold; temperatures are absolute kelvin.",
+    "Exergy destruction is reported only for the declared fixed environment reference temperature.",
+    "The interval case assumes independent rectangular input intervals and monotonic corner evaluation."
+  ],
+  "cases": [
+    {
+      "case_id": "EE01_EQUAL_TEMPERATURE_REVERSIBLE_LIMIT",
+      "kind": "two_reservoir_heat_transfer",
+      "inputs": {
+        "heat_j": 100,
+        "hot_temperature_k": 300,
+        "cold_temperature_k": 300,
+        "environment_temperature_k": 300
+      },
+      "expected": {
+        "status": "valid",
+        "entropy_generated_j_per_k": 0,
+        "exergy_destroyed_j": 0
+      }
+    },
+    {
+      "case_id": "EE02_FINITE_HOT_TO_COLD_TRANSFER",
+      "kind": "two_reservoir_heat_transfer",
+      "inputs": {
+        "heat_j": 100,
+        "hot_temperature_k": 350,
+        "cold_temperature_k": 300,
+        "environment_temperature_k": 300
+      },
+      "expected": {
+        "status": "valid",
+        "entropy_generated_j_per_k": 0.047619047619047616,
+        "exergy_destroyed_j": 14.285714285714285
+      }
+    },
+    {
+      "case_id": "EE03_NONPOSITIVE_ABSOLUTE_TEMPERATURE",
+      "kind": "two_reservoir_heat_transfer",
+      "inputs": {
+        "heat_j": 100,
+        "hot_temperature_k": 0,
+        "cold_temperature_k": 300,
+        "environment_temperature_k": 300
+      },
+      "expected": {
+        "status": "invalid_input",
+        "entropy_generated_j_per_k": null,
+        "exergy_destroyed_j": null
+      }
+    },
+    {
+      "case_id": "EE04_REVERSED_PASSIVE_HEAT_FLOW_SIGN",
+      "kind": "two_reservoir_heat_transfer",
+      "inputs": {
+        "heat_j": -100,
+        "hot_temperature_k": 350,
+        "cold_temperature_k": 300,
+        "environment_temperature_k": 300
+      },
+      "expected": {
+        "status": "invalid_input",
+        "entropy_generated_j_per_k": null,
+        "exergy_destroyed_j": null
+      }
+    },
+    {
+      "case_id": "EE05_INCOMPLETE_CONTROL_VOLUME_BOUNDARY",
+      "kind": "open_control_volume_incomplete",
+      "inputs": {
+        "required_heat_port_ids": [
+          "winding-to-housing",
+          "housing-to-ambient"
+        ],
+        "observed_heat_port_ids": [
+          "winding-to-housing"
+        ]
+      },
+      "expected": {
+        "status": "unknown_incomplete_boundary",
+        "entropy_generated_j_per_k": null,
+        "exergy_destroyed_j": null
+      }
+    },
+    {
+      "case_id": "EE06_MODEL_RELATIVE_PATH_RATIO_ONLY",
+      "kind": "model_relative_path_ratio",
+      "inputs": {
+        "log_forward_reverse_probability_ratio": 0.6931471805599453
+      },
+      "expected": {
+        "status": "dimensionless_only",
+        "reported_value": 0.6931471805599453,
+        "unit": "1",
+        "physical_entropy_generation": "not_identified"
+      }
+    },
+    {
+      "case_id": "EE07_INTERVAL_PROPAGATION",
+      "kind": "interval_two_reservoir_heat_transfer",
+      "inputs": {
+        "heat_j_interval": [
+          90,
+          110
+        ],
+        "hot_temperature_k_interval": [
+          345,
+          355
+        ],
+        "cold_temperature_k_interval": [
+          295,
+          305
+        ],
+        "environment_temperature_k": 300
+      },
+      "expected": {
+        "status": "valid_interval",
+        "entropy_generated_j_per_k_interval": [
+          0.034212401995723445,
+          0.0630222010026259
+        ],
+        "exergy_destroyed_j_interval": [
+          10.263720598717033,
+          18.90666030078777
+        ]
+      }
+    }
+  ]
+}
