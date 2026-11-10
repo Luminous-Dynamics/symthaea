@@ -31,7 +31,7 @@ All three partitions carry entity-level sample and hierarchy digests. The select
 
 ## Leakage and adaptation controls
 
-Preprocessing records name the transform, fit scope and transform digest. Validation/test-label fitting is prohibited. Label-free target adaptation is allowed only when explicitly declared with a nonzero unlabeled target budget and exactly zero target-label budget. Target label adaptation is not part of v0.1.
+Preprocessing records name the transform, fit scope and transform digest. Validation/test-label fitting is prohibited. A fixed predeclared transform additionally binds its predeclaration time and digest, and that time must precede the frozen split timestamp. Label-free target adaptation is allowed only when explicitly declared with a nonzero unlabeled target budget and exactly zero target-label budget. Target label adaptation is not part of v0.1.
 
 The manifest distinguishes the fitted transform from the learned estimator. A future extension should bind feature/label extraction, model selection, hyperparameter search, calibration and test-set access to a single workflow receipt, with target-label access separately budgeted.
 
@@ -41,9 +41,9 @@ The operational target binds a target-definition digest, numerator, denominator,
 
 ## Metrics, aggregation and uncertainty
 
-Every metric has a formula, unit, aggregation rule, sample count and result digest. A worst-domain result requires at least two named domain strata. Report per-asset/per-domain results beside pooled values; macro and micro aggregation are not interchangeable.
+Every metric has a formula, unit, aggregation rule, sample count and result digest. Stratified metrics must cover the exact physical identities in the held-out test partition, and stratum sample counts must sum to the reported count. Macro values are replay-checked from the strata; nearest-rank p95 and worst-domain values are also recomputed. Worst-domain error metrics use the maximum stratum error, while coverage and R² use the minimum. A worst-domain result requires at least two named domain strata.
 
-Uncertainty status is explicit. A reported interval method requires nominal levels and a declared calibration partition. Not-reported uncertainty cannot be disguised as an empty but otherwise successful record.
+Uncertainty status is explicit. A reported interval method requires nominal levels, a held-out validation or external calibration source, and matching 90%/95% coverage metrics stratified by domain. Train-only calibration cannot substantiate held-out coverage. Not-reported uncertainty cannot be disguised as an empty but otherwise successful record.
 
 ## Reproducibility envelope
 
