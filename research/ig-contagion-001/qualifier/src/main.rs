@@ -1296,17 +1296,17 @@ mod tests {
     }
 
     #[test]
-    fn forty_four_scenarios_are_rejected() {
+    fn forty_nine_scenarios_are_rejected() {
         let mut matrix = parsed(MATRIX);
         matrix["fixtures"].as_array_mut().unwrap().pop();
-        matrix["fixture_count"] = Value::from(44);
+        matrix["fixture_count"] = Value::from(49);
         let mut errors = Vec::new();
         let report = validate_matrix(&matrix, &parsed(PROTOCOL), &mut errors);
-        assert_eq!(report.fixtures, 44);
+        assert_eq!(report.fixtures, 49);
         assert!(
             errors
                 .iter()
-                .any(|error| error.contains("expected 45 fixtures"))
+                .any(|error| error.contains("expected 50 fixtures"))
         );
     }
 
