@@ -461,6 +461,7 @@ pub fn apply_score_edit_plan(
         };
 
         let mut note_indices = Vec::new();
+        let mut intersects_target = false;
         for (index, note) in source.notes.iter().enumerate() {
             if note.part != part {
                 continue;
@@ -491,6 +492,7 @@ pub fn apply_score_edit_plan(
                 continue;
             };
             if intersects(onset, note_end, start, end) {
+                intersects_target = true;
                 if start.less_or_equal(onset) && note_end.less_or_equal(end) {
                     let scaled = note.velocity * f32::from(operation.numerator)
                         / f32::from(operation.denominator);
@@ -507,6 +509,15 @@ pub fn apply_score_edit_plan(
                             Some(index),
                             "velocity scaling would create a non-finite or out-of-range value; clamping is forbidden",
                         );
+                    } else if scaled.to_bits() == note.velocity.to_bits() {
+                        push_issue(
+                            &mut issues,
+                            ScoreEditIssueCodeV1::NoOpVelocityScale,
+                            Some(&operation.id),
+                            Some(operation.part_id),
+                            Some(index),
+                            "velocity scaling leaves this source event unchanged at f32 precision",
+                        );
                     } else {
                         note_indices.push(index);
                     }
@@ -522,7 +533,7 @@ pub fn apply_score_edit_plan(
                 }
             }
         }
-        if note_indices.is_empty() {
+        if !intersects_target {
             push_issue(
                 &mut issues,
                 ScoreEditIssueCodeV1::EmptyTargetSelection,
@@ -1047,6 +1058,21 @@ mod tests {
         );
         assert!(result.unwrap_err().iter().any(|issue| {
             issue.code == ScoreEditIssueCodeV1::OverlappingOperations
+        }));
+    }
+
+    #[test]
+    fn rejects_velocity_scale_that_is_a_no_op_for_a_selected_zero_velocity_note() {
+        let mut source = source_score();
+        source.notes[0].velocity = 0.0;
+        let result = apply_score_edit_plan(
+            &source,
+            &plan(vec![operation("zero-velocity", 0, 1)]),
+            &digest(),
+        );
+        assert!(result.unwrap_err().iter().any(|issue| {
+            issue.code == ScoreEditIssueCodeV1::NoOpVelocityScale
+                && issue.note_index == Some(0)
         }));
     }
 
