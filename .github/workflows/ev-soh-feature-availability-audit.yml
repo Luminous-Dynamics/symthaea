@@ -30,9 +30,9 @@ jobs:
         run: |
           cargo run --manifest-path tools/ev-soh-feature-availability-audit/Cargo.toml -- --schema schemas/transport/ev_soh_feature_availability_v0_1.schema.json --corpus fixtures/ev_battery/soh_feature_availability_scenarios_v0_1.json > "$RUNNER_TEMP/ev-soh-feature-availability-report.json"
           jq -e '
-            .case_count == 17 and
+            .case_count == 19 and
             .accepted_count == 3 and
-            .rejected_count == 14 and
+            .rejected_count == 16 and
             .strict_online_eligible_count == 2 and
             .offline_oracle_only_count == 1 and
             (.report_sha256 | test("^[a-f0-9]{64}$"))
