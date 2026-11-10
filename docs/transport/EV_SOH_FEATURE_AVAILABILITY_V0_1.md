@@ -34,16 +34,16 @@ Every feature definition binds its schema, implementation, transform and fit sco
 - Same-asset prefix references must bind the exact prediction asset identity.
 - Peer references must use a distinct development/training asset, never a held-out test asset.
 - Training-population transforms must be fit only on development assets.
-- Fixed transforms must be evidenced before split freeze.
+- Fixed transforms must be evidenced before split freeze, and their fit time must not occur after the predeclaration timestamp.
 - Full-trajectory, test/future, test-label and full-lifetime-extrema dependencies are rejected in strict-online mode.
 - Peer-reference experiments require a preregistered assignment, at least 100 deterministic derangements, a true-pair arm and an affine negative control. The schedule digest and freeze timestamp are bound before test access.
-- Full-lifetime normalization is retained only as an OFFLINE_ORACLE_ONLY comparison; it cannot be included in strict-online leaderboard results.
+- Full-lifetime normalization is retained only as an OFFLINE_ORACLE_ONLY comparison with an explicit full-horizon time receipt; it cannot be included in strict-online leaderboard results.
 
 The audit reports an explicit claim ceiling: STRICT_ONLINE_ELIGIBLE or OFFLINE_ORACLE_ONLY. Acceptance means the declared time/provenance contract is internally consistent. It does not authenticate source data or prove that the source timestamps are truthful.
 
 ## Frozen synthetic corpus
 
-Seventeen cases: three accepted and fourteen rejected. Accepted cases cover a valid same-cell prefix, an offline full-history oracle explicitly labelled offline-only, and a preregistered peer reference with randomized derangements. Negative controls cover full-life normalization online, delayed receipt, impossible timestamp orderings, held-out peer references, test-label dependence, future references, test-asset-fitted transforms, late fixed predeclaration, missing feature receipts, missing peer randomization, feature computation after decision, and mismatched same-cell identity.
+Nineteen cases: three accepted and sixteen rejected. Accepted cases cover a valid same-cell prefix, an offline full-history oracle explicitly labelled offline-only, and a preregistered peer reference with randomized derangements. Negative controls cover full-life normalization online, delayed receipt, impossible timestamp orderings, held-out peer references, test-label dependence, future references, test-asset-fitted transforms, late fixed predeclaration, missing feature receipts, missing peer randomization, feature computation after decision, and mismatched same-cell identity.
 
 These cases are synthetic software controls, not physical battery evidence.
 
