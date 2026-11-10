@@ -11,6 +11,9 @@ const PROTOCOL_VERSION: &str = "ev-soh-support-calibration/0.1";
 const EPSILON: f64 = 1e-12;
 const UNDER_COVERAGE_90: f64 = 0.87;
 const UNDER_COVERAGE_95: f64 = 0.92;
+const MIN_INDEPENDENT_GROUPS_PER_STRATUM_V0_1: usize = 30;
+const MIN_GROUP_EXTRAPOLATION_RECALL_V0_1: f64 = 0.90;
+const MAX_GROUP_FALSE_EXTRAPOLATION_RATE_V0_1: f64 = 0.10;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -279,7 +282,7 @@ fn validate_manifest(manifest: &Manifest) -> Vec<String> {
     }
     if manifest.split_frozen_at_ms == 0
         || manifest.test_accessed_at_ms <= manifest.split_frozen_at_ms
-        || manifest.minimum_independent_groups_per_stratum < 2
+        || manifest.minimum_independent_groups_per_stratum < MIN_INDEPENDENT_GROUPS_PER_STRATUM_V0_1
     {
         errors.push("split/test-access timing or independent-group evidence minimum is invalid".to_owned());
     }
@@ -718,10 +721,10 @@ fn compute_result(manifest: &Manifest) -> SupportCalibrationResult {
     let any_undercovered = strata.iter()
         .any(|summary| summary.undercovered_90 || summary.undercovered_95);
     let support_detection = compute_support_detection(manifest);
-    let support_detector_failed = support_detection.extrapolation_recall < 0.90
-        || support_detection.false_extrapolation_rate > 0.10
-        || support_detection.sample_extrapolation_recall < 0.90
-        || support_detection.sample_false_extrapolation_rate > 0.10;
+    let support_detector_failed = support_detection.extrapolation_recall < MIN_GROUP_EXTRAPOLATION_RECALL_V0_1
+        || support_detection.false_extrapolation_rate > MAX_GROUP_FALSE_EXTRAPOLATION_RATE_V0_1
+        || support_detection.sample_extrapolation_recall < MIN_GROUP_EXTRAPOLATION_RECALL_V0_1
+        || support_detection.sample_false_extrapolation_rate > MAX_GROUP_FALSE_EXTRAPOLATION_RATE_V0_1;
     let insufficient_groups = strata.iter().any(|summary| {
         summary.distinct_group_count < manifest.minimum_independent_groups_per_stratum
     });
@@ -1012,6 +1015,16 @@ mod tests {
             stratum.distinct_group_count < 30
                 && stratum.evidence_status == "INSUFFICIENT_PHYSICAL_GROUP_EVIDENCE"
         }));
+    }
+
+    #[test]
+    fn independent_group_evidence_floor_cannot_be_lowered_by_manifest_author() {
+        let report = report();
+        let case = report.payload.cases.iter()
+            .find(|case| case.case_id == "minimum-independent-groups-below-protocol-floor")
+            .expect("minimum-group floor control");
+        assert!(!case.accepted);
+        assert!(case.errors.iter().any(|error| error.contains("independent-group evidence minimum")));
     }
 
     #[test]
