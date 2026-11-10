@@ -1,0 +1,43 @@
+name: IG-REVISION-LEDGER-001 Qualifier
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "research/ig-revision-ledger-001/**"
+      - ".github/workflows/ig-revision-ledger-qualifier.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/ig-revision-ledger-001/**"
+      - ".github/workflows/ig-revision-ledger-qualifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ig-revision-ledger-qualifier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Format
+        run: cargo fmt --manifest-path research/ig-revision-ledger-001/qualifier/Cargo.toml --check
+      - name: Unit and negative-control tests
+        run: cargo test --manifest-path research/ig-revision-ledger-001/qualifier/Cargo.toml
+      - name: Qualify revision ledger fixtures
+        run: |
+          cargo run --manifest-path research/ig-revision-ledger-001/qualifier/Cargo.toml -- \
+            research/ig-revision-ledger-001/REVISION_LEDGER_FIXTURES_V0_1.json \
+            research/ig-revision-ledger-001/REVISION_LEDGER_FIXTURES_V0_1.schema.json \
+            research/ig-revision-ledger-001/REVISION_LEDGER_RECORD_V0_1.schema.json
