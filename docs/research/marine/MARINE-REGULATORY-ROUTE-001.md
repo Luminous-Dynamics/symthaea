@@ -65,7 +65,12 @@ The Regulation includes well-to-wake methodology and conditional RFNBO reward pr
 
 ### 2.5 Geographic air-pollution constraints
 
-MEPC 84 adopted a North-East Atlantic Emission Control Area with implementation in 2028 and a 0.10% sulphur limit within the area. Represent ECA boundaries and effective dates as versioned geographic rules. A route segment that crosses an ECA boundary must not inherit one uniform fuel assumption for the whole voyage.
+MEPC 84 adopted Resolution **MEPC.407(84)** designating the North-East Atlantic as a NOx, SOx and particulate-matter ECA. The amendment enters into force on **1 September 2027**, but the operational requirements have separate applicability rules:
+
+- **NOx Tier III:** relevant marine diesel engines above 130 kW on ships operating in the ECA are subject to the new-ship construction criteria: building contract placed on or after 1 January 2027; where no contract exists, keel laid or similar construction stage on or after 1 July 2027; or ship delivered on or after 1 January 2031. The alternative build/delivery triggers must be evaluated against evidenced ship records and engine certification.
+- **SOx/PM:** the fuel-oil sulphur limit of 0.10% m/m applies from **1 September 2028**, twelve months after the amendment's entry into force.
+
+The register therefore uses separate rule IDs: `NE-ATLANTIC-NOX-ECA-2026` and `NE-ATLANTIC-SOX-PM-ECA-2026`. Do not put both pollutant families behind one effective-date field. The official adopted ECA coordinates/polygon must be integrated from the amendment and authoritative chart data; a verbal 200-nautical-mile description is not enough for voyage-segment compliance. These are local air-pollution constraints, not WtW GHG factors.
 
 ### 2.6 IMO Net-Zero Framework status
 
@@ -186,6 +191,8 @@ Do not build another general GIS, emissions ledger or legal expert system. Integ
 ## 10. Sources
 
 - IMO MEPC 84, 27 April–1 May 2026: https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx
+- IMO MEPC.407(84), Annex VI amendment index: https://www.imo.org/en/ourwork/environment/pages/index-of-mepc-resolutions-and-guidelines-related-to-marpol-annex-vi.aspx
+- Lloyd's Register, MEPC.407(84) implementation summary: https://www.lr.org/en/services/statutory-compliance/marpol-international-convention-for-the-prevention-of-pollution/
 - IMO MEPC resolutions 2026–27, including MEPC.414(84), .415(84), .416(84): https://www.imo.org/en/knowledgecentre/indexofimoresolutions/pages/mepc-2026-27.aspx
 - IMO EEXI/CII FAQ and phase-two review: https://www.imo.org/en/mediacentre/hottopics/pages/eexi-cii-faq.aspx
 - IMO 2023 GHG Strategy and regulatory workplan: https://www.imo.org/en/ourwork/environment/pages/2023-imo-strategy-on-reduction-of-ghg-emissions-from-ships.aspx
