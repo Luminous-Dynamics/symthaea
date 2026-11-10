@@ -153,10 +153,8 @@ fn run() -> Result<(), String> {
     let query_hash = hash_vectors(queries.iter().map(|query| &query.vector.0));
     // Export the exact bytes used by this run so an independent native FAISS
     // baseline can consume the same frozen corpus without regenerating it.
-    let store_vector_bytes = binary_vector_bytes(&store);
-    let query_vector_bytes = binary_vector_bytes(
-        &queries.iter().map(|query| query.vector).collect::<Vec<_>>()
-    );
+    let store_vector_bytes = binary_vector_bytes(store.iter().map(|vector| &vector.0));
+    let query_vector_bytes = binary_vector_bytes(queries.iter().map(|query| &query.vector.0));
     let manifest = json!({
         "manifest_version": "neuro-silicon-003-input-v0.1",
         "generation": {
@@ -821,11 +819,14 @@ fn metric(
 
 /// Flatten canonical BinaryHV values to the byte-for-byte interchange format
 /// consumed by independent exact-binary baselines such as FAISS IndexBinaryFlat.
-fn binary_vector_bytes(vectors: &[BinaryHV]) -> Vec<u8> {
-    vectors
-        .iter()
-        .flat_map(|vector| vector.0.iter().copied())
-        .collect()
+fn binary_vector_bytes<'a>(
+    vectors: impl Iterator<Item = &'a [u8; VECTOR_BYTES]>,
+) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    for vector in vectors {
+        bytes.extend_from_slice(vector);
+    }
+    bytes
 }
 
 fn hash_vectors<'a>(vectors: impl Iterator<Item = &'a [u8; VECTOR_BYTES]>) -> String {
@@ -893,7 +894,7 @@ mod tests {
     #[test]
     fn binary_export_preserves_row_major_vector_bytes_and_digest() {
         let vectors = vec![BinaryHV::random(11), BinaryHV::random(22), BinaryHV::random(33)];
-        let bytes = binary_vector_bytes(&vectors);
+        let bytes = binary_vector_bytes(vectors.iter().map(|vector| &vector.0));
         assert_eq!(bytes.len(), vectors.len() * VECTOR_BYTES);
         for (index, vector) in vectors.iter().enumerate() {
             let start = index * VECTOR_BYTES;
