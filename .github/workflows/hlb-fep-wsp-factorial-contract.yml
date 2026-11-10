@@ -2,7 +2,7 @@ name: HLB FEP-WSP Factorial Contract
 
 on:
   pull_request:
-    branches: [main, research/swi-001-weight-space-introspection]
+    branches: [main, research/swi-001-weight-space-introspection, research/hlb-fep-wsp-factorial-v2]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
@@ -19,6 +19,8 @@ on:
       - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
       - "crates/core/symthaea-fep/src/decision_relevant_information.rs"
       - "crates/core/symthaea-fep/src/gaussian_decision_diagnostic.rs"
+      - "crates/core/symthaea-fep/src/multivariate_gaussian_decision_diagnostic.rs"
+      - "crates/core/symthaea-fep/examples/hlb_multivariate_gaussian_known_answers.rs"
       - "crates/core/symthaea-fep/src/causal_diagnostic_semantics.rs"
       - "crates/core/symthaea-fep/src/open_world_robust_decision.rs"
       - "crates/core/symthaea-fep/src/sibson_alpha_information.rs"
@@ -48,7 +50,7 @@ on:
       - "src/dynamics/cfc/mod.rs"
       - "src/dynamics/cfc/network.rs"
   push:
-    branches: [research/hlb-fep-wsp-factorial-v2]
+    branches: [research/hlb-fep-wsp-factorial-v2, research/hlb-correlated-gaussian-binary-v1]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - ".github/scripts/assert-hlb-test-discovery.sh"
@@ -64,6 +66,8 @@ on:
       - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
       - "crates/core/symthaea-fep/src/decision_relevant_information.rs"
       - "crates/core/symthaea-fep/src/gaussian_decision_diagnostic.rs"
+      - "crates/core/symthaea-fep/src/multivariate_gaussian_decision_diagnostic.rs"
+      - "crates/core/symthaea-fep/examples/hlb_multivariate_gaussian_known_answers.rs"
       - "crates/core/symthaea-fep/src/causal_diagnostic_semantics.rs"
       - "crates/core/symthaea-fep/src/open_world_robust_decision.rs"
       - "crates/core/symthaea-fep/src/sibson_alpha_information.rs"
@@ -155,6 +159,8 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/decision_relevant_information.rs crates/core/symthaea-fep/src/sequential_diagnostic_planning.rs crates/core/symthaea-fep/src/gaussian_model_information_gain.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/gaussian_decision_diagnostic.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/multivariate_gaussian_decision_diagnostic.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/examples/hlb_multivariate_gaussian_known_answers.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/causal_diagnostic_semantics.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/decision_diagnostic_benchmark.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/open_world_robust_decision.rs
@@ -213,6 +219,8 @@ jobs:
           cargo test --locked --release -p symthaea-fep --lib decision_relevant_information::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib causal_diagnostic_semantics::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib gaussian_decision_diagnostic::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib multivariate_gaussian_decision_diagnostic::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --example hlb_multivariate_gaussian_known_answers -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib open_world_robust_decision::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib sibson_alpha_information::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib sequential_diagnostic_planning::tests -- --nocapture
@@ -254,6 +262,25 @@ jobs:
             ([.result.paired_evsi_contrasts[].episodes] | all(. == 10000))
           ' research-results/hlb-decision-diagnostic.json >/dev/null
           cat research-results/hlb-decision-diagnostic.json
+
+      - name: Run correlated multivariate Gaussian known-answer benchmark
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-fep --example hlb_multivariate_gaussian_known_answers > research-results/hlb-multivariate-gaussian-known-answers.json
+          jq -e --arg source_sha "$SYMTHAEA_SOURCE_SHA" '
+            .schema_version == "hlb-multivariate-gaussian-known-answers-v1" and
+            .status == "synthetic_known_answer_fixture_only" and
+            .source_sha == $source_sha and
+            (.cases | length == 3) and
+            (.cases[0].mahalanobis_squared > 3.999999999 and .cases[0].mahalanobis_squared < 4.000000001) and
+            (.cases[2].mahalanobis_squared > 3.999999999 and .cases[2].mahalanobis_squared < 4.000000001) and
+            (.cases[1].mahalanobis_squared > .cases[0].mahalanobis_squared) and
+            (.cases[1].expected_posterior_bayes_risk < .cases[0].expected_posterior_bayes_risk)
+          ' research-results/hlb-multivariate-gaussian-known-answers.json >/dev/null
+          cat research-results/hlb-multivariate-gaussian-known-answers.json
 
       - name: Run open-world robustness stress benchmark
         env:
