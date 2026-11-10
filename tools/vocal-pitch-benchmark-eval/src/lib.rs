@@ -86,6 +86,8 @@ pub struct PitchSegmentMetadataV1 {
     pub technique_id: String,
     pub snr_stratum_id: String,
     pub source_audio_sha256: String,
+    pub reference_track_sha256: String,
+    pub estimated_track_sha256: String,
 }
 
 /// One frame on the frozen common frame grid.
@@ -391,6 +393,8 @@ fn validate_metadata(metadata: &PitchSegmentMetadataV1) -> Result<(), PitchBench
     require_non_empty(&metadata.technique_id, "technique_id")?;
     require_non_empty(&metadata.snr_stratum_id, "snr_stratum_id")?;
     require_digest(&metadata.source_audio_sha256, "source_audio_sha256")?;
+    require_digest(&metadata.reference_track_sha256, "reference_track_sha256")?;
+    require_digest(&metadata.estimated_track_sha256, "estimated_track_sha256")?;
     Ok(())
 }
 
@@ -631,6 +635,8 @@ mod tests {
             technique_id: "straight-tone".to_owned(),
             snr_stratum_id: "dry-clean".to_owned(),
             source_audio_sha256: digest('d'),
+            reference_track_sha256: digest('e'),
+            estimated_track_sha256: digest('f'),
         }
     }
 
@@ -811,6 +817,23 @@ mod tests {
             };
             assert!(evaluate_pitch_benchmark(&spec(), &[segment]).is_err());
         }
+    }
+
+    #[test]
+    fn missing_reference_or_estimated_track_digest_is_rejected() {
+        let mut missing_reference = PitchSegmentInputV1 {
+            metadata: metadata("clip-01", "corpus-a", "clean"),
+            frames: vec![frame(0, Some(220.0), Some(220.0))],
+        };
+        missing_reference.metadata.reference_track_sha256.clear();
+        assert!(evaluate_pitch_benchmark(&spec(), &[missing_reference]).is_err());
+
+        let mut missing_estimate = PitchSegmentInputV1 {
+            metadata: metadata("clip-01", "corpus-a", "clean"),
+            frames: vec![frame(0, Some(220.0), Some(220.0))],
+        };
+        missing_estimate.metadata.estimated_track_sha256.clear();
+        assert!(evaluate_pitch_benchmark(&spec(), &[missing_estimate]).is_err());
     }
 
     #[test]
