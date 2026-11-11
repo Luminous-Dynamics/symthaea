@@ -22,6 +22,9 @@ pub enum InterventionKind {
     CompensatingAction,
     /// An executed retreat, release, or withdrawal to a safer configuration.
     RetreatOrRelease,
+    /// An executed reverse replay of achieved robot motion (e.g. Backtrack).
+    /// This does not imply that object poses or the full scene were restored.
+    AchievedMotionRetrace,
     /// An executed regrasp or repositioning action.
     RegraspOrReposition,
     /// The simulator restored an earlier world state. Never physical recovery.
@@ -47,6 +50,7 @@ impl InterventionKind {
                 | Self::ControllerRollback
                 | Self::CompensatingAction
                 | Self::RetreatOrRelease
+                | Self::AchievedMotionRetrace
                 | Self::RegraspOrReposition
         )
     }
@@ -546,6 +550,35 @@ mod tests {
         assert_eq!(report.duplicate_trial_rows, 4);
         assert_eq!(report.invalid_identity_rows, 4);
         assert_eq!(report.valid_confirmatory_rows, 1);
+    }
+
+
+    #[test]
+    fn achieved_motion_retrace_is_physical_only_when_world_continuity_is_preserved() {
+        let mut retrace = valid_trial("retrace-safe");
+        retrace.intervention = InterventionKind::AchievedMotionRetrace;
+        let safe_report = audit_trials(&[retrace.clone()], None);
+        assert_eq!(safe_report.physical_safe_completions, 1);
+
+        retrace.trial_id = "retrace-scene-changed".to_owned();
+        retrace.world_state = WorldStateContinuity::Unknown;
+        let uncertain_report = audit_trials(&[retrace], None);
+        assert_eq!(uncertain_report.physical_safe_completions, 0);
+        assert_eq!(uncertain_report.infrastructure_indeterminate, 1);
+    }
+
+    #[test]
+    fn achieved_motion_retrace_is_not_simulator_state_rewind() {
+        let mut retrace = valid_trial("retrace");
+        retrace.intervention = InterventionKind::AchievedMotionRetrace;
+        let mut rewind = valid_trial("rewind");
+        rewind.intervention = InterventionKind::SimulatorStateRewind;
+        rewind.world_state = WorldStateContinuity::SimulatorRewound;
+
+        let report = audit_trials(&[retrace, rewind], None);
+        assert_eq!(report.physical_safe_completions, 1);
+        assert_eq!(report.simulator_only_completions, 1);
+        assert_eq!(report.simulator_rewind_rows, 1);
     }
 
 }
