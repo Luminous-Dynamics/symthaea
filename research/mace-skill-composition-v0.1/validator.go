@@ -208,6 +208,9 @@ func Validate(in Request) Report {
 	if c.RequestID == "" || c.Principal == "" || c.Scope == "" || c.Purpose == "" || c.Audience == "" || c.ExpectedTarget == "" || nowErr != nil || c.ExposureBudget < 0 {
 		fail("INVALID_CONTEXT", c.RequestID, "required context missing or malformed")
 	}
+	if !unique(c.Capabilities) {
+		fail("INVALID_CAPABILITIES", c.RequestID, "capabilities must be nonempty and unique")
+	}
 	maxLabel, ok := ParseLabel(c.MaxActionLabel)
 	if !ok {
 		fail("INVALID_LABEL", c.RequestID, "unknown max_action_label")
@@ -402,7 +405,7 @@ func Validate(in Request) Report {
 		} else if lab > limit || lab > maxLabel {
 			fail("SINK_LABEL_BLOCKED", sink.ArtifactID, "artifact classification exceeds sink/request ceiling")
 		}
-		if sink.Audience != "" && sink.Audience != c.Audience {
+		if sink.Audience != c.Audience {
 			fail("SINK_AUDIENCE_MISMATCH", sink.ArtifactID, "sink audience differs from request")
 		}
 		target := sink.Target
@@ -415,6 +418,10 @@ func Validate(in Request) Report {
 		switch sink.Kind {
 		case "internal":
 		case "external_action":
+			if sink.ActionKind == "" || sink.RequiredCapability == "" {
+				fail("ACTION_BINDING_INCOMPLETE", sink.ArtifactID, "external action requires nonempty action kind and capability")
+				continue
+			}
 			auth := sink.Authorization
 			if auth == nil {
 				fail("ACTION_AUTH_REQUIRED", sink.ArtifactID, "external action lacks independent authorization receipt")
