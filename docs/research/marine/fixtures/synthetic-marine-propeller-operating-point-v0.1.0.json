@@ -1,0 +1,118 @@
+{
+  "schema_version": "0.1.0",
+  "record_id": "SYNTHETIC-PROPELLER-OPERATING-POINT-0001",
+  "record_status": "synthetic",
+  "test_mode": "full_scale_service",
+  "case_id": "SYNTHETIC-ENVIRONMENTAL-TRIAL-CASE-0001",
+  "service_fingerprint": "e3ec23f5308213b6d7ea3743e6cf483623436bec5384e29d3044d525d736fca9",
+  "measurement_window": {
+    "start": "2026-10-15T10:00:00Z",
+    "end": "2026-10-15T10:01:00Z"
+  },
+  "timebase_id": "SYNTHETIC-ACOUSTIC-TIMEBASE-001",
+  "propeller": {
+    "propeller_id": "SYNTHETIC-PROPELLER-001",
+    "revision": "A",
+    "diameter_m": {
+      "value": 5.5,
+      "lower": 5.499,
+      "upper": 5.501,
+      "unit": "m"
+    },
+    "blade_count": 4
+  },
+  "fluid": {
+    "density": {
+      "physical_quantity": "water_density",
+      "unit": "kg/m3",
+      "value": 1025,
+      "lower": 1024,
+      "upper": 1026,
+      "channel_id": "SYNTHETIC-WATER-DENSITY-CHANNEL",
+      "calibration_record_id": "SYNTHETIC-CAL-WATER-DENSITY-001",
+      "raw_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "static_pressure": {
+      "physical_quantity": "ambient_static_pressure",
+      "unit": "Pa",
+      "value": 180000,
+      "lower": 179000,
+      "upper": 181000,
+      "channel_id": "SYNTHETIC-AMBIENT-PRESSURE-CHANNEL",
+      "calibration_record_id": "SYNTHETIC-CAL-AMBIENT-PRESSURE-001",
+      "raw_trace_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "vapour_pressure": {
+      "physical_quantity": "water_vapour_pressure",
+      "unit": "Pa",
+      "value": 2300,
+      "lower": 2250,
+      "upper": 2350,
+      "channel_id": "SYNTHETIC-WATER-VAPOUR-PRESSURE-CHANNEL",
+      "calibration_record_id": "SYNTHETIC-CAL-WATER-VAPOUR-001",
+      "raw_trace_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  },
+  "observations": {
+    "advance_velocity": {
+      "physical_quantity": "propeller_advance_velocity",
+      "unit": "m/s",
+      "value": 6.173328,
+      "lower": 6.16,
+      "upper": 6.19,
+      "channel_id": "SYNTHETIC-PROPELLER-ADVANCE-VELOCITY-CHANNEL",
+      "calibration_record_id": "SYNTHETIC-CAL-PROP-ADVANCE-001",
+      "raw_trace_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "shaft_rate": {
+      "physical_quantity": "shaft_rotational_speed",
+      "unit": "rpm",
+      "value": 85,
+      "lower": 84.9,
+      "upper": 85.1,
+      "channel_id": "SYNTHETIC-SHAFT-ROTATIONAL-SPEED-CHANNEL",
+      "calibration_record_id": "SYNTHETIC-CAL-RPM-001",
+      "raw_trace_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "thrust": {
+      "physical_quantity": "propeller_thrust",
+      "unit": "N",
+      "value": 318000,
+      "lower": 317000,
+      "upper": 319000,
+      "channel_id": "SYNTHETIC-PROPELLER-THRUST-CHANNEL",
+      "calibration_record_id": "SYNTHETIC-CAL-PROP-THRUST-001",
+      "raw_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "torque": {
+      "physical_quantity": "shaft_torque",
+      "unit": "Nm",
+      "value": 315000,
+      "lower": 313000,
+      "upper": 317000,
+      "channel_id": "SYNTHETIC-SHAFT-TORQUE-CHANNEL",
+      "calibration_record_id": "SYNTHETIC-CAL-TORQUE-001",
+      "raw_trace_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "shaft_power": {
+      "physical_quantity": "shaft_power",
+      "unit": "kW",
+      "value": 2800,
+      "lower": 2780,
+      "upper": 2820,
+      "channel_id": "SYNTHETIC-SHAFT-POWER-CHANNEL",
+      "calibration_record_id": "SYNTHETIC-CAL-SHAFT-POWER-001",
+      "raw_trace_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  },
+  "acoustic_link": {
+    "record_id": "SYNTHETIC-ACOUSTIC-TRIAL-0001",
+    "raw_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "limitations": [
+    "Synthetic known-answer fixture; no physical vessel or propeller measurement exists.",
+    "Propeller advance velocity is a synthetic local-disc value and is not inferred from vessel speed through water.",
+    "Full-scale service mode does not report open-water efficiency eta_0.",
+    "Cavitation number sigma_nD is a declared rotational-speed/diameter reference, not a cavitation-inception predictor."
+  ]
+}
