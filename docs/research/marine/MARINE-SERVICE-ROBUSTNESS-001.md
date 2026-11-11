@@ -240,6 +240,16 @@ Do not add these concepts as undocumented JSON extensions. Evolve the schema wit
 8. Plan model/bench/sea trials with qualified naval architect, operator, test facility and class/flag stakeholders.
 9. Publish only the claim level supported by evidence: contract, published reproduction, solver V&V, controlled physical trial, in-service evidence or fleet transfer.
 
+## Energy-accounting eligibility gate
+
+Before an architecture or EMS candidate is ranked on energy performance, require both:
+1. a source-input ledger with a declared primary/substitute boundary and no double-counted conversion outputs; and
+2. a component/whole-system first-law balance whose residual is within a supplied, referenced uncertainty budget for every scored component.
+
+The contracts are complementary: [MARINE-ENERGY-SOURCE-LEDGER-001](./MARINE-ENERGY-SOURCE-LEDGER-001.md) and [MARINE-ENERGY-CONSERVATION-001](./MARINE-ENERGY-CONSERVATION-001.md), implementation [#11595](https://github.com/Luminous-Dynamics/symthaea/issues/11595). Any unknown flow/loss/storage term remains INCOMPLETE; any component residual outside its uncertainty budget is UNBALANCED. A system-level aggregate cannot hide a component failure.
+
+This is an accounting eligibility gate, not proof that the uncertainty budget, meter, conversion method or physical model is correct. Exergy and regulatory boundaries remain separate.
+
 ## 14. Fleet-level, reversible and cyber-physical design extensions
 
 ### 14.1 Optimize the fleet's contracted service
