@@ -1835,6 +1835,42 @@ struct EvaluatedVectorFieldSample {
     jacobian: Vec<Vec<f64>>,
 }
 
+/// Scale-safe relative defect between two metric-whitened vectors.
+///
+/// Returns None when the inputs are non-finite, Some(None) when both terms are
+/// zero (uninformative), or Some(Some(ratio)) for a finite relative defect.
+fn relative_whitened_vector_defect(left: &[f64], right: &[f64]) -> Option<Option<f64>> {
+    if left.len() != right.len()
+        || left.iter().chain(right.iter()).any(|value| !value.is_finite())
+    {
+        return None;
+    }
+    let scale = left
+        .iter()
+        .chain(right.iter())
+        .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+    if scale == 0.0 {
+        return Some(None);
+    }
+
+    let normalized_left: Vec<f64> = left.iter().map(|value| *value / scale).collect();
+    let normalized_right: Vec<f64> = right.iter().map(|value| *value / scale).collect();
+    let left_norm = stable_vector_norm(&normalized_left);
+    let right_norm = stable_vector_norm(&normalized_right);
+    let denominator = left_norm + right_norm;
+    if denominator == 0.0 || !denominator.is_finite() {
+        return Some(None);
+    }
+    let difference_norm = normalized_left
+        .iter()
+        .zip(normalized_right.iter())
+        .fold(0.0_f64, |norm, (left_value, right_value)| {
+            norm.hypot(left_value - right_value)
+        });
+    let relative_defect = difference_norm / denominator;
+    relative_defect.is_finite().then_some(Some(relative_defect))
+}
+
 /// Evaluate a vector field's infinitesimal equivariance under every generator
 /// of an explicitly admitted linear action.
 ///
@@ -2030,7 +2066,6 @@ pub fn evaluate_metric_aware_vector_field_equivariance(
     // Evaluate F(x) and D F(x) once per sample, then reuse them for each generator.
     let mut evaluated_samples: Vec<Option<EvaluatedVectorFieldSample>> =
         Vec::with_capacity(sample_states.len());
-    let mut invalid_sample = Vec::with_capacity(sample_states.len());
 
     for (sample_index, sample) in sample_states.iter().enumerate() {
         if sample.len() != dimension {
@@ -2102,10 +2137,8 @@ pub fn evaluate_metric_aware_vector_field_equivariance(
             || field_values.iter().any(|value| !value.is_finite())
             || jacobian.iter().flatten().any(|value| !value.is_finite())
         {
-            invalid_sample.push(true);
             evaluated_samples.push(None);
         } else {
-            invalid_sample.push(false);
             evaluated_samples.push(Some(EvaluatedVectorFieldSample {
                 values: field_values,
                 jacobian,
@@ -2123,9 +2156,7 @@ pub fn evaluate_metric_aware_vector_field_equivariance(
         let mut maximum_relative_defect = 0.0_f64;
         let mut sample_relative_defects = Vec::with_capacity(sample_states.len());
 
-        for (sample_index, (sample, evaluated)) in
-            sample_states.iter().zip(evaluated_samples.iter()).enumerate()
-        {
+        for (sample, evaluated) in sample_states.iter().zip(evaluated_samples.iter()) {
             let Some(evaluated) = evaluated else {
                 invalid_sample_count = invalid_sample_count.saturating_add(1);
                 sample_relative_defects.push(None);
@@ -2180,43 +2211,27 @@ pub fn evaluate_metric_aware_vector_field_equivariance(
                 continue;
             }
 
-            let derivative_norm = stable_vector_norm(&whitened_derivative);
-            let pushforward_norm = stable_vector_norm(&whitened_pushforward);
-            if !derivative_norm.is_finite() || !pushforward_norm.is_finite() {
-                invalid_sample_count = invalid_sample_count.saturating_add(1);
-                sample_relative_defects.push(None);
-                continue;
-            }
-            let denominator = derivative_norm + pushforward_norm;
-            if denominator == 0.0 {
-                uninformative_sample_count = uninformative_sample_count.saturating_add(1);
-                sample_relative_defects.push(None);
-                continue;
-            }
-
-            let residual: Vec<f64> = whitened_derivative
-                .iter()
-                .zip(whitened_pushforward.iter())
-                .map(|(left, right)| left - right)
-                .collect();
-            let residual_norm = stable_vector_norm(&residual);
-            if !residual_norm.is_finite() {
-                invalid_sample_count = invalid_sample_count.saturating_add(1);
-                sample_relative_defects.push(None);
-                continue;
-            }
-            let relative_defect = residual_norm / denominator;
-            if !relative_defect.is_finite() {
-                invalid_sample_count = invalid_sample_count.saturating_add(1);
-                sample_relative_defects.push(None);
-                continue;
-            }
+            let relative_defect = match relative_whitened_vector_defect(
+                &whitened_derivative,
+                &whitened_pushforward,
+            ) {
+                None => {
+                    invalid_sample_count = invalid_sample_count.saturating_add(1);
+                    sample_relative_defects.push(None);
+                    continue;
+                }
+                Some(None) => {
+                    uninformative_sample_count = uninformative_sample_count.saturating_add(1);
+                    sample_relative_defects.push(None);
+                    continue;
+                }
+                Some(Some(value)) => value,
+            };
 
             informative_sample_count = informative_sample_count.saturating_add(1);
             residual_sum += relative_defect;
             maximum_relative_defect = maximum_relative_defect.max(relative_defect);
             sample_relative_defects.push(Some(relative_defect));
-            let _ = sample_index;
         }
 
         let mean_relative_defect = if informative_sample_count == 0 {
