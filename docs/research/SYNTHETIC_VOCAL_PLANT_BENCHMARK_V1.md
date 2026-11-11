@@ -1,6 +1,6 @@
 # SYNTH-VOCAL-001 — synthetic vocal acoustic plant and known-answer benchmark
 
-**Status:** implementation draft; Rust compilation, tests and exact-head CI are pending.
+**Status:** implementation draft; 24 authored synthetic tests across the plant and observer; Rust compilation, tests and exact-head CI are pending.
 
 **Policy:** synthetic-only. No performer recordings, voice identities, external corpus assets, participant recruitment or permission requests are part of this track.
 
@@ -278,3 +278,44 @@ No local Cargo/rustc toolchain was available during authoring. Therefore no Rust
 - Task-aware edit assurance: PR #11506
 - Multi-turn ledger: PR #11517
 - Conservative allocator: PR #11544
+
+
+## 11. SYNTH-OBS-001 — independent acoustic observation bridge
+
+The follow-on work in #11575 adds `tools/synthetic-vocal-plant/src/observer.rs` and extends the CLI output with:
+
+- `observations.jsonl`: per-segment F0, F1/F2/F3, relative RMS energy and voicing coverage.
+- `calibration.json`: repeated deterministic render/no-op observations on a distinct calibration parameter family.
+- `observer-manifest.json`: analyzer IDs/versions, configuration digest, exact artifact hashes, synthetic-only flags and split identities.
+
+### Two-observer F0 cross-check
+
+The pipeline retains two separate F0 measurement paths:
+
+1. The synthetic plant's own normalized-autocorrelation PCM estimator.
+2. The existing `symthaea_vocal_tract::formant_extraction::extract_formant_frames` LPC/autocorrelation path, which also returns LPC formants, relative RMS energy and voicing.
+
+The two values are never averaged to conceal disagreement. Their difference is recorded in cents, with a 50-cent diagnostic threshold. When the signal is silent, insufficiently voiced, or too short for either path, the relevant result is `INDETERMINATE`, not zero or success.
+
+Every metric record includes:
+- stable metric ID and exact unit;
+- analyzer ID and version;
+- PCM SHA-256;
+- exact sample window and eligible frame count;
+- observed value or explicit indeterminate disposition.
+
+Analysis windows exclude the segment boundary and seam guard. The metric IDs are suitable for the existing VCRB observation layer; a narrow adapter exports only observed values and does not implement a parallel control-response scorer.
+
+### Calibration split
+
+The repeatability calibration uses a distinct source-case identity and a different synthetic parameter family from the confirmatory phrase. It renders the calibration source twice and records exact PCM repeatability plus per-metric maximum absolute repeat differences.
+
+This establishes deterministic measurement plumbing for the named legacy renderer. It does not estimate uncertainty for stochastic neural backends, human variability or population-level acoustic distributions. Neural backends will need repeated stochastic seeds and a separately estimated calibration distribution before collateral tolerances can be frozen.
+
+### Claim ceiling
+
+The observer's LPC values are independent observations of generated PCM, not human-annotated formant ground truth. Its F0 cross-check is an internal observer disagreement diagnostic, not a third-party benchmark. No human-naturalness, phonetic correctness, language competence, singer identity or SOTA claim follows.
+
+### Current engineering state
+
+The stacked branch contains the observer implementation, eight additional authored tests, a VCRB-shaped adapter record, calibration/confirmatory split metadata, and workflow assertions for observation/calibration artifact generation. Total authored tests in the two slices: 24. The Rust workflow must still compile, format, test and run the fixture generator on exact PR head before any pass is claimed.
