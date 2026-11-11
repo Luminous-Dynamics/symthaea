@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::roborecover_score::{
-    BenchmarkSplit, StageTypeGroup,
+    BenchmarkPlatform, BenchmarkSplit, StageTypeGroup,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -46,6 +46,7 @@ pub struct PredictedPolicyContext {
 /// All portfolio members must use the same frozen training and cross-fit identity.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RouterEvidenceIdentity {
+    pub platform: BenchmarkPlatform,
     pub source_repository: String,
     pub source_revision: String,
     pub train_split_manifest_blob_sha: String,
@@ -369,7 +370,7 @@ pub fn select_policy(
 mod tests {
     use super::*;
     use crate::roborecover_score::{
-        DeviationType, RecoveryStage, StageTypeGroup,
+        BenchmarkPlatform, DeviationType, RecoveryStage, StageTypeGroup,
     };
 
     fn group() -> StageTypeGroup {
@@ -381,6 +382,7 @@ mod tests {
 
     fn identity() -> RouterEvidenceIdentity {
         RouterEvidenceIdentity {
+            platform: BenchmarkPlatform::RoboTwin,
             source_repository: "RUCKBReasoning/RoboRecover".to_owned(),
             source_revision: "a".repeat(40),
             train_split_manifest_blob_sha: "b".repeat(40),
@@ -666,6 +668,26 @@ mod tests {
         assert_eq!(
             decision.rejected_records.get(&RouterRejection::DuplicateCheckpointEvidence),
             Some(&2)
+        );
+    }
+
+
+    #[test]
+    fn cross_platform_competence_cannot_be_mixed() {
+        let mut candidate = record("libero-policy", 99, 0);
+        candidate.identity.platform = BenchmarkPlatform::Libero;
+        let decision = select_policy(
+            &context(),
+            &identity(),
+            &[candidate],
+            &RouterConfig::default(),
+        )
+        .unwrap();
+
+        assert!(decision.selected.is_none());
+        assert_eq!(
+            decision.rejected_records.get(&RouterRejection::IdentityMismatch),
+            Some(&1)
         );
     }
 
