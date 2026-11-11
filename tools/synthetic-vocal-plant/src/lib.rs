@@ -245,6 +245,9 @@ pub fn apply_edit(
             }
             target.energy = (target.energy * scale).clamp(0.0, 1.0);
         }
+        EditPatch::UnsupportedControl { control_id } => {
+            return Err(format!("unsupported renderer control: {control_id}"));
+        }
     }
 
     validate_phrase(&updated, sample_rate_hz)?;
