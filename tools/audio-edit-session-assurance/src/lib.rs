@@ -116,6 +116,9 @@ pub enum SessionEventKindV1 {
     SessionFinalized {
         final_output_sha256: String,
         active_ledger_sha256: String,
+        /// Canonically sorted IDs of every active instruction and preservation
+        /// constraint. Replay checks this exact set against derived state.
+        active_constraint_ids: Vec<String>,
     },
 }
 
@@ -543,6 +546,7 @@ pub fn evaluate_session_ledger(
             SessionEventKindV1::SessionFinalized {
                 final_output_sha256,
                 active_ledger_sha256,
+                active_constraint_ids,
             } => {
                 require_started(started)?;
                 if current_turn == 0 {
@@ -561,6 +565,15 @@ pub fn evaluate_session_ledger(
                     .values()
                     .filter(|constraint| constraint.superseded_by.is_none())
                     .collect();
+                let derived_active_ids: Vec<String> = active
+                    .iter()
+                    .map(|constraint| constraint.constraint_id.clone())
+                    .collect();
+                if active_constraint_ids != &derived_active_ids {
+                    return Err(LedgerError::new(
+                        "final active constraint IDs do not match replayed session state",
+                    ));
+                }
                 if active.is_empty() {
                     return Err(LedgerError::new(
                         "cannot finalize a session with no active instruction or preservation constraints",
@@ -833,12 +846,27 @@ mod tests {
     }
 
     fn finalize(events: &mut Vec<SessionEventV1>, output: char, event: char) {
+        let mut active_ids = BTreeSet::new();
+        for existing in events.iter() {
+            match &existing.kind {
+                SessionEventKindV1::ConstraintAdded { constraint_id, .. } => {
+                    active_ids.insert(constraint_id.clone());
+                }
+                SessionEventKindV1::ConstraintSuperseded {
+                    old_constraint_id, ..
+                } => {
+                    active_ids.remove(old_constraint_id);
+                }
+                _ => {}
+            }
+        }
         push_event(
             events,
             event,
             SessionEventKindV1::SessionFinalized {
                 final_output_sha256: digest(output),
                 active_ledger_sha256: digest('b'),
+                active_constraint_ids: active_ids.into_iter().collect(),
             },
         );
     }
@@ -1006,6 +1034,21 @@ mod tests {
         add_constraint(&mut events, 1, "a", ConstraintRoleV1::Instruction, '3', 'c');
         edit(&mut events, 1, 1, 'c', 'd', '4');
         finalize(&mut events, 'd', '5');
+        assert!(evaluate_session_ledger(&spec(), &events).is_err());
+    }
+
+    #[test]
+    fn finalization_active_ids_must_match_replayed_constraint_state() {
+        let mut events = valid_two_turn_session();
+        let final_event = events.last_mut().unwrap();
+        if let SessionEventKindV1::SessionFinalized {
+            active_constraint_ids, ..
+        } = &mut final_event.kind
+        {
+            active_constraint_ids.pop();
+        } else {
+            panic!("fixture must end in SessionFinalized");
+        }
         assert!(evaluate_session_ledger(&spec(), &events).is_err());
     }
 
