@@ -1,0 +1,154 @@
+{
+  "schema_version": "0.1.0",
+  "record_id": "SYNTHETIC-BIOFOULING-EVIDENCE-0001",
+  "record_status": "synthetic",
+  "vessel": {
+    "identity": {
+      "id": "SYNTHETIC-CARGO-001",
+      "revision": "A"
+    },
+    "length_overall_m": 180,
+    "ship_type": "bulk_carrier"
+  },
+  "service_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "coating_system": {
+    "system_identity": {
+      "id": "SYNTHETIC-COATING-001",
+      "revision": "C"
+    },
+    "system_family": "foul_release",
+    "application_date": "2025-01-15",
+    "condition_status": "degraded",
+    "maintenance_history": [
+      "Synthetic inspection only; no physical coating history."
+    ]
+  },
+  "inspection": {
+    "inspection_id": "SYNTHETIC-INSPECTION-001",
+    "method": "rov_imaging",
+    "inspection_date": "2026-10-15T10:00:00Z",
+    "inspector_identity": {
+      "id": "SYNTHETIC-INSPECTOR-001",
+      "revision": "A"
+    },
+    "total_hull_area_m2": 12000,
+    "inspected_area_m2": 10800,
+    "declared_total_coverage_fraction": 0.9,
+    "minimum_required_coverage_fraction": 0.85,
+    "raw_data_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "image_or_observation_count": 240,
+    "zones": [
+      {
+        "zone_id": "BOTTOM-FLAT",
+        "zone_area_m2": 6000,
+        "inspected_area_m2": 5700,
+        "declared_inspection_coverage_fraction": 0.95,
+        "fouling_class": "slime",
+        "estimated_fouling_coverage_fraction": 0.25,
+        "maximum_fouling_thickness_mm": 0.4,
+        "inspection_confidence": 0.85,
+        "species_status": "not_assessed",
+        "limitations": [
+          "Synthetic zone."
+        ]
+      },
+      {
+        "zone_id": "BILGE-KEEL",
+        "zone_area_m2": 4000,
+        "inspected_area_m2": 3300,
+        "declared_inspection_coverage_fraction": 0.825,
+        "fouling_class": "mixed",
+        "estimated_fouling_coverage_fraction": 0.35,
+        "maximum_fouling_thickness_mm": 1.8,
+        "inspection_confidence": 0.7,
+        "species_status": "suspected",
+        "limitations": [
+          "Synthetic suspected biological material; no identification claim."
+        ]
+      },
+      {
+        "zone_id": "NICHE-AREAS",
+        "zone_area_m2": 2000,
+        "inspected_area_m2": 1800,
+        "declared_inspection_coverage_fraction": 0.9,
+        "fouling_class": "unknown",
+        "estimated_fouling_coverage_fraction": 0.2,
+        "maximum_fouling_thickness_mm": 1.1,
+        "inspection_confidence": 0.4,
+        "species_status": "unknown",
+        "limitations": [
+          "Some niche geometry not visible in this synthetic example."
+        ]
+      }
+    ],
+    "limitations": [
+      "Synthetic inspection only; not full coverage of the actual hull or appendages."
+    ]
+  },
+  "cleaning_event": {
+    "cleaning_id": "SYNTHETIC-CLEANING-001",
+    "method": "in_water_rov",
+    "start": "2026-10-16T08:00:00Z",
+    "end": "2026-10-16T12:00:00Z",
+    "area_cleaned_m2": 8000,
+    "contractor_identity": {
+      "id": "SYNTHETIC-CLEANER-001",
+      "revision": "A"
+    },
+    "local_authorization_status": "approved",
+    "authorization_reference": "SYNTHETIC-PERMIT-ONLY",
+    "containment_method": "full_capture",
+    "waste_disposition": "contained_disposed",
+    "captured_waste_mass_kg": 36.5,
+    "waste_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "coating_damage_observed": false,
+    "limitations": [
+      "Synthetic cleaning and waste record; no actual permit or disposal evidence."
+    ]
+  },
+  "performance_comparison": {
+    "method_standard": "ISO 19030-1:2016",
+    "before": {
+      "observation_id": "BEFORE-001",
+      "observed_at": "2026-10-10T10:00:00Z",
+      "condition_fingerprint": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "speed_through_water_kn": 12,
+      "shaft_power_kw": 3000,
+      "shaft_rpm": 85,
+      "draft_m": 9,
+      "trim_m": 0.2,
+      "sea_state": "synthetic-sea-state",
+      "fuel_flow_kg_per_h": 420,
+      "source_trace_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "after": {
+      "observation_id": "AFTER-001",
+      "observed_at": "2026-10-17T10:00:00Z",
+      "condition_fingerprint": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "speed_through_water_kn": 12,
+      "shaft_power_kw": 2900,
+      "shaft_rpm": 85,
+      "draft_m": 9,
+      "trim_m": 0.2,
+      "sea_state": "synthetic-sea-state",
+      "fuel_flow_kg_per_h": 405,
+      "source_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "limitations": [
+      "Synthetic matched-condition example; no causal performance claim."
+    ]
+  },
+  "evidence_sources": [
+    {
+      "source_id": "SYNTHETIC-SOURCE-001",
+      "evidence_class": "synthetic_fixture",
+      "rights_status": "not_applicable",
+      "limitations": [
+        "Synthetic test data."
+      ]
+    }
+  ],
+  "limitations": [
+    "Synthetic fixture only; all permits, inspection, biological and performance data are fabricated test values."
+  ]
+}
