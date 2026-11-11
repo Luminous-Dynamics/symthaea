@@ -54,7 +54,7 @@ impl DriveConfig {
         ];
         if efficiencies
             .iter()
-            .any(|value| !value.is_finite() || !(0.0 < *value && *value <= 1.0))
+            .any(|value| !(value.is_finite() && 0.0 < *value && *value <= 1.0))
         {
             return Err(DriveError::InvalidConfiguration(
                 "all conversion efficiencies must be finite and in (0, 1]",
@@ -347,9 +347,7 @@ pub fn evaluate_drive_with_kinematics(
         motor_speed_rpm,
         motor_shaft_output_torque_nm,
     ];
-    if derived.iter().any(|value| !value.is_finite())
-        || derived.iter().any(|value| *value <= 0.0)
-    {
+    if derived.iter().any(|value| !value.is_finite()) || derived.iter().any(|value| *value <= 0.0) {
         return Err(DriveError::NumericalOverflow);
     }
 
@@ -642,15 +640,10 @@ mod tests {
         let expected_motor_torque = expected_motor_power / expected_motor_angular_velocity;
         assert!((report.motor_speed_rpm - 15_000.0).abs() < 1.0e-9);
         assert!(
-            (report.motor_angular_velocity_rad_s - expected_motor_angular_velocity).abs()
-                < 1.0e-12
+            (report.motor_angular_velocity_rad_s - expected_motor_angular_velocity).abs() < 1.0e-12
         );
-        assert!(
-            (report.drive.motor_shaft_output_power_w - expected_motor_power).abs() < 1.0e-8
-        );
-        assert!(
-            (report.motor_shaft_output_torque_nm - expected_motor_torque).abs() < 1.0e-12
-        );
+        assert!((report.drive.motor_shaft_output_power_w - expected_motor_power).abs() < 1.0e-8);
+        assert!((report.motor_shaft_output_torque_nm - expected_motor_torque).abs() < 1.0e-12);
         assert!(
             (report.motor_shaft_output_torque_nm * report.motor_angular_velocity_rad_s
                 - report.drive.motor_shaft_output_power_w)
@@ -658,8 +651,7 @@ mod tests {
                 < 1.0e-8
         );
         assert!(
-            (report.drive.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.95 * 0.98)).abs()
-                < 1.0e-8
+            (report.drive.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.95 * 0.98)).abs() < 1.0e-8
         );
     }
 
