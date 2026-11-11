@@ -786,11 +786,11 @@ mod tests {
             validation_digest: "validation-sha256".to_owned(),
             calibration_split_digest: "calibration-split-sha256".to_owned(),
             calibration_episode_count: 19,
-            alpha_ppm: 10_000,
+            alpha_ppm: 50_000,
             expansion_units: 0,
             loss_model_digest: "loss-model-sha256".to_owned(),
             loss_scale_id: "task-loss-v1".to_owned(),
-            coverage_ppm: 990_000,
+            coverage_ppm: 950_000,
             coverage_semantics: CoverageSemantics::SimultaneousAcrossActionSetAndHorizon,
             maximum_action_count: 8,
             maximum_horizon_ticks: 100,
@@ -1081,6 +1081,7 @@ mod tests {
         );
         let mut receipt = calibration(100);
         receipt.coverage_ppm = 900_000;
+        receipt.alpha_ppm = 100_000;
         evidence.calibration = Some(receipt);
         let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
         assert!(matches!(
