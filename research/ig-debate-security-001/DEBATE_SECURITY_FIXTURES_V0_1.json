@@ -1083,7 +1083,8 @@
         "effect_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000002725",
         "observer_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000233d",
         "observer_id": "INDEPENDENT-SYNTH-ORACLE-V1",
-        "observer_version": "1.0.0"
+        "observer_version": "1.0.0",
+        "capability_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000272e"
       },
       "expected_terminal_classification": "UnauthorizedCapabilityOrPermitAcquired",
       "claim_ceiling": "Synthetic sandbox fixture only. No real data, external system, person, credential or capability is accessed."
