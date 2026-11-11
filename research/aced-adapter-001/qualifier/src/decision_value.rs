@@ -130,18 +130,35 @@ fn posterior(prior: &[f64], likelihoods: &[f64]) -> Result<(f64, Vec<f64>), Stri
     if prior.len() != likelihoods.len() {
         return Err("posterior prior/likelihood dimensions differ".into());
     }
-    let probability = prior
+
+    // Normalize in log space so a very rare but possible outcome still yields a valid posterior.
+    let log_weights = prior
         .iter()
         .zip(likelihoods)
-        .map(|(prior, likelihood)| prior * likelihood)
-        .sum::<f64>();
-    if probability <= NUMERIC_TOLERANCE {
+        .map(|(prior, likelihood)| {
+            if *prior > 0.0 && *likelihood > 0.0 {
+                Some(prior.ln() + likelihood.ln())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    let Some(max_log_weight) = log_weights.iter().flatten().copied().reduce(f64::max) else {
         return Ok((0.0, vec![0.0; prior.len()]));
-    }
-    let distribution = prior
+    };
+    let scaled_weights = log_weights
         .iter()
-        .zip(likelihoods)
-        .map(|(prior, likelihood)| prior * likelihood / probability)
+        .map(|weight| weight.map(|value| (value - max_log_weight).exp()).unwrap_or(0.0))
+        .collect::<Vec<_>>();
+    let scaled_total = scaled_weights.iter().sum::<f64>();
+    if !scaled_total.is_finite() || scaled_total <= 0.0 {
+        return Err("posterior normalization failed for non-zero probability weights".into());
+    }
+    let log_probability = max_log_weight + scaled_total.ln();
+    let probability = log_probability.exp();
+    let distribution = scaled_weights
+        .iter()
+        .map(|weight| weight / scaled_total)
         .collect();
     Ok((probability, distribution))
 }
@@ -173,7 +190,7 @@ pub fn evaluate_experiment(
     for outcome in &experiment.outcomes {
         let (outcome_probability, updated_prior) =
             posterior(prior, &outcome.likelihood_by_hypothesis)?;
-        if outcome_probability <= NUMERIC_TOLERANCE {
+        if outcome_probability == 0.0 {
             continue;
         }
         expected_posterior_entropy += outcome_probability * entropy_bits(&updated_prior);
@@ -474,6 +491,15 @@ mod tests {
             0.0,
         )
         .is_err());
+    }
+
+    #[test]
+    fn rare_nonzero_outcome_retains_a_normalized_posterior() {
+        let (probability, posterior) = posterior(&[0.5, 0.5], &[1e-20, 3e-20]).unwrap();
+        assert!((probability - 2e-20).abs() / 2e-20 < 1e-12);
+        assert!((posterior[0] - 0.25).abs() < NUMERIC_TOLERANCE);
+        assert!((posterior[1] - 0.75).abs() < NUMERIC_TOLERANCE);
+        assert!((posterior.iter().sum::<f64>() - 1.0).abs() < NUMERIC_TOLERANCE);
     }
 
     #[test]
