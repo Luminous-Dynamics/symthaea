@@ -689,7 +689,7 @@ mod tests {
     fn synthetic_binding_receipt(join: &Value, acoustic: &Value) -> Value {
         serde_json::json!({
             "acoustic_record_id": acoustic["record_id"],
-            "service_fingerprint": acoustic["service_fingerprint"],
+            "service_fingerprint": join["service_fingerprint"],
             "acoustic_raw_trace_sha256": acoustic["raw_trace_sha256"],
             "common_reference_clock_id": "SYNTHETIC-UTC-REFERENCE-001",
             "acoustic_timebase_id": "SYNTHETIC-ACOUSTIC-TIMEBASE-001",
