@@ -413,10 +413,13 @@ pub fn parse_transcribed_midi_v1(
                 ..
             } => 0,
             TrackEventKind::Midi {
-                message: MidiMessage::NoteOff { .. } | MidiMessage::NoteOn { vel, .. },
+                message: MidiMessage::NoteOff { .. },
                 ..
-            } if matches!(kind, TrackEventKind::Midi { message: MidiMessage::NoteOff { .. }, .. })
-                || matches!(kind, TrackEventKind::Midi { message: MidiMessage::NoteOn { vel, .. }, .. } if vel.as_int() == 0) => 1,
+            } => 1,
+            TrackEventKind::Midi {
+                message: MidiMessage::NoteOn { vel, .. },
+                ..
+            } if vel.as_int() == 0 => 1,
             TrackEventKind::Midi {
                 message: MidiMessage::NoteOn { .. },
                 ..
@@ -1538,7 +1541,7 @@ mod tests {
         program: u8,
         tempo_events: &[(u64, u32)],
     ) -> Vec<u8> {
-        build_midi_with_velocity(notes, program, tempo_events, 100)
+        build_midi_layout(notes, program, tempo_events, 100, false)
     }
 
     fn build_midi_with_velocity(
@@ -1547,8 +1550,29 @@ mod tests {
         tempo_events: &[(u64, u32)],
         velocity: u8,
     ) -> Vec<u8> {
+        build_midi_layout(notes, program, tempo_events, velocity, false)
+    }
+
+    fn build_midi_with_program_in_conductor_track(
+        notes: &[(u8, u64, u64)],
+        program: u8,
+    ) -> Vec<u8> {
+        build_midi_layout(notes, program, &[(0, 500_000)], 100, true)
+    }
+
+    fn build_midi_layout(
+        notes: &[(u8, u64, u64)],
+        program: u8,
+        tempo_events: &[(u64, u32)],
+        velocity: u8,
+        program_in_conductor_track: bool,
+    ) -> Vec<u8> {
         let mut note_events: Vec<(u64, u8, Vec<u8>)> =
-            vec![(0, 0, vec![0xc0, program])];
+            if program_in_conductor_track {
+                Vec::new()
+            } else {
+                vec![(0, 0, vec![0xc0, program])]
+            };
         for (pitch, onset, offset) in notes {
             note_events.push((*onset, 2, vec![0x90, *pitch, velocity]));
             note_events.push((*offset, 1, vec![0x80, *pitch, 0]));
@@ -1564,6 +1588,9 @@ mod tests {
         note_track.extend_from_slice(&[0x00, 0xff, 0x2f, 0x00]);
 
         let mut tempo_track = Vec::new();
+        if program_in_conductor_track {
+            tempo_track.extend_from_slice(&[0x00, 0xc0, program]);
+        }
         let mut last_tick = 0u64;
         for (tick, tempo) in tempo_events {
             write_vlq(&mut tempo_track, *tick - last_tick);
@@ -1950,6 +1977,54 @@ mod tests {
         assert_eq!(report.full_note_metrics.f1, 1.0);
         assert!(report.average_overlap_ratio.unwrap() < 1.0);
         assert!(report.average_overlap_ratio.unwrap() > 0.89);
+    }
+
+    #[test]
+    fn program_change_in_conductor_track_applies_to_notes_in_part_track() {
+        let notes = vec![(60, 0, 480), (64, 960, 1_440)];
+        let reference = reference_artifact(&notes, 40);
+        let prediction =
+            build_midi_with_program_in_conductor_track(&notes, 40);
+        let parsed = parse_transcribed_midi_v1(&prediction).unwrap();
+        assert!(parsed.notes.iter().all(|note| note.gm_program == 40));
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.exact_program_onset_metrics.f1, 1.0);
+        assert_eq!(report.exact_program_full_note_metrics.f1, 1.0);
+    }
+
+    #[test]
+    fn type_one_note_on_and_note_off_can_be_paired_across_tracks() {
+        let mut conductor = vec![
+            0x00, 0xc0, 40,
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
+            0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let note_on = vec![0x00, 0x90, 60, 100, 0x00, 0xff, 0x2f, 0x00];
+        let note_off = vec![0x83, 0x60, 0x80, 60, 0x00, 0x00, 0xff, 0x2f, 0x00];
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"MThd");
+        bytes.extend_from_slice(&6u32.to_be_bytes());
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&3u16.to_be_bytes());
+        bytes.extend_from_slice(&MIDI_TRANSCRIPTION_TEST_PPQ.to_be_bytes());
+        for track in [&mut conductor, &mut note_on.clone(), &mut note_off.clone()] {
+            bytes.extend_from_slice(b"MTrk");
+            bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+            bytes.extend_from_slice(track);
+        }
+        let parsed = parse_transcribed_midi_v1(&bytes).unwrap();
+        assert_eq!(parsed.notes.len(), 1);
+        assert_eq!(parsed.unclosed_note_count, 0);
+        assert_eq!(parsed.orphan_note_off_count, 0);
+        assert_eq!(parsed.notes[0].track_index, 1);
+        assert_eq!(parsed.notes[0].gm_program, 40);
+        assert_eq!(parsed.notes[0].offset_tick, Some(480));
     }
 
     #[test]
