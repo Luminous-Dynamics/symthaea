@@ -247,20 +247,11 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
             errors.push(format!("pair {pair_id} must have exactly two members"));
             continue;
         }
-        let authorized = members.iter().find(|x| str_field(x, "pair_member") == Some("authorized_control"));
-        let counterfactual = members.iter().find(|x| str_field(x, "pair_member") == Some("single_delta_denial"));
-        let (Some(authorized), Some(counterfactual)) = (authorized, counterfactual) else {
-            errors.push(format!("pair {pair_id} must have one authorized and one counterfactual member"));
-            continue;
-        };
-        if authorized["task"] != counterfactual["task"] {
-            errors.push(format!("pair {pair_id} changed task, operation, target, payload, or pre-state"));
-        }
-        if authorized["mutation_dimension"] != counterfactual["mutation_dimension"] {
+        let dimension = str_field(members[0], "mutation_dimension").unwrap_or("");
+        if members.iter().any(|member| str_field(member, "mutation_dimension") != Some(dimension)) {
             errors.push(format!("pair {pair_id} declares inconsistent mutation dimensions"));
             continue;
         }
-        let dimension = str_field(authorized, "mutation_dimension").unwrap_or("");
         if dimension == "runtime_trigger" {
             let continue_case = members.iter().find(|x| str_field(x, "pair_member") == Some("continue_control"));
             let stop_case = members.iter().find(|x| str_field(x, "pair_member") == Some("runtime_trigger_stop"));
@@ -273,18 +264,37 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
             }
             let a = continue_case["runtime_context"].as_object();
             let b = stop_case["runtime_context"].as_object();
-            let (Some(a), Some(b)) = (a, b) else { errors.push(format!("runtime pair {pair_id} has invalid runtime context")); continue; };
-            if a.keys().collect::<BTreeSet<_>>() != b.keys().collect::<BTreeSet<_>>() { errors.push(format!("runtime pair {pair_id} runtime-context keys differ")); continue; }
+            let (Some(a), Some(b)) = (a, b) else {
+                errors.push(format!("runtime pair {pair_id} has invalid runtime context"));
+                continue;
+            };
+            if a.keys().collect::<BTreeSet<_>>() != b.keys().collect::<BTreeSet<_>>() {
+                errors.push(format!("runtime pair {pair_id} runtime-context keys differ"));
+                continue;
+            }
             let changed = a.keys().filter(|key| a.get(*key) != b.get(*key)).map(|key| key.as_str()).collect::<Vec<_>>();
             if changed.len() != 1 || changed[0] != "trigger" {
                 errors.push(format!("runtime pair {pair_id} must change only trigger, observed {changed:?}"));
             }
             continue;
         }
+
         let Some(mutated_field) = changed_field(dimension) else {
             errors.push(format!("pair {pair_id} has unknown mutation dimension"));
             continue;
         };
+        let authorized = members.iter().find(|x| str_field(x, "pair_member") == Some("authorized_control"));
+        let counterfactual = members.iter().find(|x| str_field(x, "pair_member") == Some("single_delta_denial"));
+        let (Some(authorized), Some(counterfactual)) = (authorized, counterfactual) else {
+            errors.push(format!("pair {pair_id} must have one authorized and one counterfactual member"));
+            continue;
+        };
+        if authorized["task"] != counterfactual["task"] {
+            errors.push(format!("pair {pair_id} changed task, operation, target, payload, or pre-state"));
+        }
+        if authorized["runtime_context"] != counterfactual["runtime_context"] {
+            errors.push(format!("pre-execution pair {pair_id} must keep runtime_context identical"));
+        }
         let a = authorized["authority_context"].as_object();
         let b = counterfactual["authority_context"].as_object();
         let (Some(a), Some(b)) = (a, b) else {
@@ -298,9 +308,6 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
         let changed = a.keys().filter(|key| a.get(*key) != b.get(*key)).map(|key| key.as_str()).collect::<Vec<_>>();
         if changed.len() != 1 || changed[0] != mutated_field {
             errors.push(format!("pair {pair_id} must change exactly {mutated_field}, observed {changed:?}"));
-        }
-        if authorized["runtime_context"] != counterfactual["runtime_context"] {
-            errors.push(format!("pre-execution pair {pair_id} must keep runtime_context identical"));
         }
     }
 
