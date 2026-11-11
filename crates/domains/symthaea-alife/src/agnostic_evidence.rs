@@ -313,6 +313,8 @@ impl EvidenceConflict {
         let mut seen = HashSet::<String>::new();
         let mut supporting_groups = HashSet::<String>::new();
         let mut contradicting_groups = HashSet::<String>::new();
+        let mut supporting_artifacts = HashSet::<String>::new();
+        let mut contradicting_artifacts = HashSet::<String>::new();
         let mut groups_complete = true;
 
         for id in &self.supporting_evidence_ids {
@@ -372,6 +374,11 @@ impl EvidenceConflict {
             if !supporting_groups.is_disjoint(&contradicting_groups) {
                 issues.push(format!(
                     "{path} cannot claim independent sourcing because supporting and contradicting evidence share a common-cause group"
+                ));
+            }
+            if !supporting_artifacts.is_disjoint(&contradicting_artifacts) {
+                issues.push(format!(
+                    "{path} cannot claim independent sourcing because supporting and contradicting evidence share an identical artifact digest"
                 ));
             }
         }
