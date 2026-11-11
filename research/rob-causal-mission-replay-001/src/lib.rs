@@ -976,7 +976,9 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         let remote_ok = match &application.request_id {
             Some(request_id) => match requests.get(request_id.as_str()) {
                 Some(request) => {
-                    if request.admission != AdmissionDisposition::Admitted {
+                    if request.admission != AdmissionDisposition::Admitted
+                        || request.request_stamp.sequence <= decision.stamp.sequence
+                    {
                         false
                     } else if application.stamp.tick > request.expiry_tick {
                         push_finding(
@@ -1000,20 +1002,23 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             },
             None => true,
         };
-        let decision_source_order_ok = decision.source_observation_ids.iter().all(|id| {
-            observations.get(id.as_str()).is_some_and(|observation| {
-                observation.stamp.sequence < decision.stamp.sequence
-                    && observation.stamp.clock_id == application.stamp.clock_id
-                    && observation.stamp.boot_epoch == application.stamp.boot_epoch
-                    && !observation.sensor_digest.trim().is_empty()
-            })
-        });
+        let decision_source_order_ok = !decision.source_observation_ids.is_empty()
+            && decision.source_observation_ids.iter().all(|id| {
+                observations.get(id.as_str()).is_some_and(|observation| {
+                    observation.stamp.sequence < decision.stamp.sequence
+                        && observation.stamp.clock_id == application.stamp.clock_id
+                        && observation.stamp.boot_epoch == application.stamp.boot_epoch
+                        && !observation.sensor_digest.trim().is_empty()
+                })
+            });
         let decision_receipt_complete = !decision.calibration_id.trim().is_empty()
             && !decision.calibration_digest.trim().is_empty()
             && !decision.loss_model_digest.trim().is_empty()
             && !decision.loss_scale_id.trim().is_empty()
             && !decision.action_domain_digest.trim().is_empty();
-        let chunk_binding_ok = chunk.decision_id == application.decision_id
+        let chunk_binding_ok = chunk.stamp.sequence > decision.stamp.sequence
+            && chunk.stamp.tick <= decision.valid_through_tick
+            && chunk.decision_id == application.decision_id
             && chunk.action_id == application.action_id
             && chunk.model_digest == decision.loss_model_digest
             && chunk.action_domain_digest == decision.action_domain_digest
