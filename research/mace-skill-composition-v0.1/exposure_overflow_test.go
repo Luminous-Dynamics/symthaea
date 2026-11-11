@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestExposureCounterOverflowFailsClosed(t *testing.T) {
 	x := fixtureRequest()
