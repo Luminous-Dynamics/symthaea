@@ -21,7 +21,7 @@ interval_m = [center_m − radius_m, center_m + radius_m]
 
 A target passes only when the *entire* interval lies inside its requested signed band. A protected metric passes only when its entire interval lies inside the symmetric no-op guard.
 
-The selected candidate is the feasible candidate with minimum weighted normalized control effort. Ties are resolved by candidate ID. If no candidate passes every hard condition, the allocator abstains and retains all rejection reasons.
+The selected candidate is the feasible candidate with minimum weighted normalized control effort. Ties are resolved by candidate ID. If no candidate passes every hard condition, the allocator abstains and retains all rejection reasons. The report retains every candidate's canonical control vector and predicted metric intervals so the decision can be replayed from the returned record.
 
 ## Authority boundary
 
