@@ -78,7 +78,7 @@ The part-separation diagnostic uses the existing one-to-one onset+pitch matches 
 
 For both levels the report gives the number of prediction groups, number of mixed groups, number of matched notes residing in mixed groups and note-weighted purity (the fraction assigned to each group's most common reference PartId). It also reports reference-PartId coverage: the fraction of distinct PartIds declared in the reference manifest's track receipts that are represented by at least one matched note. A declared but silent PartId stays in the denominator.
 
-This is a structural metric, not an instrument identity classifier. It says whether note events associated with distinct score PartIds were kept in distinct MIDI output tracks or channel lanes. It does not prove which acoustic instrument played the source recording. Only matched notes contribute to purity; unmatched extra notes are already counted as false positives by the note metrics and are not assigned a speculative PartId. A PartId can validly be spread across multiple tracks or lanes; the score is based on dominant-part purity rather than a strict one-track-per-part bijection.
+This is a structural metric, not an instrument identity classifier. It says whether note events associated with distinct score PartIds were kept in distinct MIDI output tracks or channel lanes. It does not prove which acoustic instrument played the source recording. Only unambiguous matched notes contribute to purity. If a matched MIDI event could correspond to notes from more than one reference PartId (for example, two parts doubling the same pitch at the same onset), the note remains a valid note match but is counted as an ambiguous part assignment and is excluded from part purity and coverage. This prevents deterministic bipartite tie-breaking from manufacturing a false structural claim. Unmatched extra notes are already counted as false positives by the note metrics and are not assigned a speculative PartId. A PartId can validly be spread across multiple tracks or lanes; the score is based on dominant-part purity rather than a strict one-track-per-part bijection.
 
 ### Velocity evaluation
 
@@ -99,7 +99,7 @@ Capacity exhaustion is an explicit error, not a partial score.
 
 ## Tests authored
 
-Thirty-six focused Rust tests currently cover:
+Thirty-seven focused Rust tests currently cover:
 1. exact MIDI prediction produces perfect instrument-agnostic and exact-program scores;
 2. wrong GM program changes the exact-program metrics without hiding correct pitch/onset notes;
 3. onset outside the 50 ms window reduces onset and full-note scores;
@@ -136,6 +136,7 @@ Thirty-six focused Rust tests currently cover:
 34. an empty reference is accepted as a valid all-false-positive evaluation case.
 35. a declared-but-silent manifest PartId remains in the part-coverage denominator;
 36. zero matched notes yields zero part coverage and no purity estimate.
+37. a same-pitch/same-onset note that could belong to multiple reference PartIds is withheld from part attribution while remaining a note-level match.
 35. a declared reference part with no notes in the excerpt remains in the part-coverage denominator;
 36. zero matched notes yields zero part coverage and no undefined purity value.
 
