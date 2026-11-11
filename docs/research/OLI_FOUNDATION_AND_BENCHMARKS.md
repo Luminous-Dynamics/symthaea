@@ -59,13 +59,62 @@ These values are not a universal ranking and do not imply that all properties ar
 
 ## 3. Observation outcome is not property assessment
 
-`EvidenceOutcome::NoDetection` records a measurement that did not detect a target signal. It does not mean the property is absent. The containing `PropertyFinding` must retain an explicit `ObservationCoverage` describing modality, scope, duration, spatial coverage and/or detection limit.
+`EvidenceOutcome::NoDetection` records a measurement that did not detect a target signal. It does not mean the property is absent. The containing `PropertyFinding` must retain an explicit `ObservationCoverage` describing modality, scope, observation duration, spatial and temporal coverage, temporal sampling interval, target-process timescale, detection limit and units, and any calibrated detection probability at a stated reference abundance.
+
+The coverage model also records explicit `FalseNegativeRisk` modes:
+- `LowAbundance`
+- `LowActivityOrDormancy`
+- `SpatialHeterogeneity`
+- `TemporalAliasing`
+- `PreservationOrDegradation`
+- `InstrumentSensitivity`
+- `MatrixInterference`
+- `SignatureMismatch`
+- `Unknown`
+
+If the observation interval is longer than the declared target-process timescale, `TemporalAliasing` must be recorded. A no-detection or not-observable finding must identify at least one false-negative mode. A detection limit requires units. A calibrated detection probability requires a reference abundance and a linked calibration-evidence record. Legacy serialized coverage defaults its unrecorded miss mechanism to `Unknown`, not to "no risk".
 
 A negative measurement cannot be the sole evidence supporting `SUPPORTED_WITHIN_SCOPE`. The module does not infer biological absence from non-detection.
 
 A `MODEL_INADEQUATE` finding must link at least one `DerivedInference` / `DerivedResult` record documenting the model-adequacy failure (for example, a posterior-predictive residual check). A model cannot simply emit an unsupported self-abstention status without retaining its diagnostic evidence.
 
 This implements a narrow type-level guard; it does not establish calibrated detection probability. The Sol-Atlas spatial/temporal coverage work remains authoritative for actual observability and coverage accounting.
+
+
+## 3A. 2026 false-negative and abiotic-baseline research
+
+Two 2026 publications materially strengthen the OLI requirements:
+
+1. **ten Kate et al., "False negatives in the search for extraterrestrial life", Nature Astronomy (21 May 2026), DOI 10.1038/s41550-026-02863-0.** The authors call for a deliberate research strategy to constrain false-negative causes, including abundance, activity, appearance, location, preservation of observable traces, detectability and method limitations. OLI translates these categories into explicit observation-risk modes and requires them to be carried with every no-detection/limited-observability claim.
+
+2. **Higgins et al., "A framework for evaluating biosignature potential against the abiotic baseline on ocean worlds", Nature Astronomy (17 June 2026), DOI 10.1038/s41550-026-02893-8.** Their Enceladus example shows that uncertainty in abiotic methane-isotope relationships, carbonate chemistry and amino-acid chirality can prevent hypothetical observations from definitively supporting a biosphere. They identify complementary geophysical constraints such as internal temperature, rheology, lithology, initial abiotic organic inventory and ocean transport timescales.
+
+### Paradigm shift: model the observation process, not only the classifier
+
+OLI should represent a complete generative chain:
+
+[
+	ext{substrate/mechanism}
+ightarrow 	ext{environment and energy}
+ightarrow 	ext{activity and abundance}
+ightarrow 	ext{preservation/degradation}
+ightarrow 	ext{transport/mixing}
+ightarrow 	ext{sampling geometry and cadence}
+ightarrow 	ext{instrument response}
+ightarrow 	ext{observed data}.
+]
+
+A classifier sees only the final observed data. A defensible scientific inference must account for uncertainty and missingness introduced at every preceding stage. For each candidate biosignature, OLI should carry:
+- an abiotic baseline distribution conditioned on environmental state and plausible abiotic mechanisms, not one fixed negative template;
+- a biological signal model conditioned on abundance, activity/dormancy, preservation, spatial heterogeneity and time;
+- an observation operator that maps those hidden states through sampling and instrument limits;
+- calibration evidence and a detection-probability curve at declared reference abundances;
+- the uncertainty in model parameters and any mechanism families not represented;
+- the next measurement expected to discriminate between the leading biological, abiotic and unresolved explanations.
+
+Where the posterior or likelihood-ratio interval is dominated by abiotic-baseline or observation-process uncertainty, OLI should abstain and propose a complementary observation rather than force a biological/abiological label. A positive result must be robust to reasonable abiotic-baseline variation; a negative result must show that the observation process had adequate power to detect the hypothesized signal in the sampled domain.
+
+This is the core research opportunity: turn the NASA Ladder's false-positive/false-negative and context criteria into a quantitative, replayable instrument-and-environment assurance model, without pretending the Ladder is a universal classifier or mission instrument endorsement.
 
 ## 4. Provenance and common-cause dependence
 
