@@ -28,6 +28,7 @@ pub enum QuantumInformationError {
     DenseDimensionLimit { requested: usize, maximum: usize },
     DenseStateQubitLimit { requested: usize, maximum: usize },
     PageReferenceDimensionLimit { requested: usize, maximum: usize },
+    InvalidPageEntropy(f64),
     InvalidTolerance(f64),
     NonFiniteState { index: usize },
     NonFiniteMatrix { row: usize, column: usize },
@@ -49,6 +50,7 @@ impl fmt::Display for QuantumInformationError {
             Self::DenseDimensionLimit { requested, maximum } => write!(f, "dense dimension {requested} exceeds limit {maximum}"),
             Self::DenseStateQubitLimit { requested, maximum } => write!(f, "dense state with {requested} qubits exceeds limit {maximum}"),
             Self::PageReferenceDimensionLimit { requested, maximum } => write!(f, "Page reference dimension product {requested} exceeds limit {maximum}"),
+            Self::InvalidPageEntropy(value) => write!(f, "Page reference entropy is invalid: {value}"),
             Self::InvalidTolerance(t) => write!(f, "invalid tolerance {t}"),
             Self::NonFiniteState { index } => write!(f, "non-finite state amplitude at index {index}"),
             Self::NonFiniteMatrix { row, column } => write!(f, "non-finite matrix entry ({row}, {column})"),
@@ -304,7 +306,7 @@ pub fn page_average_entropy_nats(
     if entropy.is_finite() && entropy >= 0.0 {
         Ok(entropy)
     } else {
-        Err(QuantumInformationError::NonFiniteMatrix { row: 0, column: 0 })
+        Err(QuantumInformationError::InvalidPageEntropy(entropy))
     }
 }
 
