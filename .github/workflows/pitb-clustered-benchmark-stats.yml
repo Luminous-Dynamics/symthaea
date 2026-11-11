@@ -2,6 +2,7 @@ name: PITB Clustered Benchmark Statistics
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - "tools/pitb-clustered-benchmark-stats/**"
       - "tools/pitb-sorrydb-audit/schema/sorrydb-proof-run-v0.schema.json"
