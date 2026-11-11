@@ -212,10 +212,6 @@ pub fn plan_sequential_experiments(
     if !minimum_net_value.is_finite() || minimum_net_value < 0.0 {
         return Err("minimum net value must be finite and non-negative".into());
     }
-    if max_depth > experiments.len() {
-        return Err("maximum depth cannot exceed the number of unique experiments".into());
-    }
-
     let mut identities = BTreeSet::new();
     for experiment in experiments {
         if experiment.id.trim().is_empty() || !identities.insert(experiment.id.as_str()) {
@@ -355,6 +351,27 @@ mod tests {
         let plan = plan_sequential_experiments(&prior, &actions, &risky, 1.0, 2.0, 0.0, 2)
             .unwrap();
         assert!(plan.net_value_of_plan <= 0.0);
+        assert!(matches!(plan.tree.action, SequentialAction::Stop));
+    }
+
+    #[test]
+    fn empty_candidate_set_stops_cleanly() {
+        let prior = vec![0.5, 0.5];
+        let actions = vec![vec![10.0, 0.0], vec![0.0, 10.0]];
+        let plan = plan_sequential_experiments(&prior, &actions, &[], 0.0, 0.0, 0.0, 2)
+            .unwrap();
+        assert_eq!(plan.net_value_of_plan, 0.0);
+        assert_eq!(plan.expected_experiments, 0.0);
+        assert!(matches!(plan.tree.action, SequentialAction::Stop));
+    }
+
+    #[test]
+    fn horizon_may_exceed_available_candidates_and_stops_after_exhaustion() {
+        let (prior, actions, experiments) = complementarity_problem();
+        let plan = plan_sequential_experiments(&prior, &actions, &experiments[..1], 1.0, 0.0, 0.0, 2)
+            .unwrap();
+        assert_eq!(plan.net_value_of_plan, 0.0);
+        assert_eq!(plan.expected_experiments, 0.0);
         assert!(matches!(plan.tree.action, SequentialAction::Stop));
     }
 
