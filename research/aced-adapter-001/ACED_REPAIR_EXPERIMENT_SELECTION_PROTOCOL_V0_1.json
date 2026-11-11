@@ -223,7 +223,8 @@
           "required_total_units": 126,
           "approximate_achieved_power": 0.8013
         },
-        "claim_limit": "A normal-approximation planning calculator for independent, equal-allocation, continuous outcomes. Not a substitute for design-specific power analysis for clustered, paired, binary, ordinal, survival, adaptive, sequential, repeated-look or multiplicity-adjusted experiments."
+        "claim_limit": "A normal-approximation planning calculator for independent, equal-allocation, continuous outcomes. Not a substitute for design-specific power analysis for clustered, paired, binary, ordinal, survival, adaptive, sequential, repeated-look or multiplicity-adjusted experiments.",
+        "primary_endpoint_requirement": "The plan must declare primary_outcome.scale=continuous and estimand=difference_in_means; the variable must appear in measurement.variables. Categorical forecast labels are a separate outcome taxonomy and must not be confused with the endpoint scale used in the power calculation."
       }
     }
   },
