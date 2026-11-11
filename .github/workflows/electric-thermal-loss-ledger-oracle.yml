@@ -1,0 +1,39 @@
+name: Electric Thermal Loss Ledger Reference Oracle
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "tools/electric-thermal-loss-ledger-oracle/**"
+      - ".github/workflows/electric-thermal-loss-ledger-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: electric-thermal-loss-ledger-oracle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Format, test and lint thermal loss ledger oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/electric-thermal-loss-ledger-oracle/Cargo.toml -- --check
+
+      - name: Run frozen ledger tests
+        run: cargo test --locked --manifest-path tools/electric-thermal-loss-ledger-oracle/Cargo.toml
+
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/electric-thermal-loss-ledger-oracle/Cargo.toml --all-targets -- -D warnings
