@@ -5,6 +5,7 @@ on:
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/transcription_eval.rs"
+      - "crates/domains/symthaea-muse/src/transcription_experiment.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-music-theory/src/orchestration.rs"
@@ -16,9 +17,11 @@ on:
     branches:
       - "research/melothaea-part-aware-midi-performance-v1"
       - "research/melothaea-amt-evaluation-v1"
+      - "research/melothaea-experiment-receipt-v1"
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/transcription_eval.rs"
+      - "crates/domains/symthaea-muse/src/transcription_experiment.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-music-theory/src/orchestration.rs"
@@ -68,3 +71,6 @@ jobs:
 
       - name: Run focused MIDI transcription evaluation tests
         run: cargo test --locked -p symthaea-muse --features theory transcription_eval::tests::
+
+      - name: Run focused transcription experiment receipt tests
+        run: cargo test --locked -p symthaea-muse --features theory transcription_experiment::tests::
