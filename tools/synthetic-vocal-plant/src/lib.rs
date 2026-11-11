@@ -695,14 +695,6 @@ pub fn measure_segment_formants(
         mad_f3_hz,
     })
 }
-        median_f1_hz,
-        median_f2_hz,
-        median_f3_hz,
-        mad_f1_hz,
-        mad_f2_hz,
-        mad_f3_hz,
-    })
-}
 
 pub fn sha256_bytes(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
@@ -1165,6 +1157,7 @@ mod tests {
                 .expect("formant observer should process the target PCM");
         assert!(observed.analysis_frame_count > 0);
         assert_eq!(observed.analysis_sample_rate_hz, 10_000);
+        assert_eq!(observed.f0_max_hz, 700.0);
         assert_eq!(observed.lpc_order, 16);
         assert_eq!(observed.window_ms, 25.0);
         assert!(!observed.observer_id.is_empty());
@@ -1181,7 +1174,7 @@ mod tests {
             measure_segment_formants(&rendered, "proxy-vowel-c", DEFAULT_SAMPLE_RATE_HZ)
                 .expect("silenced PCM is a valid analyzer input");
         assert_eq!(observed.voiced_frame_count, 0);
-        assert_eq!(observed.ordered_formant_frame_count, 0);
+        assert_eq!(observed.qualified_formant_frame_count, 0);
         assert_eq!(observed.median_f1_hz, None);
         assert_eq!(observed.median_f2_hz, None);
         assert_eq!(observed.median_f3_hz, None);
