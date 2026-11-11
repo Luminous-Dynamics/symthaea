@@ -332,3 +332,12 @@ The action-horizon lane now includes three additional public baselines:
 - **REMAC** (ICLR 2026): masked action chunking and prefix-preserved sampling target intra-chunk perception/execution mismatch as well as inter-chunk continuity. This adds an important training-time robustness arm beyond post-hoc chunk blending. https://proceedings.iclr.cc/paper_files/paper/2026/hash/c35834443b7881e782e52b3519fe27c7-Abstract-Conference.html
 
 **Fair comparison design:** evaluate the selector first as a candidate-horizon proposer, then apply the same Luminous physical bottleneck envelope to each proposer. The envelope must not improve a selector's model prediction; it only clips commitment to a common qualified admissible prefix. Compare proposal quality, clipped horizon, safe-success, replanning overhead and physical outcomes separately. Do not pool platform/task results across papers.
+
+
+## 13. OpenWAM and counterfactual action-outcome identification
+
+OpenWAM (6 October 2026) is a particularly useful comparator because it exposes video/action interaction programs under a common model family: video-then-action, action-then-video, joint and decoupled generation, plus separate local inverse/forward dynamics. Its reported results include 98.6% mean VTA success across four LIBERO suites and about 92% mean success on three bimanual tasks. Its counterfactual supervision reduces RGB prediction error by 34.5% and improves outcome identification among 16 same-state action outcomes from 21.1% to 71.3% in its evaluation. https://openwam.stanford.edu/
+
+The important benchmark implication is that visual prediction, action-outcome identification, action ranking and decision value are four separate gates. Symthaea should consume #598/#664 for action-conditioned physical/causal evidence and #10625 for repeated held-out continuation evaluation. Do not build a new world model or a second selectable-headroom benchmark here.
+
+See [counterfactual_action_value_extension.md](./counterfactual_action_value_extension.md).
