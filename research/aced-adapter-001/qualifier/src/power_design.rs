@@ -41,7 +41,9 @@ fn normal_cdf(value: f64) -> f64 {
 
 fn inverse_normal_cdf(probability: f64) -> Result<f64, String> {
     if !probability.is_finite() || probability <= 0.0 || probability >= 1.0 {
-        return Err("normal quantile probability must be finite and strictly between zero and one".into());
+        return Err(
+            "normal quantile probability must be finite and strictly between zero and one".into(),
+        );
     }
 
     // Acklam's rational approximation.
@@ -139,6 +141,7 @@ impl TwoSidedMeanPowerDesign {
         })
     }
 
+    /// Approximate two-sided power under the independent normal-means planning model.
     pub fn achieved_power(self, units_per_arm: u64) -> Result<f64, String> {
         self.validate()?;
         if units_per_arm < 2 {
@@ -155,7 +158,11 @@ impl TwoSidedMeanPowerDesign {
         Ok(power.clamp(0.0, 1.0))
     }
 
-    pub fn qualify_planned_total(self, planned_units: u64) -> Result<EqualAllocationSampleSize, String> {
+    /// Reject a planned total that is too small or incompatible with equal allocation.
+    pub fn qualify_planned_total(
+        self,
+        planned_units: u64,
+    ) -> Result<EqualAllocationSampleSize, String> {
         if planned_units % 2 != 0 {
             return Err("equal-allocation planned_units must be even".into());
         }
