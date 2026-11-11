@@ -231,3 +231,14 @@ cargo run --bin marine-port-call-energy-audit -- ../../docs/research/marine/mari
 ~~~
 
 The audit validates the Draft 2020-12 case contract, joins the exact #11558 service fingerprint/port-call ID and source, checks earliest/latest arrival, minimum turnaround and departure cutoff, checks ship/berth connector standard, voltage, frequency and phase-count agreement, checks port availability and confirmed power reservation, subtracts connection/disconnection overhead from berth time, and deterministically bounds delivered Wh by requested energy, port energy, power and available time. It calculates gross grid and displaced-generator GHG factors only from source-resolved factor records and reports a net delta only when the accounting boundary IDs match. Arithmetic uses integer W, seconds, Wh and micro-kg CO2e; it is a scenario audit, not a port or vessel approval.
+
+
+Audit the component and whole-system first-law energy balance:
+
+~~~sh
+cargo run --bin marine-energy-conservation-audit -- \\
+  ../../docs/research/marine/marine-energy-conservation-v0.1.0.schema.json \\
+  ../../docs/research/marine/fixtures/synthetic-marine-energy-conservation-v0.1.0.json
+~~~
+
+The conservation audit is complementary to the source-input ledger: internal transfers cancel at the system boundary, conversion losses and storage changes are explicit, and component residuals are checked against supplied expanded-uncertainty budgets. The balanced fixture is synthetic and therefore remains INCOMPLETE as physical evidence. An unbalanced negative control is provided separately.
