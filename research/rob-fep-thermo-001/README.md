@@ -267,3 +267,13 @@ The new cross-cutting real-time benchmark is tracked in [Symthaea #11561](https:
 
 
 The real-time cognition extension now has ten machine-readable known-answer cases and a strict schema at [realtime_computation_extension.md](./realtime_computation_extension.md) and [fixtures/realtime_cognition_v0_1.json](./fixtures/realtime_cognition_v0_1.json). This tests policy eligibility and measurement semantics only; it does not confer actuation authority or claim hardware timing results.
+
+
+## Real-time benchmark federation and action-chunk integrity
+
+Added the temporal alignment contract with ten synthetic exact-case fixtures:
+- [action_chunk_temporal_alignment.md](./action_chunk_temporal_alignment.md)
+- [fixtures/action_chunk_alignment_v0_1.json](./fixtures/action_chunk_alignment_v0_1.json)
+- [fixtures/action_chunk_alignment_v0_1.schema.json](./fixtures/action_chunk_alignment_v0_1.schema.json)
+
+The external benchmark federation now includes RT-SAFE (navigation safety), LIBERO-Dynamic (latency-aware manipulation) and RoboDyna (dynamic interaction). They remain separate task strata; common event/clock/action-chunk semantics are shared without inventing a global score.
