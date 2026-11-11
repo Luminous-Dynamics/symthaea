@@ -1,7 +1,7 @@
 # OLI integration in Symthaea: evidence and experiment semantics
 
 **Status:** Symthaea-side adapter / research integration; v0.2.0  
-**Canonical fixture contract:** [Symtropy OLI M0 validator PR #4428](https://github.com/Luminous-Dynamics/symtropy/pull/4428)  
+**Canonical fixture contract:** [Symtropy OLI M0 validator PR #4569](https://github.com/Luminous-Dynamics/symtropy/pull/4569)  
 **Research contract:** [LIFE-SUBSTRATE-001](https://github.com/Luminous-Dynamics/symtropy/blob/research/life-substrate-001-v0/docs/research/LIFE-SUBSTRATE-001.md)  
 **Experiment selection:** [Symthaea #11446](https://github.com/Luminous-Dynamics/symthaea/issues/11446)  
 **Adversarial confidence surfaces:** [Symthaea #11451](https://github.com/Luminous-Dynamics/symthaea/issues/11451)
@@ -115,6 +115,33 @@ A classifier sees only the final observed data. A defensible scientific inferenc
 Where the posterior or likelihood-ratio interval is dominated by abiotic-baseline or observation-process uncertainty, OLI should abstain and propose a complementary observation rather than force a biological/abiological label. A positive result must be robust to reasonable abiotic-baseline variation; a negative result must show that the observation process had adequate power to detect the hypothesized signal in the sampled domain.
 
 This is the core research opportunity: turn the NASA Ladder's false-positive/false-negative and context criteria into a quantitative, replayable instrument-and-environment assurance model, without pretending the Ladder is a universal classifier or mission instrument endorsement.
+
+
+## 3B. Reuse established calibration and run-level risk/coverage infrastructure
+
+OLI should not author another ECE/Brier implementation.
+
+- `crates/domains/symthaea-futures-calibration/src/lib.rs` already provides `BrierScore`, `LogScore`, `Crps`, `reliability_diagram` and explicit finite-score/error handling. Reuse these for forecasts and calibration reports where the outcome-space semantics match.
+- `src/consciousness/recursive_improvement/calibration_analytics.rs` already calculates Brier, reliability, resolution, uncertainty, ECE and Wilson confidence intervals for confidence/correctness pairs. Use it as an existing analytics reference; avoid adding a second independent copy of these formulas.
+- `crates/domains/symthaea-dishwasher-design/src/observer_evaluation.rs` already demonstrates run-level threshold/risk-coverage reporting, grouped holdouts, false-accept counts, unresolved outcomes and the warning that item-level observations nested within one physical run do not create independent samples. It is a domain-owned implementation, not a direct OLI dependency. Reuse the statistical design; extract a genuinely shared utility only if repeated domain adapters justify a common crate.
+
+### Score conventions that must be explicit
+
+The futures-calibration crate uses the classic multi-class Brier formulation for its forecast outcome branches. For a two-branch complementary Boolean forecast, that score is exactly twice the common binary Brier score ((p-y)^2). Do not compare absolute Brier values across these conventions without documenting the factor-of-two conversion. The OLI benchmark receipt must record the score implementation, version, event class, branch convention and binning rule.
+
+ECE is bin-sensitive and can look artificially good or bad under different fixed-width bins. Report at least 10-bin and 20-bin ECE, reliability diagrams, Brier, log loss, base rate and calibration slope/intercept where applicable. Never use ECE as the only calibration metric.
+
+### Unit of independence and risk/coverage
+
+For morphology, spectra or time-series observations, the unit of independence is the physical sample, preparation/acquisition run or independent source system—not pixels, images, individual filaments, spectra, adjacent time windows, or repeated injections of one sample. Keep all nested observations grouped into one partition.
+
+Report both:
+- challenge false-accept rate among independently known negative systems; and
+- false-release proportion among adjudicable released cases (which is prevalence-dependent).
+
+Keep unresolved ground truth separate: an unresolved case is not a pass or a negative. Where zero-event exact binomial bounds are reported, state the IID assumption and add cluster-aware uncertainty when repeated samples or shared preparations remain. Grouped holdouts prevent cross-partition leakage; they do not make observations within a group independent.
+
+This reuses existing Luminous calibration and risk/coverage foundations while making OLI's validation domain-specific: whole abiotic mechanism families, biological reference strata, preparation runs, preservation regimes, instruments and observability regimes.
 
 ## 4. Provenance and common-cause dependence
 
