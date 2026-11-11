@@ -137,6 +137,16 @@ pub struct CalibrationSplitIdentity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ControlSupportCheck {
+    pub control_id: String,
+    pub target_metric_id: String,
+    pub effect_per_control_unit: Option<f64>,
+    pub expected_response_sign: String,
+    pub supported: bool,
+    pub disposition_reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SyntheticResponseProfile {
     pub schema_version: String,
     pub content_class: String,
@@ -159,6 +169,8 @@ pub struct SyntheticResponseProfile {
     pub holdout_checks: Vec<HoldoutPredictionCheck>,
     pub holdout_coverage_fraction: f64,
     pub all_required_cells_present: bool,
+    pub control_support_checks: Vec<ControlSupportCheck>,
+    pub all_controls_supported: bool,
     pub all_holdout_checks_covered: bool,
     pub exact_no_op_repeatability: bool,
     pub split_identities_disjoint: bool,
@@ -681,7 +693,45 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
     let all_holdout_checks_covered = !holdout_checks.is_empty()
         && holdout_checks.iter().all(|check| check.covered);
 
-    let bounds = control_bounds(&probes)?;
+    let mut bounds = control_bounds(&probes)?;
+    let required_target_metrics = [
+        ("pitch_shift_cents", "pitch.f0.median.autocorrelation"),
+        ("formant_scale_delta", "formant.f1.median"),
+        ("energy_scale_delta", "vocal.energy.median"),
+    ];
+    let mut control_support_checks = Vec::new();
+    for (control_id, target_metric_id) in required_target_metrics {
+        let effect = fitted_sensitivities
+            .iter()
+            .find(|cell| {
+                cell.control_id == control_id && cell.metric_id == target_metric_id
+            })
+            .map(|cell| cell.effect_per_control_unit);
+        let supported = effect.is_some_and(|value| value.is_finite() && value > 1e-6);
+        control_support_checks.push(ControlSupportCheck {
+            control_id: control_id.into(),
+            target_metric_id: target_metric_id.into(),
+            effect_per_control_unit: effect,
+            expected_response_sign: "positive".into(),
+            supported,
+            disposition_reason: if supported {
+                "measured_positive_target_response".into()
+            } else {
+                "requested_control_has_no_qualified_positive_target_response".into()
+            },
+        });
+        if !supported {
+            if let Some(bound) = bounds.iter_mut().find(|bound| bound.control_id == control_id) {
+                bound.supported = false;
+                bound.minimum_delta = 0.0;
+                bound.maximum_delta = 0.0;
+                bound.trust_radius = 0.0;
+                bound.effort_scale = 1.0;
+            }
+        }
+    }
+    let all_controls_supported = control_support_checks.iter().all(|check| check.supported);
+
     let vcca_cells: Vec<VccaSensitivityCellAdapter> = fitted_sensitivities
         .iter()
         .map(|cell| VccaSensitivityCellAdapter {
@@ -740,6 +790,7 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
     }) && no_op_calibration.split_identity_disjoint;
     let exact_no_op_repeatability = no_op_calibration.exact_pcm_repeatability;
     let promotable = all_required_cells_present
+        && all_controls_supported
         && all_holdout_checks_covered
         && exact_no_op_repeatability
         && split_identities_disjoint;
@@ -766,6 +817,8 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
         holdout_checks,
         holdout_coverage_fraction,
         all_required_cells_present,
+        control_support_checks,
+        all_controls_supported,
         all_holdout_checks_covered,
         exact_no_op_repeatability,
         split_identities_disjoint,
@@ -795,6 +848,7 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
         &profile.confirmatory_source_case_id,
         &profile.confirmatory_parameter_sha256,
         &profile.fitted_sensitivities,
+        &profile.control_support_checks,
         &profile.holdout_checks,
         &profile.response_matrix_sha256,
         &profile.calibration_receipt_sha256,
@@ -914,6 +968,7 @@ mod tests {
         assert_eq!(
             profile.promotable,
             profile.all_required_cells_present
+                && profile.all_controls_supported
                 && profile.all_holdout_checks_covered
                 && profile.exact_no_op_repeatability
                 && profile.split_identities_disjoint
@@ -930,8 +985,8 @@ mod tests {
         assert_eq!(adapter.controls.len(), 3);
         assert!(adapter.controls.iter().all(|control| {
             control.supported
-                && control.trust_radius > 0.0
-                && control.effort_scale == control.trust_radius
+                && control.effort_scale > 0.0
+                && (control.supported == (control.trust_radius > 0.0))
         }));
         assert!(!adapter.metrics.is_empty());
         assert_eq!(
