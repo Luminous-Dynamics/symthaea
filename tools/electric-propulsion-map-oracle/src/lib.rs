@@ -35,6 +35,7 @@ pub struct EfficiencyMap2D {
     map_id: String,
     configuration_digest: String,
     context_digest: String,
+    evidence_manifest_digest: String,
     motor_torque_axis_nm: Vec<f64>,
     motor_speed_axis_rpm: Vec<f64>,
     nodes: Vec<MapNode>,
@@ -59,6 +60,7 @@ pub struct MapLookup {
     pub map_id: String,
     pub configuration_digest: String,
     pub context_digest: String,
+    pub evidence_manifest_digest: String,
     pub motor_torque_nm: f64,
     pub motor_speed_rpm: f64,
     pub efficiency: f64,
@@ -104,6 +106,7 @@ impl EfficiencyMap2D {
         map_id: impl Into<String>,
         configuration_digest: impl Into<String>,
         context_digest: impl Into<String>,
+        evidence_manifest_digest: impl Into<String>,
         motor_torque_axis_nm: Vec<f64>,
         motor_speed_axis_rpm: Vec<f64>,
         nodes: Vec<MapNode>,
@@ -112,6 +115,7 @@ impl EfficiencyMap2D {
         let map_id = map_id.into();
         let configuration_digest = configuration_digest.into();
         let context_digest = context_digest.into();
+        let evidence_manifest_digest = evidence_manifest_digest.into();
 
         if map_id.trim().is_empty() {
             return Err(MapError::InvalidMap("map identity must not be empty"));
@@ -124,8 +128,18 @@ impl EfficiencyMap2D {
         if context_digest.trim().is_empty() {
             return Err(MapError::InvalidMap("context digest must not be empty"));
         }
+        if evidence_manifest_digest.trim().is_empty() {
+            return Err(MapError::InvalidMap(
+                "evidence manifest digest must not be empty",
+            ));
+        }
         validate_axis(&motor_torque_axis_nm, "torque")?;
         validate_axis(&motor_speed_axis_rpm, "speed")?;
+        if motor_torque_axis_nm[0] <= 0.0 || motor_speed_axis_rpm[0] <= 0.0 {
+            return Err(MapError::InvalidMap(
+                "motoring map torque and speed axes must be strictly positive",
+            ));
+        }
 
         if !systematic_uncertainty_bound.is_finite()
             || !(0.0..=1.0).contains(&systematic_uncertainty_bound)
@@ -165,6 +179,7 @@ impl EfficiencyMap2D {
             map_id,
             configuration_digest,
             context_digest,
+            evidence_manifest_digest,
             motor_torque_axis_nm,
             motor_speed_axis_rpm,
             nodes,
@@ -184,6 +199,11 @@ impl EfficiencyMap2D {
         if !query.motor_torque_nm.is_finite() || !query.motor_speed_rpm.is_finite() {
             return Err(MapError::InvalidQuery(
                 "motor torque and speed must be finite",
+            ));
+        }
+        if query.motor_torque_nm <= 0.0 || query.motor_speed_rpm <= 0.0 {
+            return Err(MapError::InvalidQuery(
+                "motoring torque and motor speed must be positive",
             ));
         }
 
@@ -231,6 +251,7 @@ impl EfficiencyMap2D {
             map_id: self.map_id.clone(),
             configuration_digest: self.configuration_digest.clone(),
             context_digest: self.context_digest.clone(),
+            evidence_manifest_digest: self.evidence_manifest_digest.clone(),
             motor_torque_nm: query.motor_torque_nm,
             motor_speed_rpm: query.motor_speed_rpm,
             efficiency,
@@ -330,7 +351,8 @@ mod tests {
             "motor-map-test",
             "config-sha-001",
             "context-sha-001",
-            vec![0.0, 10.0],
+            "evidence",
+            vec![1.0, 10.0],
             vec![1_000.0, 2_000.0],
             vec![
                 MapNode {
@@ -377,9 +399,9 @@ mod tests {
     fn exact_grid_corners_return_their_node_values() {
         let map = fixture();
         let cases = [
-            (0.0, 1_000.0, 0.70),
+            (1.0, 1_000.0, 0.70),
             (10.0, 1_000.0, 0.80),
-            (0.0, 2_000.0, 0.90),
+            (1.0, 2_000.0, 0.90),
             (10.0, 2_000.0, 0.95),
         ];
         for (torque, speed, expected) in cases {
@@ -394,7 +416,8 @@ mod tests {
             "constant",
             "config",
             "context",
-            vec![0.0, 5.0, 10.0],
+            "evidence",
+            vec![1.0, 5.0, 10.0],
             vec![1_000.0, 1_500.0, 2_000.0],
             vec![
                 MapNode { efficiency: 0.9, absolute_uncertainty_bound: 0.0 };
@@ -403,7 +426,7 @@ mod tests {
             0.0,
         )
         .unwrap();
-        for (torque, speed) in [(0.0, 1_000.0), (2.5, 1_250.0), (7.0, 1_900.0), (10.0, 2_000.0)] {
+        for (torque, speed) in [(1.0, 1_000.0), (2.5, 1_250.0), (7.0, 1_900.0), (10.0, 2_000.0)] {
             let result = map.lookup(MapQuery {
                 configuration_digest: "config",
                 context_digest: "context",
@@ -417,7 +440,7 @@ mod tests {
     #[test]
     fn out_of_domain_torque_and_speed_are_rejected_without_clamping() {
         let map = fixture();
-        for torque in [-0.001, 10.001] {
+        for torque in [0.999, 10.001] {
             assert!(matches!(
                 map.lookup(query(torque, 1_500.0)),
                 Err(MapError::OutOfDomain { axis: "torque", .. })
@@ -488,6 +511,7 @@ mod tests {
                 "m",
                 "c",
                 "x",
+                "evidence",
                 vec![0.0],
                 vec![1.0, 2.0],
                 base_nodes.clone(),
@@ -497,6 +521,7 @@ mod tests {
                 "m",
                 "c",
                 "x",
+                "evidence",
                 vec![0.0, 0.0],
                 vec![1.0, 2.0],
                 base_nodes.clone(),
@@ -506,6 +531,7 @@ mod tests {
                 "m",
                 "c",
                 "x",
+                "evidence",
                 vec![0.0, f64::NAN],
                 vec![1.0, 2.0],
                 base_nodes.clone(),
@@ -515,6 +541,7 @@ mod tests {
                 "m",
                 "c",
                 "x",
+                "evidence",
                 vec![0.0, 1.0],
                 vec![2.0, 1.0],
                 base_nodes.clone(),
@@ -524,6 +551,7 @@ mod tests {
                 "m",
                 "c",
                 "x",
+                "evidence",
                 vec![0.0, 1.0],
                 vec![1.0, 2.0],
                 base_nodes[..3].to_vec(),
@@ -548,6 +576,7 @@ mod tests {
                     "m",
                     "c",
                     "x",
+                    "evidence",
                     vec![0.0, 1.0],
                     vec![1_000.0, 2_000.0],
                     vec![node; 4],
@@ -575,6 +604,7 @@ mod tests {
                     map_id,
                     config,
                     context,
+                    "evidence",
                     vec![0.0, 1.0],
                     vec![1_000.0, 2_000.0],
                     nodes.clone(),
@@ -589,6 +619,7 @@ mod tests {
                     "m",
                     "c",
                     "x",
+                    "evidence",
                     vec![0.0, 1.0],
                     vec![1_000.0, 2_000.0],
                     nodes.clone(),
@@ -605,6 +636,7 @@ mod tests {
             "grid-lines",
             "config",
             "context",
+            "evidence",
             vec![0.0, 5.0, 10.0],
             vec![1_000.0, 1_500.0, 2_000.0],
             vec![
