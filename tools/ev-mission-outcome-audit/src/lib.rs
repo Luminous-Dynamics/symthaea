@@ -124,6 +124,7 @@ pub struct AuditReport {
     pub conflicting_reference_count: usize,
     pub rejected_reference_count: usize,
     pub synthetic_scorable_count: usize,
+    pub physical_reference_case_count: usize,
     pub physical_scorable_count: usize,
     pub physical_predicted_feasible_count: usize,
     pub physical_false_feasible_count: usize,
@@ -641,26 +642,21 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
     let physical_scorable = physical_predicted_feasible + physical_predicted_infeasible;
     let physical_false_feasible = physical("FALSE_FEASIBLE");
     let physical_false_infeasible = physical("FALSE_INFEASIBLE");
-    let physical_pack_count = cases
+    let physical_reference_case_count = cases
         .iter()
-        .filter(|row| {
-            row.evidence_class == "INDEPENDENT_PHYSICAL_REFERENCE"
-                && row.scoring_eligible
-        })
-        .map(|row| row.pack_ref.clone())
-        .collect::<BTreeSet<_>>()
-        .len();
+        .filter(|row| row.evidence_class == "INDEPENDENT_PHYSICAL_REFERENCE")
+        .count();
+    let has_synthetic_references = cases
+        .iter()
+        .any(|row| row.evidence_class == "SYNTHETIC_KNOWN_TRUTH");
 
-    let source_grade = if physical_scorable == 0 {
-        "SYNTHETIC_ONLY".to_owned()
-    } else if cases
-        .iter()
-        .any(|row| row.evidence_class == "SYNTHETIC_KNOWN_TRUTH")
-    {
-        "MIXED_SYNTHETIC_AND_PHYSICAL_REFERENCE".to_owned()
-    } else {
-        "INDEPENDENT_PHYSICAL_REFERENCE_PRESENT".to_owned()
-    };
+    let source_grade = match (physical_reference_case_count > 0, has_synthetic_references) {
+        (false, true) => "SYNTHETIC_ONLY",
+        (true, true) => "MIXED_SYNTHETIC_AND_PHYSICAL_REFERENCE_INPUTS",
+        (true, false) => "PHYSICAL_REFERENCE_INPUTS_PRESENT_NOT_A_QUALIFICATION",
+        (false, false) => "NO_REFERENCE_CLASSIFIED",
+    }
+    .to_owned();
 
     let mut report = AuditReport {
         corpus_version: corpus.corpus_version,
@@ -679,6 +675,7 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
             + synthetic("FALSE_FEASIBLE")
             + synthetic("TRUE_INFEASIBLE")
             + synthetic("FALSE_INFEASIBLE"),
+        physical_reference_case_count,
         physical_scorable_count: physical_scorable,
         physical_predicted_feasible_count: physical_predicted_feasible,
         physical_false_feasible_count: physical_false_feasible,
@@ -708,20 +705,6 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
     let report_bytes = serde_json::to_vec(&report)
         .map_err(|error| format!("report serialization: {error}"))?;
     report.report_sha256 = sha256(&report_bytes);
-    if physical_pack_count
-        != report
-            .cases
-            .iter()
-            .filter(|row| {
-                row.evidence_class == "INDEPENDENT_PHYSICAL_REFERENCE"
-                    && row.scoring_eligible
-            })
-            .map(|row| row.pack_ref.clone())
-            .collect::<BTreeSet<_>>()
-            .len()
-    {
-        return Err("physical pack-level independence check failed".to_owned());
-    }
     Ok(report)
 }
 
