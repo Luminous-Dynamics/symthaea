@@ -217,6 +217,16 @@ The schema is `EXPERIMENT_VALUE_TRACE_V0_1.schema.json`; the Rust implementation
 
 **Important limit:** a hash chain alone does not prove when an event was created. To make a forecast genuinely prospective, the event digest must be anchored outside the agent process at proposal time (for example, by a trusted timestamping/signing service or independently controlled append-only recorder). The current module validates structure and internal hash consistency only; it does not provide trusted time, signer identity or WORM storage.
 
+## Bounded sequential experiment planning
+
+The Rust library now includes `sequential_decision_value.rs`, an exact finite-horizon policy-tree solver. At each evidence state it compares stopping with every affordable unused experiment. It enumerates the declared experiment outcomes, updates the hypothesis distribution by Bayes' rule, and chooses a separate follow-up action for each outcome. The objective is expected terminal decision utility less experiment cost and the declared risk penalty.
+
+The key research distinction is **complementary information**: an experiment can have zero one-step EVSI because it does not change the current best action, yet still be valuable as the first step of a sequence when its outcome determines how a later experiment should be interpreted. The synthetic complementarity test contains two orthogonal probes: each alone is decision-irrelevant, but both together identify the correct action. The bounded two-step planner finds the sequence that the greedy one-step EVSI arm rejects.
+
+Each node of the returned policy tree records the action (stop or probe), outcome branch probability, continuation tree, expected experiment count, expected cost and risk. Every candidate is validated before affordability filtering; an experiment can occur at most once on a path; when no probe has positive net continuation value, the policy stops. Empty candidate sets and horizons larger than the available probes stop cleanly.
+
+This is **exact enumeration for a supplied finite discrete model and a bounded horizon**, not a general POMDP solver or a guarantee outside the declared likelihoods/utilities. It can grow exponentially with horizon and outcomes; use it as a small-world baseline or verifier, then compare approximate planners under the same budgets. The uncertainty of the supplied priors, likelihoods and utilities still needs robust-EVSI or calibrated model-set treatment. All current tests are synthetic algorithm controls; no ACED world or model trial has run.
+
 ## Sample-size-aware categorical shift diagnostics
 
 The ACED-Query Active agent currently summarizes interventional-versus-observational category-frequency differences using a fixed two-percentage-point display threshold, and its cross-condition summary uses a five-point maximum-delta threshold. These are descriptive heuristics, not inferential tests: the same absolute shift has different uncertainty at (n=10) and (n=1{,}000), and examining many variables/categories increases the chance of false alarms.
