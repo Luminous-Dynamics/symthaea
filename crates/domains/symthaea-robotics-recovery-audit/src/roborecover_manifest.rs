@@ -273,7 +273,7 @@ fn expected_path(
 }
 
 fn git_blob_sha1_hex(bytes: &[u8]) -> String {
-    let header = format!("blob {}\\0", bytes.len());
+    let header = format!("blob {}\0", bytes.len());
     let mut hasher = Sha1::new();
     hasher.update(header.as_bytes());
     hasher.update(bytes);
