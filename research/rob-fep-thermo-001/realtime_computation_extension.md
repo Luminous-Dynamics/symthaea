@@ -60,3 +60,12 @@ Targets (not achieved):
 - Report null results; simpler policies may be better when additional reasoning cannot change the decision.
 
 No benchmark score confers actuator authority. RTA/HAL remains independent.
+
+
+## Synthetic known-answer corpus
+
+The wall-clock / stale-action extension has ten machine-readable cases:
+- [fixtures/realtime_cognition_v0_1.json](./fixtures/realtime_cognition_v0_1.json)
+- [fixtures/realtime_cognition_v0_1.schema.json](./fixtures/realtime_cognition_v0_1.schema.json)
+
+The corpus distinguishes frozen-world upper bounds, stale proposals, valid-but-not-yet-authorized proposals, missed deadlines, direct-policy wins after latency costs, anytime-plan expiry, compute thermal throttling, clock uncertainty, no model value-add, and simulation-time-only evidence. It is synthetic and does not itself qualify a runtime clock, hardware deadline or controller.
