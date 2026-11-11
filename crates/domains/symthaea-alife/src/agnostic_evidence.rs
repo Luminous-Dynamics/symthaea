@@ -310,23 +310,19 @@ impl EvidenceConflict {
             issues.push(format!("{path} requires contradicting evidence ids"));
         }
 
-        let mut seen = HashSet::new();
-        let mut supporting_groups = HashSet::new();
-        let mut contradicting_groups = HashSet::new();
+        let mut seen = HashSet::<String>::new();
+        let mut supporting_groups = HashSet::<String>::new();
+        let mut contradicting_groups = HashSet::<String>::new();
         let mut groups_complete = true;
 
         for (side, ids, groups) in [
             ("supporting", &self.supporting_evidence_ids, &mut supporting_groups),
             ("contradicting", &self.contradicting_evidence_ids, &mut contradicting_groups),
         ] {
-            let mut side_seen = HashSet::new();
             for id in ids {
-                if !side_seen.insert(id.as_str()) {
-                    issues.push(format!("{path}.{side}_evidence_ids contains duplicate id {id}"));
-                }
-                if !seen.insert(id.as_str()) {
+                if !seen.insert(id.clone()) {
                     issues.push(format!(
-                        "{path} evidence id {id} appears on both sides of the conflict"
+                        "{path} evidence id {id} is duplicated or appears on both sides of the conflict"
                     ));
                 }
                 if !property_evidence_ids.iter().any(|property_id| property_id == id) {
@@ -337,7 +333,7 @@ impl EvidenceConflict {
                 match evidence.iter().find(|record| record.id == *id) {
                     Some(record) => match &record.independence_group {
                         Some(group) if !group.trim().is_empty() => {
-                            groups.insert(group.as_str());
+                            groups.insert(group.clone());
                         }
                         _ => groups_complete = false,
                     },
