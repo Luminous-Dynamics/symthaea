@@ -1,0 +1,621 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-pack-capability-metrics/0.2",
+  "title": "EV pack inconsistency metrics profile v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_version",
+    "profile_id",
+    "asset",
+    "population",
+    "topology",
+    "reference_conditions",
+    "provenance",
+    "units"
+  ],
+  "properties": {
+    "profile_version": {
+      "const": "ev-pack-capability-metrics/0.2"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vehicle_ref",
+        "vehicle_configuration_digest",
+        "pack_ref",
+        "pack_configuration_digest",
+        "chemistry"
+      ],
+      "properties": {
+        "vehicle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vehicle_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "pack_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "chemistry": {
+          "enum": [
+            "lfp",
+            "lmfp",
+            "nmc",
+            "nca",
+            "lco",
+            "sodium_ion",
+            "other",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "population": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_resolution",
+        "declared_unit_count",
+        "observed_unit_count",
+        "inventory_digest"
+      ],
+      "properties": {
+        "comparison_resolution": {
+          "enum": [
+            "cell",
+            "parallel_group",
+            "module"
+          ]
+        },
+        "declared_unit_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "observed_unit_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "inventory_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "architecture",
+        "topology_ref",
+        "topology_digest"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "qualified",
+            "unknown"
+          ]
+        },
+        "architecture": {
+          "enum": [
+            "series_single_parallel",
+            "series_parallel",
+            "parallel_only",
+            "unknown"
+          ]
+        },
+        "topology_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "topology_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "qualification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "qualification_ref",
+            "authority_ref",
+            "evidence_digest",
+            "evidence_class"
+          ],
+          "properties": {
+            "qualification_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "authority_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "evidence_class": {
+              "enum": [
+                "reference_test_measurement",
+                "derived_estimate",
+                "model_prediction",
+                "simulation_output",
+                "synthetic_fixture",
+                "vendor_claim"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "reference_conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacity",
+        "resistance"
+      ],
+      "properties": {
+        "capacity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "condition_ref",
+            "temperature_c",
+            "c_rate",
+            "lower_cutoff_voltage_v",
+            "upper_cutoff_voltage_v",
+            "protocol_ref",
+            "protocol_digest",
+            "maximum_measurement_skew_ms",
+            "condition_digest"
+          ],
+          "properties": {
+            "condition_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "temperature_c": {
+              "type": "number"
+            },
+            "c_rate": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "lower_cutoff_voltage_v": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "upper_cutoff_voltage_v": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "protocol_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "protocol_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "maximum_measurement_skew_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "condition_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "resistance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "condition_ref",
+            "temperature_c",
+            "soc_fraction",
+            "pulse_current_a",
+            "pulse_duration_ms",
+            "protocol_ref",
+            "protocol_digest"
+          ],
+          "properties": {
+            "condition_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "temperature_c": {
+              "type": "number"
+            },
+            "soc_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "pulse_current_a": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "pulse_duration_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "protocol_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "protocol_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_batch_digest",
+        "analysis_method_ref",
+        "analysis_method_digest"
+      ],
+      "properties": {
+        "source_batch_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "analysis_method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analysis_method_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "units": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unit_ref",
+          "nominal_capacity_ah",
+          "capacity",
+          "resistance"
+        ],
+        "properties": {
+          "unit_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nominal_capacity_ah": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "capacity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "value_ah",
+              "uncertainty_ah",
+              "evidence_class",
+              "method",
+              "evidence_digest",
+              "condition_ref",
+              "measurement_time_ms"
+            ],
+            "properties": {
+              "value_ah": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "uncertainty_ah": {
+                "type": "number",
+                "minimum": 0
+              },
+              "evidence_class": {
+                "enum": [
+                  "reference_test_measurement",
+                  "derived_estimate",
+                  "model_prediction",
+                  "simulation_output",
+                  "synthetic_fixture",
+                  "vendor_claim"
+                ]
+              },
+              "method": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "condition_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "measurement_time_ms": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "resistance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "value_mohm",
+              "uncertainty_mohm",
+              "evidence_class",
+              "method",
+              "evidence_digest",
+              "condition_ref"
+            ],
+            "properties": {
+              "value_mohm": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "uncertainty_mohm": {
+                "type": "number",
+                "minimum": 0
+              },
+              "evidence_class": {
+                "enum": [
+                  "reference_test_measurement",
+                  "derived_estimate",
+                  "model_prediction",
+                  "simulation_output",
+                  "synthetic_fixture",
+                  "vendor_claim"
+                ]
+              },
+              "method": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "condition_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "soc_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_type",
+        "snapshot_ref",
+        "pack_configuration_digest",
+        "condition_ref",
+        "maximum_sample_skew_ms",
+        "snapshot_digest",
+        "observations",
+        "maximum_soh_measurement_age_ms",
+        "protocol_digest",
+        "condition_digest"
+      ],
+      "properties": {
+        "event_type": {
+          "const": "end_of_charge"
+        },
+        "snapshot_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "condition_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maximum_sample_skew_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "snapshot_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "unit_ref",
+              "soc_fraction",
+              "sample_time_ms",
+              "evidence_digest",
+              "evidence_class",
+              "soh_measurement_digest"
+            ],
+            "properties": {
+              "unit_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "soc_fraction": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "sample_time_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "evidence_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "evidence_class": {
+                "enum": [
+                  "reference_test_measurement",
+                  "derived_estimate",
+                  "model_prediction",
+                  "simulation_output",
+                  "synthetic_fixture",
+                  "vendor_claim"
+                ]
+              },
+              "soh_measurement_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        },
+        "maximum_soh_measurement_age_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "protocol_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "condition_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "lifetime_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eol_rule_ref",
+        "eol_threshold_soh_fraction",
+        "evidence_digest",
+        "units",
+        "pack_configuration_digest",
+        "eol_rule_digest",
+        "service_history_digest",
+        "efc_method_ref",
+        "efc_method_digest"
+      ],
+      "properties": {
+        "eol_rule_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "eol_threshold_soh_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "evidence_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "unit_ref",
+              "status",
+              "efc_to_eol",
+              "eol_event_ref",
+              "evidence_digest",
+              "evidence_class"
+            ],
+            "properties": {
+              "unit_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "observed_eol",
+                  "right_censored",
+                  "unknown"
+                ]
+              },
+              "efc_to_eol": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "eol_event_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "evidence_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "evidence_class": {
+                "enum": [
+                  "reference_test_measurement",
+                  "derived_estimate",
+                  "model_prediction",
+                  "simulation_output",
+                  "synthetic_fixture",
+                  "vendor_claim"
+                ]
+              }
+            }
+          }
+        },
+        "pack_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "eol_rule_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "service_history_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "efc_method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "efc_method_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

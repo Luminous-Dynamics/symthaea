@@ -1,0 +1,46 @@
+name: EV pack capability metrics v0.2 audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_PACK_CAPABILITY_METRICS_V0_2.md"
+      - "schemas/transport/ev_pack_capability_metrics_v0_2.schema.json"
+      - "fixtures/ev_battery/pack_capability_metrics_v0_2.json"
+      - "tools/ev-pack-capability-metrics-audit/**"
+      - ".github/workflows/ev-pack-capability-metrics-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-pack-capability-metrics-audit/Cargo.toml -- --check
+
+      - name: Run metrics and mutation tests
+        run: cargo test --manifest-path tools/ev-pack-capability-metrics-audit/Cargo.toml
+
+      - name: Audit frozen synthetic corpus
+        run: |
+          cargo run --manifest-path tools/ev-pack-capability-metrics-audit/Cargo.toml -- \
+            --schema schemas/transport/ev_pack_capability_metrics_v0_2.schema.json \
+            --corpus fixtures/ev_battery/pack_capability_metrics_v0_2.json \
+            > "$RUNNER_TEMP/ev-pack-capability-metrics-report.json"
+          jq -e '
+            .case_count == 12 and
+            .accepted_count == 7 and
+            .rejected_count == 5 and
+            (.report_sha256 | test("^[a-f0-9]{64}$")) and
+            any(.cases[]; .case_id == "complete-qualified-series-pack" and
+              .summary.inconsistency_metrics.sigma_soh.status == "COMPUTED")
+          ' "$RUNNER_TEMP/ev-pack-capability-metrics-report.json"
