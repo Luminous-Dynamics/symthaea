@@ -2,8 +2,8 @@
   "schema_version": "action-context-alignment-model-trial-results-v0.1",
   "benchmark_id": "ACTION-CONTEXT-ALIGNMENT-001",
   "status": "synthetic_golden_control_not_model_trial",
-  "dataset_sha256": "000000000000000000000000000000000000000000000000000000000000abcd",
-  "protocol_sha256": "000000000000000000000000000000000000000000000000000000000000bcde",
+  "dataset_sha256": "3be31d65983e6dae7267d7cc638cd7236a30c605b6e78b1face6c4d5182d954c",
+  "protocol_sha256": "de783f1470f6c151cc64dd81faf4dabf189d8cb3199114669bdeb2f904786398",
   "model_profile": {
     "provider": "none-synthetic",
     "model_id": "deterministic-golden-policy-oracle",
