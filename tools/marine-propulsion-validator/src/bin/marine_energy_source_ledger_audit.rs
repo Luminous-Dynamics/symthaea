@@ -333,7 +333,7 @@ fn run() -> Result<i32, String> {
         ledger_id: ledger.get("ledger_id").and_then(Value::as_str).map(str::to_owned),
         disposition: findings.disposition(),
         accounting_basis: "research_source_input_boundary_v1",
-        energy_unit: "micro_gj (1 micro_gj = 1 joule)",
+        energy_unit: "micro-GJ (1 micro-GJ = 1,000 joules = 1 kJ)",
         known_subtotal_micro_gj: computation.known_subtotal_micro_gj,
         total_source_input_micro_gj: computation.total_source_input_micro_gj,
         included_source_ids: computation.included_source_ids,
@@ -367,6 +367,11 @@ mod tests {
 
     fn fixture() -> Value {
         serde_json::from_str(LEDGER_FIXTURE).expect("ledger fixture JSON")
+    }
+
+    #[test]
+    fn micro_gj_is_one_kilojoule_not_one_joule() {
+        assert_eq!(1.0e-6 * 1.0e9, 1_000.0);
     }
 
     #[test]
