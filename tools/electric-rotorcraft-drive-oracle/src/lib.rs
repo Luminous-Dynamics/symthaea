@@ -21,7 +21,7 @@
 use std::f64::consts::TAU;
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.5.0";
+pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.6.0";
 
 /// Explicit operating-point efficiencies and bus limits.
 ///
@@ -199,6 +199,93 @@ pub struct DriveMapEnvelope {
     pub nominal_efficiency_scenario: Result<DriveReport, DriveError>,
     /// Highest efficiency / lowest DC demand. Typed failures remain visible.
     pub favourable_efficiency_scenario: Result<DriveReport, DriveError>,
+}
+
+
+/// One declared, constant-operating-point propulsion interval in a frozen
+/// mission profile. Gaps between intervals remain explicitly unmodelled.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MissionDriveSegmentInput {
+    pub segment_id: String,
+    pub start_timestamp_ns: u64,
+    pub end_timestamp_ns: u64,
+    pub rotor_shaft_torque_nm: f64,
+    pub rotor_speed_rpm: f64,
+    pub dc_bus_voltage_v: f64,
+    pub transmission: TransmissionKinematics,
+    pub context_digest: String,
+    pub motor_efficiency_evidence: MotorEfficiencyEvidence,
+}
+
+/// A gap in the supplied propulsion profile. It is not treated as zero demand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MissionUnmodelledInterval {
+    pub start_timestamp_ns: u64,
+    pub end_timestamp_ns: u64,
+    pub duration_ns: u64,
+}
+
+/// Per-segment pointwise evaluation with the exact map/evidence envelope retained.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MissionDriveSegmentReport {
+    pub segment_id: String,
+    pub start_timestamp_ns: u64,
+    pub end_timestamp_ns: u64,
+    pub duration_s: f64,
+    pub dc_bus_voltage_v: f64,
+    pub evaluation: Result<DriveMapEnvelope, DriveError>,
+}
+
+/// Aggregate for one efficiency scenario over all segments of one drive path.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MissionDriveScenarioSummary {
+    pub segment_count: usize,
+    pub active_duration_s: f64,
+    pub rotor_shaft_energy_j: f64,
+    pub transmission_loss_energy_j: f64,
+    pub motor_loss_energy_j: f64,
+    pub inverter_loss_energy_j: f64,
+    pub total_conversion_loss_energy_j: f64,
+    pub dc_bus_input_energy_j: f64,
+    pub average_dc_bus_power_w: f64,
+    pub peak_dc_bus_power_w: f64,
+    pub peak_dc_bus_current_a: f64,
+}
+
+/// A segment-specific failure. One failed segment does not get hidden by other
+/// feasible segments or by a mission-average power result.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MissionDriveSegmentFailure {
+    pub segment_id: String,
+    pub error: DriveError,
+}
+
+/// Profile-wide result for one propulsion drive path. Three scenario summaries
+/// are independently qualified; a scenario fails if any segment fails.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MissionDriveProfileReport {
+    pub model_version: &'static str,
+    pub drive_path_id: String,
+    pub configuration_digest: String,
+    pub start_timestamp_ns: u64,
+    pub end_timestamp_ns: u64,
+    pub elapsed_duration_s: f64,
+    pub active_duration_s: f64,
+    pub unmodelled_gap_duration_s: f64,
+    pub unmodelled_intervals: Vec<MissionUnmodelledInterval>,
+    pub segments: Vec<MissionDriveSegmentReport>,
+    pub adverse_scenario: Result<MissionDriveScenarioSummary, Vec<MissionDriveSegmentFailure>>,
+    pub nominal_scenario: Result<MissionDriveScenarioSummary, Vec<MissionDriveSegmentFailure>>,
+    pub favourable_scenario: Result<MissionDriveScenarioSummary, Vec<MissionDriveSegmentFailure>>,
+}
+
+/// Structural failures in a mission profile, before pointwise drive evaluation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MissionDriveProfileError {
+    InvalidProfile(&'static str),
+    DuplicateSegmentId,
+    SegmentOrderOrOverlap,
+    NumericalOverflow,
 }
 
 /// Explicit non-PASS outcomes for unsupported or infeasible operating points.
@@ -544,6 +631,246 @@ pub fn evaluate_drive_with_map_evidence(
     })
 }
 
+
+/// Evaluate a frozen piecewise-constant propulsion demand profile for one drive
+/// path. Each segment uses its own context-bound motor-map efficiency envelope.
+/// Time gaps are returned as unmodelled intervals, never treated as zero demand.
+pub fn evaluate_mission_drive_profile(
+    config: &DriveConfig,
+    drive_path_id: &str,
+    expected_configuration_digest: &str,
+    segments: &[MissionDriveSegmentInput],
+) -> Result<MissionDriveProfileReport, MissionDriveProfileError> {
+    if drive_path_id.trim().is_empty() || expected_configuration_digest.trim().is_empty() {
+        return Err(MissionDriveProfileError::InvalidProfile(
+            "drive-path and aircraft-configuration identities are required",
+        ));
+    }
+    if segments.is_empty() {
+        return Err(MissionDriveProfileError::InvalidProfile(
+            "at least one propulsion segment is required",
+        ));
+    }
+
+    let mut ids = std::collections::BTreeSet::new();
+    let mut reports = Vec::with_capacity(segments.len());
+    let mut gaps = Vec::new();
+    let mut active_duration_s = 0.0;
+    let mut gap_duration_ns = 0u64;
+    let mut previous_end: Option<u64> = None;
+
+    for segment in segments {
+        if segment.segment_id.trim().is_empty() || segment.context_digest.trim().is_empty() {
+            return Err(MissionDriveProfileError::InvalidProfile(
+                "segment and operating-context identities must not be empty",
+            ));
+        }
+        if !ids.insert(segment.segment_id.clone()) {
+            return Err(MissionDriveProfileError::DuplicateSegmentId);
+        }
+        if segment.end_timestamp_ns <= segment.start_timestamp_ns {
+            return Err(MissionDriveProfileError::InvalidProfile(
+                "each segment must have positive duration",
+            ));
+        }
+        if let Some(end) = previous_end {
+            if segment.start_timestamp_ns < end {
+                return Err(MissionDriveProfileError::SegmentOrderOrOverlap);
+            }
+            if segment.start_timestamp_ns > end {
+                let gap_ns = segment.start_timestamp_ns - end;
+                gap_duration_ns = gap_duration_ns
+                    .checked_add(gap_ns)
+                    .ok_or(MissionDriveProfileError::NumericalOverflow)?;
+                gaps.push(MissionUnmodelledInterval {
+                    start_timestamp_ns: end,
+                    end_timestamp_ns: segment.start_timestamp_ns,
+                    duration_ns: gap_ns,
+                });
+            }
+        }
+
+        let duration_ns = segment.end_timestamp_ns - segment.start_timestamp_ns;
+        let duration_s = duration_ns as f64 / 1_000_000_000.0;
+        if !duration_s.is_finite() || duration_s <= 0.0 {
+            return Err(MissionDriveProfileError::NumericalOverflow);
+        }
+        if !active_duration_s.is_finite() || !(active_duration_s + duration_s).is_finite() {
+            return Err(MissionDriveProfileError::NumericalOverflow);
+        }
+        active_duration_s += duration_s;
+
+        let input = DriveInput {
+            rotor_shaft_torque_nm: segment.rotor_shaft_torque_nm,
+            rotor_speed_rpm: segment.rotor_speed_rpm,
+            dc_bus_voltage_v: segment.dc_bus_voltage_v,
+            duration_s,
+        };
+        let expected_context = DriveMapExpectedContext {
+            configuration_digest: expected_configuration_digest,
+            context_digest: &segment.context_digest,
+        };
+        let evaluation = evaluate_drive_with_map_evidence(
+            config,
+            input,
+            segment.transmission,
+            expected_context,
+            &segment.motor_efficiency_evidence,
+        );
+
+        reports.push(MissionDriveSegmentReport {
+            segment_id: segment.segment_id.clone(),
+            start_timestamp_ns: segment.start_timestamp_ns,
+            end_timestamp_ns: segment.end_timestamp_ns,
+            duration_s,
+            dc_bus_voltage_v: segment.dc_bus_voltage_v,
+            evaluation,
+        });
+        previous_end = Some(segment.end_timestamp_ns);
+    }
+
+    let start_timestamp_ns = segments[0].start_timestamp_ns;
+    let end_timestamp_ns = segments[segments.len() - 1].end_timestamp_ns;
+    let elapsed_ns = end_timestamp_ns
+        .checked_sub(start_timestamp_ns)
+        .ok_or(MissionDriveProfileError::NumericalOverflow)?;
+    let elapsed_duration_s = elapsed_ns as f64 / 1_000_000_000.0;
+    let unmodelled_gap_duration_s = gap_duration_ns as f64 / 1_000_000_000.0;
+
+    fn summarize_scenario(
+        segments: &[MissionDriveSegmentReport],
+        select: fn(&DriveMapEnvelope) -> &Result<DriveReport, DriveError>,
+        active_duration_s: f64,
+    ) -> Result<MissionDriveScenarioSummary, Vec<MissionDriveSegmentFailure>> {
+        let mut failures = Vec::new();
+        let mut summary = MissionDriveScenarioSummary {
+            segment_count: segments.len(),
+            active_duration_s,
+            rotor_shaft_energy_j: 0.0,
+            transmission_loss_energy_j: 0.0,
+            motor_loss_energy_j: 0.0,
+            inverter_loss_energy_j: 0.0,
+            total_conversion_loss_energy_j: 0.0,
+            dc_bus_input_energy_j: 0.0,
+            average_dc_bus_power_w: 0.0,
+            peak_dc_bus_power_w: 0.0,
+            peak_dc_bus_current_a: 0.0,
+        };
+
+        for segment in segments {
+            let evaluated = match &segment.evaluation {
+                Ok(envelope) => select(envelope),
+                Err(error) => {
+                    failures.push(MissionDriveSegmentFailure {
+                        segment_id: segment.segment_id.clone(),
+                        error: error.clone(),
+                    });
+                    continue;
+                }
+            };
+            let report = match evaluated {
+                Ok(report) => report,
+                Err(error) => {
+                    failures.push(MissionDriveSegmentFailure {
+                        segment_id: segment.segment_id.clone(),
+                        error: error.clone(),
+                    });
+                    continue;
+                }
+            };
+
+            let energy_values = [
+                report.rotor_shaft_energy_j,
+                report.transmission_loss_energy_j,
+                report.motor_loss_energy_j,
+                report.inverter_loss_energy_j,
+                report.dc_bus_input_energy_j,
+            ];
+            if energy_values.iter().any(|value| !value.is_finite() || *value < 0.0) {
+                failures.push(MissionDriveSegmentFailure {
+                    segment_id: segment.segment_id.clone(),
+                    error: DriveError::NumericalOverflow,
+                });
+                continue;
+            }
+
+            summary.rotor_shaft_energy_j += report.rotor_shaft_energy_j;
+            summary.transmission_loss_energy_j += report.transmission_loss_energy_j;
+            summary.motor_loss_energy_j += report.motor_loss_energy_j;
+            summary.inverter_loss_energy_j += report.inverter_loss_energy_j;
+            summary.dc_bus_input_energy_j += report.dc_bus_input_energy_j;
+            summary.peak_dc_bus_power_w =
+                summary.peak_dc_bus_power_w.max(report.dc_bus_input_power_w);
+            summary.peak_dc_bus_current_a =
+                summary.peak_dc_bus_current_a.max(report.dc_bus_current_a);
+        }
+
+        if !failures.is_empty() {
+            return Err(failures);
+        }
+
+        summary.total_conversion_loss_energy_j = summary.transmission_loss_energy_j
+            + summary.motor_loss_energy_j
+            + summary.inverter_loss_energy_j;
+        summary.average_dc_bus_power_w =
+            summary.dc_bus_input_energy_j / summary.active_duration_s;
+        let totals = [
+            summary.rotor_shaft_energy_j,
+            summary.transmission_loss_energy_j,
+            summary.motor_loss_energy_j,
+            summary.inverter_loss_energy_j,
+            summary.total_conversion_loss_energy_j,
+            summary.dc_bus_input_energy_j,
+            summary.average_dc_bus_power_w,
+            summary.peak_dc_bus_power_w,
+            summary.peak_dc_bus_current_a,
+        ];
+        if totals.iter().any(|value| !value.is_finite() || *value < 0.0) {
+            return Err(vec![MissionDriveSegmentFailure {
+                segment_id: segments
+                    .last()
+                    .map(|segment| segment.segment_id.clone())
+                    .unwrap_or_default(),
+                error: DriveError::NumericalOverflow,
+            }]);
+        }
+
+        Ok(summary)
+    }
+
+    let adverse_scenario = summarize_scenario(
+        &reports,
+        |envelope| &envelope.adverse_efficiency_scenario,
+        active_duration_s,
+    );
+    let nominal_scenario = summarize_scenario(
+        &reports,
+        |envelope| &envelope.nominal_efficiency_scenario,
+        active_duration_s,
+    );
+    let favourable_scenario = summarize_scenario(
+        &reports,
+        |envelope| &envelope.favourable_efficiency_scenario,
+        active_duration_s,
+    );
+
+    Ok(MissionDriveProfileReport {
+        model_version: MODEL_VERSION,
+        drive_path_id: drive_path_id.to_owned(),
+        configuration_digest: expected_configuration_digest.to_owned(),
+        start_timestamp_ns,
+        end_timestamp_ns,
+        elapsed_duration_s,
+        active_duration_s,
+        unmodelled_gap_duration_s,
+        unmodelled_intervals: gaps,
+        segments: reports,
+        adverse_scenario,
+        nominal_scenario,
+        favourable_scenario,
+    })
+}
+
 /// Evaluate the existing rotor-side drive-chain reference and derive the motor
 /// shaft operating point using an explicit gearbox speed ratio.
 ///
@@ -627,6 +954,389 @@ mod tests {
             efficiency_nominal: 0.95,
             efficiency_upper_bound: 0.98,
         }
+    }
+
+    fn mission_segment(
+        segment_id: &str,
+        start_timestamp_ns: u64,
+        end_timestamp_ns: u64,
+        rotor_power_w: f64,
+        model: &DriveConfig,
+        transmission: TransmissionKinematics,
+        context_digest: &str,
+    ) -> MissionDriveSegmentInput {
+        let duration_s =
+            (end_timestamp_ns - start_timestamp_ns) as f64 / 1_000_000_000.0;
+        let input = input_for_power(rotor_power_w, 400.0, duration_s);
+        let mut evidence = map_evidence(model, input, transmission);
+        evidence.context_digest = context_digest.to_owned();
+        MissionDriveSegmentInput {
+            segment_id: segment_id.to_owned(),
+            start_timestamp_ns,
+            end_timestamp_ns,
+            rotor_shaft_torque_nm: input.rotor_shaft_torque_nm,
+            rotor_speed_rpm: input.rotor_speed_rpm,
+            dc_bus_voltage_v: input.dc_bus_voltage_v,
+            transmission,
+            context_digest: context_digest.to_owned(),
+            motor_efficiency_evidence: evidence,
+        }
+    }
+
+    #[test]
+    fn one_segment_mission_matches_closed_form_energy_envelope() {
+        let mut model = config();
+        model.transmission_efficiency = 0.90;
+        model.inverter_efficiency = 0.98;
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 5.0,
+        };
+        let segment = mission_segment(
+            "climb",
+            0,
+            10_000_000_000,
+            10_000.0,
+            &model,
+            transmission,
+            "climb-context",
+        );
+        let result = evaluate_mission_drive_profile(
+            &model,
+            "left-propulsor",
+            "aircraft-config-sha256",
+            &[segment],
+        )
+        .unwrap();
+
+        let adverse = result.adverse_scenario.unwrap();
+        let nominal = result.nominal_scenario.unwrap();
+        let favourable = result.favourable_scenario.unwrap();
+        let expected_adverse = 10_000.0 / (0.90 * 0.90 * 0.98) * 10.0;
+        let expected_nominal = 10_000.0 / (0.90 * 0.95 * 0.98) * 10.0;
+        let expected_favourable = 10_000.0 / (0.90 * 0.98 * 0.98) * 10.0;
+        assert!((adverse.dc_bus_input_energy_j - expected_adverse).abs() < 1.0e-6);
+        assert!((nominal.dc_bus_input_energy_j - expected_nominal).abs() < 1.0e-6);
+        assert!((favourable.dc_bus_input_energy_j - expected_favourable).abs() < 1.0e-6);
+        assert_eq!(result.active_duration_s, 10.0);
+        assert_eq!(result.unmodelled_gap_duration_s, 0.0);
+        assert_eq!(result.segments.len(), 1);
+        assert_eq!(result.segments[0].dc_bus_voltage_v, 400.0);
+    }
+
+    #[test]
+    fn multiple_mission_segments_sum_energy_and_preserve_context() {
+        let mut model = config();
+        model.transmission_efficiency = 0.90;
+        model.inverter_efficiency = 0.98;
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 5.0,
+        };
+        let first = mission_segment(
+            "climb",
+            0,
+            10_000_000_000,
+            10_000.0,
+            &model,
+            transmission,
+            "hot-climb-context",
+        );
+        let second = mission_segment(
+            "cruise",
+            10_000_000_000,
+            30_000_000_000,
+            5_000.0,
+            &model,
+            transmission,
+            "cruise-context",
+        );
+        let result = evaluate_mission_drive_profile(
+            &model,
+            "left-propulsor",
+            "aircraft-config-sha256",
+            &[first, second],
+        )
+        .unwrap();
+        let adverse = result.adverse_scenario.unwrap();
+        let expected = 10_000.0 / (0.90 * 0.90 * 0.98) * 10.0
+            + 5_000.0 / (0.90 * 0.90 * 0.98) * 20.0;
+        assert!((adverse.dc_bus_input_energy_j - expected).abs() < 1.0e-6);
+        assert_eq!(adverse.segment_count, 2);
+        assert_eq!(adverse.active_duration_s, 30.0);
+        assert_eq!(
+            result.segments[0]
+                .evaluation
+                .as_ref()
+                .unwrap()
+                .context_digest,
+            "hot-climb-context"
+        );
+        assert_eq!(
+            result.segments[1]
+                .evaluation
+                .as_ref()
+                .unwrap()
+                .context_digest,
+            "cruise-context"
+        );
+    }
+
+    #[test]
+    fn adverse_segment_limit_failure_is_not_hidden_by_mission_average() {
+        let mut model = config();
+        model.transmission_efficiency = 0.90;
+        model.inverter_efficiency = 0.98;
+        model.maximum_dc_bus_power_w = 12_000.0;
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 5.0,
+        };
+        let high = mission_segment(
+            "high-power-climb",
+            0,
+            5_000_000_000,
+            10_000.0,
+            &model,
+            transmission,
+            "climb-context",
+        );
+        let low = mission_segment(
+            "low-power-cruise",
+            5_000_000_000,
+            105_000_000_000,
+            1_000.0,
+            &model,
+            transmission,
+            "cruise-context",
+        );
+        let result = evaluate_mission_drive_profile(
+            &model,
+            "left-propulsor",
+            "aircraft-config-sha256",
+            &[high, low],
+        )
+        .unwrap();
+
+        assert!(matches!(
+            &result.adverse_scenario,
+            Err(failures)
+                if failures.len() == 1
+                    && failures[0].segment_id == "high-power-climb"
+                    && matches!(failures[0].error, DriveError::DcBusPowerLimitExceeded { .. })
+        ));
+        assert!(result.nominal_scenario.is_ok());
+        assert!(result.favourable_scenario.is_ok());
+        assert!(result.nominal_scenario.as_ref().unwrap().average_dc_bus_power_w < 12_000.0);
+    }
+
+    #[test]
+    fn mission_profile_reports_time_gaps_as_unmodelled_not_zero_demand() {
+        let model = config();
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let first = mission_segment(
+            "takeoff",
+            0,
+            2_000_000_000,
+            5_000.0,
+            &model,
+            transmission,
+            "context-a",
+        );
+        let second = mission_segment(
+            "cruise",
+            7_000_000_000,
+            17_000_000_000,
+            2_000.0,
+            &model,
+            transmission,
+            "context-b",
+        );
+        let result = evaluate_mission_drive_profile(
+            &model,
+            "drive-path-1",
+            "aircraft-config-sha256",
+            &[first, second],
+        )
+        .unwrap();
+        assert_eq!(result.elapsed_duration_s, 17.0);
+        assert_eq!(result.active_duration_s, 12.0);
+        assert_eq!(result.unmodelled_gap_duration_s, 5.0);
+        assert_eq!(result.unmodelled_intervals.len(), 1);
+        assert_eq!(result.unmodelled_intervals[0].start_timestamp_ns, 2_000_000_000);
+        assert_eq!(result.unmodelled_intervals[0].end_timestamp_ns, 7_000_000_000);
+    }
+
+    #[test]
+    fn mission_profile_rejects_overlapping_or_out_of_order_segments() {
+        let model = config();
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let first = mission_segment(
+            "first",
+            0,
+            10_000_000_000,
+            5_000.0,
+            &model,
+            transmission,
+            "context",
+        );
+        let overlapping = mission_segment(
+            "overlap",
+            9_000_000_000,
+            12_000_000_000,
+            2_000.0,
+            &model,
+            transmission,
+            "context",
+        );
+        assert_eq!(
+            evaluate_mission_drive_profile(
+                &model,
+                "drive-path",
+                "aircraft-config-sha256",
+                &[first.clone(), overlapping],
+            ),
+            Err(MissionDriveProfileError::SegmentOrderOrOverlap)
+        );
+
+        let reversed = mission_segment(
+            "reversed",
+            20_000_000_000,
+            25_000_000_000,
+            2_000.0,
+            &model,
+            transmission,
+            "context",
+        );
+        assert_eq!(
+            evaluate_mission_drive_profile(
+                &model,
+                "drive-path",
+                "aircraft-config-sha256",
+                &[reversed, first],
+            ),
+            Err(MissionDriveProfileError::SegmentOrderOrOverlap)
+        );
+    }
+
+    #[test]
+    fn mission_profile_rejects_duplicate_ids_and_empty_profile() {
+        let model = config();
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let first = mission_segment(
+            "duplicate",
+            0,
+            1_000_000_000,
+            2_000.0,
+            &model,
+            transmission,
+            "context",
+        );
+        let second = mission_segment(
+            "duplicate",
+            1_000_000_000,
+            2_000_000_000,
+            2_000.0,
+            &model,
+            transmission,
+            "context",
+        );
+        assert_eq!(
+            evaluate_mission_drive_profile(
+                &model,
+                "drive-path",
+                "aircraft-config-sha256",
+                &[first, second],
+            ),
+            Err(MissionDriveProfileError::DuplicateSegmentId)
+        );
+        assert!(matches!(
+            evaluate_mission_drive_profile(
+                &model,
+                "drive-path",
+                "aircraft-config-sha256",
+                &[],
+            ),
+            Err(MissionDriveProfileError::InvalidProfile(_))
+        ));
+    }
+
+    #[test]
+    fn mission_profile_preserves_map_and_operating_point_failures_by_segment() {
+        let model = config();
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let mut segment = mission_segment(
+            "stale-map-point",
+            0,
+            1_000_000_000,
+            5_000.0,
+            &model,
+            transmission,
+            "context",
+        );
+        segment.motor_efficiency_evidence.motor_speed_rpm += 1.0;
+        let result = evaluate_mission_drive_profile(
+            &model,
+            "drive-path",
+            "aircraft-config-sha256",
+            &[segment],
+        )
+        .unwrap();
+        assert!(matches!(
+            &result.nominal_scenario,
+            Err(failures)
+                if failures.len() == 1
+                    && failures[0].segment_id == "stale-map-point"
+                    && matches!(failures[0].error, DriveError::InvalidOperatingPoint(_))
+        ));
+    }
+
+    #[test]
+    fn mission_profile_replays_deterministically() {
+        let model = config();
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let segments = vec![
+            mission_segment(
+                "segment-a",
+                0,
+                1_000_000_000,
+                5_000.0,
+                &model,
+                transmission,
+                "context-a",
+            ),
+            mission_segment(
+                "segment-b",
+                1_000_000_000,
+                2_500_000_000,
+                2_000.0,
+                &model,
+                transmission,
+                "context-b",
+            ),
+        ];
+        let first = evaluate_mission_drive_profile(
+            &model,
+            "drive-path",
+            "aircraft-config-sha256",
+            &segments,
+        )
+        .unwrap();
+        let second = evaluate_mission_drive_profile(
+            &model,
+            "drive-path",
+            "aircraft-config-sha256",
+            &segments,
+        )
+        .unwrap();
+        assert_eq!(first, second);
     }
 
     #[test]

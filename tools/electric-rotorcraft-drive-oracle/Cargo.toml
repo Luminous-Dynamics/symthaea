@@ -1,10 +1,10 @@
 [package]
 name = "electric-rotorcraft-drive-oracle"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.94"
 publish = false
-description = "Independent std-only evidence-aware gearbox rotorcraft drive-chain reference oracle"
+description = "Evidence-aware gearbox and mission-profile rotorcraft drive reference oracle"
 license = "AGPL-3.0-or-later"
 
 [lib]
