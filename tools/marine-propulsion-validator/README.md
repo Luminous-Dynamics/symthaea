@@ -209,3 +209,16 @@ the documentation does not imply a test pass.
 - `marine-emissions-evidence-audit` keeps MEPC.414 test-bed/onboard measurement, MEPC.415 engine-load calculation and MEPC.416 CEMS paths distinct.
 - Expected gases must be observed or explicitly declared unmeasured with a reason. Missing is not zero.
 - Gas mass-rate uncertainty remains quantified or explicitly unknown. No CO2e conversion is performed without a declared GWP and accounting boundary.
+
+
+## Port-call shore-power energy audit
+
+Validate the v0.1.0 port-call OPS/charging contract:
+
+~~~sh
+cargo run --bin marine-port-call-energy-audit -- \\
+  ../../docs/research/marine/marine-port-call-energy-v0.1.0.schema.json \\
+  ../../docs/research/marine/fixtures/synthetic-marine-port-call-energy-v0.1.0.json
+~~~
+
+The audit validates the Draft 2020-12 case contract, checks exact ship/berth connector standard, voltage, frequency and phase-count agreement, checks port availability and confirmed power reservation, subtracts connection/disconnection overhead from berth time, and deterministically bounds delivered Wh by requested energy, port energy, power and available time. It calculates gross grid and displaced-generator GHG factors only from source-resolved factor records and reports a net delta only when the accounting boundary IDs match. Arithmetic uses integer W, seconds, Wh and micro-kg CO2e; it is a scenario audit, not a port or vessel approval.
