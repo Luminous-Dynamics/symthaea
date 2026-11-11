@@ -173,6 +173,32 @@ A passing Rust validator establishes only that the local typed profile satisfies
 Scientific qualification requires exact data/model digests, matched baselines, independent known-truth evaluation, preregistered splits, adversarial testing and independent replication where appropriate.
 
 
+## 6A. Measurement portfolios and discovery option value
+
+Davila et al. (Astrobiology, first published 15 September 2026, DOI [10.1177/15311074261484864](https://doi.org/10.1177/15311074261484864)) summarizes a 2025 interdisciplinary abiotic-background workshop. It identifies the need to balance targeted analyses, untargeted discovery, experimental standards, realistic laboratory simulations and abiotic chemistry models under the payload constraints of robotic spacecraft. It also asks how much instrument flexibility should be reserved for unanticipated findings.
+
+OLI should extend its experiment-selection programme from choosing a single next measurement to designing a **budgeted measurement portfolio**:
+- targeted measurements for registered, high-value hypotheses;
+- untargeted measurements that preserve discovery potential beyond the current signature library;
+- contextual geophysical/geochemical measurements that constrain abiotic baselines;
+- blanks, standards, calibration, contamination-control and replication tasks;
+- a reserved discovery option for reanalysis or adaptive follow-up when an unexpected signature is found.
+
+The portfolio optimizer must respect hard constraints for mass, volume, power, data, duty cycle, operations time, reliability, sample use, contamination control, planetary protection, rights and human authorization. Safety, contamination and calibration tasks cannot be traded away for nominal information gain.
+
+### Discovery option value
+
+Represent reserved capacity as (R), the portion of total payload/operations/data budget not precommitted to known targets. Sweep (R) from 0 to 30% on a frozen finite challenge set rather than assuming a universal optimum. Report:
+- fraction of blinded novel-signature classes recoverable;
+- post-hoc reanalysis success after a new hypothesis arrives;
+- marginal utility of the reserve at fixed total resource budget;
+- opportunity cost against a fully committed targeted portfolio;
+- changes in false-positive and false-negative rates caused by wider untargeted coverage.
+
+Compare all-targeted, all-untargeted, fixed mixed, nominal-EIG greedy, cost-normalized greedy, robust/minimax, discovery-reserve and exact-subset-oracle portfolios under identical constraints. Report the Pareto frontier, not only a single weighted score. Measure instrument common causes: two instruments are not independent when they share sampling, extraction, calibration, clocks, contamination sources or upstream signals.
+
+This portfolio-design work is tracked under [OLI-EXPERIMENT-001 #11446](https://github.com/Luminous-Dynamics/symthaea/issues/11446). It is an offline mission-design benchmark; it does not authorize payload selection, laboratory actuation or spacecraft operations.
+
 ## 7. Mission and industry comparison: qualify the complete evidence chain
 
 OLI should not compare itself to a single commercial product by headline accuracy. The current landscape has distinct layers:
