@@ -2001,6 +2001,11 @@ fn exact_vector_field_component_residual(
             .iter()
             .position(|name| name == &state_coordinate_names[row_index])
             .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+        charge_exact_vector_field_operations(
+            operation_count,
+            state_components[output_index].len(),
+            profile,
+        )?;
         let derivative = polynomial_derivative(
             &state_components[output_index],
             state_variable_index,
@@ -2216,6 +2221,9 @@ pub fn check_exact_vector_field_equivariance(
         return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
     }
 
+    // One shared operation budget spans all component parsing, all state
+    // derivatives, all output-generator contractions and every generator pair.
+    let mut operation_count = 0usize;
     let mut state_components = Vec::with_capacity(output_dimension);
     for component in vector_field {
         let polynomial = parse_exact_polynomial(component, &variable_names, profile).map_err(
@@ -2228,10 +2236,15 @@ pub fn check_exact_vector_field_equivariance(
                 }
             },
         )?;
+        charge_exact_vector_field_operations(
+            &mut operation_count,
+            polynomial.len(),
+            profile,
+        )
+        .map_err(|_| ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded)?;
         state_components.push(polynomial);
     }
 
-    let mut operation_count = 0usize;
     let mut generator_results = Vec::with_capacity(state_declaration.generators.len());
     for state_generator in &state_declaration.generators {
         let output_generator = output_generator_by_id
