@@ -105,7 +105,7 @@ pub enum AudioEventObservationIssueV1 {
     ReceiptInputBindingMismatch,
     ReceiptNoteCoverageMismatch,
     ReceiptEventMismatch { ordinal: usize },
-    MissingTrackReceipt { track_index: u16 },
+    UnknownTrackIndex { track_index: u16 },
     EmptyTrackNotes { track_index: u16 },
     InputTooLarge,
     TooManyTracks,
