@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDateTime};
+use chrono::DateTime;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -314,13 +314,27 @@ fn run_audit(schema: &Value, case: &Value) -> AuditReport {
         ),
     }
 
+    let interface_matches =
+        connection.get("ship_connector_standard") == connection.get("berth_connector_standard")
+        && connection.get("ship_voltage_v") == connection.get("berth_voltage_v")
+        && connection.get("ship_frequency_hz") == connection.get("berth_frequency_hz")
+        && connection.get("ship_phase_count") == connection.get("berth_phase_count");
+
+    if compatibility == Some("compatible") && !interface_matches {
+        findings.push(
+            "/connection",
+            "INVALID",
+            "declared compatible interface contradicts connector standard, voltage, frequency or phase-count identity",
+        );
+    }
+
     let delivery_eligible = compatibility == Some("compatible")
+        && interface_matches
         && connection.get("port_availability").and_then(Value::as_str) == Some("available")
         && supply.get("reservation_status").and_then(Value::as_str) == Some("confirmed")
         && usable_connection_seconds > 0
         && !findings.invalid
-        && !findings.blocked
-        && !findings.incomplete;
+        && !findings.blocked;
 
     let effective_connection_power_w = min_u64(&[
         requested_max_power_w,
@@ -393,54 +407,47 @@ fn run_audit(schema: &Value, case: &Value) -> AuditReport {
         .get("micro_kg_co2e_per_kwh")
         .and_then(Value::as_u64);
 
-    let mut grid_ghg = None;
-    let mut generator_ghg = None;
+    let grid_ghg = grid_rate.and_then(|rate| ghg_for_energy(delivered_energy_wh, rate));
+    let generator_ghg =
+        generator_rate.and_then(|rate| ghg_for_energy(delivered_energy_wh, rate));
     let mut net_ghg_delta = None;
-    if grid_boundary.is_some() && grid_boundary == generator_boundary {
-        if let (Some(grid_rate), Some(generator_rate)) = (grid_rate, generator_rate) {
-            check_factor_source(
-                grid_factor,
-                "/ghg_comparison/grid_factor",
-                &source_ids,
-                &mut findings,
-            );
-            check_factor_source(
-                generator_factor,
-                "/ghg_comparison/onboard_generator_factor",
-                &source_ids,
-                &mut findings,
-            );
-            grid_ghg = ghg_for_energy(delivered_energy_wh, grid_rate);
-            generator_ghg = ghg_for_energy(delivered_energy_wh, generator_rate);
-            match (grid_ghg, generator_ghg) {
-                (Some(grid_value), Some(generator_value)) => {
-                    match (
-                        i128::try_from(grid_value),
-                        i128::try_from(generator_value),
-                    ) {
-                        (Ok(grid_value), Ok(generator_value)) => {
-                            net_ghg_delta = Some(grid_value - generator_value);
-                        }
-                        _ => findings.push(
-                            "/ghg_comparison",
-                            "INVALID",
-                            "GHG arithmetic result exceeds signed 128-bit reporting range",
-                        ),
+
+    if grid_rate.is_none() || generator_rate.is_none() {
+        findings.push(
+            "/ghg_comparison",
+            "INCOMPLETE",
+            "grid and generator emission factors must be known before calculating a delta",
+        );
+    } else if grid_boundary.is_some() && grid_boundary == generator_boundary {
+        match (grid_ghg, generator_ghg) {
+            (Some(grid_value), Some(generator_value)) => {
+                match (
+                    i128::try_from(grid_value),
+                    i128::try_from(generator_value),
+                ) {
+                    (Ok(grid_value), Ok(generator_value)) => {
+                        net_ghg_delta = Some(grid_value - generator_value);
                     }
+                    _ => findings.push(
+                        "/ghg_comparison",
+                        "INVALID",
+                        "GHG arithmetic result exceeds signed 128-bit reporting range",
+                    ),
                 }
-                _ => findings.push(
-                    "/ghg_comparison",
-                    "INVALID",
-                    "GHG factor multiplication overflowed",
-                ),
             }
-        } else {
-            findings.push(
+            _ => findings.push(
                 "/ghg_comparison",
-                "INCOMPLETE",
-                "grid and generator emission factors must be known before calculating a delta",
-            );
+                "INVALID",
+                "GHG factor multiplication overflowed",
+            ),
         }
+    } else {
+        // Keep both gross values, but never net factors with mismatched boundaries.
+        findings.push(
+            "/ghg_comparison",
+            "INCOMPARABLE",
+            "gross values are retained separately; no net GHG delta is reported across different accounting boundaries",
+        );
     }
 
     AuditReport {
@@ -538,6 +545,15 @@ mod tests {
     }
 
     #[test]
+    fn compatible_label_with_voltage_or_connector_mismatch_is_invalid() {
+        let (schema, mut case) = fixture();
+        case["connection"]["berth_voltage_v"] = serde_json::json!(6000);
+        let report = run_audit(&schema, &case);
+        assert_eq!(report.delivered_energy_wh, 0);
+        assert_eq!(report.disposition, "INVALID");
+    }
+
+    #[test]
     fn unknown_compatibility_is_incomplete_not_eligible() {
         let (schema, mut case) = fixture();
         case["connection"]["compatibility"] = serde_json::json!("unknown");
@@ -564,6 +580,8 @@ mod tests {
         case["ghg_comparison"]["onboard_generator_factor"]["boundary_id"] =
             serde_json::json!("DIFFERENT-BOUNDARY");
         let report = run_audit(&schema, &case);
+        assert_eq!(report.grid_ghg_micro_kg_co2e, Some(340_000_000));
+        assert_eq!(report.displaced_generator_ghg_micro_kg_co2e, Some(1_360_000_000));
         assert_eq!(report.net_ghg_delta_micro_kg_co2e, None);
         assert_eq!(report.disposition, "INCOMPLETE"); // synthetic record precedence
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic.code == "INCOMPARABLE"));
