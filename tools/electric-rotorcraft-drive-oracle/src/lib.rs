@@ -21,7 +21,7 @@
 use std::f64::consts::TAU;
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.6.0";
+pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.7.0";
 
 /// Explicit operating-point efficiencies and bus limits.
 ///
@@ -977,6 +977,8 @@ pub struct DcBusBranchSegmentResult {
     pub drive_path_id: String,
     pub feeder_id: String,
     pub common_cause_group_id: String,
+    pub protection_device_id: String,
+    pub branch_evidence_manifest_digest: String,
     pub map_id: String,
     pub map_digest: String,
     pub evidence_manifest_digest: String,
@@ -1233,6 +1235,32 @@ fn summarize_dc_bus_scenario(
                     continue;
                 }
             };
+            if envelope.map_id.trim().is_empty()
+                || envelope.map_digest.trim().is_empty()
+                || envelope.map_model_version.trim().is_empty()
+                || envelope.configuration_digest != bus.configuration_digest
+                || envelope.context_digest.trim().is_empty()
+                || envelope.evidence_manifest_digest.trim().is_empty()
+                || envelope.interpolation_weights.iter().any(|weight| {
+                    !weight.is_finite() || !(0.0..=1.0).contains(weight)
+                })
+                || (envelope.interpolation_weights.iter().sum::<f64>() - 1.0).abs()
+                    > 1.0e-12
+            {
+                failures.push(DcBusScenarioFailure {
+                    bus_id: bus.bus_id.clone(),
+                    segment_id: segment.segment_id.clone(),
+                    branch_id: Some(branch.branch_id.clone()),
+                    drive_path_id: Some(branch.drive_path_id.clone()),
+                    feeder_id: Some(branch.feeder_id.clone()),
+                    kind: DcBusFailureKind::PropulsionDrive(
+                        DriveError::InvalidConfiguration(
+                            "map/configuration/context/evidence lineage is incomplete or mismatched",
+                        ),
+                    ),
+                });
+                continue;
+            }
             let drive = match selected_drive_result(envelope, scenario) {
                 Ok(drive) => drive,
                 Err(error) => {
@@ -1302,6 +1330,8 @@ fn summarize_dc_bus_scenario(
                 drive_path_id: branch.drive_path_id.clone(),
                 feeder_id: branch.feeder_id.clone(),
                 common_cause_group_id: branch.common_cause_group_id.clone(),
+                protection_device_id: branch.protection_device_id.clone(),
+                branch_evidence_manifest_digest: branch.evidence_manifest_digest.clone(),
                 map_id: envelope.map_id.clone(),
                 map_digest: envelope.map_digest.clone(),
                 evidence_manifest_digest: envelope.evidence_manifest_digest.clone(),
