@@ -1008,16 +1008,33 @@ pub fn evaluate_linear_action_samples(
         let mut residual_values = Vec::with_capacity(samples.len());
         let mut sample_residuals = Vec::with_capacity(samples.len());
 
+        let generator_scale = generator
+            .matrix
+            .iter()
+            .flatten()
+            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
         for (sample, gradient) in samples.iter().zip(sample_gradients.iter()) {
+            // The residual depends only on the tangent direction. Normalize A
+            // and x by common positive scales before A*x so finite inputs cannot
+            // overflow solely because the chosen coordinate units are large.
+            let state_scale = action_coordinate_indices
+                .iter()
+                .map(|&state_index| sample.state[state_index].abs())
+                .fold(0.0_f64, f64::max);
             let mut tangent = vec![0.0_f64; dimension];
-            for (tangent_component, generator_row) in
-                tangent.iter_mut().zip(generator.matrix.iter())
-            {
-                *tangent_component = generator_row
-                    .iter()
-                    .zip(action_coordinate_indices.iter())
-                    .map(|(coefficient, &state_index)| coefficient * sample.state[state_index])
-                    .sum();
+            if state_scale > 0.0 && generator_scale > 0.0 {
+                for (tangent_component, generator_row) in
+                    tangent.iter_mut().zip(generator.matrix.iter())
+                {
+                    *tangent_component = generator_row
+                        .iter()
+                        .zip(action_coordinate_indices.iter())
+                        .map(|(coefficient, &state_index)| {
+                            (coefficient / generator_scale)
+                                * (sample.state[state_index] / state_scale)
+                        })
+                        .sum();
+                }
             }
             if tangent.iter().any(|value| !value.is_finite()) {
                 return Err(LinearActionSamplingErrorV1::NonFiniteOrbitTangent {
@@ -1437,6 +1454,51 @@ mod tests {
         assert!(statistics.p95_normalized_squared_residual
             <= statistics.maximum_normalized_squared_residual);
         assert!(statistics.standard_deviation_normalized_squared_residual.is_finite());
+    }
+
+    #[test]
+    fn sampled_linear_action_is_scale_safe_for_large_generator_and_state() {
+        let generator_scale = 1.0e160;
+        let action = LinearGroupActionV1 {
+            action_id: "large-scale-sampled-so2".to_string(),
+            coordinate_basis_id: "xy-large".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: vec![LinearGeneratorV1 {
+                id: "large-J".to_string(),
+                matrix: vec![
+                    vec![0.0, -generator_scale],
+                    vec![generator_scale, 0.0],
+                ],
+            }],
+        }
+        .try_admit(LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+        let sample = LinearActionSampleV1 {
+            sample_id: "large-paired-sample".to_string(),
+            state: vec![2.0e150, 1.0e150],
+            direction_basis: vec![
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![1.0, 1.0],
+            ],
+        };
+        let report = evaluate_linear_action_samples(
+            &add(square("x"), square("y")),
+            &action,
+            &[sample],
+            LinearActionSamplingProfileV1 {
+                finite_difference_step: 1.0e145,
+                maximum_samples: 1,
+                minimum_informative_samples: 1,
+                ..sampling_profile()
+            },
+        )
+        .unwrap();
+        assert!(report.invariant_within_tolerance());
+        assert_eq!(report.generator_statistics[0].informative_sample_count, 1);
+        assert!(report.generator_statistics[0].maximum_normalized_squared_residual < 1.0e-12);
     }
 
     #[test]
