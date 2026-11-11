@@ -38,7 +38,7 @@ struct AuditReport {
     total_loss_micro_gj: Option<i128>,
     total_storage_delta_micro_gj: Option<i128>,
     system_residual_micro_gj: Option<i128>,
-    system_expanded_uncertainty_micro_gj: Option<u128>,
+    sum_component_tolerance_bounds_micro_gj: Option<u128>,
     component_balances: Vec<ComponentBalance>,
     diagnostics: Vec<Diagnostic>,
     claim_ceiling: &'static str,
@@ -734,7 +734,7 @@ fn calculate(record: &Value) -> AuditReport {
         total_loss_micro_gj: if losses_known { Some(total_loss) } else { None },
         total_storage_delta_micro_gj: if storage_known { Some(total_storage_delta) } else { None },
         system_residual_micro_gj: system_residual,
-        system_expanded_uncertainty_micro_gj: system_tolerance,
+        sum_component_tolerance_bounds_micro_gj: system_tolerance,
         component_balances,
         diagnostics: findings.diagnostics,
         claim_ceiling: "First-law arithmetic closure against supplied values and supplied expanded-uncertainty budgets only. This does not verify meters, uncertainty budgets, physical models, exergy, source factors, emissions, safety, vessel performance or regulatory compliance.",
@@ -796,7 +796,7 @@ mod tests {
 
     #[test]
     fn micro_gj_is_one_kilojoule_not_one_joule() {
-        assert_eq!(1.0e-6 * 1.0e9, 1_000.0);
+        assert_eq!(1_000_000_000u128 / 1_000_000u128, 1_000u128);
     }
 
     #[test]
