@@ -64,6 +64,10 @@ pub struct BridgeConfig {
     /// The proprioceptive weight is 1,000,000 minus this value.
     pub visual_weight_ppm: u32,
     pub vehicle_encoder_seed_phrase: String,
+    /// Optional exact camera calibration pin. When set, observations with a
+    /// different calibration digest are rejected before temporal state advances.
+    #[serde(default)]
+    pub expected_camera_calibration_sha256: Option<String>,
 }
 
 impl BridgeConfig {
@@ -84,6 +88,9 @@ impl BridgeConfig {
         }
         if self.visual_weight_ppm > 1_000_000 {
             return Err(BridgeError::InvalidConfig("visual weight must be <= 1,000,000 ppm"));
+        }
+        if self.expected_camera_calibration_sha256.as_deref().is_some_and(|digest| !is_sha256_hex(digest)) {
+            return Err(BridgeError::InvalidConfig("expected camera calibration digest must be lowercase SHA-256"));
         }
         if self.vehicle_encoder_seed_phrase.trim().is_empty()
             || self.vehicle_encoder_seed_phrase.len() > 1_024
@@ -230,6 +237,7 @@ pub enum BridgeError {
     UpstreamReceiptMalformed,
     UpstreamReceiptCommitmentMismatch,
     UpstreamIdentityMismatch,
+    UpstreamCalibrationMismatch,
     UpstreamFrameMismatch,
     UpstreamSequenceMismatch,
     UpstreamTimestampMismatch,
@@ -637,6 +645,14 @@ impl CameraDrivingBridge {
             return Err(BridgeError::UpstreamIdentityMismatch);
         }
         if self
+            .config
+            .expected_camera_calibration_sha256
+            .as_deref()
+            .is_some_and(|expected| expected != upstream.camera_calibration_sha256)
+        {
+            return Err(BridgeError::UpstreamCalibrationMismatch);
+        }
+        if self
             .last_upstream_clock_id
             .as_deref()
             .is_some_and(|last| last != upstream.clock_id)
@@ -947,6 +963,21 @@ mod tests {
         assert_eq!(parsed.channels, 3);
         assert_eq!(parsed.frame_sha256, "d".repeat(64));
         assert_eq!(parsed.applied_action_tick, Some(1));
+    }
+
+    #[test]
+    fn rejects_unpinned_camera_calibration_before_advancing_temporal_state() {
+        let mut config = config();
+        config.expected_camera_calibration_sha256 = Some("a".repeat(64));
+        let mut bridge = CameraDrivingBridge::try_new(config, VisionConfig::default()).unwrap();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let item = observation(&pixels, 1, 10_000, &state);
+        assert_eq!(
+            bridge.observe(item).err(),
+            Some(BridgeError::UpstreamCalibrationMismatch)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
     }
 
     #[test]
