@@ -2210,7 +2210,17 @@ mod tests {
             predicted_eval_note_on_channel(0, 0, 48, 1),
         ];
         let summary =
-            part_separation_summary_v1(&reference, &predicted, &[(0, 0), (1, 1)]).unwrap();
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0), (1, 1)],
+                &[
+                    std::collections::BTreeSet::from([1]),
+                    std::collections::BTreeSet::from([2]),
+                ],
+            )
+            .unwrap();
         assert_eq!(summary.mixed_prediction_lane_count, 1);
         assert_eq!(summary.matched_notes_in_mixed_lanes, 2);
         assert_eq!(summary.note_weighted_lane_purity, Some(0.5));
