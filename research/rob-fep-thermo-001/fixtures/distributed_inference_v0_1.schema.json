@@ -22,8 +22,8 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 15,
-      "maxItems": 15,
+      "minItems": 17,
+      "maxItems": 17,
       "uniqueItems": true,
       "allOf": [
         {
@@ -250,6 +250,36 @@
           },
           "minContains": 1,
           "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI16_UNAUTHENTICATED_REMOTE_ENDPOINT"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI17_REMOTE_ENERGY_BOUNDARY_INCOMPLETE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
         }
       ],
       "items": {
@@ -301,7 +331,9 @@
         "remote_safe_success",
         "local_thermal_headroom_c",
         "local_thermal_limit_c",
-        "local_rta_admissible"
+        "local_rta_admissible",
+        "whole_system_energy_boundary_complete",
+        "onboard_baseline_whole_system_energy_j"
       ],
       "properties": {
         "placement": {
@@ -430,8 +462,57 @@
             "boolean",
             "null"
           ]
+        },
+        "whole_system_energy_boundary_complete": {
+          "type": "boolean"
+        },
+        "onboard_baseline_whole_system_energy_j": {
+          "$ref": "#/$defs/nullable_number"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "whole_system_energy_boundary_complete": {
+                "const": true
+              }
+            },
+            "required": [
+              "whole_system_energy_boundary_complete"
+            ]
+          },
+          "then": {
+            "properties": {
+              "whole_system_energy_j": {
+                "type": "number"
+              },
+              "onboard_baseline_whole_system_energy_j": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "whole_system_energy_boundary_complete": {
+                "const": false
+              }
+            },
+            "required": [
+              "whole_system_energy_boundary_complete"
+            ]
+          },
+          "then": {
+            "properties": {
+              "whole_system_energy_j": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     },
     "expected": {
       "type": "object",
@@ -441,7 +522,8 @@
         "selected_placement",
         "fallback_required",
         "remote_result_can_enter_local_admission",
-        "actuation_authorized"
+        "actuation_authorized",
+        "whole_system_energy_claim"
       ],
       "properties": {
         "disposition": {
@@ -480,6 +562,14 @@
         },
         "actuation_authorized": {
           "const": false
+        },
+        "whole_system_energy_claim": {
+          "enum": [
+            "not_evaluated",
+            "matched_system_energy_equal",
+            "whole_system_energy_better",
+            "robot_battery_better_system_energy_worse"
+          ]
         }
       }
     },
