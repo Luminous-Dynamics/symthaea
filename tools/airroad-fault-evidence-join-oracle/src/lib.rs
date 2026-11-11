@@ -379,7 +379,7 @@ fn validate_topology(
         || input.scenarios.is_empty()
     {
         return Err(FaultEvidenceJoinError::InvalidInput(
-            "configuration, exact power tree, crosswalk, propulsion paths and scenarios are required",
+            "configuration and complete power-tree crosswalk are required",
         ));
     }
 
@@ -395,7 +395,7 @@ fn validate_topology(
             || binding.configuration_digest != input.configuration_digest
         {
             return Err(FaultEvidenceJoinError::InvalidInput(
-                "element binding identity, zone, common-cause and configuration evidence are required",
+                "element ID, zone, common-cause and configuration evidence are required",
             ));
         }
         if by_aircraft_id
@@ -486,7 +486,9 @@ fn validate_topology(
         }
         let binding = by_aircraft_id
             .get(&device.aircraft_element_id)
-            .ok_or_else(|| FaultEvidenceJoinError::MissingElement(device.aircraft_element_id.clone()))?;
+            .ok_or_else(|| {
+                FaultEvidenceJoinError::MissingElement(device.aircraft_element_id.clone())
+            })?;
         if binding.kind != PowerElementKind::ProtectionDevice {
             return Err(FaultEvidenceJoinError::WrongElementKind {
                 element_id: device.aircraft_element_id.clone(),
@@ -619,7 +621,10 @@ pub fn join_fault_evidence(
                 || !non_empty(&artifact.topology_digest)
                 || !non_empty(&artifact.operating_context_digest)
             {
-                mismatches.push(format!("artifact {} has incomplete identity or scope", artifact.artifact_id));
+                mismatches.push(format!(
+                    "artifact {} has incomplete identity or scope",
+                    artifact.artifact_id
+                ));
                 continue;
             }
             if artifact.configuration_digest != input.configuration_digest
@@ -860,15 +865,60 @@ mod tests {
             ],
         };
         let mut artifacts = vec![
-            artifact("topology", FaultEvidenceKind::AsBuiltTopology, "as-built-power-tree", "fault-left-short"),
-            artifact("waveform", FaultEvidenceKind::FaultWaveform, "fault-left-short", "fault-left-short"),
-            artifact("clearing", FaultEvidenceKind::ClearingTime, "fault-left-short", "fault-left-short"),
-            artifact("isolation", FaultEvidenceKind::IsolationState, "fault-left-short", "fault-left-short"),
-            artifact("availability", FaultEvidenceKind::PostFaultElectricalAvailability, "fault-left-short", "fault-left-short"),
-            artifact("capability", FaultEvidenceKind::PostFaultAircraftCapability, "fault-left-short", "fault-left-short"),
-            artifact("thermal", FaultEvidenceKind::ThermalConsequence, "fault-left-short", "fault-left-short"),
-            artifact("curve", FaultEvidenceKind::ProtectionTimeCurrentCurve, "breaker-left", "fault-left-short"),
-            artifact("interrupt", FaultEvidenceKind::InterruptingCapacity, "breaker-left", "fault-left-short"),
+            artifact(
+                "topology",
+                FaultEvidenceKind::AsBuiltTopology,
+                "as-built-power-tree",
+                "fault-left-short",
+            ),
+            artifact(
+                "waveform",
+                FaultEvidenceKind::FaultWaveform,
+                "fault-left-short",
+                "fault-left-short",
+            ),
+            artifact(
+                "clearing",
+                FaultEvidenceKind::ClearingTime,
+                "fault-left-short",
+                "fault-left-short",
+            ),
+            artifact(
+                "isolation",
+                FaultEvidenceKind::IsolationState,
+                "fault-left-short",
+                "fault-left-short",
+            ),
+            artifact(
+                "availability",
+                FaultEvidenceKind::PostFaultElectricalAvailability,
+                "fault-left-short",
+                "fault-left-short",
+            ),
+            artifact(
+                "capability",
+                FaultEvidenceKind::PostFaultAircraftCapability,
+                "fault-left-short",
+                "fault-left-short",
+            ),
+            artifact(
+                "thermal",
+                FaultEvidenceKind::ThermalConsequence,
+                "fault-left-short",
+                "fault-left-short",
+            ),
+            artifact(
+                "curve",
+                FaultEvidenceKind::ProtectionTimeCurrentCurve,
+                "breaker-left",
+                "fault-left-short",
+            ),
+            artifact(
+                "interrupt",
+                FaultEvidenceKind::InterruptingCapacity,
+                "breaker-left",
+                "fault-left-short",
+            ),
         ];
         artifacts[0].artifact_digest = "as-built-manifest".to_owned();
         artifacts[7].artifact_digest = "curve-digest".to_owned();
@@ -887,7 +937,10 @@ mod tests {
     #[test]
     fn complete_join_is_ready_only_for_independent_review() {
         let report = join_fault_evidence(&base_input()).unwrap();
-        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::ReadyForIndependentReview);
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::ReadyForIndependentReview
+        );
         assert!(report.scenario_reports[0].missing_evidence.is_empty());
         assert_eq!(report.scenario_reports[0].artifact_ids.len(), 9);
     }
@@ -897,7 +950,10 @@ mod tests {
         let mut input = base_input();
         input.artifacts.retain(|item| item.kind != FaultEvidenceKind::PostFaultAircraftCapability);
         let report = join_fault_evidence(&input).unwrap();
-        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::UnknownMissingEvidence);
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::UnknownMissingEvidence
+        );
     }
 
     #[test]
@@ -905,22 +961,36 @@ mod tests {
         let mut input = base_input();
         input.artifacts[1].topology_digest = "stale-topology".to_owned();
         let report = join_fault_evidence(&input).unwrap();
-        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch);
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch
+        );
     }
 
     #[test]
     fn protection_curve_must_match_the_exact_device_digest() {
         let mut input = base_input();
-        input.artifacts.iter_mut().find(|item| item.kind == FaultEvidenceKind::ProtectionTimeCurrentCurve).unwrap().artifact_digest = "other-curve".to_owned();
+        let curve = input
+            .artifacts
+            .iter_mut()
+            .find(|item| item.kind == FaultEvidenceKind::ProtectionTimeCurrentCurve)
+            .unwrap();
+        curve.artifact_digest = "other-curve".to_owned();
         let report = join_fault_evidence(&input).unwrap();
-        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch);
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch
+        );
     }
 
     #[test]
     fn missing_protection_device_is_not_silently_ignored() {
         let mut input = base_input();
         input.protection_devices.clear();
-        assert!(matches!(join_fault_evidence(&input), Err(FaultEvidenceJoinError::MissingProtectionDevice(_))));
+        assert!(matches!(
+            join_fault_evidence(&input),
+            Err(FaultEvidenceJoinError::MissingProtectionDevice(_))
+        ));
     }
 
     #[test]
@@ -930,82 +1000,139 @@ mod tests {
         input.protection_devices[0].interrupting_capacity_a = None;
         input.protection_devices[0].interrupting_capacity_evidence_digest = None;
         let report = join_fault_evidence(&input).unwrap();
-        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::UnknownMissingEvidence);
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::UnknownMissingEvidence
+        );
         assert!(report.scenario_reports[0].missing_evidence.len() >= 2);
     }
 
     #[test]
     fn simulated_result_requires_model_validation_manifest() {
         let mut input = base_input();
-        let item = input.artifacts.iter_mut().find(|item| item.kind == FaultEvidenceKind::FaultWaveform).unwrap();
+        let item = input
+            .artifacts
+            .iter_mut()
+            .find(|item| item.kind == FaultEvidenceKind::FaultWaveform)
+            .unwrap();
         item.provenance.class = EvidenceClass::SimulatedResult;
         item.provenance.input_manifest_digest = Some("input".to_owned());
         item.provenance.output_manifest_digest = Some("output".to_owned());
         item.provenance.validation_manifest_digest = None;
         let report = join_fault_evidence(&input).unwrap();
-        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch);
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch
+        );
     }
 
     #[test]
     fn measured_test_requires_procedure_calibration_and_raw_data() {
         let mut input = base_input();
-        input.artifacts.iter_mut().find(|item| item.kind == FaultEvidenceKind::FaultWaveform).unwrap().provenance.calibration_manifest_digest = None;
+        let waveform = input
+            .artifacts
+            .iter_mut()
+            .find(|item| item.kind == FaultEvidenceKind::FaultWaveform)
+            .unwrap();
+        waveform.provenance.calibration_manifest_digest = None;
         let report = join_fault_evidence(&input).unwrap();
-        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch);
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch
+        );
     }
 
     #[test]
     fn authority_and_certification_claims_are_preserved_without_promotion() {
         let mut input = base_input();
-        let mut authority = artifact("authority", FaultEvidenceKind::AuthorityDisposition, "fault-left-short", "fault-left-short");
+        let mut authority = artifact(
+            "authority",
+            FaultEvidenceKind::AuthorityDisposition,
+            "fault-left-short",
+            "fault-left-short",
+        );
         authority.provenance = provenance(EvidenceClass::AuthorityDecision);
-        let mut certificate = artifact("certificate", FaultEvidenceKind::CertificationApproval, "fault-left-short", "fault-left-short");
+        let mut certificate = artifact(
+            "certificate",
+            FaultEvidenceKind::CertificationApproval,
+            "fault-left-short",
+            "fault-left-short",
+        );
         certificate.provenance = provenance(EvidenceClass::CertificationApproval);
         input.artifacts.extend([authority, certificate]);
         let report = join_fault_evidence(&input).unwrap();
-        assert!(report.scenario_reports[0].claim_classes_present.contains(&EvidenceClass::AuthorityDecision));
-        assert!(report.scenario_reports[0].claim_classes_present.contains(&EvidenceClass::CertificationApproval));
+        assert!(report.scenario_reports[0]
+            .claim_classes_present
+            .contains(&EvidenceClass::AuthorityDecision));
+        assert!(report.scenario_reports[0]
+            .claim_classes_present
+            .contains(&EvidenceClass::CertificationApproval));
     }
 
     #[test]
     fn thermal_and_emc_consequence_domains_are_separately_required() {
         let mut input = base_input();
-        input.scenarios[0].affected_consequence_domains.push(ConsequenceDomain::EmcOrPowerIntegrity);
-        input.artifacts.retain(|item| item.kind != FaultEvidenceKind::EmcOrPowerIntegrityConsequence);
+        input.scenarios[0]
+            .affected_consequence_domains
+            .push(ConsequenceDomain::EmcOrPowerIntegrity);
+        input
+            .artifacts
+            .retain(|item| item.kind != FaultEvidenceKind::EmcOrPowerIntegrityConsequence);
         let report = join_fault_evidence(&input).unwrap();
-        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::UnknownMissingEvidence);
-        assert!(report.scenario_reports[0].missing_evidence.iter().any(|item| item.kind == FaultEvidenceKind::EmcOrPowerIntegrityConsequence));
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::UnknownMissingEvidence
+        );
+        assert!(report.scenario_reports[0]
+            .missing_evidence
+            .iter()
+            .any(|item| item.kind == FaultEvidenceKind::EmcOrPowerIntegrityConsequence));
     }
 
     #[test]
     fn duplicate_element_and_artifact_identities_fail_closed() {
         let mut input = base_input();
         input.element_bindings.push(input.element_bindings[0].clone());
-        assert_eq!(join_fault_evidence(&input), Err(FaultEvidenceJoinError::DuplicateIdentity("aircraft element ID")));
+        assert_eq!(
+            join_fault_evidence(&input),
+            Err(FaultEvidenceJoinError::DuplicateIdentity("aircraft element ID"))
+        );
         let mut input = base_input();
         input.artifacts.push(input.artifacts[0].clone());
-        assert_eq!(join_fault_evidence(&input), Err(FaultEvidenceJoinError::DuplicateIdentity("artifact ID")));
+        assert_eq!(
+            join_fault_evidence(&input),
+            Err(FaultEvidenceJoinError::DuplicateIdentity("artifact ID"))
+        );
     }
 
     #[test]
     fn dangling_propulsion_path_element_fails_closed() {
         let mut input = base_input();
         input.propulsion_paths[0].feeder_element_id = "missing-feeder".to_owned();
-        assert!(matches!(join_fault_evidence(&input), Err(FaultEvidenceJoinError::MissingElement(id)) if id == "missing-feeder"));
+        assert!(matches!(
+            join_fault_evidence(&input),
+            Err(FaultEvidenceJoinError::MissingElement(id)) if id == "missing-feeder"
+        ));
     }
 
     #[test]
     fn cross_configuration_element_binding_fails_closed() {
         let mut input = base_input();
         input.element_bindings[0].configuration_digest = "other-config".to_owned();
-        assert!(matches!(join_fault_evidence(&input), Err(FaultEvidenceJoinError::InvalidInput(_))));
+        assert!(matches!(
+            join_fault_evidence(&input),
+            Err(FaultEvidenceJoinError::InvalidInput(_))
+        ));
     }
 
     #[test]
     fn scenario_targets_must_exist_in_the_exact_crosswalk() {
         let mut input = base_input();
         input.scenarios[0].target_aircraft_element_ids = vec!["unknown-target".to_owned()];
-        assert!(matches!(join_fault_evidence(&input), Err(FaultEvidenceJoinError::MissingElement(id)) if id == "unknown-target"));
+        assert!(matches!(
+            join_fault_evidence(&input),
+            Err(FaultEvidenceJoinError::MissingElement(id)) if id == "unknown-target"
+        ));
     }
 
     #[test]
@@ -1013,7 +1140,46 @@ mod tests {
         let mut input = base_input();
         input.artifacts[0].operating_context_digest = "cold-context".to_owned();
         let report = join_fault_evidence(&input).unwrap();
-        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch);
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch
+        );
+    }
+
+    #[test]
+    fn short_circuit_without_declared_protection_device_is_unknown() {
+        let mut input = base_input();
+        input.scenarios[0].required_protection_device_ids.clear();
+        let report = join_fault_evidence(&input).unwrap();
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::UnknownMissingEvidence
+        );
+        assert!(report.scenario_reports[0]
+            .missing_evidence
+            .iter()
+            .any(|item| item.subject_id == "UNDECLARED_PROTECTION_DEVICE"));
+    }
+
+    #[test]
+    fn protection_device_must_be_connected_to_a_targeted_path() {
+        let mut input = base_input();
+        input.propulsion_paths[0].protection_device_element_ids.clear();
+        assert!(matches!(
+            join_fault_evidence(&input),
+            Err(FaultEvidenceJoinError::InvalidInput(_))
+        ));
+    }
+
+    #[test]
+    fn evidence_for_an_unknown_scenario_is_rejected() {
+        let mut input = base_input();
+        input.artifacts[0].scenario_id = "unregistered-scenario".to_owned();
+        assert!(matches!(
+            join_fault_evidence(&input),
+            Err(FaultEvidenceJoinError::UnknownScenario(id))
+                if id == "unregistered-scenario"
+        ));
     }
 
     #[test]
@@ -1023,14 +1189,37 @@ mod tests {
         second.scenario_id = "fault-left-open".to_owned();
         second.fault_kind = FaultKind::BranchOpenCircuit;
         second.required_protection_device_ids.clear();
-        second.affected_consequence_domains = vec![ConsequenceDomain::Electrical, ConsequenceDomain::MissionCapability];
-        let mut topology = artifact("topology-open", FaultEvidenceKind::AsBuiltTopology, "as-built-power-tree", "fault-left-open");
+        second.affected_consequence_domains = vec![
+            ConsequenceDomain::Electrical,
+            ConsequenceDomain::MissionCapability,
+        ];
+        let mut topology = artifact(
+            "topology-open",
+            FaultEvidenceKind::AsBuiltTopology,
+            "as-built-power-tree",
+            "fault-left-open",
+        );
         topology.artifact_digest = "as-built-manifest".to_owned();
         let other = vec![
             topology,
-            artifact("isolation-open", FaultEvidenceKind::IsolationState, "fault-left-open", "fault-left-open"),
-            artifact("availability-open", FaultEvidenceKind::PostFaultElectricalAvailability, "fault-left-open", "fault-left-open"),
-            artifact("capability-open", FaultEvidenceKind::PostFaultAircraftCapability, "fault-left-open", "fault-left-open"),
+            artifact(
+                "isolation-open",
+                FaultEvidenceKind::IsolationState,
+                "fault-left-open",
+                "fault-left-open",
+            ),
+            artifact(
+                "availability-open",
+                FaultEvidenceKind::PostFaultElectricalAvailability,
+                "fault-left-open",
+                "fault-left-open",
+            ),
+            artifact(
+                "capability-open",
+                FaultEvidenceKind::PostFaultAircraftCapability,
+                "fault-left-open",
+                "fault-left-open",
+            ),
         ];
         input.scenarios.push(second);
         input.artifacts.extend(other);
