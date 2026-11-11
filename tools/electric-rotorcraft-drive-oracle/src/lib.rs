@@ -916,6 +916,7 @@ pub struct DcBusExternalLoadInterval {
     pub segment_id: String,
     pub start_timestamp_ns: u64,
     pub end_timestamp_ns: u64,
+    pub context_digest: String,
     pub power_lower_bound_w: f64,
     pub power_nominal_w: f64,
     pub power_upper_bound_w: f64,
@@ -927,6 +928,7 @@ pub struct DcBusExternalLoadProfile {
     pub load_id: String,
     pub meter_boundary_id: String,
     pub bus_id: String,
+    pub configuration_digest: String,
     pub kind: DcBusExternalLoadKind,
     pub evidence_manifest_digest: String,
     pub intervals: Vec<DcBusExternalLoadInterval>,
@@ -951,6 +953,7 @@ pub struct DcBusBranchConfig {
     pub branch_id: String,
     pub drive_path_id: String,
     pub bus_id: String,
+    pub configuration_digest: String,
     pub feeder_id: String,
     pub meter_boundary_id: String,
     pub protection_device_id: String,
@@ -976,6 +979,7 @@ pub struct DcBusBranchSegmentResult {
     pub branch_id: String,
     pub drive_path_id: String,
     pub feeder_id: String,
+    pub configuration_digest: String,
     pub common_cause_group_id: String,
     pub protection_device_id: String,
     pub branch_evidence_manifest_digest: String,
@@ -995,6 +999,8 @@ pub struct DcBusExternalLoadSegmentResult {
     pub load_id: String,
     pub meter_boundary_id: String,
     pub kind: DcBusExternalLoadKind,
+    pub configuration_digest: String,
+    pub context_digest: String,
     pub evidence_manifest_digest: String,
     pub power_w: f64,
     pub current_a: f64,
@@ -1209,7 +1215,10 @@ fn summarize_dc_bus_scenario(
         }
 
         for branch in branches {
-            let Some(path) = paths.iter().find(|path| path.drive_path_id == branch.drive_path_id) else {
+            let Some(path) = paths
+                .iter()
+                .find(|path| path.drive_path_id == branch.drive_path_id)
+            else {
                 failures.push(DcBusScenarioFailure {
                     bus_id: bus.bus_id.clone(),
                     segment_id: reference_segment.segment_id.clone(),
@@ -1332,6 +1341,7 @@ fn summarize_dc_bus_scenario(
                 common_cause_group_id: branch.common_cause_group_id.clone(),
                 protection_device_id: branch.protection_device_id.clone(),
                 branch_evidence_manifest_digest: branch.evidence_manifest_digest.clone(),
+                configuration_digest: branch.configuration_digest.clone(),
                 map_id: envelope.map_id.clone(),
                 map_digest: envelope.map_digest.clone(),
                 evidence_manifest_digest: envelope.evidence_manifest_digest.clone(),
@@ -1373,6 +1383,8 @@ fn summarize_dc_bus_scenario(
                 load_id: load.load_id.clone(),
                 meter_boundary_id: load.meter_boundary_id.clone(),
                 kind: load.kind,
+                configuration_digest: load.configuration_digest.clone(),
+                context_digest: interval.context_digest.clone(),
                 evidence_manifest_digest: load.evidence_manifest_digest.clone(),
                 power_w,
                 current_a,
@@ -1526,6 +1538,7 @@ pub fn evaluate_dc_bus_mission(
         if branch.branch_id.trim().is_empty()
             || branch.drive_path_id.trim().is_empty()
             || branch.bus_id.trim().is_empty()
+            || branch.configuration_digest != input.configuration_digest
             || branch.feeder_id.trim().is_empty()
             || branch.meter_boundary_id.trim().is_empty()
             || branch.protection_device_id.trim().is_empty()
@@ -1586,6 +1599,7 @@ pub fn evaluate_dc_bus_mission(
         if load.load_id.trim().is_empty()
             || load.meter_boundary_id.trim().is_empty()
             || load.bus_id.trim().is_empty()
+            || load.configuration_digest != input.configuration_digest
             || load.evidence_manifest_digest.trim().is_empty()
         {
             return Err(DcBusCompositionError::InvalidConfiguration(
@@ -1679,6 +1693,7 @@ pub fn evaluate_dc_bus_mission(
                     || interval.start_timestamp_ns != reference.start_timestamp_ns
                     || interval.end_timestamp_ns != reference.end_timestamp_ns
                     || interval.end_timestamp_ns <= interval.start_timestamp_ns
+                    || interval.context_digest.trim().is_empty()
                     || !interval.power_lower_bound_w.is_finite()
                     || !interval.power_nominal_w.is_finite()
                     || !interval.power_upper_bound_w.is_finite()
