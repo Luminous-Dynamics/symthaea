@@ -412,3 +412,12 @@ The combined quadruped/legged experiment is now owned by [Symtropy #4689 — LOC
 This lane tests the asynchronous split-timescale / committed-prefix idea under persistent per-node temperature, actuator authority, event order and observation-constrained recovery. It compares to thermal-aware MPC/HQP, robust MPC, thermal-aware RL and direct high-rate policies. WAM methods remain manipulation references until a matched quadruped implementation exists.
 
 The fixtures qualify gate composition only; #4610 remains the physical thermal model owner and #4549/#4555/#4588 retain mission carryover and future-option measurement.
+
+
+## 14. Viability-bounded adaptive action horizon
+
+A new child workstream [Symtropy #4696](https://github.com/Luminous-Dynamics/symtropy/issues/4696) treats action horizon K as a joint evidence/physical constraint rather than a fixed model parameter. It composes observation freshness, clock mapping, chunk expiry, deadline, certificate validity, contact-model horizon, actuator-response validity, per-node thermal-to-limit time and terminal safe-stop/recovery reserve.
+
+For queued open-loop execution, the measured p99 total proposal path defines K_min; the earliest qualified physical/evidence horizon defines K_max. If K_min > K_max, queued execution cannot safely cover deliberation. A continuously operating split-timescale local expert is evaluated as a distinct architecture: it does not need to span the slow context latency, but its own cycle must meet the local deadline and its chunks remain bounded by K_max.
+
+Initial 12-case corpus and dedicated validator: [Symtropy draft PR #4704](https://github.com/Luminous-Dynamics/symtropy/pull/4704). This is an arithmetic/evaluation contract, not a new scheduler, certificate validator or controller.
