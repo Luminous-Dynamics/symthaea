@@ -29,7 +29,7 @@ A candidate is eligible only if all provenance, training-only, cross-fit, contex
 
 No eligible policy means abstention. No hidden weighted safety score is introduced.
 
-The conservative v0 preset uses 30 minimum attempts, 0.60 safe-recovery lower bound, 0.05 adverse-or-unverified upper bound and z=1.96. These are initial research gates, not regulatory thresholds or a safety certification. With zero observed adverse outcomes, the 95% Wilson upper bound remains above 5% at 40 attempts and falls below 5% around 100 attempts. Sparse evidence should therefore produce abstention, not unjustified confidence.
+The conservative v0 preset uses 30 minimum attempts, 0.60 safe-recovery lower bound, 0.05 adverse-or-unverified upper bound and z=1.96. These are initial research gates, not regulatory thresholds or a safety certification. With zero observed adverse outcomes, the 95% Wilson upper bound remains above 5% at 40 attempts and falls below 5% at 73 attempts. Sparse evidence should therefore produce abstention, not unjustified confidence.
 
 ## Leakage and evidence boundaries
 
