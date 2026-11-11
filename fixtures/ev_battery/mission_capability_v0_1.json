@@ -86,7 +86,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           },
           {
             "step_id": "regen",
@@ -123,7 +124,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           },
           {
             "step_id": "cruise",
@@ -160,7 +162,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           }
         ]
       }
@@ -234,7 +237,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           }
         ]
       }
@@ -316,7 +320,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           },
           {
             "step_id": "pulse-2",
@@ -353,7 +358,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           }
         ]
       }
@@ -427,7 +433,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           }
         ]
       }
@@ -493,7 +500,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           }
         ]
       }
@@ -567,7 +575,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           }
         ]
       }
@@ -641,7 +650,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           }
         ]
       }
@@ -715,7 +725,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           }
         ]
       }
@@ -797,7 +808,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           },
           {
             "step_id": "gap",
@@ -834,7 +846,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           }
         ]
       }
@@ -908,7 +921,8 @@
                 "voltage_lower_v": 3.2,
                 "voltage_upper_v": 3.9
               }
-            ]
+            ],
+            "pack_limit_cell_ref": "cell-001"
           }
         ]
       }
