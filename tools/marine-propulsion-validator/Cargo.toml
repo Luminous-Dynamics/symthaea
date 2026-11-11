@@ -57,3 +57,7 @@ path = "src/bin/marine_benchmark_manifest_audit.rs"
 [[bin]]
 name = "marine-energy-conservation-audit"
 path = "src/bin/marine_energy_conservation_audit.rs"
+
+[[bin]]
+name = "marine-acoustic-evidence-audit"
+path = "src/bin/marine_acoustic_evidence_audit.rs"
