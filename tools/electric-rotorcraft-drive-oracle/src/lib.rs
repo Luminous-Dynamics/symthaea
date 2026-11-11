@@ -559,3 +559,206 @@ mod tests {
         );
     }
 }
+
+/// Drive-chain result augmented with motor-side kinematics.
+///
+/// The base DriveReport remains the v0.1 rotor-side power and loss
+/// accounting contract. This additive result derives the motor operating
+/// speed and shaft torque for an explicitly supplied speed ratio.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DriveKinematicReport {
+    /// The unchanged v0.1 power and component-loss report.
+    pub drive: DriveReport,
+    /// Positive speed ratio: motor angular speed divided by rotor angular speed.
+    pub motor_to_rotor_speed_ratio: f64,
+    /// Motor shaft rotational speed (revolutions per minute).
+    pub motor_speed_rpm: f64,
+    /// Motor shaft angular velocity (rad/s).
+    pub motor_angular_velocity_rad_s: f64,
+    /// Required motor-side mechanical shaft torque (N m).
+    pub motor_shaft_torque_nm: f64,
+}
+
+/// Evaluate the v0.1 drive chain and derive motor-side speed and torque.
+///
+/// The motor_to_rotor_speed_ratio is defined as:
+///
+///     motor_speed / rotor_speed
+///
+/// It must be finite and strictly positive for this motoring-only reference.
+/// A direct-drive path explicitly supplies 1.0; no ratio is inferred or
+/// defaulted. The declared transmission efficiency remains responsible for
+/// mechanical power loss. Reverse operation and regeneration are unsupported.
+///
+/// This function is an additive kinematic wrapper: evaluate_drive, its
+/// inputs, its report and all v0.1 loss-accounting semantics remain unchanged.
+/// It does not validate a motor electromagnetic map, field-weakening region,
+/// torque-speed envelope, gearbox rating or empirical component efficiency.
+pub fn evaluate_drive_with_gear_ratio(
+    config: &DriveConfig,
+    input: DriveInput,
+    motor_to_rotor_speed_ratio: f64,
+) -> Result<DriveKinematicReport, DriveError> {
+    if !motor_to_rotor_speed_ratio.is_finite() || motor_to_rotor_speed_ratio <= 0.0 {
+        return Err(DriveError::InvalidOperatingPoint(
+            "motor-to-rotor speed ratio must be finite and positive",
+        ));
+    }
+
+    let drive = evaluate_drive(config, input)?;
+    let motor_speed_rpm = input.rotor_speed_rpm * motor_to_rotor_speed_ratio;
+    let motor_angular_velocity_rad_s = motor_speed_rpm * TAU / 60.0;
+    let motor_shaft_torque_nm =
+        drive.motor_shaft_output_power_w / motor_angular_velocity_rad_s;
+
+    let derived = [
+        motor_speed_rpm,
+        motor_angular_velocity_rad_s,
+        motor_shaft_torque_nm,
+    ];
+    if derived.iter().any(|value| !value.is_finite())
+        || derived.iter().any(|value| *value <= 0.0)
+    {
+        return Err(DriveError::NumericalOverflow);
+    }
+
+    Ok(DriveKinematicReport {
+        drive,
+        motor_to_rotor_speed_ratio,
+        motor_speed_rpm,
+        motor_angular_velocity_rad_s,
+        motor_shaft_torque_nm,
+    })
+}
+
+#[cfg(test)]
+mod kinematic_tests {
+    use super::*;
+
+    fn config() -> DriveConfig {
+        DriveConfig {
+            transmission_efficiency: 0.90,
+            motor_efficiency: 0.95,
+            inverter_efficiency: 0.98,
+            minimum_dc_bus_voltage_v: 300.0,
+            maximum_dc_bus_current_a: 500.0,
+            maximum_dc_bus_power_w: 200_000.0,
+            energy_balance_tolerance_j: 1.0e-8,
+        }
+    }
+
+    fn input() -> DriveInput {
+        let rotor_speed_rpm = 3_000.0;
+        let rotor_angular_velocity_rad_s = rotor_speed_rpm * TAU / 60.0;
+        DriveInput {
+            rotor_shaft_torque_nm: 10_000.0 / rotor_angular_velocity_rad_s,
+            rotor_speed_rpm,
+            dc_bus_voltage_v: 400.0,
+            duration_s: 12.0,
+        }
+    }
+
+    #[test]
+    fn five_to_one_gear_ratio_matches_independent_motor_operating_point() {
+        let report = evaluate_drive_with_gear_ratio(&config(), input(), 5.0).unwrap();
+
+        assert!((report.drive.rotor_shaft_power_w - 10_000.0).abs() < 1.0e-9);
+        assert!((report.motor_speed_rpm - 15_000.0).abs() < 1.0e-9);
+        assert!(
+            (report.motor_angular_velocity_rad_s - 1_570.796_326_794_896_7).abs()
+                < 1.0e-9
+        );
+        assert!(
+            (report.drive.motor_shaft_output_power_w - 11_111.111_111_111_111).abs()
+                < 1.0e-9
+        );
+        assert!(
+            (report.motor_shaft_torque_nm - 7.073_553_026_306_459).abs() < 1.0e-9
+        );
+        assert!(
+            (report.drive.dc_bus_input_power_w - 11_934.598_400_763_816).abs()
+                < 1.0e-9
+        );
+        assert!(
+            (report.drive.dc_bus_current_a - 29.836_496_001_909_54).abs() < 1.0e-9
+        );
+        assert!(
+            (report.drive.transmission_loss_energy_j
+                + report.drive.motor_loss_energy_j
+                + report.drive.inverter_loss_energy_j
+                - 23_215.180_809_165_795)
+                .abs()
+                < 1.0e-7
+        );
+    }
+
+    #[test]
+    fn motor_shaft_torque_times_speed_reconstructs_motor_shaft_power() {
+        let report = evaluate_drive_with_gear_ratio(&config(), input(), 5.0).unwrap();
+        let reconstructed_power_w =
+            report.motor_shaft_torque_nm * report.motor_angular_velocity_rad_s;
+        assert!(
+            (reconstructed_power_w - report.drive.motor_shaft_output_power_w).abs()
+                < 1.0e-9
+        );
+    }
+
+    #[test]
+    fn direct_drive_explicitly_uses_unity_speed_ratio_and_efficiency() {
+        let mut model = config();
+        model.transmission_efficiency = 1.0;
+        let operating_point = input();
+        let report =
+            evaluate_drive_with_gear_ratio(&model, operating_point, 1.0).unwrap();
+
+        assert_eq!(report.motor_speed_rpm, operating_point.rotor_speed_rpm);
+        assert!(
+            (report.motor_shaft_torque_nm - operating_point.rotor_shaft_torque_nm).abs()
+                < 1.0e-12
+        );
+        assert_eq!(report.drive.transmission_loss_w, 0.0);
+    }
+
+    #[test]
+    fn invalid_gear_ratios_are_rejected_as_non_pass() {
+        for ratio in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(matches!(
+                evaluate_drive_with_gear_ratio(&config(), input(), ratio),
+                Err(DriveError::InvalidOperatingPoint(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn extreme_gear_ratio_overflow_is_rejected() {
+        assert_eq!(
+            evaluate_drive_with_gear_ratio(&config(), input(), f64::MAX),
+            Err(DriveError::NumericalOverflow)
+        );
+    }
+
+    #[test]
+    fn near_zero_gear_ratio_torque_overflow_is_rejected() {
+        assert_eq!(
+            evaluate_drive_with_gear_ratio(&config(), input(), f64::MIN_POSITIVE),
+            Err(DriveError::NumericalOverflow)
+        );
+    }
+
+    #[test]
+    fn kinematic_wrapper_preserves_v01_drive_report_exactly() {
+        let model = config();
+        let operating_point = input();
+        let base = evaluate_drive(&model, operating_point).unwrap();
+        let with_kinematics =
+            evaluate_drive_with_gear_ratio(&model, operating_point, 5.0).unwrap();
+        assert_eq!(with_kinematics.drive, base);
+    }
+
+    #[test]
+    fn identical_kinematic_inputs_produce_identical_reports() {
+        let first = evaluate_drive_with_gear_ratio(&config(), input(), 5.0).unwrap();
+        let second = evaluate_drive_with_gear_ratio(&config(), input(), 5.0).unwrap();
+        assert_eq!(first, second);
+    }
+}
