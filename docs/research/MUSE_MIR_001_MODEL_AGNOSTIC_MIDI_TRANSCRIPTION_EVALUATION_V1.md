@@ -58,6 +58,8 @@ Each prediction can match at most one reference note and vice versa. V1 uses max
 
 The two GM-program metrics are stricter additions; they are not substitutes for the instrument-agnostic scores used by many AMT benchmarks. GM program is not a persistent PartId or a fine-grained instrument identity.
 
+V1 also reports separate onset-only and offset-only F1 diagnostics that deliberately ignore pitch, matching the scope of the corresponding mir_eval functions. Average Overlap Ratio (AOR) is reported over full-note matched pairs as the mean intersection duration divided by the union span. AOR is absent when there are no full-note matches; it must not be read as zero transcription quality in that case.
+
 Timing reports include signed mean onset error plus mean, median, p95 and p99 absolute onset/offset errors. Offset errors are measured over onset-matched pairs even when the offset is outside the full-note acceptance tolerance, so a poor release does not disappear from the timing error summary merely because it failed full-note F1.
 
 ### Frame-level activity
@@ -82,7 +84,7 @@ Capacity exhaustion is an explicit error, not a partial score.
 
 ## Tests authored
 
-Fifteen focused Rust tests currently cover:
+Eighteen focused Rust tests currently cover:
 1. exact MIDI prediction produces perfect instrument-agnostic and exact-program scores;
 2. wrong GM program changes the exact-program metrics without hiding correct pitch/onset notes;
 3. onset outside the 50 ms window reduces onset and full-note scores;
@@ -97,7 +99,10 @@ Fifteen focused Rust tests currently cover:
 12. conflicting same-tick tempo rejection;
 13. explicit non-default tempo at tick zero;
 14. inclusive exactly-50-ms onset boundary;
-15. velocity metrics absent by default.
+15. velocity metrics absent by default;
+16. onset-only matching can identify a correctly timed event despite an incorrect pitch;
+17. offset-only matching can identify a correct release despite an incorrect pitch and onset;
+18. Average Overlap Ratio reports interval overlap for a tolerance-accepted full-note pair.
 
 These tests are authored, not compiled or run in the authoring environment.
 
@@ -165,8 +170,7 @@ Those are stretch targets for a future transcription model, not a claim that an 
 
 ## Next implementation
 
-1. Pin mir_eval in a parity harness and run fixture-by-fixture comparisons for onset match, full-note match, frame occupancy and overlap ratio.
-2. Add average overlap ratio and independent onset-only / offset-only metrics.
-3. Add a frozen Slakh2100 subset and a rights-cleared commissioned performance corpus.
-4. Add an adapter manifest recording model commit/checkpoint hash, inference configuration, preprocessing, instrument condition, runtime/hardware, and exact input/output digests.
-5. Add event-level confidence only when the upstream model supplies calibrated or calibratable confidence; do not invent confidence from F1.
+1. Pin mir_eval in a parity harness and run fixture-by-fixture comparisons for onset match, full-note match, onset-only, offset-only, AOR and frame occupancy.
+2. Add a frozen Slakh2100 subset and a rights-cleared commissioned performance corpus.
+3. Add an adapter manifest recording model commit/checkpoint hash, inference configuration, preprocessing, instrument condition, runtime/hardware, license/rights basis, and exact input/output digests.
+4. Add event-level confidence only when the upstream model supplies calibrated or calibratable confidence; do not invent confidence from F1.
