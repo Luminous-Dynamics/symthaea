@@ -117,12 +117,13 @@ Each output includes float WAV, sample count, PCM SHA-256, segment ranges, targe
 ### Measurement separation
 
 - F0: a separate PCM-only normalized-autocorrelation estimator with parabolic lag interpolation. It never reads FormantFrame.f0.
+- F1–F3: a separate PCM-only LPC formant-analysis path. Each scenario records observer identity, full extraction configuration, analysis/voiced/ordered-window counts, median estimates and median absolute deviations. It does not read target formant controls. This is a separate algorithm in the same crate, not an external verifier; its fallback behavior and bias must be calibrated before qualification thresholds are frozen.
 - Locality: sample-bit comparison outside the declared dependency cone.
-- Ground truth: source parameter vector and known edit operation, recorded separately from observed measurements.
+- Ground truth: the complete source parameter vector is embedded in the manifest and accompanied by a SHA-256 digest, so reviewers can recompute the digest and verify the exact fixture inputs.
 - No-op: required to be bit-identical.
 - Collateral negative control: required to produce a nonzero changed-protected-sample count.
 
-The autocorrelation estimator is intentionally narrow. It is a first independent observation path for clean synthetic monophonic signals, not a general singing-pitch estimator and not a replacement for VPTB-001.
+The autocorrelation estimator is intentionally narrow. It is a first independent observation path for clean synthetic monophonic signals, not a general singing-pitch estimator and not a replacement for VPTB-001. The LPC formant observer is also a first measurement path: it consumes PCM, but shares a codebase with the renderer and uses coarse LPC-envelope peak picking. Treat it as a sensor under calibration, not an oracle.
 
 ## 4. Benchmark protocol
 
@@ -164,6 +165,7 @@ This matrix should be generated in budgeted deterministic batches. The first com
 | Direction | Correct sign of measured target change | 100% on clean supported controls |
 | Pitch | Median absolute F0 error | <= 5 cents on clean known-answer signals |
 | Pitch | F0 estimates within 10 cents | >= 99% of eligible clean voiced windows |
+| Formants | F1–F3 median absolute percentage error | <= 10% on clean, calibrated synthetic resonances (proposed target; not yet measured) |
 | Locality | Changed samples outside dependency cone | 0 |
 | Negative controls | No-op / wrong-direction / collateral detection | 100% on declared fixture cases |
 | Uncertainty | False-safe decisions | 0 on deterministic synthetic boundary and adversarial cases |
@@ -261,7 +263,7 @@ This work does not:
 
 ## 9. Validation record
 
-The branch currently contains a standalone crate, deterministic fixture generator, 15 authored tests, README and exact-head workflow. The workflow is designed to pin Rust 1.96, check formatting, run tests and Clippy, generate WAV fixtures, and verify the synthetic-only manifest.
+The branch currently contains a standalone crate, deterministic fixture generator, 18 authored tests, README and exact-head workflow. The workflow is designed to pin Rust 1.96, check formatting, run tests and Clippy, generate WAV fixtures, and verify the synthetic-only manifest.
 
 No local Cargo/rustc toolchain was available during authoring. Therefore no Rust compile, rustfmt, unit-test, Clippy, WAV generation or CI pass is claimed. The workflow's generated standalone lockfile is a CI-time lock, not a committed lockfile; a later hardening step should commit and digest a reviewed lockfile once a Rust toolchain is available.
 
