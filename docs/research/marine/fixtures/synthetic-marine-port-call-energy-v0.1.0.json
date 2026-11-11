@@ -1,0 +1,86 @@
+{
+  "schema_version": "0.1.0",
+  "scenario_id": "SYNTHETIC-PORT-OPS-0001",
+  "service_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "port_call_id": "SYNTHETIC-CALL-0001",
+  "port_id": "SYNTHETIC-PORT-001",
+  "berth_id": "SYNTHETIC-BERTH-004",
+  "vessel_id": "SYNTHETIC-VESSEL-001",
+  "berth_window": {
+    "berth_start": "2026-11-11T12:00:00Z",
+    "berth_end": "2026-11-11T20:00:00Z",
+    "planned_arrival": "2026-11-11T12:00:00Z",
+    "planned_departure": "2026-11-11T18:00:00Z",
+    "connection_time_seconds": 600,
+    "disconnection_time_seconds": 600
+  },
+  "connection": {
+    "compatibility": "compatible",
+    "port_availability": "available",
+    "connector_standard": "IEC/ISO/IEEE 80005-compatible-synthetic",
+    "connector_identity": "SYNTHETIC-OPS-CONNECTOR-004",
+    "voltage_v": 11000,
+    "frequency_hz": 50,
+    "phase_count": 3,
+    "ship_max_input_power_w": 500000,
+    "berth_connection_limit_w": 400000
+  },
+  "demand": {
+    "requested_energy_wh": 2000000,
+    "requested_max_power_w": 500000
+  },
+  "port_supply": {
+    "reserved_power_w": 300000,
+    "available_energy_wh": 1800000,
+    "reservation_id": "SYNTHETIC-RESERVATION-001",
+    "reservation_status": "confirmed"
+  },
+  "ghg_comparison": {
+    "grid_factor": {
+      "factor_id": "GRID-FACTOR-SYN-001",
+      "revision": "1",
+      "micro_kg_co2e_per_kwh": 200000,
+      "boundary_id": "SYNTHETIC-WTW-AT-SHIP-BUS",
+      "source_id": "SYNTHETIC-PORT-SOURCE-001",
+      "method": "synthetic well-to-wire factor at ship bus",
+      "limitations": [
+        "Synthetic value; not a real grid factor."
+      ]
+    },
+    "onboard_generator_factor": {
+      "factor_id": "GEN-FACTOR-SYN-001",
+      "revision": "1",
+      "micro_kg_co2e_per_kwh": 800000,
+      "boundary_id": "SYNTHETIC-WTW-AT-SHIP-BUS",
+      "source_id": "SYNTHETIC-GEN-SOURCE-001",
+      "method": "synthetic well-to-wake generator-electricity factor at ship bus",
+      "limitations": [
+        "Synthetic value; not a measured generator result."
+      ]
+    }
+  },
+  "evidence_sources": [
+    {
+      "source_id": "SYNTHETIC-PORT-SOURCE-001",
+      "evidence_class": "synthetic",
+      "rights_status": "not_applicable",
+      "limitations": [
+        "Software test only."
+      ]
+    },
+    {
+      "source_id": "SYNTHETIC-GEN-SOURCE-001",
+      "evidence_class": "synthetic",
+      "rights_status": "not_applicable",
+      "limitations": [
+        "Software test only."
+      ]
+    }
+  ],
+  "record_status": "synthetic",
+  "limitations": [
+    "Entire case is synthetic.",
+    "No actual port/ship compatibility or grid reservation is established.",
+    "No physical OPS performance, emissions or savings claim is made."
+  ]
+}
