@@ -272,3 +272,21 @@ The biofouling audit checks declared versus area-derived inspection coverage, hu
 accounting, taxonomic-source resolution, cleaning authorization, in-water containment,
 waste disposition and matched same-vessel performance conditions. A synthetic record must
 remain INCOMPLETE; a pass is not a cleaning permit, species identification or causal fuel claim.
+
+
+Audit a cross-domain acoustic / hull-inspection / cleaning / propulsion evidence join:
+
+~~~sh
+cargo run --bin marine-hull-state-evidence-join-audit -- \
+  docs/research/marine/marine-hull-state-evidence-join-v0.1.0.schema.json \
+  docs/research/marine/fixtures/synthetic-marine-hull-state-evidence-join-v0.1.0.json \
+  docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+  docs/research/marine/fixtures/synthetic-marine-acoustic-evidence-v0.1.0.json \
+  docs/research/marine/marine-biofouling-evidence-v0.1.0.schema.json \
+  docs/research/marine/fixtures/synthetic-marine-biofouling-evidence-v0.1.0.json
+~~~
+
+The join audit checks same-vessel revision and service identity, source record IDs/digests,
+event-time alignment, acoustic-to-pre-intervention propulsion conditions and cleaning/post
+observation order. It reports contextual linkage only. Synthetic source records must leave
+the overall result INCOMPLETE and cannot be promoted to causal fuel/noise claims.
