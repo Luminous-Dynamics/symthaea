@@ -144,6 +144,32 @@ jobs:
           test "$status" -eq 2
           jq -e '.disposition == "INCOMPLETE" and .known_subtotal_micro_gj == 102000000 and .total_source_input_micro_gj == null and (.non_additive_flow_ids | length) == 4' "$RUNNER_TEMP/marine-energy-ledger-report.json"
 
+      - name: Component and whole-system energy conservation audit
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-energy-conservation-audit -- \
+            docs/research/marine/marine-energy-conservation-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-energy-conservation-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-energy-balance-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-energy-balance-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .system_residual_micro_gj == 0 and .external_input_micro_gj == 110 and .external_output_micro_gj == 25 and .total_loss_micro_gj == 82 and .total_storage_delta_micro_gj == 3 and ([.component_balances[].residual_micro_gj] | all(. == 0))' "$RUNNER_TEMP/marine-energy-balance-report.json"
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-energy-conservation-audit -- \
+            docs/research/marine/marine-energy-conservation-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-energy-conservation-unbalanced-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-energy-balance-unbalanced-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-energy-balance-unbalanced-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "UNBALANCED" and ([.component_balances[] | select(.component_id == "HOTEL-LOAD")][0].residual_micro_gj == -2)' "$RUNNER_TEMP/marine-energy-balance-unbalanced-report.json"
+
       - name: Synthetic WAPS wind-energy evidence remains explicitly NOT_READY
         shell: bash
         run: |
@@ -202,6 +228,8 @@ jobs:
             ${{ runner.temp }}/marine-causal-report.json
             ${{ runner.temp }}/marine-wind-energy-report.json
             ${{ runner.temp }}/marine-energy-ledger-report.json
+            ${{ runner.temp }}/marine-energy-balance-report.json
+            ${{ runner.temp }}/marine-energy-balance-unbalanced-report.json
             ${{ runner.temp }}/marine-emissions-report.json
             ${{ runner.temp }}/marine-emissions-v0.2-report.json
             ${{ runner.temp }}/marine-service-flexibility-report.json
