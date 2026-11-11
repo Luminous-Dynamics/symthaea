@@ -146,7 +146,7 @@ fn validate_distribution(value: &Value) -> Result<(), String> {
 }
 
 fn validate_proposal(payload: &Value) -> Result<String, String> {
-    const FIELDS: [&str; 9] = [
+    const FIELDS: [&str; 10] = [
         "experiment_id",
         "belief_state_sha256",
         "selector",
@@ -154,6 +154,7 @@ fn validate_proposal(payload: &Value) -> Result<String, String> {
         "predicted_eig_bits",
         "predicted_evsi",
         "predicted_risk",
+        "risk_aversion_coefficient",
         "predicted_cost",
         "predicted_net_value",
     ];
@@ -185,8 +186,25 @@ fn validate_proposal(payload: &Value) -> Result<String, String> {
             return Err(format!("experiment {id} has invalid {key}"));
         }
     }
-    if finite_number(payload, "predicted_net_value").is_none() {
-        return Err(format!("experiment {id} has invalid predicted_net_value"));
+    let risk_aversion = finite_number(payload, "risk_aversion_coefficient")
+        .filter(|value| *value >= 0.0)
+        .ok_or_else(|| format!("experiment {id} has invalid risk_aversion_coefficient"))?;
+    let eig = finite_number(payload, "predicted_eig_bits").unwrap_or_default();
+    let evsi = finite_number(payload, "predicted_evsi").unwrap_or_default();
+    let risk = finite_number(payload, "predicted_risk").unwrap_or_default();
+    let cost = finite_number(payload, "predicted_cost").unwrap_or_default();
+    let net = finite_number(payload, "predicted_net_value")
+        .ok_or_else(|| format!("experiment {id} has invalid predicted_net_value"))?;
+    let expected_net = match text(payload, "selector").unwrap_or("") {
+        "EIG" => eig - cost,
+        "EVSI" => evsi - cost,
+        "RISK_ADJUSTED_EVSI" => evsi - cost - risk_aversion * risk,
+        _ => unreachable!("selector validated above"),
+    };
+    if (net - expected_net).abs() > TOLERANCE {
+        return Err(format!(
+            "experiment {id} predicted_net_value is inconsistent with selector arithmetic"
+        ));
     }
     Ok(id.to_string())
 }
@@ -412,6 +430,7 @@ mod tests {
             "predicted_eig_bits": 0.24,
             "predicted_evsi": 0.18,
             "predicted_risk": 0.01,
+            "risk_aversion_coefficient": 1.0,
             "predicted_cost": 0.02,
             "predicted_net_value": 0.15
         })
@@ -480,6 +499,20 @@ mod tests {
             }),
         );
         assert!(validate_trace(&trace(vec![first, second])).is_err());
+    }
+
+    #[test]
+    fn inconsistent_predicted_net_value_is_rejected() {
+        let mut payload = proposal();
+        payload["predicted_net_value"] = json!(0.42);
+        let first = event(
+            "event-0",
+            0,
+            "experiment_proposal",
+            GENESIS_SHA256,
+            payload,
+        );
+        assert!(validate_trace(&trace(vec![first])).is_err());
     }
 
     #[test]
