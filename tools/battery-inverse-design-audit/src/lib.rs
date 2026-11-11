@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const FLOAT_EPSILON: f64 = 1.0e-12;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
     Maximize,
     Minimize,
@@ -54,7 +54,7 @@ pub struct MetricObservation {
     pub evidence_class: EvidenceClass,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GateDisposition {
     Pass,
     Fail,
@@ -78,7 +78,7 @@ pub struct Candidate {
     pub hard_gates: Vec<HardGate>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RejectionReason {
     MissingHardGates,
     GateFailed(String),
@@ -318,6 +318,7 @@ fn rejection_reasons(candidate: &Candidate) -> Vec<RejectionReason> {
         }
     }
 
+    reasons.sort();
     reasons
 }
 
