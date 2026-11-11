@@ -37,7 +37,7 @@ The guidelines are management guidance, not a universal numeric quiet-ship limit
 - **ISO 17208-3:2025**: shallow-water measurement and source-level procedures that account for shallow-water propagation; its radiated-noise reporting uses decidecade bands.
 - **ISO 7605:2025**: ambient underwater sound measurement and reporting, including hydrophone calibration/deployment, acquisition and processing. Ambient sound is distinct from vessel self-noise.
 
-The selected standard part, water depth, band convention, test geometry, calibration, operating condition and reported quantity must travel with every result. Do not combine deep-water and shallow-water results without a declared method to transform them.
+The selected standard part, water depth, band convention, test geometry, calibration, operating condition and reported quantity must travel with every result. Deep water is defined as depth greater than max(150 m, 1.5 × overall ship length); shallow water is less than that threshold. A test exactly on the boundary is not accepted by either strict inequality and must be treated as method-selection ambiguity. Do not combine deep-water and shallow-water results without a declared method to transform them.
 
 ### 2.3 Recent propeller-noise research
 
