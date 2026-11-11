@@ -357,7 +357,11 @@ pub fn plan_retention(
 
     let mut ids = BTreeSet::new();
     let mut used = 0_u64;
-    let mut qualified_scale: Option<&str> = request.required_loss_scale_id.as_deref();
+    let mut qualified_scale: Option<&str> = if policy == RetentionPolicy::LuminousDecisionRecoveryAware {
+        request.required_loss_scale_id.as_deref()
+    } else {
+        None
+    };
     for context in contexts {
         if context.context_id.trim().is_empty() {
             return Err(RetentionError::EmptyContextId);
@@ -414,15 +418,17 @@ pub fn plan_retention(
                     context.context_id.clone(),
                 ));
             }
-            if let Some(first) = qualified_scale {
-                if first != loss_scale_id.as_str() {
-                    return Err(RetentionError::IncomparableLossScales {
-                        first: first.to_owned(),
-                        other: loss_scale_id.clone(),
-                    });
+            if policy == RetentionPolicy::LuminousDecisionRecoveryAware {
+                if let Some(first) = qualified_scale {
+                    if first != loss_scale_id.as_str() {
+                        return Err(RetentionError::IncomparableLossScales {
+                            first: first.to_owned(),
+                            other: loss_scale_id.clone(),
+                        });
+                    }
+                } else {
+                    qualified_scale = Some(loss_scale_id.as_str());
                 }
-            } else {
-                qualified_scale = Some(loss_scale_id.as_str());
             }
         }
         used = used
@@ -750,6 +756,21 @@ mod tests {
             ),
             Err(RetentionError::IncomparableLossScales { .. })
         ));
+    }
+
+    #[test]
+    fn baselines_do_not_compare_unrelated_loss_scales() {
+        let a = context("a", 40, 1, 1, false, 100, 100, 1);
+        let mut b = context("b", 40, 2, 2, false, 100, 100, 2);
+        if let DecisionImpact::Qualified { loss_scale_id, .. } = &mut b.decision_impact {
+            *loss_scale_id = "other-task-loss".to_owned();
+        }
+        let mut baseline_request = request(80, 40);
+        baseline_request.required_loss_scale_id = None;
+        let plan =
+            plan_retention(RetentionPolicy::Lru, &baseline_request, &[a, b]).unwrap();
+        assert_eq!(plan.disposition, RetentionDisposition::Admitted);
+        assert_eq!(plan.evictions.len(), 1);
     }
 
     #[test]
