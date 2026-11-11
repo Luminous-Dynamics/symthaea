@@ -129,6 +129,20 @@ pub struct MidiTranscriptionTimingErrorSummaryV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MidiTranscriptionPartSeparationSummaryV1 {
+    pub reference_part_count: u32,
+    pub matched_reference_part_count: u32,
+    pub matched_prediction_track_count: u32,
+    pub mixed_prediction_track_count: u32,
+    pub matched_notes_in_mixed_tracks: u32,
+    pub total_matched_notes: u32,
+    /// Fraction of matched notes that fall on the dominant PartId within their predicted track.
+    pub note_weighted_track_purity: Option<f64>,
+    /// Distinct reference PartIds represented by at least one matched predicted note.
+    pub reference_part_coverage: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MidiTranscriptionEvaluationReportV1 {
     pub schema: String,
     pub algorithm: String,
@@ -157,6 +171,8 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub exact_program_onset_metrics: MidiTranscriptionMetricV1,
     /// Exact GM program, pitch, onset and offset must match.
     pub exact_program_full_note_metrics: MidiTranscriptionMetricV1,
+    /// Diagnostic for whether predicted MIDI tracks keep distinct reference PartIds separate.
+    pub part_separation: Option<MidiTranscriptionPartSeparationSummaryV1>,
     /// Full-note match plus MIDI velocity within the configured tolerance.
     pub velocity_aware_full_note_metrics: Option<MidiTranscriptionMetricV1>,
     /// Framewise pitch activity; simultaneous same-pitch notes collapse into one active cell.
@@ -203,6 +219,7 @@ pub struct MidiTempoPointV1 {
 #[derive(Debug, Clone)]
 struct EvaluationNoteV1 {
     pitch_midi: u8,
+    part_id: u16,
     gm_program: u8,
     velocity_midi: u8,
     onset_seconds: f64,
@@ -229,6 +246,7 @@ struct ReportCommitmentV1<'a> {
     onset_pitch_metrics: &'a MidiTranscriptionMetricV1,
     full_note_metrics: &'a MidiTranscriptionMetricV1,
     average_overlap_ratio: f64,
+    part_separation: &'a Option<MidiTranscriptionPartSeparationSummaryV1>,
     exact_program_onset_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_full_note_metrics: &'a MidiTranscriptionMetricV1,
     velocity_aware_full_note_metrics: &'a Option<MidiTranscriptionMetricV1>,
@@ -869,6 +887,7 @@ fn reference_notes(
         }
         notes.push(EvaluationNoteV1 {
             pitch_midi: note.pitch_midi,
+            part_id: note.part_id,
             gm_program: program,
             velocity_midi: note.velocity_midi,
             onset_seconds,
@@ -1409,6 +1428,66 @@ fn metric_from_set_counts(
     metric_from_matching(reference_count, predicted_count, true_positive_count)
 }
 
+fn part_separation_summary_v1(
+    reference: &[EvaluationNoteV1],
+    predicted: &[MidiTranscribedNoteV1],
+    matching: &[(usize, usize)],
+) -> Option<MidiTranscriptionPartSeparationSummaryV1> {
+    let reference_parts: std::collections::BTreeSet<u16> =
+        reference.iter().map(|note| note.part_id).collect();
+    if reference_parts.is_empty() {
+        return None;
+    }
+
+    let mut by_prediction_track: BTreeMap<u16, BTreeMap<u16, u32>> = BTreeMap::new();
+    let mut matched_reference_parts = std::collections::BTreeSet::new();
+    for (reference_index, prediction_index) in matching {
+        let reference_note = reference.get(*reference_index)?;
+        let predicted_note = predicted.get(*prediction_index)?;
+        *by_prediction_track
+            .entry(predicted_note.track_index)
+            .or_default()
+            .entry(reference_note.part_id)
+            .or_default() += 1;
+        matched_reference_parts.insert(reference_note.part_id);
+    }
+
+    let mut mixed_prediction_track_count = 0usize;
+    let mut matched_notes_in_mixed_tracks = 0usize;
+    let mut dominant_note_count = 0usize;
+    for part_counts in by_prediction_track.values() {
+        let track_note_count: usize = part_counts.values().map(|count| *count as usize).sum();
+        if part_counts.len() > 1 {
+            mixed_prediction_track_count += 1;
+            matched_notes_in_mixed_tracks += track_note_count;
+        }
+        dominant_note_count += part_counts
+            .values()
+            .copied()
+            .max()
+            .unwrap_or(0) as usize;
+    }
+
+    let total_matched_notes = matching.len();
+    Some(MidiTranscriptionPartSeparationSummaryV1 {
+        reference_part_count: u32::try_from(reference_parts.len()).unwrap_or(u32::MAX),
+        matched_reference_part_count: u32::try_from(matched_reference_parts.len())
+            .unwrap_or(u32::MAX),
+        matched_prediction_track_count: u32::try_from(by_prediction_track.len())
+            .unwrap_or(u32::MAX),
+        mixed_prediction_track_count: u32::try_from(mixed_prediction_track_count)
+            .unwrap_or(u32::MAX),
+        matched_notes_in_mixed_tracks: u32::try_from(matched_notes_in_mixed_tracks)
+            .unwrap_or(u32::MAX),
+        total_matched_notes: u32::try_from(total_matched_notes).unwrap_or(u32::MAX),
+        note_weighted_track_purity: (total_matched_notes > 0)
+            .then_some(dominant_note_count as f64 / total_matched_notes as f64),
+        reference_part_coverage: Some(
+            matched_reference_parts.len() as f64 / reference_parts.len() as f64,
+        ),
+    })
+}
+
 fn value_error_summary(values: &[f64]) -> MidiTranscriptionValueErrorSummaryV1 {
     if values.is_empty() {
         return MidiTranscriptionValueErrorSummaryV1 {
@@ -1502,6 +1581,7 @@ pub fn midi_transcription_evaluation_commitment_v1(
         onset_pitch_metrics: &report.onset_pitch_metrics,
         full_note_metrics: &report.full_note_metrics,
         average_overlap_ratio: report.average_overlap_ratio,
+        part_separation: &report.part_separation,
         exact_program_onset_metrics: &report.exact_program_onset_metrics,
         exact_program_full_note_metrics: &report.exact_program_full_note_metrics,
         velocity_aware_full_note_metrics: &report.velocity_aware_full_note_metrics,
@@ -1544,6 +1624,7 @@ pub fn evaluate_midi_transcription_v1(
         .iter()
         .map(|note| EvaluationNoteV1 {
             pitch_midi: note.pitch_midi,
+            part_id: 0,
             gm_program: note.gm_program,
             velocity_midi: note.velocity_midi,
             onset_seconds: note.onset_seconds,
@@ -1566,6 +1647,12 @@ pub fn evaluate_midi_transcription_v1(
             build_adjacency(&reference_notes, &predicted_notes, &config, false, false, false)?;
         maximum_cardinality_matching(&adjacency, predicted_notes.len())?
     };
+    let part_separation = part_separation_summary_v1(
+        &reference_notes,
+        &predicted_notes,
+        &onset_matching,
+    );
+
     let full_matching = {
         let adjacency =
             build_adjacency(&reference_notes, &predicted_notes, &config, true, false, false)?;
@@ -1694,6 +1781,7 @@ pub fn evaluate_midi_transcription_v1(
             &predicted_notes,
             &full_matching,
         ),
+        part_separation,
         exact_program_onset_metrics: metric_from_matching(
             reference_notes.len(),
             predicted_notes.len(),
