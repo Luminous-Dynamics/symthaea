@@ -758,7 +758,7 @@ mod tests {
     #[test]
     fn frozen_corpus_replays_all_expected_dynamic_known_truth_cases() {
         let report = report();
-        assert_eq!(report.problem_count, 4);
+        assert_eq!(report.problem_count, 5);
         assert_eq!(report.canonical_corpus_sha256.len(), 64);
         assert!(report.reports.iter().all(|row| {
             row.dynamic_robust_loss.is_finite()
@@ -783,8 +783,10 @@ mod tests {
         let row = report.reports.iter()
             .find(|row| row.problem_id == "pulse-perturbs-state")
             .expect("perturbation problem");
-        assert!(row.dynamic_candidate_count > 0);
-        assert!(row.dynamic_robust_loss.is_finite());
+        assert!(row.dynamic_policy.first_test.is_none());
+        assert!(row.static_policy.first_test.is_some());
+        assert!((row.dynamic_robust_loss - 3.0).abs() < PROBABILITY_TOLERANCE);
+        assert!((row.static_policy_actual_dynamic_loss - 3.15).abs() < PROBABILITY_TOLERANCE);
     }
 
     #[test]
@@ -858,4 +860,66 @@ mod tests {
         let bytes = serde_json::to_vec(&corpus).expect("tagged corpus");
         assert!(audit_corpus(SCHEMA, &bytes).is_err());
     }
+    #[test]
+    fn conditional_followup_is_available_only_after_its_declared_outcome() {
+        let report = report();
+        let row = report.reports.iter()
+            .find(|row| row.problem_id == "conditional-followup-after-flag")
+            .expect("conditional follow-up problem");
+        assert_eq!(row.dynamic_policy.first_test.as_deref(), Some("initial-screen"));
+        assert_eq!(
+            row.dynamic_policy.branches.iter()
+                .find(|branch| branch.first_outcome == "flagged")
+                .and_then(|branch| branch.second_test.as_deref()),
+            Some("followup-reference-test")
+        );
+        assert_eq!(
+            row.dynamic_policy.branches.iter()
+                .find(|branch| branch.first_outcome == "normal")
+                .and_then(|branch| branch.second_test.as_deref()),
+            None
+        );
+        assert!(row.dynamic_robust_loss < 3.0);
+    }
+
+    #[test]
+    fn robust_policy_does_not_optimize_only_for_the_nominal_likelihood_world() {
+        let report = report();
+        let row = report.reports.iter()
+            .find(|row| row.problem_id == "likelihood-ambiguity")
+            .expect("ambiguity problem");
+        assert!(row.dynamic_policy.first_test.is_none());
+        assert!((row.dynamic_robust_loss - 3.0).abs() < PROBABILITY_TOLERANCE);
+    }
+
+    #[test]
+    fn model_receipt_rejects_unmodelled_shared_nuisance_factors() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        corpus.problems[0].worlds[0].shared_nuisance_factors.push("shared-calibration-bias".into());
+        let bytes = serde_json::to_vec(&corpus).expect("corpus with correlated nuisance");
+        assert!(audit_corpus(SCHEMA, &bytes).is_err());
+    }
+
+    #[test]
+    fn model_transition_duration_must_match_test_protocol_duration() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        corpus.problems[0].worlds[0].test_models[0].transition_duration_seconds += 1.0;
+        let bytes = serde_json::to_vec(&corpus).expect("duration mismatch corpus");
+        assert!(audit_corpus(SCHEMA, &bytes).is_err());
+    }
+
+    #[test]
+    fn conditional_test_cannot_be_selected_without_its_parent_outcome() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let conditional = corpus.problems.iter_mut()
+            .find(|problem| problem.problem_id == "conditional-followup-after-flag")
+            .expect("conditional problem");
+        conditional.tests.iter_mut()
+            .find(|test| test.test_id == "followup-reference-test")
+            .expect("follow-up")
+            .available_after_outcomes = vec!["unknown-outcome".into()];
+        let bytes = serde_json::to_vec(&corpus).expect("invalid conditional corpus");
+        assert!(audit_corpus(SCHEMA, &bytes).is_err());
+    }
+
 }
