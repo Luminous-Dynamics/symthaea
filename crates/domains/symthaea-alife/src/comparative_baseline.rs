@@ -94,6 +94,44 @@ pub enum ComparativeDisposition {
     ComparativeAnomaly,
 }
 
+/// Separately derived prediction from an alternative mechanism/model.
+///
+/// This model is not trained or validated by the comparative abiotic baseline module.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct AlternativeModelPrediction {
+    pub model_id: &'static str,
+    pub predicted_mean: f64,
+    pub predictive_stddev: f64,
+}
+
+/// Model-comparison outcome. No outcome is itself a life or biogenicity verdict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ComparativeHypothesisOutcome {
+    AbioticBaselinePredictivelyPreferred,
+    AlternativeModelPredictivelyPreferred,
+    BothModelsPredictiveButNonDiscriminating,
+    UnknownUnknownBothModelsInadequate,
+    Inconclusive,
+}
+
+/// Explicit comparison of the qualified abiotic baseline with a separately supplied model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ComparativeModelComparison {
+    pub observation_id: String,
+    pub system_id: String,
+    pub alternative_model_id: String,
+    pub abiotic_log_predictive_density: f64,
+    pub alternative_log_predictive_density: f64,
+    pub alternative_log_score_advantage: f64,
+    pub abiotic_standardized_residual: f64,
+    pub alternative_standardized_residual: f64,
+    pub adequacy_threshold: f64,
+    pub minimum_log_score_advantage: f64,
+    pub outcome: ComparativeHypothesisOutcome,
+    pub claim_ceiling: &'static str,
+}
+
 /// Evaluation of one held-out candidate against its own system's baseline.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ComparativeEvaluation {
@@ -128,6 +166,8 @@ pub enum ComparativeBaselineError {
         maximum: f64,
     },
     InvalidAnomalyThreshold(f64),
+    InvalidAlternativePrediction { model_id: String, field: &'static str, value: f64 },
+    InvalidModelScoreAdvantage(f64),
     ControlCannotBeEvaluated(String),
     DegeneratePredictiveVariance(String),
     NonFiniteFit,
@@ -179,6 +219,14 @@ impl fmt::Display for ComparativeBaselineError {
             Self::InvalidAnomalyThreshold(value) => {
                 write!(f, "anomaly threshold must be finite and > 0, got {value}")
             }
+            Self::InvalidAlternativePrediction { model_id, field, value } => write!(
+                f,
+                "alternative model {model_id} has invalid {field}={value}"
+            ),
+            Self::InvalidModelScoreAdvantage(value) => write!(
+                f,
+                "minimum model log-score advantage must be finite and >= 0, got {value}"
+            ),
             Self::ControlCannotBeEvaluated(id) => write!(
                 f,
                 "qualified control {id} cannot be evaluated as a held-out candidate"
@@ -462,6 +510,111 @@ impl ComparativeBaselineModel {
     /// Evaluate a held-out candidate against its system-conditioned predictive baseline.
     ///
     /// Context extrapolation is rejected rather than converted into a confident anomaly.
+    /// Compare the qualified abiotic baseline with a separately supplied alternative.
+    ///
+    /// If both predictive models fail the declared adequacy threshold, the outcome is
+    /// UnknownUnknownBothModelsInadequate. An alternative-model preference is a relative
+    /// predictive result only; it is not proof that the alternative mechanism is present.
+    pub fn compare_with_alternative(
+        &self,
+        candidate: &ComparativeObservation,
+        alternative: AlternativeModelPrediction,
+        adequacy_threshold: f64,
+        minimum_log_score_advantage: f64,
+    ) -> Result<ComparativeModelComparison, ComparativeBaselineError> {
+        if !minimum_log_score_advantage.is_finite() || minimum_log_score_advantage < 0.0 {
+            return Err(ComparativeBaselineError::InvalidModelScoreAdvantage(
+                minimum_log_score_advantage,
+            ));
+        }
+        if alternative.model_id.trim().is_empty() {
+            return Err(ComparativeBaselineError::EmptyIdentifier {
+                field: "alternative.model_id",
+            });
+        }
+        if !alternative.predicted_mean.is_finite() {
+            return Err(ComparativeBaselineError::InvalidAlternativePrediction {
+                model_id: alternative.model_id.to_owned(),
+                field: "predicted_mean",
+                value: alternative.predicted_mean,
+            });
+        }
+        if !alternative.predictive_stddev.is_finite() || alternative.predictive_stddev <= 0.0 {
+            return Err(ComparativeBaselineError::InvalidAlternativePrediction {
+                model_id: alternative.model_id.to_owned(),
+                field: "predictive_stddev",
+                value: alternative.predictive_stddev,
+            });
+        }
+
+        let abiotic = self.evaluate(candidate, adequacy_threshold)?;
+        let alternative_variance =
+            alternative.predictive_stddev.powi(2) + candidate.measurement_stddev.powi(2);
+        let alternative_residual = candidate.signal - alternative.predicted_mean;
+        let alternative_standardized_residual =
+            alternative_residual / alternative_variance.sqrt();
+        let alternative_log_predictive_density = -0.5
+            * ((2.0 * std::f64::consts::PI * alternative_variance).ln()
+                + alternative_residual.powi(2) / alternative_variance);
+        let alternative_log_score_advantage =
+            alternative_log_predictive_density - abiotic.gaussian_log_predictive_density;
+
+        if ![
+            alternative_variance,
+            alternative_standardized_residual,
+            alternative_log_predictive_density,
+            alternative_log_score_advantage,
+        ]
+        .iter()
+        .all(|value| value.is_finite())
+        {
+            return Err(ComparativeBaselineError::InvalidAlternativePrediction {
+                model_id: alternative.model_id.to_owned(),
+                field: "derived_predictive_score",
+                value: alternative_log_predictive_density,
+            });
+        }
+
+        let abiotic_adequate = abiotic.standardized_residual.abs() <= adequacy_threshold;
+        let alternative_adequate =
+            alternative_standardized_residual.abs() <= adequacy_threshold;
+
+        let outcome = match (abiotic_adequate, alternative_adequate) {
+            (false, false) => {
+                ComparativeHypothesisOutcome::UnknownUnknownBothModelsInadequate
+            }
+            (false, true)
+                if alternative_log_score_advantage > minimum_log_score_advantage =>
+            {
+                ComparativeHypothesisOutcome::AlternativeModelPredictivelyPreferred
+            }
+            (true, false)
+                if alternative_log_score_advantage < -minimum_log_score_advantage =>
+            {
+                ComparativeHypothesisOutcome::AbioticBaselinePredictivelyPreferred
+            }
+            (true, true) => {
+                ComparativeHypothesisOutcome::BothModelsPredictiveButNonDiscriminating
+            }
+            _ => ComparativeHypothesisOutcome::Inconclusive,
+        };
+
+        Ok(ComparativeModelComparison {
+            observation_id: candidate.observation_id.clone(),
+            system_id: candidate.system_id.clone(),
+            alternative_model_id: alternative.model_id.to_owned(),
+            abiotic_log_predictive_density: abiotic.gaussian_log_predictive_density,
+            alternative_log_predictive_density,
+            alternative_log_score_advantage,
+            abiotic_standardized_residual: abiotic.standardized_residual,
+            alternative_standardized_residual,
+            adequacy_threshold,
+            minimum_log_score_advantage,
+            outcome,
+            claim_ceiling: "relative predictive comparison only; not proof of life, biogenicity, or mechanism identity",
+        })
+    }
+
     pub fn evaluate(
         &self,
         candidate: &ComparativeObservation,
@@ -670,6 +823,95 @@ mod tests {
         assert_eq!(
             evaluation.disposition,
             ComparativeDisposition::ComparativeAnomaly
+        );
+    }
+
+    #[test]
+    fn both_poor_models_are_retained_as_unknown_unknown() {
+        let model = ComparativeBaselineModel::fit(&controls()).unwrap();
+        let held_out = target("both-poor", "system-b", 1.5, 10.0);
+        let comparison = model
+            .compare_with_alternative(
+                &held_out,
+                AlternativeModelPrediction {
+                    model_id: "alternative-mechanism-v0",
+                    predicted_mean: -10.0,
+                    predictive_stddev: 0.1,
+                },
+                3.0,
+                1.0,
+            )
+            .unwrap();
+        assert_eq!(
+            comparison.outcome,
+            ComparativeHypothesisOutcome::UnknownUnknownBothModelsInadequate
+        );
+    }
+
+    #[test]
+    fn better_alternative_prediction_is_not_promoted_to_a_life_verdict() {
+        let model = ComparativeBaselineModel::fit(&controls()).unwrap();
+        let held_out = target("alternative-better", "system-b", 1.5, 2.0);
+        let comparison = model
+            .compare_with_alternative(
+                &held_out,
+                AlternativeModelPrediction {
+                    model_id: "candidate-structured-chemistry-v1",
+                    predicted_mean: 2.0,
+                    predictive_stddev: 0.1,
+                },
+                3.0,
+                1.0,
+            )
+            .unwrap();
+        assert_eq!(
+            comparison.outcome,
+            ComparativeHypothesisOutcome::AlternativeModelPredictivelyPreferred
+        );
+        assert!(comparison.claim_ceiling.contains("not proof of life"));
+    }
+
+    #[test]
+    fn both_predictive_models_remain_non_discriminating() {
+        let model = ComparativeBaselineModel::fit(&controls()).unwrap();
+        let held_out = target("both-fit", "system-b", 1.5, 0.0);
+        let comparison = model
+            .compare_with_alternative(
+                &held_out,
+                AlternativeModelPrediction {
+                    model_id: "broad-alternative",
+                    predicted_mean: 0.0,
+                    predictive_stddev: 1.0,
+                },
+                3.0,
+                1.0,
+            )
+            .unwrap();
+        assert_eq!(
+            comparison.outcome,
+            ComparativeHypothesisOutcome::BothModelsPredictiveButNonDiscriminating
+        );
+    }
+
+    #[test]
+    fn abiotic_baseline_can_be_predictively_preferred() {
+        let model = ComparativeBaselineModel::fit(&controls()).unwrap();
+        let held_out = target("abiotic-better", "system-b", 1.5, 0.0);
+        let comparison = model
+            .compare_with_alternative(
+                &held_out,
+                AlternativeModelPrediction {
+                    model_id: "poor-alternative",
+                    predicted_mean: 2.0,
+                    predictive_stddev: 0.05,
+                },
+                3.0,
+                1.0,
+            )
+            .unwrap();
+        assert_eq!(
+            comparison.outcome,
+            ComparativeHypothesisOutcome::AbioticBaselinePredictivelyPreferred
         );
     }
 
