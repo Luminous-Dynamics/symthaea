@@ -515,6 +515,20 @@ mod tests {
                 .len(),
             3
         );
+        let observation_schema = schema["properties"]["events"]["items"]["oneOf"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| text(&item["properties"]["event_type"], "const") == Some("experiment_observation"))
+            .unwrap();
+        assert_eq!(
+            observation_schema["properties"]["payload"]["required"]
+                .as_array()
+                .unwrap()
+                .len(),
+            5
+        );
+        assert!(observation_schema["properties"]["payload"]["properties"].get("observed_outcome").is_some());
     }
 
     fn event(
@@ -644,6 +658,40 @@ mod tests {
             payload,
         );
         assert!(validate_trace(&trace(vec![first])).is_ok());
+    }
+
+    #[test]
+    fn zero_probability_observation_is_not_hidden_by_log_loss_clipping() {
+        let mut payload = proposal();
+        payload["predicted_outcome_distribution"] = json!([
+            {"outcome": "positive", "probability": 0.0},
+            {"outcome": "negative", "probability": 1.0}
+        ]);
+        let first = event(
+            "event-0",
+            0,
+            "experiment_proposal",
+            GENESIS_SHA256,
+            payload,
+        );
+        let first_hash = text(&first, "event_sha256").unwrap().to_string();
+        let second = event(
+            "event-1",
+            1,
+            "experiment_observation",
+            &first_hash,
+            json!({
+                "proposal_event_id": "event-0",
+                "observation_status": "observed",
+                "observation_sha256": "b".repeat(64),
+                "actual_cost": 0.02,
+                "observed_outcome": "positive"
+            }),
+        );
+        let report = validate_trace(&trace(vec![first, second])).unwrap();
+        assert_eq!(report.mean_brier_score, Some(2.0));
+        assert_eq!(report.mean_log_loss, None);
+        assert_eq!(report.zero_probability_outcome_count, 1);
     }
 
     #[test]
