@@ -174,7 +174,7 @@
       "No new experiment proposals or observations are permitted after stop."
     ],
     "trust_boundary": "A self-contained hash chain detects changes relative to a trusted checkpoint but does not prove event time or signer identity. Model-run use requires an independently operated append-only recorder that signs or timestamps the proposal digest before the experiment is executed.",
-    "claim_ceiling": "The current module computes proper scores for small categorical forecasts from supplied evaluator-resolved labels and validates internal trace consistency. It does not establish real-world calibration, forecast honesty, event time, signer identity or external data correctness. Those require held-out model trials, independent observation adjudication and external timestamp/signature anchoring.",
+    "claim_ceiling": "The current module validates synthetic plan structure and digest binding against supplied plan objects, plus internal trace consistency and forecast scores. It does not provide trusted timestamps, signer identity, WORM storage, candidate isolation or proof that external execution matched the plan; those need independently anchored proposal events and execution receipts.",
     "metrics": {
       "brier_score": "For observed outcomes, sum squared differences across the preregistered categorical outcome space between predicted probabilities and one-hot evaluator-resolved outcome. Lower is better.",
       "log_loss": "For observed outcomes with nonzero forecast probability, -ln(probability assigned to the observed class). An observed zero-probability class is represented as infinite/unavailable log loss and counted separately; no silent epsilon clipping.",
@@ -183,7 +183,7 @@
     },
     "experiment_plan_binding": {
       "digest_field": "experiment_plan_sha256",
-      "status": "digest_required; full plan artifact external to trace",
+      "status": "schema_and_digest_verifier_implemented_in_rust_library",
       "canonicalization": "SHA-256 over deterministic canonical JSON with recursively lexicographically sorted object keys, preserved array order and no insignificant whitespace.",
       "required_plan_fields": [
         "target and causal question / hypothesis",
@@ -197,8 +197,10 @@
         "expected confounders, selection effects and known identification assumptions"
       ],
       "immutability_rule": "The full plan artifact must be durably recorded before an experiment is authorized or executed. The digest in experiment_proposal binds to that exact artifact. Any plan change requires a new proposal event and new plan digest; do not overwrite the prior artifact.",
-      "verification_rule": "A future runner must independently retrieve the plan artifact, recompute its digest and verify it before dispatch; it must separately verify any observed execution receipt against the plan. The current trace validator checks only digest shape and event-chain consistency, because the plan artifact is not yet part of its input.",
-      "claim_ceiling": "A plan digest is not proof of prospective timing or execution fidelity. Trusted timestamp/signature anchoring and an independent execution observer are still required."
+      "verification_rule": "The Rust function validate_trace_with_plans(trace, plan_artifacts) validates each closed plan's required nested objects and recomputes canonical SHA-256; every proposal digest must resolve to exactly one supplied plan artifact, and proposal experiment_id must equal plan_id. Altered plan artifacts and ID mismatches fail closed.",
+      "claim_ceiling": "A plan digest is not proof of prospective timing or execution fidelity. Trusted timestamp/signature anchoring and an independent execution observer are still required.",
+      "schema": "ACED_EXPERIMENT_PLAN_V0_1.schema.json",
+      "rust_fixture": "qualifier/tests/fixtures/aced_experiment_plan_v0_1.json"
     }
   },
   "external_benchmark_crosswalk": [
