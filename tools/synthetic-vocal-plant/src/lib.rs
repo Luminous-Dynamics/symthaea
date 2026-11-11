@@ -236,15 +236,15 @@ pub fn apply_edit(
             if !scale.is_finite() || !(0.8..=1.2).contains(scale) {
                 return Err("formant scale must be finite and within 0.8..=1.2".into());
             }
-            target.f1_hz *= scale;
-            target.f2_hz *= scale;
-            target.f3_hz *= scale;
+            target.f1_hz *= *scale;
+            target.f2_hz *= *scale;
+            target.f3_hz *= *scale;
         }
         EditPatch::EnergyScale { scale } => {
             if !scale.is_finite() || !(0.0..=2.0).contains(scale) {
                 return Err("energy scale must be finite and within 0.0..=2.0".into());
             }
-            target.energy = (target.energy * scale).clamp(0.0, 1.0);
+            target.energy = (target.energy * *scale).clamp(0.0, 1.0);
         }
         EditPatch::UnsupportedControl { control_id } => {
             return Err(format!("unsupported renderer control: {control_id}"));
