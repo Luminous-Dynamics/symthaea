@@ -537,7 +537,7 @@ pub fn derive_motor_map_operating_point(
         || !non_empty(&point.evidence_manifest_digest)
     {
         return Err(ObservationError::InvalidMotorMapOperatingPoint(
-            "synchronized run, asset, configuration, context and evidence identities must be present",
+            "run, asset, config, context and evidence IDs are required",
         ));
     }
 
@@ -560,12 +560,16 @@ pub fn derive_motor_map_operating_point(
         .observations
         .iter()
         .find(|observation| observation.channel_id == torque_channel_id)
-        .ok_or_else(|| ObservationError::MissingRequiredChannel(torque_channel_id.to_owned()))?;
+        .ok_or_else(|| {
+            ObservationError::MissingRequiredChannel(torque_channel_id.to_owned())
+        })?;
     let speed = point
         .observations
         .iter()
         .find(|observation| observation.channel_id == speed_channel_id)
-        .ok_or_else(|| ObservationError::MissingRequiredChannel(speed_channel_id.to_owned()))?;
+        .ok_or_else(|| {
+            ObservationError::MissingRequiredChannel(speed_channel_id.to_owned())
+        })?;
 
     for observation in [torque, speed] {
         if !non_empty(&observation.channel_id)
