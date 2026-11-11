@@ -365,8 +365,8 @@
       },
       "expected": {
         "disposition": "local_rta_reject",
-        "selected_placement": "none",
-        "fallback_required": false,
+        "selected_placement": "onboard",
+        "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false
       }
