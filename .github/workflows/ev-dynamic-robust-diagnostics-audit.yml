@@ -1,0 +1,56 @@
+name: EV dynamic robust diagnostic audit v0.1
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_DYNAMIC_ROBUST_DIAGNOSTICS_V0_1.md"
+      - "schemas/transport/ev_dynamic_robust_diagnostic_v0_1.schema.json"
+      - "fixtures/ev_battery/dynamic_robust_diagnostic_v0_1.json"
+      - "tools/ev-dynamic-robust-diagnostics-audit/**"
+      - ".github/workflows/ev-dynamic-robust-diagnostics-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-dynamic-robust-diagnostics-audit/Cargo.toml -- --check
+
+      - name: Run dynamic transitions, conditional planning and robust-model tests
+        run: cargo test --manifest-path tools/ev-dynamic-robust-diagnostics-audit/Cargo.toml
+
+      - name: Audit the frozen dynamic known-truth corpus
+        run: |
+          cargo run --manifest-path tools/ev-dynamic-robust-diagnostics-audit/Cargo.toml -- \
+            --schema schemas/transport/ev_dynamic_robust_diagnostic_v0_1.schema.json \
+            --corpus fixtures/ev_battery/dynamic_robust_diagnostic_v0_1.json \
+            > "$RUNNER_TEMP/dynamic-diagnostic-report.json"
+          jq -e '
+            .problem_count == 5 and
+            any(.reports[]; .problem_id == "long-test-crosses-service-threshold" and
+              .dynamic_policy.first_test == null and
+              .static_policy.first_test == "long-test" and
+              (.robust_loss_improvement - 0.2 | fabs) < 1e-9) and
+            any(.reports[]; .problem_id == "pulse-perturbs-state" and
+              .dynamic_policy.first_test == null and
+              .static_policy.first_test == "diagnostic-pulse") and
+            any(.reports[]; .problem_id == "conditional-followup-after-flag" and
+              .dynamic_policy.first_test == "initial-screen" and
+              any(.dynamic_policy.branches[]; .first_outcome == "flagged" and .second_test == "followup-reference-test") and
+              any(.dynamic_policy.branches[]; .first_outcome == "normal" and .second_test == null)) and
+            any(.reports[]; .problem_id == "timeout-is-observed" and
+              any(.dynamic_policy.branches[]; .first_outcome == "timeout")) and
+            any(.reports[]; .problem_id == "likelihood-ambiguity" and
+              .dynamic_policy.first_test == null)
+          ' "$RUNNER_TEMP/dynamic-diagnostic-report.json"
