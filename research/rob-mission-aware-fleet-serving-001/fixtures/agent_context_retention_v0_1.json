@@ -1,0 +1,195 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_id": "ROB-AGENT-CONTEXT-RETENTION-001",
+  "status": "synthetic_known_answers_only",
+  "cases": [
+    {
+      "case_id": "CR01_PHASE_AWARE_THINK_ACT_TOOL_RETENTION",
+      "description": "Agent context alternates between think, act, tool and recover phases. Compare LRU, AgentKV, CacheScout and the Luminous candidate without preselecting a winner.",
+      "inputs": {
+        "serving_baselines": [
+          "lru_recency",
+          "agentkv_phase_query_buffer",
+          "cachescout_transition_prefetch",
+          "concur_agent_admission",
+          "luminous_decision_recovery_aware"
+        ],
+        "execution_baselines": [
+          "synchronous_short_context"
+        ],
+        "context_policy": "phase_aware",
+        "context_horizon_seconds": 60,
+        "kv_capacity_tokens": 100000,
+        "resident_tokens": 88000,
+        "candidate_context_tokens": 24000,
+        "re_prefill_latency_ms": 4200,
+        "context_decision_regret_if_evicted": 120,
+        "context_loss_scale_id": "mission-loss-v1",
+        "context_future_reuse_probability_ppm": 850000,
+        "context_is_recovery_critical": true,
+        "action_chunk_deadline_ms": 250,
+        "action_chunk_p99_ms": 140,
+        "local_projection_dispatch_guard_ms": 40,
+        "camera_deadline_ms": 30,
+        "camera_p99_ms": 12,
+        "camera_memory_bandwidth_reserved": true,
+        "local_control_resources_reserved": true,
+        "executed_prefix_digest_matches": true,
+        "observation_clock_valid": true,
+        "held_out_phase_mix": true
+      },
+      "expected": {
+        "status": "benchmark_only",
+        "performance_winner_predeclared": false,
+        "camera_deadline_must_be_preserved": true,
+        "local_control_must_be_preserved": true,
+        "action_chunk_must_meet_deadline": true,
+        "per_robot_and_phase_metrics_required": true,
+        "decision_recovery_value_must_be_reported": true
+      }
+    },
+    {
+      "case_id": "CR02_LOW_RECENCY_HIGH_RECOVERY_VALUE",
+      "description": "An old but low-reuse context contains the only qualified recovery-route evidence. Evaluate regret, replacement cost and recovery consequences rather than recency alone.",
+      "inputs": {
+        "serving_baselines": [
+          "lru_recency",
+          "agentkv_phase_query_buffer",
+          "cachescout_transition_prefetch",
+          "concur_agent_admission",
+          "luminous_decision_recovery_aware"
+        ],
+        "execution_baselines": [
+          "synchronous_short_context"
+        ],
+        "context_policy": "decision_recovery_aware",
+        "context_horizon_seconds": 120,
+        "kv_capacity_tokens": 80000,
+        "resident_tokens": 76000,
+        "candidate_context_tokens": 12000,
+        "re_prefill_latency_ms": 6500,
+        "context_decision_regret_if_evicted": 900,
+        "context_loss_scale_id": "recovery-loss-v1",
+        "context_future_reuse_probability_ppm": 50000,
+        "context_is_recovery_critical": true,
+        "action_chunk_deadline_ms": 250,
+        "action_chunk_p99_ms": 150,
+        "local_projection_dispatch_guard_ms": 40,
+        "camera_deadline_ms": 30,
+        "camera_p99_ms": 14,
+        "camera_memory_bandwidth_reserved": true,
+        "local_control_resources_reserved": true,
+        "executed_prefix_digest_matches": true,
+        "observation_clock_valid": true,
+        "held_out_phase_mix": true
+      },
+      "expected": {
+        "status": "benchmark_only",
+        "performance_winner_predeclared": false,
+        "camera_deadline_must_be_preserved": true,
+        "local_control_must_be_preserved": true,
+        "action_chunk_must_meet_deadline": true,
+        "per_robot_and_phase_metrics_required": true,
+        "decision_recovery_value_must_be_reported": true
+      }
+    },
+    {
+      "case_id": "CR03_LONG_VISUAL_CONTEXT_VS_ACTION_CHUNK_BUDGET",
+      "description": "Longer visual history may improve manipulation context, but additional history and future prediction must preserve action deadlines and foreground camera service.",
+      "inputs": {
+        "serving_baselines": [
+          "lru_recency",
+          "agentkv_phase_query_buffer",
+          "cachescout_transition_prefetch",
+          "concur_agent_admission",
+          "luminous_decision_recovery_aware"
+        ],
+        "execution_baselines": [
+          "synchronous_short_context",
+          "long_wam_context_scaling",
+          "tempowam_progress_replan",
+          "pace_phase_kinematic"
+        ],
+        "context_policy": "adaptive_causal_history",
+        "context_horizon_seconds": 19.2,
+        "kv_capacity_tokens": 180000,
+        "resident_tokens": 120000,
+        "candidate_context_tokens": 30000,
+        "re_prefill_latency_ms": 900,
+        "context_decision_regret_if_evicted": 300,
+        "context_loss_scale_id": "manipulation-loss-v1",
+        "context_future_reuse_probability_ppm": 800000,
+        "context_is_recovery_critical": false,
+        "action_chunk_deadline_ms": 250,
+        "action_chunk_p99_ms": 107,
+        "local_projection_dispatch_guard_ms": 40,
+        "camera_deadline_ms": 30,
+        "camera_p99_ms": 10,
+        "camera_memory_bandwidth_reserved": true,
+        "local_control_resources_reserved": true,
+        "executed_prefix_digest_matches": true,
+        "observation_clock_valid": true,
+        "held_out_phase_mix": true
+      },
+      "expected": {
+        "status": "benchmark_only",
+        "performance_winner_predeclared": false,
+        "camera_deadline_must_be_preserved": true,
+        "local_control_must_be_preserved": true,
+        "action_chunk_must_meet_deadline": true,
+        "per_robot_and_phase_metrics_required": true,
+        "decision_recovery_value_must_be_reported": true
+      }
+    },
+    {
+      "case_id": "CR04_ASYNC_ACTION_CONDITIONED_PREFIX_AND_OPENWAM_FACTORS",
+      "description": "Compare synchronous, streaming action-conditioned, and composable OpenWAM execution under matched model/plant budgets where possible; future prediction must use the exact executed prefix.",
+      "inputs": {
+        "serving_baselines": [
+          "lru_recency",
+          "agentkv_phase_query_buffer",
+          "cachescout_transition_prefetch",
+          "concur_agent_admission",
+          "luminous_decision_recovery_aware"
+        ],
+        "execution_baselines": [
+          "synchronous_short_context",
+          "streaming_wam_action_conditioned",
+          "openwam_vta",
+          "openwam_atv",
+          "openwam_joint",
+          "openwam_decoupled"
+        ],
+        "context_policy": "executed_prefix_conditioned",
+        "context_horizon_seconds": 8,
+        "kv_capacity_tokens": 160000,
+        "resident_tokens": 90000,
+        "candidate_context_tokens": 16000,
+        "re_prefill_latency_ms": 650,
+        "context_decision_regret_if_evicted": 250,
+        "context_loss_scale_id": "manipulation-loss-v2",
+        "context_future_reuse_probability_ppm": 650000,
+        "context_is_recovery_critical": true,
+        "action_chunk_deadline_ms": 250,
+        "action_chunk_p99_ms": 125,
+        "local_projection_dispatch_guard_ms": 40,
+        "camera_deadline_ms": 30,
+        "camera_p99_ms": 11,
+        "camera_memory_bandwidth_reserved": true,
+        "local_control_resources_reserved": true,
+        "executed_prefix_digest_matches": false,
+        "observation_clock_valid": true,
+        "held_out_phase_mix": true
+      },
+      "expected": {
+        "status": "benchmark_only",
+        "performance_winner_predeclared": false,
+        "camera_deadline_must_be_preserved": true,
+        "local_control_must_be_preserved": true,
+        "action_chunk_must_meet_deadline": true,
+        "per_robot_and_phase_metrics_required": true,
+        "decision_recovery_value_must_be_reported": true
+      }
+    }
+  ]
+}
