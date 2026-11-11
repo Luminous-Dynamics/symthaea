@@ -170,7 +170,12 @@ pub fn validate_experiment_plan(plan: &Value) -> Result<(), String> {
 
     let control = &plan["control"];
     if !exact_fields(control, &["kind", "description", "control_variables"])
-        || text(control, "kind").is_none()
+        || ![
+            "matched_no_intervention_control",
+            "active_control",
+            "sham_control",
+        ]
+        .contains(&text(control, "kind").unwrap_or(""))
         || text(control, "description").is_none()
     {
         return Err("experiment plan control contract mismatch".into());
@@ -179,7 +184,11 @@ pub fn validate_experiment_plan(plan: &Value) -> Result<(), String> {
 
     let allocation = &plan["allocation"];
     if !exact_fields(allocation, &["method", "unit", "seed_commitment_sha256"])
-        || text(allocation, "method").is_none()
+        || ![
+            "seeded_randomized_pair_assignment",
+            "blocked_seeded_randomization",
+        ]
+        .contains(&text(allocation, "method").unwrap_or(""))
         || text(allocation, "unit").is_none()
         || !text(allocation, "seed_commitment_sha256").is_some_and(is_sha256)
     {
@@ -1031,6 +1040,20 @@ mod tests {
         assert_eq!(report.mean_brier_score, Some(2.0));
         assert_eq!(report.mean_log_loss, None);
         assert_eq!(report.zero_probability_outcome_count, 1);
+    }
+
+    #[test]
+    fn uncontrolled_total_effect_design_is_rejected() {
+        let mut plan = parsed_plan();
+        plan["allocation"]["method"] = Value::String("uncontrolled_total_effect".into());
+        assert!(validate_experiment_plan(&plan).is_err());
+    }
+
+    #[test]
+    fn missing_control_arm_is_rejected() {
+        let mut plan = parsed_plan();
+        plan["control"]["kind"] = Value::String("none".into());
+        assert!(validate_experiment_plan(&plan).is_err());
     }
 
     #[test]
