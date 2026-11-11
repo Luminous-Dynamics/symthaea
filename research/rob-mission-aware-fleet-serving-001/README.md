@@ -171,6 +171,10 @@ Separate three factors rather than collapsing them into one comparison:
 
 Where the model, weights, platform or task cannot be matched, report the difference explicitly. Do not transfer reported success numbers across tasks or hardware.
 
+### Executable eviction reference
+
+The context-retention hypothesis now has an independent code workstream: [ROB-DECISION-RECOVERY-AWARE-CONTEXT-RETENTION-001 / #11665](https://github.com/Luminous-Dynamics/symthaea/issues/11665), [draft PR #11666](https://github.com/Luminous-Dynamics/symthaea/pull/11666). It provides LRU, phase-affinity, transition-reuse and decision/recovery-aware lexicographic controls. Hard-pinned or Unknown/expired contexts are protected; incomparable task-loss scales are rejected; protected-capacity overflow defers admission rather than partially evicting state. It is a deterministic ordering reference, not a KV allocator or a reproduction of AgentKV / CacheScout.
+
 ### Required metrics
 
 In addition to fleet and resource metrics, report:
