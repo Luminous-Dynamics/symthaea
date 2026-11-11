@@ -54,7 +54,7 @@ impl DriveConfig {
         ];
         if efficiencies
             .iter()
-            .any(|value| !value.is_finite() || !(0.0 < *value && *value <= 1.0))
+            .any(|value| !(value.is_finite() && 0.0 < *value && *value <= 1.0))
         {
             return Err(DriveError::InvalidConfiguration(
                 "all conversion efficiencies must be finite and in (0, 1]",
