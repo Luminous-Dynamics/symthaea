@@ -212,7 +212,7 @@ fn meter_for_bar_v1(
     observation: &ScoreGridObservationV1,
     bar_index: i32,
 ) -> Option<ScoreGridMeterMarkV1> {
-    if bar_index < 0 {
+    if bar_index < 0 || bar_index as u32 >= observation.bar_count {
         return None;
     }
     let bar_index = bar_index as u32;
@@ -646,7 +646,7 @@ fn levenshtein_v1(reference: &[EditTokenV1], prediction: &[EditTokenV1]) -> u32 
         current[0] = prediction_index + 1;
         for (reference_index, reference_token) in reference.iter().enumerate() {
             let substitution = previous[reference_index]
-                + usize::from(reference_token != prediction_token);
+                + if reference_token != prediction_token { 1 } else { 0 };
             let insertion = previous[reference_index + 1] + 1;
             let deletion = current[reference_index] + 1;
             current[reference_index + 1] = substitution.min(insertion).min(deletion);
@@ -849,10 +849,16 @@ mod tests {
 
     #[test]
     fn wrong_measure_is_not_rescued_by_audio_time_note_f1() {
-        let reference = observation(vec![note(0, 0, 8, 60, None)]);
-        let prediction = observation(vec![note(1, 0, 8, 60, None)]);
+        let reference = observation(vec![
+            note(0, 0, 8, 60, None),
+            note(1, 0, 8, 62, None),
+        ]);
+        let prediction = observation(vec![
+            note(0, 0, 8, 60, None),
+            note(2, 0, 8, 62, None),
+        ]);
         let report = evaluate_score_grid_v1(&reference, &prediction).unwrap();
-        assert_eq!(report.score_f1.f1, 0.0);
+        assert_eq!(report.score_f1.f1, 0.5);
     }
 
     #[test]
@@ -866,8 +872,8 @@ mod tests {
 
     #[test]
     fn half_tempo_score_reading_is_searchable() {
-        let reference = observation(vec![note(0, 8, 8, 60, None), note(1, 8, 8, 62, None)]);
-        let prediction = observation(vec![note(0, 16, 16, 60, None), note(1, 16, 16, 62, None)]);
+        let reference = observation(vec![note(0, 8, 8, 60, None), note(0, 16, 8, 62, None)]);
+        let prediction = observation(vec![note(0, 16, 16, 60, None), note(0, 32, 16, 62, None)]);
         let report = evaluate_score_grid_v1(&reference, &prediction).unwrap();
         assert_eq!(report.score_f1.f1, 1.0);
         assert_eq!(report.alignment.scale_numerator, 1);
@@ -987,15 +993,25 @@ mod tests {
     }
 
     #[test]
-    fn too_many_score_alignment_scans_fail_closed() {
-        let notes = vec![note(0, 0, 8, 60, None); SCORE_GRID_MAX_ALIGNMENT_NOTE_SCANS_V1 / 1000];
-        let reference = observation(Vec::new());
-        let mut prediction = observation(notes);
-        prediction.bar_count = 4;
+    fn too_many_score_notes_fail_closed_before_alignment() {
+        let notes = vec![note(0, 0, 8, 60, None); SCORE_GRID_MAX_NOTES_V1 + 1];
+        let observation = observation(notes);
         assert!(matches!(
-            evaluate_score_grid_v1(&reference, &prediction),
-            Err(ScoreGridEvaluationIssueV1::AlignmentWorkBudgetExceeded { .. })
+            validate_score_grid_observation_v1(&observation),
+            Err(ScoreGridEvaluationIssueV1::TooManyNotes { .. })
         ));
+    }
+
+    #[test]
+    fn empty_reference_marks_edit_distance_undefined() {
+        let reference = observation(Vec::new());
+        let prediction = observation(vec![note(0, 0, 8, 60, None)]);
+        let report = evaluate_score_grid_v1(&reference, &prediction).unwrap();
+        assert_eq!(
+            report.score_error_distance_status,
+            ScoreGridEditDistanceStatusV1::EmptyReference
+        );
+        assert!(report.score_error_rate.is_none());
     }
 
     #[test]
