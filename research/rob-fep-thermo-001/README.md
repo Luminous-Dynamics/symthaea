@@ -250,3 +250,12 @@ They are seven synthetic known-answer cases, not empirical or physical-model qua
 ## Competitive landscape and proposed targets
 
 The November 2026 comparator matrix, ablations, sequential-mission design and proposed (not achieved) targets are in [competitive_landscape_2026-11.md](./competitive_landscape_2026-11.md). The comparison keeps RAIBO2, A1, ANYmal, manipulator and simulation results in separate strata and introduces GenAIF and test-time physical-diagnosis papers as additional active-inference comparators.
+
+
+## Evidence-to-action qualification
+
+The six-gate evidence-use benchmark is now specified in [evidence_to_action_gates.md](./evidence_to_action_gates.md) with eight synthetic known-answer cases and a strict schema:
+- [fixtures/evidence_use_v0_1.json](./fixtures/evidence_use_v0_1.json)
+- [fixtures/evidence_use_v0_1.schema.json](./fixtures/evidence_use_v0_1.schema.json)
+
+It composes with #11122 and #11338: it does not create another EVSI or active-sensing engine.
