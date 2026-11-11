@@ -62,6 +62,10 @@ The October/November 2026 landscape makes it clear that causal discovery needs m
 
 **New Luminous experimental ladder:** (1) correct inference on supplied curated evidence; (2) select one decision-relevant experiment; (3) sequentially choose and revise experiments under a finite budget; (4) detect conflicting evidence and stop/reconcile; (5) design and execute a complete rediscovery/repair trajectory; (6) verify the final conclusion against a hidden oracle and independently recorded artifacts. Report stage transitions and failure attribution, not only a terminal answer.
 
+### B2a. Complementary information and adaptive sequential lookahead
+
+A myopic experiment policy can stop even when a useful *sequence* exists: two individually decision-irrelevant probes may jointly resolve the action. Add a bounded exact policy-tree baseline for small discrete worlds. It should be compared against greedy EIG/EVSI and robust EVSI with identical priors, utilities, likelihood models, candidate probes, costs, risk, horizon and information access. Include synthetic complementary-partition controls where each first probe has zero one-step EVSI but the two-probe sequence has positive value. Report policy-tree size, branch coverage, expected probe count/cost, sequence regret and exact-vs-approximation gap as the horizon expands. This is bounded finite-state enumeration, not a general POMDP or a claim of global optimality.
+
 ### B2. Model-uncertain experiment selection
 
 Nominal EVSI assumes a sufficiently specified prior, action-utility table and observation likelihood model. That is fragile when the agent's causal mechanism or measurement reliability is uncertain. Add a separate **robust EVSI** arm: evaluate each proposed experiment over a preregistered finite set of plausible decision models, then select using the worst-case net EVSI. Do not average the scenarios unless defensible probabilities are independently calibrated.
