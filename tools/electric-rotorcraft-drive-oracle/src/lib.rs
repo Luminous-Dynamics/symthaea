@@ -662,7 +662,10 @@ mod tests {
                 .abs()
                 < 1.0e-8
         );
-        assert!((report.drive.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.95 * 0.98)).abs() < 1.0e-8);
+        assert!(
+            (report.drive.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.95 * 0.98)).abs()
+                < 1.0e-8
+        );
     }
 
     #[test]
