@@ -734,7 +734,7 @@ fn calculate(record: &Value) -> AuditReport {
         auditor_version: env!("CARGO_PKG_VERSION"),
         balance_id: record.get("balance_id").and_then(Value::as_str).map(str::to_owned),
         disposition: findings.disposition(),
-        energy_unit: "micro-GJ (1 micro-GJ = 1 joule)",
+        energy_unit: "micro-GJ (1 micro-GJ = 1,000 joules = 1 kJ)",
         external_input_micro_gj: if external_input_known { Some(external_input) } else { None },
         external_output_micro_gj: if external_output_known { Some(external_output) } else { None },
         total_loss_micro_gj: if losses_known { Some(total_loss) } else { None },
@@ -798,6 +798,11 @@ mod tests {
 
     fn parsed(source: &str) -> Value {
         serde_json::from_str(source).expect("energy conservation fixture JSON")
+    }
+
+    #[test]
+    fn micro_gj_is_one_kilojoule_not_one_joule() {
+        assert_eq!(1.0e-6 * 1.0e9, 1_000.0);
     }
 
     #[test]
