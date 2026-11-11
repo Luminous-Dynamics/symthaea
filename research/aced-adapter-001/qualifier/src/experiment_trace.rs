@@ -721,7 +721,11 @@ pub fn validate_trace_with_plans(
         }
     }
 
-    let events = trace["events"].as_array().expect("trace validated events array");
+    let events = trace["events"]
+        .as_array()
+        .expect("trace validated events array");
+    let mut plan_by_proposal_event = BTreeMap::<String, &Value>::new();
+
     for event in events.iter().filter(|event| {
         text(event, "event_type") == Some("experiment_proposal")
     }) {
@@ -730,7 +734,7 @@ pub fn validate_trace_with_plans(
         let expected_digest = text(payload, "experiment_plan_sha256").unwrap_or("");
         let Some(plan) = plans_by_digest.get(expected_digest) else {
             errors.push(format!(
-                "proposal {event_id} references an experiment plan artifact that was not                  supplied or whose digest differs"
+                "proposal {event_id} references an experiment plan artifact that was not supplied or whose digest differs"
             ));
             continue;
         };
@@ -738,6 +742,50 @@ pub fn validate_trace_with_plans(
             errors.push(format!(
                 "proposal {event_id} experiment_id does not match the bound plan_id"
             ));
+        }
+
+        let Some(predicted_outcomes) =
+            payload["predicted_outcome_distribution"].as_array()
+        else {
+            errors.push(format!(
+                "proposal {event_id} has no predicted outcome distribution"
+            ));
+            continue;
+        };
+        let taxonomy = &plan["measurement"]["outcome_taxonomy"];
+        for outcome in predicted_outcomes {
+            let outcome_name = text(outcome, "outcome").unwrap_or("");
+            if !taxonomy
+                .as_array()
+                .is_some_and(|items| items.iter().any(|item| item.as_str() == Some(outcome_name)))
+            {
+                errors.push(format!(
+                    "proposal {event_id} forecasts outcome {outcome_name} outside the plan's outcome taxonomy"
+                ));
+            }
+        }
+        plan_by_proposal_event.insert(event_id.to_string(), *plan);
+    }
+
+    for event in events.iter().filter(|event| {
+        text(event, "event_type") == Some("experiment_observation")
+    }) {
+        let event_id = text(event, "event_id").unwrap_or("<missing-event-id>");
+        let proposal_id = text(&event["payload"], "proposal_event_id").unwrap_or("");
+        let Some(plan) = plan_by_proposal_event.get(proposal_id) else {
+            errors.push(format!(
+                "observation {event_id} has no digest-verified experiment plan"
+            ));
+            continue;
+        };
+        if let Some(actual_cost) = finite_number(&event["payload"], "actual_cost") {
+            let maximum_cost = finite_number(&plan["budget"], "max_cost_units")
+                .unwrap_or(f64::NEG_INFINITY);
+            if actual_cost > maximum_cost {
+                errors.push(format!(
+                    "observation {event_id} actual cost {actual_cost} exceeds plan maximum {maximum_cost}"
+                ));
+            }
         }
     }
 
@@ -1077,6 +1125,47 @@ mod tests {
         altered["control"]["description"] =
             Value::String("Changed control after the proposal was committed.".into());
         assert!(validate_trace_with_plans(&trace_value, &[altered]).is_err());
+    }
+
+    #[test]
+    fn forecast_outcome_space_must_match_plan_taxonomy() {
+        let mut payload = proposal();
+        payload["predicted_outcome_distribution"][0]["outcome"] =
+            Value::String("unplanned-category".into());
+        let first = event(
+            "event-0",
+            0,
+            "experiment_proposal",
+            GENESIS_SHA256,
+            payload,
+        );
+        assert!(validate_trace_with_plans(&trace(vec![first]), &[parsed_plan()]).is_err());
+    }
+
+    #[test]
+    fn actual_observation_cost_must_respect_plan_budget() {
+        let first = event(
+            "event-0",
+            0,
+            "experiment_proposal",
+            GENESIS_SHA256,
+            proposal(),
+        );
+        let first_hash = text(&first, "event_sha256").unwrap().to_string();
+        let second = event(
+            "event-1",
+            1,
+            "experiment_observation",
+            &first_hash,
+            json!({
+                "proposal_event_id": "event-0",
+                "observation_status": "observed",
+                "observation_sha256": "b".repeat(64),
+                "actual_cost": 11.0,
+                "observed_outcome": "positive"
+            }),
+        );
+        assert!(validate_trace_with_plans(&trace(vec![first, second]), &[parsed_plan()]).is_err());
     }
 
     #[test]
