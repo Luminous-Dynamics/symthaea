@@ -1,0 +1,536 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-benchmark-manifest:0.1.0",
+  "title": "Luminous Marine Benchmark Exchange Manifest v0.1.0",
+  "description": "Versioned protocol manifest for reproducible marine engineering benchmark tasks. Results/leaderboard values are kept in separate run receipts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "revision",
+    "title",
+    "task_class",
+    "claim_stage",
+    "reference_case",
+    "datasets",
+    "evaluation_protocol",
+    "baselines",
+    "metric_contracts",
+    "hard_gates",
+    "source_registry",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_class": {
+      "enum": [
+        "hydrodynamic_validation",
+        "wind_assist_physics",
+        "fuel_prediction",
+        "voyage_routing",
+        "energy_management",
+        "design_optimization",
+        "trial_causal_effect",
+        "regulatory_accounting",
+        "fleet_service",
+        "port_energy"
+      ]
+    },
+    "claim_stage": {
+      "enum": [
+        "synthetic_smoke",
+        "published_number_reconstruction",
+        "published_raw_data_reproduction",
+        "component_bench",
+        "cfd_verification_validation",
+        "model_test",
+        "sea_trial",
+        "in_service",
+        "fleet_transfer"
+      ]
+    },
+    "reference_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "case_schema_id",
+        "case_schema_version",
+        "case_content_sha256",
+        "service_fingerprint",
+        "configuration_revision"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_schema_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_schema_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "service_fingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configuration_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment_fingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "geometry_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "datasets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/dataset"
+      }
+    },
+    "evaluation_protocol": {
+      "$ref": "#/$defs/protocol"
+    },
+    "baselines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/baseline"
+      }
+    },
+    "metric_contracts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/metric"
+      }
+    },
+    "hard_gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/hard_gate"
+      }
+    },
+    "source_registry": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "evidence_class",
+        "unit_of_analysis",
+        "rights_status",
+        "license_or_access_basis",
+        "source_ids",
+        "transformations",
+        "limitations"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_class": {
+          "enum": [
+            "synthetic",
+            "published_aggregate",
+            "published_processed",
+            "measured_daily",
+            "measured_voyage",
+            "sensor_trace",
+            "test_basin",
+            "sea_trial",
+            "in_service"
+          ]
+        },
+        "unit_of_analysis": {
+          "enum": [
+            "row",
+            "time_window",
+            "day",
+            "voyage",
+            "route_season",
+            "vessel",
+            "fleet",
+            "trial_run",
+            "component_test"
+          ]
+        },
+        "time_period": {
+          "type": "string"
+        },
+        "rights_status": {
+          "enum": [
+            "public",
+            "permissioned",
+            "restricted",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "license_or_access_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "transformations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_strategy",
+        "partition_unit",
+        "held_out_partition_ids",
+        "purge_or_embargo",
+        "forecast_vintage_required",
+        "operational_inputs_only",
+        "future_observations_prohibited",
+        "same_service_fingerprint_required",
+        "leakage_audits",
+        "reproduction_command"
+      ],
+      "properties": {
+        "split_strategy": {
+          "enum": [
+            "grouped_voyage",
+            "grouped_route_season",
+            "leave_one_vessel_out",
+            "time_block_purged",
+            "pre_registered_trial",
+            "deterministic_fixture"
+          ]
+        },
+        "partition_unit": {
+          "enum": [
+            "voyage",
+            "route_season",
+            "vessel",
+            "calendar_block",
+            "trial_run",
+            "none_synthetic"
+          ]
+        },
+        "held_out_partition_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "purge_or_embargo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "forecast_vintage_required": {
+          "type": "boolean"
+        },
+        "operational_inputs_only": {
+          "type": "boolean"
+        },
+        "future_observations_prohibited": {
+          "type": "boolean"
+        },
+        "same_service_fingerprint_required": {
+          "const": true
+        },
+        "environment_boundary_separate": {
+          "type": "boolean",
+          "default": true
+        },
+        "leakage_audits": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/audit"
+          }
+        },
+        "reproduction_command": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audit_id",
+        "result",
+        "evidence_reference"
+      ],
+      "properties": {
+        "audit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "fail",
+            "not_run",
+            "not_applicable"
+          ]
+        },
+        "evidence_reference": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_id",
+        "name",
+        "algorithm_family",
+        "version",
+        "configuration_sha256",
+        "deployable",
+        "oracle_only",
+        "limitations"
+      ],
+      "properties": {
+        "baseline_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "algorithm_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "implementation_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "deployable": {
+          "type": "boolean"
+        },
+        "oracle_only": {
+          "type": "boolean"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "unit",
+        "boundary",
+        "direction",
+        "aggregation",
+        "stratification",
+        "uncertainty_required"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "minimize",
+            "maximize",
+            "target_range",
+            "report_only"
+          ]
+        },
+        "aggregation": {
+          "enum": [
+            "mean",
+            "median",
+            "p90",
+            "p95",
+            "cvar95",
+            "worst_case",
+            "per_case",
+            "distribution"
+          ]
+        },
+        "stratification": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "uncertainty_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "hard_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_id",
+        "description",
+        "compensable",
+        "failure_disposition"
+      ],
+      "properties": {
+        "gate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "compensable": {
+          "const": false
+        },
+        "failure_disposition": {
+          "enum": [
+            "BLOCKED",
+            "INCOMPLETE",
+            "INVALID",
+            "OUT_OF_DOMAIN"
+          ]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "title",
+        "uri",
+        "evidence_class",
+        "limitations"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "evidence_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
