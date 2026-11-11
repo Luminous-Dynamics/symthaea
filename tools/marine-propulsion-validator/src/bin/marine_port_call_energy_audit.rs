@@ -314,8 +314,17 @@ fn run_audit(schema: &Value, case: &Value) -> AuditReport {
         ),
     }
 
+    let effective_connection_power_w = min_u64(&[
+        requested_max_power_w,
+        ship_max_power_w,
+        berth_limit_w,
+        reserved_power_w,
+    ]);
+
     let interface_matches =
-        connection.get("ship_connector_standard") == connection.get("berth_connector_standard")
+        connection.get("connector_standard") == connection.get("ship_connector_standard")
+        && connection.get("connector_standard") == connection.get("berth_connector_standard")
+        && connection.get("ship_connector_standard") == connection.get("berth_connector_standard")
         && connection.get("ship_voltage_v") == connection.get("berth_voltage_v")
         && connection.get("ship_frequency_hz") == connection.get("berth_frequency_hz")
         && connection.get("ship_phase_count") == connection.get("berth_phase_count")
@@ -364,13 +373,6 @@ fn run_audit(schema: &Value, case: &Value) -> AuditReport {
         && (requested_energy_wh == 0 || (effective_connection_power_w > 0 && available_energy_wh > 0))
         && !findings.invalid
         && !findings.blocked;
-
-    let effective_connection_power_w = min_u64(&[
-        requested_max_power_w,
-        ship_max_power_w,
-        berth_limit_w,
-        reserved_power_w,
-    ]);
 
     let power_time_energy_wh = (effective_connection_power_w as u128)
         .checked_mul(usable_connection_seconds as u128)
