@@ -175,7 +175,7 @@ fn simulation_evidence_remains_distinct_from_measurement() {
 #[test]
 fn not_observable_requires_an_instrument_and_coverage_record() {
     let mut candidate = profile();
-    candidate.evidence.push(measurement("m1", EvidenceOutcome::InvalidMeasurement));
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::InstrumentLimitation));
     candidate.findings.push(finding(
         Property::InformationTransfer,
         PropertyAssessment::NotObservableWithCurrentInstrument,
@@ -196,6 +196,29 @@ fn model_diagnostic(id: &str) -> EvidenceRecord {
         artifact_sha256: None,
         independence_group: Some("model-fit-run-001".to_owned()),
     }
+}
+
+#[test]
+fn not_observable_requires_instrument_limitation_not_just_a_failed_measurement() {
+    let mut candidate = profile();
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::InvalidMeasurement));
+    let mut property = finding(
+        Property::InformationTransfer,
+        PropertyAssessment::NotObservableWithCurrentInstrument,
+        &["m1"],
+    );
+    property.coverage = Some(coverage());
+    candidate.findings.push(property);
+
+    let errors = candidate
+        .validate()
+        .expect_err("invalid measurement is not evidence of instrument capability");
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("requires linked InstrumentLimitation evidence")));
+
+    candidate.evidence[0].outcome = EvidenceOutcome::InstrumentLimitation;
+    assert!(candidate.validate().is_ok());
 }
 
 #[test]
