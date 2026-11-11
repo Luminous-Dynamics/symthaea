@@ -882,6 +882,7 @@ pub fn audit_corpus_with_trust(
     let non_test_blind_assignment_count =
         split_assignment_count.saturating_sub(test_blind_assignment_count);
     let mut case_ids = BTreeSet::new();
+    let mut vehicle_ids = BTreeSet::new();
     let mut pack_ids = BTreeSet::new();
     let mut mission_report_ids = BTreeSet::new();
     let mut reference_evidence_ids = BTreeSet::new();
@@ -889,6 +890,12 @@ pub fn audit_corpus_with_trust(
     for case in &corpus.cases {
         if !case_ids.insert(case.case_id.clone()) {
             return Err(format!("duplicate case identity: {}", case.case_id));
+        }
+        if !vehicle_ids.insert(case.prediction.asset.vehicle_ref.clone()) {
+            return Err(format!(
+                "duplicate vehicle identity would violate independent vehicle-pack-mission sampling: {}",
+                case.prediction.asset.vehicle_ref
+            ));
         }
         if !pack_ids.insert(case.prediction.asset.pack_ref.clone()) {
             return Err(format!(
@@ -1446,6 +1453,21 @@ mod tests {
         assert!(error.contains("caller-pinned SHA-256"));
         let right = sha256(trust);
         assert!(audit_corpus_with_trust(SCHEMA, trust, &right, CORPUS).is_ok());
+    }
+
+    #[test]
+    fn duplicate_vehicle_identity_is_rejected_as_correlated_sampling() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let first_vehicle = corpus.cases[0].prediction.asset.vehicle_ref.clone();
+        corpus.cases[1].prediction.asset.vehicle_ref = first_vehicle.clone();
+        corpus.cases[1].reference.asset.vehicle_ref = first_vehicle.clone();
+        let assignment = corpus.split_manifest.assignments.iter_mut()
+            .find(|assignment| assignment.pack_ref == corpus.cases[1].prediction.asset.pack_ref)
+            .unwrap();
+        assignment.vehicle_ref = first_vehicle;
+        let bytes = serde_json::to_vec(&corpus).expect("duplicate vehicle corpus");
+        let error = audit_corpus(SCHEMA, &bytes).expect_err("duplicate vehicle is not independent");
+        assert!(error.contains("duplicate vehicle identity"));
     }
 
 }
