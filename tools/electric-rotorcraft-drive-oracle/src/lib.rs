@@ -232,6 +232,7 @@ pub struct MissionDriveSegmentReport {
     pub start_timestamp_ns: u64,
     pub end_timestamp_ns: u64,
     pub duration_s: f64,
+    pub dc_bus_voltage_v: f64,
     pub evaluation: Result<DriveMapEnvelope, DriveError>,
 }
 
@@ -722,6 +723,7 @@ pub fn evaluate_mission_drive_profile(
             start_timestamp_ns: segment.start_timestamp_ns,
             end_timestamp_ns: segment.end_timestamp_ns,
             duration_s,
+            dc_bus_voltage_v: segment.dc_bus_voltage_v,
             evaluation,
         });
         previous_end = Some(segment.end_timestamp_ns);
@@ -1018,6 +1020,7 @@ mod tests {
         assert_eq!(result.active_duration_s, 10.0);
         assert_eq!(result.unmodelled_gap_duration_s, 0.0);
         assert_eq!(result.segments.len(), 1);
+        assert_eq!(result.segments[0].dc_bus_voltage_v, 400.0);
     }
 
     #[test]
