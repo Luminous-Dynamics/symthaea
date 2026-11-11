@@ -277,3 +277,14 @@ Added the temporal alignment contract with ten synthetic exact-case fixtures:
 - [fixtures/action_chunk_alignment_v0_1.schema.json](./fixtures/action_chunk_alignment_v0_1.schema.json)
 
 The external benchmark federation now includes RT-SAFE (navigation safety), LIBERO-Dynamic (latency-aware manipulation) and RoboDyna (dynamic interaction). They remain separate task strata; common event/clock/action-chunk semantics are shared without inventing a global score.
+
+
+## Distributed inference placement
+
+A new benchmark child is tracked by [Symthaea #11573](https://github.com/Luminous-Dynamics/symthaea/issues/11573). The protocol compares onboard, edge, cloud, hybrid and fleet-shared compute while charging full network/queue/inference/projection latency and robot/edge/cloud/network energy separately.
+
+See [distributed_inference_extension.md](./distributed_inference_extension.md) and the 15 synthetic known-answer cases:
+- [fixtures/distributed_inference_v0_1.json](./fixtures/distributed_inference_v0_1.json)
+- [fixtures/distributed_inference_v0_1.schema.json](./fixtures/distributed_inference_v0_1.schema.json)
+
+Local low-level control, RTA and safe-stop remain independent and available without remote inference.
