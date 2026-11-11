@@ -268,6 +268,44 @@ fn check_north_east_atlantic_eca(register: &Value, findings: &mut Findings, requ
         return;
     };
 
+    for (rule_id, rule) in [
+        ("NE-ATLANTIC-NOX-ECA-2026", nox),
+        ("NE-ATLANTIC-SOX-PM-ECA-2026", sox),
+    ] {
+        let revision = rule.get("revision_or_resolution").and_then(Value::as_str).unwrap_or("");
+        if !revision.contains("AWAITING CERTIFICATION") {
+            findings.push(
+                format!("/rules/{rule_id}/revision_or_resolution"),
+                "INVALID",
+                "MEPC.407(84) must preserve the 2026-11-11 IMO resolution-index status AWAITING CERTIFICATION separately from committee adoption",
+            );
+        }
+        let source_ids = rule.get("source_ids").and_then(Value::as_array);
+        let has_index_source = source_ids.is_some_and(|items| items.iter().any(|item| {
+            item.as_str() == Some("IMO-MEPC407-RESOLUTION-INDEX-2026")
+        }));
+        if !has_index_source {
+            findings.push(
+                format!("/rules/{rule_id}/source_ids"),
+                "INVALID",
+                "the official IMO resolution-index status source must be linked",
+            );
+        }
+        let geography = rule.pointer("/applicability/geographic_scope")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        for excluded in ["azores", "madeira", "canary"] {
+            if !geography.contains(excluded) {
+                findings.push(
+                    format!("/rules/{rule_id}/applicability/geographic_scope"),
+                    "INVALID",
+                    format!("North-East Atlantic ECA geography must explicitly preserve the {excluded} EEZ exclusion"),
+                );
+            }
+        }
+    }
+
     let nox_dates = nox.get("dates").unwrap_or(&Value::Null);
     for (field, expected) in [
         ("adopted_on", "2026-05-01"),
@@ -842,6 +880,34 @@ mod tests {
         let mut findings = Findings::default();
         check_registry_semantics(&register, &mut findings);
         assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn eca_registry_preserves_imo_awaiting_certification_status_and_island_exclusions() {
+        let register: Value = serde_json::from_str(RULE_REGISTER).expect("rule register JSON");
+        let mut findings = Findings::default();
+        check_north_east_atlantic_eca(&register, &mut findings, false);
+        assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn eca_index_status_cannot_be_silently_promoted_to_certified() {
+        let mut register: Value = serde_json::from_str(RULE_REGISTER).expect("rule register JSON");
+        register["rules"][4]["revision_or_resolution"] =
+            serde_json::json!("Resolution MEPC.407(84)");
+        let mut findings = Findings::default();
+        check_north_east_atlantic_eca(&register, &mut findings, false);
+        assert!(findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn eca_country_buffer_cannot_include_excluded_island_eezs() {
+        let mut register: Value = serde_json::from_str(RULE_REGISTER).expect("rule register JSON");
+        register["rules"][5]["applicability"]["geographic_scope"] =
+            serde_json::json!("EEZs and territorial seas of Greenland, Iceland, Faroe Islands, Ireland, UK, France, Spain and Portugal.");
+        let mut findings = Findings::default();
+        check_north_east_atlantic_eca(&register, &mut findings, false);
+        assert!(findings.invalid, "{:?}", findings.diagnostics);
     }
 
     #[test]
