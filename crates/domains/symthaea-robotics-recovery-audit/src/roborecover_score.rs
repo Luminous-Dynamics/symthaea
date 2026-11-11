@@ -1320,6 +1320,7 @@ mod tests {
         assert_eq!(report.policy_digest, m.policy_digest);
         assert_eq!(report.evaluator_digest, m.evaluator_digest);
         assert_eq!(report.scenarios[0].scenario_content_sha256, m.scenarios[0].scenario_content_sha256);
+        assert_eq!(report.scenarios[0].source, m.scenarios[0].source);
     }
 
 
@@ -1500,6 +1501,37 @@ mod tests {
         assert_eq!(report.policy_not_completed_rows, 1);
         assert_eq!(report.unknown_policy_outcome_rows, 0);
         assert_eq!(report.contradictory_policy_outcome_rows, 0);
+    }
+
+
+    #[test]
+    fn source_repository_and_construction_source_must_match_manifest() {
+        let m = manifest();
+        let mut wrong_repository = sample(
+            0, 0, TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        wrong_repository.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        wrong_repository.source_repository = "another/benchmark".to_owned();
+
+        let report = score_roborecover(&m, &[wrong_repository]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 0);
+        assert_eq!(report.metadata_mismatch_rows, 1);
+
+        let mut wrong_source = sample(
+            0, 0, TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        wrong_source.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        wrong_source.source = ScenarioSource::HumanConstructed;
+
+        let report = score_roborecover(&m, &[wrong_source]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 0);
+        assert_eq!(report.metadata_mismatch_rows, 1);
     }
 
 }
