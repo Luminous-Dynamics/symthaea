@@ -341,3 +341,48 @@ OpenWAM (6 October 2026) is a particularly useful comparator because it exposes 
 The important benchmark implication is that visual prediction, action-outcome identification, action ranking and decision value are four separate gates. Symthaea should consume #598/#664 for action-conditioned physical/causal evidence and #10625 for repeated held-out continuation evaluation. Do not build a new world model or a second selectable-headroom benchmark here.
 
 See [counterfactual_action_value_extension.md](./counterfactual_action_value_extension.md).
+
+
+## 11. New asynchronous world-action model comparators (11 November 2026)
+
+The action-chunk temporal benchmark must distinguish three separate recent methods that are easy to conflate by name:
+
+### Streaming-WAM — action-conditioned prefix continuation (Huang et al., arXiv:2609.28927, 24 September 2026)
+
+This method conditions future visual prediction on the actions already committed for execution, then generates the remaining chunk. Its project page reports:
+- LIBERO: 98.35% average success and 41.0 ms chunk time, with a 12× chunk-time reduction versus FastWAM.
+- RoboTwin 2.0: 91.74% success versus 87.0% for FastWAM-Joint, with 54.4 ms chunk time.
+- Real Stamp Paper task: 27/30 successes (90%) and 38 s mean time versus 26/30 (86.67%) and 90 s for Joint-WAM.
+
+These are the authors' declared evaluation strata and hardware; they are not direct comparisons with Symthaea, and the H100-based throughput must not be assumed to transfer to the user's target robot.
+
+Paper: https://arxiv.org/abs/2609.28927  
+Project/code: https://github.com/SJTU-DENG-Lab/Streaming-WAM
+
+### AHA-WAM — slow world context, fast action expert (Cai et al., arXiv:2606.09811, 8 June 2026)
+
+A dual-DiT architecture runs a low-frequency world planner with rolling latent context, while a high-frequency action expert reuses that context and adapts to the latest observation. The paper reports 92.80% average success on RoboTwin, 78.3% across four real-world tasks, and 24.17 Hz closed-loop control (4.59× Fast-WAM in the authors' comparison).
+
+This gives Luminous a testable architectural hypothesis: Symthaea's slower deliberative/world-model operations should not block a faster local control/continuation process; the fast process must nevertheless bind to the current observation and committed action prefix.
+
+Paper: https://arxiv.org/abs/2606.09811
+
+### StreamingWAM — chunk-wise staircase flow matching (Ren et al., arXiv:2610.15585, 11 October 2026)
+
+A separate work, despite the similar name. It combines a noise ladder, prefix rollout and dense video-history memory. The abstract reports steady-state replanning latency of 72.9 ms in simulation and 57.3 ms on a real robot, with smoother transitions and reduced sensitivity to action horizon K.
+
+Paper: https://arxiv.org/abs/2610.15585
+
+### New required ablations
+
+For any Symthaea/HDC/CfC/FEP contribution, compare:
+1. Single-timescale world/action model.
+2. Slow world model + fast local action proposal.
+3. Slow world model + fast action proposal conditioned on the *executed/committed prefix*.
+4. Prefix-conditioned proposal plus independent temporal eligibility, action projection and runtime assurance.
+5. Same architecture with a stale or shuffled world-context negative control.
+6. Direct reactive policy with no world-model access.
+
+Report chunk latency, closed-loop frequency, queue-underflow, boundary discontinuity, task success, safe-success, action regret at application time, observation age, compute/battery/thermal cost and recovery viability. Do not optimize success alone by lengthening chunks or allowing stale commands.
+
+The contribution we should aim to establish is not "another WAM". It is whether this asynchronous split-timescale pattern can be made evidence-qualified and thermodynamically viable across different embodiments and persistent degradation—not whether it wins a LIBERO score against a different training recipe.
