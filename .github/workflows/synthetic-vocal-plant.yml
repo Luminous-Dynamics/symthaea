@@ -60,3 +60,5 @@ jobs:
           test -s "$output/manifest.json"
           test -s "$output/manifest.sha256"
           grep -q '"content_class": "synthetic_only"' "$output/manifest.json"
+          grep -q '"segment_parameters": \[' "$output/manifest.json"
+          grep -q '"target_formant_observation":' "$output/manifest.json"
