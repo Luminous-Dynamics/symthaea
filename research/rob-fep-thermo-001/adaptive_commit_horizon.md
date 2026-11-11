@@ -90,3 +90,8 @@ Second, the common physical/evidence envelope clips the candidate:
 This allows a fair test of different horizon proposal algorithms while giving each the same independent physical constraint wrapper. The proposal algorithm can recommend less than the maximum eligible horizon; it can never make the physical cap larger.
 
 The new fixture corpus contains 19 cases. AH18 shows a PACE-style 12-tick proposal clipped to 4 ticks by thermal headroom. AH19 shows a ChunkTrust-style 14-tick proposal clipped to 3 ticks by observation-constrained viability. These are synthetic semantics, not measured PACE/ChunkTrust reproductions.
+
+
+## Executable Rust reference
+
+The dependency-free reference combiner is at [adaptive-horizon-reference/src/lib.rs](./adaptive-horizon-reference/src/lib.rs). It consumes upstream caps only; it does not estimate them. Eleven tests cover min/ties, Unknown/stale/context mismatch/prefix closure, model/prefix identity mismatch, zero horizon, minimum threshold and non-authorization. A dedicated Rust 1.96 workflow runs format, test and strict Clippy on this branch. The code has been source-audited and fetched back; no Rust pass is claimed until the exact-head workflow succeeds.
