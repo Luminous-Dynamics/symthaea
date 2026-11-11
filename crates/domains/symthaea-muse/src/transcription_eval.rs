@@ -14,12 +14,14 @@
 //! certify the acoustic source, the transcriber, or the identity of a rendered
 //! instrument beyond what the MIDI prediction explicitly encodes.
 
-use crate::audio_clock_alignment::{
-    AudioClockAlignmentProfileV1, AudioClockAlignmentStatusV1,
-    validate_audio_clock_alignment_profile_v1,
+use crate::midi_performance::{
+    MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
+    MIDI_PERFORMANCE_SCHEMA_V1,
+    MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1,
+    MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1,
+    MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1,
+    MidiPerformanceArtifactV1,
 };
-use crate::audio_event_observation::{AudioEventObservationIssueV1, validate_midi_artifact};
-use crate::midi_performance::MidiPerformanceArtifactV1;
 use midly::{Format, MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -58,6 +60,8 @@ impl Default for MidiTranscriptionEvaluationConfigV1 {
 pub struct MidiTranscribedNoteV1 {
     pub track_index: u16,
     pub midi_channel: u8,
+    pub onset_tick: u64,
+    pub offset_tick: Option<u64>,
     /// GM program captured at NoteOn; percussion channel 9 is retained.
     pub gm_program: u8,
     pub pitch_midi: u8,
@@ -71,6 +75,7 @@ pub struct ParsedMidiTranscriptionV1 {
     pub notes: Vec<MidiTranscribedNoteV1>,
     pub ticks_per_quarter: u16,
     pub tempo_point_count: u32,
+    pub tempo_points: Vec<MidiTempoPointV1>,
     pub unclosed_note_count: u32,
     pub orphan_note_off_count: u32,
 }
@@ -117,19 +122,16 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub exact_program_full_note_metrics: MidiTranscriptionMetricV1,
     pub onset_error_ms: MidiTranscriptionTimingErrorSummaryV1,
     pub offset_error_ms: MidiTranscriptionTimingErrorSummaryV1,
-    /// Set when a supplied, validated clock profile was used to shift predicted
-    /// audio timestamps back into the reference MIDI clock domain. The raw
-    /// metrics above are always uncorrected; adjusted metrics are separate.
-    pub clock_alignment_status: Option<AudioClockAlignmentStatusV1>,
-    pub clock_alignment_profile_sha256: Option<String>,
-    pub clock_correction_applied_ms: Option<f64>,
     pub report_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MidiTranscriptionEvaluationIssueV1 {
     InvalidConfig { field: String },
-    InvalidReference { issues: Vec<AudioEventObservationIssueV1> },
+    ReferenceMidiDigestMismatch,
+    ReferenceManifestDigestMismatch,
+    ReferenceMidiDoesNotMatchManifest,
+    InvalidReference,
     InvalidPredictionMidi,
     UnsupportedMidiFormat,
     UnsupportedSmpteTiming,
@@ -143,10 +145,10 @@ pub enum MidiTranscriptionEvaluationIssueV1 {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct TempoPointV1 {
-    start_tick: u64,
-    start_seconds: f64,
-    microseconds_per_quarter: u32,
+pub struct MidiMidiTempoPointV1 {
+    pub start_tick: u64,
+    pub start_seconds: f64,
+    pub microseconds_per_quarter: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -176,9 +178,6 @@ struct ReportCommitmentV1<'a> {
     exact_program_full_note_metrics: &'a MidiTranscriptionMetricV1,
     onset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
     offset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
-    clock_alignment_status: Option<AudioClockAlignmentStatusV1>,
-    clock_alignment_profile_sha256: &'a Option<String>,
-    clock_correction_applied_ms: Option<f64>,
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -221,7 +220,7 @@ fn validate_config(
 fn tempo_points_from_events(
     events: &[(u64, usize, usize, u32)],
     ticks_per_quarter: u16,
-) -> Result<Vec<TempoPointV1>, MidiTranscriptionEvaluationIssueV1> {
+) -> Result<Vec<MidiTempoPointV1>, MidiTranscriptionEvaluationIssueV1> {
     if ticks_per_quarter == 0 {
         return Err(MidiTranscriptionEvaluationIssueV1::InvalidPredictionMidi);
     }
@@ -262,7 +261,7 @@ fn tempo_points_from_events(
     Ok(points)
 }
 
-fn tick_to_seconds(tick: u64, tempo_points: &[TempoPointV1], ticks_per_quarter: u16) -> Option<f64> {
+fn tick_to_seconds(tick: u64, tempo_points: &[MidiTempoPointV1], ticks_per_quarter: u16) -> Option<f64> {
     let index = tempo_points.partition_point(|point| point.start_tick <= tick);
     let point = tempo_points.get(index.checked_sub(1)?)?;
     let delta_ticks = tick.checked_sub(point.start_tick)?;
@@ -295,8 +294,6 @@ pub fn parse_transcribed_midi_v1(
 
     let mut tempo_events = Vec::new();
     let mut absolute_tracks = Vec::with_capacity(smf.tracks.len());
-    let mut max_tick = 0u64;
-
     for (track_index, track) in smf.tracks.iter().enumerate() {
         let mut tick = 0u64;
         let mut absolute = Vec::with_capacity(track.len());
@@ -309,7 +306,6 @@ pub fn parse_transcribed_midi_v1(
             }
             absolute.push((tick, event.kind));
         }
-        max_tick = max_tick.max(tick);
         absolute_tracks.push(absolute);
     }
 
@@ -323,10 +319,7 @@ pub fn parse_transcribed_midi_v1(
             .map_err(|_| MidiTranscriptionEvaluationIssueV1::UnsupportedMidiFormat)?;
         let mut programs = [0u8; 16];
         let mut pending: HashMap<(u8, u8), VecDeque<(u64, u8)>> = HashMap::new();
-        let mut track_end_tick = 0u64;
-
         for (tick, kind) in events {
-            track_end_tick = track_end_tick.max(*tick);
             match *kind {
                 TrackEventKind::Midi { channel, message } => {
                     let channel = channel.as_int();
@@ -362,6 +355,8 @@ pub fn parse_transcribed_midi_v1(
                                     notes.push(MidiTranscribedNoteV1 {
                                         track_index: track_index_u16,
                                         midi_channel: channel,
+                                        onset_tick: start_tick,
+                                        offset_tick: Some(*tick),
                                         gm_program: program,
                                         pitch_midi: key.as_int(),
                                         onset_seconds,
@@ -389,11 +384,12 @@ pub fn parse_transcribed_midi_v1(
                     ticks_per_quarter,
                 )
                 .ok_or(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
-                let _ = (channel, pitch, program, onset_seconds, track_end_tick);
                 unclosed_note_count += 1;
                 notes.push(MidiTranscribedNoteV1 {
                     track_index: track_index_u16,
                     midi_channel: channel,
+                    onset_tick: start_tick,
+                    offset_tick: None,
                     gm_program: program,
                     pitch_midi: pitch,
                     onset_seconds,
@@ -421,6 +417,7 @@ pub fn parse_transcribed_midi_v1(
         notes,
         ticks_per_quarter,
         tempo_point_count: u32::try_from(tempo_points.len()).unwrap_or(u32::MAX),
+        tempo_points,
         unclosed_note_count: u32::try_from(unclosed_note_count).unwrap_or(u32::MAX),
         orphan_note_off_count: u32::try_from(orphan_note_off_count).unwrap_or(u32::MAX),
     })
@@ -668,9 +665,6 @@ pub fn midi_transcription_evaluation_commitment_v1(
         exact_program_full_note_metrics: &report.exact_program_full_note_metrics,
         onset_error_ms: &report.onset_error_ms,
         offset_error_ms: &report.offset_error_ms,
-        clock_alignment_status: report.clock_alignment_status,
-        clock_alignment_profile_sha256: &report.clock_alignment_profile_sha256,
-        clock_correction_applied_ms: report.clock_correction_applied_ms,
     };
     Ok(domain_separated_sha256(
         MIDI_TRANSCRIPTION_EVALUATION_SCHEMA_V1,
@@ -686,15 +680,9 @@ pub fn evaluate_midi_transcription_v1(
     prediction_midi_bytes: &[u8],
     reference: &MidiPerformanceArtifactV1,
     config: MidiTranscriptionEvaluationConfigV1,
-    clock_alignment: Option<(&[u8], &AudioClockAlignmentProfileV1)>,
 ) -> Result<MidiTranscriptionEvaluationReportV1, MidiTranscriptionEvaluationIssueV1> {
     validate_config(&config)?;
-    let reference_issues = validate_midi_artifact(reference);
-    if !reference_issues.is_empty() {
-        return Err(MidiTranscriptionEvaluationIssueV1::InvalidReference {
-            issues: reference_issues,
-        });
-    }
+    validate_reference_artifact_v1(reference)?;
 
     let reference_notes = reference_notes(reference)?;
     let parsed = parse_transcribed_midi_v1(prediction_midi_bytes)?;
@@ -750,24 +738,6 @@ pub fn evaluate_midi_transcription_v1(
         })
         .collect();
 
-    let mut clock_alignment_status = None;
-    let mut clock_alignment_profile_sha256 = None;
-    let mut clock_correction_applied_ms = None;
-    if let Some((wav_bytes, profile)) = clock_alignment {
-        let issues = validate_audio_clock_alignment_profile_v1(profile, wav_bytes, reference);
-        if !issues.is_empty() {
-            return Err(MidiTranscriptionEvaluationIssueV1::InvalidClockAlignmentProfile);
-        }
-        clock_alignment_status = Some(profile.status);
-        clock_alignment_profile_sha256 = Some(profile.profile_sha256.clone());
-        if profile.status == AudioClockAlignmentStatusV1::Candidate {
-            let correction_ms = profile
-                .audio_minus_midi_offset_ms
-                .ok_or(MidiTranscriptionEvaluationIssueV1::InvalidClockAlignmentProfile)?;
-            clock_correction_applied_ms = Some(correction_ms);
-        }
-    }
-
     let mut report = MidiTranscriptionEvaluationReportV1 {
         schema: MIDI_TRANSCRIPTION_EVALUATION_SCHEMA_V1.into(),
         algorithm: MIDI_TRANSCRIPTION_EVALUATION_ALGORITHM_V1.into(),
@@ -802,9 +772,6 @@ pub fn evaluate_midi_transcription_v1(
         ),
         onset_error_ms: timing_error_summary(&onset_errors),
         offset_error_ms: timing_error_summary(&offset_errors),
-        clock_alignment_status,
-        clock_alignment_profile_sha256,
-        clock_correction_applied_ms,
         report_sha256: String::new(),
     };
     report.report_sha256 = midi_transcription_evaluation_commitment_v1(&report)
@@ -971,7 +938,6 @@ mod tests {
             &prediction,
             &reference,
             default_config(),
-            None,
         )
         .unwrap();
         assert_eq!(report.onset_pitch_metrics.f1, 1.0);
@@ -1061,9 +1027,8 @@ mod tests {
         let pos = prediction.windows(note_marker.len()).rposition(|w| w == note_marker).unwrap();
         let start = pos - 5;
         let replacement_track = [0x00, 0xc0, 40, 0x00, 0x90, 60, 100, 0x00, 0xff, 0x2f, 0x00];
-        let _ = start;
-        let _ = replacement_track;
-        // Use the public parser for a valid unclosed fixture from raw MIDI.
+        let _ = (prediction, note_marker, pos, start, replacement_track);
+        // Use a valid unclosed fixture from raw MIDI.
         let mut raw = Vec::new();
         raw.extend_from_slice(b"MThd");
         raw.extend_from_slice(&6u32.to_be_bytes());
@@ -1074,7 +1039,7 @@ mod tests {
         let track = [0x00, 0xc0, 40, 0x00, 0x90, 60, 100, 0x00, 0xff, 0x2f, 0x00];
         raw.extend_from_slice(&(track.len() as u32).to_be_bytes());
         raw.extend_from_slice(&track);
-        let report = evaluate_midi_transcription_v1(&raw, &reference, default_config(), None).unwrap();
+        let report = evaluate_midi_transcription_v1(&raw, &reference, default_config()).unwrap();
         assert_eq!(report.prediction_unclosed_note_count, 1);
         assert_eq!(report.onset_pitch_metrics.true_positives, 1);
         assert_eq!(report.full_note_metrics.true_positives, 0);
