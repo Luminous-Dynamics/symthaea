@@ -177,6 +177,7 @@ pub enum MidiTranscriptionEvaluationIssueV1 {
     UnsupportedMidiFormat,
     UnsupportedSmpteTiming,
     InvalidTempo,
+    ConflictingProgramChange { tick: u64, channel: u8 },
     MidiTickOverflow,
     TooManyPredictedNotes { count: usize, maximum: usize },
     InvalidReferenceTrack { track_index: u16 },
@@ -368,10 +369,14 @@ pub fn parse_transcribed_midi_v1(
     }
 
     let mut tempo_events = Vec::new();
-    let mut absolute_tracks = Vec::with_capacity(smf.tracks.len());
+    let mut absolute_events = Vec::new();
+    let mut program_at_tick: BTreeMap<(u64, u8), u8> = BTreeMap::new();
+
+    // Type-1 MIDI tracks are parallel parts on a shared channel namespace.
+    // Merge their absolute events before applying channel program state or
+    // pairing overlapping same-pitch NoteOn/NoteOff events.
     for (track_index, track) in smf.tracks.iter().enumerate() {
         let mut tick = 0u64;
-        let mut absolute = Vec::with_capacity(track.len());
         for (event_index, event) in track.iter().enumerate() {
             tick = tick
                 .checked_add(u64::from(event.delta.as_int()))
@@ -379,127 +384,154 @@ pub fn parse_transcribed_midi_v1(
             if let TrackEventKind::Meta(MetaMessage::Tempo(tempo)) = event.kind {
                 tempo_events.push((tick, track_index, event_index, tempo.as_int()));
             }
-            absolute.push((tick, event.kind));
+            if let TrackEventKind::Midi {
+                channel,
+                message: MidiMessage::ProgramChange { program },
+            } = event.kind
+            {
+                let channel = channel.as_int();
+                let program = program.as_int();
+                if program_at_tick
+                    .insert((tick, channel), program)
+                    .is_some_and(|prior| prior != program)
+                {
+                    return Err(MidiTranscriptionEvaluationIssueV1::ConflictingProgramChange {
+                        tick,
+                        channel,
+                    });
+                }
+            }
+            absolute_events.push((tick, track_index, event_index, event.kind));
         }
-        absolute_tracks.push(absolute);
     }
 
     let tempo_points = tempo_points_from_events(&tempo_events, ticks_per_quarter)?;
+    absolute_events.sort_by_key(|(tick, track_index, event_index, kind)| {
+        let priority = match kind {
+            TrackEventKind::Midi {
+                message: MidiMessage::ProgramChange { .. },
+                ..
+            } => 0,
+            TrackEventKind::Midi {
+                message: MidiMessage::NoteOff { .. } | MidiMessage::NoteOn { vel, .. },
+                ..
+            } if matches!(kind, TrackEventKind::Midi { message: MidiMessage::NoteOff { .. }, .. })
+                || matches!(kind, TrackEventKind::Midi { message: MidiMessage::NoteOn { vel, .. }, .. } if vel.as_int() == 0) => 1,
+            TrackEventKind::Midi {
+                message: MidiMessage::NoteOn { .. },
+                ..
+            } => 2,
+            _ => 3,
+        };
+        (*tick, priority, *track_index, *event_index)
+    });
+
     let mut notes = Vec::new();
     let mut unclosed_note_count = 0usize;
     let mut orphan_note_off_count = 0usize;
     let mut overlapping_same_pitch_note_on_count = 0usize;
+    let mut programs = [0u8; 16];
+    let mut pending: BTreeMap<(u8, u8), VecDeque<(u64, u8, u8, u16)>> = BTreeMap::new();
+    let mut pending_note_count = 0usize;
 
-    for (track_index, events) in absolute_tracks.iter().enumerate() {
-        let track_index_u16 = u16::try_from(track_index)
-            .map_err(|_| MidiTranscriptionEvaluationIssueV1::UnsupportedMidiFormat)?;
-        let mut programs = [0u8; 16];
-        let mut pending: BTreeMap<(u8, u8), VecDeque<(u64, u8, u8)>> = BTreeMap::new();
-        let mut pending_note_count = 0usize;
-        for (tick, kind) in events {
-            match *kind {
-                TrackEventKind::Midi { channel, message } => {
-                    let channel = channel.as_int();
-                    match message {
-                        MidiMessage::ProgramChange { program } => {
-                            programs[usize::from(channel)] = program.as_int();
+    for (tick, track_index, _, kind) in absolute_events {
+        match kind {
+            TrackEventKind::Midi { channel, message } => {
+                let channel = channel.as_int();
+                match message {
+                    MidiMessage::ProgramChange { program } => {
+                        programs[usize::from(channel)] = program.as_int();
+                    }
+                    MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
+                        if notes.len().saturating_add(pending_note_count)
+                            >= MIDI_TRANSCRIPTION_MAX_NOTES_V1
+                        {
+                            return Err(MidiTranscriptionEvaluationIssueV1::TooManyPredictedNotes {
+                                count: notes.len().saturating_add(pending_note_count).saturating_add(1),
+                                maximum: MIDI_TRANSCRIPTION_MAX_NOTES_V1,
+                            });
                         }
-                        MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
-                            if pending_note_count >= MIDI_TRANSCRIPTION_MAX_NOTES_V1 {
-                                return Err(MidiTranscriptionEvaluationIssueV1::TooManyPredictedNotes {
-                                    count: pending_note_count.saturating_add(1),
-                                    maximum: MIDI_TRANSCRIPTION_MAX_NOTES_V1,
-                                });
-                            }
-                            let queue = pending.entry((channel, key.as_int())).or_default();
-                            if !queue.is_empty() {
-                                overlapping_same_pitch_note_on_count += 1;
-                            }
-                            queue.push_back((
-                                *tick,
-                                programs[usize::from(channel)],
-                                vel.as_int(),
-                            ));
-                            pending_note_count += 1;
+                        let queue = pending.entry((channel, key.as_int())).or_default();
+                        if !queue.is_empty() {
+                            overlapping_same_pitch_note_on_count += 1;
                         }
-                        MidiMessage::NoteOff { key, .. }
-                        | MidiMessage::NoteOn { key, .. } => {
-                            if let Some(queue) = pending.get_mut(&(channel, key.as_int())) {
-                                if let Some((start_tick, program, velocity)) = queue.pop_front() {
-                                    pending_note_count = pending_note_count.saturating_sub(1);
-                                    let onset_seconds = tick_to_seconds(
-                                        start_tick,
-                                        &tempo_points,
-                                        ticks_per_quarter,
-                                    )
-                                    .ok_or(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
-                                    let offset_seconds = tick_to_seconds(
-                                        *tick,
-                                        &tempo_points,
-                                        ticks_per_quarter,
-                                    )
-                                    .ok_or(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
-                                    if offset_seconds <= onset_seconds {
-                                        return Err(MidiTranscriptionEvaluationIssueV1::InvalidPredictionMidi);
-                                    }
-                                    if notes.len() >= MIDI_TRANSCRIPTION_MAX_NOTES_V1 {
-                                        return Err(MidiTranscriptionEvaluationIssueV1::TooManyPredictedNotes {
-                                            count: notes.len().saturating_add(1),
-                                            maximum: MIDI_TRANSCRIPTION_MAX_NOTES_V1,
-                                        });
-                                    }
-                                    notes.push(MidiTranscribedNoteV1 {
-                                        track_index: track_index_u16,
-                                        midi_channel: channel,
-                                        onset_tick: start_tick,
-                                        offset_tick: Some(*tick),
-                                        gm_program: program,
-                                        pitch_midi: key.as_int(),
-                                        velocity_midi: velocity,
-                                        onset_seconds,
-                                        offset_seconds: Some(offset_seconds),
-                                    });
-                                } else {
-                                    orphan_note_off_count += 1;
+                        let track_index_u16 = u16::try_from(track_index)
+                            .map_err(|_| MidiTranscriptionEvaluationIssueV1::UnsupportedMidiFormat)?;
+                        queue.push_back((
+                            tick,
+                            programs[usize::from(channel)],
+                            vel.as_int(),
+                            track_index_u16,
+                        ));
+                        pending_note_count += 1;
+                    }
+                    MidiMessage::NoteOff { key, .. }
+                    | MidiMessage::NoteOn { key, .. } => {
+                        if let Some(queue) = pending.get_mut(&(channel, key.as_int())) {
+                            if let Some((start_tick, program, velocity, onset_track_index)) =
+                                queue.pop_front()
+                            {
+                                pending_note_count = pending_note_count.saturating_sub(1);
+                                let onset_seconds = tick_to_seconds(
+                                    start_tick,
+                                    &tempo_points,
+                                    ticks_per_quarter,
+                                )
+                                .ok_or(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
+                                let offset_seconds = tick_to_seconds(
+                                    tick,
+                                    &tempo_points,
+                                    ticks_per_quarter,
+                                )
+                                .ok_or(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
+                                if offset_seconds <= onset_seconds {
+                                    return Err(MidiTranscriptionEvaluationIssueV1::InvalidPredictionMidi);
                                 }
+                                notes.push(MidiTranscribedNoteV1 {
+                                    track_index: onset_track_index,
+                                    midi_channel: channel,
+                                    onset_tick: start_tick,
+                                    offset_tick: Some(tick),
+                                    gm_program: program,
+                                    pitch_midi: key.as_int(),
+                                    velocity_midi: velocity,
+                                    onset_seconds,
+                                    offset_seconds: Some(offset_seconds),
+                                });
                             } else {
                                 orphan_note_off_count += 1;
                             }
+                        } else {
+                            orphan_note_off_count += 1;
                         }
-                        _ => {}
                     }
+                    _ => {}
                 }
-                _ => {}
             }
+            _ => {}
         }
+    }
 
-        for ((channel, pitch), queue) in pending {
-            for (start_tick, program, velocity) in queue {
-                if notes.len() >= MIDI_TRANSCRIPTION_MAX_NOTES_V1 {
-                    return Err(MidiTranscriptionEvaluationIssueV1::TooManyPredictedNotes {
-                        count: notes.len().saturating_add(1),
-                        maximum: MIDI_TRANSCRIPTION_MAX_NOTES_V1,
-                    });
-                }
-                let onset_seconds = tick_to_seconds(
-                    start_tick,
-                    &tempo_points,
-                    ticks_per_quarter,
-                )
-                .ok_or(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
-                unclosed_note_count += 1;
-                notes.push(MidiTranscribedNoteV1 {
-                    track_index: track_index_u16,
-                    midi_channel: channel,
-                    onset_tick: start_tick,
-                    offset_tick: None,
-                    gm_program: program,
-                    pitch_midi: pitch,
-                    velocity_midi: velocity,
-                    onset_seconds,
-                    offset_seconds: None,
-                });
-            }
+    for ((channel, pitch), queue) in pending {
+        for (start_tick, program, velocity, onset_track_index) in queue {
+            let onset_seconds = tick_to_seconds(
+                start_tick,
+                &tempo_points,
+                ticks_per_quarter,
+            )
+            .ok_or(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
+            unclosed_note_count += 1;
+            notes.push(MidiTranscribedNoteV1 {
+                track_index: onset_track_index,
+                midi_channel: channel,
+                onset_tick: start_tick,
+                offset_tick: None,
+                gm_program: program,
+                pitch_midi: pitch,
+                velocity_midi: velocity,
+                onset_seconds,
+                offset_seconds: None,
+            });
         }
     }
 
