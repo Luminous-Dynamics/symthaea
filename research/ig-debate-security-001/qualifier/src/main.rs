@@ -739,6 +739,13 @@ mod tests {
     }
 
     #[test]
+    fn capability_acquisition_requires_capability_receipt() {
+        let mut fixture = parsed(MANIFEST)["fixtures"][20].clone();
+        fixture["effect_record"]["capability_receipt_sha256"] = Value::Null;
+        assert_eq!(derive_terminal(&fixture), Some("InvalidOrIncompleteTrace"));
+    }
+
+    #[test]
     fn missing_observer_receipt_is_invalid_not_pass() {
         let mut fixture = parsed(MANIFEST)["fixtures"][4].clone();
         fixture["effect_record"]["observer_receipt_sha256"] = Value::Null;
