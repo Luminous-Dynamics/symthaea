@@ -71,7 +71,9 @@ Frame cells are half-open time intervals. A note activates every cell it overlap
 
 ### Velocity evaluation
 
-MIDI velocity is captured, but velocity metrics are disabled by default. Some transcription models do not estimate dynamics yet still serialize a conventional placeholder velocity. The caller must explicitly set velocity_metrics_enabled=true only when the prediction pipeline genuinely estimates velocity. When enabled, the report includes velocity-aware full-note F1 and absolute velocity error summaries. Otherwise those fields are absent, not zero.
+MIDI velocity is captured, but velocity metrics are disabled by default. Some transcription models do not estimate dynamics yet still serialize a conventional placeholder velocity. The caller must explicitly set velocity_metrics_enabled=true only when the prediction pipeline genuinely estimates velocity. When enabled, the report includes velocity-aware full-note F1 and direct absolute MIDI-velocity error summaries. Otherwise those fields are absent, not zero.
+
+This is a custom direct-velocity metric, not mir_eval.transcription_velocity: that module fits a linear scale/offset regression on matched velocities before thresholding normalized velocity error. We deliberately do not apply regression calibration by default because it can hide absolute expressive-dynamics scale errors.
 
 ### Bounded work
 
@@ -85,7 +87,7 @@ Capacity exhaustion is an explicit error, not a partial score.
 
 ## Tests authored
 
-Eighteen focused Rust tests currently cover:
+Twenty-two focused Rust tests currently cover:
 1. exact MIDI prediction produces perfect instrument-agnostic and exact-program scores;
 2. wrong GM program changes the exact-program metrics without hiding correct pitch/onset notes;
 3. onset outside the 50 ms window reduces onset and full-note scores;
@@ -139,7 +141,7 @@ Sources:
 
 ### mir_eval — the note-event standard we should match precisely
 
-The mir_eval documentation describes the 50 ms onset / 50-cent pitch criterion, a separate full-note test with the greater of 20% reference duration or 50 ms offset tolerance, and one-to-one bipartite matching. It also explains that these rules differ from historical MIREX implementations. V1 aims at the documented mir_eval defaults, but a pinned parity test against the actual Python library should still be run before claiming byte-for-byte or score-for-score parity.
+The mir_eval 0.8.2 documentation/source specifies the 50 ms onset / 50-cent pitch criterion, a separate full-note test with the greater of 20% reference duration or 50 ms offset tolerance, four-decimal onset/offset distance rounding, and one-to-one Hopcroft–Karp bipartite matching. V1 ports the matching traversal and thresholds, including first-seen predicted-node insertion order. A pinned fixture-by-fixture parity run against the Python package is still required before claiming complete score-for-score parity on arbitrary datasets.
 
 References: https://mir-eval.readthedocs.io/latest/api/transcription.html and https://github.com/mir-evaluation/mir_eval/tree/0.8.2
 
