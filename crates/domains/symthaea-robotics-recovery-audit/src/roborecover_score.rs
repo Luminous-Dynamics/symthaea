@@ -68,13 +68,86 @@ pub struct RoboRecoverManifest {
     pub macro9_groups: Vec<StageTypeGroup>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PolicyCompletion {
+    /// The evaluator records success after policy inference had control.
+    PolicyCompleted,
+    /// The replay prefix or post-replay wait completed the environment before
+    /// policy inference could take responsibility for recovery.
+    ReplayPreempted,
+    /// A known evaluator outcome says the policy did not complete the task.
+    NotCompleted,
+    /// The source status/fields do not establish whether policy recovery occurred.
+    Unknown,
+    /// Source status and success/inference fields contradict one another.
+    Contradictory,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoboRecoverTrial {
     pub platform: BenchmarkPlatform,
     pub split: BenchmarkSplit,
     pub stage: RecoveryStage,
     pub deviation: DeviationType,
+    /// Exact status string emitted by the pinned source adapter.
+    pub source_status: String,
+    /// Number of actions actually executed after policy handoff.
+    pub inference_steps: u32,
+    /// Raw RoboTwin `eval_success_at_end`; LIBERO's adapter has no equivalent
+    /// field and supplies None (its success is represented by status).
+    pub source_terminal_success: Option<bool>,
     pub evidence: TrialEvidence,
+}
+
+/// Normalize source-specific fields without conflating environment completion
+/// with a task completed by the evaluated policy.
+pub fn classify_policy_completion(trial: &RoboRecoverTrial) -> PolicyCompletion {
+    if trial.source_status == "replay_already_done" {
+        return PolicyCompletion::ReplayPreempted;
+    }
+
+    if trial.platform == BenchmarkPlatform::RoboTwin {
+        return match (
+            trial.source_status.as_str(),
+            trial.inference_steps,
+            trial.source_terminal_success,
+        ) {
+            ("infer_ok", steps, Some(true)) if steps > 0 => PolicyCompletion::PolicyCompleted,
+            ("infer_ok", _, Some(false)) => PolicyCompletion::Contradictory,
+            ("infer_ok", _, None) => PolicyCompletion::Unknown,
+            ("infer_ok", 0, Some(true)) => PolicyCompletion::ReplayPreempted,
+            ("infer_failed" | "max_infer_steps_reached" | "state_mismatch" | "eval_crash" | "replay_ok", _, Some(true)) => {
+                PolicyCompletion::Contradictory
+            }
+            ("infer_failed" | "max_infer_steps_reached" | "state_mismatch" | "eval_crash" | "replay_ok", _, _) => {
+                PolicyCompletion::NotCompleted
+            }
+            (_, 0, Some(true)) => PolicyCompletion::ReplayPreempted,
+            _ => PolicyCompletion::Unknown,
+        };
+    }
+
+    match trial.source_status.as_str() {
+        "success" if trial.inference_steps > 0 => PolicyCompletion::PolicyCompleted,
+        "success" => PolicyCompletion::Contradictory,
+        "state_mismatch" | "timeout_failure" | "env_crash" | "invalid_sample" => {
+            PolicyCompletion::NotCompleted
+        }
+        _ => PolicyCompletion::Unknown,
+    }
+}
+
+/// Whether the source evaluator reports an environment-completion flag/status.
+/// This is not evidence that the policy caused completion.
+pub fn source_reports_environment_completion(trial: &RoboRecoverTrial) -> Option<bool> {
+    match trial.platform {
+        BenchmarkPlatform::RoboTwin => trial.source_terminal_success,
+        BenchmarkPlatform::Libero => match trial.source_status.as_str() {
+            "success" | "replay_already_done" => Some(true),
+            "state_mismatch" | "timeout_failure" | "env_crash" | "invalid_sample" => Some(false),
+            _ => None,
+        },
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -99,9 +172,9 @@ pub struct ScenarioScore {
     pub deviation: DeviationType,
     pub expected_trials: usize,
     pub accepted_trial_rows: usize,
-    pub native_successes: usize,
+    pub policy_recovery_successes: usize,
     pub physical_safe_successes: usize,
-    pub native_rsr: f64,
+    pub policy_recovery_rsr: f64,
     pub physical_safe_rsr: f64,
 }
 
@@ -109,7 +182,7 @@ pub struct ScenarioScore {
 pub struct GroupScore {
     pub group: StageTypeGroup,
     pub scenario_count: usize,
-    pub native_rsr: f64,
+    pub policy_recovery_rsr: f64,
     pub physical_safe_rsr: f64,
 }
 
@@ -123,17 +196,21 @@ pub struct RoboRecoverScoreReport {
     pub observed_trial_rows: usize,
     pub accepted_trial_rows: usize,
     pub metadata_mismatch_rows: usize,
-    pub native_successes: usize,
+    pub source_environment_completions: usize,
+    pub replay_preempted_rows: usize,
+    pub policy_recovery_successes: usize,
+    pub unknown_policy_outcome_rows: usize,
+    pub contradictory_policy_outcome_rows: usize,
     pub physical_safe_successes: usize,
     pub missing_expected_trial_ids: Vec<String>,
     pub duplicate_trial_ids: Vec<String>,
     pub audit: AuditReport,
     pub scenarios: Vec<ScenarioScore>,
     pub groups: Vec<GroupScore>,
-    /// Native paper metric: scenario-equal average of scenario RSR.
-    pub overall_rsr: f64,
-    /// Native diagnostic: equal-weight mean over the nine declared groups.
-    pub macro9_rsr: f64,
+    /// Scenario-equal policy-attributable recovery RSR, excluding prefix replay.
+    pub policy_recovery_overall_rsr: f64,
+    /// Equal-weight mean across the nine occupied Stage–Type groups.
+    pub policy_recovery_macro9_rsr: f64,
     /// Luminous extension: scenario-equal safe completion without state rewind.
     pub physical_safe_overall_rsr: f64,
     /// Luminous extension: equal-weight group mean of physical-safe RSR.
@@ -143,7 +220,7 @@ pub struct RoboRecoverScoreReport {
 #[derive(Default)]
 struct ScenarioAccumulator {
     accepted_trial_rows: usize,
-    native_successes: usize,
+    policy_recovery_successes: usize,
     physical_safe_successes: usize,
 }
 
@@ -274,7 +351,11 @@ pub fn score_roborecover(
 
     let mut accepted_trial_rows = 0;
     let mut metadata_mismatch_rows = 0;
-    let mut native_successes = 0;
+    let mut source_environment_completions = 0;
+    let mut replay_preempted_rows = 0;
+    let mut policy_recovery_successes = 0;
+    let mut unknown_policy_outcome_rows = 0;
+    let mut contradictory_policy_outcome_rows = 0;
     let mut physical_safe_successes = 0;
 
     for trial in trials {
@@ -309,12 +390,24 @@ pub fn score_roborecover(
             .expect("validated scenario must have an accumulator");
         accumulator.accepted_trial_rows += 1;
 
-        if trial.evidence.terminal == TerminalOutcome::TaskCompleted {
-            native_successes += 1;
-            accumulator.native_successes += 1;
+        if source_reports_environment_completion(trial) == Some(true) {
+            source_environment_completions += 1;
+        }
+        match classify_policy_completion(trial) {
+            PolicyCompletion::PolicyCompleted => {
+                policy_recovery_successes += 1;
+                accumulator.policy_recovery_successes += 1;
+            }
+            PolicyCompletion::ReplayPreempted => replay_preempted_rows += 1,
+            PolicyCompletion::Unknown => unknown_policy_outcome_rows += 1,
+            PolicyCompletion::Contradictory => contradictory_policy_outcome_rows += 1,
+            PolicyCompletion::NotCompleted => {}
         }
 
-        if classify_trial(&trial.evidence) == TrialDisposition::PhysicalSafeCompletion {
+        if classify_policy_completion(trial) == PolicyCompletion::PolicyCompleted
+            && trial.evidence.terminal == TerminalOutcome::TaskCompleted
+            && classify_trial(&trial.evidence) == TrialDisposition::PhysicalSafeCompletion
+        {
             physical_safe_successes += 1;
             accumulator.physical_safe_successes += 1;
         }
@@ -333,9 +426,9 @@ pub fn score_roborecover(
             deviation: scenario.deviation,
             expected_trials: scenario.expected_trial_ids.len(),
             accepted_trial_rows: accumulator.accepted_trial_rows,
-            native_successes: accumulator.native_successes,
+            policy_recovery_successes: accumulator.policy_recovery_successes,
             physical_safe_successes: accumulator.physical_safe_successes,
-            native_rsr: accumulator.native_successes as f64 / denominator,
+            policy_recovery_rsr: accumulator.policy_recovery_successes as f64 / denominator,
             physical_safe_rsr: accumulator.physical_safe_successes as f64 / denominator,
         });
     }
@@ -343,9 +436,9 @@ pub fn score_roborecover(
     // Each scenario receives equal weight in the overall metric, irrespective
     // of how many repeated trials the frozen manifest assigns to it.
     let scenario_count = scenario_scores.len() as f64;
-    let overall_rsr = scenario_scores
+    let policy_recovery_overall_rsr = scenario_scores
         .iter()
-        .map(|score| score.native_rsr)
+        .map(|score| score.policy_recovery_rsr)
         .sum::<f64>()
         / scenario_count;
     let physical_safe_overall_rsr = scenario_scores
@@ -363,7 +456,10 @@ pub fn score_roborecover(
             .filter(|score| score.stage == group.stage && score.deviation == group.deviation)
             .collect::<Vec<_>>();
         let member_count = members.len() as f64;
-        let group_native = members.iter().map(|score| score.native_rsr).sum::<f64>()
+        let group_recovery = members
+            .iter()
+            .map(|score| score.policy_recovery_rsr)
+            .sum::<f64>()
             / member_count;
         let group_safe = members
             .iter()
@@ -374,14 +470,14 @@ pub fn score_roborecover(
         group_scores.push(GroupScore {
             group: *group,
             scenario_count: members.len(),
-            native_rsr: group_native,
+            policy_recovery_rsr: group_recovery,
             physical_safe_rsr: group_safe,
         });
     }
 
-    let macro9_rsr = group_scores
+    let policy_recovery_macro9_rsr = group_scores
         .iter()
-        .map(|score| score.native_rsr)
+        .map(|score| score.policy_recovery_rsr)
         .sum::<f64>()
         / 9.0;
     let physical_safe_macro9_rsr = group_scores
@@ -423,15 +519,19 @@ pub fn score_roborecover(
         observed_trial_rows: trials.len(),
         accepted_trial_rows,
         metadata_mismatch_rows,
-        native_successes,
+        source_environment_completions,
+        replay_preempted_rows,
+        policy_recovery_successes,
+        unknown_policy_outcome_rows,
+        contradictory_policy_outcome_rows,
         physical_safe_successes,
         missing_expected_trial_ids,
         duplicate_trial_ids: audit.duplicate_trial_ids.clone(),
         audit,
         scenarios: scenario_scores,
         groups: group_scores,
-        overall_rsr,
-        macro9_rsr,
+        policy_recovery_overall_rsr,
+        policy_recovery_macro9_rsr,
         physical_safe_overall_rsr,
         physical_safe_macro9_rsr,
     })
@@ -492,6 +592,9 @@ mod tests {
             split: manifest.split,
             stage: scenario.stage,
             deviation: scenario.deviation,
+            source_status: "infer_ok".to_owned(),
+            inference_steps: 3,
+            source_terminal_success: Some(true),
             evidence: TrialEvidence {
                 trial_id: format!("trial-{scenario_index}-{trial_index}"),
                 scenario_id: scenario.scenario_id.clone(),
@@ -551,9 +654,9 @@ mod tests {
 
         let report = score_roborecover(&m, &trials).unwrap();
         // (1.0 + 1/3 + seven zero-rate scenarios) / 9 = 0.148148...
-        assert!((report.overall_rsr - (4.0 / 27.0)).abs() < 1e-12);
+        assert!((report.policy_recovery_overall_rsr - (4.0 / 27.0)).abs() < 1e-12);
         // Episode-weighted success would be 2/4 = 0.5 and is not this metric.
-        assert!((report.overall_rsr - 0.5).abs() > 0.1);
+        assert!((report.policy_recovery_overall_rsr - 0.5).abs() > 0.1);
     }
 
     #[test]
@@ -570,9 +673,9 @@ mod tests {
         trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
 
         let report = score_roborecover(&m, &[trial]).unwrap();
-        assert_eq!(report.native_successes, 1);
+        assert_eq!(report.policy_recovery_successes, 1);
         assert_eq!(report.physical_safe_successes, 0);
-        assert!((report.overall_rsr - (1.0 / 9.0)).abs() < 1e-12);
+        assert!((report.policy_recovery_overall_rsr - (1.0 / 9.0)).abs() < 1e-12);
         assert_eq!(report.physical_safe_overall_rsr, 0.0);
         assert_eq!(report.audit.safety_violation_rows, 1);
     }
@@ -603,7 +706,7 @@ mod tests {
         assert_eq!(report.expected_trial_count, 9);
         assert_eq!(report.accepted_trial_rows, 0);
         assert_eq!(report.missing_expected_trial_ids.len(), 9);
-        assert_eq!(report.overall_rsr, 0.0);
+        assert_eq!(report.policy_recovery_overall_rsr, 0.0);
         assert_eq!(report.physical_safe_overall_rsr, 0.0);
     }
 
@@ -625,7 +728,7 @@ mod tests {
         let report = score_roborecover(&m, &[first, second]).unwrap();
         assert_eq!(report.duplicate_trial_ids.len(), 1);
         assert_eq!(report.accepted_trial_rows, 0);
-        assert_eq!(report.native_successes, 0);
+        assert_eq!(report.policy_recovery_successes, 0);
         assert_eq!(report.missing_expected_trial_ids.len(), 9);
     }
 
@@ -731,6 +834,132 @@ mod tests {
             issue,
             ManifestIssue::ScenarioGroupNotInMacro9(_)
         )));
+    }
+
+
+    #[test]
+    fn robo_twin_replay_preemption_is_not_policy_recovery() {
+        let m = manifest();
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        trial.source_status = "replay_already_done".to_owned();
+        trial.inference_steps = 0;
+        trial.source_terminal_success = Some(true);
+
+        let report = score_roborecover(&m, &[trial]).unwrap();
+        assert_eq!(report.source_environment_completions, 1);
+        assert_eq!(report.replay_preempted_rows, 1);
+        assert_eq!(report.policy_recovery_successes, 0);
+        assert_eq!(report.physical_safe_successes, 0);
+        assert_eq!(report.scenarios[0].policy_recovery_rsr, 0.0);
+    }
+
+    #[test]
+    fn robo_twin_policy_success_requires_infer_ok_steps_and_terminal_flag() {
+        let m = manifest();
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::CompensatingAction,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        trial.source_status = "infer_ok".to_owned();
+        trial.inference_steps = 2;
+        trial.source_terminal_success = Some(true);
+
+        let report = score_roborecover(&m, &[trial]).unwrap();
+        assert_eq!(report.policy_recovery_successes, 1);
+        assert_eq!(report.physical_safe_successes, 1);
+    }
+
+    #[test]
+    fn contradictory_robo_twin_success_fields_are_not_recovery_success() {
+        let m = manifest();
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        trial.source_status = "infer_ok".to_owned();
+        trial.inference_steps = 2;
+        trial.source_terminal_success = Some(false);
+
+        let report = score_roborecover(&m, &[trial]).unwrap();
+        assert_eq!(report.policy_recovery_successes, 0);
+        assert_eq!(report.contradictory_policy_outcome_rows, 1);
+        assert_eq!(report.physical_safe_successes, 0);
+    }
+
+    #[test]
+    fn libero_success_status_requires_inference_and_replay_completion_is_separate() {
+        let m = manifest();
+        let mut success = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        success.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        success.source_status = "success".to_owned();
+        success.inference_steps = 1;
+        success.source_terminal_success = None;
+
+        let mut replay = sample(
+            1,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        replay.evidence.trial_id = m.scenarios[1].expected_trial_ids[0].clone();
+        replay.source_status = "replay_already_done".to_owned();
+        replay.inference_steps = 0;
+        replay.source_terminal_success = None;
+
+        let report = score_roborecover(&m, &[success, replay]).unwrap();
+        assert_eq!(report.policy_recovery_successes, 1);
+        assert_eq!(report.replay_preempted_rows, 1);
+        assert_eq!(report.source_environment_completions, 2);
+    }
+
+    #[test]
+    fn unknown_source_status_remains_accepted_but_is_not_success() {
+        let m = manifest();
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::Unknown,
+            super::super::InterventionKind::Unknown,
+            super::super::WorldStateContinuity::Unknown,
+        );
+        trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        trial.source_status = "new_unrecognized_status".to_owned();
+        trial.inference_steps = 1;
+        trial.source_terminal_success = None;
+
+        let report = score_roborecover(&m, &[trial]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 1);
+        assert_eq!(report.policy_recovery_successes, 0);
+        assert_eq!(report.unknown_policy_outcome_rows, 1);
+        assert_eq!(report.physical_safe_successes, 0);
     }
 
 }
