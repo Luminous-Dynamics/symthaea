@@ -307,8 +307,9 @@ struct ScenarioAccumulator {
 
 /// Validate the frozen RoboRecover scenario and expected-trial manifest.
 ///
-/// The nine Macro-9 groups must be explicit and unique. This function does not
-/// assume which nine of the possible sixteen stage/type combinations are used.
+/// The test split requires nine explicit, unique Macro-9 groups. The training
+/// split forbids Macro-9 declarations and permits training-only Stage–Type
+/// combinations. Neither split accepts clean seed-only runs as recovery.
 fn is_lower_or_upper_hex_digest(value: &str, expected_len: usize) -> bool {
     value.len() == expected_len && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
