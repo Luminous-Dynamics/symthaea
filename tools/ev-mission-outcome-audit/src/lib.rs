@@ -260,6 +260,16 @@ fn canonicalize(corpus: &mut Corpus) {
     }
 }
 
+fn split_manifest_sha256(manifest: &SplitManifest) -> Result<String, String> {
+    let mut canonical = manifest.clone();
+    canonical
+        .assignments
+        .sort_by(|left, right| left.pack_ref.cmp(&right.pack_ref));
+    let bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| format!("split manifest serialization: {error}"))?;
+    Ok(sha256(&bytes))
+}
+
 fn validate_split_manifest(corpus: &Corpus) -> Result<BTreeMap<String, &SplitAssignment>, String> {
     let manifest = &corpus.split_manifest;
     if !nonempty(&manifest.manifest_ref) || manifest.assignments.is_empty() {
@@ -298,9 +308,7 @@ fn validate_split_manifest(corpus: &Corpus) -> Result<BTreeMap<String, &SplitAss
         }
     }
 
-    let manifest_bytes = serde_json::to_vec(manifest)
-        .map_err(|error| format!("split manifest serialization: {error}"))?;
-    let manifest_digest = sha256(&manifest_bytes);
+    let manifest_digest = split_manifest_sha256(manifest)?;
     for case in &corpus.cases {
         let prediction = &case.prediction;
         if prediction.split_manifest_ref != manifest.manifest_ref
@@ -1019,6 +1027,9 @@ mod tests {
         let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
         let template = corpus.cases[0].clone();
         corpus.cases.clear();
+        corpus.split_manifest.manifest_ref =
+            "synthetic-physical-holdout-59-pack-manifest".to_owned();
+        corpus.split_manifest.assignments.clear();
         for index in 0..59 {
             let mut case = template.clone();
             let suffix = format!("{index:02x}");
@@ -1032,6 +1043,17 @@ mod tests {
             case.prediction.mission_profile_sha256 = digest.clone();
             case.prediction.mission_report_ref = format!("mission-report-holdout-{index:03}");
             case.prediction.mission_report_sha256 = digest.clone();
+            case.prediction.split_manifest_ref = corpus.split_manifest.manifest_ref.clone();
+            case.prediction.split_frozen_at_ms = corpus.split_manifest.frozen_at_ms;
+            case.prediction.evaluation_partition = "TEST_BLIND".to_owned();
+            corpus.split_manifest.assignments.push(SplitAssignment {
+                vehicle_ref: case.prediction.asset.vehicle_ref.clone(),
+                pack_ref: case.prediction.asset.pack_ref.clone(),
+                configuration_sha256: case.prediction.asset.configuration_sha256.clone(),
+                topology_sha256: case.prediction.asset.topology_sha256.clone(),
+                physical_group_ref: case.prediction.asset.pack_ref.clone(),
+                partition: "TEST_BLIND".to_owned(),
+            });
             case.reference.asset = case.prediction.asset.clone();
             case.reference.mission_profile_ref = case.prediction.mission_profile_ref.clone();
             case.reference.mission_profile_sha256 = case.prediction.mission_profile_sha256.clone();
@@ -1045,6 +1067,10 @@ mod tests {
                 measurement.measurement_sha256 = digest.clone();
             }
             corpus.cases.push(case);
+        }
+        let manifest_digest = split_manifest_sha256(&corpus.split_manifest).expect("manifest digest");
+        for case in &mut corpus.cases {
+            case.prediction.split_manifest_sha256 = manifest_digest.clone();
         }
         let bytes = serde_json::to_vec(&corpus).expect("physical holdout corpus");
         let report = audit_corpus(SCHEMA, &bytes).expect("physical holdout audit");
