@@ -1,0 +1,15 @@
+[package]
+name = "electric-propulsion-observation-oracle"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Independent calibrated and synchronized propulsion test observation reference"
+license = "AGPL-3.0-or-later"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+
+[workspace]
