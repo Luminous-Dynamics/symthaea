@@ -18,7 +18,7 @@ It also rejects duplicate trial IDs, blank identity fields, malformed expected-t
     cargo test -p symthaea-robotics-recovery-audit
     cargo fmt --manifest-path crates/domains/symthaea-robotics-recovery-audit/Cargo.toml -- --check
 
-77 unit tests are included across the audit kernel, RoboRecover scorer, split-manifest importer and policy-router reference. They have not yet been executed in this environment. They have not yet been executed in this environment. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
+88 unit tests are included: 14 audit-kernel, 13 split-manifest importer, 37 scorer, 15 policy-router and 9 discovery-accounting tests. They have not been executed in this environment; no local Rust compile/test receipt or passing exact-head CI run is available. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
 
 
 ## Pinned split-manifest importer
@@ -42,7 +42,7 @@ The source CSV does not expose scenario construction source (Natural / ActionPer
 
 The `roborecover_score` module consumes a frozen scenario manifest and normalized source result records. It reports three distinct rate families, all with the same scenario-equal and Macro-9 weighting:
 
-- **Source environment-completion RSR:** raw source completion evidence. This may include completion during replay before a policy has acted.
+- **Source-reported success RSR:** the source evaluator's success signal. RoboTwin's raw `eval_success_at_end` can be true even when replay completed before policy inference; LIBERO's `replay_already_done` status is a replay termination, not a success status, and is not counted as source-reported success.
 - **Policy-recovery RSR:** task completion attributable to the policy after handoff.
 - **Physical-safe RSR (Luminous extension):** policy-attributable completion plus continuous physical state, a physically realizable intervention, executed actions and upstream verified compliant safety evidence.
 
@@ -57,9 +57,9 @@ The adapter uses source-specific completion rules:
 - `replay_already_done` is always a replay-preempted environment completion, never a policy recovery.
 - Contradictory or unknown status/success combinations remain explicit and are not counted as policy success.
 
-This distinction is necessary because the inspected RoboTwin source can emit `status=replay_already_done`, `infer_steps=0` and `eval_success_at_end=true`. Its source summary counts the raw boolean as success while its failed-files list includes the same row. The ambiguity is documented in [upstream RoboRecover issue #2](https://github.com/RUCKBReasoning/RoboRecover/issues/2). That issue's constructed reproducer is not evidence that a published result was affected.
+This distinction is necessary because the inspected RoboTwin source can emit `status=replay_already_done`, `infer_steps=0` and `eval_success_at_end=true`. Its source summary counts the raw boolean as success while its failed-files list includes the same row. The LIBERO wrapper sets `status=replay_already_done` when `done` occurs during replay and sets `status=success` when `done` occurs after inference; the replay status is not a success claim, so it is counted as a replay-preempted non-success. The ambiguity is documented in [upstream RoboRecover issue #2](https://github.com/RUCKBReasoning/RoboRecover/issues/2). That issue's constructed reproducer is not evidence that a published result was affected.
 
-The scorer therefore reports source environment completion, replay-preempted rows, policy-attributable recovery, unknown outcomes and contradictory outcomes separately. It also reports known policy non-completions separately. Its nested `identity_audit` is the low-level trial-ID/expected-manifest audit; `accepted_trial_rows` is the stricter count after source revision, split, execution mode, checkpoint, evaluator and scenario-content matching. This is a policy-attribution clarification, not a claim that we have reproduced the paper's published leaderboard results. Full scenario data hosting and redistribution terms remain pending in the upstream repository.
+The scorer therefore reports source-reported success, replay-preempted rows, policy-attributable recovery, known policy failures, unknown outcomes and contradictory outcomes separately. It also reports known policy non-completions separately. Its nested `identity_audit` is the low-level trial-ID/expected-manifest audit; `accepted_trial_rows` is the stricter count after source revision, split, execution mode, checkpoint, evaluator and scenario-content matching. This is a policy-attribution clarification, not a claim that we have reproduced the paper's published leaderboard results. Full scenario data hosting and redistribution terms remain pending in the upstream repository.
 
 The nine Macro-9 groups are explicitly frozen in the manifest and matched to the paper's declared test groups. No group is inferred from whichever scenarios happened to execute. Missing, duplicate, unplanned, identity-invalid and metadata-mismatched trials remain failures in the planned denominator.
 
@@ -75,6 +75,16 @@ The `roborecover_router` module provides a deterministic reference selector for 
 - Test-split records, mismatched provenance, duplicate checkpoint evidence and unsupported contexts are rejected or cause abstention.
 
 The selector returns a policy choice or an explicit abstention; it does not generate action commands, bypass the independent action-admission layer, or authorize actuators. It is a transparent statistical baseline, not yet a learned router and not a benchmark result. Prospective evaluation must compare it with the strongest fixed policy, train-selected static policy, heuristic router, correction baseline and retrospective oracle upper bound under matched budgets.
+
+
+
+## Train-only active failure-discovery accounting
+
+The `roborecover_discovery` module is an audit/scoring kernel for challenge candidates produced by an external generator. It does **not** generate perturbations, run a simulator or validate the truth of supplied replay/task-validity receipts.
+
+It requires a campaign pinned to the RoboRecover training split, exact source/simulator/evaluator/generator/observation-action-schema/target-policy digests, and positive measured simulator hours. Candidate records bind parent sample/scenario, action-prefix, perturbation and candidate-scene hashes. Only replay-verified, task-valid candidates that fail or violate the target policy's declared safety observation count as hard-failure discoveries. Duplicate candidate IDs and duplicate scenario-content hashes are excluded as whole groups. Alternative-policy outcomes are classified as non-rewind safe recovery, simulator-only recovery, unrecoverable within the evaluated portfolio, or unknown.
+
+The metrics are valid failure discoveries and adjudicated unique failure clusters per simulator-hour. Cluster IDs and replay/task-validity dispositions are supplied by the external adjudication/evaluation pipeline; this module accounts for them but does not independently verify them. A separate challenge reserve must be kept apart from the official sealed test split.
 
 ## Interpretation
 
