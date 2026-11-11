@@ -33,12 +33,15 @@ Every case binds:
 - vehicle, pack, configuration and electrical topology;
 - exact mission-profile reference and SHA-256;
 - exact mission-evaluator report reference and SHA-256;
-- evaluator version and predicted disposition;
+- evaluator version and frozen model-artifact reference/digest;
+- the split-manifest reference/digest and TEST_BLIND partition;
+- split-freeze and prediction-freeze timestamps, both preceding physical outcome observation;
 - the mission's frozen required physical measurement contract (constraint, scope, unit, limit and minimum/maximum relation);
 - independent reference protocol and digest;
 - reference evidence object and digest;
 - time of physical observation;
-- per-constraint measurement references, digests, units and observed values.
+- per-constraint measurement references, digests, units and observed values;
+- sensor identity plus calibration reference/digest for each physical measurement, with measurement time after prediction freeze and no later than the reference observation time.
 
 The reference must bind to the *same* physical asset/configuration/topology and mission-profile digest as the prediction. A near-match, another pack, a different firmware/configuration or a different mission profile is not a valid reference.
 
@@ -46,7 +49,7 @@ Each observed constraint is replayed against the frozen limit:
 - `MINIMUM_REQUIRED`: observed value must be greater than or equal to the declared limit.
 - `MAXIMUM_ALLOWED`: observed value must be less than or equal to the declared limit.
 
-The audit checks relation/constraint compatibility (for example, temperature is a maximum-allowed constraint; discharge power is a minimum-required capability). The reference outcome label must also agree with the numeric observations.
+The audit checks relation/constraint compatibility (for example, temperature is a maximum-allowed constraint; discharge power is a minimum-required capability). The reference outcome label must also agree with the numeric observations. A battery-constraint failure, non-battery abort or inconclusive test must include an explicit outcome reason. A prediction outside the TEST_BLIND partition, or a prediction/model/split freeze after the physical result is observed, is not eligible for scoring.
 
 ### Outcome classifications
 
