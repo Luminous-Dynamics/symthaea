@@ -175,6 +175,9 @@ pub enum PartStemAudioEvidenceIssueV1 {
     Observation(AudioEventObservationIssueV1),
     MissingSelectedStem { track_index: u16 },
     MissingWavInput { sha256: String },
+    ReceiptSchemaMismatch,
+    ReceiptDigestMismatch,
+    ReceiptInputBindingMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1037,6 +1040,78 @@ pub fn validate_and_observe_part_stem_v1(
     Ok(receipt)
 }
 
+
+
+/// Replay-check a combined structural-admission + stem-observation receipt
+/// against the exact bundle, MIDI artifact and WAV byte inputs. This verifies
+/// the nested commitments and event coverage without re-running the FFT.
+pub fn validate_part_stem_audio_evidence_receipt_v1(
+    receipt: &PartStemAudioEvidenceReceiptV1,
+    bundle: &PartStemEvidenceBundleV1,
+    midi: &MidiPerformanceArtifactV1,
+    wav_inputs: &[PartStemWavInputV1],
+    track_index: u16,
+) -> Vec<PartStemAudioEvidenceIssueV1> {
+    let mut issues = Vec::new();
+    let expected_stem_validation =
+        match validate_part_stem_bundle_v1(bundle, midi, wav_inputs) {
+            Ok(value) => Some(value),
+            Err(errors) => {
+                issues.extend(errors.into_iter().map(PartStemAudioEvidenceIssueV1::Admission));
+                None
+            }
+        };
+    if receipt.schema != "muse-part-stem-audio-evidence-receipt-v1" {
+        issues.push(PartStemAudioEvidenceIssueV1::ReceiptSchemaMismatch);
+    }
+    if expected_stem_validation.as_ref() != Some(&receipt.stem_validation) {
+        issues.push(PartStemAudioEvidenceIssueV1::ReceiptInputBindingMismatch);
+    }
+
+    let Some(stem) = bundle.stems.iter()
+        .find(|stem| stem.midi_track_index == track_index)
+    else {
+        issues.push(PartStemAudioEvidenceIssueV1::MissingSelectedStem { track_index });
+        return issues;
+    };
+    let Some(wav) = wav_inputs.iter()
+        .find(|input| input.wav_sha256 == stem.wav_sha256)
+    else {
+        issues.push(PartStemAudioEvidenceIssueV1::MissingWavInput {
+            sha256: stem.wav_sha256.clone(),
+        });
+        return issues;
+    };
+    let observation_issues = validate_audio_stem_event_observation_v1(
+        &receipt.audio_observation,
+        &wav.wav_bytes,
+        midi,
+        track_index,
+    );
+    issues.extend(observation_issues.into_iter().map(PartStemAudioEvidenceIssueV1::Observation));
+
+    let commitment = PartStemAudioEvidenceCommitmentV1 {
+        schema: &receipt.schema,
+        stem_validation: &receipt.stem_validation,
+        audio_observation: &receipt.audio_observation,
+    };
+    match serde_json::to_vec(&commitment) {
+        Ok(bytes) => {
+            let expected = domain_sha256(
+                "muse-part-stem-audio-evidence-receipt-serde-json-sha256-v1",
+                &bytes,
+            );
+            if expected != receipt.receipt_sha256 {
+                issues.push(PartStemAudioEvidenceIssueV1::ReceiptDigestMismatch);
+            }
+        }
+        Err(_) => issues.push(PartStemAudioEvidenceIssueV1::Admission(
+            PartStemEvidenceIssueV1::BundleSerialization,
+        )),
+    }
+    issues
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1235,6 +1310,22 @@ mod tests {
         );
         let issues = verify_midi(&midi).unwrap_err();
         assert!(issues.contains(&PartStemEvidenceIssueV1::WrongMidiSchema));
+    }
+
+
+    #[test]
+    fn combined_receipt_replays_and_detects_outer_receipt_tampering() {
+        let (bundle, midi, wavs) = fixture();
+        let receipt = validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 1).unwrap();
+        assert!(validate_part_stem_audio_evidence_receipt_v1(
+            &receipt, &bundle, &midi, &wavs, 1
+        ).is_empty());
+
+        let mut tampered = receipt.clone();
+        tampered.receipt_sha256 = "0".repeat(64);
+        assert!(validate_part_stem_audio_evidence_receipt_v1(
+            &tampered, &bundle, &midi, &wavs, 1
+        ).contains(&PartStemAudioEvidenceIssueV1::ReceiptDigestMismatch));
     }
 
     #[test]
