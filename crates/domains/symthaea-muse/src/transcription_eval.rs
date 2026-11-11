@@ -204,7 +204,6 @@ struct ReportCommitmentV1<'a> {
     velocity_aware_full_note_metrics: &'a MidiTranscriptionMetricV1,
     velocity_error: &'a MidiTranscriptionValueErrorSummaryV1,
     onset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
-    velocity_error: &'a MidiTranscriptionValueErrorSummaryV1,
     offset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
 }
 
@@ -229,11 +228,6 @@ fn validate_config(
         });
     }
     if config.pitch_tolerance_cents > 1_200 {
-        return Err(MidiTranscriptionEvaluationIssueV1::InvalidConfig {
-            field: "pitch_tolerance_cents".into(),
-        });
-    }
-    if config.velocity_tolerance > 127 {
         return Err(MidiTranscriptionEvaluationIssueV1::InvalidConfig {
             field: "pitch_tolerance_cents".into(),
         });
@@ -1077,6 +1071,7 @@ pub fn evaluate_midi_transcription_v1(
         .map(|note| EvaluationNoteV1 {
             pitch_midi: note.pitch_midi,
             gm_program: note.gm_program,
+            velocity_midi: note.velocity_midi,
             onset_seconds: note.onset_seconds,
             offset_seconds: note.offset_seconds,
         })
