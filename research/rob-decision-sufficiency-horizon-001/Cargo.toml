@@ -1,0 +1,12 @@
+[package]
+name = "rob-decision-sufficiency-horizon-001"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+publish = false
+description = "Fixed-point decision-sufficiency horizon reference"
+
+[workspace]
+
+[lib]
+path = "src/lib.rs"
