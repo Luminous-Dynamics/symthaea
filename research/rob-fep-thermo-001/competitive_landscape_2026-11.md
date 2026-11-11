@@ -276,3 +276,24 @@ The cross-lane invariant is that an action's source observation, model, executed
 Do not pool scores across RT-SAFE navigation, LIBERO-Dynamic manipulation, RoboDyna dynamic interaction and Symtropy thermodynamic locomotion. Standardize event semantics and compare within each lane.
 
 The action-chunk known-answer corpus and contract are in [action_chunk_temporal_alignment.md](./action_chunk_temporal_alignment.md) and [fixtures/action_chunk_alignment_v0_1.json](./fixtures/action_chunk_alignment_v0_1.json).
+
+
+## 10. Distributed inference placement: onboard vs edge vs cloud
+
+Microsoft Research's September 2026 study measures physical-AI inference across onboard, edge and cloud GPU placements for mobile manipulation. It reports that offloading can improve performance and battery life, while introducing trade-offs in network latency, bandwidth and available remote GPU capacity. The March 2026 Microsoft measurement-report abstract further notes that smaller onboard GPUs may not support the full workload, large onboard GPUs can shorten battery life, and network latency can erode task accuracy.
+
+This is an industry comparator and an important systems direction. It is not direct evidence that cloud FEP is beneficial for a quadruped, nor proof of whole-system energy savings. Luminous should compare:
+- onboard-only / onboard-lightweight;
+- nearby edge / remote cloud;
+- hybrid local safety plus remote deliberation;
+- asynchronous chunked offload;
+- fleet-shared edge with contention;
+- adaptive placement under deadlines and resource reserves.
+
+Measure complete capture-to-admission latency and robot, network, edge and cloud energy separately. Report robot battery endurance and whole-system energy independently. A cloud result is never actuation authority; local RTA/HAL and safe-stop must remain available under network partition.
+
+Sources:
+- https://www.microsoft.com/en-us/research/blog/offloaded-inference-for-real-world-physical-ai-robotics/
+- https://www.microsoft.com/en-us/research/publication/offload-or-overload-a-platform-measurement-study-of-mobile-robotic-manipulation-workloads/
+
+Implementation/evaluation owner: [Symthaea #11573](https://github.com/Luminous-Dynamics/symthaea/issues/11573).
