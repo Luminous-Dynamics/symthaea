@@ -195,7 +195,6 @@ pub fn classify_policy_completion(trial: &RoboRecoverTrial) -> PolicyCompletion 
             ("infer_failed" | "max_infer_steps_reached" | "state_mismatch" | "eval_crash", _, _) => {
                 PolicyCompletion::NotCompleted
             }
-            (_, 0, Some(true)) => PolicyCompletion::ReplayPreempted,
             _ => PolicyCompletion::Unknown,
         };
     }
@@ -1607,6 +1606,27 @@ mod tests {
         let report = score_roborecover(&m, &[wrong_source]).unwrap();
         assert_eq!(report.accepted_trial_rows, 0);
         assert_eq!(report.metadata_mismatch_rows, 1);
+    }
+
+
+    #[test]
+    fn unknown_zero_action_status_is_not_assumed_to_be_replay_preemption() {
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::Unknown,
+            super::super::InterventionKind::Unknown,
+            super::super::WorldStateContinuity::Unknown,
+        );
+        trial.source_status = "future_status".to_owned();
+        trial.inference_steps = 0;
+        trial.source_terminal_success = Some(true);
+
+        assert_eq!(
+            classify_policy_completion(&trial),
+            PolicyCompletion::Unknown
+        );
     }
 
 }
