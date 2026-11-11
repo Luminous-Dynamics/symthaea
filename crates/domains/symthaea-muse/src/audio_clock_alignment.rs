@@ -200,8 +200,7 @@ fn validate_config(
             field: "hop_frames".into(),
         });
     }
-    if config.minimum_offset_ms >= 0
-        || config.maximum_offset_ms == 0
+    if i64::from(config.minimum_offset_ms) >= i64::from(config.maximum_offset_ms)
         || config.minimum_unique_onsets < 2
         || config.peak_exclusion_hops == 0
         || config.baseline_inner_hops == 0
@@ -451,16 +450,31 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
     }
 
     let samples = mono_samples(&wav);
+    let sample_rate_hz = wav.info.sample_rate_hz;
     let flux = spectral_flux(&samples, fft_frames, hop_frames)
         .map_err(|issue| vec![issue])?;
-    let sample_rate = i64::from(wav.info.sample_rate_hz);
-    let minimum_lag = i64::from(config.minimum_offset_ms) * sample_rate / 1_000;
-    let maximum_lag = i64::from(config.maximum_offset_ms) * sample_rate / 1_000;
+    let sample_rate = i64::from(sample_rate_hz);
+    let minimum_lag = i64::from(config.minimum_offset_ms)
+        .checked_mul(sample_rate)
+        .ok_or_else(|| vec![AudioClockAlignmentIssueV1::InvalidConfig {
+            field: "minimum_offset_ms_overflow".into(),
+        }])?
+        / 1_000;
+    let maximum_lag = i64::from(config.maximum_offset_ms)
+        .checked_mul(sample_rate)
+        .ok_or_else(|| vec![AudioClockAlignmentIssueV1::InvalidConfig {
+            field: "maximum_offset_ms_overflow".into(),
+        }])?
+        / 1_000;
     let exclusion = usize::from(config.peak_exclusion_hops);
     let inner_radius = usize::from(config.baseline_inner_hops);
     let outer_radius = usize::from(config.baseline_outer_hops);
 
-    let first_lag = minimum_lag.div_euclid(hop_frames as i64) * hop_frames as i64;
+    let hop_i64 = hop_frames as i64;
+    let mut first_lag = minimum_lag.div_euclid(hop_i64) * hop_i64;
+    if first_lag < minimum_lag {
+        first_lag = first_lag.saturating_add(hop_i64);
+    }
     let mut lags = Vec::new();
     let mut scores = Vec::new();
     let mut matched_counts = Vec::new();
@@ -565,7 +579,7 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
         matched_expected_onset_count: u32::try_from(matched_counts[best_index]).unwrap_or(u32::MAX),
         audio_minus_midi_offset_frames: Some(refined_offset),
         audio_minus_midi_offset_ms: Some(
-            refined_offset as f64 * 1_000.0 / f64::from(wav.info.sample_rate_hz),
+            refined_offset as f64 * 1_000.0 / f64::from(sample_rate_hz),
         ),
         best_peak_score: Some(best_score),
         competing_peak_score: Some(competing_score),
