@@ -2437,6 +2437,140 @@
         "Claiming compliance for cargo vessels or WAPS hybrid propulsion",
         "Using its method as a whole-vessel energy conservation or lifecycle benchmark"
       ]
+    },
+    {
+      "source_id": "IMO-URN-GUIDELINES-MEPC1CIRC906REV1",
+      "title": "Revised Guidelines for the reduction of underwater radiated noise from shipping to address adverse impacts on marine life",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2025-10-10",
+      "url": "https://glonoise.imo.org/documents/2524",
+      "evidence_class": "official_imo_guideline",
+      "scope": {
+        "instrument": "MEPC.1/Circ.906/Rev.1",
+        "topic": "Underwater radiated noise management planning and reduction from commercial shipping.",
+        "status": "Guidelines under IMO experience-building phase; MEPC 84 agreed in principle to extend phase to end 2028."
+      },
+      "limitations": [
+        "Guidelines are not a universal numeric noise limit or a ship-specific acoustic certification.",
+        "Biological impact requires separate receiving-environment, propagation and species-sensitivity analysis."
+      ]
+    },
+    {
+      "source_id": "IMO-URN-EBP-MEPC84-2026",
+      "title": "MEPC 84 decision on underwater radiated noise experience-building phase and further IMO study",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-01",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "evidence_class": "official_committee_outcome",
+      "scope": {
+        "experience_building_phase_extension": "Agreed in principle to extend the URN experience-building phase to the end of 2028.",
+        "further_study": "Agreed in principle to commission an IMO study on URN emissions and invited proposals for a policy roadmap ahead of MEPC 85."
+      },
+      "limitations": [
+        "Agreed-in-principle work is not a binding numeric ship-noise limit.",
+        "The MEPC 85 roadmap and subsequent decisions may update this snapshot."
+      ]
+    },
+    {
+      "source_id": "ISO-17208-1-2016",
+      "title": "Underwater acoustics — Quantities and procedures for description and measurement of underwater sound from ships — Part 1: Deep-water precision measurements",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2016-03",
+      "url": "https://www.iso.org/standard/62408.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "standard": "ISO 17208-1:2016",
+        "amendment": "Amendment 1:2024",
+        "method": "Prescribed-condition deep-water radiated-noise measurement; far-field RMS SPL normalized to 1 m and reported in one-third-octave bands.",
+        "applicability": "Underway surface vessels; this part does not provide biological noise criteria."
+      },
+      "limitations": [
+        "Measurement procedure does not determine impact on marine organisms.",
+        "Propagation effects including bottom reflections, refraction and absorption may remain relevant."
+      ]
+    },
+    {
+      "source_id": "ISO-17208-2-2019",
+      "title": "Underwater acoustics — Part 2: Determination of source levels from deep-water measurements",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2019-07",
+      "url": "https://www.iso.org/standard/62409.html",
+      "evidence_class": "international_standard_confirmed_2026",
+      "scope": {
+        "standard": "ISO 17208-2:2019",
+        "method": "Derives equivalent monopole source level from eligible deep-water ISO 17208-1 measurements or prescribed deep-water hydrophone geometry.",
+        "reported_aspect": "Broadside aspect with specified nominal source depth."
+      },
+      "limitations": [
+        "Equivalent monopole source level is not identical to directly measured radiated-noise level.",
+        "Deep-water and broadside conditions must be preserved."
+      ]
+    },
+    {
+      "source_id": "ISO-17208-3-2025",
+      "title": "Underwater acoustics — Part 3: Requirements for measurements in shallow water",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2025-09",
+      "url": "https://www.iso.org/standard/81321.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "standard": "ISO 17208-3:2025",
+        "method": "Shallow-water ship-noise measurements and source-level calculations accounting for shallow-water propagation.",
+        "band_convention": "Radiated-noise level reported in decidecade bands.",
+        "comparison": "Supports contract criteria, ship-to-ship comparison, periodic signature assessments and R&D when measurement conditions are controlled."
+      },
+      "limitations": [
+        "Shallow-water results are not directly interchangeable with deep-water data without the prescribed conversion.",
+        "Ecological exposure requires further propagation/context analysis."
+      ]
+    },
+    {
+      "source_id": "ISO-7605-2025",
+      "title": "Underwater acoustics — Measurement of underwater ambient sound",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2025-07",
+      "url": "https://www.iso.org/standard/82844.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "standard": "ISO 7605:2025",
+        "method": "Ambient underwater sound measurement and reporting including instrument calibration/deployment, acquisition and processing of sound-pressure time series, levels, spectra and statistics."
+      },
+      "limitations": [
+        "Ambient sound excludes self-noise from the source under measurement.",
+        "The standard scope described does not include particle-motion measurement."
+      ]
+    },
+    {
+      "source_id": "OCEANENG-PROPELLER-URN-FULLSCALE-2025-121412",
+      "title": "Propeller design by optimisation for underwater radiated noise reduction: a full scale application",
+      "publisher": "Ocean Engineering",
+      "publication_date": "2025",
+      "url": "https://doi.org/10.1016/j.oceaneng.2025.121412",
+      "evidence_class": "peer_reviewed_full_scale_propeller_noise_case",
+      "scope": {
+        "method": "Propeller optimisation, numerical/scale model testing, refit and full-scale measurements.",
+        "reported_result": "Authors report coherent model-scale/numerical results and full-scale confirmation of URN reduction for a small passenger vessel."
+      },
+      "limitations": [
+        "Small passenger-vessel result, not a cargo/WAPS transfer result.",
+        "Full numerical methods and test conditions must be reviewed before reproduction."
+      ]
+    },
+    {
+      "source_id": "OCEANENG-CAVITATION-URN-INBEHIND-2026-124084",
+      "title": "Cavitation underwater radiated noise methodology applied to a propeller operating in-behind condition",
+      "publisher": "Ocean Engineering",
+      "publication_date": "2026-03-15",
+      "url": "https://doi.org/10.1016/j.oceaneng.2025.124084",
+      "evidence_class": "peer_reviewed_acoustic_methodology_with_model_and_full_scale_comparisons",
+      "scope": {
+        "method": "Predicted propeller pressure pulses and URN compared against model-scale experiments and full-scale sea trials; includes permeable FW-H and cavitation-volume monopole-source methods.",
+        "findings": "Paper reports sensitivity to integration surface and rotating/stationary interface errors for permeable FW-H URN calculations."
+      },
+      "limitations": [
+        "Solver-specific methodology; not universal URN solver validation.",
+        "Applicability depends on propeller, flow, cavitation and test conditions."
+      ]
     }
   ]
 }
