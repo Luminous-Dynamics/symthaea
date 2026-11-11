@@ -1154,6 +1154,7 @@ fn checked_dual(value: f64, gradient: Vec<f64>) -> Result<DualValue, DualEvaluat
 fn eval_expression_with_gradient(
     expr: &Expr,
     variable_names: &[String],
+    active_variable_indices: &[usize],
     values: &[f64],
 ) -> Result<DualValue, DualEvaluationError> {
     let dimension = variable_names.len();
@@ -1164,13 +1165,25 @@ fn eval_expression_with_gradient(
                 .position(|candidate| candidate == name)
                 .ok_or(DualEvaluationError::Unsupported)?;
             let mut gradient = vec![0.0; dimension];
-            gradient[index] = 1.0;
+            if active_variable_indices.contains(&index) {
+                gradient[index] = 1.0;
+            }
             checked_dual(values[index], gradient)
         }
         Expr::Const(value) => checked_dual(*value, vec![0.0; dimension]),
         Expr::BinOp(operation, left_expr, right_expr) => {
-            let left = eval_expression_with_gradient(left_expr, variable_names, values)?;
-            let right = eval_expression_with_gradient(right_expr, variable_names, values)?;
+            let left = eval_expression_with_gradient(
+                left_expr,
+                variable_names,
+                active_variable_indices,
+                values,
+            )?;
+            let right = eval_expression_with_gradient(
+                right_expr,
+                variable_names,
+                active_variable_indices,
+                values,
+            )?;
             let mut gradient = vec![0.0; dimension];
             let value = match operation {
                 BinOp::Add => {
@@ -1255,7 +1268,12 @@ fn eval_expression_with_gradient(
             checked_dual(value, gradient)
         }
         Expr::Func(function, argument) => {
-            let argument = eval_expression_with_gradient(argument, variable_names, values)?;
+            let argument = eval_expression_with_gradient(
+                argument,
+                variable_names,
+                active_variable_indices,
+                values,
+            )?;
             let mut gradient = vec![0.0; dimension];
             let value = match function {
                 UnaryFn::Sqrt => {
@@ -1540,7 +1558,12 @@ pub fn evaluate_metric_aware_linear_action_samples(
                 values[variable_index] = *value;
             }
 
-            let dual = match eval_expression_with_gradient(expr, &variable_names, &values) {
+            let dual = match eval_expression_with_gradient(
+                expr,
+                &variable_names,
+                &coordinate_indices,
+                &values,
+            ) {
                 Ok(result) => result,
                 Err(DualEvaluationError::Unsupported) => {
                     return Err(MetricAwareLinearActionSampleErrorV1::UnsupportedExpression);
@@ -2217,6 +2240,31 @@ mod tests {
             (base_negative_residual - transformed_negative_residual).abs() < 1e-12,
             "negative-control residual changed under basis transform: {base_negative_residual} vs {transformed_negative_residual}"
         );
+    }
+
+    #[test]
+    fn fixed_parameters_are_constant_when_differentiating_the_action_coordinates() {
+        // z is a fixed parameter used as the exponent. It is not part of the
+        // action and therefore its AD component must be zero in the directional
+        // derivative contract, even though z appears in the AST.
+        let action = metric_aware_so2_action();
+        let expression = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(var("x")),
+            Box::new(var("z")),
+        );
+        let report = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &action,
+            &[vec![-2.0, 1.0], vec![-1.5, 0.75], vec![-1.0, 2.0]],
+            &[("z", 3.0)],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+
+        assert_eq!(report.generator_results[0].invalid_sample_count, 0);
+        assert_eq!(report.generator_results[0].informative_sample_count, 3);
+        assert!(!report.invariant_under_every_generator());
     }
 
     #[test]
