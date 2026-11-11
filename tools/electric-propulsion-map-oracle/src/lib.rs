@@ -33,6 +33,7 @@ pub struct MapNode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct EfficiencyMap2D {
     map_id: String,
+    map_digest: String,
     configuration_digest: String,
     context_digest: String,
     evidence_manifest_digest: String,
@@ -58,6 +59,7 @@ pub struct MapQuery<'a> {
 pub struct MapLookup {
     pub model_version: &'static str,
     pub map_id: String,
+    pub map_digest: String,
     pub configuration_digest: String,
     pub context_digest: String,
     pub evidence_manifest_digest: String,
@@ -104,6 +106,7 @@ impl EfficiencyMap2D {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         map_id: impl Into<String>,
+        map_digest: impl Into<String>,
         configuration_digest: impl Into<String>,
         context_digest: impl Into<String>,
         evidence_manifest_digest: impl Into<String>,
@@ -113,12 +116,16 @@ impl EfficiencyMap2D {
         systematic_uncertainty_bound: f64,
     ) -> Result<Self, MapError> {
         let map_id = map_id.into();
+        let map_digest = map_digest.into();
         let configuration_digest = configuration_digest.into();
         let context_digest = context_digest.into();
         let evidence_manifest_digest = evidence_manifest_digest.into();
 
         if map_id.trim().is_empty() {
             return Err(MapError::InvalidMap("map identity must not be empty"));
+        }
+        if map_digest.trim().is_empty() {
+            return Err(MapError::InvalidMap("map content digest must not be empty"));
         }
         if configuration_digest.trim().is_empty() {
             return Err(MapError::InvalidMap(
@@ -177,6 +184,7 @@ impl EfficiencyMap2D {
 
         Ok(Self {
             map_id,
+            map_digest,
             configuration_digest,
             context_digest,
             evidence_manifest_digest,
@@ -249,6 +257,7 @@ impl EfficiencyMap2D {
         Ok(MapLookup {
             model_version: MODEL_VERSION,
             map_id: self.map_id.clone(),
+            map_digest: self.map_digest.clone(),
             configuration_digest: self.configuration_digest.clone(),
             context_digest: self.context_digest.clone(),
             evidence_manifest_digest: self.evidence_manifest_digest.clone(),
@@ -349,6 +358,7 @@ mod tests {
     fn fixture() -> EfficiencyMap2D {
         EfficiencyMap2D::new(
             "motor-map-test",
+            "map-content-sha-001",
             "config-sha-001",
             "context-sha-001",
             "evidence",
@@ -393,6 +403,7 @@ mod tests {
         assert_eq!(result.torque_cell_lower_index, 0);
         assert_eq!(result.speed_cell_lower_index, 0);
         assert_eq!(result.evidence_manifest_digest, "evidence");
+        assert_eq!(result.map_digest, "map-content-sha-001");
         assert_eq!(result.interpolation_weights, [0.375, 0.125, 0.375, 0.125]);
     }
 
@@ -415,6 +426,7 @@ mod tests {
     fn constant_map_is_constant_throughout_its_domain() {
         let map = EfficiencyMap2D::new(
             "constant",
+            "map-content-sha-001",
             "config",
             "context",
             "evidence",
@@ -527,6 +539,7 @@ mod tests {
         let invalid = [
             EfficiencyMap2D::new(
                 "m",
+                "map-content-sha-001",
                 "c",
                 "x",
                 "evidence",
@@ -537,6 +550,7 @@ mod tests {
             ),
             EfficiencyMap2D::new(
                 "m",
+                "map-content-sha-001",
                 "c",
                 "x",
                 "evidence",
@@ -547,6 +561,7 @@ mod tests {
             ),
             EfficiencyMap2D::new(
                 "m",
+                "map-content-sha-001",
                 "c",
                 "x",
                 "evidence",
@@ -557,6 +572,7 @@ mod tests {
             ),
             EfficiencyMap2D::new(
                 "m",
+                "map-content-sha-001",
                 "c",
                 "x",
                 "evidence",
@@ -567,6 +583,7 @@ mod tests {
             ),
             EfficiencyMap2D::new(
                 "m",
+                "map-content-sha-001",
                 "c",
                 "x",
                 "evidence",
@@ -591,6 +608,7 @@ mod tests {
         let invalid = [
             EfficiencyMap2D::new(
                 "m",
+                "map-content-sha-001",
                 "c",
                 "x",
                 "evidence",
@@ -601,6 +619,7 @@ mod tests {
             ),
             EfficiencyMap2D::new(
                 "m",
+                "map-content-sha-001",
                 "c",
                 "x",
                 "evidence",
@@ -611,6 +630,7 @@ mod tests {
             ),
             EfficiencyMap2D::new(
                 "m",
+                "map-content-sha-001",
                 "c",
                 "x",
                 "evidence",
@@ -636,6 +656,7 @@ mod tests {
             assert!(
                 EfficiencyMap2D::new(
                     "m",
+                    "map-content-sha-001",
                     "c",
                     "x",
                     "evidence",
@@ -678,6 +699,7 @@ mod tests {
         assert!(
             EfficiencyMap2D::new(
                 "m",
+                "map-content-sha-001",
                 "c",
                 "x",
                 "",
@@ -692,6 +714,7 @@ mod tests {
             assert!(
                 EfficiencyMap2D::new(
                     "m",
+                    "map-content-sha-001",
                     "c",
                     "x",
                     "evidence",
@@ -709,6 +732,7 @@ mod tests {
     fn exact_internal_grid_line_uses_deterministic_upper_adjacent_cell() {
         let map = EfficiencyMap2D::new(
             "grid-lines",
+            "map-content-sha-001",
             "config",
             "context",
             "evidence",
