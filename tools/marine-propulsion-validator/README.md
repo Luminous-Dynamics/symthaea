@@ -258,3 +258,17 @@ decidecade measurements. It checks test depth against the selected method, hydro
 calibration validity and frequency coverage, sample arithmetic, band ordering,
 uncertainty, ambient-reference presence and operating state. The synthetic fixture must
 return INCOMPLETE; an audit pass is not acoustic certification or evidence of ecological impact.
+
+
+Audit hull inspection, cleaning and biosecurity evidence:
+
+~~~sh
+cargo run --bin marine-biofouling-evidence-audit -- \
+  docs/research/marine/marine-biofouling-evidence-v0.1.0.schema.json \
+  docs/research/marine/fixtures/synthetic-marine-biofouling-evidence-v0.1.0.json
+~~~
+
+The biofouling audit checks declared versus area-derived inspection coverage, hull-zone
+accounting, taxonomic-source resolution, cleaning authorization, in-water containment,
+waste disposition and matched same-vessel performance conditions. A synthetic record must
+remain INCOMPLETE; a pass is not a cleaning permit, species identification or causal fuel claim.
