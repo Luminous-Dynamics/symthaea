@@ -699,25 +699,6 @@ fn finite_difference_gradient(
     Ok((gradient, condition_number, relative_reconstruction_residual))
 }
 
-/// Forward solve L y = p for lower-triangular L.
-fn solve_lower_triangular(lower: &[Vec<f64>], rhs: &[f64]) -> Option<Vec<f64>> {
-    let mut solution = Vec::with_capacity(rhs.len());
-    for (row_index, rhs_value) in rhs.iter().enumerate() {
-        let correction = solution
-            .iter()
-            .zip(lower[row_index].iter())
-            .map(|(value, coefficient)| *value * *coefficient)
-            .sum::<f64>();
-        let pivot = lower[row_index][row_index];
-        let value = (*rhs_value - correction) / pivot;
-        if !value.is_finite() || pivot <= 0.0 {
-            return None;
-        }
-        solution.push(value);
-    }
-    Some(solution)
-}
-
 /// Compute L^T v for lower-triangular L.
 fn multiply_lower_transpose(lower: &[Vec<f64>], vector: &[f64]) -> Vec<f64> {
     let dimension = vector.len();
