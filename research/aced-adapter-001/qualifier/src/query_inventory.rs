@@ -4,9 +4,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const UPSTREAM_REPOSITORY: &str = "https://github.com/Rose-STL-Lab/ACED-Bench";
 const UPSTREAM_COMMIT: &str = "998dc692bfcf5574e5319d67f1cea9c170569d80";
+const INVENTORY_VERSION: &str = "aced-query-world-inventory-v0.2";
+const MANIFEST_VERSION: &str = "aced-query-source-manifest-v0.2";
 const TRACKS: [&str; 4] = ["core_struct", "core_decision", "guess_struct", "guess_decision"];
 const EXPECTED_COUNTS: [usize; 4] = [10, 60, 30, 48];
-const KNOWN_DECISION_FAMILIES: [&str; 8] = [
+const DECISION_FAMILIES: [&str; 8] = [
     "invalid_premise",
     "mediator_structure_direct_and_mediated",
     "mediator_structure_mediated_only",
@@ -33,6 +35,7 @@ struct TrackReport {
     rows: Vec<Value>,
     domains: BTreeMap<String, usize>,
     families: BTreeMap<String, usize>,
+    scenario_subtypes: BTreeMap<String, usize>,
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -57,7 +60,11 @@ fn exact_fields(value: &Value, expected: &[&str]) -> bool {
     object.len() == expected.len() && expected.iter().all(|key| object.contains_key(*key))
 }
 
-fn expected_counts(manifest: &Value, track: &str, field: &str) -> Result<BTreeMap<String, usize>, String> {
+fn expected_counts(
+    manifest: &Value,
+    track: &str,
+    field: &str,
+) -> Result<BTreeMap<String, usize>, String> {
     let object = manifest["distributions"][track][field]
         .as_object()
         .ok_or_else(|| format!("manifest.distributions.{track}.{field} must be an object"))?;
@@ -73,7 +80,11 @@ fn expected_counts(manifest: &Value, track: &str, field: &str) -> Result<BTreeMa
     Ok(counts)
 }
 
-fn validate_track(track: &str, rows: &Value, manifest: &Value) -> Result<TrackReport, Vec<String>> {
+fn validate_track(
+    track: &str,
+    rows: &Value,
+    manifest: &Value,
+) -> Result<TrackReport, Vec<String>> {
     let mut errors = Vec::new();
     let index = TRACKS
         .iter()
@@ -94,6 +105,7 @@ fn validate_track(track: &str, rows: &Value, manifest: &Value) -> Result<TrackRe
     let mut seeds = BTreeSet::new();
     let mut domains = BTreeMap::<String, usize>::new();
     let mut families = BTreeMap::<String, usize>::new();
+    let mut scenario_subtypes = BTreeMap::<String, usize>::new();
 
     for (position, row) in items.iter().enumerate() {
         if !exact_fields(
@@ -107,6 +119,7 @@ fn validate_track(track: &str, rows: &Value, manifest: &Value) -> Result<TrackRe
                 "sha256",
                 "domain",
                 "task_family",
+                "scenario_subtype",
                 "seed",
                 "variables_n",
                 "edge_k",
@@ -114,7 +127,7 @@ fn validate_track(track: &str, rows: &Value, manifest: &Value) -> Result<TrackRe
             ],
         ) {
             errors.push(format!(
-                "{track}[{position}] does not match the closed twelve-field metadata contract"
+                "{track}[{position}] does not match the closed thirteen-field metadata contract"
             ));
             continue;
         }
@@ -147,6 +160,7 @@ fn validate_track(track: &str, rows: &Value, manifest: &Value) -> Result<TrackRe
         if row["bytes"].as_u64().is_none_or(|bytes| bytes == 0) {
             errors.push(format!("{track}[{position}] has an invalid payload byte size"));
         }
+
         let Some(domain) = text(row, "domain") else {
             errors.push(format!("{track}[{position}] has no domain"));
             continue;
@@ -154,6 +168,11 @@ fn validate_track(track: &str, rows: &Value, manifest: &Value) -> Result<TrackRe
         let Some(family) = text(row, "task_family") else {
             errors.push(format!("{track}[{position}] has no task family"));
             continue;
+        };
+        let scenario_subtype = if row["scenario_subtype"].is_null() {
+            "none"
+        } else {
+            text(row, "scenario_subtype").unwrap_or("")
         };
         let Some(seed) = row["seed"].as_u64().filter(|seed| *seed > 0) else {
             errors.push(format!("{track}[{position}] has an invalid seed"));
@@ -165,6 +184,7 @@ fn validate_track(track: &str, rows: &Value, manifest: &Value) -> Result<TrackRe
 
         if track.ends_with("struct") {
             if family != "random_graph"
+                || scenario_subtype != "none"
                 || row["variables_n"].as_u64().is_none_or(|value| value < 2)
                 || row["edge_k"].as_u64().is_none()
                 || !row["sample_n"].is_null()
@@ -173,24 +193,43 @@ fn validate_track(track: &str, rows: &Value, manifest: &Value) -> Result<TrackRe
                     "{track}[{position}] violates the structural-world metadata contract"
                 ));
             }
-        } else if !KNOWN_DECISION_FAMILIES.contains(&family)
-            || !row["variables_n"].is_null()
-            || !row["edge_k"].is_null()
-            || row["sample_n"].as_u64().is_none_or(|value| value == 0)
-        {
-            errors.push(format!(
-                "{track}[{position}] violates the decision-world metadata contract"
-            ));
+        } else {
+            let subtype_valid = if family == "invalid_premise" {
+                [
+                    "none",
+                    "valid_proposed_intervention",
+                    "wrong_side_intervention",
+                ]
+                .contains(&scenario_subtype)
+            } else {
+                scenario_subtype == "none"
+            };
+            if !DECISION_FAMILIES.contains(&family)
+                || !subtype_valid
+                || !row["variables_n"].is_null()
+                || !row["edge_k"].is_null()
+                || row["sample_n"].as_u64().is_none_or(|value| value == 0)
+            {
+                errors.push(format!(
+                    "{track}[{position}] violates the decision-world metadata contract"
+                ));
+            }
         }
 
         *domains.entry(domain.to_string()).or_default() += 1;
         *families.entry(family.to_string()).or_default() += 1;
+        *scenario_subtypes
+            .entry(scenario_subtype.to_string())
+            .or_default() += 1;
     }
 
-    let expected_domains = expected_counts(manifest, track, "domains")
-        .map_err(|error| vec![error])?;
-    let expected_families = expected_counts(manifest, track, "families")
-        .map_err(|error| vec![error])?;
+    let expected_domains =
+        expected_counts(manifest, track, "domains").map_err(|error| vec![error])?;
+    let expected_families =
+        expected_counts(manifest, track, "families").map_err(|error| vec![error])?;
+    let expected_subtypes =
+        expected_counts(manifest, track, "scenario_subtypes").map_err(|error| vec![error])?;
+
     if domains != expected_domains {
         errors.push(format!(
             "track {track} domain distribution mismatch: expected {expected_domains:?}, got {domains:?}"
@@ -201,12 +240,18 @@ fn validate_track(track: &str, rows: &Value, manifest: &Value) -> Result<TrackRe
             "track {track} family distribution mismatch: expected {expected_families:?}, got {families:?}"
         ));
     }
+    if scenario_subtypes != expected_subtypes {
+        errors.push(format!(
+            "track {track} scenario-subtype distribution mismatch: expected {expected_subtypes:?}, got {scenario_subtypes:?}"
+        ));
+    }
 
     if errors.is_empty() {
         Ok(TrackReport {
             rows: items.clone(),
             domains,
             families,
+            scenario_subtypes,
         })
     } else {
         errors.sort();
@@ -223,7 +268,10 @@ fn parse_checksums(source: &str) -> Result<BTreeMap<String, String>, Vec<String>
             continue;
         }
         let Some((digest, path)) = line.split_once("  ") else {
-            errors.push(format!("SHA256SUMS line {} lacks the standard separator", line_no + 1));
+            errors.push(format!(
+                "SHA256SUMS line {} lacks the standard separator",
+                line_no + 1
+            ));
             continue;
         };
         if !is_hex(digest, 64) {
@@ -287,11 +335,32 @@ pub fn qualify_query_inventory(
             "claim_ceiling",
         ],
     )
-        || text(manifest, "schema_version") != Some("aced-query-source-manifest-v0.1")
+        || !exact_fields(
+            &manifest["upstream"],
+            &[
+                "repository",
+                "commit",
+                "license",
+                "paper",
+                "paper_revision",
+                "paper_revision_date",
+            ],
+        )
+        || !exact_fields(
+            &manifest["artifacts"],
+            &[
+                "inventory_path",
+                "inventory_sha256",
+                "upstream_checksums_path",
+                "upstream_checksums_git_blob_sha",
+                "upstream_checksums_sha256",
+            ],
+        )
+        || text(manifest, "schema_version") != Some(MANIFEST_VERSION)
         || text(manifest, "benchmark_id") != Some("ACED-QUERY-ADAPTER-001")
         || text(manifest, "status") != Some("pinned_query_metadata_only_no_candidate_world_payloads")
     {
-        errors.push("ACED-Query source manifest identity or closed top-level contract mismatch".into());
+        errors.push("ACED-Query source manifest identity or closed contract mismatch".into());
     }
 
     let upstream = &manifest["upstream"];
@@ -315,9 +384,9 @@ pub fn qualify_query_inventory(
         errors.push("ACED-Query inventory or upstream checksum artifact digest mismatch".into());
     }
 
-    if text(inventory, "schema_version") != Some("aced-query-world-inventory-v0.1")
+    if !exact_fields(inventory, &["schema_version", "benchmark_id", "tracks"])
+        || text(inventory, "schema_version") != Some(INVENTORY_VERSION)
         || text(inventory, "benchmark_id") != Some("ACED-QUERY-ADAPTER-001")
-        || !exact_fields(inventory, &["schema_version", "benchmark_id", "tracks"])
         || !exact_fields(&inventory["tracks"], &TRACKS)
     {
         errors.push("ACED-Query inventory identity or track set mismatch".into());
@@ -343,18 +412,25 @@ pub fn qualify_query_inventory(
     }
 
     let mut reports = BTreeMap::new();
+    if !exact_fields(&manifest["track_counts"], &TRACKS)
+        || !exact_fields(&manifest["distributions"], &TRACKS)
+    {
+        errors.push("manifest track counts or distributions must be closed over the four declared tracks".into());
+    }
     for (track, expected_total) in TRACKS.iter().zip(EXPECTED_COUNTS) {
-        if !exact_fields(&manifest["track_counts"], &TRACKS)
-            || !exact_fields(&manifest["distributions"], &TRACKS)
-            || manifest["track_counts"][*track].as_u64() != Some(expected_total as u64)
+        if manifest["track_counts"][*track].as_u64() != Some(expected_total as u64)
             || manifest["distributions"][*track]["count"].as_u64() != Some(expected_total as u64)
         {
             errors.push(format!("manifest track count mismatch for {track}"));
         }
         match validate_track(track, &inventory["tracks"][*track], manifest) {
             Ok(report) => {
-                if report.rows.len() != expected_total {
-                    errors.push(format!("validated {track} row count mismatch"));
+                if report.rows.len() != expected_total
+                    || report.domains.is_empty()
+                    || report.families.is_empty()
+                    || report.scenario_subtypes.is_empty()
+                {
+                    errors.push(format!("validated {track} report is incomplete"));
                 }
                 reports.insert(*track, report);
             }
@@ -378,6 +454,20 @@ pub fn qualify_query_inventory(
         &inventory["tracks"]["guess_decision"].as_array().cloned().unwrap_or_default(),
         false,
     );
+    let mut collision_files = inventory["tracks"]["core_decision"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|left| {
+            inventory["tracks"]["guess_decision"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .any(|right| text(left, "file") == text(right, "file"))
+        })
+        .filter_map(|row| text(row, "file").map(str::to_owned))
+        .collect::<Vec<_>>();
+    collision_files.sort();
 
     let unique_payloads = inventory["tracks"]
         .as_object()
@@ -390,16 +480,41 @@ pub fn qualify_query_inventory(
         .len();
 
     let split = &manifest["split_relationships"];
-    if split["core_struct_guess_struct_exact_content_overlap"].as_u64()
-        != Some(core_struct_overlap as u64)
+    let declared_collisions = split["core_decision_guess_decision_filename_collision_files"]
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if !exact_fields(
+        split,
+        &[
+            "core_struct_guess_struct_exact_content_overlap",
+            "core_decision_guess_decision_exact_content_overlap",
+            "core_decision_guess_decision_filename_collision_count",
+            "core_decision_guess_decision_filename_collision_files",
+            "total_track_entries",
+            "unique_payload_sha256_count",
+            "uniqueness_note",
+        ],
+    )
+        || split["core_struct_guess_struct_exact_content_overlap"].as_u64()
+            != Some(core_struct_overlap as u64)
         || split["core_decision_guess_decision_exact_content_overlap"].as_u64()
             != Some(core_decision_exact_overlap as u64)
         || split["core_decision_guess_decision_filename_collision_count"].as_u64()
             != Some(core_decision_filename_collision as u64)
+        || declared_collisions != collision_files
         || split["total_track_entries"].as_u64() != Some(total_track_entries as u64)
         || split["unique_payload_sha256_count"].as_u64() != Some(unique_payloads as u64)
     {
-        errors.push("ACED-Query split identity or unique-payload counts do not match the exact inventory".into());
+        errors.push(
+            "ACED-Query split identity, filename collisions or unique-payload counts do not match the exact inventory".into(),
+        );
     }
 
     let checksum_source = std::str::from_utf8(checksum_bytes)
@@ -433,14 +548,6 @@ pub fn qualify_query_inventory(
         }
     };
 
-    // Keep the reports live until their distributions have been read: this also verifies the
-    // manifest distribution objects were parsed, rather than relying only on filename patterns.
-    for (track, report) in &reports {
-        if report.domains.is_empty() || report.families.is_empty() {
-            errors.push(format!("track {track} has an empty validated distribution"));
-        }
-    }
-
     if errors.is_empty() {
         Ok(QueryInventoryReport {
             total_track_entries,
@@ -461,7 +568,6 @@ pub fn qualify_query_inventory(
         Err(errors)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
