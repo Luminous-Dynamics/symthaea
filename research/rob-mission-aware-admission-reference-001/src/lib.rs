@@ -168,7 +168,7 @@ pub enum RejectReason {
     UnknownDecisionValue,
     /// Optional remote request has exactly zero task-loss value.
     ZeroEvsi,
-    /// Robot is already beyond a declared maximum starvation interval.
+    /// The declared maximum starvation interval is invalid or zero.
     StarvationEvidenceInvalid,
 }
 
@@ -215,6 +215,8 @@ pub struct AdmissionReport {
     pub resource_use: ResourceUse,
     /// Robots with service-floor obligations not fulfilled by this batch.
     pub service_floor_violations: Vec<String>,
+    /// Robots whose maximum starvation interval was already exceeded before this batch.
+    pub preexisting_starvation_breaches: Vec<String>,
     /// Whether all supplied service-floor obligations were met.
     pub service_floors_met: bool,
     /// Robot cursor to supply to the next Round Robin admission call.
@@ -282,9 +284,7 @@ fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
     if !request.local_hard_safety_preserved {
         return Err(RejectReason::LocalSafetyWouldBeDisplaced);
     }
-    if request.max_starvation_ticks == 0
-        || request.starvation_ticks > request.max_starvation_ticks
-    {
+    if request.max_starvation_ticks == 0 {
         return Err(RejectReason::StarvationEvidenceInvalid);
     }
 
@@ -402,6 +402,7 @@ pub fn admit_batch(
             admitted_request_ids: Vec::new(),
             resource_use: ResourceUse::default(),
             service_floor_violations: Vec::new(),
+            preexisting_starvation_breaches: Vec::new(),
             service_floors_met: true,
             next_cursor_robot_id: None,
             actuation_authorized: false,
@@ -507,6 +508,13 @@ pub fn admit_batch(
         .filter(|robot_id| !admitted_robots.contains(*robot_id))
         .cloned()
         .collect();
+    let preexisting_starvation_breaches: Vec<String> = requests
+        .iter()
+        .filter(|request| request.starvation_ticks > request.max_starvation_ticks)
+        .map(|request| request.robot_id.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
 
     let results = requests
         .iter()
@@ -525,8 +533,10 @@ pub fn admit_batch(
         requests: results,
         admitted_request_ids,
         resource_use,
-        service_floors_met: service_floor_violations.is_empty(),
+        service_floors_met: service_floor_violations.is_empty()
+            && preexisting_starvation_breaches.is_empty(),
         service_floor_violations,
+        preexisting_starvation_breaches,
         next_cursor_robot_id,
         actuation_authorized: false,
     })
@@ -752,6 +762,32 @@ mod tests {
         .unwrap();
         assert_eq!(report.admitted_request_ids, vec!["a_floor"]);
         assert!(report.service_floors_met);
+    }
+
+    #[test]
+    fn already_overdue_service_is_admitted_and_breach_is_reported() {
+        let mut q = request("q_due", "r1");
+        q.service_floor_due = true;
+        q.starvation_ticks = 12;
+        q.max_starvation_ticks = 10;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q_due"]);
+        assert!(report.service_floor_violations.is_empty());
+        assert_eq!(report.preexisting_starvation_breaches, vec!["r1"]);
+        assert!(!report.service_floors_met);
+    }
+
+    #[test]
+    fn zero_starvation_limit_is_invalid_evidence() {
+        let mut q = request("q_due", "r1");
+        q.max_starvation_ticks = 0;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::StarvationEvidenceInvalid)
+        );
     }
 
     #[test]
