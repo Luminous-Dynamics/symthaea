@@ -76,7 +76,7 @@ The part-separation diagnostic uses the existing one-to-one onset+pitch matches 
 - **Track purity:** group matched predictions by MIDI track. This reports whether multiple reference PartIds are mixed into the same physical MIDI track.
 - **Track/channel-lane purity:** group matched predictions by (MIDI track, MIDI channel). This recognises Type-0 files that put several logical parts on one physical track but separate them by channel.
 
-For both levels the report gives the number of prediction groups, number of mixed groups, number of matched notes residing in mixed groups and note-weighted purity (the fraction assigned to each group's most common reference PartId). It also reports reference-PartId coverage: the fraction of reference parts represented by at least one matched note.
+For both levels the report gives the number of prediction groups, number of mixed groups, number of matched notes residing in mixed groups and note-weighted purity (the fraction assigned to each group's most common reference PartId). It also reports reference-PartId coverage: the fraction of distinct PartIds declared in the reference manifest's track receipts that are represented by at least one matched note. A declared but silent PartId stays in the denominator.
 
 This is a structural metric, not an instrument identity classifier. It says whether note events associated with distinct score PartIds were kept in distinct MIDI output tracks or channel lanes. It does not prove which acoustic instrument played the source recording. Only matched notes contribute to purity; unmatched extra notes are already counted as false positives by the note metrics and are not assigned a speculative PartId. A PartId can validly be spread across multiple tracks or lanes; the score is based on dominant-part purity rather than a strict one-track-per-part bijection.
 
@@ -99,7 +99,7 @@ Capacity exhaustion is an explicit error, not a partial score.
 
 ## Tests authored
 
-Thirty-four focused Rust tests currently cover:
+Thirty-six focused Rust tests currently cover:
 1. exact MIDI prediction produces perfect instrument-agnostic and exact-program scores;
 2. wrong GM program changes the exact-program metrics without hiding correct pitch/onset notes;
 3. onset outside the 50 ms window reduces onset and full-note scores;
@@ -134,6 +134,8 @@ Thirty-four focused Rust tests currently cover:
 32. frame metrics are withheld when predicted notes have unclosed releases;
 33. velocity error is still measured for onset+pitch matches when note offsets are wrong;
 34. an empty reference is accepted as a valid all-false-positive evaluation case.
+35. a declared reference part with no notes in the excerpt remains in the part-coverage denominator;
+36. zero matched notes yields zero part coverage and no undefined purity value.
 
 These tests are authored, not compiled or run in the authoring environment.
 
