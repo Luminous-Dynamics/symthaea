@@ -10,6 +10,8 @@ It is a **synthetic signal-processing test plant**, not a model of a particular 
 - The existing symthaea_vocal_tract::speech::vocoder::synthesize legacy source-filter renderer.
 - Stable segment identities and bounded pitch/formant/energy edit proposals.
 - Independent F0 measurement from PCM using normalized autocorrelation and parabolic lag interpolation.
+- Separate PCM-only LPC formant observations (F1–F3), including analyzer configuration, voiced-window coverage, medians and median absolute deviations.
+- Full synthetic segment parameters in the manifest, alongside their SHA-256 digest, so the ground-truth input vector is inspectable and independently re-hashable.
 - Exact sample-level protection outside a declared segment-plus-seam dependency cone.
 - Float WAV output, parameter and PCM SHA-256 digests, and a machine-readable run manifest.
 
@@ -70,4 +72,6 @@ A passing result establishes only deterministic behavior of this generated fixtu
 - performance on MMAE, LyricEditBench or another external benchmark;
 - operation of the Series 23 physical articulatory backend.
 
-The next integration step is to export the measurements using the exact metric IDs, units, calibration receipts and provenance fields expected by VCRB-001, VIA-001, VCCR-001, VMEA-001 and VELB-001. It must not create a duplicate evaluator or allow the fixture generator to self-certify the analyzer.
+The current F1–F3 observer uses the existing LPC extractor on PCM, not the renderer controls. It is a separate analysis algorithm in the same vocal-tract crate, not an external verifier or validated phonetics instrument. Its fallback behavior and bias must be calibrated before its estimates are treated as qualification evidence.
+
+The next integration step is to export measurements using the exact metric IDs, units, calibration receipts and provenance fields expected by VCRB-001, VIA-001, VCCR-001, VMEA-001 and VELB-001. It must not create a duplicate evaluator or allow the fixture generator to self-certify the analyzer.
