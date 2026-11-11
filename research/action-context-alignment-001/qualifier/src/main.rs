@@ -156,8 +156,9 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
 
     let declared_dimensions = manifest["mutation_dimensions"].as_array()
         .map(|items| items.iter().filter_map(Value::as_str).collect::<BTreeSet<_>>());
+    let declared_dimension_count = manifest["mutation_dimensions"].as_array().map(Vec::len);
     let expected_dimensions = DIMENSIONS.iter().copied().collect::<BTreeSet<_>>();
-    if declared_dimensions != Some(expected_dimensions) {
+    if declared_dimensions != Some(expected_dimensions) || declared_dimension_count != Some(DIMENSIONS.len()) {
         errors.push("declared mutation dimensions do not match v0.1 contract".into());
     }
 
@@ -221,7 +222,7 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
             continue;
         }
         let changed = a.keys().filter(|key| a.get(*key) != b.get(*key)).map(|key| key.as_str()).collect::<Vec<_>>();
-        if changed.as_slice() != [mutated_field] {
+        if changed.len() != 1 || changed[0] != mutated_field {
             errors.push(format!("pair {pair_id} must change exactly {mutated_field}, observed {changed:?}"));
         }
     }
@@ -314,8 +315,8 @@ mod tests {
     #[test]
     fn expiry_at_evaluation_time_is_not_eligible() {
         let mut v = parsed();
-        v["fixtures"][0]["authority_context"]["expires_at_unix"] =
-            v["fixtures"][0]["task"]["evaluated_at_unix"].clone();
+        let evaluation_time = v["fixtures"][0]["task"]["evaluated_at_unix"].clone();
+        v["fixtures"][0]["authority_context"]["expires_at_unix"] = evaluation_time;
         v["fixtures"][0]["expected_disposition"] = Value::String("IneligibleNoAdapterCall".into());
         assert!(validate_manifest(&v).is_err());
     }
