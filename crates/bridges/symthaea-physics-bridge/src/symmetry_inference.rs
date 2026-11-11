@@ -92,6 +92,9 @@ use symthaea_core::hdc::lie_theory::{self, LieAlgebra};
 use crate::linear_group_action::AdmittedLinearGroupActionV1;
 use crate::types::{LieGroup, SymmetryDescriptor};
 
+const HARD_MAX_METRIC_AWARE_ACTION_DIMENSION: usize = 32;
+const HARD_MAX_METRIC_AWARE_ACTION_GENERATORS: usize = 128;
+
 /// Fully specified numerical policy used by the bounded Lie-derivative fallback.
 ///
 /// The profile is returned with every numerical candidate so a consumer can
@@ -308,6 +311,8 @@ impl Default for MetricAwareLinearActionSampleProfileV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MetricAwareLinearActionSampleErrorV1 {
     InvalidProfile,
+    ActionDimensionLimitExceeded { actual: usize, maximum: usize },
+    GeneratorCountLimitExceeded { actual: usize, maximum: usize },
     TooManySamples { actual: usize, maximum: usize },
     EmptySampleSet,
     SampleDimensionMismatch { sample_index: usize, expected: usize, actual: usize },
@@ -1328,6 +1333,22 @@ fn eval_expression_with_gradient(
     }
 }
 
+/// Return true only for the smooth AST subset supported by the metric-aware
+/// forward-mode derivative. Reject unsupported syntax before fixed-binding
+/// resolution so a summation or nondifferentiable node cannot be misreported
+/// as a missing parameter.
+fn metric_aware_expression_supported(expr: &Expr) -> bool {
+    match expr {
+        Expr::Var(_) | Expr::Const(_) => true,
+        Expr::BinOp(_, left, right) => {
+            metric_aware_expression_supported(left)
+                && metric_aware_expression_supported(right)
+        }
+        Expr::Func(UnaryFn::Abs | UnaryFn::Floor, _) | Expr::Sum(_, _) => false,
+        Expr::Func(_, argument) => metric_aware_expression_supported(argument),
+    }
+}
+
 fn canonical_expression(expr: &Expr) -> String {
     format!("symthaea-expr-v1:{}", canonical_expression_node(expr))
 }
@@ -1428,7 +1449,22 @@ pub fn evaluate_metric_aware_linear_action_samples(
 
     let declaration = action.action();
     let dimension = declaration.coordinate_names.len();
+    if dimension > HARD_MAX_METRIC_AWARE_ACTION_DIMENSION {
+        return Err(MetricAwareLinearActionSampleErrorV1::ActionDimensionLimitExceeded {
+            actual: dimension,
+            maximum: HARD_MAX_METRIC_AWARE_ACTION_DIMENSION,
+        });
+    }
+    if declaration.generators.len() > HARD_MAX_METRIC_AWARE_ACTION_GENERATORS {
+        return Err(MetricAwareLinearActionSampleErrorV1::GeneratorCountLimitExceeded {
+            actual: declaration.generators.len(),
+            maximum: HARD_MAX_METRIC_AWARE_ACTION_GENERATORS,
+        });
+    }
     let complexity = expr.complexity();
+    if !metric_aware_expression_supported(expr) {
+        return Err(MetricAwareLinearActionSampleErrorV1::UnsupportedExpression);
+    }
     if complexity > profile.maximum_expression_nodes {
         return Err(MetricAwareLinearActionSampleErrorV1::ExpressionTooComplex {
             actual: complexity,
@@ -2327,6 +2363,100 @@ mod tests {
     #[test]
     fn metric_aware_sampler_rejects_unsupported_nondifferentiable_ast() {
         let expression = Expr::Func(UnaryFn::Abs, Box::new(var("x")));
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &metric_sample_states(),
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::UnsupportedExpression)
+        );
+    }
+
+    #[test]
+    fn metric_aware_sampler_enforces_hard_action_dimension_and_generator_limits() {
+        use crate::linear_group_action::{
+            LinearGeneratorV1, LinearGroupActionAdmissionProfileV1, LinearGroupActionV1,
+        };
+
+        let dimension = HARD_MAX_METRIC_AWARE_ACTION_DIMENSION + 1;
+        let mut generator = vec![vec![0.0_f64; dimension]; dimension];
+        generator[0][1] = -1.0;
+        generator[1][0] = 1.0;
+        let large_dimension_action = LinearGroupActionV1 {
+            action_id: "metric-sampler-over-dimension-cap".to_string(),
+            coordinate_basis_id: "large-basis".to_string(),
+            coordinate_names: (0..dimension).map(|index| format!("x{index}")).collect(),
+            coordinate_unit_ids: vec!["1".to_string(); dimension],
+            metric: (0..dimension)
+                .map(|row| {
+                    (0..dimension)
+                        .map(|column| if row == column { 1.0 } else { 0.0 })
+                        .collect()
+                })
+                .collect(),
+            generators: vec![LinearGeneratorV1 {
+                id: "J".to_string(),
+                matrix: generator,
+            }],
+        }
+        .try_admit(LinearGroupActionAdmissionProfileV1 {
+            maximum_dimension: dimension,
+            ..LinearGroupActionAdmissionProfileV1::default()
+        })
+        .unwrap();
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &Expr::Var("x0".to_string()),
+                &large_dimension_action,
+                &[vec![1.0; dimension]],
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::ActionDimensionLimitExceeded {
+                actual: dimension,
+                maximum: HARD_MAX_METRIC_AWARE_ACTION_DIMENSION,
+            })
+        );
+
+        let too_many_generators = LinearGroupActionV1 {
+            action_id: "metric-sampler-over-generator-cap".to_string(),
+            coordinate_basis_id: "xy".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: (0..=HARD_MAX_METRIC_AWARE_ACTION_GENERATORS)
+                .map(|index| LinearGeneratorV1 {
+                    id: format!("J-{index}"),
+                    matrix: vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+                })
+                .collect(),
+        }
+        .try_admit(LinearGroupActionAdmissionProfileV1 {
+            maximum_generators: HARD_MAX_METRIC_AWARE_ACTION_GENERATORS + 1,
+            ..LinearGroupActionAdmissionProfileV1::default()
+        })
+        .unwrap();
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &add(pow2("x"), pow2("y")),
+                &too_many_generators,
+                &metric_sample_states(),
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::GeneratorCountLimitExceeded {
+                actual: HARD_MAX_METRIC_AWARE_ACTION_GENERATORS + 1,
+                maximum: HARD_MAX_METRIC_AWARE_ACTION_GENERATORS,
+            })
+        );
+    }
+
+    #[test]
+    fn metric_aware_sampler_rejects_summation_before_fixed_binding_resolution() {
+        let expression = Expr::Sum(Box::new(var("x")), "k".to_string());
         assert_eq!(
             evaluate_metric_aware_linear_action_samples(
                 &expression,
