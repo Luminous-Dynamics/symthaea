@@ -433,6 +433,7 @@ fn verify_midi(
             || track.midi_channel > 15
             || track.gm_program > 127
             || track.segment_end_tick <= track.segment_start_tick
+            || !non_blank(&track.track_name)
             || !non_blank(&track.segment_id)
             || !non_blank(&track.instrument_id)
             || !non_blank(&track.renderer_id)
@@ -471,7 +472,8 @@ fn verify_midi(
                 ordinal: note.source_note_ordinal,
             });
         }
-        if note.pitch_midi > 127
+        if note.source_note_ordinal > 1_000_000_000
+            || note.pitch_midi > 127
             || note.velocity_midi == 0
             || note.velocity_midi > 127
             || note.end_tick <= note.start_tick
