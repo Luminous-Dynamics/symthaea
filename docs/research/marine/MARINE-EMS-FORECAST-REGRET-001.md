@@ -25,9 +25,33 @@ Those records represent two cruise vessels and one offshore support vessel. The 
 
 EU THETIS/MRV annual ship-level aggregates are suitable for fleet emissions/CII diagnostics and external consistency checks, not daily fuel prediction labels or causal speed-fuel response.
 
+## 2A. New route-risk SOTA comparators (November 2026)
+
+Two recent route-risk studies should be included in the methodology comparison, without ranking their published percentages against one another:
+
+**Battal, Transportation Research Part D 160 (November 2026), Article 105598, DOI 10.1016/j.trd.2026.105598.** The paper reports a distributional-RL/QR-DQN policy with Wasserstein distributionally robust optimization on a Rotterdam–New York corridor. The abstract reports 17.9% lower fuel than slow steaming and 5.1% lower fuel than standard DQN, with about 390 t CO2 per voyage and near-zero adverse-weather exposure. These are author-reported results for one corridor, not an independently reproduced Luminous result or a transferable WAPS forecast.
+
+**Can, Journal of ETA Maritime Science (2 October 2026), DOI 10.4274/jems.2026.95826.** A risk-aware digital twin for the İstanbul–Piraeus route combines AIS observations, a reduced PDE–ODE resistance/navigation model, CVaR and distributionally robust optimization. The article reports a speed change from 20 kn to approximately 16 kn, about 24% lower CO2 and about 26% lower CVaR-based tail risk under its adopted assumptions. The authors explicitly state the reduced-order model is not intended to replace high-fidelity CFD.
+
+These studies expand the benchmark baselines beyond deterministic weather routing and conventional MPC. Their numerical results are **not cross-paper comparable**: vessel, corridor, fuel/CO2 boundary, weather samples, service contract, cost assumptions, and baseline policies differ. Extract the methods and reported case data first, reproduce each published case separately where inputs permit, and then compare algorithm families on one shared frozen service/route/weather corpus.
+
+### Required routing/decision baselines (expanded)
+
+- Deterministic shortest/least-fuel route and conventional weather routing.
+- Slow steaming and fixed schedule-speed policy.
+- Rule-based speed/energy management.
+- Standard DQN or equivalent point-value RL.
+- Distributional RL (e.g. QR-DQN) without DRO.
+- Distributional RL + Wasserstein DRO (or a faithfully reproduced ambiguity-set variant).
+- Risk-aware digital-twin speed optimization with CVaR + DRO.
+- Deployable receding-horizon MPC and robust/stochastic MPC.
+- Clairvoyant perfect-foresight dynamic programming as an explicitly non-deployable oracle.
+
+For a fair common-case comparison, all methods receive the same forecast snapshots available at decision time, same action frequency, same service and safety constraints, and identical initial vessel/load/SOC state. Score route length and fuel only alongside ETA distribution, on-time probability, adverse-weather exposure, p95 delay, fuel/energy uncertainty, replan latency and hard-constraint violations.
+
 ## 3. Baselines and evaluation
 
-B0 measured operating policy; B1 rule-based EMS; B2 greedy/no-lookahead EMS; B3 deployable receding-horizon/MPC; B4 robust or stochastic MPC; B5 offline perfect-foresight DP oracle; B6 conditional-physics predictor vs unconstrained ML and simple physical baselines.
+B0 measured operating policy; B1 slow steaming/fixed-speed and deterministic weather routing; B2 rule-based EMS; B3 greedy/no-lookahead EMS; B4 standard DQN/point-value RL; B5 distributional RL (QR-DQN); B6 distributional RL + Wasserstein DRO; B7 risk-aware digital twin with CVaR + DRO; B8 deployable receding-horizon/MPC; B9 robust/stochastic MPC; B10 offline perfect-foresight DP oracle; B11 conditional-physics predictor vs unconstrained ML and simple physical baselines.
 
 Freeze voyage, service, forecast snapshot, route, load, metocean, equipment, fuel boundary and model revision. Split by voyage/route/season; purge correlated adjacent windows. Only forecasts available at decision time may enter deployable policies. Observed future weather/reanalysis is not a forecast.
 
@@ -69,6 +93,8 @@ Keep the controller advisory; no direct navigation or actuator authority. Physic
 - Park & Song, JMSE 14(19), 1774 (23 September 2026): https://doi.org/10.3390/jmse14191774
 - FuelCast dataset: https://huggingface.co/datasets/krohnedigital/FuelCast
 - EU THETIS MRV: https://mrv.emsa.europa.eu
+- Battal, *Robust low-carbon ship routing under weather uncertainty: a distributional reinforcement learning approach*, Transportation Research Part D 160 (November 2026), 105598: https://doi.org/10.1016/j.trd.2026.105598
+- Can, *Risk-Aware Digital Twin-Based Speed Optimization for CO2 Emission Reduction in Short-Sea Shipping: The İstanbul-Piraeus Route*, Journal of ETA Maritime Science (2 October 2026): https://doi.org/10.4274/jems.2026.95826
 - Du et al., Applied Sciences 16(10), 4940 (15 May 2026): https://doi.org/10.3390/app16104940
 
 ## 8. Claim ceiling
