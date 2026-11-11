@@ -1025,4 +1025,13 @@ mod tests {
         assert!(errors.contains(&SplitManifestIssue::SplitCsvBlobMismatch));
     }
 
+
+    #[test]
+    fn git_blob_hash_matches_git_hash_object_known_vector() {
+        assert_eq!(
+            git_blob_sha1_hex(b"test\n"),
+            "9daeafb9864cf43055ae93beb0afd6c7d144bfa4"
+        );
+    }
+
 }
