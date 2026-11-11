@@ -319,7 +319,7 @@
         "reference_value": 91.16,
         "reference_unit": "gCO2e/MJ",
         "formula_or_method": "Calculate annual average well-to-wake GHG intensity of energy used on board using the prescribed fuel pathway, gas and GWP methodology, then compare with the applicable target after reduction factor.",
-        "phase_in": [
+        "ghg_reduction_phase_in": [
           {
             "year": 2025,
             "value": 2,
@@ -594,6 +594,81 @@
         "Standards/certification for wind-energy amount are future implementing acts and are not supplied by this record.",
         "Do not infer that the proposal or its future methodology is in force."
       ]
+    },
+    {
+      "rule_id": "FUELEU-ARTICLE6-ZERO-EMISSIONS-AT-BERTH",
+      "title": "FuelEU Maritime Article 6 zero-emission-at-berth requirement for eligible containerships and passenger ships",
+      "authority": "European Union",
+      "instrument": "Regulation (EU) 2023/1805, Article 6",
+      "revision_or_resolution": "Use consolidated Regulation and current Commission guidance",
+      "rule_status": "in_force",
+      "legal_character": "binding_regulation",
+      "dates": {
+        "entry_into_force_on": "2023-10-12",
+        "applies_from": "2030-01-01"
+      },
+      "applicability": {
+        "ship_scope": "Passenger ships and ships carrying exclusively containers, within Regulation (EU) 2023/1805 vessel/company/GT scope. The zero-emission-at-berth requirement does not automatically apply to general-cargo or mixed-cargo ships.",
+        "geographic_scope": "EU ports covered by AFIR Article 9 from 1 January 2030; all other EU ports that develop OPS facilities from 1 January 2035, subject to Article 6 and the current Regulation.",
+        "voyage_scope": "Ships at berth, moored to the quayside, for the period and conditions set out in FuelEU Maritime Article 6.",
+        "conditions": [
+          "The ship categories in scope are passenger ships and ships carrying exclusively containers, within the Regulation's applicable gross-tonnage and company scope.",
+          "From 1 January 2030, eligible ships at berth in AFIR Article 9 covered ports must connect to OPS and use it for all electrical power demand at berth, or use an applicable zero-emission technology, subject to exceptions.",
+          "From 1 January 2035, the same obligation applies in other ports that develop OPS facilities.",
+          "From 1 January 2030 through 31 December 2034, Member States may extend the obligation in specified circumstances to ports/parts of ports not covered by AFIR Article 9."
+        ],
+        "exclusions_or_unknowns": [
+          "Do not apply automatically to general cargo or mixed-use/mixed-cargo vessels.",
+          "Check the consolidated Regulation's ship scope, gross tonnage, exceptions, port status and any Member-State early application.",
+          "An AFIR infrastructure obligation does not prove that a specific berth has live, compatible or reserved OPS power."
+        ],
+        "ship_categories": [
+          "passenger",
+          "container_exclusively"
+        ],
+        "minimum_gt": 5000,
+        "berth_only": true,
+        "implementation_phases": [
+          {
+            "applies_from": "2030-01-01",
+            "port_scope": "afir_article_9_ports",
+            "ship_categories": [
+              "passenger",
+              "container_exclusively"
+            ],
+            "requirement": "connect_ops_and_use_electricity_or_zero_emission_technology",
+            "member_state_early_application_possible": true
+          },
+          {
+            "applies_from": "2035-01-01",
+            "port_scope": "eu_ports_with_ops",
+            "ship_categories": [
+              "passenger",
+              "container_exclusively"
+            ],
+            "requirement": "connect_ops_and_use_electricity_or_zero_emission_technology",
+            "member_state_early_application_possible": false
+          }
+        ]
+      },
+      "output_scope": [
+        "FuelEU Article 6 ship-category applicability",
+        "berth-only zero-emission obligation",
+        "OPS connection or zero-emission technology requirement",
+        "port-phase and effective-date evidence"
+      ],
+      "calculation_contract": {
+        "metric_id": "fueleu_article6_ops_applicability",
+        "formula_or_method": "Resolve ship type (passenger or exclusively container), gross tonnage, company/voyage scope, berth status, port AFIR Article 9 coverage or OPS-equipment status, effective date and exceptions. Do not infer a mandate for general-cargo or mixed-cargo vessels."
+      },
+      "source_ids": [
+        "EU-FUELEU-ARTICLE6-OPS-QA-2026",
+        "EU-AFIR-REG2023-1804"
+      ],
+      "limitations": [
+        "This rule record is a machine-readable interpretation aid and not a legal opinion or verifier statement.",
+        "Use consolidated Regulation (EU) 2023/1805, applicable amendments, AFIR status and Member-State implementation for actual determinations."
+      ]
     }
   ],
   "sources": [
@@ -725,6 +800,45 @@
       "limitations": [
         "Proposed method only; implementing-act standards/certification have not yet been issued by this proposal.",
         "Do not use this annex as the current statutory WAPS calculation or certification method."
+      ]
+    },
+    {
+      "source_id": "EU-FUELEU-ARTICLE6-OPS-QA-2026",
+      "title": "European Commission Q&A on FuelEU Maritime Article 6 zero-emission-at-berth requirements",
+      "publisher": "European Commission Directorate-General for Mobility and Transport",
+      "publication_date": "2026-01-01",
+      "url": "https://transport.ec.europa.eu/transport-modes/maritime/decarbonising-maritime-transport-fueleu-maritime/questions-and-answers-regulation-eu-20231805-use-renewable-and-low-carbon-fuels-maritime-transport_en",
+      "evidence_class": "official_eu_regulatory_interpretive_guidance",
+      "scope": {
+        "ship_categories": [
+          "passenger",
+          "container_exclusively"
+        ],
+        "minimum_gt": 5000,
+        "timelines": [
+          "2030-01-01 AFIR Article 9 covered ports",
+          "2035-01-01 other EU ports with OPS"
+        ],
+        "clarifies": "General cargo ships carrying containers but not exclusively containers are not in scope of Article 6 under this Q&A."
+      },
+      "limitations": [
+        "Use the consolidated regulation and current national implementation for legal determination.",
+        "A port mandate does not prove a specific berth connection is operational or reserved."
+      ]
+    },
+    {
+      "source_id": "EU-AFIR-REG2023-1804",
+      "title": "Regulation (EU) 2023/1804 on deployment of alternative fuels infrastructure",
+      "publisher": "European Union",
+      "publication_date": "2023-09-13",
+      "url": "https://eur-lex.europa.eu/eli/reg/2023/1804/oj",
+      "evidence_class": "binding_eu_regulation",
+      "scope": {
+        "maritime": "Shore-side electricity supply infrastructure requirements for specified TEN-T ports and eligible container/passenger vessel categories.",
+        "target_date": "2029-12-31"
+      },
+      "limitations": [
+        "Port infrastructure obligations depend on port category/activity and ship category; they are not a guarantee of live capacity at a particular berth."
       ]
     }
   ]
