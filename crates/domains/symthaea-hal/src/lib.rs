@@ -68,6 +68,7 @@ pub mod ina219;
 pub mod interlock;
 pub mod mock;
 pub mod motor_safety;
+pub mod observation;
 pub mod pca9685;
 pub mod recording;
 pub mod runtime;
@@ -83,6 +84,10 @@ pub use imu::{ComplementaryFilter, Mpu6050Decoder};
 pub use ina219::Ina219Decoder;
 pub use interlock::{SafetyConfig, SafetyInterlock};
 pub use motor_safety::MotorSafetyLevel;
+pub use observation::{
+    CalibrationState, ObservationEnvelope, ObservationQualityFlag, ObservationValidationError,
+    OBSERVATION_SCHEMA_VERSION,
+};
 pub use pca9685::Pca9685;
 pub use recording::{RecordingAdapter, ReplayAdapter, SensorRecording};
 pub use runtime::{
