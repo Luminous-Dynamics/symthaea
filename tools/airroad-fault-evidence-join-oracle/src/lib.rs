@@ -193,12 +193,13 @@ pub enum EvidenceJoinDisposition {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FaultScenarioEvidenceReport {
-    pub scenario_id: String,
+    pub scenario: AircraftFaultScenario,
     pub disposition: EvidenceJoinDisposition,
     pub required_evidence: Vec<EvidenceRequirement>,
     pub missing_evidence: Vec<EvidenceRequirement>,
     pub mismatches: Vec<String>,
     pub artifact_ids: Vec<String>,
+    pub evidence_artifacts: Vec<FaultEvidenceArtifact>,
     pub claim_classes_present: Vec<EvidenceClass>,
 }
 
@@ -206,8 +207,10 @@ pub struct FaultScenarioEvidenceReport {
 pub struct FaultEvidenceJoinReport {
     pub model_version: &'static str,
     pub configuration_digest: String,
-    pub topology_id: String,
-    pub topology_digest: String,
+    pub topology: AircraftPowerTreeRef,
+    pub element_bindings: Vec<AircraftElementBinding>,
+    pub propulsion_paths: Vec<PropulsionPathBinding>,
+    pub protection_devices: Vec<ProtectionDeviceBinding>,
     pub scenario_reports: Vec<FaultScenarioEvidenceReport>,
 }
 
@@ -322,6 +325,7 @@ fn required_evidence_for(
         );
     }
 
+    drop(add);
     required.into_iter().collect()
 }
 
@@ -532,7 +536,7 @@ fn validate_topology(
                     scenario
                         .target_aircraft_element_ids
                         .iter()
-                        .any(|target| target == element_id)
+                        .any(|target| target.as_str() == *element_id)
                 });
                 path_is_targeted
                     && path
@@ -665,6 +669,16 @@ pub fn join_fault_evidence(
                 missing.push(requirement.clone());
                 continue;
             }
+            let unique_digests = matches
+                .iter()
+                .map(|artifact| artifact.artifact_digest.as_str())
+                .collect::<BTreeSet<_>>();
+            if unique_digests.len() > 1 {
+                mismatches.push(format!(
+                    "conflicting digests are supplied for {:?} subject {}",
+                    requirement.kind, requirement.subject_id
+                ));
+            }
 
             if requirement.kind == FaultEvidenceKind::AsBuiltTopology
                 && matches.iter().all(|artifact| {
@@ -728,12 +742,13 @@ pub fn join_fault_evidence(
         };
 
         reports.push(FaultScenarioEvidenceReport {
-            scenario_id: scenario.scenario_id.clone(),
+            scenario: scenario.clone(),
             disposition,
             required_evidence: required,
             missing_evidence: missing,
             mismatches,
             artifact_ids: used_ids.into_iter().collect(),
+            evidence_artifacts: artifacts.into_iter().cloned().collect(),
             claim_classes_present: claim_classes.into_iter().collect(),
         });
     }
@@ -741,8 +756,10 @@ pub fn join_fault_evidence(
     Ok(FaultEvidenceJoinReport {
         model_version: MODEL_VERSION,
         configuration_digest: input.configuration_digest.clone(),
-        topology_id: input.topology.tree_id.clone(),
-        topology_digest: input.topology.tree_digest.clone(),
+        topology: input.topology.clone(),
+        element_bindings: input.element_bindings.clone(),
+        propulsion_paths: input.propulsion_paths.clone(),
+        protection_devices: input.protection_devices.clone(),
         scenario_reports: reports,
     })
 }
@@ -1183,6 +1200,29 @@ mod tests {
     }
 
     #[test]
+    fn contradictory_digests_for_one_requirement_are_non_pass() {
+        let mut input = base_input();
+        let mut conflict = input
+            .artifacts
+            .iter()
+            .find(|item| item.kind == FaultEvidenceKind::FaultWaveform)
+            .unwrap()
+            .clone();
+        conflict.artifact_id = "waveform-conflict".to_owned();
+        conflict.artifact_digest = "different-waveform-digest".to_owned();
+        input.artifacts.push(conflict);
+        let report = join_fault_evidence(&input).unwrap();
+        assert_eq!(
+            report.scenario_reports[0].disposition,
+            EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch
+        );
+        assert!(report.scenario_reports[0]
+            .mismatches
+            .iter()
+            .any(|reason| reason.contains("conflicting digests")));
+    }
+
+    #[test]
     fn scenario_order_is_canonical_and_deterministic() {
         let mut input = base_input();
         let mut second = input.scenarios[0].clone();
@@ -1228,6 +1268,9 @@ mod tests {
         input.artifacts.reverse();
         let second = join_fault_evidence(&input).unwrap();
         assert_eq!(first, second);
-        assert_eq!(first.scenario_reports[0].scenario_id, "fault-left-open");
+        assert_eq!(
+            first.scenario_reports[0].scenario.scenario_id,
+            "fault-left-open"
+        );
     }
 }
