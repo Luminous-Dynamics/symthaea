@@ -621,6 +621,9 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
         .map_err(|error| format!("canonical corpus serialization: {error}"))?;
     let mut case_ids = BTreeSet::new();
     let mut pack_ids = BTreeSet::new();
+    let mut mission_report_ids = BTreeSet::new();
+    let mut reference_evidence_ids = BTreeSet::new();
+    let mut measurement_evidence_ids = BTreeSet::new();
     for case in &corpus.cases {
         if !case_ids.insert(case.case_id.clone()) {
             return Err(format!("duplicate case identity: {}", case.case_id));
@@ -630,6 +633,26 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
                 "duplicate pack identity would violate independent pack-mission sampling: {}",
                 case.prediction.asset.pack_ref
             ));
+        }
+        if !mission_report_ids.insert(case.prediction.mission_report_ref.clone()) {
+            return Err(format!(
+                "duplicate mission report reference: {}",
+                case.prediction.mission_report_ref
+            ));
+        }
+        if !reference_evidence_ids.insert(case.reference.evidence_ref.clone()) {
+            return Err(format!(
+                "duplicate physical reference evidence identity: {}",
+                case.reference.evidence_ref
+            ));
+        }
+        for measurement in &case.reference.measurements {
+            if !measurement_evidence_ids.insert(measurement.measurement_ref.clone()) {
+                return Err(format!(
+                    "duplicate measurement evidence identity: {}",
+                    measurement.measurement_ref
+                ));
+            }
         }
     }
 
@@ -972,6 +995,16 @@ mod tests {
         let bytes = serde_json::to_vec(&corpus).expect("missing failure reason corpus");
         let report = audit_corpus(SCHEMA, &bytes).expect("missing failure reason rejected");
         assert_eq!(row(&report, "false_feasible_thermal").classification, "REJECTED_REFERENCE");
+    }
+
+    #[test]
+    fn duplicate_measurement_evidence_reference_is_rejected_across_cases() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        corpus.cases[1].reference.measurements[0].measurement_ref =
+            corpus.cases[0].reference.measurements[0].measurement_ref.clone();
+        let bytes = serde_json::to_vec(&corpus).expect("duplicate measurement reference");
+        let error = audit_corpus(SCHEMA, &bytes).expect_err("duplicate measurement evidence is invalid");
+        assert!(error.contains("duplicate measurement evidence identity"));
     }
 
 }
