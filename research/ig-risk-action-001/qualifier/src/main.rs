@@ -141,11 +141,13 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String), String> {
 fn validate_manifest(manifest: &Value) -> Result<BTreeMap<String, usize>, Vec<String>> {
     let mut errors = Vec::new();
     let expected_action_set = ACTIONS.iter().copied().collect::<BTreeSet<_>>();
-    let actual_action_set = manifest["action_set"].as_array().map(|xs| xs.iter().filter_map(Value::as_str).collect::<BTreeSet<_>>());
+    let actual_action_array = manifest["action_set"].as_array();
+    let actual_action_set = actual_action_array.map(|xs| xs.iter().filter_map(Value::as_str).collect::<BTreeSet<_>>());
     if string_field(manifest, "schema_version") != Some(SCHEMA_VERSION)
         || string_field(manifest, "benchmark_id") != Some(BENCHMARK_ID)
         || string_field(manifest, "status") != Some("synthetic_known_answer_unexecuted")
         || manifest["fixture_count"].as_u64() != Some(EXPECTED_FIXTURES as u64)
+        || actual_action_array.map(Vec::len) != Some(ACTIONS.len())
         || actual_action_set != Some(expected_action_set) {
         errors.push("manifest identity, status, fixture count or action set mismatch".into());
     }
@@ -177,7 +179,10 @@ fn validate_manifest(manifest: &Value) -> Result<BTreeMap<String, usize>, Vec<St
         high_loss.as_object_mut().unwrap().remove("wrong_answer_penalty");
         let lp=low["loss_matrix"]["wrong_answer_penalty"].as_i64();
         let hp=high["loss_matrix"]["wrong_answer_penalty"].as_i64();
-        if low["probabilities"]!=high["probabilities"] || low_loss!=high_loss
+        if low["task_family"] != high["task_family"]
+            || low["probability_source"] != high["probability_source"]
+            || low["probability_target"] != high["probability_target"]
+            || low["probabilities"]!=high["probabilities"] || low_loss!=high_loss
             || lp.zip(hp).is_none_or(|(a,b)|a>=b) || low["expected_action"]==high["expected_action"] {
             errors.push(format!("pair {id} must change only wrong-answer penalty and change optimal action"));
         }
@@ -210,6 +215,17 @@ mod tests {
     #[test] fn all_forty_fixtures_and_five_actions_validate() {
         let counts=validate_manifest(&parsed()).expect("fixtures validate");
         assert_eq!(counts.values().sum::<usize>(),40); assert_eq!(counts.len(),5);
+    }
+    #[test] fn duplicate_top_level_action_is_rejected() {
+        let mut v=parsed();
+        let duplicate=v["action_set"][0].clone();
+        v["action_set"][4]=duplicate;
+        assert!(validate_manifest(&v).is_err());
+    }
+    #[test] fn matched_pair_must_preserve_task_family() {
+        let mut v=parsed();
+        v["fixtures"][0]["task_family"]=Value::String("retrieval".into());
+        assert!(validate_manifest(&v).is_err());
     }
     #[test] fn missing_fixture_is_rejected() {
         let mut v=parsed();v["fixtures"].as_array_mut().unwrap().pop();assert!(validate_manifest(&v).is_err());
