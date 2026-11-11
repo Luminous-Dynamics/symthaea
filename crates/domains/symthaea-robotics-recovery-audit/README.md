@@ -56,7 +56,7 @@ Three additional 2026 references extend the recovery problem beyond the RoboReco
 
 ### LIBERO-Recover: depth of state recovery
 
-LIBERO-Recover defines four recovery levels:
+[LIBERO-Recover paper](https://arxiv.org/abs/2609.05178), [project page](https://liulin815.github.io/LIBERO-Recovery/) and [public repository](https://github.com/liulin815/LIBERO-Recovery) define four recovery levels:
 - L1 Action Retry: the original plan remains valid; repeat the failed action.
 - L2 Action Adaptation: revise the action while retaining task-relevant state.
 - L3 Object State Recovery: restore or re-establish a task-relevant object state.
