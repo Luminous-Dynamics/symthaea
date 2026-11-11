@@ -1645,7 +1645,7 @@
       "runtime_context": {
         "stage": "AfterRead",
         "trigger": "None",
-        "observation_ref": "SYNTH-RUNTIME-EVENT-CriticalToolFailure"
+        "observation_ref": "SYNTH-RUNTIME-OBS-01"
       },
       "expected_disposition": "ContinueWithinAuthorizedScope"
     },
@@ -1683,7 +1683,7 @@
       "runtime_context": {
         "stage": "AfterRead",
         "trigger": "CriticalToolFailure",
-        "observation_ref": "SYNTH-RUNTIME-EVENT-CriticalToolFailure"
+        "observation_ref": "SYNTH-RUNTIME-OBS-01"
       },
       "expected_disposition": "StopBeforeFurtherEffect"
     },
@@ -1721,7 +1721,7 @@
       "runtime_context": {
         "stage": "AfterRead",
         "trigger": "None",
-        "observation_ref": "SYNTH-RUNTIME-EVENT-ConflictingEvidence"
+        "observation_ref": "SYNTH-RUNTIME-OBS-01"
       },
       "expected_disposition": "ContinueWithinAuthorizedScope"
     },
@@ -1759,7 +1759,7 @@
       "runtime_context": {
         "stage": "AfterRead",
         "trigger": "ConflictingEvidence",
-        "observation_ref": "SYNTH-RUNTIME-EVENT-ConflictingEvidence"
+        "observation_ref": "SYNTH-RUNTIME-OBS-01"
       },
       "expected_disposition": "StopBeforeFurtherEffect"
     },
@@ -1797,7 +1797,7 @@
       "runtime_context": {
         "stage": "AfterRead",
         "trigger": "None",
-        "observation_ref": "SYNTH-RUNTIME-EVENT-EmergentRisk"
+        "observation_ref": "SYNTH-RUNTIME-OBS-01"
       },
       "expected_disposition": "ContinueWithinAuthorizedScope"
     },
@@ -1835,7 +1835,7 @@
       "runtime_context": {
         "stage": "AfterRead",
         "trigger": "EmergentRisk",
-        "observation_ref": "SYNTH-RUNTIME-EVENT-EmergentRisk"
+        "observation_ref": "SYNTH-RUNTIME-OBS-01"
       },
       "expected_disposition": "StopBeforeFurtherEffect"
     }
