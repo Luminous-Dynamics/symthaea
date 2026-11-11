@@ -592,6 +592,14 @@ pub fn qualify_source_capability(
     let mut source_ids = BTreeSet::new();
     let mut battery_instances = BTreeSet::new();
     for profile in &input.source_profiles {
+        if profile.bus_id.trim().is_empty()
+            || profile.source_id.trim().is_empty()
+            || profile.battery_instance_id.trim().is_empty()
+        {
+            return Err(SourceCapabilityJoinError::InvalidInput(
+                "source, battery and bus identities must not be empty",
+            ));
+        }
         if profiles_by_bus
             .insert(profile.bus_id.clone(), profile)
             .is_some()
@@ -903,9 +911,18 @@ mod tests {
     fn matched_source_capability_passes_all_three_scenarios() {
         let report = qualify_source_capability(&input()).unwrap();
         let bus = &report.buses[0];
-        assert_eq!(bus.adverse.disposition, SourceCapabilityDisposition::FeasibleWithinSuppliedCapability);
-        assert_eq!(bus.nominal.disposition, SourceCapabilityDisposition::FeasibleWithinSuppliedCapability);
-        assert_eq!(bus.favourable.disposition, SourceCapabilityDisposition::FeasibleWithinSuppliedCapability);
+        assert_eq!(
+            bus.adverse.disposition,
+            SourceCapabilityDisposition::FeasibleWithinSuppliedCapability
+        );
+        assert_eq!(
+            bus.nominal.disposition,
+            SourceCapabilityDisposition::FeasibleWithinSuppliedCapability
+        );
+        assert_eq!(
+            bus.favourable.disposition,
+            SourceCapabilityDisposition::FeasibleWithinSuppliedCapability
+        );
         assert_eq!(bus.nominal.interval_reports.len(), 2);
     }
 
@@ -916,7 +933,10 @@ mod tests {
         profile.intervals[0].adverse.maximum_deliverable_power_w = 500.0;
         let report = qualify_source_capability(&input).unwrap();
         assert_eq!(report.buses[0].adverse.disposition, SourceCapabilityDisposition::Infeasible);
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::FeasibleWithinSuppliedCapability);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::FeasibleWithinSuppliedCapability
+        );
     }
 
     #[test]
@@ -941,7 +961,10 @@ mod tests {
         let mut input = input();
         input.source_profiles[0].intervals[0].nominal.minimum_deliverable_voltage_v = 390.0;
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::Infeasible);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::Infeasible
+        );
         assert!(report.buses[0].nominal.failures.iter().any(|failure| matches!(
             failure.kind,
             SourceCapabilityFailureKind::DeliverableVoltageBelowRequired { .. }
@@ -958,7 +981,10 @@ mod tests {
         input.source_profiles[0].energy_budget.protected_end_reserve.nominal_j = 1_000.0;
         input.source_profiles[0].energy_budget.protected_end_reserve.upper_j = 1_000.0;
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::Infeasible);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::Infeasible
+        );
         assert!(report.buses[0].nominal.failures.iter().any(|failure| matches!(
             failure.kind,
             SourceCapabilityFailureKind::MissionEnergyViolatesProtectedReserve { .. }
@@ -971,7 +997,10 @@ mod tests {
         input.source_profiles.clear();
         let report = qualify_source_capability(&input).unwrap();
         assert_eq!(report.buses[0].adverse.disposition, SourceCapabilityDisposition::UnknownMissingCapability);
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::UnknownMissingCapability);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::UnknownMissingCapability
+        );
     }
 
     #[test]
@@ -979,11 +1008,17 @@ mod tests {
         let mut input = input();
         input.source_profiles[0].source_boundary_id = "other-source".to_owned();
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::NonPassIdentityMismatch);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::NonPassIdentityMismatch
+        );
         let mut input = input();
         input.source_profiles[0].aircraft_configuration_digest = "other-config".to_owned();
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::NonPassIdentityMismatch);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::NonPassIdentityMismatch
+        );
     }
 
     #[test]
@@ -991,7 +1026,10 @@ mod tests {
         let mut input = input();
         input.source_profiles[0].intervals.pop();
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::UnknownMissingCapability);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::UnknownMissingCapability
+        );
     }
 
     #[test]
@@ -999,7 +1037,10 @@ mod tests {
         let mut input = input();
         input.source_profiles[0].intervals[0].nominal.assessed_bus_power_w += 1.0;
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::NonPassIdentityMismatch);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::NonPassIdentityMismatch
+        );
     }
 
     #[test]
@@ -1007,13 +1048,20 @@ mod tests {
         let mut input = input();
         input.source_profiles[0].intervals[0].nominal.valid_for_duration_s = 5.0;
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::UnknownMissingCapability);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::UnknownMissingCapability
+        );
     }
 
     #[test]
     fn tms_energy_is_not_added_twice_to_the_bus_energy_ledger() {
         let mut input = input();
-        let nominal_bus_energy = input.bus_demand.buses[0].nominal_scenario.as_ref().unwrap().total_bus_energy_j;
+        let nominal_bus_energy = input.bus_demand.buses[0]
+            .nominal_scenario
+            .as_ref()
+            .unwrap()
+            .total_bus_energy_j;
         let report = qualify_source_capability(&input).unwrap();
         assert_eq!(report.buses[0].nominal.demanded_energy_j, Some(nominal_bus_energy));
         assert_eq!(
@@ -1039,12 +1087,18 @@ mod tests {
         let mut input = input();
         input.source_profiles[0].energy_budget.usable_energy_above_hard_floor.lower_j = 50_000.0;
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::NonPassIdentityMismatch);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::NonPassIdentityMismatch
+        );
 
         let mut input = input();
         input.source_profiles[0].intervals[0].nominal.maximum_deliverable_power_w = f64::NAN;
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::UnknownMissingCapability);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::UnknownMissingCapability
+        );
     }
 
     #[test]
@@ -1060,7 +1114,10 @@ mod tests {
         let mut input = input();
         input.bus_demand.buses[0].nominal_scenario = Err(vec![]);
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.disposition, SourceCapabilityDisposition::Infeasible);
+        assert_eq!(
+            report.buses[0].nominal.disposition,
+            SourceCapabilityDisposition::Infeasible
+        );
         assert!(matches!(
             report.buses[0].nominal.failures[0].kind,
             SourceCapabilityFailureKind::UpstreamBusScenarioInfeasible
