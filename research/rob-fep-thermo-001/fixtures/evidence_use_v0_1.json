@@ -1,0 +1,231 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_id": "ROB-FEP-THERMO-001-EVIDENCE-USE",
+  "status": "synthetic_known_answers_only",
+  "gates": [
+    "meaningful_reference",
+    "identifiability",
+    "evidence_use",
+    "decision_value",
+    "selection_value",
+    "safe_realization"
+  ],
+  "cases": [
+    {
+      "case_id": "EU01_REFERENCE_NOT_MEANINGFUL",
+      "description": "Sensor evidence lacks the required calibration/reference identity, so downstream diagnosis claims are not evaluated.",
+      "inputs": {
+        "reference_available": false,
+        "within_training_support": null,
+        "mechanism_identifiable": null,
+        "evidence_acquired": false,
+        "evidence_used": null,
+        "posterior_changed": null,
+        "evsi": null,
+        "selected_probe_cost": null,
+        "fixed_baseline_evsi": null,
+        "projected_action_admissible": null
+      },
+      "expected": {
+        "gate_status": {
+          "meaningful_reference": "fail",
+          "identifiability": "not_evaluated",
+          "evidence_use": "not_evaluated",
+          "decision_value": "not_evaluated",
+          "selection_value": "not_evaluated",
+          "safe_realization": "not_evaluated"
+        },
+        "disposition": "abstain"
+      }
+    },
+    {
+      "case_id": "EU02_MECHANISM_NOT_IDENTIFIABLE",
+      "description": "Reference is meaningful, but available measurements have identical likelihood under the competing mechanisms.",
+      "inputs": {
+        "reference_available": true,
+        "within_training_support": true,
+        "mechanism_identifiable": false,
+        "evidence_acquired": true,
+        "evidence_used": null,
+        "posterior_changed": null,
+        "evsi": null,
+        "selected_probe_cost": null,
+        "fixed_baseline_evsi": null,
+        "projected_action_admissible": null
+      },
+      "expected": {
+        "gate_status": {
+          "meaningful_reference": "pass",
+          "identifiability": "fail",
+          "evidence_use": "not_evaluated",
+          "decision_value": "not_evaluated",
+          "selection_value": "not_evaluated",
+          "safe_realization": "not_evaluated"
+        },
+        "disposition": "abstain"
+      }
+    },
+    {
+      "case_id": "EU03_EVIDENCE_ACQUIRED_BUT_UNUSED",
+      "description": "A discriminative observation is acquired, but the frozen decision model does not consume it or change its posterior.",
+      "inputs": {
+        "reference_available": true,
+        "within_training_support": true,
+        "mechanism_identifiable": true,
+        "evidence_acquired": true,
+        "evidence_used": false,
+        "posterior_changed": false,
+        "evsi": null,
+        "selected_probe_cost": 0.5,
+        "fixed_baseline_evsi": 0,
+        "projected_action_admissible": null
+      },
+      "expected": {
+        "gate_status": {
+          "meaningful_reference": "pass",
+          "identifiability": "pass",
+          "evidence_use": "fail",
+          "decision_value": "not_evaluated",
+          "selection_value": "not_evaluated",
+          "safe_realization": "not_evaluated"
+        },
+        "disposition": "abstain"
+      }
+    },
+    {
+      "case_id": "EU04_POSTERIOR_CHANGED_BUT_ZERO_DECISION_VALUE",
+      "description": "Evidence is used and changes the posterior, but the optimal downstream action remains unchanged; the costly probe has zero EVSI.",
+      "inputs": {
+        "reference_available": true,
+        "within_training_support": true,
+        "mechanism_identifiable": true,
+        "evidence_acquired": true,
+        "evidence_used": true,
+        "posterior_changed": true,
+        "evsi": 0,
+        "selected_probe_cost": 0.5,
+        "fixed_baseline_evsi": 0,
+        "projected_action_admissible": null
+      },
+      "expected": {
+        "gate_status": {
+          "meaningful_reference": "pass",
+          "identifiability": "pass",
+          "evidence_use": "pass",
+          "decision_value": "fail",
+          "selection_value": "not_evaluated",
+          "safe_realization": "not_evaluated"
+        },
+        "disposition": "decline_probe"
+      }
+    },
+    {
+      "case_id": "EU05_DECISION_VALUE_BUT_NO_SELECTION_VALUE",
+      "description": "The candidate probe has positive decision value, but a fixed alternative provides the same value at lower total cost.",
+      "inputs": {
+        "reference_available": true,
+        "within_training_support": true,
+        "mechanism_identifiable": true,
+        "evidence_acquired": true,
+        "evidence_used": true,
+        "posterior_changed": true,
+        "evsi": 1,
+        "selected_probe_cost": 0.8,
+        "fixed_baseline_evsi": 1,
+        "projected_action_admissible": null
+      },
+      "expected": {
+        "gate_status": {
+          "meaningful_reference": "pass",
+          "identifiability": "pass",
+          "evidence_use": "pass",
+          "decision_value": "pass",
+          "selection_value": "fail",
+          "safe_realization": "not_evaluated"
+        },
+        "disposition": "no_selection_value"
+      }
+    },
+    {
+      "case_id": "EU06_DIAGNOSIS_VALUE_BUT_REALIZATION_REJECTED",
+      "description": "All information and selection gates pass, but the independently projected physical action is inadmissible.",
+      "inputs": {
+        "reference_available": true,
+        "within_training_support": true,
+        "mechanism_identifiable": true,
+        "evidence_acquired": true,
+        "evidence_used": true,
+        "posterior_changed": true,
+        "evsi": 1.25,
+        "selected_probe_cost": 0.25,
+        "fixed_baseline_evsi": 0.25,
+        "projected_action_admissible": false
+      },
+      "expected": {
+        "gate_status": {
+          "meaningful_reference": "pass",
+          "identifiability": "pass",
+          "evidence_use": "pass",
+          "decision_value": "pass",
+          "selection_value": "pass",
+          "safe_realization": "fail"
+        },
+        "disposition": "reject_realization"
+      }
+    },
+    {
+      "case_id": "EU07_ALL_EVIDENCE_GATES_PASS",
+      "description": "The complete evidence-to-decision chain passes; action authority remains with independent projection/RTA/HAL and is not conferred by this fixture.",
+      "inputs": {
+        "reference_available": true,
+        "within_training_support": true,
+        "mechanism_identifiable": true,
+        "evidence_acquired": true,
+        "evidence_used": true,
+        "posterior_changed": true,
+        "evsi": 1.5,
+        "selected_probe_cost": 0.25,
+        "fixed_baseline_evsi": 0.2,
+        "projected_action_admissible": true
+      },
+      "expected": {
+        "gate_status": {
+          "meaningful_reference": "pass",
+          "identifiability": "pass",
+          "evidence_use": "pass",
+          "decision_value": "pass",
+          "selection_value": "pass",
+          "safe_realization": "pass"
+        },
+        "disposition": "evidence_chain_qualified"
+      }
+    },
+    {
+      "case_id": "EU08_OUT_OF_SUPPORT_EVIDENCE",
+      "description": "The observation is outside the frozen policy's supported input domain; evidence use and all downstream claims remain unknown.",
+      "inputs": {
+        "reference_available": true,
+        "within_training_support": false,
+        "mechanism_identifiable": null,
+        "evidence_acquired": true,
+        "evidence_used": null,
+        "posterior_changed": null,
+        "evsi": null,
+        "selected_probe_cost": 0.1,
+        "fixed_baseline_evsi": null,
+        "projected_action_admissible": null
+      },
+      "expected": {
+        "gate_status": {
+          "meaningful_reference": "pass",
+          "identifiability": "unknown",
+          "evidence_use": "unknown",
+          "decision_value": "not_evaluated",
+          "selection_value": "not_evaluated",
+          "safe_realization": "not_evaluated"
+        },
+        "disposition": "abstain"
+      }
+    }
+  ]
+}
