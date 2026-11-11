@@ -67,7 +67,7 @@
                   "predicted_risk",
                   "risk_aversion_coefficient",
                   "predicted_cost",
-                  "predicted_net_value"
+                  "predicted_selection_score"
                 ],
                 "properties": {
                   "experiment_id": {
@@ -128,7 +128,7 @@
                     "type": "number",
                     "minimum": 0
                   },
-                  "predicted_net_value": {
+                  "predicted_selection_score": {
                     "type": "number"
                   }
                 }
