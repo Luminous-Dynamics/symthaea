@@ -130,3 +130,12 @@ These are different platforms, task profiles and measurement boundaries—not on
 This document and synthetic arithmetic can establish only the stated equations and finite semantic contracts. They do not qualify Symtropy's thermal model, prove that entropy/exergy metrics improve decisions, demonstrate a physical robot result, establish FEP superiority or authorize actuation.
 
 No entropy-minimization policy should enter the motor-control path from this work.
+
+## Composition with existing Symtropy thermodynamic primitives
+
+This research kernel is deliberately a narrow *fixed hot-reservoir to fixed cold-reservoir* analytic reference. It is not the first thermodynamic accounting foundation in Symtropy and should not be treated as a replacement for existing work:
+- [Symtropy #3597](https://github.com/Luminous-Dynamics/symtropy/pull/3597) adds constant-heat-capacity body entropy, fixed-temperature bath entropy and a combined second-law classification. The 10 November exact-head CI was failing only at format-check; rustfmt-only changes have now been applied and a new CI run is queued.
+- [Symtropy #3612](https://github.com/Luminous-Dynamics/symtropy/pull/3612) adds a typed open-system first-law balance evaluator; its exact-head CI run 41950894815 completed successfully. This is an accounting evaluator, not production-flow coverage qualification.
+- [Symtropy #3594](https://github.com/Luminous-Dynamics/symtropy/pull/3594) is an earlier untyped/open-system evaluator draft whose latest observed CI run failed at formatting. Prefer the newer typed #3612 interface for future integration unless review identifies missing semantics.
+
+The reservoir-pair kernel in this work should be reconciled with #3597's body/bath equations during integration rather than becoming a competing thermal-entropy module. A combined closed-process test can compare both representations under an explicitly declared idealized reservoir/body setup.
