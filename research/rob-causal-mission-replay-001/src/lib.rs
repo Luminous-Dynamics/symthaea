@@ -368,6 +368,43 @@ fn push_finding(
     });
 }
 
+/// Check whether timestamp intervals support an already-declared causal sequence edge.
+fn check_time_order(
+    earlier: &EventStamp,
+    later: &EventStamp,
+    record_id: &str,
+    findings: &mut Vec<ReplayFinding>,
+) -> bool {
+    if earlier.clock_id != later.clock_id || earlier.boot_epoch != later.boot_epoch {
+        push_finding(
+            findings,
+            FindingSeverity::Unknown,
+            "CAUSAL_TIME_CROSS_CLOCK_OR_BOOT",
+            record_id,
+        );
+        return false;
+    }
+    if later.timestamp.upper_ns < earlier.timestamp.lower_ns {
+        push_finding(
+            findings,
+            FindingSeverity::Invalid,
+            "CAUSAL_TIMESTAMP_CONTRADICTS_SEQUENCE",
+            record_id,
+        );
+        return false;
+    }
+    if later.timestamp.lower_ns < earlier.timestamp.upper_ns {
+        push_finding(
+            findings,
+            FindingSeverity::Unknown,
+            "CAUSAL_TIMESTAMP_ORDER_UNCERTAIN",
+            record_id,
+        );
+        return false;
+    }
+    true
+}
+
 fn register_stamp(
     stamp: &EventStamp,
     scope: &MissionScope,
@@ -607,6 +644,13 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                             "DECISION_LOOKAHEAD_SOURCE",
                             &decision.decision_id,
                         );
+                    } else {
+                        check_time_order(
+                            &observation.stamp,
+                            &decision.stamp,
+                            &decision.decision_id,
+                            &mut findings,
+                        );
                     }
                 }
                 None => push_finding(
@@ -633,6 +677,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             }
         };
         if chunk.stamp.sequence <= decision.stamp.sequence
+            || chunk.stamp.tick > decision.valid_through_tick
             || chunk.action_id != decision.selected_action_id
             || chunk.model_digest != decision.loss_model_digest
             || chunk.action_domain_digest != decision.action_domain_digest
@@ -642,6 +687,13 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                 FindingSeverity::Invalid,
                 "CHUNK_DECISION_BINDING_MISMATCH",
                 &chunk.proposal_id,
+            );
+        } else {
+            check_time_order(
+                &decision.stamp,
+                &chunk.stamp,
+                &chunk.proposal_id,
+                &mut findings,
             );
         }
         if chunk.expected_executed_prefix_digest.trim().is_empty()
@@ -682,7 +734,8 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                     }
                     match &request.response_stamp {
                         Some(response) => {
-                            if request.request_stamp.sequence >= response.sequence
+                            if request.request_stamp.sequence <= decision.stamp.sequence
+                                || request.request_stamp.sequence >= response.sequence
                                 || response.sequence >= chunk.stamp.sequence
                                 || response.tick > request.expiry_tick
                             {
@@ -693,6 +746,24 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                                     &chunk.proposal_id,
                                 );
                             }
+                            check_time_order(
+                                &decision.stamp,
+                                &request.request_stamp,
+                                &chunk.proposal_id,
+                                &mut findings,
+                            );
+                            check_time_order(
+                                &request.request_stamp,
+                                response,
+                                &chunk.proposal_id,
+                                &mut findings,
+                            );
+                            check_time_order(
+                                response,
+                                &chunk.stamp,
+                                &chunk.proposal_id,
+                                &mut findings,
+                            );
                             if request.response_model_digest != chunk.model_digest
                                 || request.context_digest != chunk.observed_executed_prefix_digest
                             {
@@ -807,6 +878,19 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                         "ASSURANCE_EVENT_ORDER_INVALID",
                         &application.command_id,
                     );
+                } else {
+                    check_time_order(
+                        &chunk.stamp,
+                        &gate.stamp,
+                        &application.command_id,
+                        &mut findings,
+                    );
+                    check_time_order(
+                        &gate.stamp,
+                        &application.stamp,
+                        &application.command_id,
+                        &mut findings,
+                    );
                 }
                 match gate.disposition {
                     AssuranceDisposition::Admitted => true,
@@ -859,14 +943,13 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                         );
                         continue;
                     }
-                    if app_stamp.timestamp.lower_ns < source_stamp.timestamp.upper_ns {
+                    if !check_time_order(
+                        source_stamp,
+                        app_stamp,
+                        &application.command_id,
+                        &mut findings,
+                    ) {
                         command_aoi_complete = false;
-                        push_finding(
-                            &mut findings,
-                            FindingSeverity::Unknown,
-                            "AOI_EVENT_ORDER_UNCERTAIN",
-                            &application.command_id,
-                        );
                         continue;
                     }
                     aoi_bounds.push(AoIBound {
@@ -955,9 +1038,13 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
     let mut expected_predecessor = trace.scope.initial_reserve_state_digest.as_str();
     let mut transition_commands = BTreeSet::new();
     let mut last_physical_sequence = 0_u64;
+    let mut last_physical_stamp: Option<&EventStamp> = None;
 
     for transition in transitions {
         last_physical_sequence = last_physical_sequence.max(transition.stamp.sequence);
+        if last_physical_stamp.is_none_or(|previous| previous.sequence < transition.stamp.sequence) {
+            last_physical_stamp = Some(&transition.stamp);
+        }
         if transition.transition_id.trim().is_empty()
             || transition.resulting_state_digest.trim().is_empty()
             || transition.thermal_model_digest.trim().is_empty()
@@ -996,6 +1083,13 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                         FindingSeverity::Invalid,
                         "PHYSICAL_TRANSITION_PRECEDES_APPLICATION",
                         &transition.transition_id,
+                    );
+                } else {
+                    check_time_order(
+                        &application.stamp,
+                        &transition.stamp,
+                        &transition.transition_id,
+                        &mut findings,
                     );
                 }
             }
@@ -1054,6 +1148,13 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                     FindingSeverity::Invalid,
                     "TERMINAL_STATE_OR_ORDER_MISMATCH",
                     &terminal.stamp.event_id,
+                );
+            } else if let Some(previous) = last_physical_stamp {
+                check_time_order(
+                    previous,
+                    &terminal.stamp,
+                    &terminal.stamp.event_id,
+                    &mut findings,
                 );
             }
             match terminal.disposition {
@@ -1422,7 +1523,7 @@ mod tests {
         };
         let report = replay_mission(&trace);
         assert_eq!(report.disposition, ReplayDisposition::Unknown);
-        assert!(has_finding(&report, "AOI_EVENT_ORDER_UNCERTAIN"));
+        assert!(has_finding(&report, "CAUSAL_TIMESTAMP_ORDER_UNCERTAIN"));
         assert!(report.aoi_bounds.is_empty());
     }
 
