@@ -121,7 +121,8 @@
         "domain_temperature_max_c",
         "discharge_power_lower_kw",
         "charge_acceptance_lower_kw",
-        "cells"
+        "cells",
+        "pack_limit_cell_ref"
       ],
       "properties": {
         "step_id": {
@@ -197,6 +198,13 @@
           "items": {
             "$ref": "#/$defs/cell"
           }
+        },
+        "pack_limit_cell_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
         }
       }
     },
