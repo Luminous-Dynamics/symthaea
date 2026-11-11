@@ -1,10 +1,11 @@
-name: Muse MIDI and Audio Performance
+name: Muse MIDI, Audio Observation and Clock Alignment
 
 on:
   pull_request:
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/audio_event_observation.rs"
+      - "crates/domains/symthaea-muse/src/audio_clock_alignment.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-music-theory/src/orchestration.rs"
@@ -16,9 +17,11 @@ on:
     branches:
       - "research/melothaea-part-aware-midi-performance-v1"
       - "research/melothaea-audio-event-observation-v1"
+      - "research/melothaea-render-clock-alignment-v1"
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/audio_event_observation.rs"
+      - "crates/domains/symthaea-muse/src/audio_clock_alignment.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-music-theory/src/orchestration.rs"
@@ -68,3 +71,6 @@ jobs:
 
       - name: Run focused audio event observation tests
         run: cargo test --locked -p symthaea-muse --features theory audio_event_observation::tests::
+
+      - name: Run focused audio clock alignment tests
+        run: cargo test --locked -p symthaea-muse --features theory audio_clock_alignment::tests::

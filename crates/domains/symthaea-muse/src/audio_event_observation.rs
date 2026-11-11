@@ -111,12 +111,12 @@ struct ReceiptCommitmentV1<'a> {
     note_observations: &'a [AudioEventPitchObservationV1],
 }
 
-struct DecodedWavV1 {
-    info: AudioEventObservationWavInfoV1,
-    interleaved_samples: Vec<f32>,
+pub(crate) struct DecodedWavV1 {
+    pub(crate) info: AudioEventObservationWavInfoV1,
+    pub(crate) interleaved_samples: Vec<f32>,
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
@@ -313,7 +313,7 @@ fn midi_bytes_match_manifest(
         && actual_programs == expected_programs
 }
 
-fn validate_midi_artifact(
+pub(crate) fn validate_midi_artifact(
     artifact: &MidiPerformanceArtifactV1,
 ) -> Vec<AudioEventObservationIssueV1> {
     let manifest = &artifact.manifest;
@@ -402,7 +402,7 @@ fn validate_midi_artifact(
     issues
 }
 
-fn decode_wav(wav_bytes: &[u8]) -> Result<DecodedWavV1, AudioEventObservationIssueV1> {
+pub(crate) fn decode_wav(wav_bytes: &[u8]) -> Result<DecodedWavV1, AudioEventObservationIssueV1> {
     let mut reader = WavReader::new(Cursor::new(wav_bytes))
         .map_err(|_| AudioEventObservationIssueV1::InvalidWav)?;
     let spec = reader.spec();
@@ -460,7 +460,7 @@ fn decode_wav(wav_bytes: &[u8]) -> Result<DecodedWavV1, AudioEventObservationIss
     })
 }
 
-fn expected_frame(tick: u64, tempo_us: u32, ppq: u16, sample_rate: u32) -> Option<u64> {
+pub(crate) fn expected_frame(tick: u64, tempo_us: u32, ppq: u16, sample_rate: u32) -> Option<u64> {
     if ppq == 0 {
         return None;
     }

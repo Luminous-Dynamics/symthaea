@@ -208,6 +208,8 @@ pub mod midi_performance;
 #[cfg(feature = "theory")]
 pub mod audio_event_observation;
 #[cfg(feature = "theory")]
+pub mod audio_clock_alignment;
+#[cfg(feature = "theory")]
 pub mod theory_realize;
 pub mod training;
 pub mod training_pairs;
