@@ -37,7 +37,7 @@ jobs:
         run: cargo test --manifest-path research/action-context-alignment-001/qualifier/Cargo.toml
       - name: Validate action-context pair corpus
         run: |
-          cargo run --manifest-path research/action-context-alignment-001/qualifier/Cargo.toml -- \
+          cargo run --manifest-path research/action-context-alignment-001/qualifier/Cargo.toml --bin action-context-alignment-qualifier -- \
             research/action-context-alignment-001/ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.json \
             research/action-context-alignment-001/ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.schema.json
       - name: Validate synthetic model-trial receipt golden control
