@@ -63,7 +63,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "onboard_candidate_eligible",
@@ -74,7 +81,9 @@
         "whole_system_energy_claim": "matched_system_energy_equal",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -137,7 +146,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "local_fallback_deadline",
@@ -148,7 +164,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -211,7 +229,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "remote_result_reject_stale",
@@ -222,7 +247,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -285,7 +312,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "network_partition_fallback",
@@ -296,7 +330,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -359,7 +395,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "edge_queue_deadline_miss",
@@ -370,7 +413,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -433,7 +478,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "remote_identity_reject",
@@ -444,7 +496,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -507,7 +561,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "clock_unknown_reject",
@@ -518,7 +579,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -581,7 +644,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "local_rta_reject",
@@ -592,7 +662,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -655,7 +727,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "fleet_starvation_fallback",
@@ -666,7 +745,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -729,7 +810,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "privacy_block",
@@ -740,7 +828,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -803,7 +893,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "remote_eligible_for_local_admission",
@@ -814,7 +911,9 @@
         "whole_system_energy_claim": "whole_system_energy_better",
         "actuation_aoi_gate": "pass",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -877,7 +976,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "onboard_preferred_after_total_cost",
@@ -888,7 +994,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -951,7 +1059,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "robot_battery_saving_only",
@@ -962,7 +1077,9 @@
         "whole_system_energy_claim": "robot_battery_better_system_energy_worse",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -1025,7 +1142,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "remote_eligible_for_local_admission",
@@ -1036,7 +1160,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "pass",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -1099,7 +1225,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "remote_timeout_fallback",
@@ -1110,7 +1243,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -1173,7 +1308,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "remote_identity_reject",
@@ -1184,7 +1326,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -1247,7 +1391,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "remote_eligible_for_local_admission",
@@ -1258,7 +1409,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "pass",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -1321,7 +1474,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "compression_quality_loss_exceeds_tolerance",
@@ -1332,7 +1492,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "pass",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -1395,7 +1557,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "fleet_priority_admission_preserves_critical_deadline",
@@ -1406,7 +1575,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "pass",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -1469,7 +1640,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "actuation_aoi_reject",
@@ -1480,7 +1658,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "fail",
         "decision_value_gate": "pass",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -1543,7 +1723,14 @@
         "foreground_deadline_misses_managed": null,
         "llm_throughput_retained_pct": null,
         "memory_bandwidth_pressure_pct": null,
-        "safe_suspension_points_available": null
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "zero_evsi_no_update",
@@ -1554,7 +1741,9 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "pass",
         "decision_value_gate": "fail",
-        "foreground_deadline_gate": "not_evaluated"
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
       }
     },
     {
@@ -1617,7 +1806,14 @@
         "foreground_deadline_misses_managed": 1,
         "llm_throughput_retained_pct": 90.4,
         "memory_bandwidth_pressure_pct": 95,
-        "safe_suspension_points_available": true
+        "safe_suspension_points_available": true,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
       },
       "expected": {
         "disposition": "foreground_deadlines_prioritized",
@@ -1628,7 +1824,180 @@
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "not_evaluated",
         "decision_value_gate": "not_evaluated",
-        "foreground_deadline_gate": "pass"
+        "foreground_deadline_gate": "pass",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
+      }
+    },
+    {
+      "case_id": "DI23_PO_MA_AND_MISSED_ACTUATION_COST",
+      "description": "Across a declared set of required actuation windows, seven of one hundred opportunities miss their task-specific deadlines; report the empirical miss probability and summed task-loss cost separately from AoI.",
+      "inputs": {
+        "placement": "hybrid",
+        "local_safety_path_available": true,
+        "local_fallback_ready": true,
+        "remote_request_sent": true,
+        "remote_result_received": true,
+        "remote_endpoint_authenticated": true,
+        "remote_model_digest_matches": true,
+        "observation_anchor_matches": true,
+        "clock_mapping_known": true,
+        "privacy_policy_allows_remote_data": true,
+        "network_partition": false,
+        "fleet_queue_fairness_ok": null,
+        "round_trip_latency_ms": null,
+        "queue_latency_ms": null,
+        "inference_latency_ms": null,
+        "decode_projection_latency_ms": null,
+        "end_to_end_latency_ms": 30,
+        "deadline_ms": 200,
+        "result_age_upper_bound_ms": 40,
+        "max_result_age_ms": 100,
+        "robot_compute_energy_j": 8,
+        "edge_cloud_energy_j": 0,
+        "network_energy_j": 0,
+        "whole_system_energy_j": 8,
+        "local_model_quality": 0.9,
+        "remote_model_quality": null,
+        "local_task_success": 0.92,
+        "remote_task_success": null,
+        "local_safe_success": true,
+        "remote_safe_success": null,
+        "local_thermal_headroom_c": null,
+        "local_thermal_limit_c": null,
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": true,
+        "onboard_baseline_whole_system_energy_j": 8,
+        "payload_compressed": null,
+        "payload_compression_ratio": null,
+        "compression_accuracy_loss_pct": null,
+        "maximum_acceptable_compression_accuracy_loss_pct": null,
+        "fleet_active_requests": null,
+        "fleet_high_priority_requests": null,
+        "fleet_batch_size": null,
+        "fleet_p99_priority_latency_ms": null,
+        "fleet_p99_low_priority_latency_ms": null,
+        "fleet_priority_deadline_ms": null,
+        "fleet_low_priority_deadline_ms": null,
+        "fleet_admission_control_enabled": null,
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": 70,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": 1.2,
+        "decision_evsi_unit": "task_loss_units",
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": 100,
+        "missed_actuation_count": 7,
+        "missed_actuation_cost_loss_units": 28,
+        "fleet_scheduler_arms": null,
+        "fleet_per_robot_starvation_reported": null,
+        "fleet_per_tier_throughput_reported": null,
+        "fleet_safety_by_robot_reported": null
+      },
+      "expected": {
+        "disposition": "poma_scored_with_miss_cost",
+        "selected_placement": "hybrid",
+        "fallback_required": false,
+        "remote_result_can_enter_local_admission": true,
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "pass",
+        "decision_value_gate": "pass",
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": 0.07,
+        "fleet_scheduler_matrix_gate": "not_evaluated"
+      }
+    },
+    {
+      "case_id": "DI24_HETEROGENEOUS_FLEET_SCHEDULER_MATRIX",
+      "description": "Ten heterogeneous robots share an inference server; a fair comparison reports Round Robin, EDF, Armory Lookahead and the Luminous candidate with per-robot and per-tier service/safety outcomes. The fixture qualifies comparator completeness, not a performance winner.",
+      "inputs": {
+        "placement": "edge",
+        "local_safety_path_available": true,
+        "local_fallback_ready": true,
+        "remote_request_sent": true,
+        "remote_result_received": true,
+        "remote_endpoint_authenticated": true,
+        "remote_model_digest_matches": true,
+        "observation_anchor_matches": true,
+        "clock_mapping_known": true,
+        "privacy_policy_allows_remote_data": true,
+        "network_partition": false,
+        "fleet_queue_fairness_ok": null,
+        "round_trip_latency_ms": null,
+        "queue_latency_ms": null,
+        "inference_latency_ms": null,
+        "decode_projection_latency_ms": null,
+        "end_to_end_latency_ms": 30,
+        "deadline_ms": 200,
+        "result_age_upper_bound_ms": 70,
+        "max_result_age_ms": 100,
+        "robot_compute_energy_j": 8,
+        "edge_cloud_energy_j": 0,
+        "network_energy_j": 0,
+        "whole_system_energy_j": 8,
+        "local_model_quality": 0.9,
+        "remote_model_quality": null,
+        "local_task_success": 0.92,
+        "remote_task_success": null,
+        "local_safe_success": true,
+        "remote_safe_success": null,
+        "local_thermal_headroom_c": null,
+        "local_thermal_limit_c": null,
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": true,
+        "onboard_baseline_whole_system_energy_j": 8,
+        "payload_compressed": null,
+        "payload_compression_ratio": null,
+        "compression_accuracy_loss_pct": null,
+        "maximum_acceptable_compression_accuracy_loss_pct": null,
+        "fleet_active_requests": 10,
+        "fleet_high_priority_requests": 1,
+        "fleet_batch_size": 4,
+        "fleet_p99_priority_latency_ms": null,
+        "fleet_p99_low_priority_latency_ms": null,
+        "fleet_priority_deadline_ms": null,
+        "fleet_low_priority_deadline_ms": null,
+        "fleet_admission_control_enabled": null,
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": 90,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null,
+        "actuation_opportunity_count": null,
+        "missed_actuation_count": null,
+        "missed_actuation_cost_loss_units": null,
+        "fleet_scheduler_arms": [
+          "round_robin",
+          "edf",
+          "armory_lookahead",
+          "luminous_candidate"
+        ],
+        "fleet_per_robot_starvation_reported": true,
+        "fleet_per_tier_throughput_reported": true,
+        "fleet_safety_by_robot_reported": true
+      },
+      "expected": {
+        "disposition": "fleet_baselines_matched_no_ranking_claim",
+        "selected_placement": "edge_then_local_projection",
+        "fallback_required": false,
+        "remote_result_can_enter_local_admission": true,
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "pass",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated",
+        "poma_point_estimate": null,
+        "fleet_scheduler_matrix_gate": "complete"
       }
     }
   ]
