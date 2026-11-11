@@ -60,6 +60,8 @@ pub struct PlannedScenario {
 pub struct RoboRecoverManifest {
     pub platform: BenchmarkPlatform,
     pub split: BenchmarkSplit,
+    /// One score is one policy/intervention arm; never pool arm IDs.
+    pub arm_id: String,
     pub scenarios: Vec<PlannedScenario>,
     /// The benchmark's nine occupied Stage–Type groups, frozen from source.
     /// Do not infer or pad these from whichever scenarios happened to execute.
@@ -78,7 +80,9 @@ pub struct RoboRecoverTrial {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ManifestIssue {
     NoScenarios,
+    BlankArmId,
     BlankScenarioId,
+    ScenarioGroupNotInMacro9(StageTypeGroup),
     DuplicateScenarioId(String),
     ScenarioHasNoExpectedTrials(String),
     BlankExpectedTrialId(String),
@@ -113,6 +117,7 @@ pub struct GroupScore {
 pub struct RoboRecoverScoreReport {
     pub platform: BenchmarkPlatform,
     pub split: BenchmarkSplit,
+    pub arm_id: String,
     pub scenario_count: usize,
     pub expected_trial_count: usize,
     pub observed_trial_rows: usize,
@@ -152,6 +157,9 @@ pub fn validate_manifest(
     let mut issues = Vec::new();
     if manifest.scenarios.is_empty() {
         issues.push(ManifestIssue::NoScenarios);
+    }
+    if manifest.arm_id.trim().is_empty() {
+        issues.push(ManifestIssue::BlankArmId);
     }
 
     let mut scenario_ids = BTreeSet::new();
@@ -203,6 +211,11 @@ pub fn validate_manifest(
             issues.push(ManifestIssue::DuplicateMacro9Group(*group));
         } else if !group_presence.contains(group) {
             issues.push(ManifestIssue::Macro9GroupHasNoScenarios(*group));
+        }
+    }
+    for group in &group_presence {
+        if !declared_groups.contains(group) {
+            issues.push(ManifestIssue::ScenarioGroupNotInMacro9(*group));
         }
     }
 
@@ -280,6 +293,7 @@ pub fn score_roborecover(
 
         let metadata_matches = trial.platform == manifest.platform
             && trial.split == manifest.split
+            && trial.evidence.arm_id == manifest.arm_id
             && trial.stage == scenario.stage
             && trial.deviation == scenario.deviation
             && trial.evidence.scenario_id == scenario.scenario_id;
@@ -385,6 +399,7 @@ pub fn score_roborecover(
                     .is_some_and(|scenario| {
                         trial.platform == manifest.platform
                             && trial.split == manifest.split
+                            && trial.evidence.arm_id == manifest.arm_id
                             && trial.stage == scenario.stage
                             && trial.deviation == scenario.deviation
                             && trial.evidence.scenario_id == scenario.scenario_id
@@ -402,6 +417,7 @@ pub fn score_roborecover(
     Ok(RoboRecoverScoreReport {
         platform: manifest.platform,
         split: manifest.split,
+        arm_id: manifest.arm_id.clone(),
         scenario_count: manifest.scenarios.len(),
         expected_trial_count: expected_trial_ids.len(),
         observed_trial_rows: trials.len(),
@@ -455,6 +471,7 @@ mod tests {
         RoboRecoverManifest {
             platform: BenchmarkPlatform::Libero,
             split: BenchmarkSplit::Test,
+            arm_id: "base-policy".to_owned(),
             scenarios,
             macro9_groups: groups,
         }
@@ -685,4 +702,35 @@ mod tests {
         assert_eq!(report.native_successes, 0);
         assert_eq!(report.metadata_mismatch_rows, 1);
     }
+    #[test]
+    fn different_policy_or_intervention_arm_cannot_be_pooled() {
+        let m = manifest();
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        trial.evidence.arm_id = "monitor-correction".to_owned();
+
+        let report = score_roborecover(&m, &[trial]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 0);
+        assert_eq!(report.native_successes, 0);
+        assert_eq!(report.metadata_mismatch_rows, 1);
+    }
+
+    #[test]
+    fn all_planned_scenarios_must_belong_to_declared_macro9_groups() {
+        let mut m = manifest();
+        m.scenarios[0].deviation = DeviationType::StageRollback;
+        let errors = validate_manifest(&m).unwrap_err();
+        assert!(errors.iter().any(|issue| matches!(
+            issue,
+            ManifestIssue::ScenarioGroupNotInMacro9(_)
+        )));
+    }
+
 }
