@@ -1085,11 +1085,12 @@ mod tests {
     fn only_test_blind_predictions_can_enter_the_outcome_scoreboard() {
         let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
         corpus.cases[0].prediction.evaluation_partition = "TRAIN".to_owned();
+        let training_pack_ref = corpus.cases[0].prediction.asset.pack_ref.clone();
         corpus
             .split_manifest
             .assignments
             .iter_mut()
-            .find(|assignment| assignment.pack_ref == corpus.cases[0].prediction.asset.pack_ref)
+            .find(|assignment| assignment.pack_ref == training_pack_ref)
             .unwrap()
             .partition = "TRAIN".to_owned();
         let digest = split_manifest_sha256(&corpus.split_manifest).expect("manifest digest");
