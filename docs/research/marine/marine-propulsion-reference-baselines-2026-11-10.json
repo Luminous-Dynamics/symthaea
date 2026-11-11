@@ -2125,6 +2125,134 @@
       "ineligible_use": [
         "Assuming real-time berth power reservation from an infrastructure mandate"
       ]
+    },
+    {
+      "source_id": "ROUTING-DRO-DISTRL-2026-TRD-105598",
+      "title": "Robust low-carbon ship routing under weather uncertainty: a distributional reinforcement learning approach",
+      "publisher": "Transportation Research Part D: Transport and Environment",
+      "publication_date": "2026-11-01",
+      "url": "https://doi.org/10.1016/j.trd.2026.105598",
+      "evidence_class": "peer_reviewed_2026_methodology_single_corridor_case_author_reported",
+      "scope": {
+        "route": "Rotterdam–New York containership corridor",
+        "method": [
+          "Distributional reinforcement learning using a quantile-regression deep Q-network (QR-DQN)",
+          "Wasserstein-metric distributionally robust optimization to address weather-distribution shift",
+          "Physics-informed reward including hydrodynamic resistance and carbon-intensity compliance"
+        ],
+        "reported_results": {
+          "fuel_reduction_vs_slow_steaming_percent": 17.9,
+          "fuel_reduction_vs_standard_dqn_percent": 5.1,
+          "reported_co2_saving_tonnes_per_voyage": 390,
+          "adverse_weather_exposure": "reported near zero"
+        },
+        "publication": "Transportation Research Part D, Volume 160, November 2026, Article 105598"
+      },
+      "limitations": [
+        "Author-reported results for one corridor and one modelling/evaluation setup; not independently reproduced by Luminous.",
+        "Published percentage results must not be compared directly with another route, ship, service boundary or baseline unless conditions and accounting are matched.",
+        "No claim of transfer to wind-assisted cargo ships, other vessel classes or fleet operation.",
+        "Require full article/model/input details and held-out voyage data before reproducing any numerical result."
+      ],
+      "eligible_use": [
+        "SOTA methodology comparator for distributional RL and Wasserstein DRO",
+        "Design of route/weather distribution-shift experiments",
+        "Common-case baseline candidate after implementation details are extracted"
+      ],
+      "ineligible_use": [
+        "Direct fuel-saving forecast for a Luminous vessel",
+        "Safety qualification or autonomous navigation authority"
+      ]
+    },
+    {
+      "source_id": "RISK-AWARE-SHORTSEA-DT-CVAR-DRO-2026-JEMS-95826",
+      "title": "Risk-Aware Digital Twin-Based Speed Optimization for CO2 Emission Reduction in Short-Sea Shipping: The İstanbul-Piraeus Route",
+      "publisher": "Journal of ETA Maritime Science",
+      "publication_date": "2026-10-02",
+      "url": "https://doi.org/10.4274/jems.2026.95826",
+      "evidence_class": "peer_reviewed_2026_methodology_single_corridor_case_author_reported",
+      "scope": {
+        "route": "İstanbul–Piraeus short-sea corridor",
+        "method": [
+          "AIS-based voyage records with meteorological forcing, bunker-price indicators and port-congestion uncertainty",
+          "PDE–ODE reduced hydrodynamic resistance/navigation-state model",
+          "Conditional Value-at-Risk (CVaR) and distributionally robust optimization"
+        ],
+        "reported_results": {
+          "baseline_speed_kn": 20,
+          "optimized_speed_kn_approx": 16,
+          "co2_reduction_percent_approx": 24,
+          "cvar_tail_risk_reduction_percent_approx": 26
+        }
+      },
+      "limitations": [
+        "Author-reported result for one short-sea corridor and stated cost/uncertainty assumptions.",
+        "The paper explicitly positions the reduced PDE–ODE model as voyage decision support, not a replacement for high-fidelity CFD.",
+        "Not directly comparable with deep-sea containerships or wind-assisted propulsion without matched vessel/service boundaries.",
+        "Require independent reproduction and input provenance before using reported percentages as performance evidence."
+      ],
+      "eligible_use": [
+        "Risk-aware digital-twin and CVaR/DRO methodology comparator",
+        "Matched-speed and delay-risk scenario design",
+        "Common-case baseline candidate after model details are extracted"
+      ],
+      "ineligible_use": [
+        "Direct performance prediction for Luminous deep-sea vessel",
+        "Physical/CFD validation or regulatory approval"
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC407-RESOLUTION-INDEX-2026",
+      "title": "IMO MEPC 2026-27 resolution index entry for MEPC.407(84)",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-01",
+      "url": "https://www.imo.org/en/knowledgecentre/indexofimoresolutions/pages/mepc-2026-27.aspx",
+      "evidence_class": "official_resolution_index_status_snapshot",
+      "scope": {
+        "resolution": "MEPC.407(84)",
+        "index_status_checked": "2026-11-11",
+        "index_status": "AWAITING CERTIFICATION",
+        "meeting_outcome": "MEPC 84 meeting summary separately reports adoption of the North-East Atlantic ECA amendment and a 1 September 2027 entry-into-force date."
+      },
+      "limitations": [
+        "The linked resolution PDF currently presents an awaiting-certification placeholder, not the certified Annex VI text.",
+        "The committee meeting outcome and formal certified publication status are distinct facts.",
+        "Ship-specific legal interpretation and official ECA coordinates must use the certified amendment and authoritative MARPOL Annex VI Appendix VII."
+      ],
+      "eligible_use": [
+        "Versioned regulatory source status",
+        "Evidence of public resolution-index status as of 11 November 2026"
+      ],
+      "ineligible_use": [
+        "Substituting for certified legal text or official ECA polygon coordinates",
+        "Ship-specific compliance determination"
+      ]
+    },
+    {
+      "source_id": "DNV-NE-ATLANTIC-ECA-2026",
+      "title": "North-east Atlantic joins the expanding network of ECAs",
+      "publisher": "DNV",
+      "publication_date": "2026-06-17",
+      "url": "https://www.dnv.com/news/2026/north-east-atlantic-joins-the-expanding-network-of-ecas/",
+      "evidence_class": "classification_society_regulatory_analysis",
+      "scope": {
+        "instrument": "Resolution MEPC.407(84)",
+        "geography_note": "DNV identifies the Azores, Madeira and Canary Islands EEZs as excluded; exact area is defined by official MARPOL Annex VI Appendix VII coordinates.",
+        "entry_into_force": "2027-09-01",
+        "sox_pm_application": "2028-09-01",
+        "nox_tier_iii": "Ships meeting the MARPOL three-date construction/delivery criteria; relevant engines above 130 kW."
+      },
+      "limitations": [
+        "DNV explanatory summary is secondary analysis; certified MEPC.407(84) text and official coordinates control.",
+        "Geographic descriptions are not a substitute for official polygon data."
+      ],
+      "eligible_use": [
+        "Independent cross-check of ECA timeline and geographic exclusions",
+        "Class-oriented implementation planning"
+      ],
+      "ineligible_use": [
+        "Replacing certified MARPOL amendments or official coordinates"
+      ]
     }
   ]
 }
