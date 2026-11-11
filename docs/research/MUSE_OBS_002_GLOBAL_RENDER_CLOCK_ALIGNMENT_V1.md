@@ -31,7 +31,7 @@ The estimator:
 5. Searches a caller-declared audio-minus-MIDI offset range, defaulting to −250 ms through +2,000 ms.
 6. Scores candidate offsets against the full distinct MIDI onset sequence, penalizing candidates that cannot account for expected events.
 7. Measures the winning correlation peak, best competing peak, peak margin, peak ratio, in-WAV onset timestamp coverage, and the contiguous high-support peak width. The coverage count means the expected onset timestamp lies inside the actual WAV frame range; it does not mean an acoustic event was detected.
-8. Emits an explicit \`Candidate\`, \`AmbiguousCandidate\`, \`InsufficientOnsetDiversity\`, \`InsufficientAudioCoverage\`, or \`NoPositiveEvidence\` state.
+8. Emits an explicit \`Candidate\`, \`AmbiguousCandidate\`, \`SearchBoundaryCandidate\`, \`InsufficientOnsetDiversity\`, \`InsufficientAudioCoverage\`, or \`NoPositiveEvidence\` state. A peak at either search boundary is preserved as diagnostic evidence, but its offset is not promoted.
 9. Seals the profile to the score digest, MIDI bytes, MIDI manifest, WAV bytes, algorithm, search configuration and alignment observations. Profile validation checks structural invariants and deterministic replay against the exact same implementation; this catches re-sealed inconsistencies but is not an independent second algorithm.
 
 The high-support width is an empirical correlation-peak width, **not** a statistical confidence interval. The ambiguity-ratio threshold is a fixed diagnostic heuristic and is not a calibrated probability. `matched_expected_onset_count` is a WAV-duration coverage count: it only means the expected timestamp maps inside real WAV frames, not that an acoustic event was detected.
