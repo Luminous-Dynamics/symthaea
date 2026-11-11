@@ -115,3 +115,39 @@ A profile with time gaps is a partial propulsion profile. Its gap durations are 
 ### Claim boundary
 
 All mission fixtures are synthetic. This is a deterministic composition of supplied map evidence and the independent drive-chain reference. It does not validate a real motor map, battery, aircraft, reserve policy, thermal state, rotor aerodynamics, safety or airworthiness.
+
+
+## Simultaneous multi-propulsor DC-bus composition (v0.7)
+
+The shared-bus reference composes multiple pointwise, gearbox-aware mission drive profiles already qualified by the v0.6 mission-segment API.
+
+Each bus declares a source boundary, source-evidence digest, aircraft configuration and minimum-voltage / maximum-continuous-current / maximum-continuous-power limits. Each propulsion branch declares one drive path, one bus, a dedicated feeder, meter boundary, protection-device identity, common-cause group and branch continuous limits.
+
+For each exact common mission interval, the composer requires:
+- every connected propulsion path to provide the same segment ID and start/end times;
+- every path on the ideal bus to declare the exact same DC voltage;
+- every path profile to have no unmodelled intervals;
+- every external TMS/auxiliary profile to use the same interval grid;
+- unique branch, path, bus, feeder, load and meter-boundary identities.
+
+The shared bus uses an ideal common-voltage assumption. Propulsion current is summed from the already evaluated drive results; external load current is calculated as P/V for that same declared voltage. Branch, bus and interval limits are checked independently. Results preserve per-branch map/configuration/context/evidence lineage and the protection/common-cause identifiers supplied by the topology.
+
+### Scenario interpretation
+
+Adverse demand combines the adverse drive-map result for every propulsion path with the upper bound of every external load. Nominal uses nominal values; favourable uses favourable drive-map results and lower external-load bounds.
+
+These are rectangular conservative combinations when dependencies/covariances are unknown. They are not probability distributions or confidence levels. No correlation is inferred.
+
+### v0.1 limitations
+
+This is an accounting and static-limit reference, not an electrical network solver. It does not solve:
+- cable resistance/inductance, voltage drop or contact resistance;
+- battery source impedance, current limits or dynamic voltage sag;
+- switching ripple, harmonics, arc faults or short-circuit current;
+- contactor transients, protection selectivity, breaker/fuse coordination or bus-tie switching;
+- dynamic load sharing, source dispatch or post-failure thrust/control allocation;
+- N-1 capability or common-cause independence.
+
+Every branch in a bus report is an independently declared path/feeder record, but common-cause groups are only preserved metadata. Multiple motors do not establish electrical or flight-control redundancy by themselves.
+
+Measured raw channels and synchronized power traces remain owned by the observation/time-series oracles. This composer consumes predicted drive-path reports and separately evidenced TMS/auxiliary intervals; it does not infer zero demand for missing intervals or convert electrical loads into heat.
