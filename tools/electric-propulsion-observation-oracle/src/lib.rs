@@ -8,9 +8,10 @@
 //! not interpolate, extrapolate, impute, calibrate sensors or convert clocks.
 
 use std::collections::BTreeSet;
+use std::f64::consts::TAU;
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-propulsion-observation-oracle-v0.1.0";
+pub const MODEL_VERSION: &str = "electric-propulsion-observation-oracle-v0.2.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimeDomain {
@@ -153,6 +154,43 @@ pub struct SynchronizedOperatingPoint {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+
+/// A motor-shaft operating point projected from two synchronized, calibrated
+/// raw observations. The power interval is a rectangular absolute-bound
+/// propagation; it is not a probabilistic confidence interval.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MotorMapOperatingPoint {
+    pub observation_model_version: &'static str,
+    pub run_id: String,
+    pub asset_id: String,
+    pub configuration_digest: String,
+    pub context_digest: String,
+    pub evidence_manifest_digest: String,
+    pub time_domain: TimeDomain,
+    pub anchor_timestamp_ns: i64,
+    pub motor_shaft_boundary_id: String,
+    pub torque_channel_id: String,
+    pub torque_calibration_certificate_digest: String,
+    pub torque_raw_data_digest: String,
+    pub torque_source_sequence: u64,
+    pub torque_timestamp_ns: i64,
+    pub torque_value_nm: f64,
+    pub torque_absolute_uncertainty_nm: f64,
+    pub speed_channel_id: String,
+    pub speed_calibration_certificate_digest: String,
+    pub speed_raw_data_digest: String,
+    pub speed_source_sequence: u64,
+    pub speed_timestamp_ns: i64,
+    pub speed_value_rpm: f64,
+    pub speed_absolute_uncertainty_rpm: f64,
+    pub motor_angular_velocity_rad_s: f64,
+    pub shaft_power_w: f64,
+    pub shaft_power_lower_bound_w: f64,
+    pub shaft_power_upper_bound_w: f64,
+    pub shaft_power_absolute_uncertainty_bound_w: f64,
+    pub maximum_combined_time_error_ns: u64,
+}
+
 pub enum ObservationError {
     InvalidManifest(&'static str),
     InvalidChannel(&'static str),
@@ -190,6 +228,7 @@ pub enum ObservationError {
         clock_uncertainty_ns: u64,
         allowed_clock_uncertainty_ns: u64,
     },
+    InvalidMotorMapOperatingPoint(&'static str),
     NumericalOverflow,
 }
 
@@ -460,6 +499,153 @@ pub fn synchronize_at(
         maximum_clock_uncertainty_ns,
         maximum_combined_time_error_ns,
         observations,
+    })
+}
+
+
+/// Derive a motor-shaft torque/RPM/power operating point from a synchronized
+/// observation bundle.
+///
+/// Both channels must use the requested same motor-shaft physical boundary,
+/// carry the explicit positive-motoring sign convention and contain positive
+/// values. The power interval is computed from the rectangular absolute
+/// torque and RPM uncertainty bounds. No interpolation or unit conversion is
+/// performed except RPM to rad/s.
+pub fn derive_motor_map_operating_point(
+    point: &SynchronizedOperatingPoint,
+    torque_channel_id: &str,
+    speed_channel_id: &str,
+    expected_motor_shaft_boundary_id: &str,
+) -> Result<MotorMapOperatingPoint, ObservationError> {
+    if !non_empty(torque_channel_id)
+        || !non_empty(speed_channel_id)
+        || !non_empty(expected_motor_shaft_boundary_id)
+    {
+        return Err(ObservationError::InvalidMotorMapOperatingPoint(
+            "torque channel, speed channel and motor-shaft boundary IDs must be present",
+        ));
+    }
+    if torque_channel_id == speed_channel_id {
+        return Err(ObservationError::DuplicateIdentity(
+            "motor-map torque and speed channel IDs",
+        ));
+    }
+
+    let torque = point
+        .observations
+        .iter()
+        .find(|observation| observation.channel_id == torque_channel_id)
+        .ok_or_else(|| ObservationError::MissingRequiredChannel(torque_channel_id.to_owned()))?;
+    let speed = point
+        .observations
+        .iter()
+        .find(|observation| observation.channel_id == speed_channel_id)
+        .ok_or_else(|| ObservationError::MissingRequiredChannel(speed_channel_id.to_owned()))?;
+
+    if torque.quantity != MeasurementQuantity::Torque
+        || torque.unit != MeasurementUnit::NewtonMetre
+        || speed.quantity != MeasurementQuantity::RotationalSpeed
+        || speed.unit != MeasurementUnit::RevolutionsPerMinute
+    {
+        return Err(ObservationError::InvalidMotorMapOperatingPoint(
+            "motor map requires torque in N m and rotational speed in RPM",
+        ));
+    }
+    if torque.physical_boundary_id != expected_motor_shaft_boundary_id
+        || speed.physical_boundary_id != expected_motor_shaft_boundary_id
+    {
+        return Err(ObservationError::InvalidMotorMapOperatingPoint(
+            "torque and speed must refer to the declared same motor-shaft boundary",
+        ));
+    }
+    if torque.sign_convention != SignConvention::PositiveMotoring
+        || speed.sign_convention != SignConvention::PositiveMotoring
+    {
+        return Err(ObservationError::InvalidMotorMapOperatingPoint(
+            "torque and speed must use the explicit positive-motoring sign convention",
+        ));
+    }
+    if !torque.value.is_finite()
+        || !speed.value.is_finite()
+        || !torque.absolute_uncertainty.is_finite()
+        || !speed.absolute_uncertainty.is_finite()
+        || torque.absolute_uncertainty < 0.0
+        || speed.absolute_uncertainty < 0.0
+        || torque.value <= 0.0
+        || speed.value <= 0.0
+    {
+        return Err(ObservationError::InvalidMotorMapOperatingPoint(
+            "motor torque and RPM must be finite and positive with finite non-negative uncertainty",
+        ));
+    }
+
+    let motor_angular_velocity_rad_s = speed.value * TAU / 60.0;
+    let speed_absolute_uncertainty_rad_s = speed.absolute_uncertainty * TAU / 60.0;
+    let shaft_power_w = torque.value * motor_angular_velocity_rad_s;
+
+    let torque_lower_nm = (torque.value - torque.absolute_uncertainty).max(0.0);
+    let torque_upper_nm = torque.value + torque.absolute_uncertainty;
+    let angular_velocity_lower_rad_s =
+        (motor_angular_velocity_rad_s - speed_absolute_uncertainty_rad_s).max(0.0);
+    let angular_velocity_upper_rad_s =
+        motor_angular_velocity_rad_s + speed_absolute_uncertainty_rad_s;
+    let shaft_power_lower_bound_w =
+        torque_lower_nm * angular_velocity_lower_rad_s;
+    let shaft_power_upper_bound_w =
+        torque_upper_nm * angular_velocity_upper_rad_s;
+    let shaft_power_absolute_uncertainty_bound_w = (shaft_power_w
+        - shaft_power_lower_bound_w)
+        .max(shaft_power_upper_bound_w - shaft_power_w);
+
+    let derived = [
+        motor_angular_velocity_rad_s,
+        speed_absolute_uncertainty_rad_s,
+        shaft_power_w,
+        torque_upper_nm,
+        angular_velocity_upper_rad_s,
+        shaft_power_lower_bound_w,
+        shaft_power_upper_bound_w,
+        shaft_power_absolute_uncertainty_bound_w,
+    ];
+    if derived.iter().any(|value| !value.is_finite())
+        || shaft_power_lower_bound_w > shaft_power_w
+        || shaft_power_w > shaft_power_upper_bound_w
+    {
+        return Err(ObservationError::NumericalOverflow);
+    }
+
+    Ok(MotorMapOperatingPoint {
+        observation_model_version: point.model_version,
+        run_id: point.run_id.clone(),
+        asset_id: point.asset_id.clone(),
+        configuration_digest: point.configuration_digest.clone(),
+        context_digest: point.context_digest.clone(),
+        evidence_manifest_digest: point.evidence_manifest_digest.clone(),
+        time_domain: point.time_domain,
+        anchor_timestamp_ns: point.anchor_timestamp_ns,
+        motor_shaft_boundary_id: expected_motor_shaft_boundary_id.to_owned(),
+        torque_channel_id: torque.channel_id.clone(),
+        torque_calibration_certificate_digest: torque.calibration_certificate_digest.clone(),
+        torque_raw_data_digest: torque.raw_data_digest.clone(),
+        torque_source_sequence: torque.source_sequence,
+        torque_timestamp_ns: torque.source_timestamp_ns,
+        torque_value_nm: torque.value,
+        torque_absolute_uncertainty_nm: torque.absolute_uncertainty,
+        speed_channel_id: speed.channel_id.clone(),
+        speed_calibration_certificate_digest: speed.calibration_certificate_digest.clone(),
+        speed_raw_data_digest: speed.raw_data_digest.clone(),
+        speed_source_sequence: speed.source_sequence,
+        speed_timestamp_ns: speed.source_timestamp_ns,
+        speed_value_rpm: speed.value,
+        speed_absolute_uncertainty_rpm: speed.absolute_uncertainty,
+        motor_angular_velocity_rad_s,
+        shaft_power_w,
+        shaft_power_lower_bound_w,
+        shaft_power_upper_bound_w,
+        shaft_power_absolute_uncertainty_bound_w,
+        maximum_combined_time_error_ns: torque
+            .combined_time_error_ns
+            .max(speed.combined_time_error_ns),
     })
 }
 
