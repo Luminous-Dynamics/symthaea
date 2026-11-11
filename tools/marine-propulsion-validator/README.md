@@ -242,3 +242,19 @@ cargo run --bin marine-energy-conservation-audit -- \\
 ~~~
 
 The conservation audit is complementary to the source-input ledger: internal transfers cancel at the system boundary, conversion losses and storage changes are explicit, and component residuals are checked against supplied expanded-uncertainty budgets. The balanced fixture is synthetic and therefore remains INCOMPLETE as physical evidence. An unbalanced negative control is provided separately.
+
+
+Audit the underwater acoustic trial evidence contract:
+
+~~~sh
+cargo run --bin marine-acoustic-evidence-audit -- \
+  docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+  docs/research/marine/fixtures/synthetic-marine-acoustic-evidence-v0.1.0.json
+~~~
+
+The acoustic audit distinguishes ISO 17208-1 deep-water one-third-octave measurements,
+ISO 17208-2 equivalent monopole source-level records and ISO 17208-3 shallow-water
+decidecade measurements. It checks test depth against the selected method, hydrophone
+calibration validity and frequency coverage, sample arithmetic, band ordering,
+uncertainty, ambient-reference presence and operating state. The synthetic fixture must
+return INCOMPLETE; an audit pass is not acoustic certification or evidence of ecological impact.
