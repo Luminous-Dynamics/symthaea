@@ -321,3 +321,14 @@ The reference formula is a minimum over qualified integer caps—not a composite
 ### Adaptive horizon composition conditions
 
 The #11581 minimum-of-bounds reference is only sound when all qualified caps refer to the same state/action/model/uncertainty/clock/control-period context and each cap is prefix-closed over every intermediate tick. The 17-case corpus contains explicit mixed-context and non-prefix-closed negative controls. These prevent a superficially safe minimum from combining incompatible evidence or hiding an intermediate constraint violation.
+
+
+## 12. Additional action-horizon comparators: PACE, ChunkTrust and REMAC
+
+The action-horizon lane now includes three additional public baselines:
+
+- **PACE — Phase-Aware Chunk Execution** (arXiv:2606.00537, 30 May 2026): selects execution/replanning boundaries using low-speed transitions in the predicted action chunk. It reports RoboTwin 2.0 average success increasing from 57.8% to 64.2% over 50 tasks; on ALOHA and Franka real-robot tasks it reports average success 50.7% to 70.4% and task score 60.7 to 77.7 in its own evaluation. This is a test-time phase selector, not a physical safety bound. https://arxiv.org/abs/2606.00537
+- **ChunkTrust** (arXiv:2609.39754, 30 September 2026): infers horizon reliability from action-expert spectral stability, inter-chunk continuity, and an online Beta posterior. It reports +6.80 percentage points for π0.5 on RoboTwin 2.0, +9.67 points for Qwen3GR00T on RoboCasa, and four real-world household tasks with normalized process score 50.4% to 57.5% in its own task strata. This is an action-evidence horizon proposal, not a qualified thermal/viability cap. https://arxiv.org/abs/2609.39754
+- **REMAC** (ICLR 2026): masked action chunking and prefix-preserved sampling target intra-chunk perception/execution mismatch as well as inter-chunk continuity. This adds an important training-time robustness arm beyond post-hoc chunk blending. https://proceedings.iclr.cc/paper_files/paper/2026/hash/c35834443b7881e782e52b3519fe27c7-Abstract-Conference.html
+
+**Fair comparison design:** evaluate the selector first as a candidate-horizon proposer, then apply the same Luminous physical bottleneck envelope to each proposer. The envelope must not improve a selector's model prediction; it only clips commitment to a common qualified admissible prefix. Compare proposal quality, clipped horizon, safe-success, replanning overhead and physical outcomes separately. Do not pool platform/task results across papers.
