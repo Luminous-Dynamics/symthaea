@@ -815,7 +815,6 @@ mod tests {
                 trial_id: format!("trial-{scenario_index}-{trial_index}"),
                 scenario_id: scenario.scenario_id.clone(),
                 arm_id: "base-policy".to_owned(),
-                policy_digest: "sha256:policy".to_owned(),
                 scenario_digest: format!("{scenario_index:064x}"),
                 evaluator_digest: manifest().evaluator_digest,
                 policy_digest: manifest().policy_digest,
