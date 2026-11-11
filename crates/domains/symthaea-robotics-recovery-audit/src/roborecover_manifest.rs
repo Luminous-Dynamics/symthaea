@@ -7,6 +7,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use sha1::{Digest, Sha1};
+
 use super::roborecover_score::{
     BenchmarkPlatform, BenchmarkSplit, DeviationType, ExecutionMode, ManifestIssue,
     PlannedScenario, RecoveryStage, RoboRecoverManifest, ScenarioSource, StageTypeGroup,
@@ -166,6 +168,7 @@ impl ParsedSplitManifest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SplitManifestIssue {
     EmptyInput,
+    SplitCsvBlobMismatch,
     HeaderMismatch,
     QuotedFieldUnsupported { line: usize },
     BlankLine { line: usize },
@@ -269,15 +272,38 @@ fn expected_path(
     )
 }
 
+fn git_blob_sha1_hex(bytes: &[u8]) -> String {
+    let header = format!("blob {}\\0", bytes.len());
+    let mut hasher = Sha1::new();
+    hasher.update(header.as_bytes());
+    hasher.update(bytes);
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 /// Parse and validate a RoboRecover CSV at the pinned source revision.
 ///
-/// This parser deliberately accepts only the exact nine-column source schema,
-/// unquoted single-line rows, pinned Git blob identity and expected split size.
-/// The source SHA-256 fields identify scenario artifacts; this function does not
-/// claim to have downloaded or re-hashed those JSON artifacts.
+/// Git's blob SHA-1 is recomputed over the exact supplied bytes using the
+/// canonical `blob <length>\\0<content>` preimage. The parsed text must match
+/// the split blob recorded at the pinned upstream revision. Scenario JSON
+/// hashes are syntax-checked here; the scenario JSON artifacts themselves are
+/// not downloaded or re-hashed by this importer.
 pub fn parse_pinned_split_csv(
     csv_text: &str,
     context: SplitImportContext,
+) -> Result<ParsedSplitManifest, Vec<SplitManifestIssue>> {
+    parse_split_csv_inner(csv_text, context, true)
+}
+
+/// Shared parser. The unpinned branch is private and used only for synthetic
+/// unit fixtures; production callers use parse_pinned_split_csv.
+fn parse_split_csv_inner(
+    csv_text: &str,
+    context: SplitImportContext,
+    verify_pinned_blob: bool,
 ) -> Result<ParsedSplitManifest, Vec<SplitManifestIssue>> {
     let mut issues = Vec::new();
 
@@ -287,8 +313,13 @@ pub fn parse_pinned_split_csv(
     if context.source_revision != ROBORECOVER_SOURCE_REVISION {
         issues.push(SplitManifestIssue::WrongSourceRevision);
     }
-    if context.split_manifest_blob_sha != pinned_split_blob_sha(context.platform, context.split) {
-        issues.push(SplitManifestIssue::WrongSplitManifestBlobSha);
+    if verify_pinned_blob {
+        if context.split_manifest_blob_sha != pinned_split_blob_sha(context.platform, context.split) {
+            issues.push(SplitManifestIssue::WrongSplitManifestBlobSha);
+        }
+        if git_blob_sha1_hex(csv_text.as_bytes()) != context.split_manifest_blob_sha {
+            issues.push(SplitManifestIssue::SplitCsvBlobMismatch);
+        }
     }
 
     let mut lines = csv_text.split_terminator('\n');
@@ -562,6 +593,13 @@ pub fn parse_pinned_split_csv(
 mod tests {
     use super::*;
 
+    fn parse_fixture_csv(
+        csv_text: &str,
+        context: SplitImportContext,
+    ) -> Result<ParsedSplitManifest, Vec<SplitManifestIssue>> {
+        parse_split_csv_inner(csv_text, context, false)
+    }
+
     fn context(platform: BenchmarkPlatform, split: BenchmarkSplit) -> SplitImportContext {
         SplitImportContext {
             platform,
@@ -696,7 +734,7 @@ mod tests {
 
     #[test]
     fn rejects_wrong_header_and_wrong_scenario_count() {
-        let errors = parse_pinned_split_csv(
+        let errors = parse_fixture_csv(
             "sample_id,path\n",
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
         )
@@ -730,7 +768,7 @@ mod tests {
             ));
         }
 
-        let errors = parse_pinned_split_csv(
+        let errors = parse_fixture_csv(
             &(csv.join("\n") + "\n"),
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
         )
@@ -753,7 +791,7 @@ mod tests {
             "robotwin/test/../sample-000.json",
             1,
         );
-        let errors = parse_pinned_split_csv(
+        let errors = parse_fixture_csv(
             &csv,
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
         )
@@ -769,7 +807,7 @@ mod tests {
         let mut csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test, true);
         let valid_hash = "c".repeat(64);
         csv = csv.replacen(valid_hash.as_str(), "not-a-sha", 1);
-        let errors = parse_pinned_split_csv(
+        let errors = parse_fixture_csv(
             &csv,
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
         )
@@ -781,7 +819,7 @@ mod tests {
 
         let mut csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test, true);
         csv = csv.replacen(",12,12,", ",0,12,", 1);
-        let errors = parse_pinned_split_csv(
+        let errors = parse_fixture_csv(
             &csv,
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
         )
@@ -793,7 +831,7 @@ mod tests {
 
         let mut csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test, true);
         csv = csv.replacen(",12,12,", ",12,11,", 1);
-        let errors = parse_pinned_split_csv(
+        let errors = parse_fixture_csv(
             &csv,
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
         )
@@ -804,7 +842,7 @@ mod tests {
     #[test]
     fn rejects_missing_or_unexpected_test_macro9_groups() {
         let csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test, false);
-        let errors = parse_pinned_split_csv(
+        let errors = parse_fixture_csv(
             &csv,
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
         )
@@ -819,7 +857,7 @@ mod tests {
     fn rejects_unknown_stage_or_deviation_without_guessing() {
         let mut csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test, true);
         csv = csv.replacen(",Approach,Wrong Pose", ",Unknown,Wrong Pose", 1);
-        let errors = parse_pinned_split_csv(
+        let errors = parse_fixture_csv(
             &csv,
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
         )
@@ -834,7 +872,7 @@ mod tests {
     fn exact_test_stage_type_counts_are_platform_specific_and_frozen() {
         for platform in [BenchmarkPlatform::Libero, BenchmarkPlatform::RoboTwin] {
             let csv = synthetic_csv(platform, BenchmarkSplit::Test, true);
-            let parsed = parse_pinned_split_csv(&csv, context(platform, BenchmarkSplit::Test))
+            let parsed = parse_fixture_csv(&csv, context(platform, BenchmarkSplit::Test))
                 .unwrap();
             assert_eq!(parsed.row_count, 200);
             for group in &TEST_MACRO9 {
@@ -868,7 +906,7 @@ mod tests {
         );
         csv = csv.replacen(old.as_str(), first.as_str(), 1);
 
-        let errors = parse_pinned_split_csv(&csv, context(platform, BenchmarkSplit::Test))
+        let errors = parse_fixture_csv(&csv, context(platform, BenchmarkSplit::Test))
             .unwrap_err();
         assert!(errors.iter().any(|issue| matches!(
             issue,
@@ -916,7 +954,7 @@ mod tests {
                 deviation,
             ));
         }
-        let parsed = parse_pinned_split_csv(
+        let parsed = parse_fixture_csv(
             &(rows.join("\n") + "\n"),
             context(platform, split),
         ).unwrap();
@@ -935,7 +973,7 @@ mod tests {
         let mut ctx = context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test);
         ctx.policy_digest = "policy".to_owned();
 
-        let errors = parse_pinned_split_csv(&csv, ctx).unwrap_err();
+        let errors = parse_fixture_csv(&csv, ctx).unwrap_err();
         assert!(errors.iter().any(|issue| matches!(
             issue,
             SplitManifestIssue::InvalidScoreManifest(manifest_issues)
@@ -947,7 +985,7 @@ mod tests {
     #[test]
     fn training_parent_frame_is_emitted_from_parsed_train_split_only() {
         let csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Train, false);
-        let parsed = parse_pinned_split_csv(
+        let parsed = parse_fixture_csv(
             &csv,
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Train),
         ).unwrap();
@@ -967,11 +1005,24 @@ mod tests {
         assert_eq!(parent.deviation, first.deviation);
 
         let test_csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test, true);
-        let parsed_test = parse_pinned_split_csv(
+        let parsed_test = parse_fixture_csv(
             &test_csv,
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
         ).unwrap();
         assert!(parsed_test.pinned_training_parent_frame().is_none());
+    }
+
+
+    #[test]
+    fn pinned_parser_rejects_modified_csv_claiming_official_blob_identity() {
+        let mut csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Train, false);
+        csv.push_str("# modified after fetching pinned source\n");
+        let errors = parse_pinned_split_csv(
+            &csv,
+            context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Train),
+        )
+        .unwrap_err();
+        assert!(errors.contains(&SplitManifestIssue::SplitCsvBlobMismatch));
     }
 
 }
