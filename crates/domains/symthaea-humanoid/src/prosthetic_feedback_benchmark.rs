@@ -3,14 +3,14 @@
 //! Per-participant/session evaluation for prosthetic sensory cue recognition.
 //!
 //! This benchmark layer evaluates whether a participant correctly recognizes
-//! an expected semantic event under one fixed modality, codebook and session.
-//! It is intentionally separate from hand mechanics, task success, clinical
-//! outcomes and the physical haptic renderer.
+//! an expected semantic event under one fixed modality, information source,
+//! codebook and session. Modality (visual/audio/vibration) is distinct from the
+//! information conveyed (EMG intent, requested control, measured contact/force,
+//! or an estimated physical outcome). Never pool those source classes.
 //!
-//! Never pool different participants, sessions, modalities or mappings through
-//! this evaluator. Call it once per stratum and preserve the returned identity.
-//! Synthetic/simulated evidence is retained as such and cannot establish human
-//! sensory performance.
+//! It is intentionally separate from hand mechanics, task success, clinical
+//! outcomes and the physical haptic renderer. Synthetic/simulated evidence is
+//! retained as such and cannot establish human sensory performance.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -27,6 +27,27 @@ pub enum FeedbackModalityCondition {
     Multimodal,
 }
 
+/// Physical or inferred variable encoded by the feedback, independent of the
+/// channel used to present it. In particular, EMG/intent is not measured
+/// contact force, and a requested command is not an observed outcome.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FeedbackInformationSource {
+    /// No information is presented in the no-feedback reference condition.
+    NoInformation,
+    /// Residual-muscle / EMG signal representing user intent or effort.
+    UserIntentEmg,
+    /// Requested or projected control command; not proof of physical execution.
+    RequestedControlState,
+    /// Sensor measurement indicating physical contact.
+    MeasuredContact,
+    /// Calibrated sensor measurement of grip force.
+    MeasuredGripForce,
+    /// Estimated slip state; not a direct measurement unless separately established.
+    EstimatedSlip,
+    /// Measured prosthetic joint position.
+    MeasuredJointPosition,
+}
+
 /// One forced-choice or signal-detection recognition observation.
 ///
 /// `expected` is the reference event. `reported` is the participant's
@@ -39,6 +60,8 @@ pub struct FeedbackRecognitionTrialV1 {
     pub participant_ref: String,
     pub session_ref: String,
     pub condition: FeedbackModalityCondition,
+    /// Information source encoded by the feedback channel.
+    pub information_source: FeedbackInformationSource,
     pub mapping_id: String,
     /// Shared stimulus/trial identity used only for paired crossover analysis.
     pub paired_trial_ref: Option<String>,
@@ -76,12 +99,13 @@ pub struct CueClassMetrics {
     pub f1: Option<f64>,
 }
 
-/// Metrics for exactly one participant × session × modality × mapping stratum.
+/// Metrics for exactly one participant × session × modality × information-source × mapping stratum.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FeedbackRecognitionSummaryV1 {
     pub participant_ref: String,
     pub session_ref: String,
     pub condition: FeedbackModalityCondition,
+    pub information_source: FeedbackInformationSource,
     pub mapping_id: String,
     pub evidence_class: SensoryEvidenceClass,
     pub trial_count: u64,
@@ -110,6 +134,7 @@ pub enum FeedbackBenchmarkError {
     PairSetsDoNotMatch,
     PairedExpectedCueMismatch { pair_ref: String },
     SameModalityCondition,
+    InformationSourceConditionMismatch,
     DifferentParticipantOrSession,
     InvalidReferenceStratum,
     InvalidCandidateStratum,
@@ -136,6 +161,8 @@ pub struct PairedFeedbackComparisonV1 {
     pub session_ref: String,
     pub reference_condition: FeedbackModalityCondition,
     pub candidate_condition: FeedbackModalityCondition,
+    pub reference_information_source: FeedbackInformationSource,
+    pub candidate_information_source: FeedbackInformationSource,
     pub reference_mapping_id: String,
     pub candidate_mapping_id: String,
     pub pair_count: u64,
@@ -151,8 +178,9 @@ pub struct PairedFeedbackComparisonV1 {
 }
 
 /// Compare two conditions using exactly matched stimuli for one participant
-/// and session. Mapping IDs may differ because each modality can have its own
-/// user-configured codebook; both identities are retained in the output.
+/// and session. Conditions may differ by modality, information source, or
+/// mapping; all identities are retained in the output. The paired reference
+/// label must still represent the same preregistered event in both conditions.
 pub fn compare_paired_feedback_conditions(
     reference: &[FeedbackRecognitionTrialV1],
     candidate: &[FeedbackRecognitionTrialV1],
@@ -168,7 +196,10 @@ pub fn compare_paired_feedback_conditions(
     {
         return Err(FeedbackBenchmarkError::DifferentParticipantOrSession);
     }
-    if reference_summary.condition == candidate_summary.condition {
+    if reference_summary.condition == candidate_summary.condition
+        && reference_summary.information_source == candidate_summary.information_source
+        && reference_summary.mapping_id == candidate_summary.mapping_id
+    {
         return Err(FeedbackBenchmarkError::SameModalityCondition);
     }
 
@@ -281,6 +312,8 @@ pub fn compare_paired_feedback_conditions(
         session_ref: reference_summary.session_ref,
         reference_condition: reference_summary.condition,
         candidate_condition: candidate_summary.condition,
+        reference_information_source: reference_summary.information_source,
+        candidate_information_source: candidate_summary.information_source,
         reference_mapping_id: reference_summary.mapping_id,
         candidate_mapping_id: candidate_summary.mapping_id,
         pair_count,
@@ -295,7 +328,7 @@ pub fn compare_paired_feedback_conditions(
 }
 
 /// Evaluate one immutable stratum. Callers must group data by participant,
-/// session, condition and mapping before invoking this function.
+/// session, condition, information source and mapping before invoking this function.
 pub fn evaluate_feedback_recognition(
     trials: &[FeedbackRecognitionTrialV1],
 ) -> Result<FeedbackRecognitionSummaryV1, FeedbackBenchmarkError> {
@@ -322,9 +355,24 @@ pub fn evaluate_feedback_recognition(
                 trial_id: trial.trial_id.clone(),
             });
         }
+        let source_matches_condition = match trial.condition {
+            FeedbackModalityCondition::NoFeedback => {
+                trial.information_source == FeedbackInformationSource::NoInformation
+            }
+            FeedbackModalityCondition::VisualOnly
+            | FeedbackModalityCondition::Auditory
+            | FeedbackModalityCondition::Vibrotactile
+            | FeedbackModalityCondition::Multimodal => {
+                trial.information_source != FeedbackInformationSource::NoInformation
+            }
+        };
+        if !source_matches_condition {
+            return Err(FeedbackBenchmarkError::InformationSourceConditionMismatch);
+        }
         if trial.participant_ref != first.participant_ref
             || trial.session_ref != first.session_ref
             || trial.condition != first.condition
+            || trial.information_source != first.information_source
             || trial.mapping_id != first.mapping_id
             || trial.evidence_class != first.evidence_class
         {
@@ -450,6 +498,7 @@ pub fn evaluate_feedback_recognition(
         participant_ref: first.participant_ref.clone(),
         session_ref: first.session_ref.clone(),
         condition: first.condition,
+        information_source: first.information_source,
         mapping_id: first.mapping_id.clone(),
         evidence_class: first.evidence_class,
         trial_count: trials.len() as u64,
@@ -525,6 +574,7 @@ mod tests {
             participant_ref: "participant:p1".into(),
             session_ref: "session:s1".into(),
             condition: FeedbackModalityCondition::Vibrotactile,
+            information_source: FeedbackInformationSource::MeasuredContact,
             mapping_id: "mapping:v1".into(),
             paired_trial_ref: None,
             evidence_class: SensoryEvidenceClass::HumanObserved,
@@ -678,6 +728,7 @@ mod tests {
         reference[0].mapping_id = "no-feedback".into();
         for trial in &mut reference {
             trial.condition = FeedbackModalityCondition::NoFeedback;
+            trial.information_source = FeedbackInformationSource::NoInformation;
             trial.mapping_id = "no-feedback".into();
         }
         for trial in &mut candidate {
@@ -750,6 +801,59 @@ mod tests {
             compare_paired_feedback_conditions(&reference, &candidate),
             Err(FeedbackBenchmarkError::DifferentParticipantOrSession)
         );
+    }
+
+    #[test]
+    fn information_sources_are_separate_strata() {
+        let contact = HapticCueSemantic::Contact(
+            crate::prosthetic_sensory::HandDigit::Index,
+        );
+        let mut trials = vec![trial("t1", Some(contact), Some(contact), Some(100.0))];
+        let mut emg = trial("t2", Some(contact), Some(contact), Some(110.0));
+        emg.information_source = FeedbackInformationSource::UserIntentEmg;
+        trials.push(emg);
+
+        assert_eq!(
+            evaluate_feedback_recognition(&trials),
+            Err(FeedbackBenchmarkError::MixedParticipantSessionModalityOrMapping)
+        );
+    }
+
+    #[test]
+    fn rejects_no_feedback_with_an_information_source() {
+        let mut sample = trial("t1", None, None, None);
+        sample.condition = FeedbackModalityCondition::NoFeedback;
+        assert_eq!(
+            evaluate_feedback_recognition(&[sample]),
+            Err(FeedbackBenchmarkError::InformationSourceConditionMismatch)
+        );
+    }
+
+    #[test]
+    fn paired_same_modality_comparison_can_isolate_information_source() {
+        let contact = HapticCueSemantic::Contact(
+            crate::prosthetic_sensory::HandDigit::Index,
+        );
+        let mut intent = vec![trial("i1", Some(contact), Some(contact), Some(120.0))];
+        let mut measured_force = vec![trial("f1", Some(contact), Some(contact), Some(100.0))];
+        intent[0].information_source = FeedbackInformationSource::UserIntentEmg;
+        measured_force[0].information_source = FeedbackInformationSource::MeasuredGripForce;
+        intent[0].paired_trial_ref = Some("shared-stimulus-1".into());
+        measured_force[0].paired_trial_ref = Some("shared-stimulus-1".into());
+
+        let comparison =
+            compare_paired_feedback_conditions(&intent, &measured_force).unwrap();
+        assert_eq!(
+            comparison.reference_information_source,
+            FeedbackInformationSource::UserIntentEmg
+        );
+        assert_eq!(
+            comparison.candidate_information_source,
+            FeedbackInformationSource::MeasuredGripForce
+        );
+        assert_eq!(comparison.reference_condition, FeedbackModalityCondition::Vibrotactile);
+        assert_eq!(comparison.candidate_condition, FeedbackModalityCondition::Vibrotactile);
+        assert_eq!(comparison.paired_accuracy_difference, Some(0.0));
     }
 
     #[test]
