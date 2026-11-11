@@ -342,3 +342,6 @@ The competitive/action-chunk benchmark now distinguishes three recent approaches
 - Ren et al. StreamingWAM (arXiv:2610.15585): separate chunk-wise staircase-flow paper; abstract reports 72.9 ms simulated / 57.3 ms real-robot replanning latency.
 
 Do not conflate the two similarly named Streaming-WAM papers or import the reported speeds as target-hardware guarantees. The proposed Luminous ablation separates slow/fast timescale context, committed-prefix conditioning, chunk continuity and independent temporal assurance.
+
+
+The distributed-inference fixture corpus now contains **19** synthetic cases, including compression-induced accuracy loss (DI18) and fleet-batch priority admission under p99 queueing (DI19). The schema requires all 19 case IDs exactly once.
