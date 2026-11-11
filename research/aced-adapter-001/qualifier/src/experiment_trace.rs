@@ -94,6 +94,160 @@ fn write_canonical_json(value: &Value, output: &mut Vec<u8>) -> Result<(), Strin
     Ok(())
 }
 
+/// SHA-256 over canonical UTF-8 JSON (recursive key sort, array order preserved).
+pub fn canonical_json_sha256(value: &Value) -> Result<String, String> {
+    let mut bytes = Vec::new();
+    write_canonical_json(value, &mut bytes)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+fn validate_string_array(value: &Value, field: &str) -> Result<(), String> {
+    let Some(items) = value.as_array() else {
+        return Err(format!("{field} must be an array"));
+    };
+    if items.is_empty() {
+        return Err(format!("{field} must not be empty"));
+    }
+    let mut seen = BTreeSet::new();
+    for item in items {
+        let Some(text) = item.as_str().filter(|item| !item.trim().is_empty()) else {
+            return Err(format!("{field} items must be non-empty strings"));
+        };
+        if !seen.insert(text.to_string()) {
+            return Err(format!("{field} contains duplicate item {text}"));
+        }
+    }
+    Ok(())
+}
+
+/// Validate the typed, closed experiment-plan contract before digest binding.
+pub fn validate_experiment_plan(plan: &Value) -> Result<(), String> {
+    if !exact_fields(
+        plan,
+        &[
+            "schema_version",
+            "plan_id",
+            "benchmark_id",
+            "target",
+            "intervention",
+            "control",
+            "allocation",
+            "measurement",
+            "sample",
+            "budget",
+            "safety",
+            "identification_assumptions",
+            "confounders_and_selection",
+            "stop_rules",
+        ],
+    ) {
+        return Err("experiment plan does not match its closed fourteen-field contract".into());
+    }
+    if text(plan, "schema_version") != Some("aced-experiment-plan-v0.1")
+        || text(plan, "plan_id").is_none()
+        || text(plan, "benchmark_id") != Some("ACED-REPAIR-ADAPTER-001")
+    {
+        return Err("experiment plan identity or benchmark binding mismatch".into());
+    }
+
+    let target = &plan["target"];
+    if !exact_fields(target, &["question", "hypothesis_ids"])
+        || text(target, "question").is_none()
+    {
+        return Err("experiment plan target contract mismatch".into());
+    }
+    validate_string_array(&target["hypothesis_ids"], "target.hypothesis_ids")?;
+
+    let intervention = &plan["intervention"];
+    if !exact_fields(intervention, &["kind", "target_ref", "treatment_spec"])
+        || text(intervention, "kind").is_none()
+        || text(intervention, "target_ref").is_none()
+        || text(intervention, "treatment_spec").is_none()
+    {
+        return Err("experiment plan intervention contract mismatch".into());
+    }
+
+    let control = &plan["control"];
+    if !exact_fields(control, &["kind", "description", "control_variables"])
+        || text(control, "kind").is_none()
+        || text(control, "description").is_none()
+    {
+        return Err("experiment plan control contract mismatch".into());
+    }
+    validate_string_array(&control["control_variables"], "control.control_variables")?;
+
+    let allocation = &plan["allocation"];
+    if !exact_fields(allocation, &["method", "unit", "seed_commitment_sha256"])
+        || text(allocation, "method").is_none()
+        || text(allocation, "unit").is_none()
+        || !text(allocation, "seed_commitment_sha256").is_some_and(is_sha256)
+    {
+        return Err("experiment plan allocation contract mismatch".into());
+    }
+
+    let measurement = &plan["measurement"];
+    if !exact_fields(measurement, &["variables", "timepoints", "outcome_taxonomy"]) {
+        return Err("experiment plan measurement contract mismatch".into());
+    }
+    validate_string_array(&measurement["variables"], "measurement.variables")?;
+    validate_string_array(&measurement["timepoints"], "measurement.timepoints")?;
+    validate_string_array(&measurement["outcome_taxonomy"], "measurement.outcome_taxonomy")?;
+
+    let sample = &plan["sample"];
+    if !exact_fields(sample, &["planned_units", "power_assumptions"])
+        || sample["planned_units"].as_u64().is_none_or(|units| units == 0)
+        || text(sample, "power_assumptions").is_none()
+    {
+        return Err("experiment plan sample/power contract mismatch".into());
+    }
+
+    let budget = &plan["budget"];
+    if !exact_fields(budget, &["max_experiments", "max_turns", "max_cost_units"])
+        || budget["max_experiments"].as_u64().is_none_or(|value| value == 0)
+        || budget["max_turns"].as_u64().is_none_or(|value| value == 0)
+        || finite_number(budget, "max_cost_units").is_none_or(|value| value < 0.0)
+    {
+        return Err("experiment plan budget contract mismatch".into());
+    }
+
+    let safety = &plan["safety"];
+    if !exact_fields(
+        safety,
+        &["risk_class", "reversibility", "maximum_exposure", "stop_conditions"],
+    ) || text(safety, "risk_class").is_none()
+        || !["reversible", "partially_reversible", "irreversible"]
+            .contains(&text(safety, "reversibility").unwrap_or(""))
+        || finite_number(safety, "maximum_exposure").is_none_or(|value| value < 0.0)
+    {
+        return Err("experiment plan safety contract mismatch".into());
+    }
+    validate_string_array(&safety["stop_conditions"], "safety.stop_conditions")?;
+    validate_string_array(
+        &plan["identification_assumptions"],
+        "identification_assumptions",
+    )?;
+    validate_string_array(
+        &plan["confounders_and_selection"],
+        "confounders_and_selection",
+    )?;
+
+    let stop_rules = &plan["stop_rules"];
+    if !exact_fields(
+        stop_rules,
+        &[
+            "premature_stop_rule",
+            "continue_rule",
+            "conflict_resolution_rule",
+        ],
+    ) || text(stop_rules, "premature_stop_rule").is_none()
+        || text(stop_rules, "continue_rule").is_none()
+        || text(stop_rules, "conflict_resolution_rule").is_none()
+    {
+        return Err("experiment plan stop-rule contract mismatch".into());
+    }
+    Ok(())
+}
+
 /// Hash the immutable event envelope, excluding only its own event_sha256 field.
 pub fn event_sha256(event: &Value) -> Result<String, String> {
     const ENVELOPE_FIELDS: [&str; 5] = [
@@ -492,6 +646,61 @@ pub fn validate_trace(trace: &Value) -> Result<TraceReport, Vec<String>> {
     }
 }
 
+/// Verify every proposal's plan digest against an independently supplied immutable plan artifact.
+pub fn validate_trace_with_plans(
+    trace: &Value,
+    plan_artifacts: &[Value],
+) -> Result<TraceReport, Vec<String>> {
+    let report = validate_trace(trace)?;
+    let mut plans_by_digest = BTreeMap::<String, &Value>::new();
+    let mut errors = Vec::new();
+
+    for (index, plan) in plan_artifacts.iter().enumerate() {
+        if let Err(error) = validate_experiment_plan(plan) {
+            errors.push(format!("plan_artifacts[{index}]: {error}"));
+            continue;
+        }
+        let digest = match canonical_json_sha256(plan) {
+            Ok(digest) => digest,
+            Err(error) => {
+                errors.push(format!("plan_artifacts[{index}]: {error}"));
+                continue;
+            }
+        };
+        if plans_by_digest.insert(digest.clone(), plan).is_some() {
+            errors.push(format!("duplicate plan artifact digest {digest}"));
+        }
+    }
+
+    let events = trace["events"].as_array().expect("trace validated events array");
+    for event in events.iter().filter(|event| {
+        text(event, "event_type") == Some("experiment_proposal")
+    }) {
+        let event_id = text(event, "event_id").unwrap_or("<missing-event-id>");
+        let payload = &event["payload"];
+        let expected_digest = text(payload, "experiment_plan_sha256").unwrap_or("");
+        let Some(plan) = plans_by_digest.get(expected_digest) else {
+            errors.push(format!(
+                "proposal {event_id} references an experiment plan artifact that was not supplied or whose digest differs"
+            ));
+            continue;
+        };
+        if text(payload, "experiment_id") != text(plan, "plan_id") {
+            errors.push(format!(
+                "proposal {event_id} experiment_id does not match the bound plan_id"
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(report)
+    } else {
+        errors.sort();
+        errors.dedup();
+        Err(errors)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -499,6 +708,14 @@ mod tests {
 
     const TRACE_SCHEMA: &str =
         include_str!("../../EXPERIMENT_VALUE_TRACE_V0_1.schema.json");
+    const PLAN_SCHEMA: &str =
+        include_str!("../../ACED_EXPERIMENT_PLAN_V0_1.schema.json");
+    const PLAN_FIXTURE: &str =
+        include_str!("../tests/fixtures/aced_experiment_plan_v0_1.json");
+
+    fn parsed_plan() -> Value {
+        serde_json::from_str(PLAN_FIXTURE).expect("plan fixture JSON")
+    }
 
     #[test]
     fn checked_in_trace_schema_matches_the_closed_rust_contract() {
@@ -511,6 +728,14 @@ mod tests {
             text(&schema, "title"),
             Some("ACED experiment-value append-only trace v0.1")
         );
+        let plan_schema: Value =
+            serde_json::from_str(PLAN_SCHEMA).expect("experiment plan schema JSON");
+        assert_eq!(
+            text(&plan_schema, "title"),
+            Some("ACED prospective experiment plan v0.1")
+        );
+        assert_eq!(plan_schema["additionalProperties"], false);
+        validate_experiment_plan(&parsed_plan()).expect("plan fixture satisfies Rust contract");
         assert_eq!(schema["additionalProperties"], false);
         assert_eq!(
             schema["properties"]["events"]["items"]["oneOf"]
@@ -568,9 +793,11 @@ mod tests {
     }
 
     fn proposal() -> Value {
+        let plan = parsed_plan();
+        let plan_digest = canonical_json_sha256(&plan).expect("canonical plan digest");
         json!({
-            "experiment_id": "probe-1",
-            "experiment_plan_sha256": "d".repeat(64),
+            "experiment_id": plan["plan_id"].as_str().unwrap(),
+            "experiment_plan_sha256": plan_digest,
             "belief_state_sha256": "a".repeat(64),
             "selector": "RISK_ADJUSTED_EVSI",
             "predicted_outcome_distribution": [
@@ -622,7 +849,8 @@ mod tests {
                 "observed_outcome": "positive"
             }),
         );
-        let result = validate_trace(&trace(vec![first, second])).unwrap();
+        let trace_value = trace(vec![first, second]);
+        let result = validate_trace_with_plans(&trace_value, &[parsed_plan()]).unwrap();
         assert_eq!(result.event_count, 2);
         assert_eq!(result.proposal_count, 1);
         assert_eq!(result.observation_count, 1);
@@ -743,6 +971,36 @@ mod tests {
         assert_eq!(report.mean_brier_score, Some(2.0));
         assert_eq!(report.mean_log_loss, None);
         assert_eq!(report.zero_probability_outcome_count, 1);
+    }
+
+    #[test]
+    fn altered_plan_artifact_is_rejected_by_digest_binding() {
+        let first = event(
+            "event-0",
+            0,
+            "experiment_proposal",
+            GENESIS_SHA256,
+            proposal(),
+        );
+        let trace_value = trace(vec![first]);
+        let mut altered = parsed_plan();
+        altered["control"]["description"] =
+            Value::String("Changed control after the proposal was committed.".into());
+        assert!(validate_trace_with_plans(&trace_value, &[altered]).is_err());
+    }
+
+    #[test]
+    fn plan_id_must_match_proposal_experiment_id() {
+        let mut payload = proposal();
+        payload["experiment_id"] = Value::String("different-experiment".into());
+        let first = event(
+            "event-0",
+            0,
+            "experiment_proposal",
+            GENESIS_SHA256,
+            payload,
+        );
+        assert!(validate_trace_with_plans(&trace(vec![first]), &[parsed_plan()]).is_err());
     }
 
     #[test]
