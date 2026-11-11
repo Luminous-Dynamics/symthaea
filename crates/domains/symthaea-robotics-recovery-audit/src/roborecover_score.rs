@@ -948,6 +948,7 @@ mod tests {
     fn train_and_test_splits_cannot_be_mixed() {
         let mut m = manifest();
         m.split = BenchmarkSplit::Train;
+        m.macro9_groups.clear();
         let mut test_trial = sample(
             0,
             0,
@@ -1015,6 +1016,8 @@ mod tests {
         assert!((report.source_environment_completion_macro9_rsr - (1.0 / 9.0)).abs() < 1e-12);
         assert_eq!(report.replay_preempted_rows, 1);
         assert_eq!(report.policy_recovery_successes, 0);
+        assert_eq!(report.source_environment_completion_macro9_rsr, Some(1.0 / 9.0));
+        assert_eq!(report.policy_recovery_macro9_rsr, Some(0.0));
         assert_eq!(report.physical_safe_successes, 0);
         assert_eq!(report.scenarios[0].policy_recovery_rsr, 0.0);
     }
@@ -1183,6 +1186,10 @@ mod tests {
         assert!(validate_manifest(&m).unwrap_err().contains(&ManifestIssue::InvalidSplitManifestBlobSha));
 
         let mut m = manifest();
+        m.policy_digest = "policy".to_owned();
+        assert!(validate_manifest(&m).unwrap_err().contains(&ManifestIssue::InvalidPolicyDigest));
+
+        let mut m = manifest();
         m.evaluator_digest = "sha256:evaluator".to_owned();
         assert!(validate_manifest(&m).unwrap_err().contains(&ManifestIssue::InvalidEvaluatorDigest));
 
@@ -1237,8 +1244,98 @@ mod tests {
         assert_eq!(report.source_repository, m.source_repository);
         assert_eq!(report.source_revision, m.source_revision);
         assert_eq!(report.split_manifest_blob_sha, m.split_manifest_blob_sha);
+        assert_eq!(report.policy_digest, m.policy_digest);
         assert_eq!(report.evaluator_digest, m.evaluator_digest);
         assert_eq!(report.scenarios[0].scenario_content_sha256, m.scenarios[0].scenario_content_sha256);
+    }
+
+
+    #[test]
+    fn training_split_allows_training_only_group_and_omits_macro9() {
+        let mut m = manifest();
+        m.split = BenchmarkSplit::Train;
+        m.macro9_groups.clear();
+        m.scenarios[0].stage = RecoveryStage::Move;
+        m.scenarios[0].deviation = DeviationType::WrongTarget;
+
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.split = BenchmarkSplit::Train;
+        trial.stage = RecoveryStage::Move;
+        trial.deviation = DeviationType::WrongTarget;
+        trial.evidence.scenario_id = m.scenarios[0].scenario_id.clone();
+        trial.evidence.scenario_digest = m.scenarios[0].scenario_content_sha256.clone();
+        trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+
+        let report = score_roborecover(&m, &[trial]).unwrap();
+        assert_eq!(report.policy_recovery_successes, 1);
+        assert_eq!(report.policy_recovery_macro9_rsr, None);
+        assert_eq!(report.source_environment_completion_macro9_rsr, None);
+        assert_eq!(report.physical_safe_macro9_rsr, None);
+        assert!(report.groups.is_empty());
+    }
+
+    #[test]
+    fn training_split_rejects_macro9_declarations() {
+        let mut m = manifest();
+        m.split = BenchmarkSplit::Train;
+        assert!(validate_manifest(&m)
+            .unwrap_err()
+            .contains(&ManifestIssue::Macro9OnlyAppliesToTest));
+    }
+
+    #[test]
+    fn source_revision_and_split_manifest_mismatch_block_trial_admission() {
+        let m = manifest();
+        let mut wrong_revision = sample(
+            0, 0, TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        wrong_revision.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        wrong_revision.source_revision = "a".repeat(40);
+
+        let report = score_roborecover(&m, &[wrong_revision]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 0);
+        assert_eq!(report.metadata_mismatch_rows, 1);
+
+        let mut wrong_split_manifest = sample(
+            0, 0, TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        wrong_split_manifest.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        wrong_split_manifest.split_manifest_blob_sha = "f".repeat(40);
+
+        let report = score_roborecover(&m, &[wrong_split_manifest]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 0);
+        assert_eq!(report.metadata_mismatch_rows, 1);
+    }
+
+    #[test]
+    fn different_policy_checkpoint_cannot_be_pooled_under_same_arm_label() {
+        let m = manifest();
+        let mut trial = sample(
+            0, 0, TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        trial.evidence.policy_digest = "f".repeat(64);
+
+        let report = score_roborecover(&m, &[trial]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 0);
+        assert_eq!(report.metadata_mismatch_rows, 1);
+        assert_eq!(report.policy_recovery_successes, 0);
     }
 
 }
