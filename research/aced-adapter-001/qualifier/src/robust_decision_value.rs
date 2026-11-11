@@ -103,6 +103,26 @@ pub fn select_robust_evsi(
         }
     }
 
+    // Validate every proposed experiment in every scenario before applying the
+    // budget filter. Unaffordable candidates are still part of the submitted
+    // proposal set and must not be able to conceal malformed likelihoods.
+    for scenario in scenarios {
+        for experiment in &scenario.experiments {
+            evaluate_experiment(
+                &scenario.prior,
+                &scenario.action_utilities,
+                experiment,
+                risk_aversion,
+            )
+            .map_err(|error| {
+                format!(
+                    "scenario {} experiment {} is invalid: {error}",
+                    scenario.scenario_id, experiment.id
+                )
+            })?;
+        }
+    }
+
     if reference.is_empty() {
         return Ok(None);
     }
@@ -238,6 +258,18 @@ mod tests {
         assert!(select_robust_evsi(&scenarios, 1.0, 0.0, 0.0)
             .unwrap()
             .is_none());
+    }
+
+    #[test]
+    fn malformed_unaffordable_experiment_fails_closed() {
+        let mut first = scenario("model-a", 0.8, 1.0);
+        let mut second = scenario("model-b", 0.7, 0.5);
+        first.experiments[1].cost = 10.0;
+        second.experiments[1].cost = 10.0;
+        // This malformed candidate is outside the available budget but remains
+        // part of the submitted scenario set and therefore must be rejected.
+        first.experiments[1].outcomes[0].likelihood_by_hypothesis[0] = 0.25;
+        assert!(select_robust_evsi(&[first, second], 1.0, 0.0, 0.0).is_err());
     }
 
     #[test]
