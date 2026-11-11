@@ -14,8 +14,14 @@
     "commit": "c0312eb36c27df72a501c33246ac3c70c8aec38f",
     "archived_release_doi": "10.5281/zenodo.17050812",
     "software_license": "MIT",
-    "license_file_blob_sha256_git": "72fe8f9272c4a43e18197a9072f8ddd2dbc42b47",
-    "relevant_source_files": {
+    "runtime_declared_by_setup_py": {
+      "python": ">=3.10.8; README documents 3.10.8",
+      "numpy": "2.2.4",
+      "pandas": "2.2.3",
+      "scikit_learn": "1.6.1"
+    },
+    "license_file_blob_sha": "72fe8f9272c4a43e18197a9072f8ddd2dbc42b47",
+    "relevant_source_files_blob_shas": {
       "data/labels.csv": "d600148f91482c664b0aaaa1719db065f535dfb8",
       "config.json": "91badfae9deb49c3cd32f93a8e882b0631da34be",
       "lifetracer/src/evaluation.py": "56d7b1702001f5558aaad03c8720652323a373ec",
@@ -25,12 +31,6 @@
       "lifetracer/src/parameters_selection.py": "f9a65c9b65daa41ed8207942185be5844928b9f6",
       "scripts/eval.py": "dcf2b087fcfb2c2ba86f05692da47cffb53a53a1",
       "reproduce_paper_results.ipynb": "45dd2ea7a7eec50a67abc73ab424f4524ee3ee77"
-    },
-    "runtime_declared_by_setup_py": {
-      "python": ">=3.10.8; README documents 3.10.8",
-      "numpy": "2.2.4",
-      "pandas": "2.2.3",
-      "scikit_learn": "1.6.1"
     }
   },
   "datasets": [
@@ -85,19 +85,18 @@
     },
     "instrument": "LECO HRT+ 4D GCxGC-HRTOF-MS as reported by the study",
     "raw_scan_schema_audit": {
-      "paper_text_claim": "seven columns",
-      "paper_text_enumerates": [
-        "row index",
-        "spectrum",
-        "1st time (s)",
-        "2nd time (s)",
+      "paper_text": "The article says seven columns, then names row index, spectrum, RT1, RT2, TOF, m/z, area and resolution.",
+      "dataset_viewer_fields": [
+        "Spectrum",
+        "1st Time (s)",
+        "2nd Time (s)",
         "TOF",
-        "m/z",
-        "area",
-        "resolution"
+        "M/Z",
+        "Area",
+        "Resolution"
       ],
-      "enumerated_count": 8,
-      "disposition": "unresolved source-text inconsistency; inspect actual raw CSV header and supplementary material before building a parser"
+      "interpretation": "The dataset viewer exposes seven data columns and may omit the row index as a dataframe display index. This likely explains the count mismatch, but exact raw CSV headers still must be checked before implementing a parser.",
+      "disposition": "verify raw file header; never infer the row-index column"
     }
   },
   "sample_manifest": [
@@ -242,7 +241,8 @@
         514,
         860,
         137
-      ]
+      ],
+      "verification_note": "Seed list is consistent with the legacy NumPy RandomState selection law; confirm exact values under the pinned NumPy 2.2.4 runtime during source execution."
     },
     "fixed_features": {
       "lambda1": 5,
@@ -283,7 +283,7 @@
     "note": "Accuracy and AUC are separate source evaluation paths with distinct fold definitions. Do not merge their scores or represent them as one shared split."
   },
   "preprocessing_audit": {
-    "status": "TRANSductive_shared_feature_schema_observed",
+    "status": "TRANSDUCTIVE_SHARED_FEATURE_SCHEMA_OBSERVED",
     "evidence": [
       "TII_alignment.align collects RT1 and RT2 coordinates from every sample before constructing shared aligned axes.",
       "RetentionTimesAlignment.align_retention_times loads each m/z peak table and clusters peaks across the full samples_name_list into a shared feature vocabulary.",
