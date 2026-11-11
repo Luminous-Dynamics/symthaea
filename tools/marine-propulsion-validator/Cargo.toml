@@ -53,3 +53,7 @@ path = "src/bin/marine_port_call_energy_audit.rs"
 [[bin]]
 name = "marine-benchmark-manifest-audit"
 path = "src/bin/marine_benchmark_manifest_audit.rs"
+
+[[bin]]
+name = "marine-energy-conservation-audit"
+path = "src/bin/marine_energy_conservation_audit.rs"
