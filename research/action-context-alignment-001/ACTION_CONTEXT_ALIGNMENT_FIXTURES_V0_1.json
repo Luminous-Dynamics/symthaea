@@ -1,0 +1,1405 @@
+{
+  "schema_version": "action-context-alignment-fixtures-v0.1",
+  "benchmark_id": "ACTION-CONTEXT-ALIGNMENT-001",
+  "status": "synthetic_pair_design_unexecuted",
+  "fixture_count": 42,
+  "pair_count": 21,
+  "mutation_dimensions": [
+    "principal_binding",
+    "local_recognition",
+    "target_allowlist",
+    "purpose_binding",
+    "expiry",
+    "delegation_scope",
+    "pre_state"
+  ],
+  "fixtures": [
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-01-AUTHORIZED",
+      "pair_id": "ACA-PRINCIPAL_BINDING-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-01-COUNTERFACTUAL",
+      "pair_id": "ACA-PRINCIPAL_BINDING-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "principal_binding": "Mismatch",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-02-AUTHORIZED",
+      "pair_id": "ACA-PRINCIPAL_BINDING-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-002",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-002",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b201",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a101",
+        "evaluated_at_unix": 1900000001
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-002"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000601,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a101"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-02-COUNTERFACTUAL",
+      "pair_id": "ACA-PRINCIPAL_BINDING-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-002",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-002",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b201",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a101",
+        "evaluated_at_unix": 1900000001
+      },
+      "authority_context": {
+        "principal_binding": "Mismatch",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-002"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000601,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a101"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-03-AUTHORIZED",
+      "pair_id": "ACA-PRINCIPAL_BINDING-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-003",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-003",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b202",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a102",
+        "evaluated_at_unix": 1900000002
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-003"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000602,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a102"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-03-COUNTERFACTUAL",
+      "pair_id": "ACA-PRINCIPAL_BINDING-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-003",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-003",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b202",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a102",
+        "evaluated_at_unix": 1900000002
+      },
+      "authority_context": {
+        "principal_binding": "Mismatch",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-003"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000602,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a102"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-01-AUTHORIZED",
+      "pair_id": "ACA-LOCAL_RECOGNITION-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-004",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-004",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b203",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a103",
+        "evaluated_at_unix": 1900000100
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-004"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000700,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a103"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-01-COUNTERFACTUAL",
+      "pair_id": "ACA-LOCAL_RECOGNITION-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-004",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-004",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b203",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a103",
+        "evaluated_at_unix": 1900000100
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": false,
+        "target_allowlist": [
+          "SYNTH-TARGET-004"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000700,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a103"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-02-AUTHORIZED",
+      "pair_id": "ACA-LOCAL_RECOGNITION-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-005",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-005",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b204",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a104",
+        "evaluated_at_unix": 1900000101
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-005"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000701,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a104"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-02-COUNTERFACTUAL",
+      "pair_id": "ACA-LOCAL_RECOGNITION-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-005",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-005",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b204",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a104",
+        "evaluated_at_unix": 1900000101
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": false,
+        "target_allowlist": [
+          "SYNTH-TARGET-005"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000701,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a104"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-03-AUTHORIZED",
+      "pair_id": "ACA-LOCAL_RECOGNITION-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-006",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-006",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b205",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a105",
+        "evaluated_at_unix": 1900000102
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-006"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000702,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a105"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-03-COUNTERFACTUAL",
+      "pair_id": "ACA-LOCAL_RECOGNITION-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-006",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-006",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b205",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a105",
+        "evaluated_at_unix": 1900000102
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": false,
+        "target_allowlist": [
+          "SYNTH-TARGET-006"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000702,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a105"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-01-AUTHORIZED",
+      "pair_id": "ACA-TARGET_ALLOWLIST-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-007",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-007",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b206",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a106",
+        "evaluated_at_unix": 1900000200
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-007"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000800,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a106"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-01-COUNTERFACTUAL",
+      "pair_id": "ACA-TARGET_ALLOWLIST-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-007",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-007",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b206",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a106",
+        "evaluated_at_unix": 1900000200
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-OTHER-007"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000800,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a106"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-02-AUTHORIZED",
+      "pair_id": "ACA-TARGET_ALLOWLIST-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-008",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-008",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b207",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a107",
+        "evaluated_at_unix": 1900000201
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-008"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000801,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a107"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-02-COUNTERFACTUAL",
+      "pair_id": "ACA-TARGET_ALLOWLIST-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-008",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-008",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b207",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a107",
+        "evaluated_at_unix": 1900000201
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-OTHER-008"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000801,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a107"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-03-AUTHORIZED",
+      "pair_id": "ACA-TARGET_ALLOWLIST-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-009",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-009",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b208",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a108",
+        "evaluated_at_unix": 1900000202
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-009"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000802,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a108"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-03-COUNTERFACTUAL",
+      "pair_id": "ACA-TARGET_ALLOWLIST-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-009",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-009",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b208",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a108",
+        "evaluated_at_unix": 1900000202
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-OTHER-009"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000802,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a108"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-01-AUTHORIZED",
+      "pair_id": "ACA-PURPOSE_BINDING-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-010",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-010",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b209",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a109",
+        "evaluated_at_unix": 1900000300
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-010"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000900,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a109"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-01-COUNTERFACTUAL",
+      "pair_id": "ACA-PURPOSE_BINDING-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-010",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-010",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b209",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a109",
+        "evaluated_at_unix": 1900000300
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-010"
+        ],
+        "purpose_binding": "Different",
+        "expires_at_unix": 1900000900,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a109"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-02-AUTHORIZED",
+      "pair_id": "ACA-PURPOSE_BINDING-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-011",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-011",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20a",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10a",
+        "evaluated_at_unix": 1900000301
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-011"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000901,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10a"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-02-COUNTERFACTUAL",
+      "pair_id": "ACA-PURPOSE_BINDING-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-011",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-011",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20a",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10a",
+        "evaluated_at_unix": 1900000301
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-011"
+        ],
+        "purpose_binding": "Different",
+        "expires_at_unix": 1900000901,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10a"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-03-AUTHORIZED",
+      "pair_id": "ACA-PURPOSE_BINDING-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-012",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-012",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20b",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10b",
+        "evaluated_at_unix": 1900000302
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-012"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000902,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10b"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-03-COUNTERFACTUAL",
+      "pair_id": "ACA-PURPOSE_BINDING-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-012",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-012",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20b",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10b",
+        "evaluated_at_unix": 1900000302
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-012"
+        ],
+        "purpose_binding": "Different",
+        "expires_at_unix": 1900000902,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10b"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-01-AUTHORIZED",
+      "pair_id": "ACA-EXPIRY-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-013",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-013",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20c",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10c",
+        "evaluated_at_unix": 1900000400
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-013"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001000,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10c"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-01-COUNTERFACTUAL",
+      "pair_id": "ACA-EXPIRY-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-013",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-013",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20c",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10c",
+        "evaluated_at_unix": 1900000400
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-013"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000399,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10c"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-02-AUTHORIZED",
+      "pair_id": "ACA-EXPIRY-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-014",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-014",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20d",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10d",
+        "evaluated_at_unix": 1900000401
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-014"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001001,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10d"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-02-COUNTERFACTUAL",
+      "pair_id": "ACA-EXPIRY-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-014",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-014",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20d",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10d",
+        "evaluated_at_unix": 1900000401
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-014"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000400,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10d"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-03-AUTHORIZED",
+      "pair_id": "ACA-EXPIRY-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-015",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-015",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20e",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10e",
+        "evaluated_at_unix": 1900000402
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-015"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001002,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10e"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-03-COUNTERFACTUAL",
+      "pair_id": "ACA-EXPIRY-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-015",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-015",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20e",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10e",
+        "evaluated_at_unix": 1900000402
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-015"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000401,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10e"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-01-AUTHORIZED",
+      "pair_id": "ACA-DELEGATION_SCOPE-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-016",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-016",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20f",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10f",
+        "evaluated_at_unix": 1900000500
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-016"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001100,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10f"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-01-COUNTERFACTUAL",
+      "pair_id": "ACA-DELEGATION_SCOPE-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-016",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-016",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20f",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10f",
+        "evaluated_at_unix": 1900000500
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-016"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001100,
+        "delegated_scope": "record.read",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10f"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-02-AUTHORIZED",
+      "pair_id": "ACA-DELEGATION_SCOPE-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-017",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-017",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b210",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a110",
+        "evaluated_at_unix": 1900000501
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-017"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001101,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a110"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-02-COUNTERFACTUAL",
+      "pair_id": "ACA-DELEGATION_SCOPE-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-017",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-017",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b210",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a110",
+        "evaluated_at_unix": 1900000501
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-017"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001101,
+        "delegated_scope": "record.read",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a110"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-03-AUTHORIZED",
+      "pair_id": "ACA-DELEGATION_SCOPE-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-018",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-018",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b211",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a111",
+        "evaluated_at_unix": 1900000502
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-018"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001102,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a111"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-03-COUNTERFACTUAL",
+      "pair_id": "ACA-DELEGATION_SCOPE-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-018",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-018",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b211",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a111",
+        "evaluated_at_unix": 1900000502
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-018"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001102,
+        "delegated_scope": "record.read",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a111"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-01-AUTHORIZED",
+      "pair_id": "ACA-PRE_STATE-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-019",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-019",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b212",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a112",
+        "evaluated_at_unix": 1900000600
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-019"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001200,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a112"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-01-COUNTERFACTUAL",
+      "pair_id": "ACA-PRE_STATE-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-019",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-019",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b212",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a112",
+        "evaluated_at_unix": 1900000600
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-019"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001200,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c312"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-02-AUTHORIZED",
+      "pair_id": "ACA-PRE_STATE-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-020",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-020",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b213",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a113",
+        "evaluated_at_unix": 1900000601
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-020"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001201,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a113"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-02-COUNTERFACTUAL",
+      "pair_id": "ACA-PRE_STATE-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-020",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-020",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b213",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a113",
+        "evaluated_at_unix": 1900000601
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-020"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001201,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c313"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-03-AUTHORIZED",
+      "pair_id": "ACA-PRE_STATE-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-021",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-021",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b214",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a114",
+        "evaluated_at_unix": 1900000602
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-021"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001202,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a114"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-03-COUNTERFACTUAL",
+      "pair_id": "ACA-PRE_STATE-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-021",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-021",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b214",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a114",
+        "evaluated_at_unix": 1900000602
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-021"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900001202,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c314"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+    }
+  ],
+  "claim_ceiling": "This corpus qualifies paired authorization-context fixture semantics and the deterministic eligibility oracle only. It does not measure model understanding, authenticate real authority, issue capabilities, invoke adapters, or establish production enforcement."
+}
