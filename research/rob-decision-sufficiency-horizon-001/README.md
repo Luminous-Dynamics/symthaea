@@ -13,7 +13,11 @@ For the previously selected action a0 and each future tick t, consume:
 - explicit admissibility evidence for every candidate action;
 - a complete action-set assertion;
 - a matching loss scale and loss-model digest;
-- a calibration identity, independent validation digest, coverage level and expiry.
+- a calibration identity, independent validation digest, coverage level and expiry;
+- a **simultaneous/family-wise coverage guarantee across the entire candidate action set**, not merely marginal per-action coverage;
+- a maximum candidate-set cardinality covered by that calibration study.
+
+The minimum over alternative-action lower bounds is only justified when the confidence guarantee covers the whole candidate set jointly (or an independently validated equivalent multiplicity correction is supplied). Marginal 95% intervals do not automatically yield a 95% bound after selecting the minimum from many alternatives. The reference therefore returns Unknown for marginal-only coverage or when the observed action-set cardinality exceeds the calibrated envelope.
 
 The conservative regret upper bound is:
 
@@ -33,7 +37,7 @@ Loss values are unsigned integer units within one declared loss-scale identity. 
 
 ## Evidence limitations
 
-This crate does not estimate beliefs, predict states, calculate expected losses, calibrate confidence bounds or prove robust admissibility. The caller supplies these values and their evidence identities. Synthetic tests qualify only the deterministic evaluator semantics. Independent held-out calibration, physical admissibility and viability remain separate obligations.
+This crate does not estimate beliefs, predict states, calculate expected losses, calibrate confidence bounds or prove robust admissibility. The caller supplies these values and their evidence identities. The calibration receipt must describe simultaneous coverage over the action set and the largest action-set cardinality validated. Synthetic tests qualify only the deterministic evaluator semantics. Independent held-out calibration, physical admissibility and viability remain separate obligations.
 
 ## Run
 
