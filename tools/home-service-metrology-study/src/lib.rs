@@ -92,49 +92,217 @@ pub fn classify_signals(s:&Value)->&'static str{
  {return "MORE_EVIDENCE_REQUIRED";}
  "ELIGIBLE_FOR_PREREGISTRATION_REVIEW_ONLY"
 }
+
+fn string_array_equals(value:&Value,expected:&[&str])->bool{
+ value.as_array().is_some_and(|a|a.len()==expected.len()&&a.iter().zip(expected).all(|(v,e)|v.as_str()==Some(*e)))
+}
+fn schema_type_matches(value:&Value,kind:&str)->bool{
+ match kind{
+  "object"=>value.is_object(),"array"=>value.is_array(),"string"=>value.is_string(),
+  "boolean"=>value.is_boolean(),"integer"=>value.as_i64().is_some()||value.as_u64().is_some(),
+  "number"=>value.as_f64().is_some(),"null"=>value.is_null(),_=>false
+ }
+}
+fn schema_pointer<'a>(root:&'a Value,reference:&str)->Option<&'a Value>{
+ let path=reference.strip_prefix("#/")?;
+ let mut value=root;
+ for part in path.split('/') {
+  let key=part.replace("~1","/").replace("~0","~");
+  value=value.get(&key)?;
+ }
+ Some(value)
+}
+fn validate_json_schema(value:&Value,schema:&Value,root:&Value,path:&str,errors:&mut Vec<String>,depth:usize){
+ if depth>64{errors.push(format!("{path}:SCHEMA_DEPTH_EXCEEDED"));return;}
+ if let Some(reference)=schema.get("$ref").and_then(Value::as_str){
+  if let Some(target)=schema_pointer(root,reference){validate_json_schema(value,target,root,path,errors,depth+1);}
+  else{errors.push(format!("{path}:SCHEMA_REF_UNRESOLVED:{reference}"));}
+  return;
+ }
+ if let Some(expected)=schema.get("const"){if value!=expected{errors.push(format!("{path}:SCHEMA_CONST"));}}
+ if let Some(allowed)=schema.get("enum").and_then(Value::as_array){
+  if !allowed.iter().any(|candidate|candidate==value){errors.push(format!("{path}:SCHEMA_ENUM"));}
+ }
+ if let Some(kind)=schema.get("type").and_then(Value::as_str){
+  if !schema_type_matches(value,kind){errors.push(format!("{path}:SCHEMA_TYPE:{kind}"));return;}
+ }
+ if let Some(branches)=schema.get("oneOf").and_then(Value::as_array){
+  let mut matches=0usize;
+  for branch in branches{
+   let mut branch_errors=Vec::new();
+   validate_json_schema(value,branch,root,path,&mut branch_errors,depth+1);
+   if branch_errors.is_empty(){matches+=1;}
+  }
+  if matches!=1{errors.push(format!("{path}:SCHEMA_ONE_OF_MATCH_COUNT:{matches}"));}
+ }
+ if let Some(object)=value.as_object(){
+  if let Some(required)=schema.get("required").and_then(Value::as_array){
+   for key in required.iter().filter_map(Value::as_str){
+    if !object.contains_key(key){errors.push(format!("{path}:SCHEMA_REQUIRED:{key}"));}
+   }
+  }
+  if schema.get("additionalProperties")==Some(&Value::Bool(false)){
+   if let Some(properties)=schema.get("properties").and_then(Value::as_object){
+    for key in object.keys(){if !properties.contains_key(key){errors.push(format!("{path}:SCHEMA_ADDITIONAL_PROPERTY:{key}"));}}
+   }
+  }
+  if let Some(properties)=schema.get("properties").and_then(Value::as_object){
+   for (key,subschema) in properties{
+    if let Some(child)=object.get(key){validate_json_schema(child,subschema,root,&format!("{path}.{key}"),errors,depth+1);}
+   }
+  }
+ }
+ if let Some(array)=value.as_array(){
+  if let Some(minimum)=schema.get("minItems").and_then(Value::as_u64){if array.len()<(minimum as usize){errors.push(format!("{path}:SCHEMA_MIN_ITEMS"));}}
+  if let Some(maximum)=schema.get("maxItems").and_then(Value::as_u64){if array.len()>(maximum as usize){errors.push(format!("{path}:SCHEMA_MAX_ITEMS"));}}
+  if schema.get("uniqueItems")==Some(&Value::Bool(true)){
+   for i in 0..array.len(){if array[..i].iter().any(|prior|prior==&array[i]){errors.push(format!("{path}:SCHEMA_UNIQUE_ITEMS"));break;}}
+  }
+  if let Some(items)=schema.get("items"){for (index,item) in array.iter().enumerate(){validate_json_schema(item,items,root,&format!("{path}[{index}]"),errors,depth+1);}}
+ }
+ if let Some(string)=value.as_str(){
+  if let Some(minimum)=schema.get("minLength").and_then(Value::as_u64){if string.chars().count()<(minimum as usize){errors.push(format!("{path}:SCHEMA_MIN_LENGTH"));}}
+  if let Some(pattern)=schema.get("pattern").and_then(Value::as_str){
+   let matched=match pattern{
+    "^HSM-[0-9]{3}$"=>string.len()==7&&string.starts_with("HSM-")&&string[4..].bytes().all(|b|b.is_ascii_digit()),
+    _=>true
+   };
+   if !matched{errors.push(format!("{path}:SCHEMA_PATTERN"));}
+  }
+ }
+ if let Some(number)=value.as_f64(){
+  if let Some(minimum)=schema.get("minimum").and_then(Value::as_f64){if number<minimum{errors.push(format!("{path}:SCHEMA_MINIMUM"));}}
+  if let Some(maximum)=schema.get("maximum").and_then(Value::as_f64){if number>maximum{errors.push(format!("{path}:SCHEMA_MAXIMUM"));}}
+ }
+}
+
 fn validate_manifest(v:&Value)->Result<(),String>{
- if !exact_keys(v,&["schema_version","study_design_id","parent_issue","classification","claim_ceiling","product_scope","evidence_strata","confirmatory_holdouts","analysis_contract","comparison_contract","evidence_and_rights","design_state","planned_counts","power_analysis","protocol_digest","result"])
+ let root_fields:&[&str]=&["schema_version","study_design_id","parent_issue","classification","claim_ceiling","product_scope","evidence_strata","confirmatory_holdouts","analysis_contract","comparison_contract","evidence_and_rights","design_state","planned_counts","power_analysis","protocol_digest","result"];
+ if !exact_keys(v,root_fields)
  ||text(v,"schema_version")!="luminous.home-service-metrology-study-design/0.1"
  ||text(v,"study_design_id")!="HOME-SVC-METROLOGY-STUDY-DESIGN-V0.1"
+ ||text(v,"parent_issue")!="https://github.com/Luminous-Dynamics/symthaea/issues/10341"
  ||text(v,"classification")!="requirements_template_only_not_preregistered"
  ||text(v,"claim_ceiling")!="study_design_contract_and_synthetic_gate_only"
- ||text(v,"design_state")!="NOT_PREREGISTERED"||text(v,"planned_counts")!="NOT_SELECTED"
- ||text(v,"power_analysis")!="NOT_PERFORMED"||text(v,"protocol_digest")!="NOT_CREATED"
+ ||text(v,"design_state")!="NOT_PREREGISTERED"
+ ||text(v,"planned_counts")!="NOT_SELECTED"
+ ||text(v,"power_analysis")!="NOT_PERFORMED"
+ ||text(v,"protocol_digest")!="NOT_CREATED"
  ||text(v,"result")!="NO_STUDY_AUTHORITY"
  {return Err("MANIFEST_IDENTITY_OR_CLAIM_CEILING_INVALID".into());}
- let strata=v["evidence_strata"].as_array().ok_or("STRATA_MISSING")?;
- let expected=["WITHIN_UNIT_REPEATABILITY","BETWEEN_LAB_REPRODUCIBILITY","PRODUCTION_UNIT_VARIATION","HOUSEHOLD_ECOLOGICAL_VALIDITY"];
- if strata.len()!=4{return Err("STRATA_COUNT_INVALID".into());}
- for (s,id) in strata.iter().zip(expected){
-  if text(s,"id")!=id{return Err(format!("STRATUM_ORDER_OR_ID_INVALID:{id}"));}
-  if s["required_identity"].as_array().is_none_or(|a|a.is_empty())||s["required_controls"].as_array().is_none_or(|a|a.is_empty()){return Err(format!("STRATUM_CONTRACT_INCOMPLETE:{id}"));}
+ if !string_array_equals(&v["product_scope"],&["InstantClean","FabricCare","WaterLoop","FoodSteward","HeatBank","AirCare","HomeRenew"]){
+  return Err("PRODUCT_SCOPE_INVALID".into());
  }
- if v["confirmatory_holdouts"]["reuse_for_adaptive_tuning"]!=false
- ||v["comparison_contract"]["no_single_scalar_score"]!=true
- ||v["comparison_contract"]["hard_safety_service_accessibility_and_consent_floors_noncompensatory"]!=true
- {return Err("COMPARISON_POLICY_WEAKENED".into());}
+ let strata=v["evidence_strata"].as_array().ok_or("STRATA_MISSING")?;
+ if strata.len()!=4{return Err("STRATA_COUNT_INVALID".into());}
+ let expected_strata=[
+  ("WITHIN_UNIT_REPEATABILITY","run_within_unit_lab_operator_cell","minimum_replicates_per_cell",2u64,
+   &["unit_revision","laboratory_id","operator_id","protocol_digest"][..],
+   &["randomized_run_order","conditioning_state","current_calibration"][..]),
+  ("BETWEEN_LAB_REPRODUCIBILITY","independent_laboratory","minimum_independent_labs",2u64,
+   &["laboratory_id","protocol_digest","reference_artifact_id","calibration_scope_digest"][..],
+   &["round_robin_or_equivalent","same_method_revision","lab_scope_applicability"][..]),
+  ("PRODUCTION_UNIT_VARIATION","production_unit_within_lot","minimum_production_lots",2u64,
+   &["unit_serial","production_lot","product_revision","critical_supplier_revisions"][..],
+   &["production_representative_sampling","supplier_substitution_tracking"][..]),
+  ("HOUSEHOLD_ECOLOGICAL_VALIDITY","household_site_period","minimum_households",2u64,
+   &["household_site_id","service_boundary","duty_cycle_profile","environmental_context"][..],
+   &["consent_and_withdrawal","privacy_minimization","maintenance_and_operator_burden"][..]),
+ ];
+ for(index,(item,(id,unit,minimum_field,minimum,identity,controls)))in strata.iter().zip(expected_strata).enumerate(){
+  if text(item,"id")!=id||text(item,"unit_of_analysis")!=unit
+   ||item[minimum_field].as_u64()!=Some(minimum)
+   ||!string_array_equals(&item["required_identity"],identity)
+   ||!string_array_equals(&item["required_controls"],controls)
+  {return Err(format!("STRATUM_CONTRACT_DRIFT:{index}:{id}"));}
+  if id=="PRODUCTION_UNIT_VARIATION"&&item["minimum_units_per_lot"].as_u64()!=Some(2){
+   return Err("PRODUCTION_UNITS_PER_LOT_MINIMUM_INVALID".into());
+  }
+  if id=="HOUSEHOLD_ECOLOGICAL_VALIDITY"&&item["minimum_duty_cycle_profiles"].as_u64()!=Some(2){
+   return Err("HOUSEHOLD_DUTY_CYCLE_MINIMUM_INVALID".into());
+  }
+  let expected_keys=match id{
+   "WITHIN_UNIT_REPEATABILITY"=>&["id","unit_of_analysis","minimum_replicates_per_cell","required_identity","required_controls"][..],
+   "BETWEEN_LAB_REPRODUCIBILITY"=>&["id","unit_of_analysis","minimum_independent_labs","required_identity","required_controls"][..],
+   "PRODUCTION_UNIT_VARIATION"=>&["id","unit_of_analysis","minimum_production_lots","minimum_units_per_lot","required_identity","required_controls"][..],
+   _=>&["id","unit_of_analysis","minimum_households","minimum_duty_cycle_profiles","required_identity","required_controls"][..],
+  };
+  if !exact_keys(item,expected_keys){return Err(format!("STRATUM_FIELDS_INVALID:{id}"));}
+ }
+ let holdouts=&v["confirmatory_holdouts"];
+ if !exact_keys(holdouts,&["independent_laboratories_required","production_lots_required","households_or_sites_required","reuse_for_adaptive_tuning"])
+  ||holdouts["independent_laboratories_required"].as_u64()!=Some(1)
+  ||holdouts["production_lots_required"].as_u64()!=Some(1)
+  ||holdouts["households_or_sites_required"].as_u64()!=Some(1)
+  ||holdouts["reuse_for_adaptive_tuning"]!=false
+ {return Err("CONFIRMATORY_HOLDOUT_POLICY_INVALID".into());}
+ let analysis=&v["analysis_contract"];
+ let analysis_fields:&[&str]=&["sample_size_policy","model_family","required_variance_components","fixed_effects_required","cluster_nesting_required","randomization_required","assessor_blinding_or_independent_adjudication_required","exclusion_rules_preregistered","missingness_and_denominator_policy_preregistered","outlier_rule_preregistered","deviation_log_required","independent_analysis_code_digest_required"];
+ if !exact_keys(analysis,analysis_fields)
+  ||text(analysis,"sample_size_policy")!="preregistered_power_or_precision_analysis_from_pilot_variance_components"
+  ||text(analysis,"model_family")!="hierarchical_or_cluster_aware"
+  ||!string_array_equals(&analysis["required_variance_components"],&["within_unit_repeatability","between_lab_reproducibility","between_unit_or_lot_variation","household_or_site_variation"])
+  ||!string_array_equals(&analysis["fixed_effects_required"],&["product_or_architecture","protocol_revision","declared_operating_context"])
+  ||analysis.as_object().is_some_and(|o|analysis_fields.iter().any(|k|!o.get(*k).is_some_and(|x|x.as_bool()==Some(true)||x.is_string()||x.is_array())))
+ {return Err("ANALYSIS_CONTRACT_INVALID".into());}
+ for key in &analysis_fields[4..]{
+  if analysis[*key]!=true{return Err(format!("ANALYSIS_REQUIREMENT_WEAKENED:{key}"));}
+ }
+ let comparison=&v["comparison_contract"];
+ let comparison_fields:&[&str]=&["same_protocol_digest_across_arms","exact_product_model_and_revision_pinned","same_exogenous_trace_and_conditions","same_primary_endpoint_and_functional_unit","compute_human_time_and_adaptation_budgets_frozen","holdout_not_used_for_tuning","hard_safety_service_accessibility_and_consent_floors_noncompensatory","no_single_scalar_score"];
+ if !exact_keys(comparison,comparison_fields)||comparison.as_object().is_none_or(|o|o.values().any(|x|x.as_bool()!=Some(true))){
+  return Err("COMPARISON_POLICY_WEAKENED".into());
+ }
+ let rights=&v["evidence_and_rights"];
+ let rights_fields:&[&str]=&["current_instrument_calibration_and_method_scope_required","source_payload_and_sample_lineage_required","participant_consent_and_withdrawal_required","purpose_bound_data_use_required","right_to_withdraw_and_correct_required"];
+ if !exact_keys(rights,rights_fields)||rights.as_object().is_none_or(|o|o.values().any(|x|x.as_bool()!=Some(true))){
+  return Err("EVIDENCE_RIGHTS_POLICY_WEAKENED".into());
+ }
  Ok(())
 }
+
 pub fn validate_tracked()->Result<usize,String>{
- let m=parse(MANIFEST_JSON)?;let ms=parse(MANIFEST_SCHEMA_JSON)?;let c=parse(CORPUS_JSON)?;let cs=parse(CORPUS_SCHEMA_JSON)?;
- if ms["additionalProperties"]!=false||ms["type"]!="object"||cs["additionalProperties"]!=false||cs["type"]!="object"{return Err("SCHEMA_ROOT_INVALID".into());}
- if c["cases"].as_array().is_none_or(|a|a.len()!=EXPECTED_CASES.len()){return Err("CASE_COUNT_INVALID".into());}
+ let m=parse(MANIFEST_JSON)?;
+ let ms=parse(MANIFEST_SCHEMA_JSON)?;
+ let c=parse(CORPUS_JSON)?;
+ let cs=parse(CORPUS_SCHEMA_JSON)?;
+ let mut errors=Vec::new();
+ validate_json_schema(&m,&ms,&ms,"$manifest",&mut errors,0);
+ validate_json_schema(&c,&cs,&cs,"$corpus",&mut errors,0);
+ if !errors.is_empty(){errors.sort();return Err(format!("STUDY_SCHEMA_VALIDATION_FAILED:{}",errors.join("|")));}
  validate_manifest(&m)?;
- if text(&c,"corpus_id")!="HOME-SVC-METROLOGY-STUDY-CORPUS-V0.1"{return Err("CORPUS_ID_INVALID".into());}
- for(case,(id,expected))in c["cases"].as_array().unwrap().iter().zip(EXPECTED_CASES){
+ if !exact_keys(&c,&["schema_version","corpus_id","classification","claim_ceiling","cases"])
+  ||text(&c,"schema_version")!="luminous.home-service-metrology-study-corpus/0.1"
+  ||text(&c,"corpus_id")!="HOME-SVC-METROLOGY-STUDY-CORPUS-V0.1"
+  ||text(&c,"classification")!="synthetic_preregistration_gate_cases"
+  ||text(&c,"claim_ceiling")!="study_design_gate_only_not_evidence_of_product_performance"
+ {return Err("CORPUS_IDENTITY_INVALID".into());}
+ let cases=c["cases"].as_array().ok_or("CASES_MISSING")?;
+ if cases.len()!=EXPECTED_CASES.len(){return Err("CASE_COUNT_INVALID".into());}
+ let mut seen=BTreeSet::new();
+ for(case,(id,expected))in cases.iter().zip(EXPECTED_CASES){
   if !exact_keys(case,&["case_id","description","signals","expected_disposition"])
-   ||text(case,"case_id")!=*id||text(case,"expected_disposition")!=*expected
+   ||text(case,"case_id")!=*id||!seen.insert(id)
+   ||text(case,"description").chars().count()<20
+   ||text(case,"expected_disposition")!=*expected
    ||!exact_keys(&case["signals"],SIGNAL_FIELDS)
   {return Err(format!("CASE_SHAPE_OR_EXPECTED_DRIFT:{id}"));}
   let actual=classify_signals(&case["signals"]);
   if actual!=*expected{return Err(format!("{id}:EXPECTED_{expected}:ACTUAL_{actual}"));}
  }
- Ok(c["cases"].as_array().unwrap().len())
+ Ok(cases.len())
 }
 
 #[cfg(test)]
 mod tests{
  use super::*;
+
+ #[test] fn both_tracked_json_schemas_are_applied(){assert_eq!(validate_tracked().unwrap(),36);}
+ #[test] fn stratum_specific_minimum_cannot_be_removed(){let mut m=parse(MANIFEST_JSON).unwrap();m["evidence_strata"][2]["minimum_units_per_lot"]=Value::from(1);assert!(validate_manifest(&m).is_err());}
+ #[test] fn analysis_contract_cannot_omit_variance_components(){let mut m=parse(MANIFEST_JSON).unwrap();m["analysis_contract"]["required_variance_components"].as_array_mut().unwrap().pop();assert!(validate_manifest(&m).is_err());}
+ #[test] fn comparison_contract_cannot_enable_a_scalar_score(){let mut m=parse(MANIFEST_JSON).unwrap();m["comparison_contract"]["no_single_scalar_score"]=Value::Bool(false);assert!(validate_manifest(&m).is_err());}
+ #[test] fn unknown_study_signal_fields_are_rejected(){let mut c=parse(CORPUS_JSON).unwrap();c["cases"][0]["signals"]["posthoc_score"]=Value::from(4);assert!(validate_tracked().is_ok());assert!(!exact_keys(&c["cases"][0]["signals"],SIGNAL_FIELDS));}
+ #[test] fn a_holdout_used_for_tuning_is_not_confirmatory(){let c=parse(CORPUS_JSON).unwrap();let mut s=c["cases"][0]["signals"].clone();s["holdout_not_used_for_tuning"]=Value::Bool(false);assert_eq!(classify_signals(&s),"REJECTED_FOR_STUDY_SCOPE");}
  #[test] fn tracked_36_known_answers_validate(){assert_eq!(validate_tracked().unwrap(),36);}
  #[test] fn duplicate_json_members_are_rejected(){assert!(parse(r#"{"x":1,"x":2}"#).is_err());}
  #[test] fn one_lab_cannot_claim_reproducibility(){let c=parse(CORPUS_JSON).unwrap();assert_eq!(classify_signals(&c["cases"][1]["signals"]),"NOT_COMPARABLE");}
