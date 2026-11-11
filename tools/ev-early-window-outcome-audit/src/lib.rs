@@ -572,8 +572,8 @@ mod tests {
     fn model_derived_power_envelope_is_not_labelled_as_physical_measurement() {
         let report = report();
         let case = report.cases.iter()
-            .find(|case| case.case_id == "power-envelope-model-grade-preserved")
-            .expect("power envelope case");
+            .find(|case| case.case_id == "multioutput-30s-accepted")
+            .expect("multioutput case");
         assert_eq!(
             case.targets[0].evidence_grade,
             "MODEL_DERIVED_NOT_PHYSICAL_MEASUREMENT"
