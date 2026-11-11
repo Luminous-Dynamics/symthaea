@@ -72,3 +72,21 @@ The minimum rule is sound only if every qualified cap is an upper bound over the
 Each cap must also be **prefix-closed**: every intermediate tick from 1 through the reported cap satisfies that cap's constraint. A thermal model that checks only the final temperature after the horizon is not sufficient; likewise, a viability cap must preserve admissible continuation/safe-stop throughout the committed prefix, not merely at its endpoint. If a source cannot provide a prefix-closed bound, mark it invalid/Unknown and require a different proof or a more conservative representation.
 
 The fixture schema now requires a context digest and prefix-closure declaration for every bound. Two additional cases reject a mixed action/model context and a non-prefix-closed thermal cap. The corpus contains 17 cases; the fetched-back semantic replay verifies the minimum and all binding ties for every fully qualified/coherent case.
+
+
+## Two-stage horizon decision: propose, then physically cap
+
+Do not ask one method to solve every part of the horizon problem. First, a candidate selector proposes a preferred replan/commit horizon based on its own evidence:
+- fixed-K schedule;
+- task-progress monitor (TempoWAM);
+- phase/low-speed transition detector (PACE);
+- action-expert stability and continuity memory (ChunkTrust);
+- world-model or policy proposal;
+- other learned/adaptive selector.
+
+Second, the common physical/evidence envelope clips the candidate:
+`N_commit = min(N_candidate, N_freshness, N_deadline, N_thermal, N_actuator, N_dynamics, N_viability, N_queue, N_continuity)`.
+
+This allows a fair test of different horizon proposal algorithms while giving each the same independent physical constraint wrapper. The proposal algorithm can recommend less than the maximum eligible horizon; it can never make the physical cap larger.
+
+The new fixture corpus contains 19 cases. AH18 shows a PACE-style 12-tick proposal clipped to 4 ticks by thermal headroom. AH19 shows a ChunkTrust-style 14-tick proposal clipped to 3 ticks by observation-constrained viability. These are synthetic semantics, not measured PACE/ChunkTrust reproductions.
