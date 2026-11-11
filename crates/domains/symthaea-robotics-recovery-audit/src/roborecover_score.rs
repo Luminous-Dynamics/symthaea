@@ -112,7 +112,12 @@ pub fn classify_policy_completion(trial: &RoboRecoverTrial) -> PolicyCompletion 
             trial.inference_steps,
             trial.source_terminal_success,
         ) {
-            ("infer_ok", steps, Some(true)) if steps > 0 => PolicyCompletion::PolicyCompleted,
+            ("infer_ok", steps, Some(true))
+                if steps > 0 && trial.evidence.terminal == TerminalOutcome::TaskCompleted =>
+            {
+                PolicyCompletion::PolicyCompleted
+            }
+            ("infer_ok", steps, Some(true)) if steps > 0 => PolicyCompletion::Contradictory,
             ("infer_ok", _, Some(false)) => PolicyCompletion::Contradictory,
             ("infer_ok", _, None) => PolicyCompletion::Unknown,
             ("infer_ok", 0, Some(true)) => PolicyCompletion::ReplayPreempted,
@@ -128,7 +133,13 @@ pub fn classify_policy_completion(trial: &RoboRecoverTrial) -> PolicyCompletion 
     }
 
     match trial.source_status.as_str() {
-        "success" if trial.inference_steps > 0 => PolicyCompletion::PolicyCompleted,
+        "success"
+            if trial.inference_steps > 0
+                && trial.evidence.terminal == TerminalOutcome::TaskCompleted =>
+        {
+            PolicyCompletion::PolicyCompleted
+        }
+        "success" if trial.inference_steps > 0 => PolicyCompletion::Contradictory,
         "success" => PolicyCompletion::Contradictory,
         "state_mismatch" | "timeout_failure" | "env_crash" | "invalid_sample" => {
             PolicyCompletion::NotCompleted
@@ -569,7 +580,7 @@ mod tests {
             })
             .collect();
         RoboRecoverManifest {
-            platform: BenchmarkPlatform::Libero,
+            platform: BenchmarkPlatform::RoboTwin,
             split: BenchmarkSplit::Test,
             arm_id: "base-policy".to_owned(),
             scenarios,
@@ -612,14 +623,17 @@ mod tests {
     }
 
     fn failed_trial(scenario_index: usize, trial_index: usize) -> RoboRecoverTrial {
-        sample(
+        let mut trial = sample(
             scenario_index,
             trial_index,
             TerminalOutcome::TaskFailed,
             SafetyEvidence::VerifiedCompliant,
             super::super::InterventionKind::DirectPolicy,
             super::super::WorldStateContinuity::Preserved,
-        )
+        );
+        trial.source_status = "infer_failed".to_owned();
+        trial.source_terminal_success = Some(false);
+        trial
     }
 
     #[test]
@@ -694,7 +708,7 @@ mod tests {
         trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
 
         let report = score_roborecover(&m, &[trial]).unwrap();
-        assert_eq!(report.native_successes, 1);
+        assert_eq!(report.policy_recovery_successes, 1);
         assert_eq!(report.physical_safe_successes, 0);
         assert_eq!(report.audit.simulator_rewind_rows, 1);
     }
@@ -749,7 +763,7 @@ mod tests {
         let report = score_roborecover(&m, &[trial]).unwrap();
         assert_eq!(report.metadata_mismatch_rows, 1);
         assert_eq!(report.accepted_trial_rows, 0);
-        assert_eq!(report.native_successes, 0);
+        assert_eq!(report.policy_recovery_successes, 0);
         assert_eq!(report.missing_expected_trial_ids.len(), 9);
     }
 
@@ -769,7 +783,7 @@ mod tests {
 
         let report = score_roborecover(&m, &[trial]).unwrap();
         assert_eq!(report.metadata_mismatch_rows, 1);
-        assert_eq!(report.native_successes, 0);
+        assert_eq!(report.policy_recovery_successes, 0);
     }
 
     #[test]
@@ -802,7 +816,7 @@ mod tests {
         );
         test_trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
         let report = score_roborecover(&m, &[test_trial]).unwrap();
-        assert_eq!(report.native_successes, 0);
+        assert_eq!(report.policy_recovery_successes, 0);
         assert_eq!(report.metadata_mismatch_rows, 1);
     }
     #[test]
@@ -821,7 +835,7 @@ mod tests {
 
         let report = score_roborecover(&m, &[trial]).unwrap();
         assert_eq!(report.accepted_trial_rows, 0);
-        assert_eq!(report.native_successes, 0);
+        assert_eq!(report.policy_recovery_successes, 0);
         assert_eq!(report.metadata_mismatch_rows, 1);
     }
 
@@ -906,7 +920,8 @@ mod tests {
 
     #[test]
     fn libero_success_status_requires_inference_and_replay_completion_is_separate() {
-        let m = manifest();
+        let mut m = manifest();
+        m.platform = BenchmarkPlatform::Libero;
         let mut success = sample(
             0,
             0,
@@ -915,6 +930,7 @@ mod tests {
             super::super::InterventionKind::DirectPolicy,
             super::super::WorldStateContinuity::Preserved,
         );
+        success.platform = BenchmarkPlatform::Libero;
         success.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
         success.source_status = "success".to_owned();
         success.inference_steps = 1;
@@ -928,6 +944,7 @@ mod tests {
             super::super::InterventionKind::DirectPolicy,
             super::super::WorldStateContinuity::Preserved,
         );
+        replay.platform = BenchmarkPlatform::Libero;
         replay.evidence.trial_id = m.scenarios[1].expected_trial_ids[0].clone();
         replay.source_status = "replay_already_done".to_owned();
         replay.inference_steps = 0;
