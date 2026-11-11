@@ -48,6 +48,7 @@ pub mod dimensional;
 pub mod dimensional_inference;
 pub mod discovery;
 pub mod equation_ast;
+#[cfg(test)]
 pub mod integrated_discovery;
 pub mod linear_group_action;
 pub mod linear_lie_algebra;
