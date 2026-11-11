@@ -40,7 +40,7 @@ A high salience value is not proof of note identity. Polyphonic overlap, reverb 
 
 ## Test coverage authored
 
-Seven focused tests cover:
+Eight focused tests cover:
 
 1. a synthetic A4 tone produces a measurable expected-pitch observation;
 2. an off-pitch synthetic control has lower expected-fundamental salience;
