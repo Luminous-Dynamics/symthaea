@@ -21,12 +21,12 @@ The map is one evidence-manifest- and context-specific motoring slice. This v0.1
 
 ## Example
 
-For a 2 × 2 grid with torque axis [0, 10] N m, speed axis [1,000, 2,000] RPM, and row-major efficiencies:
+For a 2 × 2 grid with torque axis [1, 10] N m, speed axis [1,000, 2,000] RPM, and row-major efficiencies:
 
 - 1,000 RPM: [0.70, 0.80]
 - 2,000 RPM: [0.90, 0.95]
 
-A query at 2.5 N m and 1,500 RPM has bilinear weights [0.375, 0.125, 0.375, 0.125] and efficiency 0.81875.
+A query at 3.25 N m and 1,500 RPM has bilinear weights [0.375, 0.125, 0.375, 0.125] and efficiency 0.81875.
 
 These values are synthetic analytical fixtures, not measured motor performance.
 
