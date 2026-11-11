@@ -53,3 +53,23 @@ For 10 kW at the rotor shaft, 3,000 rotor RPM, a 5:1 motor-to-rotor speed ratio 
 With 95% motor efficiency, 98% inverter efficiency and a 400 V DC bus, the chain requires approximately 11,934.598 W and 29.836 A. These are synthetic analytical values, not measured hardware data.
 
 Additional negative controls reject zero, negative, non-finite and numerically unrepresentable ratios.
+
+
+## Map-qualified efficiency envelope (v0.3)
+
+The v0.3 additive API connects a caller-supplied, already-qualified motor efficiency interval to the independent drive-chain calculation without introducing a dependency on a map library.
+
+1. `derive_motor_shaft_operating_point` computes motor torque and speed from rotor demand, the explicit gearbox speed ratio and transmission efficiency. It does not require motor or inverter efficiency, so it can be used before a motor-map query.
+2. The caller constructs `MotorEfficiencyEvidence` from the map lookup output, including map ID, configuration digest, context digest, evidence-manifest digest, exact motor torque/RPM query and lower/nominal/upper efficiency bounds.
+3. `evaluate_drive_with_map_evidence` verifies the expected configuration/context, requires the map query point to match the current derived motor shaft point exactly, and independently evaluates all three efficiency values.
+
+The result contains:
+- **Adverse efficiency scenario:** lower motor efficiency, therefore highest DC-bus demand.
+- **Nominal efficiency scenario:** nominal map value.
+- **Favourable efficiency scenario:** upper motor efficiency, therefore lowest DC-bus demand.
+
+Each scenario retains its own `Result<DriveReport, DriveError>`. A nominal PASS cannot hide an adverse-case bus power/current failure. The result carries map, configuration, context and evidence-manifest identities unchanged.
+
+The efficiency interval is only as meaningful as the upstream map/evidence process. The current map oracle's weighted absolute bounds are not Gaussian confidence intervals. No joint uncertainty or correlation is inferred for transmission, inverter, battery, thermal system or rotor aerodynamics. These must be evaluated by their respective owners.
+
+All fixtures remain synthetic analytical cases; no physical motor efficiency map is embedded. The envelope does not establish a continuous rating, motor limit, safe operating point, aircraft mission capability or airworthiness.
