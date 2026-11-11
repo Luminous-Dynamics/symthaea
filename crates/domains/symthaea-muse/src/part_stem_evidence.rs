@@ -4,6 +4,10 @@
 //! This validates artifact structure and byte identity, not renderer execution
 //! or acoustic/perceptual fidelity.
 
+use crate::audio_event_observation::{
+    AudioEventObservationIssueV1, AudioStemEventObservationReceiptV1,
+    observe_rendered_audio_stem_events_v1,
+};
 use crate::midi_performance::{
     MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, MIDI_PERFORMANCE_SCHEMA_V1,
     MidiPerformanceArtifactV1, MidiPerformanceManifestV1, MidiPerformanceTrackReceiptV1,
@@ -155,6 +159,30 @@ pub struct PartStemValidationReceiptV1 {
     pub total_wav_bytes: u64,
     pub common_frame_count: u64,
     pub receipt_sha256: String,
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum PartStemAudioEvidenceIssueV1 {
+    Admission(PartStemEvidenceIssueV1),
+    Observation(AudioEventObservationIssueV1),
+    MissingSelectedStem { track_index: u16 },
+    MissingWavInput { sha256: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PartStemAudioEvidenceReceiptV1 {
+    pub schema: String,
+    pub stem_validation: PartStemValidationReceiptV1,
+    pub audio_observation: AudioStemEventObservationReceiptV1,
+    pub receipt_sha256: String,
+}
+
+#[derive(Serialize)]
+struct PartStemAudioEvidenceCommitmentV1<'a> {
+    schema: &'a str,
+    stem_validation: &'a PartStemValidationReceiptV1,
+    audio_observation: &'a AudioStemEventObservationReceiptV1,
 }
 
 #[derive(Serialize)]
@@ -940,6 +968,65 @@ pub fn validate_part_stem_bundle_v1(
     Ok(receipt)
 }
 
+
+
+/// Validate the complete part-stem bundle, then run the acoustic observer
+/// against exactly one validated track's isolated WAV. The output preserves
+/// both the structural admission receipt and the stem-scoped observation;
+/// neither is an acoustic pass/fail certification.
+pub fn validate_and_observe_part_stem_v1(
+    bundle: &PartStemEvidenceBundleV1,
+    midi: &MidiPerformanceArtifactV1,
+    wav_inputs: &[PartStemWavInputV1],
+    track_index: u16,
+) -> Result<PartStemAudioEvidenceReceiptV1, Vec<PartStemAudioEvidenceIssueV1>> {
+    let stem_validation = validate_part_stem_bundle_v1(bundle, midi, wav_inputs)
+        .map_err(|errors| errors.into_iter()
+            .map(PartStemAudioEvidenceIssueV1::Admission)
+            .collect::<Vec<_>>())?;
+
+    let Some(stem) = bundle.stems.iter()
+        .find(|stem| stem.midi_track_index == track_index)
+    else {
+        return Err(vec![PartStemAudioEvidenceIssueV1::MissingSelectedStem { track_index }]);
+    };
+    let Some(wav) = wav_inputs.iter()
+        .find(|input| input.wav_sha256 == stem.wav_sha256)
+    else {
+        return Err(vec![PartStemAudioEvidenceIssueV1::MissingWavInput {
+            sha256: stem.wav_sha256.clone(),
+        }]);
+    };
+    let audio_observation = observe_rendered_audio_stem_events_v1(
+        &wav.wav_bytes,
+        midi,
+        track_index,
+    ).map_err(|errors| errors.into_iter()
+        .map(PartStemAudioEvidenceIssueV1::Observation)
+        .collect::<Vec<_>>())?;
+
+    let mut receipt = PartStemAudioEvidenceReceiptV1 {
+        schema: "muse-part-stem-audio-evidence-receipt-v1".into(),
+        stem_validation,
+        audio_observation,
+        receipt_sha256: String::new(),
+    };
+    let commitment = PartStemAudioEvidenceCommitmentV1 {
+        schema: &receipt.schema,
+        stem_validation: &receipt.stem_validation,
+        audio_observation: &receipt.audio_observation,
+    };
+    let bytes = serde_json::to_vec(&commitment)
+        .map_err(|_| vec![PartStemAudioEvidenceIssueV1::Admission(
+            PartStemEvidenceIssueV1::BundleSerialization,
+        )])?;
+    receipt.receipt_sha256 = domain_sha256(
+        "muse-part-stem-audio-evidence-receipt-serde-json-sha256-v1",
+        &bytes,
+    );
+    Ok(receipt)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1093,6 +1180,21 @@ mod tests {
             midi,
             vec![PartStemWavInputV1 { wav_sha256, wav_bytes }],
         )
+    }
+
+
+    #[test]
+    fn validated_bundle_flows_into_track_scoped_audio_observation() {
+        let (bundle, midi, wavs) = fixture();
+        let receipt = validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 1).unwrap();
+        assert_eq!(receipt.stem_validation.stem_count, 1);
+        assert_eq!(receipt.audio_observation.track_index, 1);
+        assert_eq!(receipt.audio_observation.note_observations.len(), 1);
+        assert_eq!(
+            receipt.audio_observation.note_observations[0].status,
+            crate::audio_event_observation::AudioEventObservationStatusV1::NoMeasurableSpectralEnergy
+        );
+        assert!(valid_sha256(&receipt.receipt_sha256));
     }
 
     #[test]
