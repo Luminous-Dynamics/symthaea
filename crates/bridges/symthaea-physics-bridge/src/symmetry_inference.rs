@@ -2288,6 +2288,132 @@ mod tests {
     }
 
     #[test]
+    fn metric_aware_sampler_is_covariant_across_six_nonorthogonal_coordinate_changes() {
+        use nalgebra::Matrix2;
+
+        let transforms = [
+            Matrix2::new(1.0, 1.0, 0.0, 1.0),
+            Matrix2::new(2.0, 1.0, 1.0, 1.0),
+            Matrix2::new(1.0, 0.5, -0.25, 2.0),
+            Matrix2::new(0.5, -1.0, 1.0, 1.0),
+            Matrix2::new(2.0, -1.0, 0.5, 1.0),
+            Matrix2::new(1.0, 0.0, 3.0, 1.0),
+        ];
+        let identity_metric = Matrix2::identity();
+        let canonical_generator = Matrix2::new(0.0, -1.0, 1.0, 0.0);
+        let canonical_samples = metric_sample_states();
+        let canonical_action = metric_aware_so2_action();
+        let canonical_radial = add(pow2("x"), pow2("y"));
+        let canonical_anisotropic =
+            add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
+
+        let canonical_positive = evaluate_metric_aware_linear_action_samples(
+            &canonical_radial,
+            &canonical_action,
+            &canonical_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        let canonical_negative = evaluate_metric_aware_linear_action_samples(
+            &canonical_anisotropic,
+            &canonical_action,
+            &canonical_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        let canonical_negative_residual =
+            canonical_negative.generator_results[0].maximum_squared_residual;
+        assert!(canonical_positive.invariant_under_every_generator());
+        assert!(!canonical_negative.invariant_under_every_generator());
+
+        let quadratic_expression = |matrix: Matrix2<f64>| {
+            add(
+                add(
+                    mul(Expr::Const(matrix[(0, 0)]), pow2("X")),
+                    mul(
+                        Expr::Const(2.0 * matrix[(0, 1)]),
+                        mul(var("X"), var("Y")),
+                    ),
+                ),
+                mul(Expr::Const(matrix[(1, 1)]), pow2("Y")),
+            )
+        };
+
+        for (index, transform) in transforms.iter().enumerate() {
+            let inverse = transform
+                .try_inverse()
+                .expect("every frozen basis transform must be invertible");
+            let transformed_metric = inverse.transpose() * identity_metric * inverse;
+            let transformed_generator = transform * canonical_generator * inverse;
+            let transformed_action = crate::linear_group_action::LinearGroupActionV1 {
+                action_id: format!("sample-so2-basis-{index}"),
+                coordinate_basis_id: format!("basis-{index}"),
+                coordinate_names: vec!["X".to_string(), "Y".to_string()],
+                coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+                metric: transformed_metric
+                    .row_iter()
+                    .map(|row| row.iter().copied().collect())
+                    .collect(),
+                generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                    id: "conjugated-J".to_string(),
+                    matrix: transformed_generator
+                        .row_iter()
+                        .map(|row| row.iter().copied().collect())
+                        .collect(),
+                }],
+            }
+            .try_admit(
+                crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default(),
+            )
+            .unwrap();
+
+            let transformed_samples: Vec<Vec<f64>> = canonical_samples
+                .iter()
+                .map(|state| {
+                    let transformed =
+                        transform * Matrix2::new(state[0], state[1], 0.0, 0.0).column(0);
+                    vec![transformed[0], transformed[1]]
+                })
+                .collect();
+            let positive_expression = quadratic_expression(transformed_metric);
+            let negative_metric = inverse.transpose()
+                * Matrix2::new(1.0, 0.0, 0.0, 2.0)
+                * inverse;
+            let negative_expression = quadratic_expression(negative_metric);
+
+            let positive = evaluate_metric_aware_linear_action_samples(
+                &positive_expression,
+                &transformed_action,
+                &transformed_samples,
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            )
+            .unwrap();
+            let negative = evaluate_metric_aware_linear_action_samples(
+                &negative_expression,
+                &transformed_action,
+                &transformed_samples,
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            )
+            .unwrap();
+
+            assert!(
+                positive.invariant_under_every_generator(),
+                "radial invariant failed under basis transform {index}"
+            );
+            assert!(!negative.invariant_under_every_generator());
+            let negative_residual = negative.generator_results[0].maximum_squared_residual;
+            assert!(
+                (canonical_negative_residual - negative_residual).abs() < 2.0e-10,
+                "anisotropic residual changed under basis transform {index}: {canonical_negative_residual} vs {negative_residual}"
+            );
+        }
+    }
+
+    #[test]
     fn fixed_parameters_are_constant_when_differentiating_the_action_coordinates() {
         // z is a fixed parameter used as the exponent. It is not part of the
         // action and therefore its AD component must be zero in the directional
