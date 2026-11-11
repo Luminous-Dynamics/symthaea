@@ -1200,8 +1200,8 @@ mod tests {
             &wav,
             &midi,
             AudioClockAlignmentConfigV1 {
-                minimum_offset_ms: -100,
-                maximum_offset_ms: 100,
+                minimum_offset_ms: 200,
+                maximum_offset_ms: 210,
                 ..Default::default()
             },
         )
