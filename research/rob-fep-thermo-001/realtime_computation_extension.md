@@ -101,3 +101,8 @@ These are distinct papers and training/robot setups. Compare on the same task/ro
 ## Actuation-side freshness and foreground compute contention
 
 The real-time comparison now includes actuation-side AoI rather than stopping at inference return or message receipt. It also includes EdgePace as a foreground-deadline / unified-memory-contention baseline. See [decision_sensitive_freshness.md](./decision_sensitive_freshness.md) for equations, comparison arms and external hardware references.
+
+
+## Physical actuation-side AoI reference
+
+The timing measurement owner is [Symtropy #4713](https://github.com/Luminous-Dynamics/symtropy/issues/4713), with implementation in [draft PR #4715](https://github.com/Luminous-Dynamics/symtropy/pull/4715). Real-time task evaluation should use the source observation lineage at actual actuator-command application; result-receive age alone is insufficient.
