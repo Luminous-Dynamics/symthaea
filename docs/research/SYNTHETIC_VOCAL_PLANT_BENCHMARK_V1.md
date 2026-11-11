@@ -110,6 +110,8 @@ The fixture phrase contains five abstract vowel-like proxy events. The proxy IDs
 | formant_scale_110pct | Scale F1–F3 on one segment | Orthogonal-control probe; declared F0 remains unchanged |
 | collateral_corruption | Edit target and a protected segment | Locality evaluator must reject |
 
+The manifest also carries a fail-closed rejection receipt for an unsupported vibrato-phase control. Silence and unusable measurement windows remain unmeasured/indeterminate; they are not assigned a fabricated F0.
+
 Each output includes float WAV, sample count, PCM SHA-256, segment ranges, target and protected scope, measured target F0 where estimable, and a content-addressed manifest. The manifest explicitly states that no human recordings, external corpora or voice identities were used.
 
 ### Measurement separation
@@ -168,7 +170,7 @@ This matrix should be generated in budgeted deterministic batches. The first com
 | Correction | Convergence on held-out supported perturbations | >= 95% within 3 interventions, as a later target |
 | Evidence | Required provenance and report coverage | 100% |
 
-These are proposed targets, not results. The initial 15 authored tests are contract tests. Rust compilation, test execution, audio fixture generation, and CI qualification are still pending.
+These are proposed targets, not results. The initial 16 authored tests are contract tests. Rust compilation, test execution, audio fixture generation, and CI qualification are still pending.
 
 ### 4.4 Controller experiment
 
