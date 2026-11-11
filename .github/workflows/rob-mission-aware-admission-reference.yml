@@ -1,0 +1,35 @@
+name: ROB Mission Aware Admission Reference
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "research/rob-mission-aware-admission-reference-001/**"
+      - ".github/workflows/rob-mission-aware-admission-reference.yml"
+  push:
+    branches: ["research/rob-mission-aware-admission-reference-001"]
+    paths:
+      - "research/rob-mission-aware-admission-reference-001/**"
+      - ".github/workflows/rob-mission-aware-admission-reference.yml"
+
+concurrency:
+  group: rob-mission-aware-admission-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reference:
+    name: Deterministic admission reference (Rust 1.96)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pinned Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/rob-mission-aware-admission-reference-001/Cargo.toml -- --check
+      - name: Test reference
+        run: cargo test --locked --manifest-path research/rob-mission-aware-admission-reference-001/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/rob-mission-aware-admission-reference-001/Cargo.toml --all-targets -- -D warnings
