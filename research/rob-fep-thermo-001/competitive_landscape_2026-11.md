@@ -185,3 +185,32 @@ Entropy/exergy measurements can then help explain physical irreversibility or qu
 - A viable route under hidden state is not a route the robot can choose without observation.
 - No FEP score, entropy score, Phi value or model confidence grants actuator authority.
 - Report null results and worst-case strata; do not let averages conceal unsafe subpopulations.
+
+
+## 7. Additional current comparators and public benchmark context
+
+### Stronger quadruped control comparators
+
+- **SSZT-MPC on LeoQuad (IEEE/ASME Transactions on Mechatronics, August 2026):** simultaneous centroidal state and input-derived ZMP tracking with velocity-error adaptation; full-size quadruped hardware trials include disturbances, uneven terrain, stairs and acceleration/deceleration. This should be a serious balance-control comparator where the platform and task are matched. DOI: https://doi.org/10.1109/TMECH.2026.3714419
+- **Variable-bandwidth nonlinear extended-state-observer whole-body disturbance rejection (Control Engineering Practice, November 2026):** combines lumped disturbance estimation, adaptive foothold planning and constrained whole-body control. Add as a recent observer/adaptation comparator; confirm its platform, code and hardware evidence before assigning a leaderboard tier. DOI: https://doi.org/10.1016/j.conengprac.2026.107167
+- **Terrain-adaptive MPC + impedance/admittance + SINDy corrections (McConnellogue et al., 14 August 2026):** reports 40% slip reduction, 40–60% force-tracking improvement and 80% yaw-tracking improvement in PyBullet. Importantly, the paper explicitly describes its validation as simulation and identifies physical PAWS validation as future work. Treat it as a simulation-only controller ablation comparator, not a hardware SOTA result. DOI: https://doi.org/10.1002/rnc.70700
+
+### Industrial digital-twin / predictive-maintenance comparator
+
+Aasa et al. (16 June 2026) report a physics-informed digital twin with edge computing, hardware-in-the-loop on a UR10e and Jetson AGX Orin, and claimed 98.2% simulation-response similarity, 99.7% synchronization accuracy and 34% lower unplanned downtime in their study. This is an industrial arm/HiL comparison, not a directly matched mobile robot or independent replication. It reinforces that Luminous must measure end-to-end synchronization, fault-detection sensitivity, compute cost and downtime/service impact—not only internal model prediction. Source: https://link.springer.com/article/10.1007/s44291-026-00241-8
+
+### Cross-domain embodied benchmark context
+
+Stanford HAI's **AI Index 2026** gives a useful warning about benchmark saturation and task-horizon effects:
+- RLBench 18-task subset: EquAct 89.4% average task success as of January 2026, in controlled short-horizon evaluation.
+- BEHAVIOR-1K 2025 challenge: top reported Q-score 25.99%, but full-task success 12.4%.
+- ResponsibleRobotBench: reported best safe-success score 0.64 across 23 multi-stage hazard tasks.
+
+These are not thermal locomotion baselines and must not be pooled with quadruped results. They motivate a complementary long-horizon manipulation / household / hazard lane in which success requires the complete task *and* safety. Source: https://hai.stanford.edu/assets/files/ai_index_report_2026.pdf (section 2.7, pp. 117–120).
+
+### Additional research implications
+
+1. Report the first failing stage in the diagnostic chain, not just final recovery accuracy.
+2. Separate physical hardware, hardware-in-the-loop, full-physics simulation, reduced-order simulation and synthetic arithmetic in every comparison label.
+3. Include state/ZMP tracking, disturbance observers and impedance/admittance adaptation in the locomotion baseline suite where the platform permits.
+4. Extend beyond locomotion only after the quadruped and single-joint tracks have a repeatable protocol; preserve separate manipulation and hazard benchmarks.
