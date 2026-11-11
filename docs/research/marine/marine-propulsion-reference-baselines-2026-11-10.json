@@ -2004,6 +2004,127 @@
       "ineligible_use": [
         "assume installed meters are accurate without calibration and installation evidence"
       ]
+    },
+    {
+      "source_id": "OCEANENG-PORT-BERTH-YARD-OPS-ROBUST-2026-125850",
+      "title": "An integrated robust framework for berth, yard, and shore power planning considering vessel arrival uncertainty",
+      "publisher": "Ocean Engineering / Elsevier",
+      "publication_date": "2026-06-15",
+      "url": "https://doi.org/10.1016/j.oceaneng.2026.125850",
+      "evidence_class": "peer_reviewed_optimization_methodology",
+      "scope": {
+        "approach": "Robust integrated berth, yard and shore-power planning under vessel arrival uncertainty; article preview reports hierarchical multi-agent SAC and an anchor-point mechanism.",
+        "reported_case_savings_percent": {
+          "lower": 4,
+          "upper": 13,
+          "metric": "cost savings in the paper's studied cases"
+        },
+        "relevance": "Methodology comparator for coordinating berth/yard/shore-power decisions under uncertain arrival."
+      },
+      "limitations": [
+        "The reported 4-13% cost reduction is case-specific and is not transferable to another port, fleet or vessel.",
+        "Access to full inputs, code and data may be restricted; reproduce published baselines before comparison.",
+        "This paper is not a validation of the Luminous port-call energy audit."
+      ],
+      "eligible_use": [
+        "Published-method reproduction",
+        "Port/berth/OPS uncertainty benchmark design"
+      ],
+      "ineligible_use": [
+        "Direct prediction of Luminous port savings",
+        "Assuming the paper's multi-agent optimizer is independently reproduced"
+      ]
+    },
+    {
+      "source_id": "EMSA-SHORE-SIDE-ELECTRICITY-GUIDANCE-2025",
+      "title": "Guidance on Shore-Side Electricity: Guidance to Port Authorities and Administrations",
+      "publisher": "European Maritime Safety Agency",
+      "publication_date": "2025-11-11",
+      "url": "https://www.emsa.europa.eu/electrification/sse.html",
+      "evidence_class": "official_regulator_agency_technical_guidance",
+      "scope": {
+        "published": "2022-07-19",
+        "updated": "2025-11-11",
+        "topics": [
+          "OPS infrastructure planning",
+          "ship-shore interface compatibility",
+          "responsibility frameworks",
+          "construction and operating controls",
+          "battery charging",
+          "battery swapping",
+          "power banking",
+          "microgeneration"
+        ]
+      },
+      "limitations": [
+        "Guidance supports port planning and controls; it is not a vessel/berth-specific electrical compatibility certificate.",
+        "Current national, port and class rules and applicable IEC/ISO/IEEE standards must be independently checked."
+      ],
+      "eligible_use": [
+        "Ship-port interface requirements",
+        "Port-side OPS risk/role design"
+      ],
+      "ineligible_use": [
+        "Claiming an actual berth has available or reserved power"
+      ]
+    },
+    {
+      "source_id": "EU-FUELEU-ARTICLE6-OPS-QA-2026",
+      "title": "European Commission Q&A on FuelEU Maritime Article 6 zero-emission-at-berth requirements",
+      "publisher": "European Commission Directorate-General for Mobility and Transport",
+      "publication_date": "2026",
+      "url": "https://transport.ec.europa.eu/transport-modes/maritime/decarbonising-maritime-transport-fueleu-maritime/questions-and-answers-regulation-eu-20231805-use-renewable-and-low-carbon-fuels-maritime-transport_en",
+      "evidence_class": "official_eu_regulatory_interpretive_guidance",
+      "scope": {
+        "vessel_scope": "Passenger ships and ships carrying exclusively containers, within Regulation (EU) 2023/1805 scope; not all general-cargo or mixed-use ships.",
+        "timeline": [
+          {
+            "date": "2030-01-01",
+            "scope": "In AFIR Article 9 covered ports, within FuelEU Article 6 scope."
+          },
+          {
+            "date": "2035-01-01",
+            "scope": "Other ports equipped with OPS, within FuelEU Article 6 scope."
+          }
+        ],
+        "transition": "Member States may apply certain obligations earlier in the 2030-2034 period in specified circumstances."
+      },
+      "limitations": [
+        "This guidance does not make every cargo ship subject to zero-emission-at-berth requirements.",
+        "Use the consolidated Regulation and current national implementation/port facts for legal determinations."
+      ],
+      "eligible_use": [
+        "Vessel/port OPS rule-scope tests",
+        "FuelEU Article 6 applicability evidence"
+      ],
+      "ineligible_use": [
+        "Automatic OPS mandate for general-cargo ships",
+        "Substituting Q&A guidance for legal review"
+      ]
+    },
+    {
+      "source_id": "EU-AFIR-REG2023-1804",
+      "title": "Regulation (EU) 2023/1804 on deployment of alternative fuels infrastructure",
+      "publisher": "European Union",
+      "publication_date": "2023-09-13",
+      "url": "https://eur-lex.europa.eu/eli/reg/2023/1804/oj",
+      "evidence_class": "binding_eu_regulation",
+      "scope": {
+        "maritime_scope": "Requirements for shore-side electricity supply in certain TEN-T maritime ports for specified ship categories, including seagoing container and passenger ships, based on regulatory port/vessel criteria.",
+        "target_date": "2029-12-31",
+        "relationship": "FuelEU Article 6 references AFIR Article 9 port coverage in its staged zero-emission-at-berth requirements."
+      },
+      "limitations": [
+        "Port obligations are conditional on TEN-T port category/activity and ship category; not a universal OPS availability guarantee at every quay.",
+        "Use consolidated legal text and port-specific infrastructure status."
+      ],
+      "eligible_use": [
+        "Port infrastructure obligation scenario",
+        "AFIR/FuelEU port-scope mapping"
+      ],
+      "ineligible_use": [
+        "Assuming real-time berth power reservation from an infrastructure mandate"
+      ]
     }
   ]
 }
