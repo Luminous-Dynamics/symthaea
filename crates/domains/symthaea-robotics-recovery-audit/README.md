@@ -18,7 +18,7 @@ It also rejects duplicate trial IDs, blank identity fields, malformed expected-t
     cargo test -p symthaea-robotics-recovery-audit
     cargo fmt --manifest-path crates/domains/symthaea-robotics-recovery-audit/Cargo.toml -- --check
 
-Thirty-four unit tests cover the fail-closed audit, manifest and source-adapter scoring cases. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
+Thirty-four unit tests are included across the audit kernel and RoboRecover scorer. They have not yet been executed in this environment. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
 
 
 ## RoboRecover recovery scoring
