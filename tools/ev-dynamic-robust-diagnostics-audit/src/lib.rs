@@ -375,7 +375,7 @@ fn test_model<'a>(world: &'a WorldModel, test_id: &str) -> Result<&'a TestModel,
         .ok_or_else(|| format!("model {} lacks test {}", world.model_id, test_id))
 }
 
-remove unused lookup helperfn terminal_action<'a>(problem: &'a Problem, action_index: usize) -> Result<&'a TerminalAction, String> {
+fn terminal_action<'a>(problem: &'a Problem, action_index: usize) -> Result<&'a TerminalAction, String> {
     problem.actions.get(action_index)
         .ok_or_else(|| "policy references unknown terminal action".to_owned())
 }
