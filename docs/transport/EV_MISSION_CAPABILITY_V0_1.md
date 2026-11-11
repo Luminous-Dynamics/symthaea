@@ -112,7 +112,7 @@ For every declared cell and every time slice, compare its supplied conservative 
 
 A cell outside the upstream model domain returns UNSUPPORTED_DOMAIN. A cell that violates a mission constraint returns INFEASIBLE. These are different: the former means the model cannot justify the claim; the latter means the supplied qualified bound violates the requested mission limit.
 
-A limiting cell may change through the mission. Each step reports the hottest/limiting observed unit and margins; pack averages do not hide cell constraints.
+A limiting cell may change through the mission. The evaluator reports the hottest cell separately from the limiting cell. A pack-level power/charge bottleneck is attributed to a cell only when the upstream model supplies a matching limiting-cell reference. A pure energy-reserve shortfall does not invent a cell attribution. Pack averages do not hide cell constraints.
 
 ## Result dispositions
 
