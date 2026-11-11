@@ -2,3 +2,4 @@
 
 pub mod decision_value;
 pub mod experiment_trace;
+pub mod power_design;
