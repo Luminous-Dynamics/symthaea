@@ -195,6 +195,8 @@ fn verify_checksum_manifest(
     source: &str,
     test: &IndexReport,
     eval: &IndexReport,
+    test_index_sha256: &str,
+    eval_index_sha256: &str,
 ) -> Result<usize, Vec<String>> {
     let mut errors = Vec::new();
     let mut entries = BTreeMap::<String, String>::new();
@@ -229,6 +231,19 @@ fn verify_checksum_manifest(
         }
         if entries.insert(path.to_string(), digest.to_string()).is_some() {
             errors.push(format!("SHA256SUMS duplicates path {path}"));
+        }
+    }
+
+    for (path, expected_digest) in [
+        ("repair/test/index.json", test_index_sha256),
+        ("repair/eval/index.json", eval_index_sha256),
+    ] {
+        match entries.get(path) {
+            Some(observed) if observed == expected_digest => {}
+            Some(observed) => errors.push(format!(
+                "SHA256SUMS index digest mismatch for {path}: expected {expected_digest}, got {observed}"
+            )),
+            None => errors.push(format!("SHA256SUMS omits index artifact {path}")),
         }
     }
 
@@ -367,7 +382,15 @@ fn qualify(
         }
         match std::str::from_utf8(checksum_bytes)
             .map_err(|error| vec![format!("SHA256SUMS is not UTF-8: {error}")])
-            .and_then(|text| verify_checksum_manifest(text, test, eval))
+            .and_then(|text| {
+                verify_checksum_manifest(
+                    text,
+                    test,
+                    eval,
+                    expected_test_hash,
+                    expected_eval_hash,
+                )
+            })
         {
             Ok(count) => checksum_entries = count,
             Err(found) => errors.extend(found),
@@ -577,7 +600,7 @@ mod tests {
     }
 
     #[test]
-    fn checksum_manifest_must_cover_selected_world_payloads() {
+    fn checksum_manifest_must_cover_selected_world_payloads_and_index_artifacts() {
         let test = parsed(TEST_INDEX);
         let eval = parsed(EVAL_INDEX);
         let test_report = {
@@ -596,6 +619,31 @@ mod tests {
             &format!("repair/test/{first}"),
             "repair/test/missing-world.json.gz"
         );
-        assert!(verify_checksum_manifest(&altered, &test_report, &eval_report).is_err());
+        assert!(
+            verify_checksum_manifest(
+                &altered,
+                &test_report,
+                &eval_report,
+                &sha256(TEST_INDEX.as_bytes()),
+                &sha256(EVAL_INDEX.as_bytes()),
+            )
+            .is_err()
+        );
+
+        let mut wrong_index_digest = CHECKSUMS.to_string();
+        wrong_index_digest = wrong_index_digest.replace(
+            &sha256(TEST_INDEX.as_bytes()),
+            &"f".repeat(64),
+        );
+        assert!(
+            verify_checksum_manifest(
+                &wrong_index_digest,
+                &test_report,
+                &eval_report,
+                &sha256(TEST_INDEX.as_bytes()),
+                &sha256(EVAL_INDEX.as_bytes()),
+            )
+            .is_err()
+        );
     }
 }
