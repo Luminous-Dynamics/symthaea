@@ -18,7 +18,7 @@ use hound::{SampleFormat, WavReader};
 use rustfft::{FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
 
 pub const AUDIO_EVENT_OBSERVATION_SCHEMA_V1: &str = "muse-audio-event-observation-v1";
@@ -96,6 +96,7 @@ pub enum AudioEventObservationIssueV1 {
     ReceiptDigestMismatch,
     ReceiptInputBindingMismatch,
     ReceiptNoteCoverageMismatch,
+    ReceiptEventMismatch { ordinal: usize },
 }
 
 #[derive(Serialize)]
@@ -498,7 +499,7 @@ pub fn observe_rendered_audio_events_v1(
     wav_bytes: &[u8],
     midi: &MidiPerformanceArtifactV1,
 ) -> Result<AudioEventObservationReceiptV1, Vec<AudioEventObservationIssueV1>> {
-    let mut issues = validate_midi_artifact(midi);
+    let issues = validate_midi_artifact(midi);
     if !issues.is_empty() {
         return Err(issues);
     }
@@ -554,19 +555,84 @@ pub fn validate_audio_event_observation_v1(
         Ok(decoded) if decoded.info == receipt.wav_info => {}
         _ => issues.push(AudioEventObservationIssueV1::ReceiptInputBindingMismatch),
     }
-    let expected: BTreeSet<_> = midi
+    let expected: BTreeMap<_, _> = midi
         .manifest
         .notes
         .iter()
-        .map(|note| note.source_note_ordinal)
+        .map(|note| (note.source_note_ordinal, note))
         .collect();
-    let observed: BTreeSet<_> = receipt
+    let observed_ordinals: BTreeSet<_> = receipt
         .note_observations
         .iter()
         .map(|note| note.source_note_ordinal)
         .collect();
-    if expected != observed || observed.len() != receipt.note_observations.len() {
+    if expected.keys().copied().collect::<BTreeSet<_>>() != observed_ordinals
+        || observed_ordinals.len() != receipt.note_observations.len()
+    {
         issues.push(AudioEventObservationIssueV1::ReceiptNoteCoverageMismatch);
+    }
+    let wav_info = decoded_wav.as_ref().ok().map(|wav| &wav.info);
+    for observation in &receipt.note_observations {
+        let Some(source) = expected.get(&observation.source_note_ordinal) else {
+            continue;
+        };
+        let frame_binding_matches = wav_info.is_some_and(|info| {
+            expected_frame(
+                source.start_tick,
+                midi.manifest.tempo_microseconds_per_quarter,
+                midi.manifest.ticks_per_quarter,
+                info.sample_rate_hz,
+            ) == Some(observation.expected_start_frame)
+                && expected_frame(
+                    source.end_tick,
+                    midi.manifest.tempo_microseconds_per_quarter,
+                    midi.manifest.ticks_per_quarter,
+                    info.sample_rate_hz,
+                ) == Some(observation.expected_end_frame)
+        });
+        let frequency = 440.0
+            * 2.0f64.powf((f64::from(source.pitch_midi) - 69.0) / 12.0);
+        let frequency_matches = observation.expected_frequency_hz.is_finite()
+            && (observation.expected_frequency_hz - frequency).abs() <= 1e-9;
+        let salience_is_finite = observation
+            .harmonic_salience_db
+            .into_iter()
+            .chain(observation.fundamental_salience_db)
+            .all(f64::is_finite);
+        let window_is_well_formed = match (
+            observation.window_start_frame,
+            observation.window_frame_count,
+        ) {
+            (None, None) => true,
+            (Some(start), Some(count)) => {
+                count > 0
+                    && start >= observation.expected_start_frame
+                    && start.saturating_add(u64::from(count))
+                        <= observation.expected_end_frame
+                    && wav_info.is_some_and(|info| {
+                        start.saturating_add(u64::from(count)) <= info.frame_count
+                    })
+            }
+            _ => false,
+        };
+        if observation.part_id != source.part_id
+            || observation.segment_id != source.segment_id
+            || observation.instrument_id != source.instrument_id
+            || observation.pitch_midi != source.pitch_midi
+            || !frame_binding_matches
+            || !frequency_matches
+            || !salience_is_finite
+            || !window_is_well_formed
+            || observation.harmonics_measured > AUDIO_EVENT_OBSERVATION_HARMONICS_V1 as u8
+            || (observation.status == AudioEventObservationStatusV1::Measured
+                && (observation.harmonic_salience_db.is_none()
+                    || observation.fundamental_salience_db.is_none()
+                    || observation.window_start_frame.is_none()))
+        {
+            issues.push(AudioEventObservationIssueV1::ReceiptEventMismatch {
+                ordinal: observation.source_note_ordinal,
+            });
+        }
     }
     match audio_event_observation_commitment_v1(receipt) {
         Ok(actual) if actual == receipt.receipt_sha256 => {}
@@ -660,6 +726,25 @@ mod tests {
         cursor.into_inner()
     }
 
+    fn silent_wav(duration_secs: f32) -> Vec<u8> {
+        let sample_rate = 40_960u32;
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate,
+            bits_per_sample: 32,
+            sample_format: SampleFormat::Float,
+        };
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut writer = hound::WavWriter::new(&mut cursor, spec).unwrap();
+            for _ in 0..(duration_secs * sample_rate as f32) as usize {
+                writer.write_sample(0.0f32).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+        cursor.into_inner()
+    }
+
     #[test]
     fn expected_pitch_produces_a_harmonic_energy_observation() {
         // At 40.96 kHz and a 4096-frame window, A4 is exactly FFT bin 44.
@@ -737,21 +822,8 @@ mod tests {
     #[test]
     fn silent_audio_is_an_explicit_observation_abstention() {
         let midi = midi_artifact(69, 1_920);
-        let silent = sine_wav(440.0, 1.0)
-            .into_iter()
-            .collect::<Vec<_>>();
-        let mut reader = WavReader::new(Cursor::new(silent)).unwrap();
-        let spec = reader.spec();
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut writer = hound::WavWriter::new(&mut cursor, spec).unwrap();
-            for _ in 0..reader.duration() {
-                let _ = reader.samples::<f32>();
-                writer.write_sample(0.0f32).unwrap();
-            }
-            writer.finalize().unwrap();
-        }
-        let receipt = observe_rendered_audio_events_v1(&cursor.into_inner(), &midi).unwrap();
+        let silent = silent_wav(1.0);
+        let receipt = observe_rendered_audio_events_v1(&silent, &midi).unwrap();
         assert_eq!(
             receipt.note_observations[0].status,
             AudioEventObservationStatusV1::NoMeasurableSpectralEnergy
