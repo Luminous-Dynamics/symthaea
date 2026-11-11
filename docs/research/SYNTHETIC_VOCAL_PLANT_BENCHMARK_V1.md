@@ -195,7 +195,7 @@ Do not fit and score a response model on the same interventions. Invalidate a pr
 
 ### 5.1 General audio editing: MMAE / ICASSP 2027
 
-The official challenge evaluates Instruction Following Rate (IFR), Consistency Rate (CR), and Exact Match Rate (EMR); EMR requires every required instruction and preservation rubric to pass. Its two tracks are ranked independently. The official site states that each hidden challenge track has 500 previously unreleased examples and that registration closed on October 8, 2026. The test set and SDK were released November 10; final submission is November 25, 2026. [Official challenge protocol and schedule](https://audio-editing-challenge.github.io/)
+The official challenge evaluates Instruction Following Rate (IFR), Consistency Rate (CR), and Exact Match Rate (EMR); EMR requires every required instruction and preservation rubric to pass. Its two tracks are ranked independently. The official site states that existing systems achieve below 5% EMR on MMAE, illustrating the gap between plausible output and complete instruction-plus-preservation success. Each hidden challenge track has 500 previously unreleased examples, and the two tracks are ranked independently. Registration closed on October 8, 2026; the test set and SDK were released November 10; final submission is November 25, 2026. [Official challenge protocol and schedule](https://audio-editing-challenge.github.io/)
 
 The current public cards quoted in this research cycle show 7.60% EMR for the single-model card and 8.00% for the agent card. These are separate tracks and must not be treated as a controlled ablation or a direct model-versus-agent comparison. The local VMEA rubric scorer is not the official private judge. Do not publish a local score as an MMAE score.
 
@@ -203,7 +203,7 @@ The current public cards quoted in this research cycle show 7.60% EMR for the si
 
 ### 5.2 Singing-specific editing: YingMusic-Singer-Plus / LyricEditBench
 
-YingMusic-Singer-Plus explicitly targets controllable singing synthesis with lyric manipulation and melody guidance. Its public project describes LyricEditBench as a melody-preserving lyric-edit benchmark, with lyric and melody measures including PER and F0-CORR. Its architecture includes an IPA tokenizer and melody extraction. [Project and benchmark description](https://github.com/ASLP-lab/YingMusic-Singer-Plus)
+YingMusic-Singer-Plus is a fully diffusion-based 44.1 kHz stereo singing editor that accepts an optional timbre reference, a melody-providing singing clip and modified lyrics. It targets six edit types (partial/full replacement, insertion, deletion, translation and code-switching) and supports Chinese/English with a unified IPA tokenizer. Its LyricEditBench uses PER, speaker similarity, F0 correlation and vocal-quality evaluation. This is a stronger task-specific comparator than generic text-to-song generation. [Project and benchmark description](https://github.com/ASLP-lab/YingMusic-Singer-Plus)
 
 This is the closest task-specific model comparison, but any external reproduction must use matched source audio, split, operation, language and reference conditions. The dataset's licensing and underlying recording rights are separate constraints. This permission-free track does not download or reuse that corpus.
 
