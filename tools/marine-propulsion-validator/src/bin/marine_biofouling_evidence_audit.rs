@@ -209,7 +209,7 @@ fn check_inspection(record: &Value, findings: &mut Findings) -> (Option<f64>, us
                 }
             }
             (Some(_), Some(_)) => findings.push(
-                &path,
+                path.clone(),
                 "INVALID",
                 "zone inspected area must be between zero and the positive zone area",
             ),
@@ -220,7 +220,7 @@ fn check_inspection(record: &Value, findings: &mut Findings) -> (Option<f64>, us
         let fouling_fraction = zone.get("estimated_fouling_coverage_fraction").and_then(Value::as_f64);
         if fouling_class == Some("none") && fouling_fraction.is_some_and(|value| value > 0.0) {
             findings.push(
-                &path,
+                path.clone(),
                 "INVALID",
                 "fouling_class 'none' contradicts positive estimated fouling coverage",
             );
@@ -539,7 +539,7 @@ fn check_performance_comparison(record: &Value, cleaning_method: Option<&str>, f
         }
     }
 
-    !findings.incomparable && !findings.invalid
+    !findings.incomparable && !findings.invalid && !findings.blocked
 }
 
 fn check_record(record: &Value, findings: &mut Findings) -> (Option<f64>, usize, usize, Option<String>, bool) {
@@ -694,8 +694,9 @@ mod tests {
         let mut record = fixture();
         record["cleaning_event"]["local_authorization_status"] = serde_json::json!("denied");
         let mut findings = Findings::default();
-        check_record(&record, &mut findings);
+        let (_, _, _, _, performance_eligible) = check_record(&record, &mut findings);
         assert!(findings.blocked);
+        assert!(!performance_eligible);
     }
 
     #[test]
