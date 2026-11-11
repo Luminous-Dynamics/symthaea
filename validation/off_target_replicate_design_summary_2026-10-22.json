@@ -1,0 +1,48 @@
+{
+  "schema": "symthaea-off-target-repeat-design-summary-v1",
+  "date": "2026-10-22",
+  "status": "ROUNDED_SUMMARY_OF_EXACT_LOCAL_ENUMERATION_NOT_EXTERNAL_QUALIFICATION",
+  "source_git_blob": "796dbcaaa61ba612239db9f4c65be029a381a555",
+  "test_git_blob": "a7c8010faa2634e1bdfb5da58ab828582d6c0586",
+  "full_artifact": {
+    "filename": "off_target_replicate_design_results_exact.json",
+    "bytes": 65497,
+    "sha256": "428d17dffb74f48dfe8d1c0359bd5302d89ac2165106560fd09228f9d5386cd0",
+    "rows": 96,
+    "source_git_blob_bound": "796dbcaaa61ba612239db9f4c65be029a381a555"
+  },
+  "protocol": {
+    "action_budget": 2,
+    "repeatable_vs_distinct_only": true,
+    "policies": 6,
+    "regimes": 4,
+    "heldout_worlds": 2
+  },
+  "mean_metrics": [
+    {
+      "regime": "matched_clean",
+      "policy": "joint_graph_eig",
+      "distinct_only": {"ood_auc": 0.8796, "graph_info_bits": 0.33, "q_info_bits": 0.3142, "r_info_bits": 0.0093, "zero_support": 0.0},
+      "repeatable": {"ood_auc": 0.7139, "graph_info_bits": 0.498, "q_info_bits": 0.3156, "r_info_bits": 0.0196, "zero_support": 0.0}
+    },
+    {
+      "regime": "matched_off_target",
+      "policy": "joint_graph_eig",
+      "distinct_only": {"ood_auc": 0.8519, "graph_info_bits": 0.3019, "q_info_bits": 0.3146, "r_info_bits": 0.0088, "zero_support": 0.0},
+      "repeatable": {"ood_auc": 0.7078, "graph_info_bits": 0.4353, "q_info_bits": 0.3162, "r_info_bits": 0.0169, "zero_support": 0.0}
+    },
+    {
+      "regime": "weak_off_target",
+      "policy": "joint_graph_eig",
+      "distinct_only": {"ood_auc": 0.7727, "graph_info_bits": 0.2324, "q_info_bits": 0.4752, "r_info_bits": 0.0062, "zero_support": 0.0},
+      "repeatable": {"ood_auc": 0.678, "graph_info_bits": 0.3377, "q_info_bits": 0.4843, "r_info_bits": 0.0115, "zero_support": 0.0}
+    },
+    {
+      "regime": "noisy_off_target",
+      "policy": "joint_graph_eig",
+      "distinct_only": {"ood_auc": 0.6784, "graph_info_bits": 0.1238, "q_info_bits": 0.2277, "r_info_bits": 0.0089, "zero_support": 0.0},
+      "repeatable": {"ood_auc": 0.6716, "graph_info_bits": 0.1661, "q_info_bits": 0.2358, "r_info_bits": 0.0112, "zero_support": 0.0}
+    }
+  ],
+  "interpretation": "At an equal two-probe budget, repeating a selected action raises expected graph and off-target information in the tested joint graph-EIG policy, while decreasing OOD-surprise AUC in every listed regime. The naive perfect-hard-do learner can become less valid under repeats; no universal design ranking is established."
+}

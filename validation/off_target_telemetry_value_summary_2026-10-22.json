@@ -1,0 +1,38 @@
+{
+  "schema": "symthaea-off-target-telemetry-value-summary-v1",
+  "date": "2026-10-22",
+  "status": "ROUNDED_SUMMARY_OF_EXACT_LOCAL_ENUMERATION_NOT_EXTERNAL_QUALIFICATION",
+  "source_git_blob": "0f811ee1264816b4afa159285bdfa834f5ad0fbb",
+  "test_git_blob": "3e734c85ba273c1f3ed78aac62eec573444f01a8",
+  "full_artifact": {
+    "filename": "off_target_telemetry_value_results_exact.json",
+    "bytes": 23589,
+    "sha256": "e601f4683e3335b4aa978ca8a5d1997c95558a7ea3006cdffcd8714be2dca79d",
+    "rows": 48,
+    "source_git_blob_bound": "0f811ee1264816b4afa159285bdfa834f5ad0fbb"
+  },
+  "protocol": {
+    "budget": 2,
+    "telemetry_modes": ["outcome_only", "noisy_spill_sensor", "perfect_subset_telemetry"],
+    "sensor_sensitivity": 0.9,
+    "sensor_specificity": 0.9,
+    "regimes": 4,
+    "heldout_worlds": 2,
+    "policies": 2
+  },
+  "selected_graph_eig_rows": [
+    {"regime":"matched_clean","mode":"outcome_only","ood_auc":0.8796,"graph_info_bits":0.3300,"q_info_bits":0.3142,"r_info_bits":0.0093},
+    {"regime":"matched_clean","mode":"noisy_spill_sensor","ood_auc":0.8424,"graph_info_bits":0.3766,"q_info_bits":0.2479,"r_info_bits":0.0466},
+    {"regime":"matched_clean","mode":"perfect_subset_telemetry","ood_auc":0.8271,"graph_info_bits":0.4024,"q_info_bits":0.3877,"r_info_bits":0.0378},
+    {"regime":"matched_off_target","mode":"outcome_only","ood_auc":0.8519,"graph_info_bits":0.3019,"q_info_bits":0.3146,"r_info_bits":0.0088},
+    {"regime":"matched_off_target","mode":"noisy_spill_sensor","ood_auc":0.8342,"graph_info_bits":0.3032,"q_info_bits":0.2715,"r_info_bits":0.1156},
+    {"regime":"matched_off_target","mode":"perfect_subset_telemetry","ood_auc":0.7689,"graph_info_bits":0.3114,"q_info_bits":0.3877,"r_info_bits":0.3621},
+    {"regime":"weak_off_target","mode":"outcome_only","ood_auc":0.7727,"graph_info_bits":0.2324,"q_info_bits":0.4752,"r_info_bits":0.0062},
+    {"regime":"weak_off_target","mode":"noisy_spill_sensor","ood_auc":0.7615,"graph_info_bits":0.2350,"q_info_bits":0.4285,"r_info_bits":0.0822},
+    {"regime":"weak_off_target","mode":"perfect_subset_telemetry","ood_auc":0.6650,"graph_info_bits":0.2414,"q_info_bits":0.5640,"r_info_bits":0.2480},
+    {"regime":"noisy_off_target","mode":"outcome_only","ood_auc":0.6784,"graph_info_bits":0.1238,"q_info_bits":0.2277,"r_info_bits":0.0089},
+    {"regime":"noisy_off_target","mode":"noisy_spill_sensor","ood_auc":0.6470,"graph_info_bits":0.1231,"q_info_bits":0.2345,"r_info_bits":0.1148},
+    {"regime":"noisy_off_target","mode":"perfect_subset_telemetry","ood_auc":0.5843,"graph_info_bits":0.1253,"q_info_bits":0.3877,"r_info_bits":0.3621}
+  ],
+  "interpretation": "Telemetry markedly improves inference about off-target probability r, while surprise-AUC can decline because action mismatch is directly observed rather than conflated with graph misspecification. This is a diagnostic trade-off in a hand-authored toy benchmark, not an SOTA result."
+}

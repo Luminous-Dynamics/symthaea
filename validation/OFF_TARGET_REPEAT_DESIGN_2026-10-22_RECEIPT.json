@@ -1,0 +1,61 @@
+{
+  "schema": "symthaea-off-target-repeat-design-receipt-v1",
+  "date": "2026-10-22",
+  "status": "EXACT_LOCAL_ENUMERATION_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/entropy-causal-cut-benchmark-v1",
+  "source": {
+    "path": "validation/off_target_replicate_design.py",
+    "git_blob": "796dbcaaa61ba612239db9f4c65be029a381a555",
+    "sha256": "c13b88743199933088169d7cb68bc6d24c3f2c08328f9b476e9e9bee979bd82e",
+    "bytes": 9398
+  },
+  "tests": {
+    "path": "validation/test_off_target_replicate_design.py",
+    "git_blob": "a7c8010faa2634e1bdfb5da58ab828582d6c0586",
+    "sha256": "6cc8e537d1d5b355567bdb556859402ea60981befdbfcb3efa70af246ce1fd36",
+    "count": 4,
+    "result": "4/4_PASS_LOCAL"
+  },
+  "artifact": {
+    "filename": "off_target_replicate_design_results_exact.json",
+    "bytes": 65497,
+    "sha256": "428d17dffb74f48dfe8d1c0359bd5302d89ac2165106560fd09228f9d5386cd0",
+    "source_git_blob_bound": "796dbcaaa61ba612239db9f4c65be029a381a555",
+    "repository_summary_path": "validation/off_target_replicate_design_summary_2026-10-22.json",
+    "repository_summary_git_blob": "f1408e63123959647a3bbaca0c47578be19dbb98"
+  },
+  "report": {
+    "path": "docs/research/OFF_TARGET_REPEAT_DESIGN_2026-10-22.md",
+    "git_blob": "cd0f918232b0e28b47ce7da846c610d4adfab60b"
+  },
+  "protocol": {
+    "rows": 96,
+    "regimes": 4,
+    "policies": 6,
+    "heldout_worlds": 2,
+    "designs": [
+      "distinct_only",
+      "repeatable"
+    ],
+    "matched_action_budget": 2
+  },
+  "validation": {
+    "embedded_self_test": "PASS_LOCAL",
+    "unit_tests": "4/4_PASS_LOCAL",
+    "source_and_test_git_blobs_match_executed_bytes": true,
+    "remote_ci": "not claimed as passing",
+    "combined_compatibility_suite": {
+      "count": 26,
+      "result": "26/26_PASS_LOCAL",
+      "suites": [
+        "validation/test_off_target_kernel_inference.py",
+        "validation/test_off_target_replicate_design.py",
+        "validation/test_causal_probe_pareto_benchmark.py",
+        "validation/test_open_world_reference_stress.py"
+      ],
+      "note": "Executed locally after source/test blob verification; independent of remote GitHub Actions."
+    }
+  },
+  "conclusion": "With the same two-probe budget, repeatable probes increase expected graph and off-target information in the joint graph-EIG policy across the four tested regimes, but reduce OOD-surprise AUC. The naive q=1/r=0 policy can become less valid when repeating under actual partial/off-target actuation. This is a tiny synthetic result, not a general optimality claim."
+}
