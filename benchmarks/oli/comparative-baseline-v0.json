@@ -26,7 +26,19 @@
     "target_evaluation": "leave-target-out by construction; candidate/unresolved observations never enter the fit",
     "predictive_variance": "within-system residual + posterior system-intercept variance + candidate measurement variance + approximate common-slope variance",
     "unsupported_context_rule": "reject extrapolation outside the qualified-control context range for that system",
-    "threshold": "caller-declared standardized residual threshold; no universal biological threshold"
+    "threshold": "caller-declared standardized residual threshold; no universal biological threshold",
+    "alternative_model_comparison": {
+      "input": "separately supplied predicted_mean and predictive_stddev, with a model_id",
+      "score": "Gaussian log predictive density on the held-out observation, including candidate measurement uncertainty",
+      "outcomes": [
+        "ABIOTIC_BASELINE_PREDICTIVELY_PREFERRED",
+        "ALTERNATIVE_MODEL_PREDICTIVELY_PREFERRED",
+        "BOTH_MODELS_PREDICTIVE_BUT_NON_DISCRIMINATING",
+        "UNKNOWN_UNKNOWN_BOTH_MODELS_INADEQUATE",
+        "INCONCLUSIVE"
+      ],
+      "rule": "A model is adequate only when its absolute standardized residual is within the caller-declared threshold. If both are inadequate, preserve UnknownUnknown. A preference requires the adequate model and minimum log-score advantage."
+    }
   },
   "cases": [
     {
@@ -214,6 +226,104 @@
         "global_intercept": 1,
         "system_b_candidate_at_context_1_predicted_mean_approximately": -1
       }
+    },
+    {
+      "id": "ALTERNATIVE_MODEL_PREDICTIVELY_PREFERRED",
+      "purpose": "Demonstrate an independently supplied alternative model that predicts a comparative anomaly better than the abiotic baseline.",
+      "target": {
+        "id": "alternative-better",
+        "system_id": "system-b",
+        "context": 1.5,
+        "signal": 2,
+        "measurement_stddev": 0.05,
+        "role": "candidate"
+      },
+      "alternative_model": {
+        "model_id": "candidate-structured-chemistry-v1",
+        "predicted_mean": 2,
+        "predictive_stddev": 0.1
+      },
+      "thresholds": {
+        "adequacy_z": 3,
+        "minimum_log_score_advantage": 1
+      },
+      "expected": {
+        "outcome": "alternative_model_predictively_preferred",
+        "claim_ceiling": "relative predictive result only; not proof of life or biogenicity"
+      }
+    },
+    {
+      "id": "UNKNOWN_UNKNOWN_BOTH_MODELS_INADEQUATE",
+      "purpose": "Preserve an out-of-family observation when neither the qualified abiotic baseline nor the alternative mechanism model explains it.",
+      "target": {
+        "id": "both-poor",
+        "system_id": "system-b",
+        "context": 1.5,
+        "signal": 10,
+        "measurement_stddev": 0.05,
+        "role": "candidate"
+      },
+      "alternative_model": {
+        "model_id": "alternative-mechanism-v0",
+        "predicted_mean": -10,
+        "predictive_stddev": 0.1
+      },
+      "thresholds": {
+        "adequacy_z": 3,
+        "minimum_log_score_advantage": 1
+      },
+      "expected": {
+        "outcome": "unknown_unknown_both_models_inadequate",
+        "must_not_be_forced_to": "abiotic_or_biotic"
+      }
+    },
+    {
+      "id": "BOTH_MODELS_PREDICTIVE_NON_DISCRIMINATING",
+      "purpose": "Prevent a forced choice when both abiotic and alternative models adequately predict the same observation.",
+      "target": {
+        "id": "both-fit",
+        "system_id": "system-b",
+        "context": 1.5,
+        "signal": 0,
+        "measurement_stddev": 0.05,
+        "role": "candidate"
+      },
+      "alternative_model": {
+        "model_id": "broad-alternative",
+        "predicted_mean": 0,
+        "predictive_stddev": 1
+      },
+      "thresholds": {
+        "adequacy_z": 3,
+        "minimum_log_score_advantage": 1
+      },
+      "expected": {
+        "outcome": "both_models_predictive_but_non_discriminating"
+      }
+    },
+    {
+      "id": "ABIOTIC_BASELINE_PREDICTIVELY_PREFERRED",
+      "purpose": "Ensure a poor alternative model does not create a biosignature claim when the abiotic baseline explains the candidate.",
+      "target": {
+        "id": "abiotic-better",
+        "system_id": "system-b",
+        "context": 1.5,
+        "signal": 0,
+        "measurement_stddev": 0.05,
+        "role": "candidate"
+      },
+      "alternative_model": {
+        "model_id": "poor-alternative",
+        "predicted_mean": 2,
+        "predictive_stddev": 0.05
+      },
+      "thresholds": {
+        "adequacy_z": 3,
+        "minimum_log_score_advantage": 1
+      },
+      "expected": {
+        "outcome": "abiotic_baseline_predictively_preferred"
+      }
     }
   ],
   "anti_leakage": [
@@ -223,7 +333,9 @@
     "Candidate and Unresolved observations are excluded even when present in the fit input slice.",
     "Target observations are evaluated against a model fitted without the target.",
     "Time frames and repeated measurements from the same physical world are not independent worlds.",
-    "Context outside the qualified control range is rejected rather than extrapolated."
+    "Context outside the qualified control range is rejected rather than extrapolated.",
+    "Alternative-model predictions must be produced and versioned independently; the baseline evaluator cannot author or validate its own alternative model.",
+    "If both models fail the declared predictive-adequacy threshold, preserve the candidate as UnknownUnknownBothModelsInadequate."
   ],
   "metrics": [
     "leave_one_world_out_log_predictive_density",
