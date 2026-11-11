@@ -1,0 +1,873 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_id": "ROB-ADAPTIVE-COMMIT-HORIZON-001",
+  "status": "synthetic_known_answers_only",
+  "required_bounds": [
+    "proposal",
+    "freshness",
+    "deadline",
+    "thermal",
+    "actuator",
+    "dynamics",
+    "viability",
+    "queue",
+    "continuity"
+  ],
+  "cases": [
+    {
+      "case_id": "AH01_QUEUE_IS_TIGHTEST",
+      "description": "A complete bound set selects the minimum action prefix; queue availability is the binding limit.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "eligible",
+        "selected_horizon_ticks": 6,
+        "binding_constraints": [
+          "queue"
+        ],
+        "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH02_THERMAL_CAP_BINDS",
+      "description": "The qualified upper-bound thermal forecast limits commitment to three ticks.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 3
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "eligible",
+        "selected_horizon_ticks": 3,
+        "binding_constraints": [
+          "thermal"
+        ],
+        "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH03_VIABILITY_CAP_BINDS",
+      "description": "Observation-constrained future viability is tighter than all other physical limits.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 2
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "eligible",
+        "selected_horizon_ticks": 2,
+        "binding_constraints": [
+          "viability"
+        ],
+        "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH04_REQUIRED_THERMAL_EVIDENCE_UNKNOWN",
+      "description": "Thermal-safe prefix is Unknown; no permissive default or infinity is allowed.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "unknown",
+            "max_ticks": null
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "unknown_hold",
+        "selected_horizon_ticks": null,
+        "binding_constraints": [],
+        "eligible_for_independent_projection": false,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH05_ZERO_DEADLINE_SLACK",
+      "description": "The action deadline leaves zero executable ticks after required computation/projection.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 0
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "zero_horizon_fallback",
+        "selected_horizon_ticks": 0,
+        "binding_constraints": [
+          "deadline"
+        ],
+        "eligible_for_independent_projection": false,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH06_QUEUE_UNDERFLOW",
+      "description": "No queued action remains; the system must use the separately qualified fallback.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 0
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "zero_horizon_fallback",
+        "selected_horizon_ticks": 0,
+        "binding_constraints": [
+          "queue"
+        ],
+        "eligible_for_independent_projection": false,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH07_DYNAMICS_DIGEST_MISMATCH",
+      "description": "The dynamics bound is tied to a different model/evidence digest and cannot be consumed.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "digest_mismatch",
+            "max_ticks": null
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "provenance_mismatch",
+        "selected_horizon_ticks": null,
+        "binding_constraints": [],
+        "eligible_for_independent_projection": false,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH08_STALE_FRESHNESS_CERTIFICATE",
+      "description": "The freshness certificate is stale and cannot be treated as a qualified cap.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "stale",
+            "max_ticks": null
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "unknown_hold",
+        "selected_horizon_ticks": null,
+        "binding_constraints": [],
+        "eligible_for_independent_projection": false,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH09_LONG_WORLD_MODEL_HORIZON_CLIPPED_BY_VIABILITY",
+      "description": "A long proposed/world-model horizon is clipped to five ticks by the robust viability cap.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 32
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 28
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 24
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 18
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 5
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 10
+          }
+        },
+        "progress_only_recommended_ticks": 32,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "eligible",
+        "selected_horizon_ticks": 5,
+        "binding_constraints": [
+          "viability"
+        ],
+        "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH10_LOW_RISK_STABLE_LONG_COMMITMENT",
+      "description": "All evidence is qualified and the stable operating envelope allows a longer twenty-tick prefix.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 32
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 20
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 24
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 26
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 22
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 24
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 21
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 20
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 28
+          }
+        },
+        "progress_only_recommended_ticks": 32,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "eligible",
+        "selected_horizon_ticks": 20,
+        "binding_constraints": [
+          "freshness",
+          "deadline",
+          "thermal",
+          "actuator",
+          "dynamics",
+          "viability",
+          "queue",
+          "continuity"
+        ],
+        "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH11_PROGRESS_ONLY_RECOMMENDS_TOO_LONG",
+      "description": "A progress monitor recommends twenty-four ticks, but qualified thermal headroom permits only four.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 24
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 4
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 24,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "eligible",
+        "selected_horizon_ticks": 4,
+        "binding_constraints": [
+          "thermal"
+        ],
+        "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH12_ELIGIBLE_IS_NOT_ACTUATION_AUTHORITY",
+      "description": "All bounds permit a six-tick prefix; the evaluator returns eligibility only, never an actuation permit.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "eligible",
+        "selected_horizon_ticks": 6,
+        "binding_constraints": [
+          "queue"
+        ],
+        "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH13_SHORT_QUEUE_LIMITS_COMMITMENT",
+      "description": "A two-tick queue is the tightest valid limit even though other caps are longer.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 2
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "eligible",
+        "selected_horizon_ticks": 2,
+        "binding_constraints": [
+          "queue"
+        ],
+        "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH14_ACTUATOR_BOUND_STALE",
+      "description": "Actuator authority evidence is stale; no new prefix may be committed.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8
+          },
+          "actuator": {
+            "status": "stale",
+            "max_ticks": null
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "unknown_hold",
+        "selected_horizon_ticks": null,
+        "binding_constraints": [],
+        "eligible_for_independent_projection": false,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH15_TIED_THERMAL_AND_ACTUATOR_LIMITS",
+      "description": "Thermal and actuator limits tie at three ticks; both binding reasons are retained.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 3
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 3
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1
+      },
+      "expected": {
+        "disposition": "eligible",
+        "selected_horizon_ticks": 3,
+        "binding_constraints": [
+          "thermal",
+          "actuator"
+        ],
+        "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    }
+  ]
+}
