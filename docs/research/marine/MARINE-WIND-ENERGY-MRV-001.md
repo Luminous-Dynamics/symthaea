@@ -18,6 +18,16 @@ Most importantly, proposed Article 5(4) and the Annex I amendment would empower 
 
 That creates an opportunity: build the auditable measurement and provenance infrastructure now, but keep any future regulatory calculation method pluggable and versioned. Do not invent the future method.
 
+## 1A. Parallel IMO work on wind-propulsion GFI measurement remains draft
+
+A separate international workstream is under way. At ISWG-GHG 21, immediately before MEPC 84, draft implementation guidance was being developed for calculation of attained annual GHG Fuel Intensity (GFI), including draft guidance on how to monitor, report and verify energy derived from wind propulsion systems. The ClassNK MEPC 84 preliminary report states this development would continue in light of ongoing discussions on the IMO mid-term measures; the draft method was not adopted as an operative calculation standard at that session.
+
+This creates two separate pending standards paths:
+- EU COM(2026)620 proposes a future European implementing-act hook for the amount of WAPS energy used, but remains a legislative proposal.
+- IMO GFI implementation drafts contemplate a wind-propulsion MRV method, but depend on the unresolved IMO mid-term measure and further guideline development.
+
+Do not blend the two regimes or present either draft as a current credit formula. The data architecture should preserve the measurements and evidence needed by both, while a regulatory output stays NOT_DETERMINED until the applicable law, standard, methodology and certificate are specified and in force.
+
 ## 2. The central distinction: three different quantities
 
 The system must keep three results separate:
@@ -140,6 +150,8 @@ This complements DLR Odyssa, specialist CFD and WAPS suppliers rather than repla
 ## 9. Sources and current status
 
 - European Commission, COM(2026)620 final, 17 July 2026: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52026PC0620
+- ClassNK, Preliminary Report of IMO MEPC 84, 4 May 2026, sections 1.1.2 and 1.2: https://www.classnk.or.jp/hp/pdf/info_service/imo_and_iacs/MEPC84_sumE.pdf
+- IMO MEPC 84, 27 April–1 May 2026: https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx
 - European Parliament Legislative Observatory, procedure 2026/0210(COD): https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2026%2F0210%28COD%29
 - European Commission Annex to COM(2026)620 (proposed Annex I method and Article 5(4) wind standard/certification hook): https://publications.europa.eu/resource/cellar/bef58239-81f4-11f1-bf5e-01aa75ed71a1.0001.03/DOC_2
 - EU MRV Regulation (EU) 2015/757: https://eur-lex.europa.eu/eli/reg/2015/757/oj/eng
