@@ -145,11 +145,45 @@ Sources:
 - Official model card, scores, architecture, limits and terms: https://huggingface.co/MuScriptor/muscriptor-large
 - Official code: https://github.com/muscriptor/muscriptor
 
+### MulTTiPop — real-world pop stress test
+
+The July 2026 MulTTiPop dataset contains 572 multitrack pop segments (3.5 hours), drawn from 374 songs and 263 artists. Its artist-separated test split contains 403 segments (152 minutes); its dev split contains 169 segments (61 minutes). The dataset spans 101 genres by its authors' artist-genre labeling and covers songs from 1939–2009, with no 2010s material.
+
+The authors' published onset F1 results are low, which makes this a valuable robustness target rather than an easy leaderboard:
+- MT3: 10.87 exact-instrument onset F1; 27.82 after harmonic/percussive reduction.
+- YourMT3+: 11.51 exact-instrument onset F1; 28.74 after harmonic/percussive reduction.
+
+The results use a 50 ms onset tolerance. Their exact-instrument score requires the same MIDI program, while their reduced task groups instruments as harmonic or percussive. The paper qualitatively reports inconsistent instrument programs, missing parts, broken line continuity, and reduced rhythmic nuance.
+
+**Use constraints:** the authors explicitly say MulTTiPop is for evaluation, not model training, because it is small and its labels correspond to copyrighted commercial recordings. The authors also disclose a strong Western-pop bias. We should keep it as an evaluation-only, no-training benchmark; obtain audio through the dataset's permitted evaluation procedure and respect the underlying rights and platform terms. The paper says 49.1% of 1,164 candidate alignments were selected as acceptable; the resulting released set contains 572 accepted segments. Use the released artist-separated splits rather than rebuilding or cherry-picking alignment candidates.
+
+**Immediate target:** reproduce MT3 and YourMT3+ on the published test split and exact/harmonic-percussive instrument definitions, then run a frozen MuScriptor checkpoint using the same audio segments and same evaluator. Do not compare its MuScriptor D_Test result directly to MulTTiPop. The first meaningful Melothaea achievement is to beat the published 11.51 exact-instrument / 28.74 harmonic-percussive YourMT3+ results with 95% confidence intervals, while reporting each score separately and retaining the test split untouched.
+
+Source: https://arxiv.org/abs/2607.08756
+
 ### mir_eval — the note-event standard we should match precisely
 
 The mir_eval 0.8.2 documentation/source specifies the 50 ms onset / 50-cent pitch criterion, a separate full-note test with the greater of 20% reference duration or 50 ms offset tolerance, four-decimal onset/offset distance rounding, and one-to-one Hopcroft–Karp bipartite matching. V1 ports the matching traversal and thresholds, including first-seen predicted-node insertion order. A pinned fixture-by-fixture parity run against the Python package is still required before claiming complete score-for-score parity on arbitrary datasets.
 
 References: https://mir-eval.readthedocs.io/latest/api/transcription.html and https://github.com/mir-evaluation/mir_eval/tree/0.8.2
+
+### Dual score and playback fidelity — beyond note F1
+
+A transcription can be symbolically close to a reference while producing a poor resynthesis, or can render close to the source while being awkward or inaccurate as notation. The August 2026 *A Dual Evaluation for Music Transcription* study formalizes these as separate dimensions. It evaluates notation with OMR-NED and playback with feature-alignment metrics, learned embeddings and human preference. Its piano study used 230 recordings (23 works, 30 performers, six composers), 106 participants and 3,180 pairwise judgments.
+
+Among that study's automatic playback metrics:
+- CLEWS segment-mean similarity reached Spearman ρ=0.971 and Kendall τ=0.891 against its human Bradley–Terry preference scores.
+- Position-balanced Gemini 3.1 Pro ABX reached ρ=0.970 and τ=0.870.
+- TWED with MFCC features reached ρ=0.924 and τ=0.790.
+- DTW with Chroma CENS reached ρ=0.891 and τ=0.761.
+
+CLEWS was also cheaper than the other learned/LLM evaluators in that study: its cloud-equivalent estimate was $0.37 per 1,000 comparisons, versus $5.10 per 1,000 for the paired Gemini ABX requests. These cost estimates are paper-specific, not universal service prices.
+
+**Melothaea adaptation:** keep symbolic MIDI note-event scores as one axis. Add a separately versioned audio-render comparison track: render transcription MIDI with a frozen renderer/soundfont; compare against the exact source WAV using a deterministic DTW/TWED feature baseline first; add CLEWS or another embedding model only as a separately pinned evaluator; validate metric ranking against blinded musician A/B choices. Do not conflate source-audio similarity with MIDI-to-MIDI note accuracy. The study is piano-centric and its authors caution that transfer to ensembles, voice and non-Western genres is not established.
+
+For full score-generation workflows, add notation-side OMR-NED or an equivalent MusicXML symbol metric separately. The Melothaea MIDI evaluator itself does not claim to measure engraving or readability.
+
+Source: https://arxiv.org/abs/2608.04511
 
 ### Complementary corpora
 
@@ -168,6 +202,8 @@ A credible first external result is to reproduce MuScriptor's D_Test comparisons
 - beats 72.4 Frame F1 only after reproducing the same frame-evaluation details;
 - reports velocity separately on a dataset where velocity ground truth exists;
 - shows gains on genre-held-out and instrument-held-out splits, not only random tracks;
+- reproduces MulTTiPop YourMT3+ (11.51 exact-program onset F1; 28.74 harmonic/percussive onset F1) before claiming a win on that test;
+- reports symbolic metrics separately from playback-side scores and human preference correlation;
 - reports 95% confidence intervals, performance by instrument family, and failure rates on overlap/density strata.
 
 Those are stretch targets for a future transcription model, not a claim that an evaluator alone improves model accuracy. The first engineering deliverable is a reliable, model-neutral measurement instrument.
@@ -179,7 +215,8 @@ Those are stretch targets for a future transcription model, not a claim that an 
 3. **Event identity and overlap.** Evaluate duplicate notes, same-pitch overlap, voice separation, velocity and articulation as independent dimensions. MIDI 1.0's lack of note-instance IDs must remain visible.
 4. **Uncertainty that is calibrated.** Add event-level confidence and evaluate calibration, coverage-risk curves, selective precision/recall and abstention—not just F1.
 5. **Independent acoustic adjudication.** Keep the transcriber distinct from the observer. Use audio-side onset/pitch evidence and an independent renderer/patch reference; neither should self-certify the other.
-6. **Human utility.** A musician study should measure edit time, corrections per minute, voice/part preservation, and trust calibration. Higher transcription F1 alone does not prove a better creative workflow.
+6. **Dual fidelity.** Measure symbolic note correctness and rendered-audio playback similarity independently; for notation output, measure score readability/notation distance as a third axis. Use CLEWS/TWED/DTW as candidate playback measures only after calibration against musician judgments on ensembles.
+7. **Human utility.** A musician study should measure edit time, corrections per minute, voice/part preservation, and trust calibration. Higher transcription F1 alone does not prove a better creative workflow.
 
 ## Next implementation
 
