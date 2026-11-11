@@ -38,7 +38,7 @@ The isolated stem is not source separation. V1 requires a dedicated single-track
 
 ## V1 data contract
 
-The machine-readable contract is `docs/research/schemas/muse-part-stem-evidence-v1.schema.json`.
+The machine-readable contract is `docs/research/schemas/muse-part-stem-evidence-v1.schema.json`. An illustrative, schema-shaped two-part manifest is provided at `docs/research/fixtures/muse-part-stem-evidence-v1.example.json`. Its repeated-character digests are placeholders for contract examples only; they do not identify real score, MIDI, renderer, patch, or WAV artifacts and are not qualifying evidence. The two track-event commitments and outer bundle commitment are internally calculated for the shown payload.
 
 ### Bundle identity
 
