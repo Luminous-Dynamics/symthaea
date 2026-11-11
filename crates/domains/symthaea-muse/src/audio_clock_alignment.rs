@@ -272,7 +272,8 @@ fn spectral_flux(
                 .map(|(current, prior)| (current - prior).max(0.0))
                 .sum::<f64>();
             let prior_energy = previous.iter().sum::<f64>();
-            positive_difference / (prior_energy + 1e-9)
+            let current_energy = magnitude.iter().sum::<f64>();
+            positive_difference / (prior_energy + current_energy + 1e-9)
         } else {
             0.0
         };
@@ -504,6 +505,11 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
         }
     }
 
+    if scores.is_empty() {
+        return Err(vec![AudioClockAlignmentIssueV1::InvalidConfig {
+            field: "offset_search_contains_no_hop_samples".into(),
+        }]);
+    }
     let Some(best_index) = scores
         .iter()
         .enumerate()
