@@ -315,32 +315,51 @@ impl EvidenceConflict {
         let mut contradicting_groups = HashSet::<String>::new();
         let mut groups_complete = true;
 
-        for (side, ids, groups) in [
-            ("supporting", &self.supporting_evidence_ids, &mut supporting_groups),
-            ("contradicting", &self.contradicting_evidence_ids, &mut contradicting_groups),
-        ] {
-            for id in ids {
-                if !seen.insert(id.clone()) {
-                    issues.push(format!(
-                        "{path} evidence id {id} is duplicated or appears on both sides of the conflict"
-                    ));
-                }
-                if !property_evidence_ids.iter().any(|property_id| property_id == id) {
-                    issues.push(format!(
-                        "{path} conflict evidence id {id} is not linked by the containing property finding"
-                    ));
-                }
-                match evidence.iter().find(|record| record.id == *id) {
-                    Some(record) => match &record.independence_group {
-                        Some(group) if !group.trim().is_empty() => {
-                            groups.insert(group.clone());
-                        }
-                        _ => groups_complete = false,
-                    },
-                    None => issues.push(format!(
-                        "{path} references unknown {side} evidence id: {id}"
-                    )),
-                }
+        for id in &self.supporting_evidence_ids {
+            if !seen.insert(id.clone()) {
+                issues.push(format!(
+                    "{path} evidence id {id} is duplicated or appears on both sides of the conflict"
+                ));
+            }
+            if !property_evidence_ids.iter().any(|property_id| property_id == id) {
+                issues.push(format!(
+                    "{path} conflict evidence id {id} is not linked by the containing property finding"
+                ));
+            }
+            match evidence.iter().find(|record| record.id == *id) {
+                Some(record) => match &record.independence_group {
+                    Some(group) if !group.trim().is_empty() => {
+                        supporting_groups.insert(group.clone());
+                    }
+                    _ => groups_complete = false,
+                },
+                None => issues.push(format!(
+                    "{path} references unknown supporting evidence id: {id}"
+                )),
+            }
+        }
+
+        for id in &self.contradicting_evidence_ids {
+            if !seen.insert(id.clone()) {
+                issues.push(format!(
+                    "{path} evidence id {id} is duplicated or appears on both sides of the conflict"
+                ));
+            }
+            if !property_evidence_ids.iter().any(|property_id| property_id == id) {
+                issues.push(format!(
+                    "{path} conflict evidence id {id} is not linked by the containing property finding"
+                ));
+            }
+            match evidence.iter().find(|record| record.id == *id) {
+                Some(record) => match &record.independence_group {
+                    Some(group) if !group.trim().is_empty() => {
+                        contradicting_groups.insert(group.clone());
+                    }
+                    _ => groups_complete = false,
+                },
+                None => issues.push(format!(
+                    "{path} references unknown contradicting evidence id: {id}"
+                )),
             }
         }
 
