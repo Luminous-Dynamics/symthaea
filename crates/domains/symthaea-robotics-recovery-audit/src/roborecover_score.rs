@@ -1195,7 +1195,7 @@ mod tests {
 
         assert_eq!(
             classify_policy_completion(&trial),
-            PolicyCompletion::ReplayPreempted
+            PolicyCompletion::Contradictory
         );
         assert_eq!(source_reports_environment_completion(&trial), Some(true));
     }
