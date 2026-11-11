@@ -34,6 +34,14 @@ pub enum ExecutionMode {
     SeedOnly,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScenarioSource {
+    Natural,
+    ActionPerturbed,
+    HumanConstructed,
+    Unknown,
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum RecoveryStage {
     Approach,
@@ -61,6 +69,8 @@ pub struct PlannedScenario {
     pub scenario_id: String,
     /// SHA-256 of the exact upstream scenario JSON from the split manifest.
     pub scenario_content_sha256: String,
+    /// Evaluator-side construction provenance; never a policy/router feature.
+    pub source: ScenarioSource,
     pub stage: RecoveryStage,
     pub deviation: DeviationType,
     /// Expected independent rollout IDs for this scenario.
@@ -110,10 +120,13 @@ pub struct RoboRecoverTrial {
     pub platform: BenchmarkPlatform,
     pub split: BenchmarkSplit,
     pub execution_mode: ExecutionMode,
+    pub source_repository: String,
     pub source_revision: String,
     pub split_manifest_blob_sha: String,
     pub stage: RecoveryStage,
     pub deviation: DeviationType,
+    /// Evaluator-side construction provenance; never a policy/router feature.
+    pub source: ScenarioSource,
     /// Exact status string emitted by the pinned source adapter.
     pub source_status: String,
     /// Number of actions actually executed after policy handoff.
@@ -235,6 +248,7 @@ pub enum ManifestIssue {
 pub struct ScenarioScore {
     pub scenario_id: String,
     pub scenario_content_sha256: String,
+    pub source: ScenarioSource,
     pub stage: RecoveryStage,
     pub deviation: DeviationType,
     pub expected_trials: usize,
@@ -515,6 +529,7 @@ pub fn score_roborecover(
         let metadata_matches = trial.platform == manifest.platform
             && trial.split == manifest.split
             && trial.execution_mode == manifest.execution_mode
+            && trial.source_repository == manifest.source_repository
             && trial.source_revision == manifest.source_revision
             && trial.split_manifest_blob_sha == manifest.split_manifest_blob_sha
             && trial.evidence.policy_digest == manifest.policy_digest
@@ -570,6 +585,7 @@ pub fn score_roborecover(
         scenario_scores.push(ScenarioScore {
             scenario_id: scenario.scenario_id.clone(),
             scenario_content_sha256: scenario.scenario_content_sha256.clone(),
+            source: scenario.source,
             stage: scenario.stage,
             deviation: scenario.deviation,
             expected_trials: scenario.expected_trial_ids.len(),
@@ -667,6 +683,7 @@ pub fn score_roborecover(
                         trial.platform == manifest.platform
                             && trial.split == manifest.split
                             && trial.execution_mode == manifest.execution_mode
+                            && trial.source_repository == manifest.source_repository
                             && trial.source_revision == manifest.source_revision
                             && trial.split_manifest_blob_sha == manifest.split_manifest_blob_sha
                             && trial.evidence.policy_digest == manifest.policy_digest
@@ -750,6 +767,7 @@ mod tests {
             .map(|(index, group)| PlannedScenario {
                 scenario_id: format!("scenario-{index}"),
                 scenario_content_sha256: format!("{index:064x}"),
+                source: ScenarioSource::Natural,
                 stage: group.stage,
                 deviation: group.deviation,
                 expected_trial_ids: vec![format!("trial-{index}-0")],
@@ -784,10 +802,12 @@ mod tests {
             platform: manifest.platform,
             split: manifest.split,
             execution_mode: manifest.execution_mode,
+            source_repository: manifest.source_repository.clone(),
             source_revision: manifest.source_revision.clone(),
             split_manifest_blob_sha: manifest.split_manifest_blob_sha.clone(),
             stage: scenario.stage,
             deviation: scenario.deviation,
+            source: scenario.source,
             source_status: "infer_ok".to_owned(),
             inference_steps: 3,
             source_terminal_success: Some(true),
