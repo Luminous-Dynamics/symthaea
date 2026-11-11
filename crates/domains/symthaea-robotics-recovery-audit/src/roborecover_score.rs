@@ -216,7 +216,8 @@ pub fn classify_policy_completion(trial: &RoboRecoverTrial) -> PolicyCompletion 
     }
 }
 
-/// Whether the source evaluator reports an environment-completion flag/status.
+/// Whether the source evaluator reports a success signal.
+/// RoboTwin exposes a raw success boolean; LIBERO exposes only a status label.
 /// This is not evidence that the policy caused completion.
 pub fn source_reports_success(trial: &RoboRecoverTrial) -> Option<bool> {
     match trial.platform {
