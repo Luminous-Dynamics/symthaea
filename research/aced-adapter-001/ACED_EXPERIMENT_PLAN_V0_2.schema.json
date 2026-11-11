@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/aced-adapter-001/ACED_EXPERIMENT_PLAN_V0_2.schema.json",
+  "title": "ACED prospective experiment plan v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "benchmark_id",
+    "target",
+    "intervention",
+    "control",
+    "allocation",
+    "measurement",
+    "sample",
+    "budget",
+    "safety",
+    "identification_assumptions",
+    "confounders_and_selection",
+    "stop_rules"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "aced-experiment-plan-v0.2"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "const": "ACED-REPAIR-ADAPTER-001"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question",
+        "hypothesis_ids"
+      ],
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hypothesis_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "target_ref",
+        "treatment_spec"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "treatment_spec": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "description",
+        "control_variables"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "control_variables": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "allocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "unit",
+        "seed_commitment_sha256"
+      ],
+      "properties": {
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed_commitment_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variables",
+        "timepoints",
+        "outcome_taxonomy"
+      ],
+      "properties": {
+        "variables": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "timepoints": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "outcome_taxonomy": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planned_units",
+        "standardized_effect_size",
+        "alpha",
+        "target_power",
+        "power_method"
+      ],
+      "properties": {
+        "planned_units": {
+          "type": "integer",
+          "minimum": 2,
+          "multipleOf": 2
+        },
+        "standardized_effect_size": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.2
+        },
+        "target_power": {
+          "type": "number",
+          "exclusiveMinimum": 0.5,
+          "exclusiveMaximum": 1
+        },
+        "power_method": {
+          "const": "two_sided_equal_allocation_independent_means_normal_approximation"
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_experiments",
+        "max_turns",
+        "max_cost_units"
+      ],
+      "properties": {
+        "max_experiments": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_turns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_units": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "risk_class",
+        "reversibility",
+        "maximum_exposure",
+        "stop_conditions"
+      ],
+      "properties": {
+        "risk_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reversibility": {
+          "enum": [
+            "reversible",
+            "partially_reversible",
+            "irreversible"
+          ]
+        },
+        "maximum_exposure": {
+          "type": "number",
+          "minimum": 0
+        },
+        "stop_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "identification_assumptions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "confounders_and_selection": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "stop_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "premature_stop_rule",
+        "continue_rule",
+        "conflict_resolution_rule"
+      ],
+      "properties": {
+        "premature_stop_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "continue_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conflict_resolution_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
