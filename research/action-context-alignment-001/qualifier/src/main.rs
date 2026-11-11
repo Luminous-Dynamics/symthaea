@@ -5,12 +5,14 @@ use std::fs;
 use std::process::ExitCode;
 
 const BENCHMARK_ID: &str = "ACTION-CONTEXT-ALIGNMENT-001";
-const SCHEMA_VERSION: &str = "action-context-alignment-fixtures-v0.2";
+const SCHEMA_VERSION: &str = "action-context-alignment-fixtures-v0.3";
 const SCHEMA_ID: &str = "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/action-context-alignment-001/ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.schema.json";
-const EXPECTED_FIXTURES: usize = 48;
-const EXPECTED_PAIRS: usize = 24;
-const DIMENSIONS: [&str; 8] = [
+const EXPECTED_FIXTURES: usize = 60;
+const EXPECTED_PAIRS: usize = 30;
+const DIMENSIONS: [&str; 10] = [
     "principal_binding",
+    "actor_binding",
+    "on_behalf_of_binding",
     "local_recognition",
     "target_allowlist",
     "purpose_binding",
@@ -44,10 +46,12 @@ fn is_sha256(value: &str) -> bool {
 
 fn changed_field(dimension: &str) -> Option<&'static str> {
     match dimension {
-        "principal_binding" => Some("principal_binding"),
+        "principal_binding" => Some("principal_ref"),
+        "actor_binding" => Some("actor_ref"),
+        "on_behalf_of_binding" => Some("on_behalf_of_ref"),
         "local_recognition" => Some("local_recognition"),
         "target_allowlist" => Some("target_allowlist"),
-        "purpose_binding" => Some("purpose_binding"),
+        "purpose_binding" => Some("purpose_ref"),
         "expiry" => Some("expires_at_unix"),
         "delegation_scope" => Some("delegated_scope"),
         "pre_state" => Some("pre_state_sha256"),
@@ -70,13 +74,17 @@ fn derive_eligible(fixture: &Value) -> Result<bool, String> {
         .as_array()
         .ok_or_else(|| "target_allowlist must be an array".to_string())?;
     let target_allowed = allowlist.iter().any(|entry| entry.as_str() == Some(target));
-    let principal_exact = str_field(auth, "principal_binding") == Some("Exact");
+    let principal_exact = str_field(auth, "principal_ref") == str_field(task, "principal_ref");
+    let actor_exact = str_field(auth, "actor_ref") == str_field(task, "actor_ref");
+    let on_behalf_of_exact = str_field(auth, "on_behalf_of_ref") == str_field(task, "on_behalf_of_ref");
     let locally_recognized = bool_field(auth, "local_recognition") == Some(true);
-    let purpose_exact = str_field(auth, "purpose_binding") == Some("Exact");
+    let purpose_exact = str_field(auth, "purpose_ref") == str_field(task, "purpose_ref");
     let scope_exact = str_field(auth, "delegated_scope") == Some(required_scope);
     let pre_state_exact =
         str_field(auth, "pre_state_sha256") == str_field(task, "pre_state_sha256");
     Ok(principal_exact
+        && actor_exact
+        && on_behalf_of_exact
         && locally_recognized
         && target_allowed
         && purpose_exact
@@ -160,12 +168,14 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String),
     }
 
     let auth = &fixture["authority_context"];
-    if auth.as_object().map(serde_json::Map::len) != Some(7) {
-        return Err("authority_context must contain exactly the seven declared properties".into());
+    if auth.as_object().map(serde_json::Map::len) != Some(9) {
+        return Err("authority_context must contain exactly the nine declared properties".into());
     }
-    if !["Exact", "Mismatch"].contains(&str_field(auth, "principal_binding").unwrap_or(""))
+    if str_field(auth, "principal_ref").is_none()
+        || str_field(auth, "actor_ref").is_none()
+        || str_field(auth, "on_behalf_of_ref").is_none()
         || bool_field(auth, "local_recognition").is_none()
-        || !["Exact", "Different"].contains(&str_field(auth, "purpose_binding").unwrap_or(""))
+        || str_field(auth, "purpose_ref").is_none()
         || u64_field(auth, "expires_at_unix").is_none_or(|time| time == 0)
         || str_field(auth, "delegated_scope").is_none()
         || !str_field(auth, "pre_state_sha256").is_some_and(is_sha256)
@@ -255,7 +265,7 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
     let mut errors = Vec::new();
     if str_field(manifest, "schema_version") != Some(SCHEMA_VERSION)
         || str_field(manifest, "benchmark_id") != Some(BENCHMARK_ID)
-        || str_field(manifest, "status") != Some("synthetic_pair_design_unexecuted")
+        || str_field(manifest, "status") != Some("synthetic_preflight_runtime_identity_pair_design_unexecuted")
         || manifest["fixture_count"].as_u64() != Some(EXPECTED_FIXTURES as u64)
         || manifest["pair_count"].as_u64() != Some(EXPECTED_PAIRS as u64)
     {
@@ -283,7 +293,7 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
     if declared_dimensions != Some(expected_dimensions)
         || declared_dimension_count != Some(DIMENSIONS.len())
     {
-        errors.push("declared mutation dimensions do not match v0.1 contract".into());
+        errors.push("declared mutation dimensions do not match v0.3 contract".into());
     }
 
     let mut fixture_ids = BTreeSet::new();
@@ -509,10 +519,10 @@ mod tests {
     }
 
     #[test]
-    fn all_forty_eight_rows_and_twenty_four_pairs_validate() {
+    fn all_sixty_rows_and_thirty_pairs_validate() {
         let (n, counts) = validate_manifest(&parsed()).expect("pairs qualify");
-        assert_eq!(n, 48);
-        assert_eq!(counts.len(), 8);
+        assert_eq!(n, 60);
+        assert_eq!(counts.len(), 10);
         assert!(counts.values().all(|count| *count == 6));
     }
     #[test]
@@ -572,6 +582,17 @@ mod tests {
         v["fixtures"][1]["task"]["payload_sha256"] = Value::String("f".repeat(64));
         assert!(validate_manifest(&v).is_err());
     }
+    #[test]
+    fn principal_actor_delegated_party_and_purpose_bindings_are_explicit() {
+        let fixture = parsed()["fixtures"][0].clone();
+        assert_eq!(derive_eligible(&fixture), Ok(true));
+        for field in ["principal_ref", "actor_ref", "on_behalf_of_ref", "purpose_ref"] {
+            let mut mutated = fixture.clone();
+            mutated["authority_context"][field] = Value::String(format!("MISMATCH-{field}"));
+            assert_eq!(derive_eligible(&mutated), Ok(false), "{field} mismatch must block eligibility");
+        }
+    }
+
     #[test]
     fn changing_two_authority_facts_is_rejected() {
         let mut v = parsed();
