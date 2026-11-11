@@ -559,7 +559,7 @@ pub fn validate_audio_event_observation_v1(
     {
         issues.push(AudioEventObservationIssueV1::ReceiptInputBindingMismatch);
     }
-    match decoded_wav {
+    match &decoded_wav {
         Ok(decoded) if decoded.info == receipt.wav_info => {}
         _ => issues.push(AudioEventObservationIssueV1::ReceiptInputBindingMismatch),
     }
