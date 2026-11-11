@@ -367,6 +367,155 @@ pub fn evaluate_drive(config: &DriveConfig, input: DriveInput) -> Result<DriveRe
     })
 }
 
+
+/// Derive the motor-side shaft operating point from rotor demand and an
+/// explicit transmission speed ratio/efficiency, without needing motor or
+/// inverter efficiency. Use this before querying a motor efficiency map.
+pub fn derive_motor_shaft_operating_point(
+    input: DriveInput,
+    transmission: TransmissionKinematics,
+    transmission_efficiency: f64,
+) -> Result<MotorShaftOperatingPoint, DriveError> {
+    let ratio = transmission.motor_to_rotor_speed_ratio;
+    if !ratio.is_finite() || ratio <= 0.0 {
+        return Err(DriveError::InvalidConfiguration(
+            "motor-to-rotor speed ratio must be finite and positive for motoring",
+        ));
+    }
+    if !transmission_efficiency.is_finite()
+        || !(0.0 < transmission_efficiency && transmission_efficiency <= 1.0)
+    {
+        return Err(DriveError::InvalidConfiguration(
+            "transmission efficiency must be finite and in (0, 1]",
+        ));
+    }
+    if !input.rotor_shaft_torque_nm.is_finite()
+        || !input.rotor_speed_rpm.is_finite()
+        || input.rotor_shaft_torque_nm <= 0.0
+        || input.rotor_speed_rpm <= 0.0
+    {
+        return Err(DriveError::InvalidOperatingPoint(
+            "rotor torque and speed must be finite and positive for motoring",
+        ));
+    }
+
+    let rotor_angular_velocity_rad_s = input.rotor_speed_rpm * TAU / 60.0;
+    let rotor_shaft_power_w = input.rotor_shaft_torque_nm * rotor_angular_velocity_rad_s;
+    let motor_angular_velocity_rad_s = rotor_angular_velocity_rad_s * ratio;
+    let motor_speed_rpm = motor_angular_velocity_rad_s * 60.0 / TAU;
+    let motor_shaft_output_power_w = rotor_shaft_power_w / transmission_efficiency;
+    let motor_shaft_output_torque_nm =
+        motor_shaft_output_power_w / motor_angular_velocity_rad_s;
+
+    let derived = [
+        rotor_angular_velocity_rad_s,
+        rotor_shaft_power_w,
+        motor_angular_velocity_rad_s,
+        motor_speed_rpm,
+        motor_shaft_output_power_w,
+        motor_shaft_output_torque_nm,
+    ];
+    if derived.iter().any(|value| !value.is_finite() || *value <= 0.0) {
+        return Err(DriveError::NumericalOverflow);
+    }
+
+    Ok(MotorShaftOperatingPoint {
+        rotor_angular_velocity_rad_s,
+        rotor_shaft_power_w,
+        motor_angular_velocity_rad_s,
+        motor_speed_rpm,
+        motor_shaft_output_power_w,
+        motor_shaft_output_torque_nm,
+    })
+}
+
+/// Evaluate one drive chain at lower, nominal and upper map-qualified motor
+/// efficiencies. Expected configuration and context digests are checked before
+/// any scenario is evaluated. Each scenario retains its own typed failure.
+pub fn evaluate_drive_with_map_evidence(
+    config: &DriveConfig,
+    input: DriveInput,
+    transmission: TransmissionKinematics,
+    expected_context: DriveMapExpectedContext<'_>,
+    evidence: &MotorEfficiencyEvidence,
+) -> Result<DriveMapEnvelope, DriveError> {
+    if evidence.map_id.trim().is_empty()
+        || evidence.configuration_digest.trim().is_empty()
+        || evidence.context_digest.trim().is_empty()
+        || evidence.evidence_manifest_digest.trim().is_empty()
+        || expected_context.configuration_digest.trim().is_empty()
+        || expected_context.context_digest.trim().is_empty()
+    {
+        return Err(DriveError::InvalidConfiguration(
+            "map, configuration, context and evidence identities must not be empty",
+        ));
+    }
+    if evidence.configuration_digest != expected_context.configuration_digest {
+        return Err(DriveError::InvalidConfiguration(
+            "motor efficiency map configuration digest does not match drive configuration",
+        ));
+    }
+    if evidence.context_digest != expected_context.context_digest {
+        return Err(DriveError::InvalidConfiguration(
+            "motor efficiency map context digest does not match drive operating context",
+        ));
+    }
+
+    let efficiencies = [
+        evidence.efficiency_lower_bound,
+        evidence.efficiency_nominal,
+        evidence.efficiency_upper_bound,
+    ];
+    if efficiencies
+        .iter()
+        .any(|value| !value.is_finite() || !(0.0 < *value && *value <= 1.0))
+        || !(evidence.efficiency_lower_bound
+            <= evidence.efficiency_nominal
+            && evidence.efficiency_nominal
+                <= evidence.efficiency_upper_bound)
+    {
+        return Err(DriveError::InvalidConfiguration(
+            "motor efficiency bounds must be finite and ordered in (0, 1]",
+        ));
+    }
+
+    let motor_operating_point = derive_motor_shaft_operating_point(
+        input,
+        transmission,
+        config.transmission_efficiency,
+    )?;
+    if evidence.motor_torque_nm.to_bits()
+        != motor_operating_point.motor_shaft_output_torque_nm.to_bits()
+        || evidence.motor_speed_rpm.to_bits() != motor_operating_point.motor_speed_rpm.to_bits()
+    {
+        return Err(DriveError::InvalidOperatingPoint(
+            "motor efficiency evidence does not match the current motor torque-speed point",
+        ));
+    }
+
+    let evaluate_at_efficiency = |efficiency: f64| {
+        let scenario_config = DriveConfig {
+            motor_efficiency: efficiency,
+            ..*config
+        };
+        evaluate_drive(&scenario_config, input)
+    };
+
+    Ok(DriveMapEnvelope {
+        map_id: evidence.map_id.clone(),
+        configuration_digest: evidence.configuration_digest.clone(),
+        context_digest: evidence.context_digest.clone(),
+        evidence_manifest_digest: evidence.evidence_manifest_digest.clone(),
+        motor_operating_point,
+        efficiency_lower_bound: evidence.efficiency_lower_bound,
+        efficiency_nominal: evidence.efficiency_nominal,
+        efficiency_upper_bound: evidence.efficiency_upper_bound,
+        adverse_efficiency_scenario: evaluate_at_efficiency(evidence.efficiency_lower_bound),
+        nominal_efficiency_scenario: evaluate_at_efficiency(evidence.efficiency_nominal),
+        favourable_efficiency_scenario: evaluate_at_efficiency(evidence.efficiency_upper_bound),
+    })
+}
+
 /// Evaluate the existing rotor-side drive-chain reference and derive the motor
 /// shaft operating point using an explicit gearbox speed ratio.
 ///
