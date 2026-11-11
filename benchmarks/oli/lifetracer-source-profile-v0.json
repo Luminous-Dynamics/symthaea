@@ -1,0 +1,330 @@
+{
+  "schema_version": "oli-external-source-profile-v0.1",
+  "case_id": "OLI-MOLECULAR-LIFETRACER-SOURCE-001",
+  "status": "SOURCE_PROFILE_PINNED_DATA_NOT_MATERIALIZED",
+  "claim_ceiling": "18-sample meteorite-versus-terrestrial provenance-classification reproduction; not a universal biological-life detector",
+  "publication": {
+    "title": "Discriminating abiotic and biotic organics in meteorite and terrestrial samples using machine learning on mass spectrometry data",
+    "doi": "10.1093/pnasnexus/pgaf334",
+    "published": "2025-11-18",
+    "url": "https://academic.oup.com/pnasnexus/article/4/11/pgaf334/8323799"
+  },
+  "source_code": {
+    "repository": "https://github.com/amirgroup-codes/LifeTracer",
+    "commit": "c0312eb36c27df72a501c33246ac3c70c8aec38f",
+    "archived_release_doi": "10.5281/zenodo.17050812",
+    "software_license": "MIT",
+    "license_file_blob_sha256_git": "72fe8f9272c4a43e18197a9072f8ddd2dbc42b47",
+    "relevant_source_files": {
+      "data/labels.csv": "d600148f91482c664b0aaaa1719db065f535dfb8",
+      "config.json": "91badfae9deb49c3cd32f93a8e882b0631da34be",
+      "lifetracer/src/evaluation.py": "56d7b1702001f5558aaad03c8720652323a373ec",
+      "lifetracer/src/evaluation_auc.py": "d84c3afa4879d4526625116978d1552973209a69",
+      "lifetracer/src/retention_times_alignment.py": "4e13d73a91aeed91b4aab4bf631d79698660a3a3",
+      "lifetracer/src/TII_alignment.py": "0db69aa9af33f6cddfc641bc17450b0fa6e97889",
+      "lifetracer/src/parameters_selection.py": "f9a65c9b65daa41ed8207942185be5844928b9f6",
+      "scripts/eval.py": "dcf2b087fcfb2c2ba86f05692da47cffb53a53a1",
+      "reproduce_paper_results.ipynb": "45dd2ea7a7eec50a67abc73ab424f4524ee3ee77"
+    },
+    "runtime_declared_by_setup_py": {
+      "python": ">=3.10.8; README documents 3.10.8",
+      "numpy": "2.2.4",
+      "pandas": "2.2.3",
+      "scikit_learn": "1.6.1"
+    }
+  },
+  "datasets": [
+    {
+      "name": "Meteorites_LifeTracer",
+      "doi": "10.57967/hf/6408",
+      "url": "https://huggingface.co/datasets/DS-20202/Meteorites_LifeTracer",
+      "dataset_card_license": "MIT",
+      "license_scope": "dataset-card metadata; retain per-file/source attribution"
+    },
+    {
+      "name": "SoilSample-LifeTracer",
+      "doi": "10.57967/hf/6409",
+      "url": "https://huggingface.co/datasets/DS-20202/SoilSample-LifeTracer",
+      "dataset_card_license": "MIT",
+      "license_scope": "dataset-card metadata; retain per-file/source attribution"
+    },
+    {
+      "name": "LifeTracer-Processed-Data",
+      "doi": "10.57967/hf/6410",
+      "url": "https://huggingface.co/datasets/DS-20202/LifeTracer-Processed-Data",
+      "dataset_card_license": "MIT",
+      "license_scope": "dataset-card metadata; verify each downloaded artifact and digest"
+    }
+  ],
+  "data_admission": {
+    "materialized": false,
+    "raw_archives_downloaded": false,
+    "processed_archives_downloaded": false,
+    "per_file_sha256": null,
+    "note": "No external data has been downloaded into this benchmark branch. The source profile is code- and metadata-pinned only."
+  },
+  "task": {
+    "name": "meteorite_vs_terrestrial_sample_provenance_classification",
+    "input": "GCxGC-HRTOF-MS derived sample-level feature matrix",
+    "class_mapping": {
+      "0": "carbonaceous_meteorite_sample",
+      "1": "terrestrial_geologic_sample"
+    },
+    "interpretation": "Reproduce the paper's dataset provenance labels. These labels are not universal biological/non-biological ground truth: terrestrial samples can contain abiotic organics and meteorites can contain complex organics without biology.",
+    "samples_total": 18,
+    "class_counts": {
+      "terrestrial": 10,
+      "meteorite": 8
+    },
+    "sample_prep_as_reported": {
+      "aliquot_mass_mg": 200,
+      "solvent": "dichloromethane",
+      "solvent_volume_uL": 300,
+      "extraction_temperature_C": 100,
+      "extraction_duration_hours": 24
+    },
+    "instrument": "LECO HRT+ 4D GCxGC-HRTOF-MS as reported by the study",
+    "raw_scan_schema_audit": {
+      "paper_text_claim": "seven columns",
+      "paper_text_enumerates": [
+        "row index",
+        "spectrum",
+        "1st time (s)",
+        "2nd time (s)",
+        "TOF",
+        "m/z",
+        "area",
+        "resolution"
+      ],
+      "enumerated_count": 8,
+      "disposition": "unresolved source-text inconsistency; inspect actual raw CSV header and supplementary material before building a parser"
+    }
+  },
+  "sample_manifest": [
+    {
+      "sample_id": "iceland_soil",
+      "sample_name": "Iceland",
+      "file": "231003_04_Iceland_Soil_300uLDCM_100oC24h.csv",
+      "source_class": 1,
+      "provenance_family": "terrestrial_geologic"
+    },
+    {
+      "sample_id": "jarosite_soil",
+      "sample_name": "Jarosite",
+      "file": "230823_06_Jarosite_Soil_300uLDCM_100oC24h.csv",
+      "source_class": 1,
+      "provenance_family": "terrestrial_geologic"
+    },
+    {
+      "sample_id": "atacama_soil",
+      "sample_name": "Atacama",
+      "file": "230823_01_Atacama_Soil_300uLDCM_100oC24h-001.csv",
+      "source_class": 1,
+      "provenance_family": "terrestrial_geologic"
+    },
+    {
+      "sample_id": "antarctica_soil",
+      "sample_name": "Antarctica",
+      "file": "230823_05_Antarctica_Soil_300uLDCM_100oC24h-001.csv",
+      "source_class": 1,
+      "provenance_family": "terrestrial_geologic"
+    },
+    {
+      "sample_id": "green_river_shale",
+      "sample_name": "Green R. Shale",
+      "file": "230823_07_Green_River_Shale_Soil_500uLDCM_100oC24h.csv",
+      "source_class": 1,
+      "provenance_family": "terrestrial_geologic"
+    },
+    {
+      "sample_id": "rio_tinto_soil",
+      "sample_name": "Rio Tinto",
+      "file": "230823_02_Rio_Tinto_Soil_300uLDCM_100oC24h.csv",
+      "source_class": 1,
+      "provenance_family": "terrestrial_geologic"
+    },
+    {
+      "sample_id": "lignite",
+      "sample_name": "Lignite",
+      "file": "230830_03_Lignite_300uLDCM_100oC24h-001.csv",
+      "source_class": 1,
+      "provenance_family": "terrestrial_geologic"
+    },
+    {
+      "sample_id": "utah_soil",
+      "sample_name": "Utah",
+      "file": "231003_03_Utah_Soil_300uLDCM_100oC24h.csv",
+      "source_class": 1,
+      "provenance_family": "terrestrial_geologic"
+    },
+    {
+      "sample_id": "gsfc_soil",
+      "sample_name": "GSFC",
+      "file": "230901_05_GSFC_soil_300uLDCM_100oC24h.csv",
+      "source_class": 1,
+      "provenance_family": "terrestrial_geologic"
+    },
+    {
+      "sample_id": "murchison_soil",
+      "sample_name": "Murchison Soil",
+      "file": "230823_04_Murchison_Soil_300uLDCM_100oC24h-001.csv",
+      "source_class": 1,
+      "provenance_family": "terrestrial_geologic"
+    },
+    {
+      "sample_id": "orgueil",
+      "sample_name": "Orgueil",
+      "file": "230830_02_Orgueil_300uLDCM_100oC24h-001.csv",
+      "source_class": 0,
+      "provenance_family": "carbonaceous_chondrite"
+    },
+    {
+      "sample_id": "alh83100",
+      "sample_name": "ALH 83100",
+      "file": "230901_06_ALH83100_300uLDCM_100oC24h.csv",
+      "source_class": 0,
+      "provenance_family": "carbonaceous_chondrite"
+    },
+    {
+      "sample_id": "lon94101",
+      "sample_name": "LON 94101",
+      "file": "230901_07_LON94101_300uLDCM_100oC24h.csv",
+      "source_class": 0,
+      "provenance_family": "carbonaceous_chondrite"
+    },
+    {
+      "sample_id": "aguas_zarcas",
+      "sample_name": "Aguas Zarcas",
+      "file": "231003_01_AZ_400uLDCM_100oC24h.csv",
+      "source_class": 0,
+      "provenance_family": "carbonaceous_chondrite"
+    },
+    {
+      "sample_id": "murchison_pristine",
+      "sample_name": "Murchison",
+      "file": "230823_03_Murchison_Pristine_2.0_300uLDCM_100oC24h-003.csv",
+      "source_class": 0,
+      "provenance_family": "carbonaceous_chondrite"
+    },
+    {
+      "sample_id": "jbilet_winselwan",
+      "sample_name": "Jbilet Winselwan",
+      "file": "231003_02_Jbilet_Winselwan_300uLDCM_100oC24h.csv",
+      "source_class": 0,
+      "provenance_family": "carbonaceous_chondrite"
+    },
+    {
+      "sample_id": "lew85311",
+      "sample_name": "LEW 85311",
+      "file": "230901_08_LEW85311_300uLDCM_100oC24h.csv",
+      "source_class": 0,
+      "provenance_family": "carbonaceous_chondrite"
+    },
+    {
+      "sample_id": "eet96029",
+      "sample_name": "EET 96029",
+      "file": "230830_01_EET96029_300uLDCM_100oC24h.csv",
+      "source_class": 0,
+      "provenance_family": "carbonaceous_chondrite"
+    }
+  ],
+  "source_faithful_evaluation": {
+    "seeds": {
+      "selection": "numpy.random.seed(42); numpy.random.choice(range(1,1001), size=10, replace=False)",
+      "values": [
+        522,
+        738,
+        741,
+        661,
+        412,
+        679,
+        627,
+        514,
+        860,
+        137
+      ]
+    },
+    "fixed_features": {
+      "lambda1": 5,
+      "lambda2": 100,
+      "rt1_threshold": 50,
+      "rt2_threshold": 0.8,
+      "c_grid": [
+        0.0001,
+        0.001,
+        0.01,
+        0.1,
+        1,
+        10,
+        100,
+        1000,
+        10000
+      ],
+      "final_paper_notebook_c": 0.1
+    },
+    "accuracy_path": {
+      "implementation": "lifetracer/src/evaluation.py",
+      "outer_split": "sklearn.model_selection.KFold(n_splits=9, shuffle=True, random_state=seed)",
+      "outer_fold_count": 9,
+      "sample_count_per_test_fold": 2,
+      "inner_validation": "leave-one-training-sample-out within each outer training fold",
+      "selection_metric": "validation accuracy",
+      "final_metric": "mean outer-fold test accuracy per seed; then mean and standard deviation across 10 seeds"
+    },
+    "auc_path": {
+      "implementation": "lifetracer/src/evaluation_auc.py",
+      "outer_split": "sklearn.model_selection.StratifiedKFold(n_splits=6, shuffle=True, random_state=seed)",
+      "outer_fold_count": 6,
+      "sample_count_per_test_fold": 3,
+      "inner_validation": "sklearn.model_selection.StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)",
+      "selection_metric": "mean inner-fold ROC AUC",
+      "final_metric": "mean outer-fold test ROC AUC per seed; then mean and standard deviation across 10 seeds"
+    },
+    "note": "Accuracy and AUC are separate source evaluation paths with distinct fold definitions. Do not merge their scores or represent them as one shared split."
+  },
+  "preprocessing_audit": {
+    "status": "TRANSductive_shared_feature_schema_observed",
+    "evidence": [
+      "TII_alignment.align collects RT1 and RT2 coordinates from every sample before constructing shared aligned axes.",
+      "RetentionTimesAlignment.align_retention_times loads each m/z peak table and clusters peaks across the full samples_name_list into a shared feature vocabulary.",
+      "evaluation.py and evaluation_auc.py load the resulting full-dataset feature matrix and only then create outer train/test splits."
+    ],
+    "interpretation": "The published evaluation is a source-faithful benchmark over a feature schema informed by the full 18-sample collection. It holds labels out of model fitting, but is not a strictly inductive prospective-new-sample pipeline because held-out sample measurements contribute to shared axes/feature construction.",
+    "fair_reporting": "Label the reproduction as transductive-feature-space evaluation unless exact code audit establishes otherwise.",
+    "inductive_oli_extension": {
+      "required": "For every outer fold, fit retention-time axes, peak clustering, alignment and feature vocabulary using training samples only; freeze those artifacts; map held-out samples onto that frozen representation.",
+      "unseen_feature_policy": "Report out-of-vocabulary peak abundance/count and distribution shift; do not silently extend the vocabulary using held-out data.",
+      "expected_comparison": "Report both source-faithful transductive results and strictly inductive fold-fitted preprocessing results."
+    }
+  },
+  "reproduction_constraints": {
+    "preserve_paper_protocol": true,
+    "independent_holdout_required": true,
+    "grouped_split_units": [
+      "sample_identity",
+      "geological_subfamily",
+      "meteorite_or_terrestrial_family",
+      "preparation_batch",
+      "instrument_or_acquisition_campaign"
+    ],
+    "instrument_holdout_possible_in_source_dataset": false,
+    "full_raw_dataset_bulk_download_required_for_first_stage": false,
+    "processed_feature_bundle_first": true,
+    "no_unverified_derived_data_redistribution": true
+  },
+  "open_questions": [
+    "Pin exact Zenodo archive files and per-artifact digests before ingestion.",
+    "Verify Hugging Face dataset card licenses against downloaded file-level metadata and source provenance.",
+    "Resolve the paper's seven-versus-eight raw scan columns statement against real CSV headers.",
+    "Confirm whether shared TII axis and retention-time feature clustering use any sample labels or only unlabeled measurements.",
+    "Reconstruct fold membership and the selected C per outer fold before comparing outputs.",
+    "Determine whether the reported >87% score can be matched from the processed feature matrix and exact notebook version."
+  ],
+  "result": {
+    "reproduced": false,
+    "source_results_verified": false,
+    "data_digest": null,
+    "benchmark_receipt": null,
+    "status": "NOT_RUN"
+  }
+}
