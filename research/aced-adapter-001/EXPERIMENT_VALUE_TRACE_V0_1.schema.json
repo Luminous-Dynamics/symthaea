@@ -173,7 +173,8 @@
                   "proposal_event_id",
                   "observation_status",
                   "observation_sha256",
-                  "actual_cost"
+                  "actual_cost",
+                  "observed_outcome"
                 ],
                 "properties": {
                   "proposal_event_id": {
@@ -203,6 +204,17 @@
                       {
                         "type": "number",
                         "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "observed_outcome": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
                       },
                       {
                         "type": "null"
