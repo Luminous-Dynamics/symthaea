@@ -29,7 +29,8 @@ pub struct LinearActionSampleV1 {
     /// any action coordinates absent from the expression. Sum-bound variables
     /// are supplied by lexical evaluation and are not part of this state vector.
     pub state: Vec<f64>,
-    /// Full finite-difference direction basis; one vector per column.
+    /// Finite-difference direction probes. They must span the action-coordinate
+    /// tangent space; overcomplete probe sets test local directional consistency.
     pub direction_basis: Vec<Vec<f64>>,
 }
 
@@ -62,6 +63,7 @@ const HARD_MAX_LINEAR_ACTION_DIMENSION: usize = 32;
 const HARD_MAX_EXPRESSION_EVALUATION_COST: usize = 50_000_000;
 const HARD_MAX_LINEAR_ALGEBRA_OPERATION_COST: usize = 100_000_000;
 const HARD_MAX_LINEAR_ACTION_GENERATORS: usize = 128;
+const HARD_MAX_LINEAR_ACTION_DIRECTIONS: usize = 128;
 const HARD_MAX_DIRECTION_BASIS_CONDITION: f64 = 1e12;
 
 impl Default for LinearActionSamplingProfileV1 {
@@ -166,9 +168,10 @@ pub enum LinearActionSamplingErrorV1 {
     GeneratorCountLimitExceeded { actual: usize, maximum: usize },
     LinearAlgebraBudgetExceeded { estimated: usize, maximum: usize },
     NonFiniteState { sample_id: String, index: usize },
-    DirectionBasisDimensionMismatch {
+    DirectionCountOutsideBounds {
         sample_id: String,
-        expected: usize,
+        minimum: usize,
+        maximum: usize,
         actual: usize,
     },
     DirectionVectorDimensionMismatch {
@@ -512,6 +515,7 @@ fn finite_difference_gradient(
     profile: LinearActionSamplingProfileV1,
 ) -> Result<(Vec<f64>, f64, f64), LinearActionSamplingErrorV1> {
     let dimension = action_coordinate_indices.len();
+    let direction_count = sample.direction_basis.len();
     let whitened_directions: Vec<Vec<f64>> = sample
         .direction_basis
         .iter()
@@ -536,11 +540,14 @@ fn finite_difference_gradient(
         });
     }
 
-    let direction_matrix = DMatrix::from_fn(dimension, dimension, |row, column| {
-        whitened_directions[column][row] / direction_scale
+    // Each row is one directional probe in whitened coordinates. With more
+    // probes than dimensions, the SVD computes a least-squares gradient and
+    // the reconstruction residual measures whether all finite differences
+    // are consistent with one local covector.
+    let measurement_matrix = DMatrix::from_fn(direction_count, dimension, |row, column| {
+        whitened_directions[row][column] / direction_scale
     });
-    let transpose = direction_matrix.transpose();
-    let decomposition = transpose.clone().svd(true, true);
+    let decomposition = measurement_matrix.clone().svd(true, true);
     let maximum_singular_value = decomposition
         .singular_values
         .iter()
@@ -566,7 +573,7 @@ fn finite_difference_gradient(
     // finite-difference factor 1/(2h) and this expression scale both cancel
     // from the gradient direction required by a cosine residual. This avoids
     // overflowing a quotient when h is tiny or when f has a huge amplitude.
-    let mut function_pairs = Vec::with_capacity(dimension);
+    let mut function_pairs = Vec::with_capacity(direction_count);
     let mut expression_value_scale = 0.0_f64;
     for (direction_index, direction) in sample.direction_basis.iter().enumerate() {
         let mut plus = sample.state.clone();
@@ -655,7 +662,7 @@ fn finite_difference_gradient(
             sample_id: sample.sample_id.clone(),
         });
     }
-    let reconstructed = &transpose * &solution;
+    let reconstructed = &measurement_matrix * &solution;
     let residual_norm = reconstructed
         .iter()
         .zip(observed_vector.iter())
@@ -857,20 +864,26 @@ pub fn evaluate_linear_action_samples(
         });
     }
 
-    // Bound the cubic direction-basis SVD work plus the per-generator tangent
-    // matrix-vector products. The SVD multiplier is a conservative operation
-    // proxy, not a hardware-calibrated runtime model.
+    // Count actual directional probes. Overcomplete probe sets improve
+    // finite-difference consistency checks, so both AST and linear-algebra
+    // budgets charge every supplied direction rather than only the dimension.
+    let total_directional_probes = samples.iter().fold(0usize, |total, sample| {
+        total.checked_add(sample.direction_basis.len()).unwrap_or(usize::MAX)
+    });
+
+    // Bound the overdetermined SVD work plus per-generator tangent products.
+    // The multiplier is a conservative operation proxy, not a measured runtime.
     let dimension_squared = dimension.checked_mul(dimension).unwrap_or(usize::MAX);
     let direction_factorization_cost = dimension_squared
-        .checked_mul(dimension)
+        .checked_mul(total_directional_probes)
         .and_then(|cost| cost.checked_mul(10))
         .unwrap_or(usize::MAX);
     let tangent_cost = dimension_squared
         .checked_mul(declaration.generators.len())
+        .and_then(|cost| cost.checked_mul(samples.len()))
         .unwrap_or(usize::MAX);
     let estimated_linear_algebra_operation_cost = direction_factorization_cost
         .checked_add(tangent_cost)
-        .and_then(|cost| cost.checked_mul(samples.len()))
         .unwrap_or(usize::MAX);
     if estimated_linear_algebra_operation_cost > HARD_MAX_LINEAR_ALGEBRA_OPERATION_COST {
         return Err(LinearActionSamplingErrorV1::LinearAlgebraBudgetExceeded {
@@ -879,14 +892,12 @@ pub fn evaluate_linear_action_samples(
         });
     }
 
-    // Each sample requires one plus/minus evaluation for every action
-    // coordinate direction. Sum nodes are conservatively charged for their
-    // maximum 101 body evaluations, so a small AST cannot hide an expensive sum.
+    // Sum nodes are conservatively charged for their maximum 101 body
+    // evaluations, so a small AST cannot hide an expensive summation.
     let per_evaluation_cost = expression_evaluation_cost(expr).unwrap_or(usize::MAX);
     let estimated_expression_evaluation_cost = per_evaluation_cost
         .checked_mul(2)
-        .and_then(|cost| cost.checked_mul(dimension))
-        .and_then(|cost| cost.checked_mul(samples.len()))
+        .and_then(|cost| cost.checked_mul(total_directional_probes))
         .unwrap_or(usize::MAX);
     if estimated_expression_evaluation_cost > profile.maximum_expression_evaluation_cost {
         return Err(LinearActionSamplingErrorV1::ExpressionEvaluationBudgetExceeded {
@@ -927,10 +938,13 @@ pub fn evaluate_linear_action_samples(
                 index,
             });
         }
-        if sample.direction_basis.len() != dimension {
-            return Err(LinearActionSamplingErrorV1::DirectionBasisDimensionMismatch {
+        if sample.direction_basis.len() < dimension
+            || sample.direction_basis.len() > HARD_MAX_LINEAR_ACTION_DIRECTIONS
+        {
+            return Err(LinearActionSamplingErrorV1::DirectionCountOutsideBounds {
                 sample_id: sample.sample_id.clone(),
-                expected: dimension,
+                minimum: dimension,
+                maximum: HARD_MAX_LINEAR_ACTION_DIRECTIONS,
                 actual: sample.direction_basis.len(),
             });
         }
@@ -1427,7 +1441,6 @@ mod tests {
         assert!(report.generator_statistics[0].maximum_normalized_squared_residual > 0.01);
     }
 
-    #[test]
     fn quadratic_form_expression(
         matrix: &nalgebra::Matrix2<f64>,
         first: &str,
@@ -1740,6 +1753,69 @@ mod tests {
             Err(LinearActionSamplingErrorV1::GeneratorCountLimitExceeded {
                 actual: 129,
                 maximum: 128
+            })
+        ));
+    }
+
+    #[test]
+    fn overcomplete_direction_probes_detect_inconsistent_finite_difference_gradient() {
+        // A cubic cross-term has direction-dependent central-difference bias.
+        // Two orthogonal probes alone always define a square solvable system;
+        // a third independent probe makes the inconsistency observable.
+        let expression = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::Var("x".to_string())),
+                Box::new(Expr::Var("y".to_string())),
+            )),
+            Box::new(Expr::Const(3.0)),
+        );
+        let sample = LinearActionSampleV1 {
+            sample_id: "overcomplete-cubic".to_string(),
+            state: vec![1.0, 1.0],
+            direction_basis: vec![
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![1.0, 1.0],
+            ],
+        };
+        let profile = LinearActionSamplingProfileV1 {
+            finite_difference_step: 0.1,
+            maximum_samples: 1,
+            minimum_informative_samples: 1,
+            maximum_directional_reconstruction_relative_residual: 1.0e-8,
+            ..sampling_profile()
+        };
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &expression,
+                &canonical_action(),
+                &[sample],
+                profile
+            ),
+            Err(LinearActionSamplingErrorV1::GradientReconstructionResidualExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn sampled_linear_action_rejects_too_few_direction_probes() {
+        let states = [[0.7, 1.1], [1.2, 0.8], [1.7, 2.1], [2.3, 1.4]];
+        let mut batch = samples(&states, [[1.0, 0.0], [0.0, 1.0]]);
+        for sample in &mut batch {
+            sample.direction_basis.pop();
+        }
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &add(square("x"), square("y")),
+                &canonical_action(),
+                &batch,
+                sampling_profile()
+            ),
+            Err(LinearActionSamplingErrorV1::DirectionCountOutsideBounds {
+                minimum: 2,
+                actual: 1,
+                ..
             })
         ));
     }
