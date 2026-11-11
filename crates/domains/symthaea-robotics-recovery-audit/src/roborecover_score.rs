@@ -843,6 +843,11 @@ mod tests {
             let mut trial = failed_trial(1, index);
             trial.evidence.trial_id = format!("b{index}");
             trial.evidence.terminal = terminal;
+            if terminal == TerminalOutcome::TaskCompleted {
+                trial.source_status = "infer_ok".to_owned();
+                trial.inference_steps = 2;
+                trial.source_terminal_success = Some(true);
+            }
             trials.push(trial);
         }
 
@@ -1023,7 +1028,8 @@ mod tests {
     #[test]
     fn all_planned_scenarios_must_belong_to_declared_macro9_groups() {
         let mut m = manifest();
-        m.scenarios[0].deviation = DeviationType::StageRollback;
+        m.scenarios[0].stage = RecoveryStage::Move;
+        m.scenarios[0].deviation = DeviationType::WrongTarget;
         let errors = validate_manifest(&m).unwrap_err();
         assert!(errors.iter().any(|issue| matches!(
             issue,
@@ -1118,6 +1124,7 @@ mod tests {
             super::super::WorldStateContinuity::Preserved,
         );
         success.platform = BenchmarkPlatform::Libero;
+        success.split_manifest_blob_sha = m.split_manifest_blob_sha.clone();
         success.evidence.evaluator_digest = m.evaluator_digest.clone();
         success.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
         success.source_status = "success".to_owned();
@@ -1133,6 +1140,7 @@ mod tests {
             super::super::WorldStateContinuity::Preserved,
         );
         replay.platform = BenchmarkPlatform::Libero;
+        replay.split_manifest_blob_sha = m.split_manifest_blob_sha.clone();
         replay.evidence.evaluator_digest = m.evaluator_digest.clone();
         replay.evidence.trial_id = m.scenarios[1].expected_trial_ids[0].clone();
         replay.source_status = "replay_already_done".to_owned();
@@ -1292,6 +1300,7 @@ mod tests {
     fn training_split_allows_training_only_group_and_omits_macro9() {
         let mut m = manifest();
         m.split = BenchmarkSplit::Train;
+        m.split_manifest_blob_sha = "b211728e96d4e6548d4d5353daf73346c37f5a4d".to_owned();
         m.macro9_groups.clear();
         m.scenarios[0].stage = RecoveryStage::Move;
         m.scenarios[0].deviation = DeviationType::WrongTarget;
@@ -1305,6 +1314,7 @@ mod tests {
             super::super::WorldStateContinuity::Preserved,
         );
         trial.split = BenchmarkSplit::Train;
+        trial.split_manifest_blob_sha = m.split_manifest_blob_sha.clone();
         trial.stage = RecoveryStage::Move;
         trial.deviation = DeviationType::WrongTarget;
         trial.evidence.scenario_id = m.scenarios[0].scenario_id.clone();
