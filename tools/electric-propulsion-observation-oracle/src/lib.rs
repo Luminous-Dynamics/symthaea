@@ -529,6 +529,11 @@ pub fn derive_motor_map_operating_point(
     speed_channel_id: &str,
     expected_motor_shaft_boundary_id: &str,
 ) -> Result<MotorMapOperatingPoint, ObservationError> {
+    if point.model_version != MODEL_VERSION {
+        return Err(ObservationError::InvalidMotorMapOperatingPoint(
+            "unsupported synchronized observation model version",
+        ));
+    }
     if !non_empty(torque_channel_id)
         || !non_empty(speed_channel_id)
         || !non_empty(expected_motor_shaft_boundary_id)
@@ -890,6 +895,42 @@ mod tests {
         assert_eq!(result.speed_raw_data_digest, "raw-sha-rpm");
         assert_eq!(result.torque_timestamp_ns, 1_000);
         assert_eq!(result.speed_timestamp_ns, 1_000);
+    }
+
+    #[test]
+    fn motor_map_projection_preserves_nonzero_torque_speed_sample_separation() {
+        let run = manifest();
+        let mut values = channels();
+        values[0].samples = vec![sample(1, 980, 7.5)];
+        values[1].samples = vec![sample(1, 1_020, 15_000.0)];
+        let synced = synchronize_at(&run, &values, &required(), 1_000).unwrap();
+        let result = derive_motor_map_operating_point(
+            &synced,
+            "torque",
+            "rpm",
+            "motor-shaft",
+        )
+        .unwrap();
+        assert_eq!(result.torque_timestamp_offset_ns, -20);
+        assert_eq!(result.speed_timestamp_offset_ns, 20);
+        assert_eq!(result.torque_speed_sample_time_delta_ns, 40);
+        assert_eq!(result.maximum_combined_time_error_ns, 70);
+    }
+
+    #[test]
+    fn motor_map_projection_rejects_unsupported_observation_model_version() {
+        let run = manifest();
+        let mut synced = synchronize_at(&run, &channels(), &required(), 1_000).unwrap();
+        synced.model_version = "unrecognized-observation-oracle";
+        assert!(matches!(
+            derive_motor_map_operating_point(
+                &synced,
+                "torque",
+                "rpm",
+                "motor-shaft",
+            ),
+            Err(ObservationError::InvalidMotorMapOperatingPoint(_))
+        ));
     }
 
     #[test]
