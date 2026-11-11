@@ -158,7 +158,7 @@ pub fn classify_policy_completion(trial: &RoboRecoverTrial) -> PolicyCompletion 
             ("infer_ok", steps, Some(true)) if steps > 0 => PolicyCompletion::Contradictory,
             ("infer_ok", _, Some(false)) => PolicyCompletion::Contradictory,
             ("infer_ok", _, None) => PolicyCompletion::Unknown,
-            ("infer_ok", 0, Some(true)) => PolicyCompletion::ReplayPreempted,
+            ("infer_ok", 0, Some(true)) => PolicyCompletion::Contradictory,
             ("replay_ok", 0, Some(true)) => PolicyCompletion::ReplayPreempted,
             ("replay_ok", 0, None) => PolicyCompletion::Unknown,
             ("replay_ok", 0, Some(false)) => PolicyCompletion::NotCompleted,
@@ -1172,7 +1172,7 @@ mod tests {
 
 
     #[test]
-    fn robo_twin_environment_success_without_policy_inference_is_replay_preemption() {
+    fn robo_twin_infer_ok_without_inference_actions_is_contradictory() {
         let mut trial = sample(
             0,
             0,
