@@ -227,24 +227,36 @@ pub fn evaluate_experiment(
     })
 }
 
+/// Select only experiments whose declared cost is within the remaining hard budget.
 pub fn select_experiment(
     prior: &[f64],
     action_utilities: &[Vec<f64>],
     experiments: &[Experiment],
+    available_budget: f64,
     method: SelectionMethod,
     risk_aversion: f64,
     minimum_selection_score: f64,
 ) -> Result<Option<ExperimentValue>, String> {
     if !minimum_selection_score.is_finite() {
-        return Err("minimum net value must be finite".into());
+        return Err("minimum selection score must be finite".into());
+    }
+    if !available_budget.is_finite() || available_budget < 0.0 {
+        return Err("available experiment budget must be finite and non-negative".into());
     }
     validate_inputs(prior, action_utilities, experiments, risk_aversion)?;
     if experiments.is_empty() {
         return Ok(None);
     }
 
-    let mut scored = experiments
+    let affordable = experiments
         .iter()
+        .filter(|experiment| experiment.cost <= available_budget)
+        .collect::<Vec<_>>();
+    if affordable.is_empty() {
+        return Ok(None);
+    }
+    let mut scored = affordable
+        .into_iter()
         .map(|experiment| evaluate_experiment(prior, action_utilities, experiment, risk_aversion))
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -331,6 +343,7 @@ mod tests {
             &prior,
             &actions,
             &experiments,
+            1.0,
             SelectionMethod::ExpectedInformationGain,
             0.0,
             0.0,
@@ -341,6 +354,7 @@ mod tests {
             &prior,
             &actions,
             &experiments,
+            1.0,
             SelectionMethod::ExpectedValueOfSampleInformation,
             0.0,
             0.0,
@@ -371,6 +385,7 @@ mod tests {
             &prior,
             &actions,
             &experiments,
+            1.0,
             SelectionMethod::ExpectedInformationGain,
             0.0,
             0.0,
@@ -381,6 +396,7 @@ mod tests {
             &prior,
             &actions,
             &experiments,
+            1.0,
             SelectionMethod::ExpectedValueOfSampleInformation,
             0.0,
             0.0,
@@ -415,6 +431,7 @@ mod tests {
             &prior,
             &actions,
             &experiments,
+            1.0,
             SelectionMethod::ExpectedValueOfSampleInformation,
             2.0,
             0.0,
@@ -425,6 +442,7 @@ mod tests {
             &prior,
             &actions,
             &experiments,
+            1.0,
             SelectionMethod::RiskAdjustedExpectedValueOfSampleInformation,
             2.0,
             0.0,
@@ -447,12 +465,56 @@ mod tests {
             &prior,
             &actions,
             &experiments,
+            1.0,
             SelectionMethod::ExpectedValueOfSampleInformation,
             0.0,
             0.0,
         )
         .unwrap()
         .is_none());
+    }
+
+    #[test]
+    fn unaffordable_high_information_experiment_is_excluded() {
+        let (prior, actions, mut experiments) = problem();
+        experiments[0].cost = 100.0;
+        let chosen = select_experiment(
+            &prior,
+            &actions,
+            &experiments,
+            0.1,
+            SelectionMethod::ExpectedInformationGain,
+            0.0,
+            0.0,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(chosen.experiment_id, "signal_that_can_reverse_the_action");
+    }
+
+    #[test]
+    fn invalid_available_budget_fails_closed() {
+        let (prior, actions, experiments) = problem();
+        assert!(select_experiment(
+            &prior,
+            &actions,
+            &experiments,
+            f64::NAN,
+            SelectionMethod::ExpectedInformationGain,
+            0.0,
+            0.0,
+        )
+        .is_err());
+        assert!(select_experiment(
+            &prior,
+            &actions,
+            &experiments,
+            -0.1,
+            SelectionMethod::ExpectedInformationGain,
+            0.0,
+            0.0,
+        )
+        .is_err());
     }
 
     #[test]
@@ -463,6 +525,7 @@ mod tests {
             &prior,
             &actions,
             &[],
+            1.0,
             SelectionMethod::ExpectedValueOfSampleInformation,
             0.0,
             0.0,
@@ -510,6 +573,7 @@ mod tests {
             &prior,
             &actions,
             &experiments,
+            1.0,
             SelectionMethod::ExpectedValueOfSampleInformation,
             0.0,
             0.0,
@@ -537,6 +601,7 @@ mod tests {
             &prior,
             &actions,
             &[one, two],
+            1.0,
             SelectionMethod::ExpectedValueOfSampleInformation,
             0.0,
             0.0,
