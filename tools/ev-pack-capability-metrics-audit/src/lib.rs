@@ -1147,6 +1147,13 @@ fn summarize(profile: &Profile) -> ProfileSummary {
     }
 }
 
+fn compare_unit_ref_then_canonical(left: &Value, right: &Value) -> std::cmp::Ordering {
+    left.get("unit_ref")
+        .and_then(Value::as_str)
+        .cmp(&right.get("unit_ref").and_then(Value::as_str))
+        .then_with(|| left.to_string().cmp(&right.to_string()))
+}
+
 fn canonicalize_corpus(value: &mut Value) {
     if let Some(cases) = value.get_mut("cases").and_then(Value::as_array_mut) {
         cases.sort_by(|left, right| {
@@ -1157,33 +1164,21 @@ fn canonicalize_corpus(value: &mut Value) {
         for case in cases {
             if let Some(profile) = case.get_mut("profile") {
                 if let Some(units) = profile.get_mut("units").and_then(Value::as_array_mut) {
-                    units.sort_by(|left, right| {
-                        left.get("unit_ref")
-                            .and_then(Value::as_str)
-                            .cmp(&right.get("unit_ref").and_then(Value::as_str))
-                    });
+                    units.sort_by(compare_unit_ref_then_canonical);
                 }
                 if let Some(observations) = profile
                     .get_mut("soc_snapshot")
                     .and_then(|value| value.get_mut("observations"))
                     .and_then(Value::as_array_mut)
                 {
-                    observations.sort_by(|left, right| {
-                        left.get("unit_ref")
-                            .and_then(Value::as_str)
-                            .cmp(&right.get("unit_ref").and_then(Value::as_str))
-                    });
+                    observations.sort_by(compare_unit_ref_then_canonical);
                 }
                 if let Some(units) = profile
                     .get_mut("lifetime_evidence")
                     .and_then(|value| value.get_mut("units"))
                     .and_then(Value::as_array_mut)
                 {
-                    units.sort_by(|left, right| {
-                        left.get("unit_ref")
-                            .and_then(Value::as_str)
-                            .cmp(&right.get("unit_ref").and_then(Value::as_str))
-                    });
+                    units.sort_by(compare_unit_ref_then_canonical);
                 }
             }
         }
