@@ -29,11 +29,11 @@ Each observation binds one active constraint, one output digest, one rubric prof
 7. An observation applies only to a currently active constraint and exact current output.
 8. Rubric profile digest on observation equals the profile declared by the constraint.
 9. Final output digest equals the last successful output.
-10. Finalization requires an observation for every active constraint against the exact final output.
+10. Finalization supplies a sorted active-constraint ID set; replay verifies it exactly equals the derived active set and requires an observation for every active constraint against the exact final output.
 11. Every final active constraint must pass for QUALIFIED; any definite failure is NONCOMPLIANT; otherwise any uncertainty is INDETERMINATE.
 12. No event or mutation is accepted after finalization.
 
-The event hash values are supplied by a canonical serializer outside this crate. The evaluator validates hash format, uniqueness and link continuity; it does not claim cryptographic recomputation.
+The event hash values are supplied by a canonical serializer outside this crate. The evaluator validates hash format, uniqueness and link continuity; it does not claim cryptographic recomputation. The final active-constraint ID set is nevertheless checked directly against replayed session state; the opaque active-ledger digest remains an upstream canonical receipt.
 
 ## Experiment design
 
