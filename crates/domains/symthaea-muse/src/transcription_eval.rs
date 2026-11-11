@@ -45,6 +45,7 @@ pub struct MidiTranscriptionEvaluationConfigV1 {
     pub pitch_tolerance_cents: u16,
     pub offset_ratio_basis_points: u16,
     pub offset_min_tolerance_ms: u32,
+    pub velocity_tolerance: u8,
 }
 
 impl Default for MidiTranscriptionEvaluationConfigV1 {
@@ -54,6 +55,7 @@ impl Default for MidiTranscriptionEvaluationConfigV1 {
             pitch_tolerance_cents: MIDI_TRANSCRIPTION_DEFAULT_PITCH_TOLERANCE_CENTS_V1,
             offset_ratio_basis_points: MIDI_TRANSCRIPTION_DEFAULT_OFFSET_RATIO_BPS_V1,
             offset_min_tolerance_ms: MIDI_TRANSCRIPTION_DEFAULT_OFFSET_MIN_TOLERANCE_MS_V1,
+            velocity_tolerance: 10,
         }
     }
 }
@@ -67,6 +69,7 @@ pub struct MidiTranscribedNoteV1 {
     /// GM program captured at NoteOn; percussion channel 9 is retained.
     pub gm_program: u8,
     pub pitch_midi: u8,
+    pub velocity_midi: u8,
     pub onset_seconds: f64,
     /// None means the prediction contained a NoteOn without a matching NoteOff.
     pub offset_seconds: Option<f64>,
@@ -91,6 +94,15 @@ pub struct MidiTranscriptionMetricV1 {
     pub precision: f64,
     pub recall: f64,
     pub f1: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MidiTranscriptionValueErrorSummaryV1 {
+    pub sample_count: u32,
+    pub mean_absolute_error: Option<f64>,
+    pub median_absolute_error: Option<f64>,
+    pub p95_absolute_error: Option<f64>,
+    pub p99_absolute_error: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -126,6 +138,9 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub exact_program_onset_metrics: MidiTranscriptionMetricV1,
     /// Exact GM program, pitch, onset and offset must match.
     pub exact_program_full_note_metrics: MidiTranscriptionMetricV1,
+    /// Full-note match plus MIDI velocity within the configured tolerance.
+    pub velocity_aware_full_note_metrics: MidiTranscriptionMetricV1,
+    pub velocity_error: MidiTranscriptionValueErrorSummaryV1,
     pub onset_error_ms: MidiTranscriptionTimingErrorSummaryV1,
     pub offset_error_ms: MidiTranscriptionTimingErrorSummaryV1,
     pub report_sha256: String,
@@ -162,6 +177,7 @@ pub struct MidiTempoPointV1 {
 struct EvaluationNoteV1 {
     pitch_midi: u8,
     gm_program: u8,
+    velocity_midi: u8,
     onset_seconds: f64,
     offset_seconds: Option<f64>,
 }
@@ -185,7 +201,10 @@ struct ReportCommitmentV1<'a> {
     full_note_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_onset_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_full_note_metrics: &'a MidiTranscriptionMetricV1,
+    velocity_aware_full_note_metrics: &'a MidiTranscriptionMetricV1,
+    velocity_error: &'a MidiTranscriptionValueErrorSummaryV1,
     onset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
+    velocity_error: &'a MidiTranscriptionValueErrorSummaryV1,
     offset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
 }
 
@@ -210,6 +229,11 @@ fn validate_config(
         });
     }
     if config.pitch_tolerance_cents > 1_200 {
+        return Err(MidiTranscriptionEvaluationIssueV1::InvalidConfig {
+            field: "pitch_tolerance_cents".into(),
+        });
+    }
+    if config.velocity_tolerance > 127 {
         return Err(MidiTranscriptionEvaluationIssueV1::InvalidConfig {
             field: "pitch_tolerance_cents".into(),
         });
@@ -333,7 +357,7 @@ pub fn parse_transcribed_midi_v1(
         let track_index_u16 = u16::try_from(track_index)
             .map_err(|_| MidiTranscriptionEvaluationIssueV1::UnsupportedMidiFormat)?;
         let mut programs = [0u8; 16];
-        let mut pending: HashMap<(u8, u8), VecDeque<(u64, u8)>> = HashMap::new();
+        let mut pending: HashMap<(u8, u8), VecDeque<(u64, u8, u8)>> = HashMap::new();
         let mut pending_note_count = 0usize;
         for (tick, kind) in events {
             match *kind {
@@ -354,13 +378,17 @@ pub fn parse_transcribed_midi_v1(
                             if !queue.is_empty() {
                                 overlapping_same_pitch_note_on_count += 1;
                             }
-                            queue.push_back((*tick, programs[usize::from(channel)]));
+                            queue.push_back((
+                                *tick,
+                                programs[usize::from(channel)],
+                                vel.as_int(),
+                            ));
                             pending_note_count += 1;
                         }
                         MidiMessage::NoteOff { key, .. }
                         | MidiMessage::NoteOn { key, .. } => {
                             if let Some(queue) = pending.get_mut(&(channel, key.as_int())) {
-                                if let Some((start_tick, program)) = queue.pop_front() {
+                                if let Some((start_tick, program, velocity)) = queue.pop_front() {
                                     pending_note_count = pending_note_count.saturating_sub(1);
                                     let onset_seconds = tick_to_seconds(
                                         start_tick,
@@ -390,6 +418,7 @@ pub fn parse_transcribed_midi_v1(
                                         offset_tick: Some(*tick),
                                         gm_program: program,
                                         pitch_midi: key.as_int(),
+                                        velocity_midi: velocity,
                                         onset_seconds,
                                         offset_seconds: Some(offset_seconds),
                                     });
@@ -408,7 +437,7 @@ pub fn parse_transcribed_midi_v1(
         }
 
         for ((channel, pitch), queue) in pending {
-            for (start_tick, program) in queue {
+            for (start_tick, program, velocity) in queue {
                 if notes.len() >= MIDI_TRANSCRIPTION_MAX_NOTES_V1 {
                     return Err(MidiTranscriptionEvaluationIssueV1::TooManyPredictedNotes {
                         count: notes.len().saturating_add(1),
@@ -429,6 +458,7 @@ pub fn parse_transcribed_midi_v1(
                     offset_tick: None,
                     gm_program: program,
                     pitch_midi: pitch,
+                    velocity_midi: velocity,
                     onset_seconds,
                     offset_seconds: None,
                 });
@@ -720,6 +750,7 @@ fn reference_notes(
         notes.push(EvaluationNoteV1 {
             pitch_midi: note.pitch_midi,
             gm_program: program,
+            velocity_midi: note.velocity_midi,
             onset_seconds,
             offset_seconds: Some(offset_seconds),
         });
@@ -817,6 +848,7 @@ fn build_adjacency(
     config: &MidiTranscriptionEvaluationConfigV1,
     require_offset: bool,
     require_program: bool,
+    require_velocity: bool,
 ) -> Result<Vec<Vec<usize>>, MidiTranscriptionEvaluationIssueV1> {
     // Prediction events are sorted by onset by parse_transcribed_midi_v1.
     // Use binary-search time windows and per-pitch candidates rather than the
@@ -850,6 +882,13 @@ fn build_adjacency(
                 continue;
             }
             if require_program && reference_note.gm_program != predicted_note.gm_program {
+                continue;
+            }
+            if require_velocity
+                && (i16::from(reference_note.velocity_midi)
+                    - i16::from(predicted_note.velocity_midi))
+                    .unsigned_abs() > u16::from(config.velocity_tolerance)
+            {
                 continue;
             }
             if require_offset {
@@ -906,6 +945,39 @@ fn metric_from_matching(
         precision,
         recall,
         f1,
+    }
+}
+
+fn value_error_summary(values: &[f64]) -> MidiTranscriptionValueErrorSummaryV1 {
+    if values.is_empty() {
+        return MidiTranscriptionValueErrorSummaryV1 {
+            sample_count: 0,
+            mean_absolute_error: None,
+            median_absolute_error: None,
+            p95_absolute_error: None,
+            p99_absolute_error: None,
+        };
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let mean = sorted.iter().sum::<f64>() / sorted.len() as f64;
+    let percentile = |fraction: f64| {
+        let index = ((sorted.len() as f64 * fraction).ceil() as usize)
+            .saturating_sub(1)
+            .min(sorted.len() - 1);
+        sorted[index]
+    };
+    let median = if sorted.len().is_multiple_of(2) {
+        (sorted[sorted.len() / 2 - 1] + sorted[sorted.len() / 2]) * 0.5
+    } else {
+        sorted[sorted.len() / 2]
+    };
+    MidiTranscriptionValueErrorSummaryV1 {
+        sample_count: u32::try_from(sorted.len()).unwrap_or(u32::MAX),
+        mean_absolute_error: Some(mean),
+        median_absolute_error: Some(median),
+        p95_absolute_error: Some(percentile(0.95)),
+        p99_absolute_error: Some(percentile(0.99)),
     }
 }
 
@@ -969,6 +1041,7 @@ pub fn midi_transcription_evaluation_commitment_v1(
         exact_program_onset_metrics: &report.exact_program_onset_metrics,
         exact_program_full_note_metrics: &report.exact_program_full_note_metrics,
         onset_error_ms: &report.onset_error_ms,
+        velocity_error: &report.velocity_error,
         offset_error_ms: &report.offset_error_ms,
     };
     Ok(domain_separated_sha256(
@@ -1016,17 +1089,23 @@ pub fn evaluate_midi_transcription_v1(
     };
     let full_matching = {
         let adjacency =
-            build_adjacency(&reference_notes, &predicted_notes, &config, true, false)?;
+            build_adjacency(&reference_notes, &predicted_notes, &config, true, false, false)?;
         maximum_cardinality_matching(&adjacency, predicted_notes.len())?
     };
     let program_onset_matching = {
         let adjacency =
-            build_adjacency(&reference_notes, &predicted_notes, &config, false, true)?;
+            build_adjacency(&reference_notes, &predicted_notes, &config, false, true, false)?;
         maximum_cardinality_matching(&adjacency, predicted_notes.len())?
     };
     let program_full_matching = {
         let adjacency =
-            build_adjacency(&reference_notes, &predicted_notes, &config, true, true)?;
+            build_adjacency(&reference_notes, &predicted_notes, &config, true, true, false)?;
+        maximum_cardinality_matching(&adjacency, predicted_notes.len())?
+    };
+
+    let velocity_matching = {
+        let adjacency =
+            build_adjacency(&reference_notes, &predicted_notes, &config, true, false, true)?;
         maximum_cardinality_matching(&adjacency, predicted_notes.len())?
     };
 
@@ -1047,6 +1126,15 @@ pub fn evaluate_midi_transcription_v1(
                 predicted_notes[*prediction_index].offset_seconds?
                     - reference_notes[*reference_index].offset_seconds?,
             )
+        })
+        .collect();
+
+    let velocity_errors: Vec<_> = velocity_matching
+        .iter()
+        .map(|(reference_index, prediction_index)| {
+            (i16::from(predicted_notes[*prediction_index].velocity_midi)
+                - i16::from(reference_notes[*reference_index].velocity_midi))
+                .unsigned_abs() as f64
         })
         .collect();
 
@@ -1085,6 +1173,12 @@ pub fn evaluate_midi_transcription_v1(
             predicted_notes.len(),
             program_full_matching.len(),
         ),
+        velocity_aware_full_note_metrics: metric_from_matching(
+            reference_notes.len(),
+            predicted_notes.len(),
+            velocity_matching.len(),
+        ),
+        velocity_error: value_error_summary(&velocity_errors),
         onset_error_ms: timing_error_summary(&onset_errors),
         offset_error_ms: timing_error_summary(&offset_errors),
         report_sha256: String::new(),
