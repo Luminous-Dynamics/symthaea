@@ -432,7 +432,7 @@ mod tests {
         json!({
             "experiment_id": "probe-1",
             "belief_state_sha256": "a".repeat(64),
-            "selector": "EVSI",
+            "selector": "RISK_ADJUSTED_EVSI",
             "predicted_outcome_distribution": [
                 {"outcome": "positive", "probability": 0.3},
                 {"outcome": "negative", "probability": 0.7}
