@@ -2374,6 +2374,69 @@
         "WAPS fuel-saving claims",
         "Fleet transfer or physical qualification"
       ]
+    },
+    {
+      "source_id": "IEC-60092-501-2025",
+      "title": "Electrical installations in ships — Part 501: Special features — Electric propulsion plant",
+      "publisher": "International Electrotechnical Commission",
+      "publication_date": "2025-08-26",
+      "url": "https://webstore.iec.ch/en/publication/92837",
+      "evidence_class": "published_international_standard",
+      "scope": {
+        "edition": "IEC 60092-501:2025, Edition 6",
+        "coverage": [
+          "generators and prime movers",
+          "battery and alternative power sources",
+          "switchboards and distribution",
+          "power converters",
+          "propulsion motors",
+          "control, monitoring and safety systems",
+          "podded drives including azimuth"
+        ],
+        "relevance": "Electrical equipment and configuration boundaries for hybrid-electric marine propulsion design and test."
+      },
+      "limitations": [
+        "This standard is not a whole-vessel first-law energy balance method or a fuel-saving benchmark.",
+        "Use the licensed current standard and vessel-specific class/flag applicability; public web metadata is not the full normative text."
+      ],
+      "eligible_use": [
+        "Electrical propulsion system boundary and interface mapping",
+        "Configuration/test evidence planning"
+      ],
+      "ineligible_use": [
+        "Claiming that a first-law ledger pass establishes IEC compliance",
+        "Substituting an accounting audit for electrical system testing"
+      ]
+    },
+    {
+      "source_id": "ISO-TS-25128-2026",
+      "title": "Small craft — Propulsion system energy consumption — Test method",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2026-09-01",
+      "url": "https://www.iso.org/standard/89049.html",
+      "evidence_class": "published_technical_specification_limited_scope",
+      "scope": {
+        "edition": "ISO/TS 25128:2026, Edition 1",
+        "scope": "Measurement, documentation and presentation of mechanical propulsion energy consumption for small craft underway, irrespective of propulsion system, energy type or hull characteristics.",
+        "explicit_exclusions": [
+          "wind propulsion",
+          "wind-assisted hybrid propulsion",
+          "wave propulsion"
+        ]
+      },
+      "limitations": [
+        "Small-craft scope; not a cargo-vessel standard.",
+        "Explicit exclusions mean it cannot be claimed as a WAPS or wind-assisted hybrid cargo validation standard.",
+        "Do not infer coverage from its general propulsion-system wording."
+      ],
+      "eligible_use": [
+        "Scope-bound small-craft mechanical propulsion methodology comparison",
+        "Demonstrating why a cargo/WAPS test method needs an explicit scope"
+      ],
+      "ineligible_use": [
+        "Claiming compliance for cargo vessels or WAPS hybrid propulsion",
+        "Using its method as a whole-vessel energy conservation or lifecycle benchmark"
+      ]
     }
   ]
 }
