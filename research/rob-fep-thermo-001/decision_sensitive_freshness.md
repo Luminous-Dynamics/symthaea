@@ -132,3 +132,20 @@ DI18 and DI19 were also corrected so they isolate compression-quality loss and f
 ## 8. Claim boundary
 
 The AoI and regret calculations qualify only the declared timestamp/decision model. They do not validate robot clocks, sensor calibration, belief accuracy, task-loss choice, whole-system energy, physical dynamics or safety. An actuation-AoI pass does not confer action authority. #4117 certificate validity, #4382 projection and #2836 controller dispatch remain independent.
+
+
+## Age of Actuation and Probability of Missing Actuation
+
+A 2026 IEEE Transactions on Communications paper formalizes **Age of Actuation (AoA)** and **Probability of Missing Actuation (PoMA)** alongside Age of Information. Its abstract defines AoA as a timeliness measure for status updates that are used to actuate; it characterizes average AoA, AoA violation probability and PoMA, including the cost of missed actions. The model is a wireless-power-transfer system, not a robot, so these concepts should be treated as a useful communication/control comparator rather than copied without adapting the actuation semantics.
+
+- Nikkhah, Ephremides & Pappas, “Age of Actuation and Timeliness: Semantics in a Wireless Power Transfer System,” IEEE Transactions on Communications, 2026, DOI: https://doi.org/10.1109/TCOMM.2026.3663227
+
+Luminous should report, as separate metrics:
+- actuation-side AoI from exact source observation to command application;
+- actuation deadline violation probability (PoMA-style, with the event and denominator declared);
+- probability that the command is physically admitted/applied before its task deadline;
+- task-loss impact of a missed actuation, in fixed task-loss units;
+- decision-focused EVSI of requesting a newer observation;
+- physical resource and recovery consequences.
+
+Do not identify AoA with the AoI measurement implemented in Symtropy #4713. AoA, actuator-side AoI, command-to-motion delay, EVSI and missed-actuation cost are related but distinct. A lower AoI does not imply lower probability of missing a critical action if the actuation deadline or physical feasibility changed.
