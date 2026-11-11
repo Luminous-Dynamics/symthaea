@@ -1515,6 +1515,21 @@ mod tests {
     }
 
     #[test]
+    fn event_sequence_cannot_hide_a_definite_timestamp_inversion() {
+        let mut trace = valid_trace();
+        trace.observations[0].stamp.timestamp = TimestampInterval {
+            lower_ns: 120,
+            upper_ns: 120,
+        };
+        let report = replay_mission(&trace);
+        assert_eq!(report.disposition, ReplayDisposition::Rejected);
+        assert!(has_finding(
+            &report,
+            "CAUSAL_TIMESTAMP_CONTRADICTS_SEQUENCE"
+        ));
+    }
+
+    #[test]
     fn uncertain_same_clock_timestamp_order_does_not_invent_aoi() {
         let mut trace = valid_trace();
         trace.observations[0].stamp.timestamp = TimestampInterval {
