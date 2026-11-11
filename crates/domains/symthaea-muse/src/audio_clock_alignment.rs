@@ -1192,6 +1192,89 @@ mod tests {
     }
 
     #[test]
+    fn search_boundary_candidate_abstains_instead_of_clamping_the_offset() {
+        let notes = irregular_notes();
+        let midi = artifact(&notes);
+        let wav = rendered_bursts(&notes, 9_600, 48_000);
+        let profile = estimate_audio_minus_midi_clock_offset_v1(
+            &wav,
+            &midi,
+            AudioClockAlignmentConfigV1 {
+                minimum_offset_ms: -100,
+                maximum_offset_ms: 100,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            profile.status,
+            AudioClockAlignmentStatusV1::SearchBoundaryCandidate
+        );
+        assert!(profile.audio_minus_midi_offset_frames.is_none());
+        assert!(profile.best_candidate_offset_frames.is_some());
+        assert!(profile.best_peak_score.unwrap() > 0.0);
+        assert!(validate_audio_clock_alignment_profile_v1(&profile, &wav, &midi).is_empty());
+    }
+
+    #[test]
+    fn repeated_onset_pattern_is_reported_as_ambiguous() {
+        let notes = vec![
+            (60, 0, 600),
+            (64, 1_920, 2_520),
+            (67, 3_840, 4_440),
+            (62, 5_760, 6_360),
+            (65, 7_680, 8_280),
+        ];
+        let midi = artifact(&notes);
+        let wav = rendered_bursts(&notes, 0, 48_000);
+        let profile = estimate_audio_minus_midi_clock_offset_v1(
+            &wav,
+            &midi,
+            AudioClockAlignmentConfigV1 {
+                minimum_offset_ms: -100,
+                maximum_offset_ms: 1_500,
+                ambiguity_ratio_basis_points: 7_000,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            profile.status,
+            AudioClockAlignmentStatusV1::AmbiguousCandidate,
+            "{profile:?}"
+        );
+        assert!(profile.competing_peak_ratio.unwrap() >= 0.70);
+        assert!(validate_audio_clock_alignment_profile_v1(&profile, &wav, &midi).is_empty());
+    }
+
+    #[test]
+    fn re_sealed_but_inconsistent_offset_profile_is_rejected_by_replay() {
+        let notes = irregular_notes();
+        let midi = artifact(&notes);
+        let wav = rendered_bursts(&notes, 9_600, 48_000);
+        let mut profile = estimate_audio_minus_midi_clock_offset_v1(
+            &wav,
+            &midi,
+            AudioClockAlignmentConfigV1 {
+                minimum_offset_ms: -100,
+                maximum_offset_ms: 500,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let offset = profile.audio_minus_midi_offset_frames.unwrap() + 1_000;
+        profile.audio_minus_midi_offset_frames = Some(offset);
+        profile.best_candidate_offset_frames = Some(offset);
+        profile.audio_minus_midi_offset_ms =
+            Some(offset as f64 * 1_000.0 / 48_000.0);
+        profile.profile_sha256 = alignment_commitment(&profile).unwrap();
+        let issues = validate_audio_clock_alignment_profile_v1(&profile, &wav, &midi);
+        assert!(issues.contains(&AudioClockAlignmentIssueV1::InvalidProfile {
+            field: "deterministic_replay".into(),
+        }));
+    }
+
+    #[test]
     fn changed_wav_invalidates_alignment_profile_binding() {
         let notes = irregular_notes();
         let midi = artifact(&notes);
