@@ -594,6 +594,30 @@ mod tests {
     }
 
     #[test]
+    fn actor_binding_counterfactuals_are_ineligible() {
+        let mut fixture = parsed()["fixtures"]
+            .as_array().unwrap().iter()
+            .find(|item| str_field(item, "mutation_dimension") == Some("actor_binding")
+                && str_field(item, "pair_member") == Some("single_delta_denial"))
+            .unwrap().clone();
+        assert_eq!(derive_eligible(&fixture), Ok(false));
+        fixture["authority_context"]["actor_ref"] = fixture["task"]["actor_ref"].clone();
+        assert_eq!(derive_eligible(&fixture), Ok(true));
+    }
+
+    #[test]
+    fn represented_party_binding_is_not_the_actor_binding() {
+        let mut fixture = parsed()["fixtures"]
+            .as_array().unwrap().iter()
+            .find(|item| str_field(item, "mutation_dimension") == Some("on_behalf_of_binding")
+                && str_field(item, "pair_member") == Some("single_delta_denial"))
+            .unwrap().clone();
+        assert_eq!(derive_eligible(&fixture), Ok(false));
+        fixture["authority_context"]["on_behalf_of_ref"] = fixture["task"]["on_behalf_of_ref"].clone();
+        assert_eq!(derive_eligible(&fixture), Ok(true));
+    }
+
+    #[test]
     fn changing_two_authority_facts_is_rejected() {
         let mut v = parsed();
         v["fixtures"][1]["authority_context"]["local_recognition"] = Value::Bool(false);
