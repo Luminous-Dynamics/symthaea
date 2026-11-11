@@ -489,6 +489,15 @@ impl SystemProfile {
             {
                 issues.push(format!("{path}.source_ref must be omitted rather than empty"));
             }
+            if record
+                .independence_group
+                .as_ref()
+                .is_some_and(|group| group.trim().is_empty())
+            {
+                issues.push(format!(
+                    "{path}.independence_group must be omitted rather than empty"
+                ));
+            }
             if let Some(digest) = &record.artifact_sha256
                 && (digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()))
             {
