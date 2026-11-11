@@ -2285,6 +2285,95 @@
         "Statutory wind-energy calculation",
         "Claiming adopted IMO WAPS MRV requirements"
       ]
+    },
+    {
+      "source_id": "AREDAH-RAKHA-WEATHER-ROUTING-BENCHMARK-2026",
+      "title": "Weather-Routing Benchmark: a multi-basin, multi-vessel instance set for ship weather-routing and speed-optimization research",
+      "publisher": "Ahmed Aredah and Hesham A. Rakha; Texas A&M Transportation Institute / Virginia Tech",
+      "publication_date": "2026",
+      "url": "https://doi.org/10.5281/zenodo.21052776",
+      "evidence_class": "public_physics_model_benchmark_with_ERA5_reanalysis_and_priced_per_instance_results",
+      "scope": {
+        "dataset_version": "1.0.0",
+        "license": "CC BY 4.0",
+        "repository": "https://github.com/AhmedAredah/weather-routing-benchmark",
+        "paper_status": "Accompanying paper is listed as under review in CITATION.cff.",
+        "design": {
+          "route_count": 12,
+          "seasons": [
+            "DJF",
+            "MAM",
+            "JJA",
+            "SON"
+          ],
+          "years": [
+            2022,
+            2023
+          ],
+          "instances_per_vessel": 96,
+          "vessel_classes": [
+            "S175 containership",
+            "KVLCC2 VLCC tanker",
+            "JBC capesize bulk carrier"
+          ],
+          "objectives": [
+            "minimum fuel",
+            "minimum voyage cost"
+          ],
+          "total_priced_voyages": 576
+        },
+        "baseline": "Weather-blind calm-optimal route scored under the same historical ERA5 weather, with separate route-only and joint route+speed optimization.",
+        "weather_inputs": "ERA5 reanalysis (hourly 10 m winds; significant wave height / mean wave period), not operational forecast vintages. Raw metocean fields are not redistributed in this repository.",
+        "model_components": [
+          "Holtrop–Mennen calm-water resistance",
+          "Lang–Mao spectral added resistance",
+          "Fujiwara wind resistance",
+          "Wageningen B-series propeller operating point",
+          "load-dependent SFOC map",
+          "engine MCR / IMO MSC.1/Circ.1228 seakeeping / under-keel clearance / current-triangle gates"
+        ],
+        "published_headlines": {
+          "S175": {
+            "route_only_mean_percent": 5.04,
+            "route_only_median_percent": 1.91,
+            "route_only_p90_percent": 14.58,
+            "joint_route_speed_mean_percent": 11.01
+          },
+          "KVLCC2": {
+            "route_only_mean_percent": 6.14,
+            "route_only_median_percent": 3.91,
+            "route_only_p90_percent": 16.07,
+            "joint_route_speed_mean_percent": 10.95
+          },
+          "JBC": {
+            "route_only_mean_percent": 4.55,
+            "route_only_median_percent": 1.82,
+            "route_only_p90_percent": 15.09,
+            "joint_route_speed_mean_percent": 9.57
+          }
+        }
+      },
+      "limitations": [
+        "This is a first-principles simulation benchmark evaluated under historical ERA5 reanalysis, not a dataset of measured ship fuel consumption or sea-trial truth.",
+        "The published campaign outputs/results are provided, but raw ERA5 metocean fields are not redistributed; users must obtain them separately under their source terms.",
+        "The KVLCC2 and JBC engine SFOC shape is stated by the benchmark authors as scaled from the S175 reference; it is not a vessel-specific measured engine map.",
+        "Weather-blind baseline infeasibility and canal/draft route infeasibility are represented by statuses and missing savings values. They must not be dropped silently or counted as zero savings.",
+        "The accompanying paper is marked under review in CITATION.cff; reported summaries are author-provided and require independent reproduction.",
+        "The 2024 bunker price and ECA min-cost objective is a benchmark scenario, not a current 2026 statutory emissions-liability calculation.",
+        "The benchmark contains no WAPS device model or ship-specific actual service contract; it is a routing-method baseline only."
+      ],
+      "eligible_use": [
+        "Common deterministic weather-routing and speed-optimization algorithm comparison",
+        "Instance-level reproduction of the published headline summaries",
+        "Feasibility, runtime, route-quality and objective-sensitivity evaluation",
+        "Retrospective route selection under reanalysis, clearly distinguished from forecast-aware operation"
+      ],
+      "ineligible_use": [
+        "Measured cargo-vessel fuel-prediction validation",
+        "Direct forecast-aware controller validation without operational forecast inputs",
+        "WAPS fuel-saving claims",
+        "Fleet transfer or physical qualification"
+      ]
     }
   ]
 }
