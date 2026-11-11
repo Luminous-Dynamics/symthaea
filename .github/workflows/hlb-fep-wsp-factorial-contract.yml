@@ -3,7 +3,7 @@ name: HLB FEP-WSP Factorial Contract
 on:
   pull_request:
     branches: [main, research/swi-001-weight-space-introspection]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
@@ -47,6 +47,7 @@ concurrency:
 
 jobs:
   protocol-contract:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Validate four-factor protocol contract
     runs-on: ubuntu-latest
     timeout-minutes: 30
