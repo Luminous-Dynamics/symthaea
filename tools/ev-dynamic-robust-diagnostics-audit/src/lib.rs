@@ -42,6 +42,11 @@ pub struct TestSpec {
     pub test_id: String,
     pub outcomes: Vec<String>,
     pub duration_seconds: f64,
+    pub protocol_ref: String,
+    pub equipment_ref: String,
+    pub calibration_evidence_ref: String,
+    pub requires_prior_outcome_from: Option<String>,
+    pub available_after_outcomes: Vec<String>,
     pub test_cost: f64,
     pub downtime_cost: f64,
     pub safety_approved: bool,
@@ -58,6 +63,16 @@ impl TestSpec {
             && self.equipment_available
     }
 
+    fn eligible_as_first_test(&self) -> bool {
+        self.eligible() && self.requires_prior_outcome_from.is_none()
+    }
+
+    fn can_follow(&self, first: &TestSpec, outcome: &str) -> bool {
+        self.eligible()
+            && self.requires_prior_outcome_from.as_deref() == Some(first.test_id.as_str())
+            && self.available_after_outcomes.iter().any(|candidate| candidate == outcome)
+    }
+
     fn cost(&self) -> f64 {
         self.test_cost + self.downtime_cost
     }
@@ -67,6 +82,13 @@ impl TestSpec {
 #[serde(deny_unknown_fields)]
 pub struct WorldModel {
     pub model_id: String,
+    pub model_version: String,
+    pub model_evidence_ref: String,
+    pub model_evidence_sha256: String,
+    pub domain_ref: String,
+    pub source_class: String,
+    pub likelihood_assumption: String,
+    pub shared_nuisance_factors: Vec<String>,
     pub prior: Vec<f64>,
     pub test_models: Vec<TestModel>,
 }
@@ -75,6 +97,7 @@ pub struct WorldModel {
 #[serde(deny_unknown_fields)]
 pub struct TestModel {
     pub test_id: String,
+    pub transition_duration_seconds: f64,
     /// Transition during test duration: row = pre-test state, column = state
     /// after elapsed-time degradation has occurred.
     pub time_transition: Vec<Vec<f64>>,
@@ -263,15 +286,50 @@ fn validate_problem(problem: &Problem) -> Result<(), String> {
         if !is_finite_nonnegative(test.duration_seconds)
             || !is_finite_nonnegative(test.test_cost)
             || !is_finite_nonnegative(test.downtime_cost)
+            || test.protocol_ref.trim().is_empty()
+            || test.equipment_ref.trim().is_empty()
+            || test.calibration_evidence_ref.trim().is_empty()
         {
-            return Err(format!("test {} has invalid duration or cost", test.test_id));
+            return Err(format!("test {} has invalid duration, cost, or missing protocol/equipment/calibration evidence reference", test.test_id));
         }
+        match &test.requires_prior_outcome_from {
+            Some(parent_id) => {
+                if parent_id == &test.test_id || test.available_after_outcomes.is_empty() {
+                    return Err(format!("conditional test {} has invalid predecessor or no permitted outcomes", test.test_id));
+                }
+                let parent = problem.tests.iter().find(|candidate| &candidate.test_id == parent_id)
+                    .ok_or_else(|| format!("conditional test {} references unknown predecessor {}", test.test_id, parent_id))?;
+                if test.available_after_outcomes.iter().any(|outcome| !parent.outcomes.contains(outcome)) {
+                    return Err(format!("conditional test {} references an outcome not declared by {}", test.test_id, parent_id));
+                }
+            }
+            None if !test.available_after_outcomes.is_empty() => {
+                return Err(format!("unconditional test {} must not declare conditional availability outcomes", test.test_id));
+            }
+            None => {}
+        }
+    }
+    if problem.tests.iter().any(|test| test.requires_prior_outcome_from.is_some())
+        && problem.tests.len() > 2
+    {
+        return Err("v0.1 supports a single conditional follow-up and at most two total tests".to_owned());
     }
 
     let mut model_ids = BTreeSet::new();
     for world in &problem.worlds {
         if world.model_id.trim().is_empty() || !model_ids.insert(world.model_id.clone()) {
             return Err(format!("ambiguity model identity is empty or duplicated: {}", world.model_id));
+        }
+        if world.model_version.trim().is_empty()
+            || world.model_evidence_ref.trim().is_empty()
+            || world.domain_ref.trim().is_empty()
+            || world.model_evidence_sha256.len() != 64
+            || !world.model_evidence_sha256.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            || world.source_class != "SYNTHETIC_KNOWN_TRUTH"
+            || world.likelihood_assumption != "CONDITIONAL_INDEPENDENT_GIVEN_POST_STATE"
+            || !world.shared_nuisance_factors.is_empty()
+        {
+            return Err(format!("model {} lacks a valid synthetic model receipt or explicitly supported likelihood assumption; correlated nuisance factors require the joint-likelihood owner", world.model_id));
         }
         if world.prior.len() != 2 {
             return Err(format!("model {} prior must contain exactly two states", world.model_id));
@@ -287,6 +345,12 @@ fn validate_problem(problem: &Problem) -> Result<(), String> {
             }
             let spec = problem.tests.iter().find(|test| test.test_id == test_model.test_id)
                 .ok_or_else(|| format!("model {} references unknown test {}", world.model_id, test_model.test_id))?;
+            if !test_model.transition_duration_seconds.is_finite()
+                || test_model.transition_duration_seconds < 0.0
+                || (test_model.transition_duration_seconds - spec.duration_seconds).abs() > PROBABILITY_TOLERANCE
+            {
+                return Err(format!("test {} transition model duration does not match the declared test duration", spec.test_id));
+            }
             matrix_2x2(&test_model.time_transition, "time transition")?;
             matrix_2x2(&test_model.perturbation_transition, "test perturbation transition")?;
             if test_model.observation_by_post_state.len() != 2 {
@@ -308,12 +372,7 @@ fn test_model<'a>(world: &'a WorldModel, test_id: &str) -> Result<&'a TestModel,
         .ok_or_else(|| format!("model {} lacks test {}", world.model_id, test_id))
 }
 
-fn test_spec<'a>(problem: &'a Problem, test_id: &str) -> Result<&'a TestSpec, String> {
-    problem.tests.iter().find(|item| item.test_id == test_id)
-        .ok_or_else(|| format!("problem {} lacks test {}", problem.problem_id, test_id))
-}
-
-fn terminal_action<'a>(problem: &'a Problem, action_index: usize) -> Result<&'a TerminalAction, String> {
+remove unused lookup helperfn terminal_action<'a>(problem: &'a Problem, action_index: usize) -> Result<&'a TerminalAction, String> {
     problem.actions.get(action_index)
         .ok_or_else(|| "policy references unknown terminal action".to_owned())
 }
@@ -511,6 +570,9 @@ fn optimize(problem: &Problem, dynamic: bool) -> Result<(CandidatePolicy, f64, u
     let eligible: Vec<usize> = problem.tests.iter().enumerate()
         .filter_map(|(index, test)| if test.eligible() { Some(index) } else { None })
         .collect();
+    let eligible_first: Vec<usize> = problem.tests.iter().enumerate()
+        .filter_map(|(index, test)| if test.eligible_as_first_test() { Some(index) } else { None })
+        .collect();
     let mut best: Option<(CandidatePolicy, f64, String)> = None;
     let mut candidate_count = 0usize;
 
@@ -525,23 +587,40 @@ fn optimize(problem: &Problem, dynamic: bool) -> Result<(CandidatePolicy, f64, u
         consider_candidate(problem, dynamic, policy, &mut best, &mut candidate_count)
     })?;
 
-    for first_index in &eligible {
+    for first_index in &eligible_first {
         let first = &problem.tests[*first_index];
         let second_eligible: Vec<usize> = eligible.iter().copied()
-            .filter(|index| index != first_index)
+            .filter(|index| problem.tests[*index].can_follow(first, &first.outcomes[0])
+                || first.outcomes.iter().any(|outcome| problem.tests[*index].can_follow(first, outcome)))
             .collect();
-        // v0.1 is deliberately bounded to at most one follow-up test.
+        // v0.1 is deliberately bounded to one conditional follow-up test.
         if second_eligible.len() > 1 {
-            return Err("v0.1 planner supports at most two total eligible tests".to_owned());
+            return Err("v0.1 planner supports at most one conditional follow-up".to_owned());
         }
         let second_index = second_eligible.first().copied();
         let branch_combinations = 1usize << first.outcomes.len();
         for branch_code in 0..branch_combinations {
+            let mut valid_branch_set = true;
             let second_by_first_outcome: Vec<Option<usize>> = (0..first.outcomes.len())
                 .map(|index| {
-                    if (branch_code & (1usize << index)) != 0 { second_index } else { None }
+                    if (branch_code & (1usize << index)) == 0 {
+                        None
+                    } else if let Some(second) = second_index {
+                        if problem.tests[second].can_follow(first, &first.outcomes[index]) {
+                            Some(second)
+                        } else {
+                            valid_branch_set = false;
+                            None
+                        }
+                    } else {
+                        valid_branch_set = false;
+                        None
+                    }
                 })
                 .collect();
+            if !valid_branch_set {
+                continue;
+            }
             let leaves = build_leaves(problem, Some(*first_index), &second_by_first_outcome)?;
             enumerate_decision_maps(&leaves, problem.actions.len(), |decision_map| {
                 let policy = CandidatePolicy {
