@@ -308,3 +308,45 @@ The join checks same-vessel revision/service identity, source record IDs and dig
 alignment, acoustic-to-pre-intervention propulsion conditions, and cleaning/post-observation
 order. A synthetic join may report context_links_valid=true while the overall disposition
 remains INCOMPLETE. The join does not establish causal or environmental benefit.
+
+
+## Acoustic / propulsion shared-timebase binding
+
+Run the acoustic-to-trial binding audit before the hull-state join:
+
+~~~sh
+cargo run --bin marine-acoustic-timebase-binding-audit -- \
+  ../../docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-marine-acoustic-timebase-v0.1.0.json \
+  ../../docs/research/marine/marine-propulsion-case-v0.4.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-marine-environmental-trial-case-v0.4.0.json \
+  > /tmp/marine-acoustic-timebase-binding-report.json
+~~~
+
+The binding audit requires one exact hydrophone channel match by instrument identity,
+calibration record, certificate digest, raw-trace digest, sample rate, sample counts and
+measurement window. It resolves the hydrophone and propulsion channels through the
+trial's normalized calibration/timebase registries, checks calibration and timebase
+validity over the full acoustic interval, accounts for base synchronization uncertainty
+and accumulated residual clock-drift uncertainty, and requires a shared reference-clock
+identity for shaft torque, shaft rotational speed, speed through water, vessel position
+and shaft angle. Unknown uncertainty and synthetic provenance remain INCOMPLETE; a
+clock identity or trace mismatch is not accepted.
+
+Pass the resulting JSON receipt as the final argument to the hull-state join:
+
+~~~sh
+cargo run --bin marine-hull-state-evidence-join-audit -- \
+  ../../docs/research/marine/marine-hull-state-evidence-join-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-marine-hull-state-timebase-join-v0.1.0.json \
+  ../../docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-marine-acoustic-timebase-v0.1.0.json \
+  ../../docs/research/marine/marine-biofouling-evidence-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-marine-biofouling-timebase-v0.1.0.json \
+  /tmp/marine-acoustic-timebase-binding-report.json
+~~~
+
+The join's `timebase_binding_valid` field reports structural/timebase linkage only.
+Even with `binding_valid=true`, synthetic source records or unknown calibration and
+synchronization uncertainty keep the result INCOMPLETE. This is not sensor authentication,
+ISO conformity, cavitation validation, causal attribution, or an energy/noise improvement claim.
