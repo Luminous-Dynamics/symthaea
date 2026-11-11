@@ -43,6 +43,8 @@ pub const MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATION_SCANS_V1: usize = 10_000_000;
 pub const MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATIONS_V1: usize = 2_000_000;
 pub const MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1: usize = 2_000_000;
 pub const MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1: usize = 10_000_000;
+pub const MIDI_TRANSCRIPTION_RUN_RECEIPT_SCHEMA_V1: &str =
+    "muse-midi-transcription-run-receipt-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MidiTranscriptionEvaluationConfigV1 {
@@ -136,6 +138,9 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub reference_midi_sha256: String,
     pub reference_manifest_sha256: String,
     pub prediction_midi_sha256: String,
+    /// Exact model/inference/input provenance; absent for legacy MIDI-only scoring.
+    pub run_receipt: Option<MidiTranscriptionRunReceiptV1>,
+    pub run_receipt_sha256: Option<String>,
     pub config: MidiTranscriptionEvaluationConfigV1,
     pub reference_note_count: u32,
     pub prediction_note_count: u32,
@@ -176,6 +181,7 @@ pub enum MidiTranscriptionEvaluationIssueV1 {
     ReferenceMidiDigestMismatch,
     ReferenceManifestDigestMismatch,
     ReferenceMidiDoesNotMatchManifest,
+    InvalidRunReceipt,
     InvalidReference,
     InvalidPredictionMidi,
     MidiTooLarge { count: usize, maximum: usize },
@@ -191,6 +197,63 @@ pub enum MidiTranscriptionEvaluationIssueV1 {
     TooManyCandidatePairs { count: usize, maximum: usize },
     MatchingWorkBudgetExceeded { scans: usize, maximum: usize },
     SerializationFailed,
+}
+
+/// Execution environment recorded by the adapter that produced a MIDI file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MidiTranscriptionRuntimeReceiptV1 {
+    pub runtime_name: String,
+    pub runtime_version: String,
+    pub backend: String,
+    pub hardware: String,
+    pub elapsed_milliseconds: Option<u64>,
+}
+
+/// Reproducibility metadata for one audio-to-MIDI model invocation.
+///
+/// The evaluator verifies both content digests against exact bytes supplied to
+/// the receipt-aware evaluation function. Model weight/code digests are
+/// optional for hosted services where the implementation is not exposed; a
+/// stable model revision is still required.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MidiTranscriptionRunReceiptV1 {
+    pub schema: String,
+    pub model_id: String,
+    pub model_revision: String,
+    pub model_weights_sha256: Option<String>,
+    pub model_code_sha256: Option<String>,
+    pub input_audio_sha256: String,
+    pub prediction_midi_sha256: String,
+    pub preprocessing_config_sha256: String,
+    pub inference_config_sha256: String,
+    pub instrument_conditioning: Option<String>,
+    pub adapter_id: String,
+    pub adapter_revision: String,
+    pub runtime: MidiTranscriptionRuntimeReceiptV1,
+    /// Model/license or hosted-service terms, as declared by the adapter.
+    pub license_or_terms: String,
+    /// Declared legal basis for evaluating this exact input (not independently verified).
+    pub rights_basis: String,
+    pub receipt_sha256: String,
+}
+
+#[derive(Serialize)]
+struct RunReceiptCommitmentV1<'a> {
+    schema: &'a str,
+    model_id: &'a str,
+    model_revision: &'a str,
+    model_weights_sha256: &'a Option<String>,
+    model_code_sha256: &'a Option<String>,
+    input_audio_sha256: &'a str,
+    prediction_midi_sha256: &'a str,
+    preprocessing_config_sha256: &'a str,
+    inference_config_sha256: &'a str,
+    instrument_conditioning: &'a Option<String>,
+    adapter_id: &'a str,
+    adapter_revision: &'a str,
+    runtime: &'a MidiTranscriptionRuntimeReceiptV1,
+    license_or_terms: &'a str,
+    rights_basis: &'a str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -217,6 +280,7 @@ struct ReportCommitmentV1<'a> {
     reference_midi_sha256: &'a str,
     reference_manifest_sha256: &'a str,
     prediction_midi_sha256: &'a str,
+    run_receipt_sha256: &'a Option<String>,
     config: &'a MidiTranscriptionEvaluationConfigV1,
     reference_note_count: u32,
     prediction_note_count: u32,
@@ -1479,6 +1543,75 @@ fn timing_error_summary(values_seconds: &[f64]) -> MidiTranscriptionTimingErrorS
     }
 }
 
+fn bounded_nonempty(value: &str, maximum_bytes: usize) -> bool {
+    !value.trim().is_empty() && value.len() <= maximum_bytes
+}
+
+/// Compute the domain-separated commitment for a transcription run receipt.
+pub fn midi_transcription_run_receipt_commitment_v1(
+    receipt: &MidiTranscriptionRunReceiptV1,
+) -> Result<String, serde_json::Error> {
+    let commitment = RunReceiptCommitmentV1 {
+        schema: &receipt.schema,
+        model_id: &receipt.model_id,
+        model_revision: &receipt.model_revision,
+        model_weights_sha256: &receipt.model_weights_sha256,
+        model_code_sha256: &receipt.model_code_sha256,
+        input_audio_sha256: &receipt.input_audio_sha256,
+        prediction_midi_sha256: &receipt.prediction_midi_sha256,
+        preprocessing_config_sha256: &receipt.preprocessing_config_sha256,
+        inference_config_sha256: &receipt.inference_config_sha256,
+        instrument_conditioning: &receipt.instrument_conditioning,
+        adapter_id: &receipt.adapter_id,
+        adapter_revision: &receipt.adapter_revision,
+        runtime: &receipt.runtime,
+        license_or_terms: &receipt.license_or_terms,
+        rights_basis: &receipt.rights_basis,
+    };
+    Ok(domain_separated_sha256(
+        MIDI_TRANSCRIPTION_RUN_RECEIPT_SCHEMA_V1,
+        &serde_json::to_vec(&commitment)?,
+    ))
+}
+
+fn validate_run_receipt_v1(
+    receipt: &MidiTranscriptionRunReceiptV1,
+    input_audio_bytes: &[u8],
+    prediction_midi_bytes: &[u8],
+) -> Result<(), MidiTranscriptionEvaluationIssueV1> {
+    if receipt.schema != MIDI_TRANSCRIPTION_RUN_RECEIPT_SCHEMA_V1
+        || !bounded_nonempty(&receipt.model_id, 256)
+        || !bounded_nonempty(&receipt.model_revision, 256)
+        || !bounded_nonempty(&receipt.adapter_id, 256)
+        || !bounded_nonempty(&receipt.adapter_revision, 256)
+        || !bounded_nonempty(&receipt.runtime.runtime_name, 128)
+        || !bounded_nonempty(&receipt.runtime.runtime_version, 128)
+        || !bounded_nonempty(&receipt.runtime.backend, 128)
+        || !bounded_nonempty(&receipt.runtime.hardware, 512)
+        || !bounded_nonempty(&receipt.license_or_terms, 512)
+        || !bounded_nonempty(&receipt.rights_basis, 512)
+        || receipt.instrument_conditioning.as_ref().is_some_and(|value| {
+            !bounded_nonempty(value, 512)
+        })
+        || !valid_sha256(&receipt.input_audio_sha256)
+        || !valid_sha256(&receipt.prediction_midi_sha256)
+        || !valid_sha256(&receipt.preprocessing_config_sha256)
+        || !valid_sha256(&receipt.inference_config_sha256)
+        || receipt.model_weights_sha256.as_ref().is_some_and(|value| !valid_sha256(value))
+        || receipt.model_code_sha256.as_ref().is_some_and(|value| !valid_sha256(value))
+        || receipt.input_audio_sha256 != sha256_hex(input_audio_bytes)
+        || receipt.prediction_midi_sha256 != sha256_hex(prediction_midi_bytes)
+    {
+        return Err(MidiTranscriptionEvaluationIssueV1::InvalidRunReceipt);
+    }
+    let expected = midi_transcription_run_receipt_commitment_v1(receipt)
+        .map_err(|_| MidiTranscriptionEvaluationIssueV1::SerializationFailed)?;
+    if expected != receipt.receipt_sha256 {
+        return Err(MidiTranscriptionEvaluationIssueV1::InvalidRunReceipt);
+    }
+    Ok(())
+}
+
 pub fn midi_transcription_evaluation_commitment_v1(
     report: &MidiTranscriptionEvaluationReportV1,
 ) -> Result<String, serde_json::Error> {
@@ -1489,6 +1622,7 @@ pub fn midi_transcription_evaluation_commitment_v1(
         reference_midi_sha256: &report.reference_midi_sha256,
         reference_manifest_sha256: &report.reference_manifest_sha256,
         prediction_midi_sha256: &report.prediction_midi_sha256,
+        run_receipt_sha256: &report.run_receipt_sha256,
         config: &report.config,
         reference_note_count: report.reference_note_count,
         prediction_note_count: report.prediction_note_count,
@@ -1527,7 +1661,27 @@ pub fn evaluate_midi_transcription_v1(
     reference: &MidiPerformanceArtifactV1,
     config: MidiTranscriptionEvaluationConfigV1,
 ) -> Result<MidiTranscriptionEvaluationReportV1, MidiTranscriptionEvaluationIssueV1> {
+    evaluate_midi_transcription_with_run_receipt_v1(
+        prediction_midi_bytes,
+        reference,
+        config,
+        None,
+    )
+}
+
+/// Evaluate a prediction and optionally bind it to exact source-audio bytes
+/// and a model execution receipt. When run metadata is present, both audio
+/// and MIDI digests plus the receipt commitment are verified.
+pub fn evaluate_midi_transcription_with_run_receipt_v1(
+    prediction_midi_bytes: &[u8],
+    reference: &MidiPerformanceArtifactV1,
+    config: MidiTranscriptionEvaluationConfigV1,
+    run_context: Option<(&[u8], &MidiTranscriptionRunReceiptV1)>,
+) -> Result<MidiTranscriptionEvaluationReportV1, MidiTranscriptionEvaluationIssueV1> {
     validate_config(&config)?;
+    if let Some((input_audio_bytes, receipt)) = run_context {
+        validate_run_receipt_v1(receipt, input_audio_bytes, prediction_midi_bytes)?;
+    }
     validate_reference_artifact_v1(reference)?;
 
     let reference_notes = reference_notes(reference)?;
@@ -1661,6 +1815,8 @@ pub fn evaluate_midi_transcription_v1(
         reference_midi_sha256: reference.manifest.midi_sha256.clone(),
         reference_manifest_sha256: reference.manifest_sha256.clone(),
         prediction_midi_sha256: sha256_hex(prediction_midi_bytes),
+        run_receipt: run_context.map(|(_, receipt)| receipt.clone()),
+        run_receipt_sha256: run_context.map(|(_, receipt)| receipt.receipt_sha256.clone()),
         config: config.clone(),
         reference_note_count: u32::try_from(reference_notes.len()).unwrap_or(u32::MAX),
         prediction_note_count: u32::try_from(predicted_notes.len()).unwrap_or(u32::MAX),
