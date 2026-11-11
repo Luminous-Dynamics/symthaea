@@ -831,10 +831,16 @@ fn maximum_cardinality_matching(
     // order, each connected to reference vertices in reference order.
     let reference_count = adjacency.len();
     let mut graph = vec![Vec::<usize>::new(); predicted_count];
+    let mut prediction_order = Vec::new();
+    let mut prediction_seen = vec![false; predicted_count];
     for (reference_index, predictions) in adjacency.iter().enumerate() {
         for &prediction_index in predictions {
             if prediction_index >= predicted_count {
                 return Err(MidiTranscriptionEvaluationIssueV1::InvalidPredictionMidi);
+            }
+            if !prediction_seen[prediction_index] {
+                prediction_seen[prediction_index] = true;
+                prediction_order.push(prediction_index);
             }
             graph[prediction_index].push(reference_index);
         }
@@ -845,7 +851,7 @@ fn maximum_cardinality_matching(
     let mut edge_scans = 0usize;
 
     // Upstream greedy initialization.
-    for prediction_index in 0..predicted_count {
+    for &prediction_index in &prediction_order {
         for &reference_index in &graph[prediction_index] {
             edge_scans = edge_scans.saturating_add(1);
             if edge_scans > MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1 {
@@ -882,7 +888,9 @@ fn maximum_cardinality_matching(
             }
         }
 
-        let mut layer: Vec<usize> = (0..predicted_count)
+        let mut layer: Vec<usize> = prediction_order
+            .iter()
+            .copied()
             .filter(|&prediction_index| predecessor_of_prediction[prediction_index].is_some())
             .collect();
         predecessors_of_reference.fill(None);
@@ -2155,7 +2163,7 @@ mod tests {
 
     #[test]
     fn type_one_note_on_and_note_off_can_be_paired_across_tracks() {
-        let mut conductor = vec![
+        let conductor = vec![
             0x00, 0xc0, 40,
             0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
             0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08,
@@ -2163,16 +2171,17 @@ mod tests {
         ];
         let note_on = vec![0x00, 0x90, 60, 100, 0x00, 0xff, 0x2f, 0x00];
         let note_off = vec![0x83, 0x60, 0x80, 60, 0x00, 0x00, 0xff, 0x2f, 0x00];
+        let tracks = vec![conductor, note_on, note_off];
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"MThd");
         bytes.extend_from_slice(&6u32.to_be_bytes());
         bytes.extend_from_slice(&1u16.to_be_bytes());
         bytes.extend_from_slice(&3u16.to_be_bytes());
         bytes.extend_from_slice(&MIDI_TRANSCRIPTION_TEST_PPQ.to_be_bytes());
-        for track in [&mut conductor, &mut note_on.clone(), &mut note_off.clone()] {
+        for track in tracks {
             bytes.extend_from_slice(b"MTrk");
             bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
-            bytes.extend_from_slice(track);
+            bytes.extend_from_slice(&track);
         }
         let parsed = parse_transcribed_midi_v1(&bytes).unwrap();
         assert_eq!(parsed.notes.len(), 1);
@@ -2184,6 +2193,36 @@ mod tests {
     }
 
     #[test]
+    fn conflicting_same_tick_program_changes_on_shared_channel_are_rejected() {
+        let conductor_a = vec![
+            0x00, 0xc0, 40,
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
+            0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let conductor_b = vec![0x00, 0xc0, 41, 0x00, 0xff, 0x2f, 0x00];
+        let note_track = vec![0x00, 0x90, 60, 100, 0x83, 0x60, 0x80, 60, 0x00, 0x00, 0xff, 0x2f, 0x00];
+        let tracks = vec![conductor_a, conductor_b, note_track];
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"MThd");
+        bytes.extend_from_slice(&6u32.to_be_bytes());
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&3u16.to_be_bytes());
+        bytes.extend_from_slice(&MIDI_TRANSCRIPTION_TEST_PPQ.to_be_bytes());
+        for track in tracks {
+            bytes.extend_from_slice(b"MTrk");
+            bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+            bytes.extend_from_slice(&track);
+        }
+        assert_eq!(
+            parse_transcribed_midi_v1(&bytes).unwrap_err(),
+            MidiTranscriptionEvaluationIssueV1::ConflictingProgramChange {
+                tick: 0,
+                channel: 0,
+            }
+        );
+    }
+
     fn unclosed_note_is_kept_for_onset_metrics_but_cannot_match_full_note() {
         let notes = vec![(60, 0, 480)];
         let reference = reference_artifact(&notes, 40);
