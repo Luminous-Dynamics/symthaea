@@ -1059,8 +1059,8 @@ fn build_adjacency(
     let mut edge_count = 0usize;
 
     for reference_note in reference {
-        let lower_time = reference_note.onset_seconds - onset_tolerance_seconds;
-        let upper_time = reference_note.onset_seconds + onset_tolerance_seconds;
+        let lower_time = reference_note.onset_seconds - onset_tolerance_seconds - 0.00005;
+        let upper_time = reference_note.onset_seconds + onset_tolerance_seconds + 0.00005;
         let start = predicted.partition_point(|note| note.onset_seconds < lower_time);
         let end = predicted.partition_point(|note| note.onset_seconds <= upper_time);
         let reference_duration = reference_note
@@ -1125,11 +1125,17 @@ fn build_onset_only_adjacency(
     let mut adjacency = Vec::with_capacity(reference.len());
     let mut edge_count = 0usize;
     for note in reference {
-        let lower = note.onset_seconds - tolerance;
-        let upper = note.onset_seconds + tolerance;
+        let lower = note.onset_seconds - tolerance - 0.00005;
+        let upper = note.onset_seconds + tolerance + 0.00005;
         let start = predicted.partition_point(|predicted_note| predicted_note.onset_seconds < lower);
         let end = predicted.partition_point(|predicted_note| predicted_note.onset_seconds <= upper);
-        let candidates: Vec<usize> = (start..end).collect();
+        let candidates: Vec<usize> = (start..end)
+            .filter(|&prediction_index| {
+                mir_eval_round_distance_v1(
+                    (note.onset_seconds - predicted[prediction_index].onset_seconds).abs(),
+                ) <= tolerance
+            })
+            .collect();
         edge_count = edge_count.saturating_add(candidates.len());
         if edge_count > MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1 {
             return Err(MidiTranscriptionEvaluationIssueV1::TooManyCandidatePairs {
@@ -1172,7 +1178,10 @@ fn build_offset_only_adjacency(
         let end = predicted_offsets.partition_point(|(offset, _)| *offset <= upper);
         let mut candidates: Vec<usize> = predicted_offsets[start..end]
             .iter()
-            .map(|(_, index)| *index)
+            .filter_map(|(offset, index)| {
+                (mir_eval_round_distance_v1((reference_offset - *offset).abs()) <= tolerance)
+                    .then_some(*index)
+            })
             .collect();
         candidates.sort_unstable();
         edge_count = edge_count.saturating_add(candidates.len());
@@ -1215,7 +1224,7 @@ fn average_overlap_ratio_v1(
         let union_span = reference_offset.max(predicted_offset)
             - reference_note.onset_seconds.min(predicted_note.onset_seconds);
         if !union_span.is_finite() || union_span <= 0.0 {
-            return None;
+            return 0.0;
         }
         ratios.push((overlap / union_span).clamp(0.0, 1.0));
     }
