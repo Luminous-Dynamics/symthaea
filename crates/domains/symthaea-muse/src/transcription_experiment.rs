@@ -442,7 +442,6 @@ mod tests {
     use super::*;
     use crate::transcription_eval::{
         MidiTranscriptionEvaluationConfigV1,
-        MidiTranscriptionEvaluationMetricV1,
         MidiTranscriptionMetricV1,
         MidiTranscriptionTimingErrorSummaryV1,
         MidiTranscriptionValueErrorSummaryV1,
