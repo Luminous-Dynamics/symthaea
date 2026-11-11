@@ -145,6 +145,8 @@ fn best_expected_utility(prior: &[f64], action_utilities: &[Vec<f64>]) -> f64 {
         .fold(f64::NEG_INFINITY, f64::max)
 }
 
+/// Evaluate one-step sample information for a fixed finite hypothesis and action set.
+/// This does not implement a multi-stage policy, causal intervention optimizer or general POMDP solver.
 pub fn evaluate_experiment(
     prior: &[f64],
     action_utilities: &[Vec<f64>],
@@ -154,6 +156,9 @@ pub fn evaluate_experiment(
     validate_inputs(prior, action_utilities, std::slice::from_ref(experiment), risk_aversion)?;
     let current_entropy = entropy_bits(prior);
     let current_best = best_expected_utility(prior, action_utilities);
+    if !current_entropy.is_finite() || !current_best.is_finite() {
+        return Err("current belief/action utility arithmetic is non-finite".into());
+    }
     let mut expected_posterior_entropy = 0.0;
     let mut expected_post_observation_utility = 0.0;
 
@@ -173,6 +178,18 @@ pub fn evaluate_experiment(
         (expected_post_observation_utility - current_best).max(0.0);
     let risk_penalty = risk_aversion * experiment.risk;
     let net_value = expected_value_of_information - experiment.cost - risk_penalty;
+    if !expected_posterior_entropy.is_finite()
+        || !expected_post_observation_utility.is_finite()
+        || !information_gain_bits.is_finite()
+        || !expected_value_of_information.is_finite()
+        || !risk_penalty.is_finite()
+        || !net_value.is_finite()
+    {
+        return Err(format!(
+            "experiment {} produced non-finite value arithmetic",
+            experiment.id
+        ));
+    }
 
     Ok(ExperimentValue {
         experiment_id: experiment.id.clone(),
