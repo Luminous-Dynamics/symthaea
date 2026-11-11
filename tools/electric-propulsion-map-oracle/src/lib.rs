@@ -512,7 +512,7 @@ mod tests {
 
     #[test]
     fn conservative_uncertainty_adds_weighted_node_and_systematic_bounds() {
-        let result = fixture().lookup(query(2.5, 1_500.0)).unwrap();
+        let result = fixture().lookup(query(3.25, 1_500.0)).unwrap();
         assert!((result.absolute_uncertainty_bound - 0.0275).abs() < 1.0e-12);
         assert!((result.efficiency_lower_bound - 0.79125).abs() < 1.0e-12);
         assert!((result.efficiency_upper_bound - 0.84625).abs() < 1.0e-12);
@@ -623,7 +623,7 @@ mod tests {
                     config,
                     context,
                     "evidence",
-                    vec![0.0, 1.0],
+                    vec![1.0, 2.0],
                     vec![1_000.0, 2_000.0],
                     nodes.clone(),
                     0.0,
@@ -651,7 +651,7 @@ mod tests {
                     "c",
                     "x",
                     "evidence",
-                    vec![0.0, 1.0],
+                    vec![1.0, 2.0],
                     vec![1_000.0, 2_000.0],
                     nodes.clone(),
                     uncertainty,
@@ -696,7 +696,7 @@ mod tests {
     #[test]
     fn identical_frozen_inputs_replay_identically() {
         let map = fixture();
-        let input = query(2.5, 1_500.0);
+        let input = query(3.25, 1_500.0);
         assert_eq!(map.lookup(input), map.lookup(input));
     }
 }
