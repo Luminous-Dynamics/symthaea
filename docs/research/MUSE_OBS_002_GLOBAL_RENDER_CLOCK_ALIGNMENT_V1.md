@@ -34,11 +34,11 @@ The estimator:
 8. Emits an explicit \`Candidate\`, \`AmbiguousCandidate\`, \`InsufficientOnsetDiversity\`, \`InsufficientAudioCoverage\`, or \`NoPositiveEvidence\` state.
 9. Seals the profile to the score digest, MIDI bytes, MIDI manifest, WAV bytes, algorithm, search configuration and alignment observations. Profile validation checks structural invariants and deterministic replay against the exact same implementation; this catches re-sealed inconsistencies but is not an independent second algorithm.
 
-The high-support width is an empirical correlation-peak width, **not** a statistical confidence interval. The ambiguity-ratio threshold is a fixed diagnostic heuristic and is not a calibrated probability.
+The high-support width is an empirical correlation-peak width, **not** a statistical confidence interval. The ambiguity-ratio threshold is a fixed diagnostic heuristic and is not a calibrated probability. `matched_expected_onset_count` is a WAV-duration coverage count: it only means the expected timestamp maps inside real WAV frames, not that an acoustic event was detected.
 
 ## Tests authored
 
-Seven focused tests cover:
+Ten focused tests cover:
 
 1. recovery of a known global 200 ms audio-minus-MIDI offset on irregularly spaced note onsets;
 2. silence returning no estimate;
@@ -46,7 +46,10 @@ Seven focused tests cover:
 4. truncated WAV coverage of only part of the expected MIDI event sequence abstaining;
 5. tampered MIDI bytes being rejected before alignment;
 6. WAV replacement invalidating the profile's input binding;
-7. anti-phase stereo preserving timing evidence instead of cancelling during channel downmix.
+7. anti-phase stereo preserving timing evidence through per-channel magnitude spectra;
+8. a boundary-limited search abstaining rather than clamping an offset;
+9. a repeated rhythmic onset pattern being marked ambiguous;
+10. a re-sealed but altered profile being rejected by deterministic replay.
 
 The tests have not been compiled or run in the authoring environment.
 
