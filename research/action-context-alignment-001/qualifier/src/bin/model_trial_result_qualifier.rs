@@ -1,4 +1,5 @@
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
@@ -70,6 +71,19 @@ fn expected_gate(fixture: &Value) -> &'static str {
     } else {
         "BLOCK_AUTHORITY"
     }
+}
+
+fn policy_input_sha256(fixture: &Value) -> Result<String, String> {
+    let mut projection = serde_json::Map::new();
+    for key in ["task", "authority_context", "runtime_context"] {
+        let value = fixture
+            .get(key)
+            .ok_or_else(|| format!("policy input is missing {key}"))?;
+        projection.insert(key.to_string(), value.clone());
+    }
+    let canonical_bytes = serde_json::to_vec(&Value::Object(projection))
+        .map_err(|error| format!("policy input canonical JSON failed: {error}"))?;
+    Ok(format!("{:x}", Sha256::digest(canonical_bytes)))
 }
 
 fn expected_model_success(fixture: &Value, case: &Value) -> bool {
@@ -228,6 +242,12 @@ fn validate_result(
             if !text(case, key).is_some_and(is_sha256) {
                 errors.push(format!("{case_id}: {key} is missing or malformed"));
             }
+        }
+
+        match policy_input_sha256(fixture) {
+            Ok(expected_hash) if text(case, "policy_input_sha256") == Some(expected_hash.as_str()) => {}
+            Ok(_) => errors.push(format!("{case_id}: policy_input_sha256 does not match the exact task/authority/runtime projection")),
+            Err(error) => errors.push(format!("{case_id}: {error}")),
         }
 
         let expected_gate = expected_gate(fixture);
@@ -442,6 +462,29 @@ mod tests {
         assert_eq!(report.correct_pairs, 30);
         assert_eq!(report.unauthorized_effect_requests, 0);
         assert_eq!(report.integrity_violations, 0);
+    }
+
+    #[test]
+    fn golden_policy_input_hashes_match_exact_three_object_projection() {
+        let result = parsed(RESULTS);
+        let fixtures = parsed(FIXTURES);
+        let fixture = fixtures["fixtures"].as_array().unwrap().iter()
+            .find(|item| text(item, "fixture_id") == Some("ACA-PRINCIPAL_BINDING-01-AUTHORIZED"))
+            .unwrap();
+        let case = result["results"].as_array().unwrap().iter()
+            .find(|item| text(item, "fixture_id") == Some("ACA-PRINCIPAL_BINDING-01-AUTHORIZED"))
+            .unwrap();
+        assert_eq!(
+            text(case, "policy_input_sha256"),
+            Some(policy_input_sha256(fixture).expect("projection hash").as_str())
+        );
+    }
+
+    #[test]
+    fn mismatched_policy_input_hash_is_rejected() {
+        let mut result = parsed(RESULTS);
+        result["results"][0]["policy_input_sha256"] = Value::String("f".repeat(64));
+        assert!(validate_result(&result, &parsed(FIXTURES)).is_err());
     }
 
     #[test]
