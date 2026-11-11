@@ -38,6 +38,8 @@ go run . < example-request.json
 
 Exit 0 means the structured request passed this reference contract; exit 1 means policy rejection; exit 2 means malformed input.
 
+The complete local verification bundle includes a 32-test suite, 256 generated two-step label/read combinations checked against a direct lattice oracle, 256 irrelevant-context mutations and five byte-for-byte CLI fixtures. See `RESULTS.md` for what is and is not established.
+
 ## Important limits
 
 This does not interpret arbitrary skill prose, authenticate issuer/source identity, verify signatures, establish that an upstream verifier-status field is truthful, execute actions, inspect model hidden-state or side-channel information flows, or reproduce CoSA-Bench. A digest establishes content identity, not provenance or authority. A production design needs a trusted broker that revalidates policy and authorization immediately before every side effect.
