@@ -35,6 +35,20 @@ The source manifest also pins the raw SHA-256 and Git blob identity of the two i
 
 **No compressed world payloads, structural equations, ground-truth interventions, oracle fixes, scoring batteries, hidden roles or grader state are copied into this adapter.** The checksum ledger exposes file paths and digests, not the payload bytes.
 
+## ACED-Query inventory and split identity
+
+The ACED-Query metadata-only extension pins four upstream tracks from the same v2 commit:
+- `core_struct`: 10 structural worlds;
+- `core_decision`: 60 decision worlds;
+- `guess_struct`: 30 structural worlds;
+- `guess_decision`: 48 decision worlds.
+
+The inventory records full track-relative path, Git blob SHA-1, byte size, SHA-256 from upstream `data/SHA256SUMS`, domain, task family, seed and the filename-declared graph/sample sizes. It does not copy any world JSON or make a world file candidate-visible.
+
+**Split identity is content-addressed, not filename-addressed.** The 10 Core structural payloads are exact duplicates in `guess_struct`. There are also two same-basename pairs in `core_decision` and `guess_decision`, but the files differ in byte size and both Git blob/SHA-256 digest; they are distinct payloads. Across 148 track entries there are 138 distinct payload digests. Preserve the full track path; never infer content identity from a filename.
+
+The Query README describes four-turn Active, Active+Code and Modular agents plus a guess-only baseline. A future Query trial must reproduce the upstream task/agent/tool/turn budgets and scoring unchanged before adding Luminous metrics. The guess and core tracks are not automatically independent datasets.
+
 ## Reproduction
 
 From the Symthaea repository root:
