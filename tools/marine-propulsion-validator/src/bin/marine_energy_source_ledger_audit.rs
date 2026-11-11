@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn micro_gj_is_one_kilojoule_not_one_joule() {
-        assert_eq!(1.0e-6 * 1.0e9, 1_000.0);
+        assert_eq!(1_000_000_000u128 / 1_000_000u128, 1_000u128);
     }
 
     #[test]
