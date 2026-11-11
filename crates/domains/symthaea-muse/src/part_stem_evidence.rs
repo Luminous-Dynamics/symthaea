@@ -93,6 +93,9 @@ pub enum PartStemEvidenceIssueV1 {
     BundleCommitmentMismatch,
     TooManyStems,
     TooManyNotes,
+    TooManyTracks,
+    TooManyWavInputs,
+    MidiArtifactTooLarge,
     EmptyStemSet,
     InvalidAudioClock,
     InvalidIdentity { field: String },
@@ -305,10 +308,13 @@ fn verify_midi(
 ) -> Result<BTreeMap<u16, Vec<TrackEventProgramChangeV1>>, Vec<PartStemEvidenceIssueV1>> {
     let manifest = &midi.manifest;
     let mut issues = Vec::new();
-    if midi.midi_bytes.len() > PART_STEM_MAX_MIDI_BYTES_V1
-        || manifest.tracks.len() > PART_STEM_MAX_STEMS_V1
-        || manifest.notes.len() > PART_STEM_MAX_NOTES_V1
-    {
+    if midi.midi_bytes.len() > PART_STEM_MAX_MIDI_BYTES_V1 {
+        return Err(vec![PartStemEvidenceIssueV1::MidiArtifactTooLarge]);
+    }
+    if manifest.tracks.len() > PART_STEM_MAX_STEMS_V1 {
+        return Err(vec![PartStemEvidenceIssueV1::TooManyTracks]);
+    }
+    if manifest.notes.len() > PART_STEM_MAX_NOTES_V1 {
         return Err(vec![PartStemEvidenceIssueV1::TooManyNotes]);
     }
     if manifest.schema != MIDI_PERFORMANCE_SCHEMA_V1
@@ -665,17 +671,17 @@ pub fn validate_part_stem_bundle_v1(
     if bundle.stems.len() > PART_STEM_MAX_STEMS_V1 {
         issues.push(PartStemEvidenceIssueV1::TooManyStems);
     }
-    if midi.manifest.tracks.len() > PART_STEM_MAX_STEMS_V1
-        || midi.manifest.notes.len() > PART_STEM_MAX_NOTES_V1
-        || midi.midi_bytes.len() > PART_STEM_MAX_MIDI_BYTES_V1
-    {
-        issues.push(PartStemEvidenceIssueV1::TooManyNotes);
-    }
-    if wav_inputs.len() > PART_STEM_MAX_STEMS_V1 {
-        issues.push(PartStemEvidenceIssueV1::TooManyStems);
+    if midi.manifest.tracks.len() > PART_STEM_MAX_STEMS_V1 {
+        issues.push(PartStemEvidenceIssueV1::TooManyTracks);
     }
     if midi.manifest.notes.len() > PART_STEM_MAX_NOTES_V1 {
         issues.push(PartStemEvidenceIssueV1::TooManyNotes);
+    }
+    if midi.midi_bytes.len() > PART_STEM_MAX_MIDI_BYTES_V1 {
+        issues.push(PartStemEvidenceIssueV1::MidiArtifactTooLarge);
+    }
+    if wav_inputs.len() > PART_STEM_MAX_STEMS_V1 {
+        issues.push(PartStemEvidenceIssueV1::TooManyWavInputs);
     }
     if bundle.score_sha256 != midi.manifest.score_sha256
         || bundle.midi_sha256 != midi.manifest.midi_sha256
@@ -803,7 +809,9 @@ pub fn validate_part_stem_bundle_v1(
                 track_index: stem.midi_track_index,
             });
         }
-        if stem.source_note_ordinals.len() > PART_STEM_MAX_NOTES_V1
+        if stem.source_note_ordinals.is_empty()
+            || stem.source_note_ordinals.len() > PART_STEM_MAX_NOTES_V1
+            || stem.source_note_ordinals.iter().any(|ordinal| *ordinal > 1_000_000_000)
             || stem.source_note_ordinals.windows(2).any(|pair| pair[0] >= pair[1])
         {
             issues.push(PartStemEvidenceIssueV1::InvalidSourceOrdinalOrder {
