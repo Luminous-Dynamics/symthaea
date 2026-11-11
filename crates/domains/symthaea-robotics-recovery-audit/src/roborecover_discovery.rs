@@ -11,8 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::{
     InterventionKind, WorldStateContinuity,
     roborecover_manifest::{
-        pinned_split_blob_sha, PinnedTrainingParentFrame, TrainingParentScenario,
-        ROBORECOVER_SOURCE_REPOSITORY, ROBORECOVER_SOURCE_REVISION,
+        pinned_split_blob_sha, PinnedTrainingParentFrame, ROBORECOVER_SOURCE_REPOSITORY,
+        ROBORECOVER_SOURCE_REVISION,
     },
     roborecover_score::{BenchmarkPlatform, BenchmarkSplit, DeviationType, RecoveryStage},
 };
@@ -478,6 +478,7 @@ pub fn score_discovery_campaign(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::roborecover_manifest::TrainingParentScenario;
 
     fn parent_entries() -> BTreeMap<String, TrainingParentScenario> {
         let mut entries = BTreeMap::new();
