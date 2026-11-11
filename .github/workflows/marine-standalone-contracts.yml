@@ -245,6 +245,23 @@ jobs:
           test "$status" -eq 2
           jq -e '.disposition == "INCOMPLETE" and .hull_coverage_fraction == 0.9 and .zone_count == 3 and .confirmed_species_count == 0 and .performance_pair_conditions_matched == true' "$RUNNER_TEMP/marine-biofouling-report.json"
 
+      - name: Acoustic and propulsion channels bind to one declared timebase; synthetic remains INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-acoustic-timebase-binding-audit -- \
+            docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-acoustic-timebase-v0.1.0.json \
+            docs/research/marine/marine-propulsion-case-v0.4.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-environmental-trial-case-v0.4.0.json \
+            > "$RUNNER_TEMP/marine-acoustic-timebase-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-acoustic-timebase-report.json"
+          test "$status" -eq 2
+          jq -e '.binding_valid == true and .disposition == "INCOMPLETE" and .synchronized_channel_count == 6 and .common_reference_clock_id == "SYNTHETIC-UTC-REFERENCE-001"' "$RUNNER_TEMP/marine-acoustic-timebase-report.json"
+
       - name: Cross-domain acoustic and hull-state evidence join resolves context but remains INCOMPLETE
         shell: bash
         run: |
@@ -302,3 +319,4 @@ jobs:
             ${{ runner.temp }}/marine-emissions-v0.2-report.json
             ${{ runner.temp }}/marine-service-flexibility-report.json
             ${{ runner.temp }}/marine-acoustic-report.json
+            ${{ runner.temp }}/marine-acoustic-timebase-report.json
