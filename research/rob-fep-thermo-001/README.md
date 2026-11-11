@@ -299,3 +299,6 @@ See [adaptive_commit_horizon.md](./adaptive_commit_horizon.md) and its 15 synthe
 - [fixtures/adaptive_commit_horizon_v0_1.schema.json](./fixtures/adaptive_commit_horizon_v0_1.schema.json)
 
 The result is only a maximum eligible prefix for independent projection/admission, never an actuation permit.
+
+
+The 17-case adaptive-horizon corpus now includes shared-context and prefix-closure checks. Every qualified cap must bind the same context digest (state/action/model/uncertainty/clock/control-period identity) and be valid for every intermediate prefix tick; mismatched or endpoint-only bounds block eligibility.
