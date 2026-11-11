@@ -164,7 +164,7 @@ fn solve_node(
         let lexical_better = match &best.action {
             SequentialAction::Stop => true,
             SequentialAction::RunExperiment { experiment_id, .. } => {
-                experiment.id < *experiment_id
+                experiment.id.as_str() < experiment_id.as_str()
             }
         };
         if net_value_over_stop > minimum_net_value + VALUE_TOLERANCE
@@ -316,10 +316,23 @@ mod tests {
         .unwrap();
         assert!(plan.net_value_of_plan > 4.0);
         assert!((plan.expected_experiments - 2.0).abs() < 1e-10);
-        assert!(matches!(
-            plan.tree.action,
-            SequentialAction::RunExperiment { .. }
-        ));
+        match &plan.tree.action {
+            SequentialAction::RunExperiment {
+                experiment_id,
+                outcomes,
+            } => {
+                assert_eq!(experiment_id, "partition_alpha");
+                assert_eq!(outcomes.len(), 2);
+                assert!(outcomes.iter().all(|branch| {
+                    matches!(
+                        branch.continuation.action,
+                        SequentialAction::RunExperiment { ref experiment_id, .. }
+                            if experiment_id == "partition_beta"
+                    )
+                }));
+            }
+            SequentialAction::Stop => panic!("complementary sequence should not stop"),
+        }
     }
 
     #[test]
