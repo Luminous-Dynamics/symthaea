@@ -105,6 +105,23 @@ A fleet-average throughput win cannot conceal one robot breaching its starvation
 - FA11: equal fleet throughput but unequal per-robot PoMA/miss costs; no aggregate winner claim.
 - FA12: complete matched RR/EDF/Armory/RED/Luminous matrix; no predeclared performance winner.
 
+## Joint brain / VLA / foreground-sensing contention extension
+
+A separate six-case synthetic corpus captures the shared-serving problem across three coupled workloads:
+
+- long-lived deliberative requests and resident agent KV-cache state;
+- short-deadline VLA action chunks with action-buffer exhaustion risk;
+- foreground camera/observation work that can be delayed by unified-memory bandwidth contention.
+
+Fixtures and strict Draft 2020-12 schema:
+
+- `fixtures/agent_vla_memory_contention_v0_1.json`
+- `fixtures/agent_vla_memory_contention_v0_1.schema.json`
+
+Cases cover active-session/KV admission pressure, the VLA p99-plus-guard boundary, memory bandwidth binding before GPU compute, eviction/re-prefill costs, a robot approaching its starvation floor, and graceful overload degradation of optional brain work. All six require foreground camera and local-control reservations to remain preserved, retain per-robot reporting, and prohibit a fleet-wide winner claim.
+
+External comparators for this extension are the 1 November 2026 agentic-robot-fleet KV-cache/admission preprint (arXiv:2611.01404) and EdgePace's unified-memory bandwidth-aware scheduling study (arXiv:2610.37307). Their published results motivate the factors but have not been reproduced by these synthetic fixtures. The six cases were JSON-parsed and deterministically checked for case identity and reserved-path invariants; this is not JSON Schema validator execution, a runtime scheduler, a measured serving trace or hardware evidence.
+
 ## Prospective targets (not achieved)
 
 - Zero displacement of local hard-real-time control, RTA and safe-stop.
