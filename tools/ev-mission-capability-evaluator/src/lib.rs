@@ -81,6 +81,8 @@ pub struct CapabilitySlice {
     /// Conservative lower bounds supplied by the upstream qualified pack model.
     pub discharge_power_lower_kw: f64,
     pub charge_acceptance_lower_kw: f64,
+    /// Optional upstream attribution for the aggregate pack power/charge bound.
+    pub pack_limit_cell_ref: Option<String>,
     pub cells: Vec<CellEnvelope>,
 }
 
@@ -107,6 +109,7 @@ pub struct StepAudit {
     pub energy_remaining_above_reserve_kwh_lower: Option<f64>,
     pub external_energy_kwh_not_credited: f64,
     pub limiting_cell_ref: Option<String>,
+    pub hottest_cell_ref: Option<String>,
     pub thermal_margin_c: Option<f64>,
     pub reason: Option<String>,
 }
@@ -347,6 +350,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 energy_remaining_above_reserve_kwh_lower: None,
                 external_energy_kwh_not_credited: step.external_energy_kwh,
                 limiting_cell_ref: None,
+                hottest_cell_ref: None,
                 thermal_margin_c: None,
                 reason: Some("No capability slice covers this exact mission interval".to_owned()),
             });
@@ -368,6 +372,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 energy_remaining_above_reserve_kwh_lower: None,
                 external_energy_kwh_not_credited: step.external_energy_kwh,
                 limiting_cell_ref: None,
+                hottest_cell_ref: None,
                 thermal_margin_c: None,
                 reason: Some("Capability slice time bounds do not exactly match the mission step".to_owned()),
             });
@@ -395,6 +400,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 energy_remaining_above_reserve_kwh_lower: None,
                 external_energy_kwh_not_credited: step.external_energy_kwh,
                 limiting_cell_ref: None,
+                hottest_cell_ref: None,
                 thermal_margin_c: None,
                 reason: Some("Capability slice asset/configuration/topology/model evidence does not bind to this mission".to_owned()),
             });
@@ -415,6 +421,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 energy_remaining_above_reserve_kwh_lower: None,
                 external_energy_kwh_not_credited: step.external_energy_kwh,
                 limiting_cell_ref: None,
+                hottest_cell_ref: None,
                 thermal_margin_c: None,
                 reason: Some("Capability source class is not admitted".to_owned()),
             });
@@ -446,6 +453,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 energy_remaining_above_reserve_kwh_lower: None,
                 external_energy_kwh_not_credited: step.external_energy_kwh,
                 limiting_cell_ref: None,
+                hottest_cell_ref: None,
                 thermal_margin_c: None,
                 reason: Some("Capability envelope has invalid domains or bounds".to_owned()),
             });
@@ -458,6 +466,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
             mission.declared_cell_refs.iter().cloned().collect();
         if actual_cells.len() != slice.cells.len()
             || slice.cells.iter().any(|cell| !expected_cells.contains(&cell.cell_ref))
+            || slice.pack_limit_cell_ref.as_ref().is_some_and(|cell| !expected_cells.contains(cell))
         {
             disposition = "CONFLICTING_EVIDENCE".to_owned();
             step_audits.push(StepAudit {
@@ -471,6 +480,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 energy_remaining_above_reserve_kwh_lower: None,
                 external_energy_kwh_not_credited: step.external_energy_kwh,
                 limiting_cell_ref: None,
+                hottest_cell_ref: None,
                 thermal_margin_c: None,
                 reason: Some("Capability slice contains duplicate or undeclared cell identities".to_owned()),
             });
@@ -491,6 +501,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 energy_remaining_above_reserve_kwh_lower: None,
                 external_energy_kwh_not_credited: step.external_energy_kwh,
                 limiting_cell_ref: None,
+                hottest_cell_ref: None,
                 thermal_margin_c: None,
                 reason: Some("The declared cell population is not completely covered".to_owned()),
             });
@@ -619,29 +630,20 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
             reason = Some("Cumulative mission energy crosses the required end-of-mission reserve".to_owned());
         }
         minimum_energy_remaining = minimum_energy_remaining.min(energy_remaining);
+        let power_or_charge_failed = discharge_margin < -EPS || charge_margin < -EPS;
         if step_disposition == "INFEASIBLE" {
             disposition = "INFEASIBLE".to_owned();
-            if global_limiting_cell.is_none() {
-                global_limiting_cell = slice.cells.iter()
-                    .max_by(|left, right| {
-                        left.temperature_upper_c.partial_cmp(&right.temperature_upper_c)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    })
-                    .map(|cell| cell.cell_ref.clone());
+            if power_or_charge_failed && global_limiting_cell.is_none() {
+                global_limiting_cell = slice.pack_limit_cell_ref.clone();
             }
         }
-        let max_cell_temp = slice.cells.iter()
+        let hottest_cell = slice.cells.iter()
             .max_by(|left, right| left.temperature_upper_c.partial_cmp(&right.temperature_upper_c)
                 .unwrap_or(std::cmp::Ordering::Equal));
-        let thermal_margin = max_cell_temp.map(|cell| {
+        let thermal_margin = hottest_cell.map(|cell| {
             mission.maximum_cell_temperature_c - cell.temperature_upper_c
         });
-        let limiting_cell = max_cell_temp.map(|cell| cell.cell_ref.clone());
-        if let Some(ref cell) = limiting_cell {
-            if thermal_margin.is_some_and(|margin| margin < 0.0) {
-                global_limiting_cell = Some(cell.clone());
-            }
-        }
+        let hottest_cell_ref = hottest_cell.map(|cell| cell.cell_ref.clone());
         step_audits.push(StepAudit {
             step_id: step.step_id.clone(),
             disposition: step_disposition,
@@ -652,7 +654,12 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
             charge_acceptance_margin_kw: Some(charge_margin),
             energy_remaining_above_reserve_kwh_lower: Some(energy_remaining),
             external_energy_kwh_not_credited: step.external_energy_kwh,
-            limiting_cell_ref: limiting_cell,
+            limiting_cell_ref: if power_or_charge_failed {
+                slice.pack_limit_cell_ref.clone()
+            } else {
+                None
+            },
+            hottest_cell_ref,
             thermal_margin_c: thermal_margin,
             reason,
         });
