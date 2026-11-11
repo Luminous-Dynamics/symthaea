@@ -110,7 +110,7 @@
     "method_standard": "ISO 19030-1:2016",
     "before": {
       "observation_id": "BEFORE-001",
-      "observed_at": "2026-10-10T10:00:00Z",
+      "observed_at": "2026-10-15T10:00:00Z",
       "condition_fingerprint": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "speed_through_water_kn": 12,
       "shaft_power_kw": 2800,
@@ -150,6 +150,7 @@
   ],
   "limitations": [
     "Synthetic fixture only; all permits, inspection, biological and performance data are fabricated test values.",
-    "Synthetic baseline acoustic shaft power is matched to the acoustic evidence fixture for cross-record join software testing only."
+    "Synthetic baseline acoustic shaft power is matched to the acoustic evidence fixture for cross-record join software testing only.",
+    "Synthetic pre-intervention performance observation is time-aligned to the synthetic acoustic trial and hull inspection for cross-record join tests only."
   ]
 }
