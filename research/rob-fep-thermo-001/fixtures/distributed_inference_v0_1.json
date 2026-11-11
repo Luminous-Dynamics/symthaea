@@ -54,7 +54,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "onboard_candidate_eligible",
@@ -62,7 +71,10 @@
         "fallback_required": false,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "matched_system_energy_equal"
+        "whole_system_energy_claim": "matched_system_energy_equal",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -116,7 +128,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "local_fallback_deadline",
@@ -124,7 +145,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -178,7 +202,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "remote_result_reject_stale",
@@ -186,7 +219,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -240,7 +276,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "network_partition_fallback",
@@ -248,7 +293,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -302,7 +350,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "edge_queue_deadline_miss",
@@ -310,7 +367,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -364,7 +424,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "remote_identity_reject",
@@ -372,7 +441,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -426,7 +498,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "clock_unknown_reject",
@@ -434,7 +515,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -488,7 +572,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "local_rta_reject",
@@ -496,7 +589,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -550,7 +646,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "fleet_starvation_fallback",
@@ -558,7 +663,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -612,7 +720,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "privacy_block",
@@ -620,7 +737,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -674,7 +794,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": 75,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "remote_eligible_for_local_admission",
@@ -682,7 +811,10 @@
         "fallback_required": false,
         "remote_result_can_enter_local_admission": true,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "whole_system_energy_better"
+        "whole_system_energy_claim": "whole_system_energy_better",
+        "actuation_aoi_gate": "pass",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -736,7 +868,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "onboard_preferred_after_total_cost",
@@ -744,7 +885,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -798,7 +942,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "robot_battery_saving_only",
@@ -806,7 +959,10 @@
         "fallback_required": false,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "robot_battery_better_system_energy_worse"
+        "whole_system_energy_claim": "robot_battery_better_system_energy_worse",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -860,7 +1016,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": 65,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "remote_eligible_for_local_admission",
@@ -868,7 +1033,10 @@
         "fallback_required": false,
         "remote_result_can_enter_local_admission": true,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "pass",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -922,7 +1090,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "remote_timeout_fallback",
@@ -930,7 +1107,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -984,7 +1164,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "remote_identity_reject",
@@ -992,7 +1181,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -1046,7 +1238,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": 55,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "remote_eligible_for_local_admission",
@@ -1054,7 +1255,10 @@
         "fallback_required": false,
         "remote_result_can_enter_local_admission": true,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "pass",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -1079,7 +1283,7 @@
         "decode_projection_latency_ms": 10,
         "end_to_end_latency_ms": 150,
         "deadline_ms": 200,
-        "result_age_upper_bound_ms": 130,
+        "result_age_upper_bound_ms": 80,
         "max_result_age_ms": 100,
         "robot_compute_energy_j": 8,
         "edge_cloud_energy_j": 0,
@@ -1090,7 +1294,7 @@
         "local_task_success": 0.9,
         "remote_task_success": 0.7,
         "local_safe_success": true,
-        "remote_safe_success": false,
+        "remote_safe_success": true,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
         "local_rta_admissible": true,
@@ -1108,7 +1312,16 @@
         "fleet_priority_deadline_ms": null,
         "fleet_low_priority_deadline_ms": null,
         "fleet_admission_control_enabled": null,
-        "low_priority_deferred_or_fallback": null
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": 80,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "compression_quality_loss_exceeds_tolerance",
@@ -1116,7 +1329,10 @@
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "pass",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
       }
     },
     {
@@ -1141,7 +1357,7 @@
         "decode_projection_latency_ms": 10,
         "end_to_end_latency_ms": 150,
         "deadline_ms": 200,
-        "result_age_upper_bound_ms": 120,
+        "result_age_upper_bound_ms": 80,
         "max_result_age_ms": 100,
         "robot_compute_energy_j": 8,
         "edge_cloud_energy_j": 0,
@@ -1170,7 +1386,16 @@
         "fleet_priority_deadline_ms": 200,
         "fleet_low_priority_deadline_ms": 300,
         "fleet_admission_control_enabled": true,
-        "low_priority_deferred_or_fallback": true
+        "low_priority_deferred_or_fallback": true,
+        "actuation_aoi_upper_bound_ms": 80,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
       },
       "expected": {
         "disposition": "fleet_priority_admission_preserves_critical_deadline",
@@ -1178,7 +1403,232 @@
         "fallback_required": false,
         "remote_result_can_enter_local_admission": true,
         "actuation_authorized": false,
-        "whole_system_energy_claim": "not_evaluated"
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "pass",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
+      }
+    },
+    {
+      "case_id": "DI20_RESULT_FRESH_AT_RECEIPT_STALE_AT_ACTUATION",
+      "description": "Remote output arrives inside its receipt-age bound and deadline, but the controller queue/transport delay makes the source observation too old by the time the command would reach the actuators.",
+      "inputs": {
+        "placement": "edge",
+        "local_safety_path_available": true,
+        "local_fallback_ready": true,
+        "remote_request_sent": true,
+        "remote_result_received": true,
+        "remote_endpoint_authenticated": true,
+        "remote_model_digest_matches": true,
+        "observation_anchor_matches": true,
+        "clock_mapping_known": true,
+        "privacy_policy_allows_remote_data": true,
+        "network_partition": false,
+        "fleet_queue_fairness_ok": null,
+        "round_trip_latency_ms": 15,
+        "queue_latency_ms": 5,
+        "inference_latency_ms": 35,
+        "decode_projection_latency_ms": 10,
+        "end_to_end_latency_ms": 90,
+        "deadline_ms": 200,
+        "result_age_upper_bound_ms": 45,
+        "max_result_age_ms": 100,
+        "robot_compute_energy_j": 1,
+        "edge_cloud_energy_j": 4,
+        "network_energy_j": 1,
+        "whole_system_energy_j": null,
+        "local_model_quality": null,
+        "remote_model_quality": null,
+        "local_task_success": null,
+        "remote_task_success": null,
+        "local_safe_success": null,
+        "remote_safe_success": null,
+        "local_thermal_headroom_c": 2,
+        "local_thermal_limit_c": 80,
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null,
+        "payload_compressed": null,
+        "payload_compression_ratio": null,
+        "compression_accuracy_loss_pct": null,
+        "maximum_acceptable_compression_accuracy_loss_pct": null,
+        "fleet_active_requests": null,
+        "fleet_high_priority_requests": null,
+        "fleet_batch_size": null,
+        "fleet_p99_priority_latency_ms": null,
+        "fleet_p99_low_priority_latency_ms": null,
+        "fleet_priority_deadline_ms": null,
+        "fleet_low_priority_deadline_ms": null,
+        "fleet_admission_control_enabled": null,
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": 230,
+        "max_actuation_aoi_ms": 150,
+        "decision_evsi": 1,
+        "decision_evsi_unit": "task_loss_units",
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
+      },
+      "expected": {
+        "disposition": "actuation_aoi_reject",
+        "selected_placement": "onboard",
+        "fallback_required": true,
+        "remote_result_can_enter_local_admission": false,
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "fail",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "not_evaluated"
+      }
+    },
+    {
+      "case_id": "DI21_FRESH_UPDATE_HAS_ZERO_DECISION_VALUE",
+      "description": "The new observation is very fresh, but its expected downstream decision value is zero; preserve the current admissible local plan rather than spend additional bandwidth/compute solely to lower age.",
+      "inputs": {
+        "placement": "edge",
+        "local_safety_path_available": true,
+        "local_fallback_ready": true,
+        "remote_request_sent": true,
+        "remote_result_received": true,
+        "remote_endpoint_authenticated": true,
+        "remote_model_digest_matches": true,
+        "observation_anchor_matches": true,
+        "clock_mapping_known": true,
+        "privacy_policy_allows_remote_data": true,
+        "network_partition": false,
+        "fleet_queue_fairness_ok": null,
+        "round_trip_latency_ms": 12,
+        "queue_latency_ms": 2,
+        "inference_latency_ms": 20,
+        "decode_projection_latency_ms": 5,
+        "end_to_end_latency_ms": 39,
+        "deadline_ms": 200,
+        "result_age_upper_bound_ms": 30,
+        "max_result_age_ms": 100,
+        "robot_compute_energy_j": 8,
+        "edge_cloud_energy_j": 1,
+        "network_energy_j": 1,
+        "whole_system_energy_j": 10,
+        "local_model_quality": 0.9,
+        "remote_model_quality": null,
+        "local_task_success": 0.92,
+        "remote_task_success": null,
+        "local_safe_success": true,
+        "remote_safe_success": null,
+        "local_thermal_headroom_c": null,
+        "local_thermal_limit_c": null,
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": true,
+        "onboard_baseline_whole_system_energy_j": 8,
+        "payload_compressed": null,
+        "payload_compression_ratio": null,
+        "compression_accuracy_loss_pct": null,
+        "maximum_acceptable_compression_accuracy_loss_pct": null,
+        "fleet_active_requests": null,
+        "fleet_high_priority_requests": null,
+        "fleet_batch_size": null,
+        "fleet_p99_priority_latency_ms": null,
+        "fleet_p99_low_priority_latency_ms": null,
+        "fleet_priority_deadline_ms": null,
+        "fleet_low_priority_deadline_ms": null,
+        "fleet_admission_control_enabled": null,
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": 40,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": 0,
+        "decision_evsi_unit": "task_loss_units",
+        "foreground_deadline_misses_unmanaged": null,
+        "foreground_deadline_misses_managed": null,
+        "llm_throughput_retained_pct": null,
+        "memory_bandwidth_pressure_pct": null,
+        "safe_suspension_points_available": null
+      },
+      "expected": {
+        "disposition": "zero_evsi_no_update",
+        "selected_placement": "onboard",
+        "fallback_required": false,
+        "remote_result_can_enter_local_admission": false,
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "pass",
+        "decision_value_gate": "fail",
+        "foreground_deadline_gate": "not_evaluated"
+      }
+    },
+    {
+      "case_id": "DI22_SHARED_MEMORY_CONTENTION_PROTECTS_FOREGROUND",
+      "description": "Local deliberative inference contends with camera/foreground processing for unified memory bandwidth. A deadline-aware suspend/resume scheduler protects the foreground sensing deadline while preserving useful inference throughput.",
+      "inputs": {
+        "placement": "onboard",
+        "local_safety_path_available": true,
+        "local_fallback_ready": true,
+        "remote_request_sent": false,
+        "remote_result_received": false,
+        "remote_endpoint_authenticated": null,
+        "remote_model_digest_matches": null,
+        "observation_anchor_matches": null,
+        "clock_mapping_known": false,
+        "privacy_policy_allows_remote_data": true,
+        "network_partition": false,
+        "fleet_queue_fairness_ok": null,
+        "round_trip_latency_ms": null,
+        "queue_latency_ms": null,
+        "inference_latency_ms": null,
+        "decode_projection_latency_ms": null,
+        "end_to_end_latency_ms": 40,
+        "deadline_ms": 200,
+        "result_age_upper_bound_ms": null,
+        "max_result_age_ms": 100,
+        "robot_compute_energy_j": 8,
+        "edge_cloud_energy_j": 0,
+        "network_energy_j": 0,
+        "whole_system_energy_j": 8,
+        "local_model_quality": 0.9,
+        "remote_model_quality": null,
+        "local_task_success": 0.92,
+        "remote_task_success": null,
+        "local_safe_success": true,
+        "remote_safe_success": null,
+        "local_thermal_headroom_c": null,
+        "local_thermal_limit_c": null,
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": true,
+        "onboard_baseline_whole_system_energy_j": 8,
+        "payload_compressed": null,
+        "payload_compression_ratio": null,
+        "compression_accuracy_loss_pct": null,
+        "maximum_acceptable_compression_accuracy_loss_pct": null,
+        "fleet_active_requests": null,
+        "fleet_high_priority_requests": null,
+        "fleet_batch_size": null,
+        "fleet_p99_priority_latency_ms": null,
+        "fleet_p99_low_priority_latency_ms": null,
+        "fleet_priority_deadline_ms": null,
+        "fleet_low_priority_deadline_ms": null,
+        "fleet_admission_control_enabled": null,
+        "low_priority_deferred_or_fallback": null,
+        "actuation_aoi_upper_bound_ms": null,
+        "max_actuation_aoi_ms": 100,
+        "decision_evsi": null,
+        "decision_evsi_unit": null,
+        "foreground_deadline_misses_unmanaged": 10,
+        "foreground_deadline_misses_managed": 1,
+        "llm_throughput_retained_pct": 90.4,
+        "memory_bandwidth_pressure_pct": 95,
+        "safe_suspension_points_available": true
+      },
+      "expected": {
+        "disposition": "foreground_deadlines_prioritized",
+        "selected_placement": "onboard_managed",
+        "fallback_required": false,
+        "remote_result_can_enter_local_admission": false,
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated",
+        "actuation_aoi_gate": "not_evaluated",
+        "decision_value_gate": "not_evaluated",
+        "foreground_deadline_gate": "pass"
       }
     }
   ]
