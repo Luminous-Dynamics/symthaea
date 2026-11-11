@@ -215,55 +215,63 @@ fn validate_config(
     Ok(())
 }
 
-fn mono_samples(
-    wav: &crate::audio_event_observation::DecodedWavV1,
-) -> Vec<f32> {
-    let channels = usize::from(wav.info.channels);
-    wav.interleaved_samples
-        .chunks_exact(channels)
-        .map(|frame| frame.iter().copied().sum::<f32>() / channels as f32)
-        .collect()
-}
-
 fn spectral_flux(
-    samples: &[f32],
+    wav: &crate::audio_event_observation::DecodedWavV1,
     fft_frames: usize,
     hop_frames: usize,
 ) -> Result<Vec<f64>, AudioClockAlignmentIssueV1> {
-    if samples.len() < fft_frames {
+    let channels = usize::from(wav.info.channels);
+    let samples: Vec<Vec<f32>> = (0..channels)
+        .map(|channel| {
+            wav.interleaved_samples
+                .chunks_exact(channels)
+                .map(|frame| frame[channel])
+                .collect()
+        })
+        .collect();
+    if samples.iter().any(|channel| channel.len() < fft_frames) {
         return Err(AudioClockAlignmentIssueV1::TooFewAudioFrames);
     }
 
     // Prefix one complete window of silence. A flux frame's timestamp is its
     // center relative to the original WAV, so the first frames can observe an
     // onset at sample frame zero without inventing a positive lead-in.
-    let mut padded = vec![0.0f32; fft_frames];
-    padded.extend_from_slice(samples);
-    padded.extend(std::iter::repeat_n(0.0f32, fft_frames));
+    let padded: Vec<Vec<f32>> = samples
+        .iter()
+        .map(|channel| {
+            let mut padded = vec![0.0f32; fft_frames];
+            padded.extend_from_slice(channel);
+            padded.extend(std::iter::repeat_n(0.0f32, fft_frames));
+            padded
+        })
+        .collect();
 
-    let frame_count = (padded.len() - fft_frames) / hop_frames + 1;
+    let frame_count = (padded[0].len() - fft_frames) / hop_frames + 1;
     let mut planner = FftPlanner::<f32>::new();
     let fft = planner.plan_fft_forward(fft_frames);
     let mut previous: Option<Vec<f64>> = None;
     let mut flux = Vec::with_capacity(frame_count);
     let window_denominator = (fft_frames - 1) as f64;
+    let bins = fft_frames / 2;
 
     for frame_index in 0..frame_count {
         let start = frame_index * hop_frames;
-        let mut buffer = vec![Complex::new(0.0f32, 0.0f32); fft_frames];
-        for (index, value) in buffer.iter_mut().enumerate() {
-            let hann = 0.5
-                - 0.5
-                    * (std::f64::consts::TAU * index as f64 / window_denominator).cos();
-            value.re = padded[start + index] * hann as f32;
+        // Average channel magnitudes after each channel's FFT. Never average
+        // stereo PCM samples first: anti-phase content could cancel to silence.
+        let mut magnitude = vec![0.0f64; bins];
+        for channel in &padded {
+            let mut buffer = vec![Complex::new(0.0f32, 0.0f32); fft_frames];
+            for (index, value) in buffer.iter_mut().enumerate() {
+                let hann = 0.5
+                    - 0.5
+                        * (std::f64::consts::TAU * index as f64 / window_denominator).cos();
+                value.re = channel[start + index] * hann as f32;
+            }
+            fft.process(&mut buffer);
+            for (bin, value) in buffer.iter().enumerate().take(bins + 1).skip(1) {
+                magnitude[bin - 1] += f64::from(value.norm()) / channels as f64;
+            }
         }
-        fft.process(&mut buffer);
-
-        let magnitude: Vec<f64> = buffer[..=fft_frames / 2]
-            .iter()
-            .skip(1)
-            .map(|value| f64::from(value.norm()))
-            .collect();
 
         let value = if let Some(previous) = &previous {
             let positive_difference = magnitude
@@ -454,9 +462,8 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
         .map_err(|issue| vec![issue]);
     }
 
-    let samples = mono_samples(&wav);
     let sample_rate_hz = wav.info.sample_rate_hz;
-    let flux = spectral_flux(&samples, fft_frames, hop_frames)
+    let flux = spectral_flux(&wav, fft_frames, hop_frames)
         .map_err(|issue| vec![issue])?;
     let sample_rate = i64::from(sample_rate_hz);
     let minimum_lag = i64::from(config.minimum_offset_ms)
@@ -669,7 +676,7 @@ mod tests {
         MidiPerformanceNoteReceiptV1,
         MidiPerformanceTrackReceiptV1,
     };
-    use hound::{SampleFormat, WavWriter};
+    use hound::{SampleFormat, WavReader, WavWriter};
     use std::io::Cursor;
 
     fn write_vlq(output: &mut Vec<u8>, mut value: u64) {
@@ -874,6 +881,52 @@ mod tests {
         );
         assert_eq!(profile.unique_expected_onset_count, 5);
         assert!(validate_audio_clock_alignment_profile_v1(&profile, &wav, &midi).is_empty());
+    }
+
+    fn stereo_antiphase_wav(mono_wav: &[u8]) -> Vec<u8> {
+        let mut reader = WavReader::new(Cursor::new(mono_wav)).unwrap();
+        let input_spec = reader.spec();
+        assert_eq!(input_spec.channels, 1);
+        let samples: Vec<f32> = reader.samples::<f32>().map(Result::unwrap).collect();
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let spec = hound::WavSpec {
+                channels: 2,
+                sample_rate: input_spec.sample_rate,
+                bits_per_sample: 32,
+                sample_format: SampleFormat::Float,
+            };
+            let mut writer = WavWriter::new(&mut cursor, spec).unwrap();
+            for sample in samples {
+                writer.write_sample(sample).unwrap();
+                writer.write_sample(-sample).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+        cursor.into_inner()
+    }
+
+    #[test]
+    fn stereo_antiphase_does_not_cancel_clock_alignment_evidence() {
+        let notes = irregular_notes();
+        let midi = artifact(&notes);
+        let mono = rendered_bursts(&notes, 9_600, 48_000);
+        let stereo = stereo_antiphase_wav(&mono);
+        let profile = estimate_audio_minus_midi_clock_offset_v1(
+            &stereo,
+            &midi,
+            AudioClockAlignmentConfigV1 {
+                minimum_offset_ms: -100,
+                maximum_offset_ms: 500,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let estimated = profile.audio_minus_midi_offset_frames.unwrap();
+        assert!(
+            (estimated - 9_600).abs() <= 2_048,
+            "stereo anti-phase estimate={estimated}; profile={profile:?}"
+        );
     }
 
     #[test]
