@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const CORPUS_VERSION: &str = "ev-mission-outcome-audit/0.1";
-const ALPHA_95: f64 = 0.05;
+const CONFIDENCE_95: f64 = 0.95;
 const EPS: f64 = 1e-9;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -685,7 +685,7 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
             Some(clopper_pearson_upper(
                 physical_false_feasible,
                 physical_predicted_feasible,
-                0.95,
+                CONFIDENCE_95,
             )?)
         } else {
             None
@@ -863,4 +863,45 @@ mod tests {
             serde_json::to_value(&replay.cases).unwrap()
         );
     }
+    #[test]
+    fn physical_false_feasible_bound_uses_only_independent_scorable_packs() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let template = corpus.cases[0].clone();
+        corpus.cases.clear();
+        for index in 0..59 {
+            let mut case = template.clone();
+            let suffix = format!("{index:02x}");
+            let digest = suffix.repeat(32);
+            case.case_id = format!("physical-holdout-{index:03}");
+            case.prediction.asset.vehicle_ref = format!("vehicle-holdout-{index:03}");
+            case.prediction.asset.pack_ref = format!("pack-holdout-{index:03}");
+            case.prediction.asset.configuration_sha256 = digest.clone();
+            case.prediction.asset.topology_sha256 = digest.clone();
+            case.prediction.mission_profile_ref = format!("mission-holdout-{index:03}");
+            case.prediction.mission_profile_sha256 = digest.clone();
+            case.prediction.mission_report_ref = format!("mission-report-holdout-{index:03}");
+            case.prediction.mission_report_sha256 = digest.clone();
+            case.reference.asset = case.prediction.asset.clone();
+            case.reference.mission_profile_ref = case.prediction.mission_profile_ref.clone();
+            case.reference.mission_profile_sha256 = case.prediction.mission_profile_sha256.clone();
+            case.reference.evidence_class = "INDEPENDENT_PHYSICAL_REFERENCE".to_owned();
+            case.reference.evidence_ref = format!("physical-reference-{index:03}");
+            case.reference.evidence_sha256 = digest.clone();
+            case.reference.protocol_sha256 = digest.clone();
+            for (measurement_index, measurement) in case.reference.measurements.iter_mut().enumerate() {
+                measurement.measurement_ref =
+                    format!("physical-measurement-{index:03}-{measurement_index:02}");
+                measurement.measurement_sha256 = digest.clone();
+            }
+            corpus.cases.push(case);
+        }
+        let bytes = serde_json::to_vec(&corpus).expect("physical holdout corpus");
+        let report = audit_corpus(SCHEMA, &bytes).expect("physical holdout audit");
+        assert_eq!(report.physical_reference_case_count, 59);
+        assert_eq!(report.physical_predicted_feasible_count, 59);
+        assert_eq!(report.physical_false_feasible_count, 0);
+        let upper = report.physical_false_feasible_upper_95_one_sided.unwrap();
+        assert!(upper < 0.05 && upper > 0.049);
+    }
+
 }
