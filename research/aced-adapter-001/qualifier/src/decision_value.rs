@@ -27,6 +27,12 @@ pub enum SelectionMethod {
     RiskAdjustedExpectedValueOfSampleInformation,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScoreUnits {
+    Bits,
+    Utility,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExperimentValue {
     pub experiment_id: String,
@@ -34,7 +40,9 @@ pub struct ExperimentValue {
     pub expected_value_of_information: f64,
     pub cost: f64,
     pub risk_penalty: f64,
-    pub net_value: f64,
+    /// Comparable only within a single SelectionMethod because EIG is measured in bits and EVSI in utility.
+    pub selection_score: f64,
+    pub selection_score_units: ScoreUnits,
 }
 
 fn validate_inputs(
@@ -197,7 +205,8 @@ pub fn evaluate_experiment(
         expected_value_of_information,
         cost: experiment.cost,
         risk_penalty,
-        net_value,
+        selection_score: expected_value_of_information,
+        selection_score_units: ScoreUnits::Utility,
     })
 }
 
@@ -207,9 +216,9 @@ pub fn select_experiment(
     experiments: &[Experiment],
     method: SelectionMethod,
     risk_aversion: f64,
-    minimum_net_value: f64,
+    minimum_selection_score: f64,
 ) -> Result<Option<ExperimentValue>, String> {
-    if !minimum_net_value.is_finite() {
+    if !minimum_selection_score.is_finite() {
         return Err("minimum net value must be finite".into());
     }
     validate_inputs(prior, action_utilities, experiments, risk_aversion)?;
@@ -223,27 +232,33 @@ pub fn select_experiment(
         .collect::<Result<Vec<_>, _>>()?;
 
     for score in &mut scored {
-        score.net_value = match method {
-            SelectionMethod::ExpectedInformationGain => score.information_gain_bits - score.cost,
+        match method {
+            SelectionMethod::ExpectedInformationGain => {
+                score.selection_score = score.information_gain_bits;
+                score.selection_score_units = ScoreUnits::Bits;
+            }
             SelectionMethod::ExpectedValueOfSampleInformation => {
-                score.expected_value_of_information - score.cost
+                score.selection_score = score.expected_value_of_information - score.cost;
+                score.selection_score_units = ScoreUnits::Utility;
             }
             SelectionMethod::RiskAdjustedExpectedValueOfSampleInformation => {
-                score.expected_value_of_information - score.cost - score.risk_penalty
+                score.selection_score =
+                    score.expected_value_of_information - score.cost - score.risk_penalty;
+                score.selection_score_units = ScoreUnits::Utility;
             }
-        };
+        }
     }
 
     scored.sort_by(|left, right| {
         right
-            .net_value
-            .partial_cmp(&left.net_value)
+            .selection_score
+            .partial_cmp(&left.selection_score)
             .unwrap_or(Ordering::Equal)
             .then_with(|| left.experiment_id.cmp(&right.experiment_id))
     });
 
     match scored.into_iter().next() {
-        Some(best) if best.net_value > minimum_net_value => Ok(Some(best)),
+        Some(best) if best.selection_score > minimum_selection_score => Ok(Some(best)),
         _ => Ok(None),
     }
 }
@@ -321,6 +336,13 @@ mod tests {
         assert!(eig.information_gain_bits > evsi.information_gain_bits);
         assert!(evsi.expected_value_of_information > 0.0);
         assert!(eig.expected_value_of_information < NUMERIC_TOLERANCE);
+        assert_eq!(eig.selection_score_units, ScoreUnits::Bits);
+        assert_eq!(evsi.selection_score_units, ScoreUnits::Utility);
+        assert!((eig.selection_score - eig.information_gain_bits).abs() < NUMERIC_TOLERANCE);
+        assert!(
+            (evsi.selection_score - (evsi.expected_value_of_information - evsi.cost)).abs()
+                < NUMERIC_TOLERANCE
+        );
     }
 
     #[test]
