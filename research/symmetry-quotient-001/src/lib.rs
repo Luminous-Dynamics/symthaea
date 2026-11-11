@@ -248,7 +248,10 @@ fn preflight(
     // Group: Latin rows/columns (2g²), inverse search (<=g²),
     // associativity (g³), and two-sided identity (2g).
     let group_work = g3
-        .checked_add(g2.checked_mul(3).ok_or(QuotientErrorV1::ArithmeticOverflow)?)
+        .checked_add(
+            g2.checked_mul(3)
+                .ok_or(QuotientErrorV1::ArithmeticOverflow)?,
+        )
         .and_then(|value| value.checked_add(group_order.checked_mul(2)?))
         .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
 
@@ -774,8 +777,7 @@ mod tests {
             let mut action = vec![0; 16];
             for source in 0..4 {
                 for target in 0..4 {
-                    action[source * 4 + target] =
-                        permutation[source] * 4 + permutation[target];
+                    action[source * 4 + target] = permutation[source] * 4 + permutation[target];
                 }
             }
             pair_permutations.push(action);
@@ -1054,7 +1056,10 @@ mod tests {
     #[test]
     fn non_abelian_d4_pair_action_matches_three_exhaustive_orbits() {
         let action = d4_action();
-        assert_ne!(action.group.multiplication[1][4], action.group.multiplication[4][1]);
+        assert_ne!(
+            action.group.multiplication[1][4],
+            action.group.multiplication[4][1]
+        );
 
         let mut candidate_ids = Vec::with_capacity(16);
         let mut semantics = Vec::with_capacity(16);
@@ -1105,8 +1110,13 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![4, 8, 4]
         );
-        verify_certificate(&problem, &action, &certificate, QualificationBudgetV1::default())
-            .unwrap();
+        verify_certificate(
+            &problem,
+            &action,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
     }
 
     #[test]
