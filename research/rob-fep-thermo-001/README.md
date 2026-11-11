@@ -332,3 +332,13 @@ It separates prediction accuracy, action-outcome identification, decision rankin
 
 
 The adaptive commitment horizon consumes finite-horizon non-recyclable chance-risk allocation from Symtropy #4232 as a separate `N_risk` cap. This remains distinct from one-step chance constraints (#4010) and robust observation-constrained viability (#4588).
+
+
+## Current asynchronous WAM baseline set
+
+The competitive/action-chunk benchmark now distinguishes three recent approaches:
+- Huang et al. Streaming-WAM (arXiv:2609.28927): committed-prefix-conditioned future prediction; authors report 98.35% LIBERO success / 41 ms chunk time in their H100 setup, and 90% (27/30) on Stamp Paper.
+- Cai et al. AHA-WAM (arXiv:2606.09811): low-frequency world-context model plus high-frequency action expert; authors report 92.80% RoboTwin success, 78.3% over four real tasks and 24.17 Hz.
+- Ren et al. StreamingWAM (arXiv:2610.15585): separate chunk-wise staircase-flow paper; abstract reports 72.9 ms simulated / 57.3 ms real-robot replanning latency.
+
+Do not conflate the two similarly named Streaming-WAM papers or import the reported speeds as target-hardware guarantees. The proposed Luminous ablation separates slow/fast timescale context, committed-prefix conditioning, chunk continuity and independent temporal assurance.
