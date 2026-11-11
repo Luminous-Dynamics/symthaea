@@ -28,8 +28,8 @@
         "result_age_upper_bound_ms": null,
         "max_result_age_ms": 100,
         "robot_compute_energy_j": 8,
-        "edge_cloud_energy_j": null,
-        "network_energy_j": null,
+        "edge_cloud_energy_j": 0,
+        "network_energy_j": 0,
         "whole_system_energy_j": 8,
         "local_model_quality": 0.9,
         "remote_model_quality": null,
@@ -39,14 +39,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": true
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": true,
+        "onboard_baseline_whole_system_energy_j": 8
       },
       "expected": {
         "disposition": "onboard_candidate_eligible",
         "selected_placement": "onboard",
         "fallback_required": false,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "matched_system_energy_equal"
       }
     },
     {
@@ -85,14 +88,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": true
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "local_fallback_deadline",
         "selected_placement": "onboard",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -131,14 +137,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": null
+        "local_rta_admissible": null,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "remote_result_reject_stale",
         "selected_placement": "onboard",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -177,14 +186,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": null
+        "local_rta_admissible": null,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "network_partition_fallback",
         "selected_placement": "onboard",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -223,14 +235,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": null
+        "local_rta_admissible": null,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "edge_queue_deadline_miss",
         "selected_placement": "onboard",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -269,14 +284,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": null
+        "local_rta_admissible": null,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "remote_identity_reject",
         "selected_placement": "onboard",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -315,14 +333,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": null
+        "local_rta_admissible": null,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "clock_unknown_reject",
         "selected_placement": "onboard",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -361,14 +382,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": false
+        "local_rta_admissible": false,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "local_rta_reject",
         "selected_placement": "onboard",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -407,14 +431,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": null
+        "local_rta_admissible": null,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "fleet_starvation_fallback",
         "selected_placement": "onboard",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -453,14 +480,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": null
+        "local_rta_admissible": null,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "privacy_block",
         "selected_placement": "local_or_abstain",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -499,14 +529,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": 2,
         "local_thermal_limit_c": 80,
-        "local_rta_admissible": true
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": true,
+        "onboard_baseline_whole_system_energy_j": 8
       },
       "expected": {
         "disposition": "remote_eligible_for_local_admission",
         "selected_placement": "edge_then_local_projection",
         "fallback_required": false,
         "remote_result_can_enter_local_admission": true,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "whole_system_energy_better"
       }
     },
     {
@@ -545,14 +578,17 @@
         "remote_safe_success": false,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": true
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "onboard_preferred_after_total_cost",
         "selected_placement": "onboard",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -591,14 +627,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": true
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": true,
+        "onboard_baseline_whole_system_energy_j": 8
       },
       "expected": {
         "disposition": "robot_battery_saving_only",
         "selected_placement": "edge_but_no_system_energy_claim",
         "fallback_required": false,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "robot_battery_better_system_energy_worse"
       }
     },
     {
@@ -637,14 +676,17 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": true
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "remote_eligible_for_local_admission",
         "selected_placement": "hybrid",
         "fallback_required": false,
         "remote_result_can_enter_local_admission": true,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     },
     {
@@ -683,14 +725,115 @@
         "remote_safe_success": null,
         "local_thermal_headroom_c": null,
         "local_thermal_limit_c": null,
-        "local_rta_admissible": null
+        "local_rta_admissible": null,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
       },
       "expected": {
         "disposition": "remote_timeout_fallback",
         "selected_placement": "onboard",
         "fallback_required": true,
         "remote_result_can_enter_local_admission": false,
-        "actuation_authorized": false
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
+      }
+    },
+    {
+      "case_id": "DI16_UNAUTHENTICATED_REMOTE_ENDPOINT",
+      "description": "Remote result is fresh and uses the expected model digest, but endpoint/session authentication is absent; reject it and preserve the local fallback.",
+      "inputs": {
+        "placement": "edge",
+        "local_safety_path_available": true,
+        "local_fallback_ready": true,
+        "remote_request_sent": true,
+        "remote_result_received": true,
+        "remote_endpoint_authenticated": false,
+        "remote_model_digest_matches": true,
+        "observation_anchor_matches": true,
+        "clock_mapping_known": true,
+        "privacy_policy_allows_remote_data": true,
+        "network_partition": false,
+        "fleet_queue_fairness_ok": null,
+        "round_trip_latency_ms": 20,
+        "queue_latency_ms": 5,
+        "inference_latency_ms": 30,
+        "decode_projection_latency_ms": 10,
+        "end_to_end_latency_ms": 65,
+        "deadline_ms": 200,
+        "result_age_upper_bound_ms": 50,
+        "max_result_age_ms": 100,
+        "robot_compute_energy_j": null,
+        "edge_cloud_energy_j": null,
+        "network_energy_j": null,
+        "whole_system_energy_j": null,
+        "local_model_quality": 0.9,
+        "remote_model_quality": null,
+        "local_task_success": 0.92,
+        "remote_task_success": null,
+        "local_safe_success": true,
+        "remote_safe_success": null,
+        "local_thermal_headroom_c": null,
+        "local_thermal_limit_c": null,
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
+      },
+      "expected": {
+        "disposition": "remote_identity_reject",
+        "selected_placement": "onboard",
+        "fallback_required": true,
+        "remote_result_can_enter_local_admission": false,
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
+      }
+    },
+    {
+      "case_id": "DI17_REMOTE_ENERGY_BOUNDARY_INCOMPLETE",
+      "description": "Robot-side energy is measured and remote result is timely, but edge/cloud and network energy are not measured; no whole-system energy improvement claim is permitted.",
+      "inputs": {
+        "placement": "edge",
+        "local_safety_path_available": true,
+        "local_fallback_ready": true,
+        "remote_request_sent": true,
+        "remote_result_received": true,
+        "remote_endpoint_authenticated": true,
+        "remote_model_digest_matches": true,
+        "observation_anchor_matches": true,
+        "clock_mapping_known": true,
+        "privacy_policy_allows_remote_data": true,
+        "network_partition": false,
+        "fleet_queue_fairness_ok": null,
+        "round_trip_latency_ms": 15,
+        "queue_latency_ms": 5,
+        "inference_latency_ms": 35,
+        "decode_projection_latency_ms": 10,
+        "end_to_end_latency_ms": 70,
+        "deadline_ms": 200,
+        "result_age_upper_bound_ms": 55,
+        "max_result_age_ms": 100,
+        "robot_compute_energy_j": 1,
+        "edge_cloud_energy_j": null,
+        "network_energy_j": null,
+        "whole_system_energy_j": null,
+        "local_model_quality": null,
+        "remote_model_quality": null,
+        "local_task_success": null,
+        "remote_task_success": null,
+        "local_safe_success": null,
+        "remote_safe_success": null,
+        "local_thermal_headroom_c": 2,
+        "local_thermal_limit_c": 80,
+        "local_rta_admissible": true,
+        "whole_system_energy_boundary_complete": false,
+        "onboard_baseline_whole_system_energy_j": null
+      },
+      "expected": {
+        "disposition": "remote_eligible_for_local_admission",
+        "selected_placement": "edge_then_local_projection",
+        "fallback_required": false,
+        "remote_result_can_enter_local_admission": true,
+        "actuation_authorized": false,
+        "whole_system_energy_claim": "not_evaluated"
       }
     }
   ]
