@@ -288,3 +288,14 @@ See [distributed_inference_extension.md](./distributed_inference_extension.md) a
 - [fixtures/distributed_inference_v0_1.schema.json](./fixtures/distributed_inference_v0_1.schema.json)
 
 Local low-level control, RTA and safe-stop remain independent and available without remote inference.
+
+
+## Viability-constrained action commitment horizon
+
+A new benchmark child is tracked by [Symthaea #11581](https://github.com/Luminous-Dynamics/symthaea/issues/11581). It compares fixed-K, progress-triggered, horizon-decoupled, action-prefix-conditioned and latent Reuse-then-Refine execution against a **bottleneck horizon** bounded by freshness, deadline, thermal, actuator, dynamics, viability, queue and continuity evidence.
+
+See [adaptive_commit_horizon.md](./adaptive_commit_horizon.md) and its 15 synthetic known-answer cases:
+- [fixtures/adaptive_commit_horizon_v0_1.json](./fixtures/adaptive_commit_horizon_v0_1.json)
+- [fixtures/adaptive_commit_horizon_v0_1.schema.json](./fixtures/adaptive_commit_horizon_v0_1.schema.json)
+
+The result is only a maximum eligible prefix for independent projection/admission, never an actuation permit.
