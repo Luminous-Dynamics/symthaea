@@ -207,7 +207,7 @@ fn config_digest(config: &ExtractionConfig) -> String {
     sha256_bytes(canonical.as_bytes())
 }
 
-fn median(values: &mut [f32]) -> Option<f32> {
+fn median(values: &mut Vec<f32>) -> Option<f32> {
     values.retain(|value| value.is_finite());
     if values.is_empty() {
         return None;
@@ -354,16 +354,22 @@ pub fn observe_phrase(
         let mut f3_values: Vec<f32> = voiced.iter().map(|frame| frame.f3).collect();
         let mut energy_values: Vec<f32> = eligible.iter().map(|frame| frame.energy).collect();
 
-        let lpc_f0 = median(&mut lpc_f0_values);
-        let f1 = median(&mut f1_values);
-        let f2 = median(&mut f2_values);
-        let f3 = median(&mut f3_values);
-        let energy = median(&mut energy_values);
         let voiced_fraction = if eligible.is_empty() {
             None
         } else {
             Some(voiced.len() as f32 / eligible.len() as f32)
         };
+        let sufficient_voicing = voiced_fraction
+            .is_some_and(|fraction| fraction >= MIN_VOICED_FRACTION);
+        let lpc_f0 = if sufficient_voicing {
+            median(&mut lpc_f0_values)
+        } else {
+            None
+        };
+        let f1 = if sufficient_voicing { median(&mut f1_values) } else { None };
+        let f2 = if sufficient_voicing { median(&mut f2_values) } else { None };
+        let f3 = if sufficient_voicing { median(&mut f3_values) } else { None };
+        let energy = median(&mut energy_values);
 
         let custom_f0 = measure_autocorrelation_f0(
             &rendered.samples,
