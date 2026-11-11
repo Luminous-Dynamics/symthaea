@@ -505,6 +505,7 @@ mod tests {
     const EVAL_INDEX: &str = include_str!("../../upstream/repair_eval_index.json");
     const SOURCE_MANIFEST: &str = include_str!("../../ACED_REPAIR_SOURCE_MANIFEST_V0_1.json");
     const CHECKSUMS: &str = include_str!("../../upstream/SHA256SUMS");
+    const INDEX_SCHEMA: &str = include_str!("../../ACED_REPAIR_INDEX_V0_1.schema.json");
 
     fn parsed(source: &str) -> Value {
         serde_json::from_str(source).expect("checked-in JSON must parse")
@@ -517,6 +518,24 @@ mod tests {
             parse_counts(expected, "domains").unwrap(),
             parse_counts(expected, "archetypes").unwrap(),
         )
+    }
+
+    #[test]
+    fn index_schema_is_closed_and_matches_metadata_only_contract() {
+        let schema: Value = parsed(INDEX_SCHEMA);
+        assert_eq!(text(&schema, "$schema"), Some("https://json-schema.org/draft/2020-12/schema"));
+        assert_eq!(
+            text(&schema, "$id"),
+            Some("https://github.com/Luminous-Dynamics/symthaea/blob/main/research/aced-adapter-001/ACED_REPAIR_INDEX_V0_1.schema.json")
+        );
+        assert_eq!(text(&schema, "type"), Some("array"));
+        assert_eq!(schema["items"]["type"], "object");
+        assert_eq!(schema["items"]["additionalProperties"], false);
+        assert_eq!(schema["items"]["required"].as_array().unwrap().len(), 4);
+        assert_eq!(schema["items"]["properties"]["file"]["type"], "string");
+        assert_eq!(schema["items"]["properties"]["seed"]["type"], "integer");
+        assert_eq!(schema["items"]["properties"]["domain"]["enum"].as_array().unwrap().len(), 10);
+        assert_eq!(schema["items"]["properties"]["archetype"]["enum"].as_array().unwrap().len(), 9);
     }
 
     #[test]
