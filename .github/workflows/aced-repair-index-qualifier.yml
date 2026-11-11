@@ -28,8 +28,14 @@ jobs:
         run: cargo test --manifest-path research/aced-adapter-001/qualifier/Cargo.toml
       - name: Qualify pinned upstream inventory
         run: |
-          cargo run --manifest-path research/aced-adapter-001/qualifier/Cargo.toml -- \
+          cargo run --manifest-path research/aced-adapter-001/qualifier/Cargo.toml --bin aced-repair-index-qualifier -- \
             research/aced-adapter-001/upstream/repair_test_index.json \
             research/aced-adapter-001/upstream/repair_eval_index.json \
             research/aced-adapter-001/ACED_REPAIR_SOURCE_MANIFEST_V0_1.json \
+            research/aced-adapter-001/upstream/SHA256SUMS
+      - name: Qualify pinned ACED-Query metadata inventory
+        run: |
+          cargo run --manifest-path research/aced-adapter-001/qualifier/Cargo.toml --bin aced-query-index-qualifier -- \
+            research/aced-adapter-001/upstream/aced_query_world_inventory.json \
+            research/aced-adapter-001/ACED_QUERY_SOURCE_MANIFEST_V0_1.json \
             research/aced-adapter-001/upstream/SHA256SUMS
