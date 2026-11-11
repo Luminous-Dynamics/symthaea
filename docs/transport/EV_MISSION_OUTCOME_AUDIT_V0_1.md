@@ -58,7 +58,7 @@ The CLI requires a separate `--trust-manifest` input validated against `ev_missi
 - The report records the digest of the external trust-manifest bytes, physical-reference claims, and separately the number admitted by a trusted test authority.
 - Only admitted, fully scorable physical references contribute to the false-feasible / false-infeasible confidence denominators.
 
-The trust manifest is an external trust input: its file and digest must be controlled by the evaluation authority, not supplied by the model under test or bundled as an editable part of the prediction corpus. The public keys and synthetic private test key are not production credentials.
+The trust manifest is an external trust input: its file and digest must be controlled by the evaluation authority, not supplied by the model under test or bundled as an editable part of the prediction corpus. The CLI also requires a caller-pinned `--expected-trust-manifest-sha256` value; the file digest is checked before any case is scored and is recorded in the report. The caller must obtain that expected digest out-of-band from the test authority's approved evaluation configuration. The public keys and synthetic private test key are not production credentials.
 
 ### Blind split and prediction freeze
 
@@ -88,7 +88,7 @@ A non-battery abort (route closure, operator action, charger/site fault unrelate
 
 ## Independent sample unit and statistical bounds
 
-The primary v0.1 independent unit is **one pack–mission pair per physical pack**. The audit rejects duplicate pack identities in a corpus. Multiple time intervals, cells, cycles or repeated missions from the same pack do not become independent qualification samples.
+The primary v0.1 independent unit is **one vehicle–pack–mission pair per physical vehicle**. The audit rejects duplicate vehicle identities and duplicate pack identities in a corpus, and the frozen split manifest binds one physical-group identity to one pack. Multiple packs from one vehicle, time intervals, cells, cycles or repeated missions from the same pack do not become independent qualification samples.
 
 The false-feasible denominator is the number of independent physically scorable pack–mission cases where the frozen evaluator predicted FEASIBLE. The false-feasible numerator is the subset of those cases physically shown to exceed a battery constraint.
 
@@ -104,7 +104,7 @@ At zero observed false-feasible outcomes:
 
 These are sample-size implications, not measured performance claims. The bound is calculated only from cases marked `INDEPENDENT_PHYSICAL_REFERENCE`. Synthetic known-truth fixtures never contribute to the physical denominator or confidence bound.
 
-Repeated missions from the same pack require pack-cluster-aware statistical treatment and a larger effective sample. They must not be counted as independent Bernoulli trials.
+Repeated missions from the same pack or multiple packs from the same vehicle require vehicle/pack-cluster-aware statistical treatment and a larger effective sample. They must not be counted as independent Bernoulli trials.
 
 ## Benchmark tournament
 
