@@ -261,21 +261,13 @@ fn validate_manifest(v:&Value)->Result<(),String>{
  Ok(())
 }
 
-pub fn validate_tracked()->Result<usize,String>{
- let m=parse(MANIFEST_JSON)?;
- let ms=parse(MANIFEST_SCHEMA_JSON)?;
- let c=parse(CORPUS_JSON)?;
- let cs=parse(CORPUS_SCHEMA_JSON)?;
- let mut errors=Vec::new();
- validate_json_schema(&m,&ms,&ms,"$manifest",&mut errors,0);
- validate_json_schema(&c,&cs,&cs,"$corpus",&mut errors,0);
- if !errors.is_empty(){errors.sort();return Err(format!("STUDY_SCHEMA_VALIDATION_FAILED:{}",errors.join("|")));}
- validate_manifest(&m)?;
- if !exact_keys(&c,&["schema_version","corpus_id","classification","claim_ceiling","cases"])
-  ||text(&c,"schema_version")!="luminous.home-service-metrology-study-corpus/0.1"
-  ||text(&c,"corpus_id")!="HOME-SVC-METROLOGY-STUDY-CORPUS-V0.1"
-  ||text(&c,"classification")!="synthetic_preregistration_gate_cases"
-  ||text(&c,"claim_ceiling")!="study_design_gate_only_not_evidence_of_product_performance"
+
+fn validate_corpus(c:&Value)->Result<usize,String>{
+ if !exact_keys(c,&["schema_version","corpus_id","classification","claim_ceiling","cases"])
+  ||text(c,"schema_version")!="luminous.home-service-metrology-study-corpus/0.1"
+  ||text(c,"corpus_id")!="HOME-SVC-METROLOGY-STUDY-CORPUS-V0.1"
+  ||text(c,"classification")!="synthetic_preregistration_gate_cases"
+  ||text(c,"claim_ceiling")!="study_design_gate_only_not_evidence_of_product_performance"
  {return Err("CORPUS_IDENTITY_INVALID".into());}
  let cases=c["cases"].as_array().ok_or("CASES_MISSING")?;
  if cases.len()!=EXPECTED_CASES.len(){return Err("CASE_COUNT_INVALID".into());}
@@ -292,6 +284,18 @@ pub fn validate_tracked()->Result<usize,String>{
  }
  Ok(cases.len())
 }
+pub fn validate_tracked()->Result<usize,String>{
+ let m=parse(MANIFEST_JSON)?;
+ let ms=parse(MANIFEST_SCHEMA_JSON)?;
+ let c=parse(CORPUS_JSON)?;
+ let cs=parse(CORPUS_SCHEMA_JSON)?;
+ let mut errors=Vec::new();
+ validate_json_schema(&m,&ms,&ms,"$manifest",&mut errors,0);
+ validate_json_schema(&c,&cs,&cs,"$corpus",&mut errors,0);
+ if !errors.is_empty(){errors.sort();return Err(format!("STUDY_SCHEMA_VALIDATION_FAILED:{}",errors.join("|")));}
+ validate_manifest(&m)?;
+ validate_corpus(&c)
+}
 
 #[cfg(test)]
 mod tests{
@@ -301,7 +305,7 @@ mod tests{
  #[test] fn stratum_specific_minimum_cannot_be_removed(){let mut m=parse(MANIFEST_JSON).unwrap();m["evidence_strata"][2]["minimum_units_per_lot"]=Value::from(1);assert!(validate_manifest(&m).is_err());}
  #[test] fn analysis_contract_cannot_omit_variance_components(){let mut m=parse(MANIFEST_JSON).unwrap();m["analysis_contract"]["required_variance_components"].as_array_mut().unwrap().pop();assert!(validate_manifest(&m).is_err());}
  #[test] fn comparison_contract_cannot_enable_a_scalar_score(){let mut m=parse(MANIFEST_JSON).unwrap();m["comparison_contract"]["no_single_scalar_score"]=Value::Bool(false);assert!(validate_manifest(&m).is_err());}
- #[test] fn unknown_study_signal_fields_are_rejected(){let mut c=parse(CORPUS_JSON).unwrap();c["cases"][0]["signals"]["posthoc_score"]=Value::from(4);assert!(validate_tracked().is_ok());assert!(!exact_keys(&c["cases"][0]["signals"],SIGNAL_FIELDS));}
+ #[test] fn unknown_study_signal_fields_are_rejected(){let mut c=parse(CORPUS_JSON).unwrap();c["cases"][0]["signals"]["posthoc_score"]=Value::from(4);assert!(validate_corpus(&c).is_err());}
  #[test] fn a_holdout_used_for_tuning_is_not_confirmatory(){let c=parse(CORPUS_JSON).unwrap();let mut s=c["cases"][0]["signals"].clone();s["holdout_not_used_for_tuning"]=Value::Bool(false);assert_eq!(classify_signals(&s),"REJECTED_FOR_STUDY_SCOPE");}
  #[test] fn tracked_36_known_answers_validate(){assert_eq!(validate_tracked().unwrap(),36);}
  #[test] fn duplicate_json_members_are_rejected(){assert!(parse(r#"{"x":1,"x":2}"#).is_err());}
