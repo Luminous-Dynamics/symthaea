@@ -68,6 +68,7 @@
         "cell_ref",
         "soc_lower_pct",
         "soc_upper_pct",
+        "temperature_lower_c",
         "temperature_upper_c",
         "voltage_lower_v",
         "voltage_upper_v"
@@ -97,6 +98,9 @@
         "voltage_upper_v": {
           "type": "number",
           "minimum": 0
+        },
+        "temperature_lower_c": {
+          "type": "number"
         }
       }
     },
