@@ -254,6 +254,7 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
         }
         "REMAINING_DISCHARGE_TIME" => {
             if target.unit != "seconds"
+                || target.uncertainty.is_none()
                 || !nonempty(target.load_profile_ref.as_deref().unwrap_or(""))
                 || !is_sha256(target.load_profile_sha256.as_deref().unwrap_or(""))
                 || !finite_nonnegative(target.observed_duration_seconds.unwrap_or(f64::NAN))
@@ -334,6 +335,9 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
                     reason: Some("Observed population does not establish the declared maximum".to_owned()),
                 });
             }
+            if target.uncertainty.is_none() {
+                return Err(format!("PEAK_TEMPERATURE_UNCERTAINTY_MISSING:{}", target.target_id));
+            }
             let value = target
                 .target_value
                 .ok_or_else(|| format!("PEAK_TEMPERATURE_VALUE_MISSING:{}", target.target_id))?;
@@ -352,6 +356,7 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
         }
         "POWER_ENVELOPE" => {
             if target.unit != "W"
+                || target.uncertainty.is_none()
                 || target.target_value.is_none()
                 || target.target_value.is_some_and(|value| value < 0.0)
                 || target.label_source != "QUALIFIED_PHYSICAL_MODEL"
