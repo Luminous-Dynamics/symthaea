@@ -746,6 +746,45 @@ mod tests {
     }
 
     #[test]
+    fn malformed_experiment_plan_digest_is_rejected() {
+        let mut payload = proposal();
+        payload["experiment_plan_sha256"] = json!("not-a-sha256");
+        let first = event(
+            "event-0",
+            0,
+            "experiment_proposal",
+            GENESIS_SHA256,
+            payload,
+        );
+        assert!(validate_trace(&trace(vec![first])).is_err());
+    }
+
+    #[test]
+    fn forecast_trace_schema_requires_experiment_plan_digest() {
+        let schema: Value =
+            serde_json::from_str(TRACE_SCHEMA).expect("trace schema JSON");
+        let proposal_schema = schema["properties"]["events"]["items"]["oneOf"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| {
+                text(&item["properties"]["event_type"], "const")
+                    == Some("experiment_proposal")
+            })
+            .unwrap();
+        assert!(proposal_schema["properties"]["payload"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|field| field == "experiment_plan_sha256"));
+        assert_eq!(
+            proposal_schema["properties"]["payload"]["properties"]
+                ["experiment_plan_sha256"]["pattern"],
+            "^[a-f0-9]{64}$"
+        );
+    }
+
+    #[test]
     fn inconsistent_predicted_selection_score_is_rejected() {
         let mut payload = proposal();
         payload["predicted_selection_score"] = json!(0.42);
