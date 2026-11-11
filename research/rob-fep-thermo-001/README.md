@@ -355,3 +355,8 @@ The combined physical experiment is now tracked by [Symtropy #4689](https://gith
 ## Thermodynamic asynchronous locomotion lane
 
 Symtropy [#4689](https://github.com/Luminous-Dynamics/symtropy/issues/4689) now owns the combined asynchronous-execution × persistent-thermal locomotion experiment. First finite fixtures and a Draft 2020-12 validator are in [Symtropy draft PR #4694](https://github.com/Luminous-Dynamics/symtropy/pull/4694). The benchmark compares split-timescale/committed-prefix execution against physical legged baselines with no thermal or mission-state reset.
+
+
+## Viability-bounded action horizon
+
+Symtropy [#4696](https://github.com/Luminous-Dynamics/symtropy/issues/4696) now owns the selection/evaluation contract for the longest action chunk allowed by the earliest qualified evidence or physical horizon. It distinguishes queued K_min coverage from K_max viability and split-timescale local-expert execution. The initial 12-case corpus and validator are in [draft PR #4704](https://github.com/Luminous-Dynamics/symtropy/pull/4704).
