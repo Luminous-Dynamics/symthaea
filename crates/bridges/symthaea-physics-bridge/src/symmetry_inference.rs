@@ -1720,6 +1720,86 @@ pub fn evaluate_metric_aware_linear_action_samples(
 
 
 /// Numerical policy for infinitesimal equivariance of a vector field.
+/// Explicit output-space representation for a vector field under the same
+/// named infinitesimal generators as an admitted state-space action.
+/// Output dimension, basis and units may differ from the state-space representation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LinearVectorFieldOutputRepresentationV1 {
+    pub representation_id: String,
+    pub coordinate_basis_id: String,
+    pub component_names: Vec<String>,
+    pub component_unit_ids: Vec<String>,
+    pub generators: Vec<crate::linear_group_action::LinearGeneratorV1>,
+}
+
+/// Typed errors from exact polynomial vector-field equivariance checking.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExactVectorFieldEquivarianceErrorV1 {
+    InvalidProfile,
+    EmptyOutputRepresentationId,
+    EmptyOutputBasisId,
+    NoOutputComponents,
+    OutputComponentCountMismatch { expected: usize, actual: usize },
+    EmptyOutputComponentName { index: usize },
+    DuplicateOutputComponentName { name: String },
+    EmptyOutputUnitId { index: usize },
+    OutputGeneratorCountMismatch { expected: usize, actual: usize },
+    MissingOutputGenerator { generator_id: String },
+    DuplicateOutputGenerator { generator_id: String },
+    OutputGeneratorRowCountMismatch { generator_id: String, expected: usize, actual: usize },
+    OutputGeneratorColumnCountMismatch {
+        generator_id: String, row: usize, expected: usize, actual: usize
+    },
+    NonFiniteOutputGeneratorEntry {
+        generator_id: String, row: usize, column: usize
+    },
+    UnsupportedExpression,
+    ResourceLimitExceeded,
+}
+
+/// Exact residual term counts for one paired state/output generator.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExactVectorFieldGeneratorResultV1 {
+    pub generator_id: String,
+    pub component_residual_term_counts: Vec<usize>,
+}
+
+impl ExactVectorFieldGeneratorResultV1 {
+    pub fn equivariant(&self) -> bool {
+        self.component_residual_term_counts.iter().all(|count| *count == 0)
+    }
+}
+
+/// Exact polynomial report for D F(x) A x - B F(x).
+///
+/// This establishes only an exact algebraic identity for the interpreted
+/// polynomial components and bounded exact coefficient arithmetic. It does not
+/// establish Lie-algebra representation compatibility, global group integration,
+/// conservation, or physical qualification.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExactVectorFieldEquivarianceReportV1 {
+    pub action_id: String,
+    pub state_coordinate_basis_id: String,
+    pub output_representation: LinearVectorFieldOutputRepresentationV1,
+    pub state_action_declaration: crate::linear_group_action::LinearGroupActionV1,
+    pub original_state_action_declaration: crate::linear_group_action::LinearGroupActionV1,
+    pub state_action_admission_profile: crate::linear_group_action::LinearGroupActionAdmissionProfileV1,
+    pub state_action_admission_diagnostics: crate::linear_group_action::LinearGroupActionAdmissionDiagnosticsV1,
+    pub state_coordinate_names: Vec<String>,
+    pub output_component_names: Vec<String>,
+    pub expression_variables: Vec<String>,
+    pub vector_field_canonical: Vec<String>,
+    pub profile: ExactPolynomialLieProfileV1,
+    pub generator_results: Vec<ExactVectorFieldGeneratorResultV1>,
+}
+
+impl ExactVectorFieldEquivarianceReportV1 {
+    pub fn equivariant_under_every_generator(&self) -> bool {
+        !self.generator_results.is_empty()
+            && self.generator_results.iter().all(ExactVectorFieldGeneratorResultV1::equivariant)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct MetricAwareVectorFieldEquivarianceProfileV1 {
     pub maximum_samples: usize,
@@ -1870,6 +1950,367 @@ fn relative_whitened_vector_defect(left: &[f64], right: &[f64]) -> Option<Option
         });
     let relative_defect = difference_norm / denominator;
     relative_defect.is_finite().then_some(Some(relative_defect))
+}
+
+fn charge_exact_vector_field_operations(
+    operation_count: &mut usize,
+    additional: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<(), ExactPolynomialError> {
+    *operation_count = (*operation_count)
+        .checked_add(additional)
+        .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+    if *operation_count > profile.maximum_term_products {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    Ok(())
+}
+
+fn add_scaled_exact_polynomial(
+    target: &mut ExactPolynomial,
+    source: &ExactPolynomial,
+    scale: ExactRational,
+    profile: ExactPolynomialLieProfileV1,
+    operation_count: &mut usize,
+) -> Result<(), ExactPolynomialError> {
+    for (monomial, coefficient) in source {
+        charge_exact_vector_field_operations(operation_count, 1, profile)?;
+        let scaled = coefficient
+            .checked_mul(scale)
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        polynomial_add_term(target, monomial.clone(), scaled, profile)?;
+    }
+    Ok(())
+}
+
+fn exact_vector_field_component_residual(
+    state_components: &[ExactPolynomial],
+    output_index: usize,
+    state_generator: &crate::linear_group_action::LinearGeneratorV1,
+    output_generator: &crate::linear_group_action::LinearGeneratorV1,
+    state_coordinate_names: &[String],
+    variable_names: &[String],
+    profile: ExactPolynomialLieProfileV1,
+    operation_count: &mut usize,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut residual = ExactPolynomial::new();
+
+    // Build the state-orbit derivative term: sum_j (dF_i/dx_j) * (A x)_j.
+    for (row_index, generator_row) in state_generator.matrix.iter().enumerate() {
+        let state_variable_index = variable_names
+            .iter()
+            .position(|name| name == &state_coordinate_names[row_index])
+            .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+        charge_exact_vector_field_operations(
+            operation_count,
+            state_components[output_index].len(),
+            profile,
+        )?;
+        let derivative = polynomial_derivative(
+            &state_components[output_index],
+            state_variable_index,
+            profile,
+        )?;
+        for (column_index, matrix_entry) in generator_row.iter().enumerate() {
+            let coefficient = ExactRational::from_f64(
+                *matrix_entry,
+                profile.maximum_dyadic_denominator_power,
+            )
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+            if coefficient.is_zero() {
+                continue;
+            }
+            let coordinate_variable_index = variable_names
+                .iter()
+                .position(|name| name == &state_coordinate_names[column_index])
+                .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+            charge_exact_vector_field_operations(operation_count, derivative.len(), profile)?;
+            let term = polynomial_multiply_variable(
+                &derivative,
+                coordinate_variable_index,
+                profile,
+            )?;
+            add_scaled_exact_polynomial(
+                &mut residual,
+                &term,
+                coefficient,
+                profile,
+                operation_count,
+            )?;
+        }
+    }
+
+    // Subtract the explicit output-orbit term: sum_j B_ij F_j(x).
+    for (component_index, matrix_entry) in
+        output_generator.matrix[output_index].iter().enumerate()
+    {
+        let coefficient = ExactRational::from_f64(
+            *matrix_entry,
+            profile.maximum_dyadic_denominator_power,
+        )
+        .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        if coefficient.is_zero() {
+            continue;
+        }
+        let negative_coefficient = coefficient
+            .checked_neg()
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        add_scaled_exact_polynomial(
+            &mut residual,
+            &state_components[component_index],
+            negative_coefficient,
+            profile,
+            operation_count,
+        )?;
+    }
+
+    Ok(residual)
+}
+
+/// Check exact polynomial infinitesimal equivariance under explicitly paired
+/// state and output representations.
+///
+/// For each paired generator (A, B), every output component is checked against
+/// D F(x) A x - B F(x) = 0. State and output dimensions may differ. The output
+/// generator IDs must pair one-to-one with the admitted state-action generator
+/// IDs; no implicit B = A assumption is made.
+///
+/// All finite f64 polynomial coefficients and generator matrix entries are
+/// interpreted as exact IEEE-754 dyadic rationals in the existing bounded
+/// sparse-polynomial arithmetic. Variables outside the state action remain
+/// symbolic parameters in the identity.
+pub fn check_exact_vector_field_equivariance(
+    vector_field: &[Expr],
+    state_action: &AdmittedLinearGroupActionV1,
+    output_representation: &LinearVectorFieldOutputRepresentationV1,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactVectorFieldEquivarianceReportV1, ExactVectorFieldEquivarianceErrorV1> {
+    if profile.maximum_variables == 0
+        || profile.maximum_terms == 0
+        || profile.maximum_term_products == 0
+        || profile.maximum_total_degree == 0
+        || profile.maximum_power == 0
+        || profile.maximum_dyadic_denominator_power > 126
+    {
+        return Err(ExactVectorFieldEquivarianceErrorV1::InvalidProfile);
+    }
+
+    if output_representation.representation_id.trim().is_empty() {
+        return Err(ExactVectorFieldEquivarianceErrorV1::EmptyOutputRepresentationId);
+    }
+    if output_representation.coordinate_basis_id.trim().is_empty() {
+        return Err(ExactVectorFieldEquivarianceErrorV1::EmptyOutputBasisId);
+    }
+
+    let output_dimension = output_representation.component_names.len();
+    if output_dimension == 0 {
+        return Err(ExactVectorFieldEquivarianceErrorV1::NoOutputComponents);
+    }
+    if output_dimension > HARD_MAX_METRIC_AWARE_ACTION_DIMENSION {
+        return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
+    }
+    if vector_field.len() != output_dimension {
+        return Err(ExactVectorFieldEquivarianceErrorV1::OutputComponentCountMismatch {
+            expected: output_dimension,
+            actual: vector_field.len(),
+        });
+    }
+    if output_representation.component_unit_ids.len() != output_dimension {
+        return Err(ExactVectorFieldEquivarianceErrorV1::OutputComponentCountMismatch {
+            expected: output_dimension,
+            actual: output_representation.component_unit_ids.len(),
+        });
+    }
+
+    let mut component_names = BTreeSet::new();
+    for (index, name) in output_representation.component_names.iter().enumerate() {
+        if name.trim().is_empty() {
+            return Err(ExactVectorFieldEquivarianceErrorV1::EmptyOutputComponentName {
+                index,
+            });
+        }
+        if !component_names.insert(name) {
+            return Err(ExactVectorFieldEquivarianceErrorV1::DuplicateOutputComponentName {
+                name: name.clone(),
+            });
+        }
+    }
+    for (index, unit_id) in output_representation.component_unit_ids.iter().enumerate() {
+        if unit_id.trim().is_empty() {
+            return Err(ExactVectorFieldEquivarianceErrorV1::EmptyOutputUnitId { index });
+        }
+    }
+
+    let state_declaration = state_action.action();
+    let state_dimension = state_declaration.coordinate_names.len();
+    if state_dimension > HARD_MAX_METRIC_AWARE_ACTION_DIMENSION {
+        return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
+    }
+    if state_declaration.generators.len() > HARD_MAX_METRIC_AWARE_ACTION_GENERATORS {
+        return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
+    }
+    if output_representation.generators.len() != state_declaration.generators.len() {
+        return Err(ExactVectorFieldEquivarianceErrorV1::OutputGeneratorCountMismatch {
+            expected: state_declaration.generators.len(),
+            actual: output_representation.generators.len(),
+        });
+    }
+
+    let mut output_generator_by_id = BTreeMap::new();
+    for generator in &output_representation.generators {
+        if generator.id.trim().is_empty() {
+            return Err(ExactVectorFieldEquivarianceErrorV1::MissingOutputGenerator {
+                generator_id: generator.id.clone(),
+            });
+        }
+        if output_generator_by_id
+            .insert(generator.id.as_str(), generator)
+            .is_some()
+        {
+            return Err(ExactVectorFieldEquivarianceErrorV1::DuplicateOutputGenerator {
+                generator_id: generator.id.clone(),
+            });
+        }
+        if generator.matrix.len() != output_dimension {
+            return Err(ExactVectorFieldEquivarianceErrorV1::OutputGeneratorRowCountMismatch {
+                generator_id: generator.id.clone(),
+                expected: output_dimension,
+                actual: generator.matrix.len(),
+            });
+        }
+        for (row_index, row) in generator.matrix.iter().enumerate() {
+            if row.len() != output_dimension {
+                return Err(
+                    ExactVectorFieldEquivarianceErrorV1::OutputGeneratorColumnCountMismatch {
+                        generator_id: generator.id.clone(),
+                        row: row_index,
+                        expected: output_dimension,
+                        actual: row.len(),
+                    },
+                );
+            }
+            for (column_index, value) in row.iter().enumerate() {
+                if !value.is_finite() {
+                    return Err(
+                        ExactVectorFieldEquivarianceErrorV1::NonFiniteOutputGeneratorEntry {
+                            generator_id: generator.id.clone(),
+                            row: row_index,
+                            column: column_index,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    let mut total_expression_complexity = 0usize;
+    let mut variable_names = Vec::new();
+    for component in vector_field {
+        if !metric_aware_expression_supported(component) {
+            return Err(ExactVectorFieldEquivarianceErrorV1::UnsupportedExpression);
+        }
+        total_expression_complexity = total_expression_complexity
+            .checked_add(component.complexity())
+            .ok_or(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded)?;
+        collect_var_names(component, &mut variable_names);
+    }
+    if total_expression_complexity > HARD_MAX_METRIC_AWARE_EXPRESSION_NODES {
+        return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
+    }
+    for coordinate_name in &state_declaration.coordinate_names {
+        if !variable_names.contains(coordinate_name) {
+            variable_names.push(coordinate_name.clone());
+        }
+    }
+    if variable_names.len() > profile.maximum_variables
+        || variable_names.len() > HARD_MAX_METRIC_AWARE_EXPRESSION_VARIABLES
+    {
+        return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
+    }
+
+    // One shared operation budget spans expression traversal / parsing,
+    // all state derivatives, output-generator contractions and every generator.
+    let mut operation_count = 0usize;
+    charge_exact_vector_field_operations(
+        &mut operation_count,
+        total_expression_complexity,
+        profile,
+    )
+    .map_err(|_| ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded)?;
+    let mut state_components = Vec::with_capacity(output_dimension);
+    for component in vector_field {
+        let polynomial = parse_exact_polynomial(component, &variable_names, profile).map_err(
+            |error| match error {
+                ExactPolynomialError::UnsupportedExpression => {
+                    ExactVectorFieldEquivarianceErrorV1::UnsupportedExpression
+                }
+                ExactPolynomialError::ResourceLimitExceeded => {
+                    ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded
+                }
+            },
+        )?;
+        charge_exact_vector_field_operations(
+            &mut operation_count,
+            polynomial.len(),
+            profile,
+        )
+        .map_err(|_| ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded)?;
+        state_components.push(polynomial);
+    }
+
+    let mut generator_results = Vec::with_capacity(state_declaration.generators.len());
+    for state_generator in &state_declaration.generators {
+        let output_generator = output_generator_by_id
+            .get(state_generator.id.as_str())
+            .copied()
+            .ok_or_else(|| ExactVectorFieldEquivarianceErrorV1::MissingOutputGenerator {
+                generator_id: state_generator.id.clone(),
+            })?;
+
+        let mut component_residual_term_counts = Vec::with_capacity(output_dimension);
+        for output_index in 0..output_dimension {
+            let residual = exact_vector_field_component_residual(
+                &state_components,
+                output_index,
+                state_generator,
+                output_generator,
+                &state_declaration.coordinate_names,
+                &variable_names,
+                profile,
+                &mut operation_count,
+            )
+            .map_err(|error| match error {
+                ExactPolynomialError::UnsupportedExpression => {
+                    ExactVectorFieldEquivarianceErrorV1::UnsupportedExpression
+                }
+                ExactPolynomialError::ResourceLimitExceeded => {
+                    ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded
+                }
+            })?;
+            component_residual_term_counts.push(residual.len());
+        }
+
+        generator_results.push(ExactVectorFieldGeneratorResultV1 {
+            generator_id: state_generator.id.clone(),
+            component_residual_term_counts,
+        });
+    }
+
+    Ok(ExactVectorFieldEquivarianceReportV1 {
+        action_id: state_declaration.action_id.clone(),
+        state_coordinate_basis_id: state_declaration.coordinate_basis_id.clone(),
+        output_representation: output_representation.clone(),
+        state_action_declaration: state_declaration.clone(),
+        original_state_action_declaration: state_action.declared_action().clone(),
+        state_action_admission_profile: *state_action.profile(),
+        state_action_admission_diagnostics: state_action.diagnostics().clone(),
+        state_coordinate_names: state_declaration.coordinate_names.clone(),
+        output_component_names: output_representation.component_names.clone(),
+        expression_variables: variable_names,
+        vector_field_canonical: vector_field.iter().map(canonical_expression).collect(),
+        profile,
+        generator_results,
+    })
 }
 
 /// Evaluate a vector field's infinitesimal equivariance under every generator
@@ -2574,6 +3015,26 @@ mod tests {
         ]
     }
 
+    fn output_representation(
+        representation_id: &str,
+        component_names: &[&str],
+        component_unit_ids: &[&str],
+        generator_id: &str,
+        matrix: Vec<Vec<f64>>,
+    ) -> LinearVectorFieldOutputRepresentationV1 {
+        LinearVectorFieldOutputRepresentationV1 {
+            representation_id: representation_id.to_string(),
+            coordinate_basis_id: "output-basis".to_string(),
+            component_names: component_names.iter().map(|name| name.to_string()).collect(),
+            component_unit_ids: component_unit_ids.iter().map(|unit| unit.to_string()).collect(),
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: generator_id.to_string(),
+                matrix,
+            }],
+        }
+    }
+
+
 
     fn rotational_vector_field() -> Vec<Expr> {
         vec![
@@ -2589,6 +3050,238 @@ mod tests {
             mul(Expr::Const(-1.0), mul(radial_scale.clone(), var("y"))),
             mul(radial_scale, var("x")),
         ]
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_accepts_state_and_output_representation_match() {
+        let report = check_exact_vector_field_equivariance(
+            &rotational_vector_field(),
+            &metric_aware_so2_action(),
+            &output_representation(
+                "same-state-output",
+                &["vx", "vy"],
+                &["m/s", "m/s"],
+                "J",
+                vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+            ),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.generator_results[0].component_residual_term_counts, vec![0, 0]);
+        assert_eq!(report.output_representation.component_names, vec!["vx", "vy"]);
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_accepts_twice_angle_complex_square_output() {
+        // F(x,y) = (x^2-y^2, 2xy) transforms under B=2J when the
+        // state transforms under A=J. This is a concrete A != B fixture.
+        let vector_field = vec![
+            sub(pow2("x"), pow2("y")),
+            mul(Expr::Const(2.0), mul(var("x"), var("y"))),
+        ];
+        let output = output_representation(
+            "weight-two-output",
+            &["real", "imag"],
+            &["1", "1"],
+            "J",
+            vec![vec![0.0, -2.0], vec![2.0, 0.0]],
+        );
+        let report = check_exact_vector_field_equivariance(
+            &vector_field,
+            &metric_aware_so2_action(),
+            &output,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.generator_results[0].component_residual_term_counts, vec![0, 0]);
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_rejects_wrong_output_representation() {
+        let vector_field = vec![
+            sub(pow2("x"), pow2("y")),
+            mul(Expr::Const(2.0), mul(var("x"), var("y"))),
+        ];
+        let wrong_output = output_representation(
+            "wrong-weight-output",
+            &["real", "imag"],
+            &["1", "1"],
+            "J",
+            vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+        );
+        let report = check_exact_vector_field_equivariance(
+            &vector_field,
+            &metric_aware_so2_action(),
+            &wrong_output,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(!report.equivariant_under_every_generator());
+        assert!(report.generator_results[0]
+            .component_residual_term_counts
+            .iter()
+            .any(|count| *count > 0));
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_is_covariant_under_independent_state_and_output_bases() {
+        // State coordinates use D=[[1,1],[0,1]]; output coordinates use
+        // E=[[1,0],[1,2]]. The complex-square vector field is transformed as
+        // F'(X)=E F(D^-1 X), A'=D A D^-1, B'=E (2J) E^-1.
+        let state_change = nalgebra::Matrix2::new(1.0, 1.0, 0.0, 1.0);
+        let state_inverse = state_change.try_inverse().unwrap();
+        let output_change = nalgebra::Matrix2::new(1.0, 0.0, 1.0, 2.0);
+        let output_inverse = output_change.try_inverse().unwrap();
+        let rotation_generator = nalgebra::Matrix2::new(0.0, -1.0, 1.0, 0.0);
+        let state_generator =
+            state_change * rotation_generator * state_inverse;
+        let output_generator = output_change
+            * (2.0 * rotation_generator)
+            * output_inverse;
+        let metric = state_inverse.transpose() * state_inverse;
+        let transformed_action = crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "exact-so2-independent-state-basis".to_string(),
+            coordinate_basis_id: "state-XY".to_string(),
+            coordinate_names: vec!["X".to_string(), "Y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: metric
+                .row_iter()
+                .map(|row| row.iter().copied().collect())
+                .collect(),
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "J-prime".to_string(),
+                matrix: state_generator
+                    .row_iter()
+                    .map(|row| row.iter().copied().collect())
+                    .collect(),
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+        let output = output_representation(
+            "independent-output-basis",
+            &["w", "z"],
+            &["1", "1"],
+            "J-prime",
+            output_generator
+                .row_iter()
+                .map(|row| row.iter().copied().collect())
+                .collect(),
+        );
+        let transformed_field = vec![
+            sub(pow2("X"), mul(Expr::Const(2.0), mul(var("X"), var("Y")))),
+            sub(
+                add(pow2("X"), mul(Expr::Const(2.0), mul(var("X"), var("Y")))),
+                mul(Expr::Const(4.0), pow2("Y")),
+            ),
+        ];
+
+        let report = check_exact_vector_field_equivariance(
+            &transformed_field,
+            &transformed_action,
+            &output,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.generator_results[0].component_residual_term_counts, vec![0, 0]);
+        assert_eq!(report.state_coordinate_basis_id, "state-XY");
+        assert_eq!(report.output_representation.coordinate_basis_id, "output-basis");
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_supports_scalar_output_with_distinct_dimension() {
+        let scalar_output = vec![add(pow2("x"), pow2("y"))];
+        let output = output_representation(
+            "scalar-radial-output",
+            &["radius_squared"],
+            &["m^2"],
+            "J",
+            vec![vec![0.0]],
+        );
+        let report = check_exact_vector_field_equivariance(
+            &scalar_output,
+            &metric_aware_so2_action(),
+            &output,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.generator_results[0].component_residual_term_counts, vec![0]);
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_keeps_unacted_parameters_symbolic() {
+        let vector_field = vec![
+            mul(var("rate"), sub(pow2("x"), pow2("y"))),
+            mul(Expr::Const(2.0), mul(var("rate"), mul(var("x"), var("y")))),
+        ];
+        let output = output_representation(
+            "weighted-complex-square",
+            &["real", "imag"],
+            &["1", "1"],
+            "J",
+            vec![vec![0.0, -2.0], vec![2.0, 0.0]],
+        );
+        let report = check_exact_vector_field_equivariance(
+            &vector_field,
+            &metric_aware_so2_action(),
+            &output,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert!(report.expression_variables.contains(&"rate".to_string()));
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_rejects_bad_output_pairing_and_budget() {
+        let vector_field = vec![var("x"), var("y")];
+        let missing = output_representation(
+            "missing-generator",
+            &["vx", "vy"],
+            &["1", "1"],
+            "other-generator",
+            vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+        );
+        assert_eq!(
+            check_exact_vector_field_equivariance(
+                &vector_field,
+                &metric_aware_so2_action(),
+                &missing,
+                ExactPolynomialLieProfileV1::default(),
+            ),
+            Err(ExactVectorFieldEquivarianceErrorV1::MissingOutputGenerator {
+                generator_id: "J".to_string(),
+            })
+        );
+
+        let output = output_representation(
+            "budget-limited",
+            &["vx", "vy"],
+            &["1", "1"],
+            "J",
+            vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+        );
+        let mut limited = ExactPolynomialLieProfileV1::default();
+        limited.maximum_term_products = 1;
+        assert_eq!(
+            check_exact_vector_field_equivariance(
+                &vector_field,
+                &metric_aware_so2_action(),
+                &output,
+                limited,
+            ),
+            Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded)
+        );
     }
 
     #[test]
