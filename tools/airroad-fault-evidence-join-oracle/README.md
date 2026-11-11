@@ -25,7 +25,7 @@ The caller supplies:
 5. Frozen fault scenarios, mission segment, operating context, target elements and required protection devices.
 6. Typed evidence references, each bound to exact scenario/configuration/topology/context and evidence class.
 
-The oracle checks crosswalk uniqueness, exact configuration ownership, dangling path references, protection metadata identity, evidence scope, and class-specific provenance. Measured-test references require procedure, calibration and raw-data manifests. Simulated-result references require input, output and model-validation manifests. Authority and certification references preserve issuer, decision/certificate identity and exact scope.
+The oracle checks crosswalk uniqueness, exact configuration ownership, dangling path references, protection metadata identity, scenario-to-device/path association, evidence scope, and class-specific provenance. Conflicting digests for one evidence requirement are a non-pass. Measured-test references require procedure, calibration and raw-data manifests. Simulated-result references require input, output and model-validation manifests. Authority and certification references preserve issuer, decision/certificate identity and exact scope. The returned report retains the complete scenario, topology crosswalk, propulsion-path mappings, protection-device instances and scenario-scoped artifact references.
 
 Required evidence is derived from the declared fault family and consequence domains. Protection curve and interrupting-capacity evidence must match the exact pinned device digests.
 
@@ -55,4 +55,4 @@ cargo test --locked --manifest-path tools/airroad-fault-evidence-join-oracle/Car
 
 cargo clippy --locked --manifest-path tools/airroad-fault-evidence-join-oracle/Cargo.toml --all-targets -- -D warnings
 
-All fixtures are synthetic. Tests establish only identity, crosswalk and evidence-completeness semantics. They do not prove protection performance, fault isolation, flight safety, airworthiness or certification.
+All fixtures are synthetic. The reference contains 20 synthetic tests. Tests establish only identity, crosswalk and evidence-completeness semantics. They do not prove protection performance, fault isolation, flight safety, airworthiness or certification.
