@@ -94,6 +94,10 @@ use crate::types::{LieGroup, SymmetryDescriptor};
 
 const HARD_MAX_METRIC_AWARE_ACTION_DIMENSION: usize = 32;
 const HARD_MAX_METRIC_AWARE_ACTION_GENERATORS: usize = 128;
+const HARD_MAX_METRIC_AWARE_SAMPLES: usize = 4096;
+const HARD_MAX_METRIC_AWARE_EXPRESSION_NODES: usize = 16_384;
+const HARD_MAX_METRIC_AWARE_GRADIENT_WORK: usize = 20_000_000;
+const HARD_MAX_METRIC_AWARE_GENERATOR_SAMPLE_PAIRS: usize = 65_536;
 
 /// Fully specified numerical policy used by the bounded Lie-derivative fallback.
 ///
@@ -1427,9 +1431,14 @@ pub fn evaluate_metric_aware_linear_action_samples(
     profile: MetricAwareLinearActionSampleProfileV1,
 ) -> Result<MetricAwareLinearActionSampleReportV1, MetricAwareLinearActionSampleErrorV1> {
     if profile.maximum_samples == 0
+        || profile.maximum_samples > HARD_MAX_METRIC_AWARE_SAMPLES
         || profile.maximum_expression_nodes == 0
+        || profile.maximum_expression_nodes > HARD_MAX_METRIC_AWARE_EXPRESSION_NODES
         || profile.maximum_total_gradient_work == 0
+        || profile.maximum_total_gradient_work > HARD_MAX_METRIC_AWARE_GRADIENT_WORK
         || profile.maximum_total_generator_sample_pairs == 0
+        || profile.maximum_total_generator_sample_pairs
+            > HARD_MAX_METRIC_AWARE_GENERATOR_SAMPLE_PAIRS
         || profile.minimum_informative_samples_per_generator == 0
         || profile.minimum_informative_samples_per_generator > profile.maximum_samples
         || !profile.squared_cosine_tolerance.is_finite()
@@ -2372,6 +2381,73 @@ mod tests {
                 MetricAwareLinearActionSampleProfileV1::default(),
             ),
             Err(MetricAwareLinearActionSampleErrorV1::UnsupportedExpression)
+        );
+    }
+
+    #[test]
+    fn metric_aware_sampler_rejects_profiles_above_hard_resource_ceilings() {
+        let expression = add(pow2("x"), pow2("y"));
+        let states = metric_sample_states();
+
+        let too_many_samples = MetricAwareLinearActionSampleProfileV1 {
+            maximum_samples: HARD_MAX_METRIC_AWARE_SAMPLES + 1,
+            ..MetricAwareLinearActionSampleProfileV1::default()
+        };
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                too_many_samples
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::InvalidProfile)
+        );
+
+        let too_many_nodes = MetricAwareLinearActionSampleProfileV1 {
+            maximum_expression_nodes: HARD_MAX_METRIC_AWARE_EXPRESSION_NODES + 1,
+            ..MetricAwareLinearActionSampleProfileV1::default()
+        };
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                too_many_nodes
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::InvalidProfile)
+        );
+
+        let too_much_work = MetricAwareLinearActionSampleProfileV1 {
+            maximum_total_gradient_work: HARD_MAX_METRIC_AWARE_GRADIENT_WORK + 1,
+            ..MetricAwareLinearActionSampleProfileV1::default()
+        };
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                too_much_work
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::InvalidProfile)
+        );
+
+        let too_many_pairs = MetricAwareLinearActionSampleProfileV1 {
+            maximum_total_generator_sample_pairs:
+                HARD_MAX_METRIC_AWARE_GENERATOR_SAMPLE_PAIRS + 1,
+            ..MetricAwareLinearActionSampleProfileV1::default()
+        };
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                too_many_pairs
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::InvalidProfile)
         );
     }
 
