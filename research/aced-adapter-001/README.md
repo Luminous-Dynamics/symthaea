@@ -91,6 +91,22 @@ Add independent Symthaea research measures without altering the official score:
 
 No single aggregate causal score is authorized. Report the complete vector, per-world paired comparisons and uncertainty intervals.
 
+## Experiment selection and optimal stopping
+
+`ACED_REPAIR_EXPERIMENT_SELECTION_PROTOCOL_V0_1.json` specifies a separate research comparison that preserves the upstream score. It compares:
+- official ACED agent;
+- random valid intervention;
+- greedy expected information gain;
+- expected value of sample information (EVSI);
+- risk-adjusted EVSI;
+- adaptive evidence-gated experiment selection.
+
+The scientific distinction is important: an experiment can reduce uncertainty without changing the best available decision. Conversely, a low-entropy observation can reverse the optimal intervention. We therefore measure generic information gain separately from decision-relevant value.
+
+The protocol also pre-registers stopping comparisons: premature-stop regret when a useful experiment remains, versus unnecessary experiment cost when further evidence cannot materially improve the decision. Predicted experiment value must be recorded before the outcome is observed; an agent's post-hoc explanation is not a substitute.
+
+The 54-world upstream evaluation split is useful for an initial matched reproduction, but its domain counts are only five or six worlds in most groups. It is not automatically powered for all subgroup claims. Confirmatory comparisons require a preregistered power analysis and world-clustered uncertainty; the test/eval parent/subset relationship must not be treated as independent samples.
+
 ## Baselines and ablations
 
 Reproduce the official scripted/mock controls and official evaluation protocol where licensing and execution contracts allow. Then compare under matched model snapshot, prompts, tools, 15-experiment/32-turn budgets and compute accounting:
