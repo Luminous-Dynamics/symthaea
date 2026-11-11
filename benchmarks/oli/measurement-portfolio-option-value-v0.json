@@ -1,0 +1,295 @@
+{
+  "schema_version": "oli-measurement-portfolio-v0.1",
+  "case_id": "OLI-XD13-DISCOVERY-OPTION-001",
+  "status": "SYNTHETIC_KNOWN_TRUTH_DEVELOPMENT_FIXTURE",
+  "claim_ceiling": "Toy finite budgeted measurement-portfolio design benchmark; not a spacecraft payload recommendation or real ocean-world model",
+  "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+  "scientific_context": {
+    "inspiration": "Targeted and untargeted analysis, abiotic context, calibration and discovery potential under robotic payload constraints",
+    "reference": "Davila et al., Astrobiology, first published 2026-09-15, DOI 10.1177/15311074261484864",
+    "scenario": "A synthetic ocean-world plume sampling campaign with an unknown organic signal. The numerical likelihoods and costs below are invented benchmark values, not physical Enceladus estimates."
+  },
+  "hidden_worlds": [
+    {
+      "world_id": "W1",
+      "class": "known_targeted_biosignature",
+      "probability": 0.25,
+      "description": "The observation contains a registered targeted signature above the target assay's calibrated detection limit."
+    },
+    {
+      "world_id": "W2",
+      "class": "abiotic_organic_background",
+      "probability": 0.35,
+      "description": "Complex abiotic organics and mineral/chemical background mimic the targeted signature."
+    },
+    {
+      "world_id": "W3",
+      "class": "unfamiliar_biological_signature",
+      "probability": 0.2,
+      "description": "A biological system is present but the signature is outside the targeted reference library."
+    },
+    {
+      "world_id": "W4",
+      "class": "unfamiliar_abiotic_process",
+      "probability": 0.2,
+      "description": "An unmodelled abiotic process creates an unexpected signal that can be investigated only through broad discovery and contextual follow-up."
+    }
+  ],
+  "resource_budget": {
+    "mass_units": 6,
+    "peak_power_units": 7,
+    "operation_time_units": 8,
+    "data_storage_units": 10,
+    "sample_consumption_units": 4,
+    "discovery_reserve_fraction_min": 0.15,
+    "discovery_reserve_fraction_max": 0.3,
+    "mandatory_actions": [
+      "Q_BLANK_CALIBRATION"
+    ]
+  },
+  "actions": [
+    {
+      "id": "T_TARGETED_CHIRALITY",
+      "family": "TARGETED",
+      "description": "High-sensitivity targeted chirality assay for a registered amino-acid family.",
+      "resource_cost": {
+        "mass_units": 2,
+        "peak_power_units": 2,
+        "operation_time_units": 2,
+        "data_storage_units": 1,
+        "sample_consumption_units": 1
+      },
+      "outcome_likelihoods": {
+        "W1": {
+          "targeted_signal": 0.9,
+          "abiotic_flag": 0.08
+        },
+        "W2": {
+          "targeted_signal": 0.08,
+          "abiotic_flag": 0.7
+        },
+        "W3": {
+          "targeted_signal": 0.12,
+          "abiotic_flag": 0.08
+        },
+        "W4": {
+          "targeted_signal": 0.05,
+          "abiotic_flag": 0.3
+        }
+      },
+      "measurement_error_model": "SYNTHETIC_KNOWN_TRUTH",
+      "common_cause_group": "SAMPLE_PREP_A",
+      "data_class": "TARGETED"
+    },
+    {
+      "id": "U_UNTARGETED_ORGANIC_PROFILE",
+      "family": "UNTARGETED",
+      "description": "Broad untargeted organic mass-profile acquisition with a blinded novel-signature channel.",
+      "resource_cost": {
+        "mass_units": 3,
+        "peak_power_units": 3,
+        "operation_time_units": 3,
+        "data_storage_units": 5,
+        "sample_consumption_units": 1
+      },
+      "outcome_likelihoods": {
+        "W1": {
+          "broad_pattern": 0.8,
+          "novel_pattern": 0.25
+        },
+        "W2": {
+          "broad_pattern": 0.65,
+          "novel_pattern": 0.2
+        },
+        "W3": {
+          "broad_pattern": 0.75,
+          "novel_pattern": 0.85
+        },
+        "W4": {
+          "broad_pattern": 0.7,
+          "novel_pattern": 0.8
+        }
+      },
+      "measurement_error_model": "SYNTHETIC_KNOWN_TRUTH",
+      "common_cause_group": "SAMPLE_PREP_A",
+      "data_class": "UNTARGETED"
+    },
+    {
+      "id": "C_CONTEXT_GEO",
+      "family": "CONTEXTUAL",
+      "description": "Independent contextual constraints on temperature, redox, water-rock interaction and transport regime.",
+      "resource_cost": {
+        "mass_units": 2,
+        "peak_power_units": 1,
+        "operation_time_units": 2,
+        "data_storage_units": 1,
+        "sample_consumption_units": 0
+      },
+      "outcome_likelihoods": {
+        "W1": {
+          "abiotic_context_match": 0.25
+        },
+        "W2": {
+          "abiotic_context_match": 0.85
+        },
+        "W3": {
+          "abiotic_context_match": 0.2
+        },
+        "W4": {
+          "abiotic_context_match": 0.75
+        }
+      },
+      "measurement_error_model": "SYNTHETIC_KNOWN_TRUTH",
+      "common_cause_group": "INDEPENDENT_CONTEXT_SENSOR",
+      "data_class": "CONTEXTUAL"
+    },
+    {
+      "id": "Q_BLANK_CALIBRATION",
+      "family": "QUALITY_CONTROL",
+      "description": "Process blank, contamination reference and calibration standard bundle.",
+      "resource_cost": {
+        "mass_units": 1,
+        "peak_power_units": 1,
+        "operation_time_units": 1,
+        "data_storage_units": 1,
+        "sample_consumption_units": 0
+      },
+      "outcome_likelihoods": {
+        "W1": {
+          "quality_control_pass": 0.95
+        },
+        "W2": {
+          "quality_control_pass": 0.95
+        },
+        "W3": {
+          "quality_control_pass": 0.95
+        },
+        "W4": {
+          "quality_control_pass": 0.95
+        }
+      },
+      "measurement_error_model": "SYNTHETIC_KNOWN_TRUTH",
+      "common_cause_group": "QC_REFERENCE",
+      "data_class": "QUALITY_CONTROL",
+      "mandatory": true
+    },
+    {
+      "id": "R_DISCOVERY_REANALYSIS",
+      "family": "DISCOVERY_RESERVE",
+      "description": "Keep an uncommitted reanalysis/retuning/data-channel reserve that can be invoked only after a novel signature is observed.",
+      "resource_cost": {
+        "mass_units": 0,
+        "peak_power_units": 0,
+        "operation_time_units": 1,
+        "data_storage_units": 2,
+        "sample_consumption_units": 0
+      },
+      "outcome_likelihoods": {
+        "W1": {
+          "novel_followup_recoverability": 0.3
+        },
+        "W2": {
+          "novel_followup_recoverability": 0.25
+        },
+        "W3": {
+          "novel_followup_recoverability": 0.9
+        },
+        "W4": {
+          "novel_followup_recoverability": 0.85
+        }
+      },
+      "measurement_error_model": "SYNTHETIC_KNOWN_TRUTH",
+      "common_cause_group": "POST_ACQUISITION_REANALYSIS",
+      "data_class": "DISCOVERY_RESERVE",
+      "reserve_action": true
+    }
+  ],
+  "hard_constraints": {
+    "all_resource_costs_must_fit": true,
+    "mandatory_actions_must_be_selected": true,
+    "minimum_discovery_reserve_fraction": 0.15,
+    "maximum_discovery_reserve_fraction": 0.3,
+    "discovery_reserve_is_not_counted_as_a_new_measurement_until_activated": true,
+    "qc_cannot_be_removed_to_improve_nominal_information_gain": true,
+    "safety_rights_contamination_and_authority_are_non_tradable": true
+  },
+  "dependence_model": {
+    "principle": "Outcomes from actions sharing a common_cause_group must not be assumed conditionally independent without a justified model.",
+    "groups": {
+      "SAMPLE_PREP_A": [
+        "T_TARGETED_CHIRALITY",
+        "U_UNTARGETED_ORGANIC_PROFILE"
+      ],
+      "INDEPENDENT_CONTEXT_SENSOR": [
+        "C_CONTEXT_GEO"
+      ],
+      "QC_REFERENCE": [
+        "Q_BLANK_CALIBRATION"
+      ],
+      "POST_ACQUISITION_REANALYSIS": [
+        "R_DISCOVERY_REANALYSIS"
+      ]
+    },
+    "required_ablation": "Compare naive independence scoring with a dependence-aware joint likelihood; report any portfolio ranking reversal."
+  },
+  "scoring": {
+    "primary_objective": "Maximize expected discrimination utility over hidden worlds, adjusted for resource cost and common-cause dependence.",
+    "utility_components": {
+      "detect_registered_target": 1,
+      "discover_unregistered_biological_signature": 1.5,
+      "discriminate_abiotic_background": 1.2,
+      "preserve_future_reanalysis_option": 0.8,
+      "false_biogenic_claim": -3,
+      "false_absence_claim": -3,
+      "missed_novel_signature": -1
+    },
+    "report_separately": [
+      "expected_utility",
+      "robust_utility_lower_bound",
+      "cost_to_resolution",
+      "targeted_sensitivity",
+      "novel_signature_recall",
+      "abiotic_false_positive_rate",
+      "false_absence_rate",
+      "calibration_error",
+      "common_cause_penalty",
+      "discovery_reserve_fraction"
+    ],
+    "scalarization_warning": "Do not report only one weighted score; publish Pareto trade-offs and each safety/quality metric."
+  },
+  "benchmark_baselines": [
+    "ALL_TARGETED",
+    "ALL_UNTARGETED",
+    "FIXED_MIXED_EXPERT",
+    "NOMINAL_EIG_GREEDY",
+    "COST_NORMALIZED_GREEDY",
+    "ROBUST_MINIMAX_PORTFOLIO",
+    "DISCOVERY_RESERVE_PORTFOLIO",
+    "EXACT_SUBSET_ORACLE"
+  ],
+  "oracle": {
+    "action_count": 5,
+    "enumeration": "Exhaustively enumerate all 2^5 subsets; reject any subset violating the mandatory QC action, resource constraints or reserve bounds.",
+    "expected_outputs": [
+      "all feasible portfolios",
+      "Pareto frontier",
+      "best portfolio per scalarized utility configuration",
+      "regret of each baseline"
+    ],
+    "note": "The exact oracle is only for this small finite synthetic action set; it is not a general mission planner."
+  },
+  "adversarial_cases": [
+    "A target-only portfolio misses W3 and W4 by construction.",
+    "A broad untargeted portfolio can be vulnerable to abiotic false positives without context and calibration.",
+    "A redundant pair of sample-prep measurements must not receive full independent information credit.",
+    "A nominal-EIG optimizer may allocate zero discovery reserve unless the reserve is explicitly represented.",
+    "A payload-descoping mutation removes C_CONTEXT_GEO and measures ambiguity increase.",
+    "A hidden novel signature is introduced after acquisition to test archived-data reanalysis."
+  ],
+  "reproducibility": {
+    "seed": 20261111,
+    "deterministic_generation": true,
+    "data_digest_sha256": null,
+    "status": "SYNTHETIC_SPECIFICATION_ONLY_NOT_EXECUTED"
+  }
+}
