@@ -220,7 +220,7 @@ mod tests {
     fn optimistic_single_model_value_does_not_hide_negative_worst_case_value() {
         let scenarios = vec![
             scenario("model-a", 1.0, 1.0),
-            scenario("model-b", 0.5, 0.5),
+            scenario("model-b", 0.6, 0.5),
         ];
         let chosen = select_robust_evsi(&scenarios, 1.0, 0.0, 0.0)
             .unwrap()
