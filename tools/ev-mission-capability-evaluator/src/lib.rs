@@ -120,6 +120,7 @@ pub struct CaseAudit {
     pub disposition: String,
     pub input_errors: Vec<String>,
     pub step_audits: Vec<StepAudit>,
+    pub battery_energy_accounting_complete: bool,
     pub minimum_energy_remaining_above_reserve_kwh_lower: Option<f64>,
     pub total_battery_discharge_energy_kwh_upper: f64,
     pub total_regenerative_energy_credited_kwh_lower: f64,
@@ -203,6 +204,7 @@ fn reject_input(case_id: &str, errors: Vec<String>) -> CaseAudit {
         disposition: "REJECTED_INPUT".to_owned(),
         input_errors: errors,
         step_audits: Vec::new(),
+        battery_energy_accounting_complete: false,
         minimum_energy_remaining_above_reserve_kwh_lower: None,
         total_battery_discharge_energy_kwh_upper: 0.0,
         total_regenerative_energy_credited_kwh_lower: 0.0,
@@ -326,6 +328,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
     let mut total_discharge = 0.0;
     let mut total_regen_credit = 0.0;
     let mut total_external = 0.0;
+    let mut battery_energy_accounting_complete = true;
     let mut worst_discharge_margin: Option<f64> = None;
     let mut worst_charge_margin: Option<f64> = None;
     let mut global_limiting_cell: Option<String> = None;
@@ -354,6 +357,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 thermal_margin_c: None,
                 reason: Some("No capability slice covers this exact mission interval".to_owned()),
             });
+            battery_energy_accounting_complete = false;
             continue;
         };
         let duration = step.end_time_seconds - step.start_time_seconds;
@@ -376,6 +380,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 thermal_margin_c: None,
                 reason: Some("Capability slice time bounds do not exactly match the mission step".to_owned()),
             });
+            battery_energy_accounting_complete = false;
             continue;
         }
         if slice.vehicle_ref != mission.vehicle_ref
@@ -404,6 +409,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 thermal_margin_c: None,
                 reason: Some("Capability slice asset/configuration/topology/model evidence does not bind to this mission".to_owned()),
             });
+            battery_energy_accounting_complete = false;
             continue;
         }
         if slice.source_class != "SYNTHETIC_KNOWN_TRUTH"
@@ -425,6 +431,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 thermal_margin_c: None,
                 reason: Some("Capability source class is not admitted".to_owned()),
             });
+            battery_energy_accounting_complete = false;
             continue;
         }
         if slice.source_class == "QUALIFIED_PHYSICAL_MODEL" {
@@ -457,6 +464,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 thermal_margin_c: None,
                 reason: Some("Capability envelope has invalid domains or bounds".to_owned()),
             });
+            battery_energy_accounting_complete = false;
             continue;
         }
 
@@ -484,6 +492,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 thermal_margin_c: None,
                 reason: Some("Capability slice contains duplicate or undeclared cell identities".to_owned()),
             });
+            battery_energy_accounting_complete = false;
             continue;
         }
         if actual_cells != expected_cells {
@@ -505,6 +514,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 thermal_margin_c: None,
                 reason: Some("The declared cell population is not completely covered".to_owned()),
             });
+            battery_energy_accounting_complete = false;
             continue;
         }
 
@@ -601,6 +611,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 thermal_margin_c: hottest_thermal_margin.or(Some(thermal_margin)),
                 reason: Some("A cell trajectory violates the mission limit or the model support domain".to_owned()),
             });
+            battery_energy_accounting_complete = false;
             continue;
         }
 
@@ -696,7 +707,12 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
         disposition,
         input_errors: Vec::new(),
         step_audits,
-        minimum_energy_remaining_above_reserve_kwh_lower: Some(minimum_energy_remaining),
+        battery_energy_accounting_complete,
+        minimum_energy_remaining_above_reserve_kwh_lower: if battery_energy_accounting_complete {
+            Some(minimum_energy_remaining)
+        } else {
+            None
+        },
         total_battery_discharge_energy_kwh_upper: total_discharge,
         total_regenerative_energy_credited_kwh_lower: total_regen_credit,
         total_external_energy_kwh_not_credited: total_external,
@@ -947,6 +963,25 @@ mod tests {
         assert!((row.total_regenerative_energy_credited_kwh_lower - expected).abs() < EPS);
         assert!(row.total_regenerative_energy_credited_kwh_lower
             < 10.0 * 0.95 * 300.0 / 3600.0);
+    }
+
+    #[test]
+    fn incomplete_capability_coverage_never_reports_a_mission_wide_reserve_minimum() {
+        let report = report();
+        let missing = case(&report, "missing_cell_coverage");
+        assert!(!missing.battery_energy_accounting_complete);
+        assert_eq!(missing.minimum_energy_remaining_above_reserve_kwh_lower, None);
+        let unsupported = case(&report, "temperature_out_of_model_domain");
+        assert!(!unsupported.battery_energy_accounting_complete);
+        assert_eq!(unsupported.minimum_energy_remaining_above_reserve_kwh_lower, None);
+    }
+
+    #[test]
+    fn fully_evaluated_energy_shortfall_retains_its_negative_reserve_result() {
+        let report = report();
+        let row = case(&report, "peak_passes_but_sustained_energy_fails");
+        assert!(row.battery_energy_accounting_complete);
+        assert!(row.minimum_energy_remaining_above_reserve_kwh_lower.unwrap() < 0.0);
     }
 
 }
