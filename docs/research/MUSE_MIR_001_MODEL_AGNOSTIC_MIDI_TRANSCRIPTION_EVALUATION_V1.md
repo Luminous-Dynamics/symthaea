@@ -79,6 +79,7 @@ This is a custom direct-velocity metric, not mir_eval.transcription_velocity: th
 
 V1 uses explicit limits to prevent malformed or adversarial MIDI from triggering unbounded work:
 - maximum 20,000 parsed/reference notes;
+- maximum 64 MiB per MIDI input and 1,000,000 MIDI events;
 - maximum 2,000,000 candidate note-pair edges;
 - maximum 10,000,000 matching edge scans per matching pass;
 - maximum 10,000,000 frame-activation scans and 2,000,000 unique activation cells per frame view.
@@ -87,7 +88,7 @@ Capacity exhaustion is an explicit error, not a partial score.
 
 ## Tests authored
 
-Twenty-two focused Rust tests currently cover:
+Twenty-five focused Rust tests currently cover:
 1. exact MIDI prediction produces perfect instrument-agnostic and exact-program scores;
 2. wrong GM program changes the exact-program metrics without hiding correct pitch/onset notes;
 3. onset outside the 50 ms window reduces onset and full-note scores;
@@ -109,9 +110,14 @@ Twenty-two focused Rust tests currently cover:
 19. the upstream mir_eval Hopcroft–Karp adversarial graph yields the same deterministic pairing;
 20. Type-1 note-on/note-off events across tracks pair in the shared channel stream;
 21. a conductor-track program change applies to part-track notes on the same channel;
-22. simultaneous conflicting program changes across tracks on the same channel abstain.
+22. simultaneous conflicting program changes across tracks on the same channel abstain;
+23. an empty reference and empty prediction are scored as a negative example;
+24. false-positive notes are counted against an empty reference;
+25. velocity tolerances above the MIDI 1.0 range are rejected.
 
 These tests are authored, not compiled or run in the authoring environment.
+
+Empty-reference clips are valid benchmark items. They are essential for measuring false positives in silence, pauses, isolated noise and music with no target instrument; they are not discarded as malformed references.
 
 ## External baselines and what they mean
 
