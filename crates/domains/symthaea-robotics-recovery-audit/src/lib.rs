@@ -92,6 +92,7 @@ pub enum TrialDisposition {
     InfrastructureIndeterminate,
     Unplanned,
     InvalidIdentity,
+    InvalidManifest,
 }
 
 /// One benchmark trial with the minimum identities needed for audit.
@@ -131,6 +132,9 @@ pub struct AuditReport {
     pub observed_trial_rows: usize,
     pub unique_observed_trial_ids: usize,
     pub expected_trial_count: Option<usize>,
+    pub expected_manifest_valid: Option<bool>,
+    pub blank_expected_trial_ids: usize,
+    pub invalid_manifest_rows: usize,
     pub missing_expected_trial_ids: Vec<String>,
     pub duplicate_expected_trial_ids: Vec<String>,
     pub duplicate_trial_ids: Vec<String>,
@@ -231,21 +235,42 @@ pub fn audit_trials(
         .filter(|count| **count > 1)
         .sum();
 
+    // Raw adverse-event markers remain visible even when a row is excluded
+    // from confirmatory scoring because its identity is duplicated or invalid.
+    report.simulator_rewind_rows = trials
+        .iter()
+        .filter(|trial| {
+            trial.intervention == InterventionKind::SimulatorStateRewind
+                || trial.world_state == WorldStateContinuity::SimulatorRewound
+        })
+        .count();
+    report.safety_violation_rows = trials
+        .iter()
+        .filter(|trial| trial.safety == SafetyEvidence::ViolationObserved)
+        .count();
+
     let mut expected_set: Option<BTreeSet<String>> = None;
     if let Some(expected_ids) = expected_trial_ids {
         let mut expected_counts = BTreeMap::<String, usize>::new();
         for id in expected_ids {
-            if !id.trim().is_empty() {
+            if id.trim().is_empty() {
+                report.blank_expected_trial_ids += 1;
+            } else {
                 *expected_counts.entry(id.clone()).or_insert(0) += 1;
             }
         }
 
-        report.expected_trial_count = Some(expected_counts.len());
+        report.expected_trial_count = Some(expected_ids.len());
         report.duplicate_expected_trial_ids = expected_counts
             .iter()
             .filter_map(|(id, count)| (*count > 1).then(|| id.clone()))
             .collect();
-        expected_set = Some(expected_counts.keys().cloned().collect());
+        let manifest_valid = report.blank_expected_trial_ids == 0
+            && report.duplicate_expected_trial_ids.is_empty();
+        report.expected_manifest_valid = Some(manifest_valid);
+        if manifest_valid {
+            expected_set = Some(expected_counts.keys().cloned().collect());
+        }
     }
 
     let duplicate_ids = report
@@ -264,7 +289,10 @@ pub fn audit_trials(
             .map(|ids| ids.contains(&trial.trial_id))
             .unwrap_or(true);
 
-        let disposition = if duplicate || !identity_valid {
+        let disposition = if report.expected_manifest_valid == Some(false) {
+            report.invalid_manifest_rows += 1;
+            TrialDisposition::InvalidManifest
+        } else if duplicate || !identity_valid {
             report.invalid_identity_rows += 1;
             TrialDisposition::InvalidIdentity
         } else if !planned {
@@ -278,15 +306,6 @@ pub fn audit_trials(
                 .intervention_counts
                 .entry(trial.intervention)
                 .or_insert(0) += 1;
-
-            if trial.intervention == InterventionKind::SimulatorStateRewind
-                || trial.world_state == WorldStateContinuity::SimulatorRewound
-            {
-                report.simulator_rewind_rows += 1;
-            }
-            if trial.safety == SafetyEvidence::ViolationObserved {
-                report.safety_violation_rows += 1;
-            }
 
             let result = classify_trial(trial);
             match result {
@@ -305,7 +324,9 @@ pub fn audit_trials(
                 TrialDisposition::InfrastructureIndeterminate => {
                     report.infrastructure_indeterminate += 1;
                 }
-                TrialDisposition::Unplanned | TrialDisposition::InvalidIdentity => {
+                TrialDisposition::Unplanned
+                | TrialDisposition::InvalidIdentity
+                | TrialDisposition::InvalidManifest => {
                     unreachable!("pre-filtered dispositions are unreachable here");
                 }
             }
@@ -462,4 +483,47 @@ mod tests {
         assert_eq!(report.valid_confirmatory_rows, 0);
         assert_eq!(report.physical_safe_completions, 0);
     }
+
+    #[test]
+    fn duplicate_expected_manifest_invalidates_confirmatory_accounting() {
+        let observed = vec![valid_trial("trial-01")];
+        let expected = vec!["trial-01".to_owned(), "trial-01".to_owned()];
+
+        let report = audit_trials(&observed, Some(&expected));
+        assert_eq!(report.expected_manifest_valid, Some(false));
+        assert_eq!(
+            report.duplicate_expected_trial_ids,
+            vec!["trial-01".to_owned()]
+        );
+        assert_eq!(report.valid_confirmatory_rows, 0);
+        assert_eq!(report.invalid_manifest_rows, 1);
+    }
+
+    #[test]
+    fn blank_expected_manifest_id_invalidates_confirmatory_accounting() {
+        let observed = vec![valid_trial("trial-01")];
+        let expected = vec!["trial-01".to_owned(), "   ".to_owned()];
+
+        let report = audit_trials(&observed, Some(&expected));
+        assert_eq!(report.expected_manifest_valid, Some(false));
+        assert_eq!(report.blank_expected_trial_ids, 1);
+        assert_eq!(report.valid_confirmatory_rows, 0);
+    }
+
+    #[test]
+    fn raw_safety_and_rewind_markers_survive_duplicate_row_exclusion() {
+        let mut rewind = valid_trial("duplicate");
+        rewind.intervention = InterventionKind::SimulatorStateRewind;
+        rewind.world_state = WorldStateContinuity::SimulatorRewound;
+
+        let mut unsafe_row = valid_trial("duplicate");
+        unsafe_row.safety = SafetyEvidence::ViolationObserved;
+
+        let report = audit_trials(&[rewind, unsafe_row], None);
+        assert_eq!(report.valid_confirmatory_rows, 0);
+        assert_eq!(report.invalid_identity_rows, 2);
+        assert_eq!(report.simulator_rewind_rows, 1);
+        assert_eq!(report.safety_violation_rows, 1);
+    }
+
 }
