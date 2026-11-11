@@ -69,6 +69,17 @@ V1 additionally reports instrument-agnostic pitch-frame F1 and exact-GM-program/
 
 Frame cells are half-open time intervals. A note activates every cell it overlaps. Repeated/overlapping notes of the same pitch collapse to one pitch/frame cell in the instrument-agnostic metric. This is a custom, explicit frame-occupancy view; do not claim direct numeric equivalence to another paper's Frame F1 until its frame hop, rounding, pitch mapping and evaluation code have been reproduced exactly.
 
+### Part separation — track topology is not the same as note accuracy
+
+The part-separation diagnostic uses the existing one-to-one onset+pitch matches to identify which reference PartId each matched predicted note corresponds to. It then reports two different topologies:
+
+- **Track purity:** group matched predictions by MIDI track. This reports whether multiple reference PartIds are mixed into the same physical MIDI track.
+- **Track/channel-lane purity:** group matched predictions by (MIDI track, MIDI channel). This recognises Type-0 files that put several logical parts on one physical track but separate them by channel.
+
+For both levels the report gives the number of prediction groups, number of mixed groups, number of matched notes residing in mixed groups and note-weighted purity (the fraction assigned to each group's most common reference PartId). It also reports reference-PartId coverage: the fraction of reference parts represented by at least one matched note.
+
+This is a structural metric, not an instrument identity classifier. It says whether note events associated with distinct score PartIds were kept in distinct MIDI output tracks or channel lanes. It does not prove which acoustic instrument played the source recording. Only matched notes contribute to purity; unmatched extra notes are already counted as false positives by the note metrics and are not assigned a speculative PartId. A PartId can validly be spread across multiple tracks or lanes; the score is based on dominant-part purity rather than a strict one-track-per-part bijection.
+
 ### Velocity evaluation
 
 MIDI velocity is captured, but velocity metrics are disabled by default. Some transcription models do not estimate dynamics yet still serialize a conventional placeholder velocity. The caller must explicitly set velocity_metrics_enabled=true only when the prediction pipeline genuinely estimates velocity. When enabled, the report includes velocity-aware full-note F1 and direct absolute MIDI-velocity error summaries. Otherwise those fields are absent, not zero.
@@ -88,7 +99,7 @@ Capacity exhaustion is an explicit error, not a partial score.
 
 ## Tests authored
 
-Twenty-five focused Rust tests currently cover:
+Thirty-four focused Rust tests currently cover:
 1. exact MIDI prediction produces perfect instrument-agnostic and exact-program scores;
 2. wrong GM program changes the exact-program metrics without hiding correct pitch/onset notes;
 3. onset outside the 50 ms window reduces onset and full-note scores;
@@ -114,6 +125,15 @@ Twenty-five focused Rust tests currently cover:
 23. an empty reference and empty prediction are scored as a negative example;
 24. false-positive notes are counted against an empty reference;
 25. velocity tolerances above the MIDI 1.0 range are rejected.
+26. distinct output tracks preserve two reference PartIds with perfect track and lane purity;
+27. notes can be pitch/onset-correct yet still reveal contamination when two PartIds share one output track;
+28. a Type-0 single-track file can preserve distinct parts on separate MIDI channels, yielding low track purity but perfect lane purity;
+29. mixed PartIds on the same track/channel lane reduce lane purity;
+30. a missing reference part reduces part coverage without penalizing the purity of correctly separated surviving parts;
+31. the part-separation summary is included in the report commitment;
+32. frame metrics are withheld when predicted notes have unclosed releases;
+33. velocity error is still measured for onset+pitch matches when note offsets are wrong;
+34. an empty reference is accepted as a valid all-false-positive evaluation case.
 
 These tests are authored, not compiled or run in the authoring environment.
 
