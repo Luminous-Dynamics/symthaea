@@ -27,7 +27,7 @@ The `upstream/` directory contains only:
 - `repair_eval_index.json`: 54 matching selected records.
 - `SHA256SUMS`: the upstream hash ledger for the repository's data files.
 
-The source manifest also pins the raw SHA-256 and Git blob identity of the two index files and checksum ledger, upstream commit, MIT license, expected distributions and split semantics. The upstream license is preserved in `ACED-UPSTREAM-LICENSE`; attribution is in `UPSTREAM_NOTICE.md`.
+The source manifest also pins the raw SHA-256 and Git blob identity of the two index files and checksum ledger, upstream commit, MIT license, expected distributions and split semantics. The upstream license is preserved in `ACED-UPSTREAM-LICENSE`; attribution is in `UPSTREAM_NOTICE.md`. The closed `ACED_REPAIR_INDEX_V0_1.schema.json` contract separately defines each metadata-only row (file, domain, archetype, seed); the Rust qualifier enforces split-specific counts and distribution constraints beyond that general row schema.
 
 **No compressed world payloads, structural equations, ground-truth interventions, oracle fixes, scoring batteries, hidden roles or grader state are copied into this adapter.** The checksum ledger exposes file paths and digests, not the payload bytes.
 
