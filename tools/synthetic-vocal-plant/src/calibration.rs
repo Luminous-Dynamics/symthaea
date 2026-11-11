@@ -829,7 +829,7 @@ pub fn generate_response_profile(output_dir: &Path) -> Result<SyntheticResponseP
     std::fs::write(
         output_dir.join("response-calibration-pairs.sha256"),
         format!(
-            "{}  response-calibration-pairs.json\\n",
+            "{}  response-calibration-pairs.json\n",
             sha256_bytes(&pair_bytes)
         ),
     )
