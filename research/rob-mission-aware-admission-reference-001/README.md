@@ -35,11 +35,11 @@ A selected batch must remain within all declared budgets:
 - memory-bandwidth service units;
 - network bytes.
 
-This is deliberately not a detailed GPU/KV-cache runtime model. The next extension must add long-lived brain-context/KV residency, short-deadline VLA chunks, KV eviction/re-prefill cost and foreground sensor memory-bandwidth deadlines, using measured or frozen trace inputs. GPU-time density is only a tie-breaker; memory bandwidth and network remain hard independent budgets.
+The KV-cache growth budget is a hard incremental reservation, not a detailed runtime cache model. Long-lived brain-context residency, phase-aware eviction, re-prefill cost and foreground sensor memory-bandwidth deadlines still require measured or frozen trace inputs. GPU-time density is only a tie-breaker; memory bandwidth and network remain hard independent budgets.
 
 ## Output and limits
 
-The result identifies admitted requests, request-level rejections, consumed resources, the next Round Robin cursor, service-floor obligations not met by the batch, and maximum-starvation breaches that predate the current admission decision. An already-overdue robot remains eligible and is prioritized for remediation; the prior breach remains visible rather than being erased by a late service event. It carries no actuation authority. A service-floor breach makes the schedule unacceptable even if aggregate throughput increases.
+The result identifies admitted requests, request-level rejections, consumed GPU, memory-bandwidth, network and KV-growth resources, the next Round Robin cursor, service-floor obligations not met by the batch, and maximum-starvation breaches that predate the current admission decision. An already-overdue robot remains eligible and is prioritized for remediation; the prior breach remains visible rather than being erased by a late service event. It carries no actuation authority. A service-floor breach makes the schedule unacceptable even if aggregate throughput increases.
 
 This is deterministic policy/reference logic only. It does not validate network timing, PoMA calibration, EVSI estimation, model identity cryptographically, physical state, hardware resource estimates or hard-real-time guarantees.
 
