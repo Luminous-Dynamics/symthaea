@@ -277,6 +277,7 @@ fn tempo_points_from_events(
         start_seconds: 0.0,
         microseconds_per_quarter: 500_000,
     }];
+    let mut explicit_tempo_at_zero_seen = false;
 
     for (tick, _, _, tempo) in sorted {
         if tempo == 0 {
@@ -285,6 +286,14 @@ fn tempo_points_from_events(
         let previous = *points.last().expect("initial tempo point is present");
         if tick < previous.start_tick {
             return Err(MidiTranscriptionEvaluationIssueV1::InvalidPredictionMidi);
+        }
+        if tick == 0 && !explicit_tempo_at_zero_seen {
+            // The first explicit tempo at tick zero overrides the MIDI
+            // default tempo. Subsequent conflicting explicit events at the
+            // same tick remain invalid.
+            points[0].microseconds_per_quarter = tempo;
+            explicit_tempo_at_zero_seen = true;
+            continue;
         }
         if tick == previous.start_tick {
             if tempo != previous.microseconds_per_quarter {
@@ -603,8 +612,9 @@ fn validate_reference_artifact_v1(
             .or_insert(0) += 1;
     }
     let mut ordinals = std::collections::BTreeSet::new();
-    for note in &manifest.notes {
-        if !ordinals.insert(note.source_note_ordinal)
+    for (expected_ordinal, note) in manifest.notes.iter().enumerate() {
+        if note.source_note_ordinal != expected_ordinal
+            || !ordinals.insert(note.source_note_ordinal)
             || note.pitch_midi > 127
             || note.velocity_midi == 0
             || note.end_tick <= note.start_tick
