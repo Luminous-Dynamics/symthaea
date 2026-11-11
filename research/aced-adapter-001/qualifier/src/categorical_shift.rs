@@ -203,7 +203,7 @@ mod tests {
             &binary_counts(80, 20),
             &binary_counts(70, 30),
             1.96,
-            0.15,
+            0.08,
         )
         .unwrap();
         assert!((report.total_variation_distance - 0.10).abs() < 1e-12);
