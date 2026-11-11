@@ -1244,7 +1244,7 @@ pub fn evaluate_midi_transcription_v1(
         reference_midi_sha256: reference.manifest.midi_sha256.clone(),
         reference_manifest_sha256: reference.manifest_sha256.clone(),
         prediction_midi_sha256: sha256_hex(prediction_midi_bytes),
-        config,
+        config: config.clone(),
         reference_note_count: u32::try_from(reference_notes.len()).unwrap_or(u32::MAX),
         prediction_note_count: u32::try_from(predicted_notes.len()).unwrap_or(u32::MAX),
         prediction_unclosed_note_count: parsed.unclosed_note_count,
