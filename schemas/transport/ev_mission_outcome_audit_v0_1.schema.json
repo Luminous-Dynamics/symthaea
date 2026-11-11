@@ -6,7 +6,8 @@
   "additionalProperties": false,
   "required": [
     "corpus_version",
-    "cases"
+    "cases",
+    "split_manifest"
   ],
   "properties": {
     "corpus_version": {
@@ -19,6 +20,9 @@
       "items": {
         "$ref": "#/$defs/case"
       }
+    },
+    "split_manifest": {
+      "$ref": "#/$defs/split_manifest"
     }
   },
   "$defs": {
@@ -342,6 +346,73 @@
         },
         "reference": {
           "$ref": "#/$defs/reference"
+        }
+      }
+    },
+    "split_assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vehicle_ref",
+        "pack_ref",
+        "configuration_sha256",
+        "topology_sha256",
+        "physical_group_ref",
+        "partition"
+      ],
+      "properties": {
+        "vehicle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "topology_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "physical_group_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "partition": {
+          "enum": [
+            "TRAIN",
+            "VALIDATION",
+            "CALIBRATION",
+            "TEST_BLIND"
+          ]
+        }
+      }
+    },
+    "split_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_ref",
+        "frozen_at_ms",
+        "assignments"
+      ],
+      "properties": {
+        "manifest_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frozen_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "assignments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10000,
+          "items": {
+            "$ref": "#/$defs/split_assignment"
+          }
         }
       }
     }
