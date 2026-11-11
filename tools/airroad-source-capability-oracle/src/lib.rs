@@ -695,9 +695,13 @@ pub fn qualify_source_capability(
                 as_installed_pack_configuration_digest: Some(
                     profile.as_installed_pack_configuration_digest.clone(),
                 ),
-                source_evidence_manifest_digest: Some(profile.source_evidence_manifest_digest.clone()),
+                source_evidence_manifest_digest: Some(
+                    profile.source_evidence_manifest_digest.clone(),
+                ),
                 source_state_manifest_digest: Some(profile.source_state_manifest_digest.clone()),
-                energy_evidence_manifest_digest: Some(profile.energy_evidence_manifest_digest.clone()),
+                energy_evidence_manifest_digest: Some(
+                    profile.energy_evidence_manifest_digest.clone(),
+                ),
                 source_model_id: Some(profile.source_model_id.clone()),
                 source_model_version: Some(profile.source_model_version.clone()),
                 source_model_output_digest: Some(profile.source_model_output_digest.clone()),
@@ -882,10 +886,10 @@ mod tests {
         let nominal = bus.nominal_scenario.as_ref().unwrap();
         let favourable = bus.favourable_scenario.as_ref().unwrap();
         SourceCapabilityProfile {
-            source_id: "battery-source-main".to_owned(),
-            battery_instance_id: "pack-serial-123".to_owned(),
-            bus_id: "main-bus".to_owned(),
-            source_boundary_id: "battery-main-terminals".to_owned(),
+            source_id: format!("source-{}", bus.bus_id),
+            battery_instance_id: format!("pack-{}", bus.bus_id),
+            bus_id: bus.bus_id.clone(),
+            source_boundary_id: bus.source_boundary_id.clone(),
             aircraft_configuration_digest: "aircraft-config".to_owned(),
             as_installed_pack_configuration_digest: "pack-config-v7".to_owned(),
             mission_profile_digest: "mission-profile-sha256".to_owned(),
@@ -1086,13 +1090,18 @@ mod tests {
     #[test]
     fn tms_energy_is_not_added_twice_to_the_bus_energy_ledger() {
         let mut input = input();
-        let nominal_bus_energy = input.bus_demand.buses[0]
+        let nominal = input.bus_demand.buses[0]
             .nominal_scenario
-            .as_ref()
-            .unwrap()
-            .total_bus_energy_j;
+            .as_mut()
+            .unwrap();
+        nominal.external_load_energy_j = 3_000.0;
+        nominal.propulsion_energy_j = nominal.total_bus_energy_j - 3_000.0;
+        let nominal_bus_energy = nominal.total_bus_energy_j;
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].nominal.demanded_energy_j, Some(nominal_bus_energy));
+        assert_eq!(
+            report.buses[0].nominal.demanded_energy_j,
+            Some(nominal_bus_energy)
+        );
         assert_eq!(
             report.buses[0].nominal.remaining_energy_margin_j,
             Some(24_000.0 - 3_000.0 - nominal_bus_energy)
@@ -1131,11 +1140,62 @@ mod tests {
     }
 
     #[test]
-    fn source_profile_order_is_deterministic() {
-        let report_a = qualify_source_capability(&input()).unwrap();
-        let report_b = qualify_source_capability(&input()).unwrap();
-        assert_eq!(report_a, report_b);
-        assert_eq!(report_a.buses[0].bus_id, "main-bus");
+    fn source_profiles_and_bus_reports_are_order_invariant() {
+        let mut forward = input();
+        let mut second_bus = forward.bus_demand.buses[0].clone();
+        second_bus.bus_id = "aux-bus".to_owned();
+        second_bus.source_boundary_id = "battery-aux-terminals".to_owned();
+        second_bus.source_evidence_manifest_digest = "aux-bus-evidence".to_owned();
+        let second_profile = profile(&second_bus);
+        forward.bus_demand.buses.push(second_bus);
+        forward.source_profiles.push(second_profile);
+
+        let mut reversed = forward.clone();
+        reversed.bus_demand.buses.reverse();
+        reversed.source_profiles.reverse();
+
+        let first_report = qualify_source_capability(&forward).unwrap();
+        let second_report = qualify_source_capability(&reversed).unwrap();
+        assert_eq!(first_report, second_report);
+        assert_eq!(first_report.buses[0].bus_id, "aux-bus");
+        assert_eq!(
+            first_report.buses[0].source_boundary_id,
+            "battery-aux-terminals"
+        );
+        assert_eq!(
+            first_report.buses[1].battery_instance_id.as_deref(),
+            Some("pack-main-bus")
+        );
+    }
+
+    #[test]
+    fn report_preserves_exact_bus_pack_and_source_evidence_lineage() {
+        let report = qualify_source_capability(&input()).unwrap();
+        let bus = &report.buses[0];
+        assert_eq!(
+            bus.bus_source_evidence_manifest_digest,
+            "bus-source-evidence"
+        );
+        assert_eq!(
+            bus.as_installed_pack_configuration_digest.as_deref(),
+            Some("pack-config-v7")
+        );
+        assert_eq!(
+            bus.source_evidence_manifest_digest.as_deref(),
+            Some("source-evidence-digest")
+        );
+        assert_eq!(
+            bus.source_state_manifest_digest.as_deref(),
+            Some("source-state-manifest")
+        );
+        assert_eq!(
+            bus.energy_evidence_manifest_digest.as_deref(),
+            Some("energy-budget-manifest")
+        );
+        assert_eq!(
+            bus.source_model_output_digest.as_deref(),
+            Some("source-output-digest")
+        );
     }
 
     #[test]
