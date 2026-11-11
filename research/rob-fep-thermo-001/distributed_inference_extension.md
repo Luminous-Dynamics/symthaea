@@ -138,3 +138,8 @@ The offload benchmark now composes with [Symtropy #4689](https://github.com/Lumi
 The distributed placement protocol now has a dedicated [decision-sensitive freshness extension](./decision_sensitive_freshness.md). It distinguishes result age at receipt from actuation-side Age of Information (AoI), and AoI from decision-focused EVSI. The new cases DI20–DI22 cover stale-at-actuation despite fresh receipt, a fresh update with zero EVSI, and shared-memory contention that delays foreground camera work.
 
 The 22-case corpus also now treats DI18 (compression quality loss) and DI19 (fleet-priority admission) as isolated cases with earlier freshness gates passing. The schema requires the actuation-AoI / EVSI / foreground-deadline gate fields; any remote result eligible for local admission must have authenticated identity, matching model and observation anchor, known clock mapping, current RTA admissibility and an AoI pass.
+
+
+## Source-to-actuator AoI implementation
+
+The measurement arithmetic is now owned by [Symtropy #4713](https://github.com/Luminous-Dynamics/symtropy/issues/4713), with a standalone Rust reference in [PR #4715](https://github.com/Luminous-Dynamics/symtropy/pull/4715). The reference preserves a per-source age vector, requires a shared monotonic clock/boot epoch for V0, and reports time-weighted held-command AoI. It does not determine action freshness thresholds or authorize actuation.
