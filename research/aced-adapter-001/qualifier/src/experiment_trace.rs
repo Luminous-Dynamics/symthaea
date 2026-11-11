@@ -341,7 +341,7 @@ fn validate_stop(
 }
 
 /// Qualify append-only proposal/observation/stop events.
-/// The hash chain detects edits relative to a previously anchored event; by itself it is not a trusted timestamp.
+/// The hash chain detects edits relative to a previously anchored event. It does not prove a trusted timestamp.
 pub fn validate_trace(trace: &Value) -> Result<TraceReport, Vec<String>> {
     let mut errors = Vec::new();
     if !exact_fields(trace, &["schema_version", "run_id", "events", "claim_ceiling"])
@@ -519,7 +519,9 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
-            .find(|item| text(&item["properties"]["event_type"], "const") == Some("experiment_observation"))
+            .find(|item| {
+                text(&item["properties"]["event_type"], "const") == Some("experiment_observation")
+            })
             .unwrap();
         assert_eq!(
             observation_schema["properties"]["payload"]["required"]
@@ -528,7 +530,18 @@ mod tests {
                 .len(),
             5
         );
-        assert!(observation_schema["properties"]["payload"]["properties"].get("observed_outcome").is_some());
+        assert!(
+            observation_schema["properties"]["payload"]["properties"]
+                .get("observed_outcome")
+                .is_some()
+        );
+        assert_eq!(
+            observation_schema["properties"]["payload"]["allOf"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
     }
 
     fn event(
@@ -574,7 +587,10 @@ mod tests {
             "run_id": "run-001",
             "events": events,
             "claim_ceiling":
-                "Append-only forecast/observation trace structure only; not model capability or trusted time."
+                concat!(
+                    "Append-only forecast/observation trace structure only; ",
+                    "not model capability or trusted time."
+                )
         })
     }
 
