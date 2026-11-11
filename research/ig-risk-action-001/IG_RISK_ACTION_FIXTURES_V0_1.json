@@ -17,7 +17,7 @@
       "scenario_id": "RA-PAIR-1-LOW",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 80,
@@ -81,7 +81,7 @@
       "scenario_id": "RA-PAIR-1-HIGH",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 80,
@@ -145,7 +145,7 @@
       "scenario_id": "RA-PAIR-2-LOW",
       "task_family": "retrieval",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 80,
@@ -209,7 +209,7 @@
       "scenario_id": "RA-PAIR-2-HIGH",
       "task_family": "retrieval",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 80,
@@ -273,7 +273,7 @@
       "scenario_id": "RA-PAIR-3-LOW",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 80,
@@ -337,7 +337,7 @@
       "scenario_id": "RA-PAIR-3-HIGH",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 80,
@@ -401,7 +401,7 @@
       "scenario_id": "RA-PAIR-4-LOW",
       "task_family": "institutional_process",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 80,
@@ -465,7 +465,7 @@
       "scenario_id": "RA-PAIR-4-HIGH",
       "task_family": "institutional_process",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 80,
@@ -529,7 +529,7 @@
       "scenario_id": "RA-PAIR-5-LOW",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 80,
@@ -593,7 +593,7 @@
       "scenario_id": "RA-PAIR-5-HIGH",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 80,
@@ -657,7 +657,7 @@
       "scenario_id": "RA-ANSWER-01",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 94,
@@ -719,7 +719,7 @@
       "scenario_id": "RA-ANSWER-02",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 95,
@@ -781,7 +781,7 @@
       "scenario_id": "RA-ANSWER-03",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 96,
@@ -843,7 +843,7 @@
       "scenario_id": "RA-ANSWER-04",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 97,
@@ -905,7 +905,7 @@
       "scenario_id": "RA-ANSWER-05",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 98,
@@ -967,7 +967,7 @@
       "scenario_id": "RA-ANSWER-06",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 99,
@@ -1029,7 +1029,7 @@
       "scenario_id": "RA-ABSTAIN-01",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 5,
@@ -1091,7 +1091,7 @@
       "scenario_id": "RA-ABSTAIN-02",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 6,
@@ -1153,7 +1153,7 @@
       "scenario_id": "RA-ABSTAIN-03",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 7,
@@ -1215,7 +1215,7 @@
       "scenario_id": "RA-ABSTAIN-04",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 8,
@@ -1277,7 +1277,7 @@
       "scenario_id": "RA-ABSTAIN-05",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 9,
@@ -1339,7 +1339,7 @@
       "scenario_id": "RA-ABSTAIN-06",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 10,
@@ -1401,7 +1401,7 @@
       "scenario_id": "RA-REQUESTEVIDENCE-01",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 45,
@@ -1463,7 +1463,7 @@
       "scenario_id": "RA-REQUESTEVIDENCE-02",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 46,
@@ -1525,7 +1525,7 @@
       "scenario_id": "RA-REQUESTEVIDENCE-03",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 47,
@@ -1587,7 +1587,7 @@
       "scenario_id": "RA-REQUESTEVIDENCE-04",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 48,
@@ -1649,7 +1649,7 @@
       "scenario_id": "RA-REQUESTEVIDENCE-05",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 49,
@@ -1711,7 +1711,7 @@
       "scenario_id": "RA-REQUESTEVIDENCE-06",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 50,
@@ -1773,7 +1773,7 @@
       "scenario_id": "RA-ESCALATE-01",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 30,
@@ -1835,7 +1835,7 @@
       "scenario_id": "RA-ESCALATE-02",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 31,
@@ -1897,7 +1897,7 @@
       "scenario_id": "RA-ESCALATE-03",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 32,
@@ -1959,7 +1959,7 @@
       "scenario_id": "RA-ESCALATE-04",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 33,
@@ -2021,7 +2021,7 @@
       "scenario_id": "RA-ESCALATE-05",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 34,
@@ -2083,7 +2083,7 @@
       "scenario_id": "RA-ESCALATE-06",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 35,
@@ -2145,7 +2145,7 @@
       "scenario_id": "RA-DEFER-01",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 30,
@@ -2207,7 +2207,7 @@
       "scenario_id": "RA-DEFER-02",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 31,
@@ -2269,7 +2269,7 @@
       "scenario_id": "RA-DEFER-03",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 32,
@@ -2331,7 +2331,7 @@
       "scenario_id": "RA-DEFER-04",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 33,
@@ -2393,7 +2393,7 @@
       "scenario_id": "RA-DEFER-05",
       "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 34,
@@ -2455,7 +2455,7 @@
       "scenario_id": "RA-DEFER-06",
       "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
-      "confidence_target": "post_answer_correctness",
+      "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
         "answer_correctness": {
           "numerator": 35,
