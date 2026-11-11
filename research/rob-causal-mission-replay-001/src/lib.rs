@@ -1350,6 +1350,17 @@ mod tests {
     }
 
     #[test]
+    fn empty_decision_source_vector_is_never_counted_as_linked() {
+        let mut trace = valid_trace();
+        trace.decisions[0].source_observation_ids.clear();
+        trace.applications[0].source_observation_ids.clear();
+        let report = replay_mission(&trace);
+        assert_eq!(report.disposition, ReplayDisposition::Unknown);
+        assert_eq!(report.applications_linked, 0);
+        assert!(has_finding(&report, "DECISION_HAS_NO_SOURCE_OBSERVATIONS"));
+    }
+
+    #[test]
     fn mismatched_boot_epoch_preserves_unknown() {
         let mut trace = valid_trace();
         trace.observations[0].stamp.boot_epoch = 8;
