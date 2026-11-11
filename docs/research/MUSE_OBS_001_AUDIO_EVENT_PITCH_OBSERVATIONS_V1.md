@@ -18,7 +18,7 @@ V1 adds a deliberately modest, independent spectral observation over the exact W
 2. Checks the schema identifiers, tempo/PPQ representation, note ordinals, and each note's part/segment/instrument/track binding.
 3. Parses the WAV bytes directly and rejects malformed headers, invalid channel/frame layouts, and non-finite float samples.
 4. Converts each note's integer MIDI ticks into expected audio sample frames using the manifest's integer microseconds-per-quarter and PPQ.
-5. Selects a centered window fully inside the expected event interval, with a frequency-dependent minimum window length.
+5. Selects a centered window fully inside the expected event interval, with a frequency-dependent minimum window length. Sample-frame conversion rounds half-frame ties upward using integer arithmetic.
 6. Uses a Hann-windowed FFT to measure the fundamental and harmonic peak-to-local-sideband ratios.
 7. Emits one observation per source-note ordinal, including the expected frame interval, analyzed window, measured salience, and an explicit abstention status when the note is too short, truncated, or below the available frequency resolution.
 8. Seals the report with a domain-separated receipt digest bound to the source score digest, MIDI bytes, MIDI manifest, and WAV bytes.
@@ -48,7 +48,8 @@ Seven focused tests cover:
 4. MIDI-byte tampering is rejected before analysis;
 5. WAV replacement and receipt-field tampering are detected;
 6. silent audio produces an explicit no-energy abstention;
-7. non-finite float audio is rejected.
+7. MIDI tick-to-sample mapping uses checked integer arithmetic and deterministic rounding;
+8. non-finite float audio is rejected.
 
 The tests are authored but have not been compiled or run in this environment. The focused GitHub Actions workflow checks out the exact PR head and uses Rust 1.96.0.
 
