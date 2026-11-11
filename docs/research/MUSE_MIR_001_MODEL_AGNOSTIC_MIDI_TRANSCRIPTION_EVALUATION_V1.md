@@ -167,6 +167,30 @@ The mir_eval 0.8.2 documentation/source specifies the 50 ms onset / 50-cent pitc
 
 References: https://mir-eval.readthedocs.io/latest/api/transcription.html and https://github.com/mir-evaluation/mir_eval/tree/0.8.2
 
+### October 2026 industry reports — a wider frontier than note F1
+
+Two recent vendor-published studies add important, but non-independent, competitive evidence.
+
+**Songscription / Play Anything (October 2026).** On 200 multi-instrument recordings from RWC, JazzSAMBA and MulTTiPop, the authors report a composite MIDI accuracy average of three mir_eval-derived metrics (onset F1, onset-offset F1 and frame F1): Songscription 52.2, Mirelo 45.1, MuScriptor 41.0, Klangio 40.4, YourMT3+ 39.8 and Basic Pitch 32.7. This is not an individual F1 score, and it is not the same test set or protocol as MuScriptor's 372-track D_Test. The same report says its systems received the same full recordings, no separated stems and no manual corrections; each product was shown in its best-scoring mode. Its multi-instrument sheet-music comparison uses a separate private set of 28 professional transcriptions and reports Songscription 61.1 vs Klangio 46.5, so do not merge that score with the MIDI metric.
+
+**Klangio (October 22, 2026).** Its benchmark uses 130 one-minute clips across 13 sets, with ten clips per set. The reported raw-note F1 uses a 100 ms onset tolerance, averaged over nine aligned sets: Klangio 0.82, Songscription 0.77, AnthemScore 0.76, MuScriptor 0.73 and YourMT3+ 0.72. Its mean final-score F1 across all 13 sets is 0.67, 0.47, 0.43, 0.29 and 0.19 respectively. It reports the leading score-F1 result on 12 of 13 sets and emphasizes beat, barline, meter and key structure before notation. This is a vendor-produced evaluation and includes internal recordings/sets, so it is not an independent public leaderboard. The 100 ms raw-note metric is not directly comparable to this evaluator's default 50 ms mir_eval-style threshold.
+
+The striking systems lesson is that **the score is not merely a container for transcribed notes**. Klangio reports a median 7 seconds per one-minute clip on one GPU versus 20 seconds for MuScriptor on the same GPU, but its comparison also says Songscription's 31-second browser time includes upload and queue time; that is not a matched latency test. It also reports MuScriptor default-tempo fallback on 117 of 130 of its clips. These are vendor-reported observations, not independently reproduced measurements.
+
+Sources:
+- Songscription / Play Anything, October 2026: https://playanything.ai/blog/state-of-the-art-music-transcription
+- Klangio, October 22, 2026: https://klang.io/blog/music-transcription-benchmark-2026/
+
+**Melothaea response:** build the benchmark as a scorecard vector, not one average:
+1. note onset/full-note/frame metrics at standardized 50 ms tolerances;
+2. beat/downbeat, tempo, meter, barline and measure-relative note placement;
+3. track-to-part separation, voice continuity and instrument identity;
+4. notation readability and edit distance (MUSTER / OMR-NED or exact pinned equivalents);
+5. rendered playback fidelity and musician preference;
+6. human correction time, edit locality and workflow trust.
+
+The October vendor figures are useful to select baselines and failure cases. They are not substitute labels, nor valid direct comparators across different datasets, onset tolerances, best-mode policies or score-construction workflows.
+
 ### Dual score and playback fidelity — beyond note F1
 
 A transcription can be symbolically close to a reference while producing a poor resynthesis, or can render close to the source while being awkward or inaccurate as notation. The August 2026 *A Dual Evaluation for Music Transcription* study formalizes these as separate dimensions. It evaluates notation with OMR-NED and playback with feature-alignment metrics, learned embeddings and human preference. Its piano study used 230 recordings (23 works, 30 performers, six composers), 106 participants and 3,180 pairwise judgments.
@@ -199,6 +223,8 @@ A credible first external result is to reproduce MuScriptor's D_Test comparisons
 
 - exceeds 60.4 onset F1 and 48.6 offset F1 under the identical D_Test protocol;
 - exceeds 47.8 Multi-F1 without sacrificing onset, offset or drums;
+- reproduces Songscription's 52.2 composite only after reconstructing its exact 200-recording set, metric aggregation and product settings; do not compare that composite to a single F1;
+- reproduces Klangio's 100 ms raw-note F1 separately from the 50 ms standard scorecard, and measures barline/meter accuracy on the same 13-set corpus where access permits;
 - beats 72.4 Frame F1 only after reproducing the same frame-evaluation details;
 - reports velocity separately on a dataset where velocity ground truth exists;
 - shows gains on genre-held-out and instrument-held-out splits, not only random tracks;
@@ -211,7 +237,8 @@ Those are stretch targets for a future transcription model, not a claim that an 
 ## Beyond SOTA: the next research shifts
 
 1. **Score-conditioned transcription.** When a trusted score exists, use it as a prior to disambiguate the audio without silently treating the score as acoustic proof. Report audio-only and score-conditioned metrics separately.
-2. **Open-set transcription.** Support unknown instruments and abstention instead of forcing every source into 36 or 128 instrument buckets.
+2. **Structure-first transcription.** Infer beat/downbeat, tempo, meter and barline hypotheses before committing notes to measures. Keep the performance clock separate from the notated score clock, and report meter/barline confidence.
+3. **Open-set transcription.** Support unknown instruments and abstention instead of forcing every source into 36 or 128 instrument buckets.
 3. **Event identity and overlap.** Evaluate duplicate notes, same-pitch overlap, voice separation, velocity and articulation as independent dimensions. MIDI 1.0's lack of note-instance IDs must remain visible.
 4. **Uncertainty that is calibrated.** Add event-level confidence and evaluate calibration, coverage-risk curves, selective precision/recall and abstention—not just F1.
 5. **Independent acoustic adjudication.** Keep the transcriber distinct from the observer. Use audio-side onset/pitch evidence and an independent renderer/patch reference; neither should self-certify the other.
