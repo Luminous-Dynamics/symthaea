@@ -102,6 +102,9 @@ fn validate_equations(equations: &Value) -> Result<(BTreeSet<String>, Vec<(Strin
             if !unique_inputs.insert(parent.clone()) {
                 return Err(format!("equations[{index}] duplicates input {parent}"));
             }
+            if parent == node {
+                return Err(format!("equations[{index}] contains a self-dependency"));
+            }
             if !nodes.contains(&parent) {
                 return Err(format!(
                     "equations[{index}] references {parent} before it is defined; order must be topological"
@@ -535,6 +538,14 @@ mod tests {
         let mut value = parsed();
         value["tasks"][0]["causal_prior"]["equations"][1]["inputs"][0] =
             Value::String("MISSING".into());
+        assert!(validate_manifest(&value).is_err());
+    }
+
+    #[test]
+    fn self_dependent_equation_is_rejected() {
+        let mut value = parsed();
+        value["tasks"][0]["causal_prior"]["equations"][1]["inputs"][0] =
+            Value::String("X1".into());
         assert!(validate_manifest(&value).is_err());
     }
 
