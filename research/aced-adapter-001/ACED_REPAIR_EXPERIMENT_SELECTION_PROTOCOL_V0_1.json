@@ -149,5 +149,25 @@
       "risk-adjusted EVSI rejects the high-risk perfect-information experiment in the synthetic counterexample"
     ],
     "claim_ceiling": "Purely synthetic algorithmic reference and unit tests. No ACED worlds, hidden world payloads, external data, model calls or human evaluations are executed by this module."
+  },
+  "prospective_experiment_trace": {
+    "schema": "EXPERIMENT_VALUE_TRACE_V0_1.schema.json",
+    "rust_module": "qualifier/src/experiment_trace.rs",
+    "status": "reusable_synthetic_trace_validator_not_yet_connected_to_model_runner",
+    "event_types": {
+      "experiment_proposal": "Pre-observation commitment to belief digest, selector, predicted outcomes, EIG, EVSI, risk, risk-aversion coefficient, cost and net value.",
+      "experiment_observation": "Append-only later record referencing exactly one proposal event, with observed/failed/unknown status, output digest when observed and actual cost.",
+      "stop": "Terminal reason and evidence-state digest; it is rejected if any proposal lacks an observation/failure/unknown reconciliation event."
+    },
+    "integrity_rules": [
+      "Events use zero-based contiguous sequence numbers and a previous-event SHA-256 chain.",
+      "Event digest covers canonical JSON for event ID, sequence, event type, previous digest and payload; the digest field itself is excluded.",
+      "Proposal event IDs and experiment IDs are unique; every observation references one prior proposal exactly once.",
+      "Observed, failed and unknown attempts are all recorded; missing outcomes are not silently dropped.",
+      "Predicted net value must equal EIG-cost, EVSI-cost, or EVSI-cost-risk_aversion*predicted_risk according to the declared selector.",
+      "No new experiment proposals or observations are permitted after stop."
+    ],
+    "trust_boundary": "A self-contained hash chain detects changes relative to a trusted checkpoint but does not prove event time or signer identity. Model-run use requires an independently operated append-only recorder that signs or timestamps the proposal digest before the experiment is executed.",
+    "claim_ceiling": "The current module qualifies synthetic trace structure and internal event/hash consistency only. It is not a trusted timestamp authority, WORM store, model-run receipt, ACED model trial or causal-performance result."
   }
 }
