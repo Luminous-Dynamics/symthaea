@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-risk-action-001/IG_RISK_ACTION_FIXTURES_V0_1.schema.json",
+  "title": "IG-RISK-ACTION-001 fixtures v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "fixture_count",
+    "action_set",
+    "tie_break_policy",
+    "utility_profile",
+    "fixtures",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-risk-action-fixtures-v0.1"
+    },
+    "benchmark_id": {
+      "const": "IG-RISK-ACTION-001"
+    },
+    "status": {
+      "const": "synthetic_known_answer_unexecuted"
+    },
+    "fixture_count": {
+      "const": 40
+    },
+    "action_set": {
+      "const": [
+        "Answer",
+        "Abstain",
+        "RequestEvidence",
+        "Escalate",
+        "Defer"
+      ]
+    },
+    "tie_break_policy": {
+      "const": "per_fixture_explicit_order"
+    },
+    "utility_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 40,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "task_family",
+          "probability_source",
+          "confidence_target",
+          "probabilities",
+          "loss_matrix",
+          "tie_break_order",
+          "expected_utilities",
+          "expected_action"
+        ],
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task_family": {
+            "enum": [
+              "factual_reasoning",
+              "retrieval",
+              "mechanical_diagnosis",
+              "institutional_process"
+            ]
+          },
+          "probability_source": {
+            "const": "SyntheticScenarioOracle"
+          },
+          "confidence_target": {
+            "const": "post_answer_correctness"
+          },
+          "probabilities": {
+            "type": "object"
+          },
+          "loss_matrix": {
+            "type": "object"
+          },
+          "tie_break_order": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 5
+          },
+          "expected_utilities": {
+            "type": "object"
+          },
+          "expected_action": {
+            "enum": [
+              "Answer",
+              "Abstain",
+              "RequestEvidence",
+              "Escalate",
+              "Defer"
+            ]
+          },
+          "sensitivity_pair_id": {
+            "type": "string"
+          },
+          "sensitivity_pair_level": {
+            "enum": [
+              "low_penalty",
+              "high_penalty"
+            ]
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
