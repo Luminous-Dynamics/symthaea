@@ -70,7 +70,10 @@ impl TestSpec {
     fn can_follow(&self, first: &TestSpec, outcome: &str) -> bool {
         self.eligible()
             && self.requires_prior_outcome_from.as_deref() == Some(first.test_id.as_str())
-            && self.available_after_outcomes.iter().any(|candidate| candidate == outcome)
+            && self
+                .available_after_outcomes
+                .iter()
+                .any(|candidate| candidate == outcome)
     }
 
     fn cost(&self) -> f64 {
@@ -191,11 +194,17 @@ fn compile_schema(bytes: &[u8]) -> Result<Validator, String> {
 }
 
 fn validate_schema(validator: &Validator, value: &Value) -> Result<(), String> {
-    let errors: Vec<String> = validator.iter_errors(value).map(|error| error.to_string()).collect();
+    let errors: Vec<String> = validator
+        .iter_errors(value)
+        .map(|error| error.to_string())
+        .collect();
     if errors.is_empty() {
         Ok(())
     } else {
-        Err(format!("dynamic diagnostic corpus schema errors: {}", errors.join("; ")))
+        Err(format!(
+            "dynamic diagnostic corpus schema errors: {}",
+            errors.join("; ")
+        ))
     }
 }
 
@@ -204,7 +213,11 @@ fn is_finite_nonnegative(value: f64) -> bool {
 }
 
 fn probability_row(values: &[f64], label: &str) -> Result<(), String> {
-    if values.is_empty() || values.iter().any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0) {
+    if values.is_empty()
+        || values
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
+    {
         return Err(format!("{label} contains an invalid probability"));
     }
     let sum: f64 = values.iter().sum();
@@ -257,7 +270,9 @@ fn validate_problem(problem: &Problem) -> Result<(), String> {
         return Err(format!("v0.1 supports at most {MAX_TESTS} tests"));
     }
     if problem.worlds.is_empty() || problem.worlds.len() > MAX_MODELS {
-        return Err(format!("v0.1 requires one to {MAX_MODELS} ambiguity models"));
+        return Err(format!(
+            "v0.1 requires one to {MAX_MODELS} ambiguity models"
+        ));
     }
 
     let mut action_ids = BTreeSet::new();
@@ -265,7 +280,10 @@ fn validate_problem(problem: &Problem) -> Result<(), String> {
         if action.action_id.trim().is_empty()
             || !action_ids.insert(action.action_id.clone())
             || action.loss_by_state.len() != 2
-            || action.loss_by_state.iter().any(|value| !is_finite_nonnegative(*value))
+            || action
+                .loss_by_state
+                .iter()
+                .any(|value| !is_finite_nonnegative(*value))
         {
             return Err(format!("terminal action {} is malformed", action.action_id));
         }
@@ -274,14 +292,27 @@ fn validate_problem(problem: &Problem) -> Result<(), String> {
     let mut test_ids = BTreeSet::new();
     for test in &problem.tests {
         if test.test_id.trim().is_empty() || !test_ids.insert(test.test_id.clone()) {
-            return Err(format!("test identity is empty or duplicated: {}", test.test_id));
+            return Err(format!(
+                "test identity is empty or duplicated: {}",
+                test.test_id
+            ));
         }
         if test.outcomes.len() < 2 || test.outcomes.len() > MAX_OUTCOMES {
-            return Err(format!("test {} must declare two or three outcomes", test.test_id));
+            return Err(format!(
+                "test {} must declare two or three outcomes",
+                test.test_id
+            ));
         }
         let mut outcomes = BTreeSet::new();
-        if test.outcomes.iter().any(|value| value.trim().is_empty() || !outcomes.insert(value.clone())) {
-            return Err(format!("test {} has empty or duplicate outcome labels", test.test_id));
+        if test
+            .outcomes
+            .iter()
+            .any(|value| value.trim().is_empty() || !outcomes.insert(value.clone()))
+        {
+            return Err(format!(
+                "test {} has empty or duplicate outcome labels",
+                test.test_id
+            ));
         }
         if !is_finite_nonnegative(test.duration_seconds)
             || !is_finite_nonnegative(test.test_cost)
@@ -290,80 +321,154 @@ fn validate_problem(problem: &Problem) -> Result<(), String> {
             || test.equipment_ref.trim().is_empty()
             || test.calibration_evidence_ref.trim().is_empty()
         {
-            return Err(format!("test {} has invalid duration, cost, or missing protocol/equipment/calibration evidence reference", test.test_id));
+            return Err(format!(
+                "test {} has invalid duration, cost, or missing protocol/equipment/calibration evidence reference",
+                test.test_id
+            ));
         }
         match &test.requires_prior_outcome_from {
             Some(parent_id) => {
                 if parent_id == &test.test_id || test.available_after_outcomes.is_empty() {
-                    return Err(format!("conditional test {} has invalid predecessor or no permitted outcomes", test.test_id));
+                    return Err(format!(
+                        "conditional test {} has invalid predecessor or no permitted outcomes",
+                        test.test_id
+                    ));
                 }
-                let parent = problem.tests.iter().find(|candidate| &candidate.test_id == parent_id)
-                    .ok_or_else(|| format!("conditional test {} references unknown predecessor {}", test.test_id, parent_id))?;
+                let parent = problem
+                    .tests
+                    .iter()
+                    .find(|candidate| &candidate.test_id == parent_id)
+                    .ok_or_else(|| {
+                        format!(
+                            "conditional test {} references unknown predecessor {}",
+                            test.test_id, parent_id
+                        )
+                    })?;
                 if parent.requires_prior_outcome_from.is_some() {
-                    return Err(format!("conditional test {} references a conditional predecessor; multi-level chains/cycles are unsupported in v0.1", test.test_id));
+                    return Err(format!(
+                        "conditional test {} references a conditional predecessor; multi-level chains/cycles are unsupported in v0.1",
+                        test.test_id
+                    ));
                 }
-                if test.available_after_outcomes.iter().any(|outcome| !parent.outcomes.contains(outcome)) {
-                    return Err(format!("conditional test {} references an outcome not declared by {}", test.test_id, parent_id));
+                if test
+                    .available_after_outcomes
+                    .iter()
+                    .any(|outcome| !parent.outcomes.contains(outcome))
+                {
+                    return Err(format!(
+                        "conditional test {} references an outcome not declared by {}",
+                        test.test_id, parent_id
+                    ));
                 }
             }
             None if !test.available_after_outcomes.is_empty() => {
-                return Err(format!("unconditional test {} must not declare conditional availability outcomes", test.test_id));
+                return Err(format!(
+                    "unconditional test {} must not declare conditional availability outcomes",
+                    test.test_id
+                ));
             }
             None => {}
         }
     }
-    if problem.tests.iter().any(|test| test.requires_prior_outcome_from.is_some())
+    if problem
+        .tests
+        .iter()
+        .any(|test| test.requires_prior_outcome_from.is_some())
         && problem.tests.len() > 2
     {
-        return Err("v0.1 supports a single conditional follow-up and at most two total tests".to_owned());
+        return Err(
+            "v0.1 supports a single conditional follow-up and at most two total tests".to_owned(),
+        );
     }
 
     let mut model_ids = BTreeSet::new();
     for world in &problem.worlds {
         if world.model_id.trim().is_empty() || !model_ids.insert(world.model_id.clone()) {
-            return Err(format!("ambiguity model identity is empty or duplicated: {}", world.model_id));
+            return Err(format!(
+                "ambiguity model identity is empty or duplicated: {}",
+                world.model_id
+            ));
         }
         if world.model_version.trim().is_empty()
             || world.model_evidence_ref.trim().is_empty()
             || world.domain_ref.trim().is_empty()
             || world.model_evidence_sha256.len() != 64
-            || !world.model_evidence_sha256.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            || !world
+                .model_evidence_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
             || world.source_class != "SYNTHETIC_KNOWN_TRUTH"
             || world.likelihood_assumption != "CONDITIONAL_INDEPENDENT_GIVEN_POST_STATE"
             || !world.shared_nuisance_factors.is_empty()
         {
-            return Err(format!("model {} lacks a valid synthetic model receipt or explicitly supported likelihood assumption; correlated nuisance factors require the joint-likelihood owner", world.model_id));
+            return Err(format!(
+                "model {} lacks a valid synthetic model receipt or explicitly supported likelihood assumption; correlated nuisance factors require the joint-likelihood owner",
+                world.model_id
+            ));
         }
         if world.prior.len() != 2 {
-            return Err(format!("model {} prior must contain exactly two states", world.model_id));
+            return Err(format!(
+                "model {} prior must contain exactly two states",
+                world.model_id
+            ));
         }
         probability_row(&world.prior, &format!("model {} prior", world.model_id))?;
         if world.test_models.len() != problem.tests.len() {
-            return Err(format!("model {} does not define every test exactly once", world.model_id));
+            return Err(format!(
+                "model {} does not define every test exactly once",
+                world.model_id
+            ));
         }
         let mut model_test_ids = BTreeSet::new();
         for test_model in &world.test_models {
             if !model_test_ids.insert(test_model.test_id.clone()) {
-                return Err(format!("model {} duplicates test model {}", world.model_id, test_model.test_id));
+                return Err(format!(
+                    "model {} duplicates test model {}",
+                    world.model_id, test_model.test_id
+                ));
             }
-            let spec = problem.tests.iter().find(|test| test.test_id == test_model.test_id)
-                .ok_or_else(|| format!("model {} references unknown test {}", world.model_id, test_model.test_id))?;
+            let spec = problem
+                .tests
+                .iter()
+                .find(|test| test.test_id == test_model.test_id)
+                .ok_or_else(|| {
+                    format!(
+                        "model {} references unknown test {}",
+                        world.model_id, test_model.test_id
+                    )
+                })?;
             if !test_model.transition_duration_seconds.is_finite()
                 || test_model.transition_duration_seconds < 0.0
-                || (test_model.transition_duration_seconds - spec.duration_seconds).abs() > PROBABILITY_TOLERANCE
+                || (test_model.transition_duration_seconds - spec.duration_seconds).abs()
+                    > PROBABILITY_TOLERANCE
             {
-                return Err(format!("test {} transition model duration does not match the declared test duration", spec.test_id));
+                return Err(format!(
+                    "test {} transition model duration does not match the declared test duration",
+                    spec.test_id
+                ));
             }
             matrix_2x2(&test_model.time_transition, "time transition")?;
-            matrix_2x2(&test_model.perturbation_transition, "test perturbation transition")?;
+            matrix_2x2(
+                &test_model.perturbation_transition,
+                "test perturbation transition",
+            )?;
             if test_model.observation_by_post_state.len() != 2 {
-                return Err(format!("test {} must define observation likelihoods for both post-states", spec.test_id));
+                return Err(format!(
+                    "test {} must define observation likelihoods for both post-states",
+                    spec.test_id
+                ));
             }
             for (state, row) in test_model.observation_by_post_state.iter().enumerate() {
                 if row.len() != spec.outcomes.len() {
-                    return Err(format!("test {} state {state} likelihoods do not match its outcome labels", spec.test_id));
+                    return Err(format!(
+                        "test {} state {state} likelihoods do not match its outcome labels",
+                        spec.test_id
+                    ));
                 }
-                probability_row(row, &format!("test {} state {state} likelihoods", spec.test_id))?;
+                probability_row(
+                    row,
+                    &format!("test {} state {state} likelihoods", spec.test_id),
+                )?;
             }
         }
     }
@@ -371,12 +476,20 @@ fn validate_problem(problem: &Problem) -> Result<(), String> {
 }
 
 fn test_model<'a>(world: &'a WorldModel, test_id: &str) -> Result<&'a TestModel, String> {
-    world.test_models.iter().find(|item| item.test_id == test_id)
+    world
+        .test_models
+        .iter()
+        .find(|item| item.test_id == test_id)
         .ok_or_else(|| format!("model {} lacks test {}", world.model_id, test_id))
 }
 
-fn terminal_action<'a>(problem: &'a Problem, action_index: usize) -> Result<&'a TerminalAction, String> {
-    problem.actions.get(action_index)
+fn terminal_action<'a>(
+    problem: &'a Problem,
+    action_index: usize,
+) -> Result<&'a TerminalAction, String> {
+    problem
+        .actions
+        .get(action_index)
         .ok_or_else(|| "policy references unknown terminal action".to_owned())
 }
 
@@ -384,8 +497,18 @@ fn history_first(test_id: &str, outcome: &str) -> String {
     format!("{test_id}={outcome}")
 }
 
-fn history_second(first_test: &str, first_outcome: &str, second_test: &str, second_outcome: &str) -> String {
-    format!("{}|{}={}", history_first(first_test, first_outcome), second_test, second_outcome)
+fn history_second(
+    first_test: &str,
+    first_outcome: &str,
+    second_test: &str,
+    second_outcome: &str,
+) -> String {
+    format!(
+        "{}|{}={}",
+        history_first(first_test, first_outcome),
+        second_test,
+        second_outcome
+    )
 }
 
 fn build_leaves(
@@ -406,7 +529,9 @@ fn build_leaves(
         match second_index {
             None => leaves.push(history_first(&first.test_id, first_outcome)),
             Some(second_index) => {
-                let second = problem.tests.get(*second_index)
+                let second = problem
+                    .tests
+                    .get(*second_index)
                     .ok_or_else(|| "policy references an unknown second test".to_owned())?;
                 for second_outcome in &second.outcomes {
                     leaves.push(history_second(
@@ -424,7 +549,9 @@ fn build_leaves(
 }
 
 fn to_policy_plan(policy: &CandidatePolicy, problem: &Problem) -> Result<PolicyPlan, String> {
-    let first_test = policy.first_test.map(|index| problem.tests[index].test_id.clone());
+    let first_test = policy
+        .first_test
+        .map(|index| problem.tests[index].test_id.clone());
     let mut branches = Vec::new();
     if let Some(first_index) = policy.first_test {
         let first = &problem.tests[first_index];
@@ -435,12 +562,16 @@ fn to_policy_plan(policy: &CandidatePolicy, problem: &Problem) -> Result<PolicyP
             });
         }
     }
-    let terminal_decisions = policy.terminal_action_by_history.iter().map(|(history, action_index)| {
-        Ok(TerminalDecision {
-            history: history.clone(),
-            action_id: terminal_action(problem, *action_index)?.action_id.clone(),
+    let terminal_decisions = policy
+        .terminal_action_by_history
+        .iter()
+        .map(|(history, action_index)| {
+            Ok(TerminalDecision {
+                history: history.clone(),
+                action_id: terminal_action(problem, *action_index)?.action_id.clone(),
+            })
         })
-    }).collect::<Result<Vec<_>, String>>()?;
+        .collect::<Result<Vec<_>, String>>()?;
     let mut plan = PolicyPlan {
         first_test,
         branches,
@@ -466,9 +597,12 @@ fn evaluate_policy_world(
             continue;
         }
         let Some(first_index) = policy.first_test else {
-            let action_index = *policy.terminal_action_by_history.get("NO_TEST")
+            let action_index = *policy
+                .terminal_action_by_history
+                .get("NO_TEST")
                 .ok_or_else(|| "no-test policy lacks a terminal decision".to_owned())?;
-            expected_loss += prior * terminal_action(problem, action_index)?.loss_by_state[initial_state];
+            expected_loss +=
+                prior * terminal_action(problem, action_index)?.loss_by_state[initial_state];
             continue;
         };
 
@@ -492,13 +626,20 @@ fn evaluate_policy_world(
                     continue;
                 }
                 let first_outcome = &first_spec.outcomes[first_outcome_index];
-                let second_index = policy.second_by_first_outcome.get(first_outcome_index).copied().flatten();
+                let second_index = policy
+                    .second_by_first_outcome
+                    .get(first_outcome_index)
+                    .copied()
+                    .flatten();
                 let Some(second_index) = second_index else {
                     let history = history_first(&first_spec.test_id, first_outcome);
-                    let action_index = *policy.terminal_action_by_history.get(&history)
+                    let action_index = *policy
+                        .terminal_action_by_history
+                        .get(&history)
                         .ok_or_else(|| format!("policy lacks terminal decision for {history}"))?;
                     expected_loss += path_probability
-                        * (first_spec.cost() + terminal_action(problem, action_index)?.loss_by_state[first_state]);
+                        * (first_spec.cost()
+                            + terminal_action(problem, action_index)?.loss_by_state[first_state]);
                     expected_tests += path_probability;
                     continue;
                 };
@@ -516,8 +657,8 @@ fn evaluate_policy_world(
                         continue;
                     }
                     for second_outcome_index in 0..second_spec.outcomes.len() {
-                        let second_probability =
-                            second_model.observation_by_post_state[final_state][second_outcome_index];
+                        let second_probability = second_model.observation_by_post_state
+                            [final_state][second_outcome_index];
                         let full_probability = after_second_transition * second_probability;
                         if full_probability == 0.0 {
                             continue;
@@ -529,9 +670,14 @@ fn evaluate_policy_world(
                             &second_spec.test_id,
                             second_outcome,
                         );
-                        let action_index = *policy.terminal_action_by_history.get(&history)
-                            .ok_or_else(|| format!("policy lacks terminal decision for {history}"))?;
-                        let action_loss = terminal_action(problem, action_index)?.loss_by_state[final_state];
+                        let action_index = *policy
+                            .terminal_action_by_history
+                            .get(&history)
+                            .ok_or_else(|| {
+                                format!("policy lacks terminal decision for {history}")
+                            })?;
+                        let action_loss =
+                            terminal_action(problem, action_index)?.loss_by_state[final_state];
                         expected_loss += full_probability
                             * (first_spec.cost() + second_spec.cost() + action_loss);
                         expected_tests += full_probability * 2.0;
@@ -570,11 +716,23 @@ fn plan_key(policy: &CandidatePolicy, problem: &Problem) -> Result<String, Strin
 }
 
 fn optimize(problem: &Problem, dynamic: bool) -> Result<(CandidatePolicy, f64, usize), String> {
-    let eligible: Vec<usize> = problem.tests.iter().enumerate()
+    let eligible: Vec<usize> = problem
+        .tests
+        .iter()
+        .enumerate()
         .filter_map(|(index, test)| if test.eligible() { Some(index) } else { None })
         .collect();
-    let eligible_first: Vec<usize> = problem.tests.iter().enumerate()
-        .filter_map(|(index, test)| if test.eligible_as_first_test() { Some(index) } else { None })
+    let eligible_first: Vec<usize> = problem
+        .tests
+        .iter()
+        .enumerate()
+        .filter_map(|(index, test)| {
+            if test.eligible_as_first_test() {
+                Some(index)
+            } else {
+                None
+            }
+        })
         .collect();
     let mut best: Option<(CandidatePolicy, f64, String)> = None;
     let mut candidate_count = 0usize;
@@ -592,9 +750,16 @@ fn optimize(problem: &Problem, dynamic: bool) -> Result<(CandidatePolicy, f64, u
 
     for first_index in &eligible_first {
         let first = &problem.tests[*first_index];
-        let second_eligible: Vec<usize> = eligible.iter().copied()
-            .filter(|index| problem.tests[*index].can_follow(first, &first.outcomes[0])
-                || first.outcomes.iter().any(|outcome| problem.tests[*index].can_follow(first, outcome)))
+        let second_eligible: Vec<usize> = eligible
+            .iter()
+            .copied()
+            .filter(|index| {
+                problem.tests[*index].can_follow(first, &first.outcomes[0])
+                    || first
+                        .outcomes
+                        .iter()
+                        .any(|outcome| problem.tests[*index].can_follow(first, outcome))
+            })
             .collect();
         // v0.1 is deliberately bounded to one conditional follow-up test.
         if second_eligible.len() > 1 {
@@ -668,21 +833,30 @@ fn consider_candidate(
 }
 
 fn canonicalize(corpus: &mut Corpus) {
-    corpus.problems.sort_by(|left, right| left.problem_id.cmp(&right.problem_id));
+    corpus
+        .problems
+        .sort_by(|left, right| left.problem_id.cmp(&right.problem_id));
     for problem in &mut corpus.problems {
-        problem.tests.sort_by(|left, right| left.test_id.cmp(&right.test_id));
-        problem.actions.sort_by(|left, right| left.action_id.cmp(&right.action_id));
-        problem.worlds.sort_by(|left, right| left.model_id.cmp(&right.model_id));
+        problem
+            .tests
+            .sort_by(|left, right| left.test_id.cmp(&right.test_id));
+        problem
+            .actions
+            .sort_by(|left, right| left.action_id.cmp(&right.action_id));
+        problem
+            .worlds
+            .sort_by(|left, right| left.model_id.cmp(&right.model_id));
         for world in &mut problem.worlds {
-            world.test_models.sort_by(|left, right| left.test_id.cmp(&right.test_id));
+            world
+                .test_models
+                .sort_by(|left, right| left.test_id.cmp(&right.test_id));
         }
     }
 }
 
 fn solve_problem(problem: &Problem) -> Result<ProblemReport, String> {
     validate_problem(problem)?;
-    let (dynamic_policy, dynamic_robust_loss, dynamic_candidate_count) =
-        optimize(problem, true)?;
+    let (dynamic_policy, dynamic_robust_loss, dynamic_candidate_count) = optimize(problem, true)?;
     let (static_policy, static_model_robust_loss, static_candidate_count) =
         optimize(problem, false)?;
     let mut dynamic_worlds = Vec::new();
@@ -695,8 +869,7 @@ fn solve_problem(problem: &Problem) -> Result<ProblemReport, String> {
             expected_total_loss: dynamic_loss,
             expected_tests: dynamic_tests,
         });
-        let (static_actual_loss, _) =
-            evaluate_policy_world(problem, world, &static_policy, true)?;
+        let (static_actual_loss, _) = evaluate_policy_world(problem, world, &static_policy, true)?;
         static_policy_actual_dynamic_loss =
             static_policy_actual_dynamic_loss.max(static_actual_loss);
     }
@@ -717,8 +890,8 @@ fn solve_problem(problem: &Problem) -> Result<ProblemReport, String> {
 
 pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditReport, String> {
     let validator = compile_schema(schema_bytes)?;
-    let json: Value = serde_json::from_slice(corpus_bytes)
-        .map_err(|error| format!("corpus JSON: {error}"))?;
+    let json: Value =
+        serde_json::from_slice(corpus_bytes).map_err(|error| format!("corpus JSON: {error}"))?;
     validate_schema(&validator, &json)?;
     let mut corpus: Corpus =
         serde_json::from_value(json).map_err(|error| format!("corpus decode: {error}"))?;
@@ -734,7 +907,11 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
     }
     let canonical = serde_json::to_vec(&corpus)
         .map_err(|error| format!("canonical corpus serialization: {error}"))?;
-    let reports = corpus.problems.iter().map(solve_problem).collect::<Result<Vec<_>, _>>()?;
+    let reports = corpus
+        .problems
+        .iter()
+        .map(solve_problem)
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(AuditReport {
         corpus_version: corpus.corpus_version,
         input_sha256: sha256(corpus_bytes),
@@ -773,7 +950,9 @@ mod tests {
     #[test]
     fn state_drift_during_a_long_test_can_reverse_the_static_choice() {
         let report = report();
-        let row = report.reports.iter()
+        let row = report
+            .reports
+            .iter()
             .find(|row| row.problem_id == "long-test-crosses-service-threshold")
             .expect("drift problem");
         assert_ne!(row.dynamic_policy.first_test, row.static_policy.first_test);
@@ -783,7 +962,9 @@ mod tests {
     #[test]
     fn test_induced_state_perturbation_is_separate_from_elapsed_time() {
         let report = report();
-        let row = report.reports.iter()
+        let row = report
+            .reports
+            .iter()
             .find(|row| row.problem_id == "pulse-perturbs-state")
             .expect("perturbation problem");
         assert!(row.dynamic_policy.first_test.is_none());
@@ -795,21 +976,34 @@ mod tests {
     #[test]
     fn model_ambiguity_uses_one_policy_across_all_worlds() {
         let report = report();
-        let row = report.reports.iter()
+        let row = report
+            .reports
+            .iter()
             .find(|row| row.problem_id == "likelihood-ambiguity")
             .expect("ambiguity problem");
         assert_eq!(row.dynamic_worlds.len(), 2);
-        assert!(row.dynamic_robust_loss >= row.dynamic_worlds[0].expected_total_loss - PROBABILITY_TOLERANCE);
-        assert!(row.dynamic_robust_loss >= row.dynamic_worlds[1].expected_total_loss - PROBABILITY_TOLERANCE);
+        assert!(
+            row.dynamic_robust_loss
+                >= row.dynamic_worlds[0].expected_total_loss - PROBABILITY_TOLERANCE
+        );
+        assert!(
+            row.dynamic_robust_loss
+                >= row.dynamic_worlds[1].expected_total_loss - PROBABILITY_TOLERANCE
+        );
     }
 
     #[test]
     fn test_failure_is_an_observation_outcome_not_silently_dropped() {
         let report = report();
-        let row = report.reports.iter()
+        let row = report
+            .reports
+            .iter()
             .find(|row| row.problem_id == "timeout-is-observed")
             .expect("timeout problem");
-        let has_timeout_branch = row.dynamic_policy.branches.iter()
+        let has_timeout_branch = row
+            .dynamic_policy
+            .branches
+            .iter()
             .any(|branch| branch.first_outcome == "timeout");
         assert!(has_timeout_branch || row.dynamic_policy.first_test.is_none());
     }
@@ -818,10 +1012,23 @@ mod tests {
     fn unapproved_or_uncalibrated_tests_are_never_selected() {
         let report = report();
         for row in &report.reports {
-            let all_selected: Vec<&str> = row.dynamic_policy.first_test.iter().map(String::as_str)
-                .chain(row.dynamic_policy.branches.iter().filter_map(|branch| branch.second_test.as_deref()))
+            let all_selected: Vec<&str> = row
+                .dynamic_policy
+                .first_test
+                .iter()
+                .map(String::as_str)
+                .chain(
+                    row.dynamic_policy
+                        .branches
+                        .iter()
+                        .filter_map(|branch| branch.second_test.as_deref()),
+                )
                 .collect();
-            assert!(!all_selected.iter().any(|test| test.starts_with("unsafe-") || test.starts_with("uncalibrated-")));
+            assert!(
+                !all_selected
+                    .iter()
+                    .any(|test| test.starts_with("unsafe-") || test.starts_with("uncalibrated-"))
+            );
         }
     }
 
@@ -840,7 +1047,10 @@ mod tests {
         }
         let bytes = serde_json::to_vec(&corpus).expect("permuted corpus");
         let replay = audit_corpus(SCHEMA, &bytes).expect("permuted audit");
-        assert_eq!(original.canonical_corpus_sha256, replay.canonical_corpus_sha256);
+        assert_eq!(
+            original.canonical_corpus_sha256,
+            replay.canonical_corpus_sha256
+        );
         assert_eq!(
             serde_json::to_value(original.reports).unwrap(),
             serde_json::to_value(replay.reports).unwrap()
@@ -866,18 +1076,27 @@ mod tests {
     #[test]
     fn conditional_followup_is_available_only_after_its_declared_outcome() {
         let report = report();
-        let row = report.reports.iter()
+        let row = report
+            .reports
+            .iter()
             .find(|row| row.problem_id == "conditional-followup-after-flag")
             .expect("conditional follow-up problem");
-        assert_eq!(row.dynamic_policy.first_test.as_deref(), Some("initial-screen"));
         assert_eq!(
-            row.dynamic_policy.branches.iter()
+            row.dynamic_policy.first_test.as_deref(),
+            Some("initial-screen")
+        );
+        assert_eq!(
+            row.dynamic_policy
+                .branches
+                .iter()
                 .find(|branch| branch.first_outcome == "flagged")
                 .and_then(|branch| branch.second_test.as_deref()),
             Some("followup-reference-test")
         );
         assert_eq!(
-            row.dynamic_policy.branches.iter()
+            row.dynamic_policy
+                .branches
+                .iter()
                 .find(|branch| branch.first_outcome == "normal")
                 .and_then(|branch| branch.second_test.as_deref()),
             None
@@ -888,7 +1107,9 @@ mod tests {
     #[test]
     fn robust_policy_does_not_optimize_only_for_the_nominal_likelihood_world() {
         let report = report();
-        let row = report.reports.iter()
+        let row = report
+            .reports
+            .iter()
             .find(|row| row.problem_id == "likelihood-ambiguity")
             .expect("ambiguity problem");
         assert!(row.dynamic_policy.first_test.is_none());
@@ -898,7 +1119,9 @@ mod tests {
     #[test]
     fn model_receipt_rejects_unmodelled_shared_nuisance_factors() {
         let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
-        corpus.problems[0].worlds[0].shared_nuisance_factors.push("shared-calibration-bias".into());
+        corpus.problems[0].worlds[0]
+            .shared_nuisance_factors
+            .push("shared-calibration-bias".into());
         let bytes = serde_json::to_vec(&corpus).expect("corpus with correlated nuisance");
         assert!(audit_corpus(SCHEMA, &bytes).is_err());
     }
@@ -914,10 +1137,14 @@ mod tests {
     #[test]
     fn conditional_test_cannot_be_selected_without_its_parent_outcome() {
         let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
-        let conditional = corpus.problems.iter_mut()
+        let conditional = corpus
+            .problems
+            .iter_mut()
             .find(|problem| problem.problem_id == "conditional-followup-after-flag")
             .expect("conditional problem");
-        conditional.tests.iter_mut()
+        conditional
+            .tests
+            .iter_mut()
             .find(|test| test.test_id == "followup-reference-test")
             .expect("follow-up")
             .available_after_outcomes = vec!["unknown-outcome".into()];
@@ -928,19 +1155,24 @@ mod tests {
     #[test]
     fn conditional_test_cycles_and_multilevel_chains_are_rejected() {
         let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
-        let problem = corpus.problems.iter_mut()
+        let problem = corpus
+            .problems
+            .iter_mut()
             .find(|problem| problem.problem_id == "conditional-followup-after-flag")
             .expect("conditional problem");
-        problem.tests.iter_mut()
+        problem
+            .tests
+            .iter_mut()
             .find(|test| test.test_id == "initial-screen")
             .expect("initial screen")
             .requires_prior_outcome_from = Some("followup-reference-test".into());
-        problem.tests.iter_mut()
+        problem
+            .tests
+            .iter_mut()
             .find(|test| test.test_id == "initial-screen")
             .expect("initial screen")
             .available_after_outcomes = vec!["within_limit".into()];
         let bytes = serde_json::to_vec(&corpus).expect("cyclic conditional corpus");
         assert!(audit_corpus(SCHEMA, &bytes).is_err());
     }
-
 }
