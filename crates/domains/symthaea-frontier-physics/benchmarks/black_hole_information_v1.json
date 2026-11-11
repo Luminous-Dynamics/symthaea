@@ -92,7 +92,8 @@
         "small_well_conditioned_absolute_error": 1e-10,
         "oracle": "independent small-matrix eigensolver or analytic spectrum",
         "failure_policy": "typed rejection; do not silently repair invalid states"
-      }
+      },
+      "implementation_status": "partial_source_authored_not_executed"
     },
     {
       "id": "QI-1",
@@ -108,7 +109,8 @@
       "acceptance": {
         "small_well_conditioned_absolute_error": 1e-10,
         "independent_oracle": "Schmidt spectrum or analytic state"
-      }
+      },
+      "implementation_status": "partial_source_authored_not_executed"
     },
     {
       "id": "QI-2",
@@ -136,7 +138,8 @@
         "ensemble_mean": "inside preregistered sampling confidence interval",
         "single_sample_is_not_ensemble_claim": true,
         "seeds": "frozen before evaluation"
-      }
+      },
+      "implementation_status": "page_reference_formula_authored_not_executed; Haar sampler and ensemble benchmark not implemented"
     },
     {
       "id": "QI-3",
@@ -162,7 +165,8 @@
         "emitted_subsystems_are_immutable_after_emission": true,
         "late_complete_radiation_state_is_pure_for_closed_unitary_model": true,
         "finite_size_variance_reported": true
-      }
+      },
+      "implementation_status": "not_implemented"
     },
     {
       "id": "QI-4",
@@ -189,7 +193,8 @@
         "information_recovery_claim_requires_measured_fidelity_and_cost": true,
         "existence_of_recovery_map_is_not_called_efficient_decoder": true,
         "null_controls_required": true
-      }
+      },
+      "implementation_status": "not_implemented"
     },
     {
       "id": "QI-5",
@@ -214,7 +219,8 @@
         "model_assumptions_are_kept_separate": true,
         "finite_n_effects_are_measured_not_assumed": true,
         "island_saddle_is_not_inferred_from_random_circuit": true
-      }
+      },
+      "implementation_status": "not_implemented"
     },
     {
       "id": "QI-6",
@@ -232,7 +238,8 @@
         "cost_comparison_at_matched_accuracy": true,
         "truncation_error_reported": true,
         "exact_small_system_reference_required": true
-      }
+      },
+      "implementation_status": "not_implemented"
     },
     {
       "id": "QI-7",
@@ -256,7 +263,8 @@
         "whole_circuit_instance_is_split_unit": true,
         "heldout_seed_leakage_prohibited": true,
         "unsupported_models_return_unresolved": true
-      }
+      },
+      "implementation_status": "not_implemented"
     }
   ],
   "negative_controls": [
@@ -355,8 +363,56 @@
       "crates/domains/symthaea-frontier-physics/src/quantum_darwinism.rs"
     ],
     "code_execution": "not_run",
-    "rust_tests": "not_run",
-    "ci": "not_started",
-    "results_claimed": false
+    "rust_tests": "authored_not_run",
+    "ci": {
+      "status": "all_skipped",
+      "exact_head_sha": "66023bcb9ce7fd7c744f36c901eb4419712f64e5",
+      "reported_check_runs": 42,
+      "skipped_check_runs": 42,
+      "passed_check_runs": 0,
+      "failed_check_runs": 0
+    },
+    "results_claimed": false,
+    "independent_algorithm_cross_check": {
+      "status": "python_numpy_cross_check_only",
+      "method": "real_symmetric_embedding_plus_cyclic_jacobi_compared_with_numpy_linalg_eigvalsh",
+      "positive_density_matrix_dimensions": [
+        2,
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "maximum_observed_absolute_eigenvalue_difference": "<7e-16",
+      "rust_source_executed": false
+    }
+  },
+  "implementation_progress": {
+    "source_status": "partial_source_authored_not_executed",
+    "modules": [
+      "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs"
+    ],
+    "authored_capabilities": {
+      "QI-0_partial_trace_and_density_diagnostics": "authored_not_executed",
+      "QI-0_complex_hermitian_spectrum": "authored_not_executed",
+      "QI-0_von_neumann_entropy": "authored_not_executed",
+      "QI-0_renyi_2_and_3": "authored_not_executed",
+      "QI-1_complementary_subsystem_identity_controls": "authored_not_executed",
+      "QI-2_page_haar_average_reference_formula": "authored_not_executed"
+    },
+    "not_implemented_or_not_qualified": {
+      "haar_state_sampler": "not_implemented",
+      "finite_depth_random_circuit_ensembles": "not_implemented",
+      "sequential_unitary_evaporation_model": "not_implemented",
+      "hayden_preskill_recovery_decoders": "not_implemented",
+      "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
+      "island_or_qes_calculation": "not_implemented"
+    },
+    "resource_limits": {
+      "dense_state_qubits_max": 20,
+      "dense_reduced_dimension_max": 64,
+      "page_harmonic_reference_total_dimension_max": 1048576
+    }
   }
 }
