@@ -139,10 +139,16 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub prediction_orphan_note_off_count: u32,
     pub prediction_tempo_point_count: u32,
     pub prediction_overlapping_same_pitch_note_on_count: u32,
+    /// mir_eval-style onset-only metric; deliberately ignores pitch.
+    pub onset_only_metrics: MidiTranscriptionMetricV1,
+    /// mir_eval-style offset-only metric; deliberately ignores pitch and onset.
+    pub offset_only_metrics: MidiTranscriptionMetricV1,
     /// Instrument-agnostic: pitch and onset must match.
     pub onset_pitch_metrics: MidiTranscriptionMetricV1,
     /// Instrument-agnostic: pitch, onset and offset must match.
     pub full_note_metrics: MidiTranscriptionMetricV1,
+    /// Average interval overlap ratio over the full-note matched pairs.
+    pub average_overlap_ratio: Option<f64>,
     /// Exact GM program, pitch and onset must match.
     pub exact_program_onset_metrics: MidiTranscriptionMetricV1,
     /// Exact GM program, pitch, onset and offset must match.
@@ -211,8 +217,11 @@ struct ReportCommitmentV1<'a> {
     prediction_orphan_note_off_count: u32,
     prediction_tempo_point_count: u32,
     prediction_overlapping_same_pitch_note_on_count: u32,
+    onset_only_metrics: &'a MidiTranscriptionMetricV1,
+    offset_only_metrics: &'a MidiTranscriptionMetricV1,
     onset_pitch_metrics: &'a MidiTranscriptionMetricV1,
     full_note_metrics: &'a MidiTranscriptionMetricV1,
+    average_overlap_ratio: &'a Option<f64>,
     exact_program_onset_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_full_note_metrics: &'a MidiTranscriptionMetricV1,
     velocity_aware_full_note_metrics: &'a Option<MidiTranscriptionMetricV1>,
@@ -954,6 +963,104 @@ fn build_adjacency(
     Ok(adjacency)
 }
 
+fn build_onset_only_adjacency(
+    reference: &[EvaluationNoteV1],
+    predicted: &[MidiTranscribedNoteV1],
+    config: &MidiTranscriptionEvaluationConfigV1,
+) -> Result<Vec<Vec<usize>>, MidiTranscriptionEvaluationIssueV1> {
+    let tolerance = f64::from(config.onset_tolerance_ms) / 1_000.0;
+    let mut adjacency = Vec::with_capacity(reference.len());
+    let mut edge_count = 0usize;
+    for note in reference {
+        let lower = note.onset_seconds - tolerance;
+        let upper = note.onset_seconds + tolerance;
+        let start = predicted.partition_point(|predicted_note| predicted_note.onset_seconds < lower);
+        let end = predicted.partition_point(|predicted_note| predicted_note.onset_seconds <= upper);
+        let candidates: Vec<usize> = (start..end).collect();
+        edge_count = edge_count.saturating_add(candidates.len());
+        if edge_count > MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1 {
+            return Err(MidiTranscriptionEvaluationIssueV1::TooManyCandidatePairs {
+                count: edge_count,
+                maximum: MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1,
+            });
+        }
+        adjacency.push(candidates);
+    }
+    Ok(adjacency)
+}
+
+fn build_offset_only_adjacency(
+    reference: &[EvaluationNoteV1],
+    predicted: &[MidiTranscribedNoteV1],
+    config: &MidiTranscriptionEvaluationConfigV1,
+) -> Result<Vec<Vec<usize>>, MidiTranscriptionEvaluationIssueV1> {
+    let mut predicted_offsets: Vec<(f64, usize)> = predicted
+        .iter()
+        .enumerate()
+        .filter_map(|(index, note)| note.offset_seconds.map(|offset| (offset, index)))
+        .collect();
+    predicted_offsets.sort_by(|left, right| left.0.total_cmp(&right.0));
+
+    let mut adjacency = Vec::with_capacity(reference.len());
+    let mut edge_count = 0usize;
+    for note in reference {
+        let Some(reference_offset) = note.offset_seconds else {
+            adjacency.push(Vec::new());
+            continue;
+        };
+        let duration = reference_offset - note.onset_seconds;
+        let tolerance = (duration
+            * f64::from(config.offset_ratio_basis_points)
+            / 10_000.0)
+            .max(f64::from(config.offset_min_tolerance_ms) / 1_000.0);
+        let lower = reference_offset - tolerance;
+        let upper = reference_offset + tolerance;
+        let start = predicted_offsets.partition_point(|(offset, _)| *offset < lower);
+        let end = predicted_offsets.partition_point(|(offset, _)| *offset <= upper);
+        let mut candidates: Vec<usize> = predicted_offsets[start..end]
+            .iter()
+            .map(|(_, index)| *index)
+            .collect();
+        candidates.sort_unstable();
+        edge_count = edge_count.saturating_add(candidates.len());
+        if edge_count > MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1 {
+            return Err(MidiTranscriptionEvaluationIssueV1::TooManyCandidatePairs {
+                count: edge_count,
+                maximum: MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1,
+            });
+        }
+        adjacency.push(candidates);
+    }
+    Ok(adjacency)
+}
+
+fn average_overlap_ratio_v1(
+    reference: &[EvaluationNoteV1],
+    predicted: &[MidiTranscribedNoteV1],
+    matching: &[(usize, usize)],
+) -> Option<f64> {
+    if matching.is_empty() {
+        return None;
+    }
+    let mut ratios = Vec::with_capacity(matching.len());
+    for (reference_index, prediction_index) in matching {
+        let reference_note = reference.get(*reference_index)?;
+        let predicted_note = predicted.get(*prediction_index)?;
+        let reference_offset = reference_note.offset_seconds?;
+        let predicted_offset = predicted_note.offset_seconds?;
+        let overlap = (reference_offset.min(predicted_offset)
+            - reference_note.onset_seconds.max(predicted_note.onset_seconds))
+            .max(0.0);
+        let union_span = reference_offset.max(predicted_offset)
+            - reference_note.onset_seconds.min(predicted_note.onset_seconds);
+        if !union_span.is_finite() || union_span <= 0.0 {
+            return None;
+        }
+        ratios.push((overlap / union_span).clamp(0.0, 1.0));
+    }
+    Some(ratios.iter().sum::<f64>() / ratios.len() as f64)
+}
+
 fn metric_from_matching(
     reference_count: usize,
     predicted_count: usize,
@@ -1146,8 +1253,11 @@ pub fn midi_transcription_evaluation_commitment_v1(
         prediction_tempo_point_count: report.prediction_tempo_point_count,
         prediction_overlapping_same_pitch_note_on_count:
             report.prediction_overlapping_same_pitch_note_on_count,
+        onset_only_metrics: &report.onset_only_metrics,
+        offset_only_metrics: &report.offset_only_metrics,
         onset_pitch_metrics: &report.onset_pitch_metrics,
         full_note_metrics: &report.full_note_metrics,
+        average_overlap_ratio: &report.average_overlap_ratio,
         exact_program_onset_metrics: &report.exact_program_onset_metrics,
         exact_program_full_note_metrics: &report.exact_program_full_note_metrics,
         velocity_aware_full_note_metrics: &report.velocity_aware_full_note_metrics,
@@ -1197,6 +1307,16 @@ pub fn evaluate_midi_transcription_v1(
         })
         .collect();
 
+    let onset_only_matching = {
+        let adjacency =
+            build_onset_only_adjacency(&reference_notes, &predicted_notes, &config)?;
+        maximum_cardinality_matching(&adjacency, predicted_notes.len())?
+    };
+    let offset_only_matching = {
+        let adjacency =
+            build_offset_only_adjacency(&reference_notes, &predicted_notes, &config)?;
+        maximum_cardinality_matching(&adjacency, predicted_notes.len())?
+    };
     let onset_matching = {
         let adjacency =
             build_adjacency(&reference_notes, &predicted_notes, &config, false, false, false)?;
@@ -1288,6 +1408,16 @@ pub fn evaluate_midi_transcription_v1(
         prediction_tempo_point_count: parsed.tempo_point_count,
         prediction_overlapping_same_pitch_note_on_count:
             parsed.overlapping_same_pitch_note_on_count,
+        onset_only_metrics: metric_from_matching(
+            reference_notes.len(),
+            predicted_notes.len(),
+            onset_only_matching.len(),
+        ),
+        offset_only_metrics: metric_from_matching(
+            reference_notes.len(),
+            predicted_notes.len(),
+            offset_only_matching.len(),
+        ),
         onset_pitch_metrics: metric_from_matching(
             reference_notes.len(),
             predicted_notes.len(),
@@ -1297,6 +1427,11 @@ pub fn evaluate_midi_transcription_v1(
             reference_notes.len(),
             predicted_notes.len(),
             full_matching.len(),
+        ),
+        average_overlap_ratio: average_overlap_ratio_v1(
+            &reference_notes,
+            &predicted_notes,
+            &full_matching,
         ),
         exact_program_onset_metrics: metric_from_matching(
             reference_notes.len(),
