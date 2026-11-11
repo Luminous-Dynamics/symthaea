@@ -1045,7 +1045,7 @@ mod tests {
         assert_eq!(result.stopped_at_tick, Some(11));
         assert_eq!(result.stop_reason, Some(HorizonStopReason::NonContiguousTick));
         assert!(matches!(
-            result.assessments[1].disposition,
+            &result.assessments[1].disposition,
             TickDisposition::Unknown {
                 reason: UnknownReason::NonContiguousTick { .. }
             }
