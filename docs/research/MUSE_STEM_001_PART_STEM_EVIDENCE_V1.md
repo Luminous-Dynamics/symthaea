@@ -53,6 +53,8 @@ The bundle binds:
 
 Every digest is a lowercase 64-character SHA-256 hex string. The digests detect substitution relative to a retained manifest; they are not signatures, trusted timestamps, or proof of who produced the artifacts.
 
+The bundle commitment uses domain identifier `muse-part-stem-evidence-serde-json-sha256-v1`. Construct a typed payload containing, in schema field order, `schema`, `score_sha256`, `midi_sha256`, `midi_manifest_sha256`, `audio_clock`, and `stems`; omit `bundle_sha256`. Sort stems by `(part_id, segment_id, instrument_id, midi_track_index)`, serialize the payload with `serde_json::to_vec`, then calculate SHA-256 over `domain || 0x00 || payload_bytes`. The validator must recompute this value; a syntactically valid digest is not evidence that the bundle commitment is correct.
+
 ### One stem record
 
 Each record names exactly one:
