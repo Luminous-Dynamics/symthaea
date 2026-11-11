@@ -205,7 +205,7 @@
         "module": "qualifier/src/power_design.rs",
         "method": "two_sided_equal_allocation_independent_means_normal_approximation",
         "validated_parameters": [
-          "standardized effect size",
+          "standardized effect size (Cohen's d)",
           "two-sided alpha",
           "target power",
           "even total planned units"
@@ -220,9 +220,10 @@
           "alpha": 0.05,
           "target_power": 0.8,
           "required_units_per_arm": 63,
-          "required_total_units": 126
+          "required_total_units": 126,
+          "approximate_achieved_power": 0.8013
         },
-        "claim_limit": "A normal-approximation planning calculator for independent, equal-allocation, continuous outcomes. Not a substitute for exact or design-specific power analysis for clustered, paired, binary, ordinal, survival, adaptive, sequential, repeated-look or multiplicity-adjusted experiments."
+        "claim_limit": "A normal-approximation planning calculator for independent, equal-allocation, continuous outcomes. Not a substitute for design-specific power analysis for clustered, paired, binary, ordinal, survival, adaptive, sequential, repeated-look or multiplicity-adjusted experiments."
       }
     }
   },
