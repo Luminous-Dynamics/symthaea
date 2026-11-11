@@ -134,7 +134,8 @@
       "required": [
         "variables",
         "timepoints",
-        "outcome_taxonomy"
+        "outcome_taxonomy",
+        "primary_outcome"
       ],
       "properties": {
         "variables": {
@@ -162,6 +163,32 @@
           "items": {
             "type": "string",
             "minLength": 1
+          }
+        },
+        "primary_outcome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "variable",
+            "scale",
+            "estimand",
+            "unit"
+          ],
+          "properties": {
+            "variable": {
+              "type": "string",
+              "minLength": 1
+            },
+            "scale": {
+              "const": "continuous"
+            },
+            "estimand": {
+              "const": "difference_in_means"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       }
