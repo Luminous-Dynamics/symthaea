@@ -20,7 +20,8 @@
     "planned_counts",
     "power_analysis",
     "protocol_digest",
-    "result"
+    "result",
+    "laboratory_competence_contract"
   ],
   "properties": {
     "schema_version": {
@@ -386,6 +387,38 @@
     },
     "result": {
       "const": "NO_STUDY_AUTHORITY"
+    },
+    "laboratory_competence_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope_schedule_per_laboratory_required",
+        "scope_must_cover_exact_measurand_method_range",
+        "proficiency_assessment_reference",
+        "proficiency_assessment_may_be_not_applicable_with_justification",
+        "proficiency_is_not_reproducibility_substitute",
+        "withdrawn_method_edition_forbidden"
+      ],
+      "properties": {
+        "scope_schedule_per_laboratory_required": {
+          "const": true
+        },
+        "scope_must_cover_exact_measurand_method_range": {
+          "const": true
+        },
+        "proficiency_assessment_reference": {
+          "const": "ISO/IEC 17043:2023 + ISO 13528:2022/Amd 1:2026"
+        },
+        "proficiency_assessment_may_be_not_applicable_with_justification": {
+          "const": true
+        },
+        "proficiency_is_not_reproducibility_substitute": {
+          "const": true
+        },
+        "withdrawn_method_edition_forbidden": {
+          "const": true
+        }
+      }
     }
   }
 }
