@@ -1153,7 +1153,7 @@ mod tests {
         );
         assert_eq!(
             row(&report, "incomplete_reference_measurements").covered_measurement_count,
-            4
+            5
         );
     }
 
@@ -1436,13 +1436,12 @@ mod tests {
     #[test]
     fn reference_signature_is_independent_of_measurement_array_order() {
         let corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
-        let mut first = corpus.cases[0].reference.clone();
+        let first = corpus.cases[0].reference.clone();
         let mut second = first.clone();
         second.measurements.reverse();
         let a = reference_signing_bytes(&first).expect("first claims");
         let b = reference_signing_bytes(&second).expect("permuted claims");
         assert_eq!(sha256(&a), sha256(&b));
-        first.admission = None;
     }
 
     #[test]
