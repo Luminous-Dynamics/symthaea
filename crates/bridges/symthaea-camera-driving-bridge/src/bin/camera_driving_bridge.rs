@@ -23,6 +23,7 @@ use symthaea_vision_manifold::VisionConfig;
 
 const MAX_EPISODE_OBSERVATIONS: usize = 100_000;
 const MAX_EPISODE_INPUT_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+const MAX_EPISODE_POLICY_OUTPUT_BYTES: u64 = 1024 * 1024 * 1024;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -190,6 +191,7 @@ fn process_episode(
     let mut policy_input_artifacts = Vec::with_capacity(request.observations.len());
     let mut staged_policy_inputs = Vec::with_capacity(request.observations.len());
     let mut aggregate_input_bytes = 0_u64;
+    let mut aggregate_policy_output_bytes = 0_u64;
 
     for (index, observation) in request.observations.iter().enumerate() {
         let relative_pixels = safe_relative_path(&observation.pixels_file)?;
@@ -228,9 +230,16 @@ fn process_episode(
             .into());
         }
 
+        aggregate_policy_output_bytes = aggregate_policy_output_bytes
+            .checked_add(policy_input_bytes.len() as u64)
+            .ok_or("aggregate policy-input output size overflow")?;
+        if aggregate_policy_output_bytes > MAX_EPISODE_POLICY_OUTPUT_BYTES {
+            return Err("aggregate policy-input artifacts exceed the 1 GiB episode output bound".into());
+        }
+
         let artifact_name = format!("policy_input_{:08}.f32le", observation.sequence);
         let relative_artifact_path = artifact_name.clone();
-        staged_policy_inputs.push((artifact_name, policy_input_bytes.clone()));
+        staged_policy_inputs.push((artifact_name, policy_input_bytes));
 
         policy_input_artifacts.push(PolicyInputArtifact {
             sequence: observation.sequence,
