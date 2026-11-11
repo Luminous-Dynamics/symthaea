@@ -38,7 +38,7 @@ The isolated stem is not source separation. V1 requires a dedicated single-track
 
 ## V1 data contract
 
-The machine-readable contract is `docs/research/schemas/muse-part-stem-evidence-v1.schema.json`. An illustrative, schema-shaped two-part manifest is provided at `docs/research/fixtures/muse-part-stem-evidence-v1.example.json`. Its repeated-character digests are placeholders for contract examples only; they do not identify real score, MIDI, renderer, patch, or WAV artifacts and are not qualifying evidence. The two track-event commitments and outer bundle commitment are internally calculated for the shown payload.
+The machine-readable contract is `docs/research/schemas/muse-part-stem-evidence-v1.schema.json`. An illustrative, schema-shaped two-part manifest is provided at `docs/research/fixtures/muse-part-stem-evidence-v1.example.json`. Its repeated-character digests are placeholders for contract examples only; they do not identify real score, MIDI, renderer, patch, or WAV artifacts and are not qualifying evidence. The outer bundle commitment is internally calculated for the shown JSON payload. The two track-event-set digests are illustrative placeholders: their source MIDI/event manifests are not included in this example, so those two values cannot be independently recomputed from this JSON file alone.
 
 ### Bundle identity
 
@@ -122,6 +122,20 @@ V1 uses full-length stems with the same:
 No implicit trimming, leading-silence removal, resampling, padding, alignment, or normalization is allowed during bundle admission. Such transformations change the measurement domain. A future format may encode explicit offsets and transforms, but those must be separate, versioned operations with their own receipts.
 
 The common clock is a structural alignment contract, not evidence that the renderer placed every note at the correct sample. Event timing remains an independently measured property.
+
+## Implementation resource limits
+
+The authored Rust validator and the downstream observer currently use these V1 admission ceilings:
+
+- Bundle JSON: 16 MiB.
+- MIDI artifact: 64 MiB.
+- Tracks/stems and WAV input objects: 256 each.
+- Manifest notes and total source-note ordinals across stems: 100,000.
+- Each WAV: 128 MiB; total WAV bytes in one bundle: 512 MiB.
+- Decoded audio: at most 24,000,000 frames and 32,000,000 interleaved scalar samples.
+- MIDI: Standard MIDI Type 1, PPQ fixed to the V1 exporter resolution of 960.
+
+These are defensive implementation bounds, not musical-quality thresholds. Inputs exceeding them must reject before unbounded decoding or analysis. A later version may raise a limit only with corresponding memory/work tests and a new versioned contract.
 
 ## Admission and verification procedure
 
