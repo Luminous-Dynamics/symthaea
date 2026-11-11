@@ -1,0 +1,528 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rob-fep-thermo-001/fixtures/distributed_inference_v0_1.schema.json",
+  "title": "ROB-DISTRIBUTED-INFERENCE-001 synthetic known answers v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "const": "ROB-DISTRIBUTED-INFERENCE-001"
+    },
+    "status": {
+      "const": "synthetic_known_answers_only"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "uniqueItems": true,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI01_ONBOARD_LOCAL_BASELINE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI02_REMOTE_WAN_MISSES_DEADLINE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI03_REMOTE_RESULT_STALE_AT_ARRIVAL"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI04_NETWORK_PARTITION_LOCAL_FALLBACK"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI05_EDGE_QUEUE_CONTENTION_MISSES_DEADLINE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI06_REMOTE_MODEL_IDENTITY_MISMATCH"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI07_REMOTE_CLOCK_MAPPING_UNKNOWN"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI08_LOCAL_RTA_REJECTS_REMOTE_PROPOSAL"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI09_FLEET_QUEUE_STARVATION"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI10_REMOTE_PRIVACY_POLICY_BLOCK"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI11_THERMAL_PRESSURE_EDGE_OFFLOAD_ELIGIBLE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI12_LARGER_REMOTE_MODEL_LOSES_AFTER_LATENCY"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI13_BATTERY_SAVING_NOT_WHOLE_SYSTEM_ENERGY_SAVING"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI14_HYBRID_SPLIT_LOCAL_SAFETY_REMOTE_DELIBERATION"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI15_REMOTE_TIMEOUT_LOCAL_FALLBACK"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "nullable_number": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "placement",
+        "local_safety_path_available",
+        "local_fallback_ready",
+        "remote_request_sent",
+        "remote_result_received",
+        "remote_endpoint_authenticated",
+        "remote_model_digest_matches",
+        "observation_anchor_matches",
+        "clock_mapping_known",
+        "privacy_policy_allows_remote_data",
+        "network_partition",
+        "fleet_queue_fairness_ok",
+        "round_trip_latency_ms",
+        "queue_latency_ms",
+        "inference_latency_ms",
+        "decode_projection_latency_ms",
+        "end_to_end_latency_ms",
+        "deadline_ms",
+        "result_age_upper_bound_ms",
+        "max_result_age_ms",
+        "robot_compute_energy_j",
+        "edge_cloud_energy_j",
+        "network_energy_j",
+        "whole_system_energy_j",
+        "local_model_quality",
+        "remote_model_quality",
+        "local_task_success",
+        "remote_task_success",
+        "local_safe_success",
+        "remote_safe_success",
+        "local_thermal_headroom_c",
+        "local_thermal_limit_c",
+        "local_rta_admissible"
+      ],
+      "properties": {
+        "placement": {
+          "enum": [
+            "onboard",
+            "edge",
+            "cloud",
+            "hybrid"
+          ]
+        },
+        "local_safety_path_available": {
+          "type": "boolean"
+        },
+        "local_fallback_ready": {
+          "type": "boolean"
+        },
+        "remote_request_sent": {
+          "type": "boolean"
+        },
+        "remote_result_received": {
+          "type": "boolean"
+        },
+        "remote_endpoint_authenticated": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "remote_model_digest_matches": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "observation_anchor_matches": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "clock_mapping_known": {
+          "type": "boolean"
+        },
+        "privacy_policy_allows_remote_data": {
+          "type": "boolean"
+        },
+        "network_partition": {
+          "type": "boolean"
+        },
+        "fleet_queue_fairness_ok": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "round_trip_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "queue_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "inference_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "decode_projection_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "end_to_end_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "deadline_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "result_age_upper_bound_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "max_result_age_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "robot_compute_energy_j": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "edge_cloud_energy_j": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "network_energy_j": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "whole_system_energy_j": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "local_model_quality": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "remote_model_quality": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "local_task_success": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "remote_task_success": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "local_safe_success": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "remote_safe_success": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "local_thermal_headroom_c": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "local_thermal_limit_c": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "local_rta_admissible": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "selected_placement",
+        "fallback_required",
+        "remote_result_can_enter_local_admission",
+        "actuation_authorized"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "onboard_candidate_eligible",
+            "local_fallback_deadline",
+            "remote_result_reject_stale",
+            "network_partition_fallback",
+            "edge_queue_deadline_miss",
+            "remote_identity_reject",
+            "clock_unknown_reject",
+            "local_rta_reject",
+            "fleet_starvation_fallback",
+            "privacy_block",
+            "remote_eligible_for_local_admission",
+            "onboard_preferred_after_total_cost",
+            "robot_battery_saving_only",
+            "remote_timeout_fallback"
+          ]
+        },
+        "selected_placement": {
+          "enum": [
+            "onboard",
+            "edge_then_local_projection",
+            "hybrid",
+            "edge_but_no_system_energy_claim",
+            "local_or_abstain",
+            "none"
+          ]
+        },
+        "fallback_required": {
+          "type": "boolean"
+        },
+        "remote_result_can_enter_local_admission": {
+          "type": "boolean"
+        },
+        "actuation_authorized": {
+          "const": false
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "DI01_ONBOARD_LOCAL_BASELINE",
+            "DI02_REMOTE_WAN_MISSES_DEADLINE",
+            "DI03_REMOTE_RESULT_STALE_AT_ARRIVAL",
+            "DI04_NETWORK_PARTITION_LOCAL_FALLBACK",
+            "DI05_EDGE_QUEUE_CONTENTION_MISSES_DEADLINE",
+            "DI06_REMOTE_MODEL_IDENTITY_MISMATCH",
+            "DI07_REMOTE_CLOCK_MAPPING_UNKNOWN",
+            "DI08_LOCAL_RTA_REJECTS_REMOTE_PROPOSAL",
+            "DI09_FLEET_QUEUE_STARVATION",
+            "DI10_REMOTE_PRIVACY_POLICY_BLOCK",
+            "DI11_THERMAL_PRESSURE_EDGE_OFFLOAD_ELIGIBLE",
+            "DI12_LARGER_REMOTE_MODEL_LOSES_AFTER_LATENCY",
+            "DI13_BATTERY_SAVING_NOT_WHOLE_SYSTEM_ENERGY_SAVING",
+            "DI14_HYBRID_SPLIT_LOCAL_SAFETY_REMOTE_DELIBERATION",
+            "DI15_REMOTE_TIMEOUT_LOCAL_FALLBACK"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
