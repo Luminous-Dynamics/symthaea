@@ -589,6 +589,30 @@ mod tests {
         }
     }
 
+    fn map_evidence(
+        model: &DriveConfig,
+        input: DriveInput,
+        transmission: TransmissionKinematics,
+    ) -> MotorEfficiencyEvidence {
+        let point = derive_motor_shaft_operating_point(
+            input,
+            transmission,
+            model.transmission_efficiency,
+        )
+        .unwrap();
+        MotorEfficiencyEvidence {
+            map_id: "motor-map-v1".to_owned(),
+            configuration_digest: "aircraft-config-sha256".to_owned(),
+            context_digest: "motor-context-sha256".to_owned(),
+            evidence_manifest_digest: "measurement-manifest-sha256".to_owned(),
+            motor_torque_nm: point.motor_shaft_output_torque_nm,
+            motor_speed_rpm: point.motor_speed_rpm,
+            efficiency_lower_bound: 0.90,
+            efficiency_nominal: 0.95,
+            efficiency_upper_bound: 0.98,
+        }
+    }
+
     #[test]
     fn unit_efficiency_path_matches_rotor_power_and_bus_current() {
         let report = evaluate_drive(&config(), input_for_power(10_000.0, 400.0, 2.0)).unwrap();
@@ -819,6 +843,217 @@ mod tests {
             evaluate_drive(&model, input),
             Err(DriveError::NumericalOverflow)
         );
+    }
+
+    #[test]
+    fn motor_shaft_operating_point_is_independent_of_motor_efficiency() {
+        let input = input_for_power(10_000.0, 400.0, 12.0);
+        let point = derive_motor_shaft_operating_point(
+            input,
+            TransmissionKinematics {
+                motor_to_rotor_speed_ratio: 5.0,
+            },
+            0.90,
+        )
+        .unwrap();
+        assert!((point.motor_speed_rpm - 15_000.0).abs() < 1.0e-9);
+        assert!((point.motor_shaft_output_power_w - 11_111.111_111_111_11).abs() < 1.0e-8);
+        assert!((point.motor_shaft_output_torque_nm - 7.073_553_026_306_46).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn map_evidence_produces_ordered_drive_demand_envelope() {
+        let mut model = config();
+        model.transmission_efficiency = 0.90;
+        model.inverter_efficiency = 0.98;
+        let input = input_for_power(10_000.0, 400.0, 12.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 5.0,
+        };
+        let evidence = map_evidence(&model, input, transmission);
+        let result = evaluate_drive_with_map_evidence(
+            &model,
+            input,
+            transmission,
+            DriveMapExpectedContext {
+                configuration_digest: "aircraft-config-sha256",
+                context_digest: "motor-context-sha256",
+            },
+            &evidence,
+        )
+        .unwrap();
+
+        let adverse = result.adverse_efficiency_scenario.unwrap();
+        let nominal = result.nominal_efficiency_scenario.unwrap();
+        let favourable = result.favourable_efficiency_scenario.unwrap();
+        assert!(adverse.dc_bus_input_power_w > nominal.dc_bus_input_power_w);
+        assert!(nominal.dc_bus_input_power_w > favourable.dc_bus_input_power_w);
+        assert!(
+            (adverse.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.90 * 0.98)).abs()
+                < 1.0e-8
+        );
+        assert!(
+            (nominal.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.95 * 0.98)).abs()
+                < 1.0e-8
+        );
+        assert!(
+            (favourable.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.98 * 0.98)).abs()
+                < 1.0e-8
+        );
+        assert_eq!(result.map_id, "motor-map-v1");
+        assert_eq!(
+            result.evidence_manifest_digest,
+            "measurement-manifest-sha256"
+        );
+        assert!((result.motor_operating_point.motor_speed_rpm - 15_000.0).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn adverse_bus_limit_failure_is_not_hidden_by_nominal_pass() {
+        let mut model = config();
+        model.transmission_efficiency = 0.90;
+        model.inverter_efficiency = 0.98;
+        model.maximum_dc_bus_power_w = 12_000.0;
+        let input = input_for_power(10_000.0, 400.0, 12.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 5.0,
+        };
+        let evidence = map_evidence(&model, input, transmission);
+        let result = evaluate_drive_with_map_evidence(
+            &model,
+            input,
+            transmission,
+            DriveMapExpectedContext {
+                configuration_digest: "aircraft-config-sha256",
+                context_digest: "motor-context-sha256",
+            },
+            &evidence,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            result.adverse_efficiency_scenario,
+            Err(DriveError::DcBusPowerLimitExceeded { .. })
+        ));
+        assert!(result.nominal_efficiency_scenario.is_ok());
+        assert!(result.favourable_efficiency_scenario.is_ok());
+    }
+
+    #[test]
+    fn map_configuration_and_context_mismatches_fail_closed() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let evidence = map_evidence(&model, input, transmission);
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "other-aircraft",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "other-temperature-or-firmware-context",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+    }
+
+    #[test]
+    fn stale_motor_operating_point_evidence_is_rejected() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.motor_speed_rpm += 1.0;
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidOperatingPoint(_))
+        ));
+    }
+
+    #[test]
+    fn invalid_map_efficiency_interval_and_missing_provenance_fail_closed() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.efficiency_lower_bound = 0.99;
+        evidence.efficiency_nominal = 0.95;
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.efficiency_lower_bound = 0.0;
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.evidence_manifest_digest.clear();
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
     }
 
     #[test]
