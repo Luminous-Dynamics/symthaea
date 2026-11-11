@@ -103,7 +103,11 @@
         "unit",
         "measured_value",
         "measurement_ref",
-        "measurement_sha256"
+        "measurement_sha256",
+        "sensor_ref",
+        "calibration_ref",
+        "calibration_sha256",
+        "measured_at_ms"
       ],
       "properties": {
         "constraint": {
@@ -135,6 +139,21 @@
         },
         "measurement_sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "sensor_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "measured_at_ms": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -149,7 +168,14 @@
         "mission_report_sha256",
         "evaluator_version",
         "disposition",
-        "required_measurements"
+        "required_measurements",
+        "model_artifact_ref",
+        "model_artifact_sha256",
+        "split_manifest_ref",
+        "split_manifest_sha256",
+        "evaluation_partition",
+        "split_frozen_at_ms",
+        "prediction_frozen_at_ms"
       ],
       "properties": {
         "asset": {
@@ -190,6 +216,36 @@
           "items": {
             "$ref": "#/$defs/required_measurement"
           }
+        },
+        "model_artifact_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_artifact_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "split_manifest_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evaluation_partition": {
+          "enum": [
+            "TRAIN",
+            "VALIDATION",
+            "CALIBRATION",
+            "TEST_BLIND"
+          ]
+        },
+        "split_frozen_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prediction_frozen_at_ms": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
