@@ -323,6 +323,8 @@ The v0.4.0 Symthaea OLI context adds an explicit `EvidenceConflict` record. It n
 A source can claim independent sourcing only when:
 - every supporting and contradicting record declares a non-empty `independence_group`;
 - the supporting and contradicting group sets are disjoint;
+- no identical artifact SHA-256 appears on both sides;
+- every conflict evidence ID is linked by the containing property finding;
 - evidence IDs are not duplicated or placed on both sides.
 
 Different record IDs do not establish independence. Two sensor outputs that share sample preparation, calibration, acquisition, data processing or another common-cause group cannot be declared independent merely because they are stored as separate records.
