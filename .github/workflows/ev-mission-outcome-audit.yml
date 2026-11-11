@@ -42,6 +42,10 @@ jobs:
             > "$RUNNER_TEMP/mission-outcome-report.json"
           jq -e '
             .case_count == 11 and
+            .split_assignment_count == 11 and
+            .test_blind_assignment_count == 11 and
+            .non_test_blind_assignment_count == 0 and
+            (.split_manifest_sha256 | test("^[a-f0-9]{64}$")) and
             .true_feasible_count == 1 and
             .false_feasible_count == 2 and
             .true_infeasible_count == 1 and
