@@ -182,8 +182,17 @@ fn check_record(record: &Value, findings: &mut Findings) {
     let water_depth = record.pointer("/test_site/water_depth_m").and_then(Value::as_f64);
     if let (Some(loa), Some(depth)) = (loa, water_depth) {
         let deep_water_threshold = 150.0_f64.max(1.5 * loa);
+        if (depth - deep_water_threshold).abs() <= f64::EPSILON * deep_water_threshold.max(1.0) {
+            findings.push(
+                "/test_site/water_depth_m",
+                "INVALID",
+                format!(
+                    "water depth equals the deep/shallow boundary max(150 m, 1.5 × LOA = {deep_water_threshold:.3} m); the selected ISO 17208 method requires depth strictly above or below this boundary"
+                ),
+            );
+        }
         match standard {
-            "ISO 17208-1:2016" | "ISO 17208-2:2019" if depth <= deep_water_threshold => {
+            "ISO 17208-1:2016" | "ISO 17208-2:2019" if depth < deep_water_threshold => {
                 findings.push(
                     "/test_site/water_depth_m",
                     "INVALID",
@@ -585,6 +594,15 @@ mod tests {
     fn deep_water_method_rejects_insufficient_test_depth() {
         let mut record = fixture();
         record["test_site"]["water_depth_m"] = serde_json::json!(240.0);
+        let mut findings = Findings::default();
+        check_record(&record, &mut findings);
+        assert!(findings.invalid);
+    }
+
+    #[test]
+    fn water_depth_exactly_on_deep_shallow_boundary_is_rejected() {
+        let mut record = fixture();
+        record["test_site"]["water_depth_m"] = serde_json::json!(270.0);
         let mut findings = Findings::default();
         check_record(&record, &mut findings);
         assert!(findings.invalid);
