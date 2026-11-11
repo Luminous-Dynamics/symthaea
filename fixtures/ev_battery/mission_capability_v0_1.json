@@ -2,6 +2,156 @@
   "corpus_version": "ev-mission-capability-corpus/0.1",
   "cases": [
     {
+      "case_id": "exact_reserve_boundary",
+      "expected_disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+      "mission": {
+        "vehicle_ref": "synthetic-vehicle-001",
+        "pack_ref": "synthetic-pack-001",
+        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "profile_ref": "synthetic-mission-profile-v0.1",
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "declared_cell_refs": [
+          "cell-001",
+          "cell-002"
+        ],
+        "start_time_seconds": 0,
+        "end_time_seconds": 600,
+        "initial_energy_above_reserve_kwh_lower": 1,
+        "regenerative_efficiency_lower": 0.95,
+        "minimum_cell_soc_pct": 10,
+        "maximum_cell_soc_pct": 95,
+        "maximum_cell_temperature_c": 60,
+        "minimum_cell_voltage_v": 2.5,
+        "maximum_cell_voltage_v": 4.2,
+        "steps": [
+          {
+            "step_id": "reserve-boundary",
+            "start_time_seconds": 0,
+            "end_time_seconds": 600,
+            "requested_battery_power_kw": 6,
+            "power_uncertainty_kw": 0,
+            "external_energy_kwh": 0
+          }
+        ],
+        "capability_slices": [
+          {
+            "step_id": "reserve-boundary",
+            "start_time_seconds": 0,
+            "end_time_seconds": 600,
+            "vehicle_ref": "synthetic-vehicle-001",
+            "pack_ref": "synthetic-pack-001",
+            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "model_version": "synthetic-capability-envelope/0.1",
+            "model_evidence_ref": "synthetic-model:reserve-boundary",
+            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source_class": "SYNTHETIC_KNOWN_TRUTH",
+            "domain_soc_min_pct": 0,
+            "domain_soc_max_pct": 100,
+            "domain_temperature_min_c": 0,
+            "domain_temperature_max_c": 70,
+            "discharge_power_lower_kw": 6,
+            "charge_acceptance_lower_kw": 5,
+            "cells": [
+              {
+                "cell_ref": "cell-001",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 45,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              },
+              {
+                "cell_ref": "cell-002",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 45,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              }
+            ],
+            "pack_limit_cell_ref": "cell-001"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "external_energy_not_double_counted",
+      "expected_disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+      "mission": {
+        "vehicle_ref": "synthetic-vehicle-001",
+        "pack_ref": "synthetic-pack-001",
+        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "profile_ref": "synthetic-mission-profile-v0.1",
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "declared_cell_refs": [
+          "cell-001",
+          "cell-002"
+        ],
+        "start_time_seconds": 0,
+        "end_time_seconds": 600,
+        "initial_energy_above_reserve_kwh_lower": 2,
+        "regenerative_efficiency_lower": 0.95,
+        "minimum_cell_soc_pct": 10,
+        "maximum_cell_soc_pct": 95,
+        "maximum_cell_temperature_c": 60,
+        "minimum_cell_voltage_v": 2.5,
+        "maximum_cell_voltage_v": 4.2,
+        "steps": [
+          {
+            "step_id": "trolley-supported",
+            "start_time_seconds": 0,
+            "end_time_seconds": 600,
+            "requested_battery_power_kw": 6,
+            "power_uncertainty_kw": 0,
+            "external_energy_kwh": 10
+          }
+        ],
+        "capability_slices": [
+          {
+            "step_id": "trolley-supported",
+            "start_time_seconds": 0,
+            "end_time_seconds": 600,
+            "vehicle_ref": "synthetic-vehicle-001",
+            "pack_ref": "synthetic-pack-001",
+            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "model_version": "synthetic-capability-envelope/0.1",
+            "model_evidence_ref": "synthetic-model:trolley-supported",
+            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source_class": "SYNTHETIC_KNOWN_TRUTH",
+            "domain_soc_min_pct": 0,
+            "domain_soc_max_pct": 100,
+            "domain_temperature_min_c": 0,
+            "domain_temperature_max_c": 70,
+            "discharge_power_lower_kw": 8,
+            "charge_acceptance_lower_kw": 5,
+            "cells": [
+              {
+                "cell_ref": "cell-001",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 45,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              },
+              {
+                "cell_ref": "cell-002",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 45,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              }
+            ],
+            "pack_limit_cell_ref": "cell-001"
+          }
+        ]
+      }
+    },
+    {
       "case_id": "feasible_mixed_mission",
       "expected_disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
       "mission": {
@@ -169,277 +319,6 @@
       }
     },
     {
-      "case_id": "peak_passes_but_sustained_energy_fails",
-      "expected_disposition": "INFEASIBLE",
-      "mission": {
-        "vehicle_ref": "synthetic-vehicle-001",
-        "pack_ref": "synthetic-pack-001",
-        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "profile_ref": "synthetic-mission-profile-v0.1",
-        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "declared_cell_refs": [
-          "cell-001",
-          "cell-002"
-        ],
-        "start_time_seconds": 0,
-        "end_time_seconds": 600,
-        "initial_energy_above_reserve_kwh_lower": 0.8,
-        "regenerative_efficiency_lower": 0.95,
-        "minimum_cell_soc_pct": 10,
-        "maximum_cell_soc_pct": 95,
-        "maximum_cell_temperature_c": 60,
-        "minimum_cell_voltage_v": 2.5,
-        "maximum_cell_voltage_v": 4.2,
-        "steps": [
-          {
-            "step_id": "sustained",
-            "start_time_seconds": 0,
-            "end_time_seconds": 600,
-            "requested_battery_power_kw": 12,
-            "power_uncertainty_kw": 0,
-            "external_energy_kwh": 0
-          }
-        ],
-        "capability_slices": [
-          {
-            "step_id": "sustained",
-            "start_time_seconds": 0,
-            "end_time_seconds": 600,
-            "vehicle_ref": "synthetic-vehicle-001",
-            "pack_ref": "synthetic-pack-001",
-            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "model_version": "synthetic-capability-envelope/0.1",
-            "model_evidence_ref": "synthetic-model:sustained",
-            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "source_class": "SYNTHETIC_KNOWN_TRUTH",
-            "domain_soc_min_pct": 0,
-            "domain_soc_max_pct": 100,
-            "domain_temperature_min_c": 0,
-            "domain_temperature_max_c": 70,
-            "discharge_power_lower_kw": 15,
-            "charge_acceptance_lower_kw": 5,
-            "cells": [
-              {
-                "cell_ref": "cell-001",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 45,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              },
-              {
-                "cell_ref": "cell-002",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 45,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              }
-            ],
-            "pack_limit_cell_ref": "cell-001"
-          }
-        ]
-      }
-    },
-    {
-      "case_id": "thermal_limit_crossed_in_later_segment",
-      "expected_disposition": "INFEASIBLE",
-      "mission": {
-        "vehicle_ref": "synthetic-vehicle-001",
-        "pack_ref": "synthetic-pack-001",
-        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "profile_ref": "synthetic-mission-profile-v0.1",
-        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "declared_cell_refs": [
-          "cell-001",
-          "cell-002"
-        ],
-        "start_time_seconds": 0,
-        "end_time_seconds": 600,
-        "initial_energy_above_reserve_kwh_lower": 5,
-        "regenerative_efficiency_lower": 0.95,
-        "minimum_cell_soc_pct": 10,
-        "maximum_cell_soc_pct": 95,
-        "maximum_cell_temperature_c": 60,
-        "minimum_cell_voltage_v": 2.5,
-        "maximum_cell_voltage_v": 4.2,
-        "steps": [
-          {
-            "step_id": "pulse-1",
-            "start_time_seconds": 0,
-            "end_time_seconds": 300,
-            "requested_battery_power_kw": 8,
-            "power_uncertainty_kw": 0,
-            "external_energy_kwh": 0
-          },
-          {
-            "step_id": "pulse-2",
-            "start_time_seconds": 300,
-            "end_time_seconds": 600,
-            "requested_battery_power_kw": 8,
-            "power_uncertainty_kw": 0,
-            "external_energy_kwh": 0
-          }
-        ],
-        "capability_slices": [
-          {
-            "step_id": "pulse-1",
-            "start_time_seconds": 0,
-            "end_time_seconds": 300,
-            "vehicle_ref": "synthetic-vehicle-001",
-            "pack_ref": "synthetic-pack-001",
-            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "model_version": "synthetic-capability-envelope/0.1",
-            "model_evidence_ref": "synthetic-model:pulse-1",
-            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "source_class": "SYNTHETIC_KNOWN_TRUTH",
-            "domain_soc_min_pct": 0,
-            "domain_soc_max_pct": 100,
-            "domain_temperature_min_c": 0,
-            "domain_temperature_max_c": 70,
-            "discharge_power_lower_kw": 15,
-            "charge_acceptance_lower_kw": 5,
-            "cells": [
-              {
-                "cell_ref": "cell-001",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 50,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              },
-              {
-                "cell_ref": "cell-002",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 52,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              }
-            ],
-            "pack_limit_cell_ref": "cell-001"
-          },
-          {
-            "step_id": "pulse-2",
-            "start_time_seconds": 300,
-            "end_time_seconds": 600,
-            "vehicle_ref": "synthetic-vehicle-001",
-            "pack_ref": "synthetic-pack-001",
-            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "model_version": "synthetic-capability-envelope/0.1",
-            "model_evidence_ref": "synthetic-model:pulse-2",
-            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "source_class": "SYNTHETIC_KNOWN_TRUTH",
-            "domain_soc_min_pct": 0,
-            "domain_soc_max_pct": 100,
-            "domain_temperature_min_c": 0,
-            "domain_temperature_max_c": 70,
-            "discharge_power_lower_kw": 15,
-            "charge_acceptance_lower_kw": 5,
-            "cells": [
-              {
-                "cell_ref": "cell-001",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 61,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              },
-              {
-                "cell_ref": "cell-002",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 59,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              }
-            ],
-            "pack_limit_cell_ref": "cell-001"
-          }
-        ]
-      }
-    },
-    {
-      "case_id": "regen_exceeds_charge_acceptance",
-      "expected_disposition": "INFEASIBLE",
-      "mission": {
-        "vehicle_ref": "synthetic-vehicle-001",
-        "pack_ref": "synthetic-pack-001",
-        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "profile_ref": "synthetic-mission-profile-v0.1",
-        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "declared_cell_refs": [
-          "cell-001",
-          "cell-002"
-        ],
-        "start_time_seconds": 0,
-        "end_time_seconds": 300,
-        "initial_energy_above_reserve_kwh_lower": 1,
-        "regenerative_efficiency_lower": 0.95,
-        "minimum_cell_soc_pct": 10,
-        "maximum_cell_soc_pct": 95,
-        "maximum_cell_temperature_c": 60,
-        "minimum_cell_voltage_v": 2.5,
-        "maximum_cell_voltage_v": 4.2,
-        "steps": [
-          {
-            "step_id": "regen-overload",
-            "start_time_seconds": 0,
-            "end_time_seconds": 300,
-            "requested_battery_power_kw": -10,
-            "power_uncertainty_kw": 0.2,
-            "external_energy_kwh": 0
-          }
-        ],
-        "capability_slices": [
-          {
-            "step_id": "regen-overload",
-            "start_time_seconds": 0,
-            "end_time_seconds": 300,
-            "vehicle_ref": "synthetic-vehicle-001",
-            "pack_ref": "synthetic-pack-001",
-            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "model_version": "synthetic-capability-envelope/0.1",
-            "model_evidence_ref": "synthetic-model:regen-overload",
-            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "source_class": "SYNTHETIC_KNOWN_TRUTH",
-            "domain_soc_min_pct": 0,
-            "domain_soc_max_pct": 100,
-            "domain_temperature_min_c": 0,
-            "domain_temperature_max_c": 70,
-            "discharge_power_lower_kw": 15,
-            "charge_acceptance_lower_kw": 5,
-            "cells": [
-              {
-                "cell_ref": "cell-001",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 45,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              },
-              {
-                "cell_ref": "cell-002",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 45,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              }
-            ],
-            "pack_limit_cell_ref": "cell-001"
-          }
-        ]
-      }
-    },
-    {
       "case_id": "missing_cell_coverage",
       "expected_disposition": "NOT_COMPUTABLE",
       "mission": {
@@ -494,231 +373,6 @@
             "cells": [
               {
                 "cell_ref": "cell-001",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 45,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              }
-            ],
-            "pack_limit_cell_ref": "cell-001"
-          }
-        ]
-      }
-    },
-    {
-      "case_id": "temperature_out_of_model_domain",
-      "expected_disposition": "UNSUPPORTED_DOMAIN",
-      "mission": {
-        "vehicle_ref": "synthetic-vehicle-001",
-        "pack_ref": "synthetic-pack-001",
-        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "profile_ref": "synthetic-mission-profile-v0.1",
-        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "declared_cell_refs": [
-          "cell-001",
-          "cell-002"
-        ],
-        "start_time_seconds": 0,
-        "end_time_seconds": 300,
-        "initial_energy_above_reserve_kwh_lower": 5,
-        "regenerative_efficiency_lower": 0.95,
-        "minimum_cell_soc_pct": 10,
-        "maximum_cell_soc_pct": 95,
-        "maximum_cell_temperature_c": 80,
-        "minimum_cell_voltage_v": 2.5,
-        "maximum_cell_voltage_v": 4.2,
-        "steps": [
-          {
-            "step_id": "hot-domain",
-            "start_time_seconds": 0,
-            "end_time_seconds": 300,
-            "requested_battery_power_kw": 4,
-            "power_uncertainty_kw": 0,
-            "external_energy_kwh": 0
-          }
-        ],
-        "capability_slices": [
-          {
-            "step_id": "hot-domain",
-            "start_time_seconds": 0,
-            "end_time_seconds": 300,
-            "vehicle_ref": "synthetic-vehicle-001",
-            "pack_ref": "synthetic-pack-001",
-            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "model_version": "synthetic-capability-envelope/0.1",
-            "model_evidence_ref": "synthetic-model:hot-domain",
-            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "source_class": "SYNTHETIC_KNOWN_TRUTH",
-            "domain_soc_min_pct": 0,
-            "domain_soc_max_pct": 100,
-            "domain_temperature_min_c": 0,
-            "domain_temperature_max_c": 65,
-            "discharge_power_lower_kw": 15,
-            "charge_acceptance_lower_kw": 5,
-            "cells": [
-              {
-                "cell_ref": "cell-001",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 70,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              },
-              {
-                "cell_ref": "cell-002",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 62,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              }
-            ],
-            "pack_limit_cell_ref": "cell-001"
-          }
-        ]
-      }
-    },
-    {
-      "case_id": "wrong_configuration",
-      "expected_disposition": "CONFLICTING_EVIDENCE",
-      "mission": {
-        "vehicle_ref": "synthetic-vehicle-001",
-        "pack_ref": "synthetic-pack-001",
-        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "profile_ref": "synthetic-mission-profile-v0.1",
-        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "declared_cell_refs": [
-          "cell-001",
-          "cell-002"
-        ],
-        "start_time_seconds": 0,
-        "end_time_seconds": 300,
-        "initial_energy_above_reserve_kwh_lower": 5,
-        "regenerative_efficiency_lower": 0.95,
-        "minimum_cell_soc_pct": 10,
-        "maximum_cell_soc_pct": 95,
-        "maximum_cell_temperature_c": 60,
-        "minimum_cell_voltage_v": 2.5,
-        "maximum_cell_voltage_v": 4.2,
-        "steps": [
-          {
-            "step_id": "wrong-config",
-            "start_time_seconds": 0,
-            "end_time_seconds": 300,
-            "requested_battery_power_kw": 4,
-            "power_uncertainty_kw": 0,
-            "external_energy_kwh": 0
-          }
-        ],
-        "capability_slices": [
-          {
-            "step_id": "wrong-config",
-            "start_time_seconds": 0,
-            "end_time_seconds": 300,
-            "vehicle_ref": "synthetic-vehicle-001",
-            "pack_ref": "synthetic-pack-001",
-            "configuration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "model_version": "synthetic-capability-envelope/0.1",
-            "model_evidence_ref": "synthetic-model:wrong-config",
-            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "source_class": "SYNTHETIC_KNOWN_TRUTH",
-            "domain_soc_min_pct": 0,
-            "domain_soc_max_pct": 100,
-            "domain_temperature_min_c": 0,
-            "domain_temperature_max_c": 70,
-            "discharge_power_lower_kw": 15,
-            "charge_acceptance_lower_kw": 5,
-            "cells": [
-              {
-                "cell_ref": "cell-001",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 45,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              },
-              {
-                "cell_ref": "cell-002",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 45,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              }
-            ],
-            "pack_limit_cell_ref": "cell-001"
-          }
-        ]
-      }
-    },
-    {
-      "case_id": "external_energy_not_double_counted",
-      "expected_disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
-      "mission": {
-        "vehicle_ref": "synthetic-vehicle-001",
-        "pack_ref": "synthetic-pack-001",
-        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "profile_ref": "synthetic-mission-profile-v0.1",
-        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "declared_cell_refs": [
-          "cell-001",
-          "cell-002"
-        ],
-        "start_time_seconds": 0,
-        "end_time_seconds": 600,
-        "initial_energy_above_reserve_kwh_lower": 2,
-        "regenerative_efficiency_lower": 0.95,
-        "minimum_cell_soc_pct": 10,
-        "maximum_cell_soc_pct": 95,
-        "maximum_cell_temperature_c": 60,
-        "minimum_cell_voltage_v": 2.5,
-        "maximum_cell_voltage_v": 4.2,
-        "steps": [
-          {
-            "step_id": "trolley-supported",
-            "start_time_seconds": 0,
-            "end_time_seconds": 600,
-            "requested_battery_power_kw": 6,
-            "power_uncertainty_kw": 0,
-            "external_energy_kwh": 10
-          }
-        ],
-        "capability_slices": [
-          {
-            "step_id": "trolley-supported",
-            "start_time_seconds": 0,
-            "end_time_seconds": 600,
-            "vehicle_ref": "synthetic-vehicle-001",
-            "pack_ref": "synthetic-pack-001",
-            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "model_version": "synthetic-capability-envelope/0.1",
-            "model_evidence_ref": "synthetic-model:trolley-supported",
-            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "source_class": "SYNTHETIC_KNOWN_TRUTH",
-            "domain_soc_min_pct": 0,
-            "domain_soc_max_pct": 100,
-            "domain_temperature_min_c": 0,
-            "domain_temperature_max_c": 70,
-            "discharge_power_lower_kw": 8,
-            "charge_acceptance_lower_kw": 5,
-            "cells": [
-              {
-                "cell_ref": "cell-001",
-                "soc_lower_pct": 70,
-                "soc_upper_pct": 72,
-                "temperature_upper_c": 45,
-                "voltage_lower_v": 3.2,
-                "voltage_upper_v": 3.9
-              },
-              {
-                "cell_ref": "cell-002",
                 "soc_lower_pct": 70,
                 "soc_upper_pct": 72,
                 "temperature_upper_c": 45,
@@ -853,14 +507,89 @@
       }
     },
     {
-      "case_id": "exact_reserve_boundary",
-      "expected_disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+      "case_id": "peak_passes_but_sustained_energy_fails",
+      "expected_disposition": "INFEASIBLE",
       "mission": {
         "vehicle_ref": "synthetic-vehicle-001",
         "pack_ref": "synthetic-pack-001",
         "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "profile_ref": "synthetic-mission-profile-v0.1",
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "declared_cell_refs": [
+          "cell-001",
+          "cell-002"
+        ],
+        "start_time_seconds": 0,
+        "end_time_seconds": 600,
+        "initial_energy_above_reserve_kwh_lower": 0.8,
+        "regenerative_efficiency_lower": 0.95,
+        "minimum_cell_soc_pct": 10,
+        "maximum_cell_soc_pct": 95,
+        "maximum_cell_temperature_c": 60,
+        "minimum_cell_voltage_v": 2.5,
+        "maximum_cell_voltage_v": 4.2,
+        "steps": [
+          {
+            "step_id": "sustained",
+            "start_time_seconds": 0,
+            "end_time_seconds": 600,
+            "requested_battery_power_kw": 12,
+            "power_uncertainty_kw": 0,
+            "external_energy_kwh": 0
+          }
+        ],
+        "capability_slices": [
+          {
+            "step_id": "sustained",
+            "start_time_seconds": 0,
+            "end_time_seconds": 600,
+            "vehicle_ref": "synthetic-vehicle-001",
+            "pack_ref": "synthetic-pack-001",
+            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "model_version": "synthetic-capability-envelope/0.1",
+            "model_evidence_ref": "synthetic-model:sustained",
+            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source_class": "SYNTHETIC_KNOWN_TRUTH",
+            "domain_soc_min_pct": 0,
+            "domain_soc_max_pct": 100,
+            "domain_temperature_min_c": 0,
+            "domain_temperature_max_c": 70,
+            "discharge_power_lower_kw": 15,
+            "charge_acceptance_lower_kw": 5,
+            "cells": [
+              {
+                "cell_ref": "cell-001",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 45,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              },
+              {
+                "cell_ref": "cell-002",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 45,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              }
+            ],
+            "pack_limit_cell_ref": "cell-001"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "power_uncertainty_straddles_zero_no_regen_credit",
+      "expected_disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+      "mission": {
+        "vehicle_ref": "synthetic-vehicle-001",
+        "pack_ref": "synthetic-pack-001",
+        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "profile_ref": "synthetic-mission-profile-v0.1:ambiguous-direction",
         "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "declared_cell_refs": [
           "cell-001",
@@ -877,17 +606,17 @@
         "maximum_cell_voltage_v": 4.2,
         "steps": [
           {
-            "step_id": "reserve-boundary",
+            "step_id": "ambiguous-direction",
             "start_time_seconds": 0,
             "end_time_seconds": 600,
-            "requested_battery_power_kw": 6,
-            "power_uncertainty_kw": 0,
+            "requested_battery_power_kw": -0.5,
+            "power_uncertainty_kw": 1,
             "external_energy_kwh": 0
           }
         ],
         "capability_slices": [
           {
-            "step_id": "reserve-boundary",
+            "step_id": "ambiguous-direction",
             "start_time_seconds": 0,
             "end_time_seconds": 600,
             "vehicle_ref": "synthetic-vehicle-001",
@@ -895,14 +624,360 @@
             "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "model_version": "synthetic-capability-envelope/0.1",
-            "model_evidence_ref": "synthetic-model:reserve-boundary",
+            "model_evidence_ref": "synthetic-model:ambiguous-direction",
             "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "source_class": "SYNTHETIC_KNOWN_TRUTH",
             "domain_soc_min_pct": 0,
             "domain_soc_max_pct": 100,
             "domain_temperature_min_c": 0,
             "domain_temperature_max_c": 70,
-            "discharge_power_lower_kw": 6,
+            "discharge_power_lower_kw": 1,
+            "charge_acceptance_lower_kw": 2,
+            "pack_limit_cell_ref": "cell-001",
+            "cells": [
+              {
+                "cell_ref": "cell-001",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 45,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              },
+              {
+                "cell_ref": "cell-002",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 45,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "regen_exceeds_charge_acceptance",
+      "expected_disposition": "INFEASIBLE",
+      "mission": {
+        "vehicle_ref": "synthetic-vehicle-001",
+        "pack_ref": "synthetic-pack-001",
+        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "profile_ref": "synthetic-mission-profile-v0.1",
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "declared_cell_refs": [
+          "cell-001",
+          "cell-002"
+        ],
+        "start_time_seconds": 0,
+        "end_time_seconds": 300,
+        "initial_energy_above_reserve_kwh_lower": 1,
+        "regenerative_efficiency_lower": 0.95,
+        "minimum_cell_soc_pct": 10,
+        "maximum_cell_soc_pct": 95,
+        "maximum_cell_temperature_c": 60,
+        "minimum_cell_voltage_v": 2.5,
+        "maximum_cell_voltage_v": 4.2,
+        "steps": [
+          {
+            "step_id": "regen-overload",
+            "start_time_seconds": 0,
+            "end_time_seconds": 300,
+            "requested_battery_power_kw": -10,
+            "power_uncertainty_kw": 0.2,
+            "external_energy_kwh": 0
+          }
+        ],
+        "capability_slices": [
+          {
+            "step_id": "regen-overload",
+            "start_time_seconds": 0,
+            "end_time_seconds": 300,
+            "vehicle_ref": "synthetic-vehicle-001",
+            "pack_ref": "synthetic-pack-001",
+            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "model_version": "synthetic-capability-envelope/0.1",
+            "model_evidence_ref": "synthetic-model:regen-overload",
+            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source_class": "SYNTHETIC_KNOWN_TRUTH",
+            "domain_soc_min_pct": 0,
+            "domain_soc_max_pct": 100,
+            "domain_temperature_min_c": 0,
+            "domain_temperature_max_c": 70,
+            "discharge_power_lower_kw": 15,
+            "charge_acceptance_lower_kw": 5,
+            "cells": [
+              {
+                "cell_ref": "cell-001",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 45,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              },
+              {
+                "cell_ref": "cell-002",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 45,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              }
+            ],
+            "pack_limit_cell_ref": "cell-001"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "temperature_out_of_model_domain",
+      "expected_disposition": "UNSUPPORTED_DOMAIN",
+      "mission": {
+        "vehicle_ref": "synthetic-vehicle-001",
+        "pack_ref": "synthetic-pack-001",
+        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "profile_ref": "synthetic-mission-profile-v0.1",
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "declared_cell_refs": [
+          "cell-001",
+          "cell-002"
+        ],
+        "start_time_seconds": 0,
+        "end_time_seconds": 300,
+        "initial_energy_above_reserve_kwh_lower": 5,
+        "regenerative_efficiency_lower": 0.95,
+        "minimum_cell_soc_pct": 10,
+        "maximum_cell_soc_pct": 95,
+        "maximum_cell_temperature_c": 80,
+        "minimum_cell_voltage_v": 2.5,
+        "maximum_cell_voltage_v": 4.2,
+        "steps": [
+          {
+            "step_id": "hot-domain",
+            "start_time_seconds": 0,
+            "end_time_seconds": 300,
+            "requested_battery_power_kw": 4,
+            "power_uncertainty_kw": 0,
+            "external_energy_kwh": 0
+          }
+        ],
+        "capability_slices": [
+          {
+            "step_id": "hot-domain",
+            "start_time_seconds": 0,
+            "end_time_seconds": 300,
+            "vehicle_ref": "synthetic-vehicle-001",
+            "pack_ref": "synthetic-pack-001",
+            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "model_version": "synthetic-capability-envelope/0.1",
+            "model_evidence_ref": "synthetic-model:hot-domain",
+            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source_class": "SYNTHETIC_KNOWN_TRUTH",
+            "domain_soc_min_pct": 0,
+            "domain_soc_max_pct": 100,
+            "domain_temperature_min_c": 0,
+            "domain_temperature_max_c": 65,
+            "discharge_power_lower_kw": 15,
+            "charge_acceptance_lower_kw": 5,
+            "cells": [
+              {
+                "cell_ref": "cell-001",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 70,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              },
+              {
+                "cell_ref": "cell-002",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 62,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              }
+            ],
+            "pack_limit_cell_ref": "cell-001"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "thermal_limit_crossed_in_later_segment",
+      "expected_disposition": "INFEASIBLE",
+      "mission": {
+        "vehicle_ref": "synthetic-vehicle-001",
+        "pack_ref": "synthetic-pack-001",
+        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "profile_ref": "synthetic-mission-profile-v0.1",
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "declared_cell_refs": [
+          "cell-001",
+          "cell-002"
+        ],
+        "start_time_seconds": 0,
+        "end_time_seconds": 600,
+        "initial_energy_above_reserve_kwh_lower": 5,
+        "regenerative_efficiency_lower": 0.95,
+        "minimum_cell_soc_pct": 10,
+        "maximum_cell_soc_pct": 95,
+        "maximum_cell_temperature_c": 60,
+        "minimum_cell_voltage_v": 2.5,
+        "maximum_cell_voltage_v": 4.2,
+        "steps": [
+          {
+            "step_id": "pulse-1",
+            "start_time_seconds": 0,
+            "end_time_seconds": 300,
+            "requested_battery_power_kw": 8,
+            "power_uncertainty_kw": 0,
+            "external_energy_kwh": 0
+          },
+          {
+            "step_id": "pulse-2",
+            "start_time_seconds": 300,
+            "end_time_seconds": 600,
+            "requested_battery_power_kw": 8,
+            "power_uncertainty_kw": 0,
+            "external_energy_kwh": 0
+          }
+        ],
+        "capability_slices": [
+          {
+            "step_id": "pulse-1",
+            "start_time_seconds": 0,
+            "end_time_seconds": 300,
+            "vehicle_ref": "synthetic-vehicle-001",
+            "pack_ref": "synthetic-pack-001",
+            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "model_version": "synthetic-capability-envelope/0.1",
+            "model_evidence_ref": "synthetic-model:pulse-1",
+            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source_class": "SYNTHETIC_KNOWN_TRUTH",
+            "domain_soc_min_pct": 0,
+            "domain_soc_max_pct": 100,
+            "domain_temperature_min_c": 0,
+            "domain_temperature_max_c": 70,
+            "discharge_power_lower_kw": 15,
+            "charge_acceptance_lower_kw": 5,
+            "cells": [
+              {
+                "cell_ref": "cell-001",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 50,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              },
+              {
+                "cell_ref": "cell-002",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 52,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              }
+            ],
+            "pack_limit_cell_ref": "cell-001"
+          },
+          {
+            "step_id": "pulse-2",
+            "start_time_seconds": 300,
+            "end_time_seconds": 600,
+            "vehicle_ref": "synthetic-vehicle-001",
+            "pack_ref": "synthetic-pack-001",
+            "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "model_version": "synthetic-capability-envelope/0.1",
+            "model_evidence_ref": "synthetic-model:pulse-2",
+            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source_class": "SYNTHETIC_KNOWN_TRUTH",
+            "domain_soc_min_pct": 0,
+            "domain_soc_max_pct": 100,
+            "domain_temperature_min_c": 0,
+            "domain_temperature_max_c": 70,
+            "discharge_power_lower_kw": 15,
+            "charge_acceptance_lower_kw": 5,
+            "cells": [
+              {
+                "cell_ref": "cell-001",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 61,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              },
+              {
+                "cell_ref": "cell-002",
+                "soc_lower_pct": 70,
+                "soc_upper_pct": 72,
+                "temperature_upper_c": 59,
+                "voltage_lower_v": 3.2,
+                "voltage_upper_v": 3.9
+              }
+            ],
+            "pack_limit_cell_ref": "cell-001"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "wrong_configuration",
+      "expected_disposition": "CONFLICTING_EVIDENCE",
+      "mission": {
+        "vehicle_ref": "synthetic-vehicle-001",
+        "pack_ref": "synthetic-pack-001",
+        "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "profile_ref": "synthetic-mission-profile-v0.1",
+        "profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "declared_cell_refs": [
+          "cell-001",
+          "cell-002"
+        ],
+        "start_time_seconds": 0,
+        "end_time_seconds": 300,
+        "initial_energy_above_reserve_kwh_lower": 5,
+        "regenerative_efficiency_lower": 0.95,
+        "minimum_cell_soc_pct": 10,
+        "maximum_cell_soc_pct": 95,
+        "maximum_cell_temperature_c": 60,
+        "minimum_cell_voltage_v": 2.5,
+        "maximum_cell_voltage_v": 4.2,
+        "steps": [
+          {
+            "step_id": "wrong-config",
+            "start_time_seconds": 0,
+            "end_time_seconds": 300,
+            "requested_battery_power_kw": 4,
+            "power_uncertainty_kw": 0,
+            "external_energy_kwh": 0
+          }
+        ],
+        "capability_slices": [
+          {
+            "step_id": "wrong-config",
+            "start_time_seconds": 0,
+            "end_time_seconds": 300,
+            "vehicle_ref": "synthetic-vehicle-001",
+            "pack_ref": "synthetic-pack-001",
+            "configuration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "topology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "model_version": "synthetic-capability-envelope/0.1",
+            "model_evidence_ref": "synthetic-model:wrong-config",
+            "model_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source_class": "SYNTHETIC_KNOWN_TRUTH",
+            "domain_soc_min_pct": 0,
+            "domain_soc_max_pct": 100,
+            "domain_temperature_min_c": 0,
+            "domain_temperature_max_c": 70,
+            "discharge_power_lower_kw": 15,
             "charge_acceptance_lower_kw": 5,
             "cells": [
               {
