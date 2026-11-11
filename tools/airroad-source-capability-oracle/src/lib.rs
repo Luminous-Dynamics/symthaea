@@ -115,6 +115,7 @@ pub enum SourceCapabilityDisposition {
     Infeasible,
     UnknownMissingCapability,
     NonPassIdentityMismatch,
+    NonPassInvalidCapability,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -552,11 +553,17 @@ fn assess_scenario(
                 | SourceCapabilityFailureKind::OperatingPointMismatch(_)
         )
     });
+    let invalid_failure = report.failures.iter().any(|failure| {
+        matches!(
+            &failure.kind,
+            SourceCapabilityFailureKind::InvalidCapability(_)
+                | SourceCapabilityFailureKind::NumericalOverflow
+        )
+    });
     let unknown_failure = report.failures.iter().any(|failure| {
         matches!(
             &failure.kind,
             SourceCapabilityFailureKind::MissingCapability(_)
-                | SourceCapabilityFailureKind::InvalidCapability(_)
         )
     });
     let infeasible_failure = !report.failures.is_empty();
@@ -567,10 +574,12 @@ fn assess_scenario(
     report.remaining_energy_margin_j = Some(usable_energy - protected_reserve - demanded_energy);
     report.disposition = if identity_failure {
         SourceCapabilityDisposition::NonPassIdentityMismatch
-    } else if infeasible_failure && !unknown_failure {
-        SourceCapabilityDisposition::Infeasible
+    } else if invalid_failure {
+        SourceCapabilityDisposition::NonPassInvalidCapability
     } else if unknown_failure {
         SourceCapabilityDisposition::UnknownMissingCapability
+    } else if infeasible_failure {
+        SourceCapabilityDisposition::Infeasible
     } else {
         SourceCapabilityDisposition::FeasibleWithinSuppliedCapability
     };
@@ -1135,7 +1144,7 @@ mod tests {
         let report = qualify_source_capability(&input).unwrap();
         assert_eq!(
             report.buses[0].nominal.disposition,
-            SourceCapabilityDisposition::UnknownMissingCapability
+            SourceCapabilityDisposition::NonPassInvalidCapability
         );
     }
 
