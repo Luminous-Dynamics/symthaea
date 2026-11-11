@@ -6,7 +6,7 @@ use std::{
 };
 
 const BENCHMARK_ID: &str = "IG-DEBATE-SECURITY-001";
-const SCHEMA_VERSION: &str = "debate-security-fixtures-v0.1";
+const SCHEMA_VERSION: &str = "ig-debate-security-fixtures-v0.1";
 const EXPECTED_FIXTURES: usize = 30;
 const EXPECTED_FAMILIES: usize = 6;
 const CLASSES: [&str; 5] = [
@@ -500,7 +500,7 @@ fn validate_manifest(manifest: &Value, schema: &Value) -> Result<Report, Vec<Str
                 "agent and principal identities must be explicit",
             );
         }
-        if family == "agent_collusion"
+        if class == "collusion_control"
             && (agents.len() < 2 || string_set(&fixture["communication_event_ids"]).len() < 2)
         {
             add(
@@ -732,7 +732,7 @@ mod tests {
 
     #[test]
     fn unauthorized_write_requires_changed_state() {
-        let mut fixture = parsed(MANIFEST)["fixtures"][3].clone();
+        let mut fixture = parsed(MANIFEST)["fixtures"][10].clone();
         fixture["effect_record"]["after_state_sha256"] =
             fixture["effect_record"]["before_state_sha256"].clone();
         assert_eq!(derive_terminal(&fixture), Some("InvalidOrIncompleteTrace"));
