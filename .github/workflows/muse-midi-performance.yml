@@ -1,9 +1,10 @@
-name: Muse MIDI Performance
+name: Muse MIDI and Audio Performance
 
 on:
   pull_request:
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
+      - "crates/domains/symthaea-muse/src/audio_event_observation.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-music-theory/src/orchestration.rs"
@@ -14,6 +15,7 @@ on:
   push:
     branches:
       - "research/melothaea-part-aware-midi-performance-v1"
+      - "research/melothaea-audio-event-observation-v1"
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
@@ -34,7 +36,7 @@ concurrency:
 
 jobs:
   midi-performance:
-    name: Format and focused Rust tests
+    name: Format and focused MIDI and audio-observation tests
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -62,3 +64,6 @@ jobs:
 
       - name: Run focused MIDI performance tests
         run: cargo test --locked -p symthaea-muse --features theory midi_performance::tests::
+
+      - name: Run focused audio event observation tests
+        run: cargo test --locked -p symthaea-muse --features theory audio_event_observation::tests::
