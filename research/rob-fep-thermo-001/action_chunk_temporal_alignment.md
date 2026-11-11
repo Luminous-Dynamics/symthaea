@@ -126,3 +126,8 @@ Add three separate comparators:
 - Ren et al., StreamingWAM / chunk-wise staircase flow matching (arXiv:2610.15585): distinct paper and authors from Huang's Streaming-WAM; abstract reports 72.9 ms simulation and 57.3 ms real-robot replanning latency. https://arxiv.org/abs/2610.15585
 
 Do not conflate these studies or use their reported latencies as guaranteed target-hardware figures. They motivate controlled ablations of slow/fast model separation, prefix conditioning, chunk length, continuity, queue underflow and state freshness.
+
+
+## Locomotion transfer boundary
+
+The quadruped/legged experiment is separately owned by [Symtropy #4689](https://github.com/Luminous-Dynamics/symtropy/issues/4689). Do not directly compare WAM manipulation scores or chunk times with quadruped locomotion. The transfer hypothesis is architectural: slow world context + fast local action continuation conditioned on the executed prefix, evaluated with persistent thermal/actuator state and independent viability/dispatch.
