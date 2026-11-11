@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, FixedOffset};
+use chrono::{DateTime, FixedOffset};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -141,7 +141,7 @@ fn check_registry(case: &Value, service_calls: &BTreeMap<String, Value>, case_in
         }
 
         let arrival_ok = arrival >= earliest && arrival <= latest;
-        let turnaround_seconds = departure.signed_duration_since(arrival).num_seconds();
+        let turnaround_seconds = departure.clone().signed_duration_since(arrival.clone()).num_seconds();
         let turnaround_ok = turnaround_seconds >= min_turnaround;
         let departure_ok = departure <= latest_dep;
         if !arrival_ok {
@@ -154,11 +154,15 @@ fn check_registry(case: &Value, service_calls: &BTreeMap<String, Value>, case_in
             f.push(format!("{path}/planned_departure"), "BLOCKED", "planned departure exceeds the latest departure cutoff");
         }
 
-        let slack_available = latest.signed_duration_since(target).num_seconds();
-        let late_shift = arrival.signed_duration_since(target).num_seconds();
+        let slack_available = latest.clone().signed_duration_since(target.clone()).num_seconds();
+        let late_shift = arrival.clone().signed_duration_since(target.clone()).num_seconds();
         let consumed = late_shift.max(0).min(slack_available.max(0));
-        let remaining = if arrival <= latest { latest.signed_duration_since(arrival).num_seconds().max(0) } else { 0 };
-        let early_margin = target.signed_duration_since(arrival).num_seconds().max(0);
+        let remaining = if arrival <= latest {
+            latest.clone().signed_duration_since(arrival.clone()).num_seconds().max(0)
+        } else {
+            0
+        };
+        let early_margin = target.clone().signed_duration_since(arrival.clone()).num_seconds().max(0);
 
         out.push(PortCallResult {
             case_id: case_id.clone(),
@@ -222,8 +226,20 @@ fn check_semantics(instance: &Value, f: &mut Findings) -> Vec<PortCallResult> {
         if instance.get("data_class").and_then(Value::as_str) == Some("synthetic") {
             f.push(format!("/cases/{i}/energy_evidence"), "INCOMPLETE", "synthetic case has no qualifying energy outcome; schedule arithmetic only");
         }
-        if case.pointer("/energy_evidence/status").and_then(Value::as_str) == Some("not_supplied") {
+        let energy_status = case.pointer("/energy_evidence/status").and_then(Value::as_str);
+        if energy_status == Some("not_supplied") {
             f.push(format!("/cases/{i}/energy_evidence"), "INCOMPLETE", "energy evidence is not supplied; no fuel or storage benefit can be claimed");
+        }
+        let storage = case.get("storage").unwrap_or(&Value::Null);
+        let technology = storage.get("technology").and_then(Value::as_str);
+        let usable = storage.get("usable_energy_kwh").and_then(Value::as_f64).unwrap_or(-1.0);
+        let mass = storage.get("mass_kg").and_then(Value::as_f64).unwrap_or(-1.0);
+        let volume = storage.get("volume_m3").and_then(Value::as_f64).unwrap_or(-1.0);
+        if technology == Some("none") && (usable != 0.0 || mass != 0.0 || volume != 0.0) {
+            f.push(format!("/cases/{i}/storage"), "INVALID", "storage technology 'none' must declare zero usable energy, mass and volume");
+        }
+        if technology != Some("none") && (usable <= 0.0 || mass <= 0.0 || volume <= 0.0) {
+            f.push(format!("/cases/{i}/storage"), "INVALID", "installed storage must have positive usable energy, mass and volume");
         }
         check_registry(case, &service_by_id, i, f, &mut results);
     }
