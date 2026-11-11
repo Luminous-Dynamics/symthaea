@@ -2373,7 +2373,7 @@ mod tests {
                 .iter()
                 .map(|state| {
                     let transformed =
-                        transform * Matrix2::new(state[0], state[1], 0.0, 0.0).column(0);
+                        transform * nalgebra::Vector2::new(state[0], state[1]);
                     vec![transformed[0], transformed[1]]
                 })
                 .collect();
