@@ -221,11 +221,20 @@ fn preflight(
     if candidate_count > budget.maximum_candidates {
         return Err(QuotientErrorV1::CandidateCountExceeded);
     }
-    let g2 = group_order.checked_mul(group_order).ok_or(QuotientErrorV1::ArithmeticOverflow)?;
-    let g3 = g2.checked_mul(group_order).ok_or(QuotientErrorV1::ArithmeticOverflow)?;
-    let gn = group_order.checked_mul(candidate_count).ok_or(QuotientErrorV1::ArithmeticOverflow)?;
-    let g2n = g2.checked_mul(candidate_count).ok_or(QuotientErrorV1::ArithmeticOverflow)?;
-    let required = g3.checked_add(g2n)
+    let g2 = group_order
+        .checked_mul(group_order)
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    let g3 = g2
+        .checked_mul(group_order)
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    let gn = group_order
+        .checked_mul(candidate_count)
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    let g2n = g2
+        .checked_mul(candidate_count)
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    let required = g3
+        .checked_add(g2n)
         .and_then(|v| v.checked_add(gn))
         .and_then(|v| v.checked_add(candidate_count))
         .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
@@ -449,7 +458,9 @@ fn build_orbits(
         }
         let mut members = Vec::with_capacity(indices.len());
         for index in indices {
-            let element = action.permutations.iter()
+            let element = action
+                .permutations
+                .iter()
                 .position(|permutation| permutation[representative] == index)
                 .expect("every orbit member has a witness");
             members.push(MemberWitnessV1 {
@@ -584,7 +595,9 @@ pub fn verify_certificate(
             {
                 return Err(QuotientErrorV1::BadInverseWitness);
             }
-            let first_witness = action.permutations.iter()
+            let first_witness = action
+                .permutations
+                .iter()
                 .position(|permutation| permutation[rep] == index)
                 .ok_or(QuotientErrorV1::BadWitness)?;
             if member.group_element != first_witness {
@@ -595,14 +608,17 @@ pub fn verify_certificate(
             }
         }
 
-        let minimum_id = actual_members.iter()
+        let minimum_id = actual_members
+            .iter()
             .map(|index| problem.candidate_ids[*index].as_str())
             .min()
             .ok_or(QuotientErrorV1::EmptyOrbit)?;
         if minimum_id != orbit.representative_id {
             return Err(QuotientErrorV1::BadRepresentative);
         }
-        let expected_members: BTreeSet<usize> = action.permutations.iter()
+        let expected_members: BTreeSet<usize> = action
+            .permutations
+            .iter()
             .map(|permutation| permutation[rep])
             .collect();
         if expected_members != actual_members {
@@ -646,15 +662,21 @@ pub fn lift_representative_solution(
     budget: QualificationBudgetV1,
 ) -> Result<Vec<LiftedCandidateV1>, QuotientErrorV1> {
     verify_certificate(problem, action, certificate, budget)?;
-    let orbit = certificate.orbits.iter()
+    let orbit = certificate
+        .orbits
+        .iter()
         .find(|orbit| orbit.representative_index == representative_index)
         .ok_or(QuotientErrorV1::RequestedCandidateIsNotRepresentative)?;
-    Ok(orbit.members.iter().map(|member| LiftedCandidateV1 {
-        candidate_index: member.candidate_index,
-        candidate_id: member.candidate_id.clone(),
-        group_element_from_representative: member.group_element,
-        inverse_group_element: member.inverse_group_element,
-    }).collect())
+    Ok(orbit
+        .members
+        .iter()
+        .map(|member| LiftedCandidateV1 {
+            candidate_index: member.candidate_index,
+            candidate_id: member.candidate_id.clone(),
+            group_element_from_representative: member.group_element,
+            inverse_group_element: member.inverse_group_element,
+        })
+        .collect())
 }
 
 #[cfg(test)]
@@ -688,7 +710,12 @@ mod tests {
     fn c2_problem() -> SearchProblemV1 {
         SearchProblemV1 {
             problem_id: "two-pair-search-v1".to_owned(),
-            candidate_ids: vec!["A0".to_owned(), "A1".to_owned(), "B0".to_owned(), "B1".to_owned()],
+            candidate_ids: vec![
+                "A0".to_owned(),
+                "A1".to_owned(),
+                "B0".to_owned(),
+                "B1".to_owned(),
+            ],
             semantics: vec![
                 semantics(10, 2, "boundary-a", "output-a"),
                 semantics(10, 2, "boundary-a", "output-a"),
@@ -702,7 +729,9 @@ mod tests {
         let mut remaining: BTreeSet<usize> = (0..count).collect();
         let mut result = Vec::new();
         while let Some(seed) = remaining.iter().next().copied() {
-            let orbit: BTreeSet<usize> = action.permutations.iter()
+            let orbit: BTreeSet<usize> = action
+                .permutations
+                .iter()
                 .map(|permutation| permutation[seed])
                 .collect();
             for member in &orbit {
@@ -716,7 +745,8 @@ mod tests {
     fn authorized_fixture() -> (SearchProblemV1, FiniteActionV1, QuotientCertificateV1) {
         let problem = c2_problem();
         let action = c2_action();
-        let outcome = compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
+        let outcome =
+            compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
         let CompileOutcomeV1::Authorized(certificate) = outcome else {
             panic!("expected an exact task-preserving quotient");
         };
@@ -726,9 +756,19 @@ mod tests {
     #[test]
     fn c2_quotient_matches_exhaustive_oracle_and_lifts_all_members() {
         let (problem, action, certificate) = authorized_fixture();
-        let receipt = verify_certificate(&problem, &action, &certificate, QualificationBudgetV1::default()).unwrap();
-        let compiled: Vec<BTreeSet<usize>> = certificate.orbits.iter()
-            .map(|orbit| orbit.members.iter().map(|member| member.candidate_index).collect())
+        let receipt = verify_certificate(
+            &problem,
+            &action,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        let compiled: Vec<BTreeSet<usize>> = certificate
+            .orbits
+            .iter()
+            .map(|orbit| {
+                orbit.members.iter().map(|member| member.candidate_index).collect()
+            })
             .collect();
         assert_eq!(compiled, exhaustive_oracle(&action, problem.candidate_ids.len()));
         assert_eq!(receipt.orbit_count, 2);
@@ -746,42 +786,68 @@ mod tests {
         let action = c2_action();
         let mut problem = c2_problem();
         problem.semantics[1].boundary_condition_id = "different-boundary".to_owned();
-        let outcome = compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
-        assert_eq!(outcome, CompileOutcomeV1::Blocked(TaskInvarianceViolationV1 {
-            group_element: 1,
-            source_index: 0,
-            image_index: 1,
-            source_candidate_id: "A0".to_owned(),
-            image_candidate_id: "A1".to_owned(),
-        }));
+        let outcome =
+            compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
+        assert_eq!(
+            outcome,
+            CompileOutcomeV1::Blocked(TaskInvarianceViolationV1 {
+                group_element: 1,
+                source_index: 0,
+                image_index: 1,
+                source_candidate_id: "A0".to_owned(),
+                image_candidate_id: "A1".to_owned(),
+            })
+        );
     }
 
     #[test]
     fn non_latin_multiplication_table_is_rejected() {
         let mut action = c2_action();
         action.group.multiplication = vec![vec![0, 1], vec![1, 1]];
-        assert_eq!(validate_action(&action, 4, QualificationBudgetV1::default()), Err(QuotientErrorV1::MultiplicationTableNotLatin));
+        assert_eq!(
+            validate_action(&action, 4, QualificationBudgetV1::default()),
+            Err(QuotientErrorV1::MultiplicationTableNotLatin)
+        );
     }
 
     #[test]
     fn non_bijective_action_is_rejected() {
         let mut action = c2_action();
         action.permutations[1] = vec![0, 0, 2, 3];
-        assert_eq!(validate_action(&action, 4, QualificationBudgetV1::default()), Err(QuotientErrorV1::NotPermutation));
+        assert_eq!(
+            validate_action(&action, 4, QualificationBudgetV1::default()),
+            Err(QuotientErrorV1::NotPermutation)
+        );
     }
 
     #[test]
     fn omitted_orbit_member_is_rejected() {
         let (problem, action, mut certificate) = authorized_fixture();
         certificate.orbits[0].members.pop();
-        assert_eq!(verify_certificate(&problem, &action, &certificate, QualificationBudgetV1::default()), Err(QuotientErrorV1::IncompleteOrbit));
+        assert_eq!(
+            verify_certificate(
+                &problem,
+                &action,
+                &certificate,
+                QualificationBudgetV1::default()
+            ),
+            Err(QuotientErrorV1::IncompleteOrbit)
+        );
     }
 
     #[test]
     fn incorrect_inverse_witness_is_rejected() {
         let (problem, action, mut certificate) = authorized_fixture();
         certificate.orbits[0].members[1].inverse_group_element = 0;
-        assert_eq!(verify_certificate(&problem, &action, &certificate, QualificationBudgetV1::default()), Err(QuotientErrorV1::BadInverseWitness));
+        assert_eq!(
+            verify_certificate(
+                &problem,
+                &action,
+                &certificate,
+                QualificationBudgetV1::default()
+            ),
+            Err(QuotientErrorV1::BadInverseWitness)
+        );
     }
 
     #[test]
@@ -789,17 +855,40 @@ mod tests {
         let problem = SearchProblemV1 {
             problem_id: "trivial-action-search".to_owned(),
             candidate_ids: vec!["c".to_owned(), "a".to_owned(), "b".to_owned()],
-            semantics: vec![semantics(3, 0, "bc", "oc"), semantics(1, 0, "ba", "oa"), semantics(2, 0, "bb", "ob")],
+            semantics: vec![
+                semantics(3, 0, "bc", "oc"),
+                semantics(1, 0, "ba", "oa"),
+                semantics(2, 0, "bb", "ob"),
+            ],
         };
         let action = FiniteActionV1 {
             action_id: "trivial-action".to_owned(),
-            group: FiniteGroupV1 { group_id: "C1".to_owned(), identity: 0, multiplication: vec![vec![0]] },
+            group: FiniteGroupV1 {
+                group_id: "C1".to_owned(),
+                identity: 0,
+                multiplication: vec![vec![0]],
+            },
             permutations: vec![vec![0, 1, 2]],
         };
         let outcome = compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
-        let CompileOutcomeV1::Authorized(certificate) = outcome else { panic!("expected trivial quotient"); };
-        assert_eq!(certificate.orbits.iter().map(|orbit| orbit.representative_id.as_str()).collect::<Vec<_>>(), vec!["a", "b", "c"]);
-        verify_certificate(&problem, &action, &certificate, QualificationBudgetV1::default()).unwrap();
+        let CompileOutcomeV1::Authorized(certificate) = outcome else {
+            panic!("expected trivial quotient");
+        };
+        assert_eq!(
+            certificate
+                .orbits
+                .iter()
+                .map(|orbit| orbit.representative_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a", "b", "c"]
+        );
+        verify_certificate(
+            &problem,
+            &action,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -818,17 +907,9 @@ mod tests {
             group: FiniteGroupV1 {
                 group_id: "C3".to_owned(),
                 identity: 0,
-                multiplication: vec![
-                    vec![0, 1, 2],
-                    vec![1, 2, 0],
-                    vec![2, 0, 1],
-                ],
+                multiplication: vec![vec![0, 1, 2], vec![1, 2, 0], vec![2, 0, 1]],
             },
-            permutations: vec![
-                vec![0, 1, 2],
-                vec![1, 2, 0],
-                vec![2, 0, 1],
-            ],
+            permutations: vec![vec![0, 1, 2], vec![1, 2, 0], vec![2, 0, 1]],
         };
         let outcome = compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
         let CompileOutcomeV1::Authorized(certificate) = outcome else {
@@ -841,15 +922,25 @@ mod tests {
 
     #[test]
     fn work_budget_fails_before_qualification() {
-        let budget = QualificationBudgetV1 { maximum_group_order: 4, maximum_candidates: 4, maximum_work_units: 1 };
-        assert_eq!(compile_quotient(&c2_problem(), &c2_action(), budget), Err(QuotientErrorV1::WorkBudgetExceeded));
+        let budget = QualificationBudgetV1 {
+            maximum_group_order: 4,
+            maximum_candidates: 4,
+            maximum_work_units: 1,
+        };
+        assert_eq!(
+            compile_quotient(&c2_problem(), &c2_action(), budget),
+            Err(QuotientErrorV1::WorkBudgetExceeded)
+        );
     }
 
     #[test]
     fn action_law_violation_is_rejected() {
         let mut action = c2_action();
         action.permutations[1] = vec![1, 0, 2, 3];
-        assert_eq!(validate_action(&action, 4, QualificationBudgetV1::default()), Err(QuotientErrorV1::ActionLawViolation));
+        assert_eq!(
+            validate_action(&action, 4, QualificationBudgetV1::default()),
+            Err(QuotientErrorV1::ActionLawViolation)
+        );
     }
 
     #[test]
@@ -857,6 +948,14 @@ mod tests {
         let (_problem, action, certificate) = authorized_fixture();
         let mut changed_problem = c2_problem();
         changed_problem.semantics[2].objective_cost += 1;
-        assert_eq!(verify_certificate(&changed_problem, &action, &certificate, QualificationBudgetV1::default()), Err(QuotientErrorV1::TaskSemanticsMismatch));
+        assert_eq!(
+            verify_certificate(
+                &changed_problem,
+                &action,
+                &certificate,
+                QualificationBudgetV1::default()
+            ),
+            Err(QuotientErrorV1::TaskSemanticsMismatch)
+        );
     }
 }
