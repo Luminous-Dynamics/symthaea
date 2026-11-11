@@ -1,0 +1,134 @@
+{
+  "schema_version": "luminous.home-service-metrology-study-design/0.1",
+  "study_design_id": "HOME-SVC-METROLOGY-STUDY-DESIGN-V0.1",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10341",
+  "classification": "requirements_template_only_not_preregistered",
+  "claim_ceiling": "study_design_contract_and_synthetic_gate_only",
+  "product_scope": [
+    "InstantClean",
+    "FabricCare",
+    "WaterLoop",
+    "FoodSteward",
+    "HeatBank",
+    "AirCare",
+    "HomeRenew"
+  ],
+  "evidence_strata": [
+    {
+      "id": "WITHIN_UNIT_REPEATABILITY",
+      "unit_of_analysis": "run_within_unit_lab_operator_cell",
+      "minimum_replicates_per_cell": 2,
+      "required_identity": [
+        "unit_revision",
+        "laboratory_id",
+        "operator_id",
+        "protocol_digest"
+      ],
+      "required_controls": [
+        "randomized_run_order",
+        "conditioning_state",
+        "current_calibration"
+      ]
+    },
+    {
+      "id": "BETWEEN_LAB_REPRODUCIBILITY",
+      "unit_of_analysis": "independent_laboratory",
+      "minimum_independent_labs": 2,
+      "required_identity": [
+        "laboratory_id",
+        "protocol_digest",
+        "reference_artifact_id",
+        "calibration_scope_digest"
+      ],
+      "required_controls": [
+        "round_robin_or_equivalent",
+        "same_method_revision",
+        "lab_scope_applicability"
+      ]
+    },
+    {
+      "id": "PRODUCTION_UNIT_VARIATION",
+      "unit_of_analysis": "production_unit_within_lot",
+      "minimum_production_lots": 2,
+      "minimum_units_per_lot": 2,
+      "required_identity": [
+        "unit_serial",
+        "production_lot",
+        "product_revision",
+        "critical_supplier_revisions"
+      ],
+      "required_controls": [
+        "production_representative_sampling",
+        "supplier_substitution_tracking"
+      ]
+    },
+    {
+      "id": "HOUSEHOLD_ECOLOGICAL_VALIDITY",
+      "unit_of_analysis": "household_site_period",
+      "minimum_households": 2,
+      "minimum_duty_cycle_profiles": 2,
+      "required_identity": [
+        "household_site_id",
+        "service_boundary",
+        "duty_cycle_profile",
+        "environmental_context"
+      ],
+      "required_controls": [
+        "consent_and_withdrawal",
+        "privacy_minimization",
+        "maintenance_and_operator_burden"
+      ]
+    }
+  ],
+  "confirmatory_holdouts": {
+    "independent_laboratories_required": 1,
+    "production_lots_required": 1,
+    "households_or_sites_required": 1,
+    "reuse_for_adaptive_tuning": false
+  },
+  "analysis_contract": {
+    "sample_size_policy": "preregistered_power_or_precision_analysis_from_pilot_variance_components",
+    "model_family": "hierarchical_or_cluster_aware",
+    "required_variance_components": [
+      "within_unit_repeatability",
+      "between_lab_reproducibility",
+      "between_unit_or_lot_variation",
+      "household_or_site_variation"
+    ],
+    "fixed_effects_required": [
+      "product_or_architecture",
+      "protocol_revision",
+      "declared_operating_context"
+    ],
+    "cluster_nesting_required": true,
+    "randomization_required": true,
+    "assessor_blinding_or_independent_adjudication_required": true,
+    "exclusion_rules_preregistered": true,
+    "missingness_and_denominator_policy_preregistered": true,
+    "outlier_rule_preregistered": true,
+    "deviation_log_required": true,
+    "independent_analysis_code_digest_required": true
+  },
+  "comparison_contract": {
+    "same_protocol_digest_across_arms": true,
+    "exact_product_model_and_revision_pinned": true,
+    "same_exogenous_trace_and_conditions": true,
+    "same_primary_endpoint_and_functional_unit": true,
+    "compute_human_time_and_adaptation_budgets_frozen": true,
+    "holdout_not_used_for_tuning": true,
+    "hard_safety_service_accessibility_and_consent_floors_noncompensatory": true,
+    "no_single_scalar_score": true
+  },
+  "evidence_and_rights": {
+    "current_instrument_calibration_and_method_scope_required": true,
+    "source_payload_and_sample_lineage_required": true,
+    "participant_consent_and_withdrawal_required": true,
+    "purpose_bound_data_use_required": true,
+    "right_to_withdraw_and_correct_required": true
+  },
+  "design_state": "NOT_PREREGISTERED",
+  "planned_counts": "NOT_SELECTED",
+  "power_analysis": "NOT_PERFORMED",
+  "protocol_digest": "NOT_CREATED",
+  "result": "NO_STUDY_AUTHORITY"
+}
