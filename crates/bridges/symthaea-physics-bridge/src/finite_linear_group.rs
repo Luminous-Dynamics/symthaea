@@ -152,6 +152,9 @@ pub struct FiniteGroupAdmissionDiagnosticsV1 {
     pub identity_matrix_relative_defect: f64,
     pub maximum_element_isometry_relative_defect: f64,
     pub maximum_multiplication_relative_defect: f64,
+    /// Non-identity abstract elements whose admitted matrices act as identity.
+    /// A nonempty kernel means the represented action is non-faithful.
+    pub non_identity_kernel_element_ids: Vec<String>,
     pub checked_multiplication_pairs: usize,
     pub checked_associativity_triples: usize,
     pub element_diagnostics: Vec<FiniteGroupElementDiagnosticV1>,
@@ -194,6 +197,11 @@ impl AdmittedFiniteLinearGroupActionV1 {
 
     pub fn order(&self) -> usize {
         self.action.elements.len()
+    }
+
+    /// True only when no non-identity abstract element acts as the identity matrix.
+    pub fn representation_is_faithful(&self) -> bool {
+        self.diagnostics.non_identity_kernel_element_ids.is_empty()
     }
 
     pub fn metric_scale(&self) -> f64 {
@@ -533,6 +541,17 @@ impl FiniteLinearGroupActionV1 {
             });
         }
 
+        let non_identity_kernel_element_ids: Vec<String> = self
+            .elements
+            .iter()
+            .filter(|element| element.id != self.identity_element_id)
+            .filter(|element| {
+                matrix_rms_defect(&whitened_elements[&element.id], &identity)
+                    <= profile.multiplication_relative_tolerance
+            })
+            .map(|element| element.id.clone())
+            .collect();
+
         let mut multiplication_lookup = BTreeMap::new();
         for entry in &self.multiplication_table {
             if !element_ids.contains(entry.left_element_id.as_str()) {
@@ -666,6 +685,7 @@ impl FiniteLinearGroupActionV1 {
                 identity_matrix_relative_defect: identity_defect,
                 maximum_element_isometry_relative_defect: maximum_isometry_defect,
                 maximum_multiplication_relative_defect: maximum_multiplication_defect,
+                non_identity_kernel_element_ids,
                 checked_multiplication_pairs: expected_table_entries,
                 checked_associativity_triples,
                 element_diagnostics,
@@ -942,6 +962,71 @@ mod tests {
                 | Err(FiniteGroupAdmissionErrorV1::MissingTwoSidedInverse { .. })
                 | Err(FiniteGroupAdmissionErrorV1::NonAssociativeMultiplicationTable { .. })
                 | Err(FiniteGroupAdmissionErrorV1::MultiplicationRepresentationMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn finite_group_admission_reports_nonfaithful_representation_kernel() {
+        let mut action = c4_action();
+        for element in &mut action.elements {
+            element.matrix = identity_matrix(2);
+        }
+        let admitted = action
+            .try_admit(FiniteGroupAdmissionProfileV1::default())
+            .unwrap();
+
+        assert!(!admitted.representation_is_faithful());
+        assert_eq!(
+            admitted.diagnostics().non_identity_kernel_element_ids,
+            vec!["r1".to_string(), "r2".to_string(), "r3".to_string()]
+        );
+    }
+
+    #[test]
+    fn finite_group_admission_rejects_nonassociative_latin_table_even_when_matrices_match() {
+        // This order-five Latin loop has a two-sided identity and inverses but
+        // is not associative. Giving every abstract element the identity matrix
+        // makes the matrix product condition vacuous; the Cayley-table check
+        // must still reject it.
+        let table = [
+            [0, 1, 2, 3, 4],
+            [1, 0, 4, 2, 3],
+            [2, 3, 0, 4, 1],
+            [3, 4, 1, 0, 2],
+            [4, 2, 3, 1, 0],
+        ];
+        let ids: Vec<String> = (0..5).map(|index| format!("g{index}")).collect();
+        let action = FiniteLinearGroupActionV1 {
+            action_id: "nonassociative-loop-negative-control".to_string(),
+            coordinate_basis_id: "xy".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: identity_matrix(2),
+            identity_element_id: "g0".to_string(),
+            elements: ids
+                .iter()
+                .map(|id| FiniteGroupElementV1 {
+                    id: id.clone(),
+                    matrix: identity_matrix(2),
+                })
+                .collect(),
+            multiplication_table: (0..5)
+                .flat_map(|left| {
+                    (0..5).map(move |right| FiniteGroupMultiplicationV1 {
+                        left_element_id: format!("g{left}"),
+                        right_element_id: format!("g{right}"),
+                        product_element_id: format!("g{}", table[left][right]),
+                    })
+                })
+                .collect(),
+        };
+        assert!(matches!(
+            action.try_admit(FiniteGroupAdmissionProfileV1::default()),
+            Err(FiniteGroupAdmissionErrorV1::NonAssociativeMultiplicationTable {
+                left,
+                middle,
+                right
+            }) if left == "g1" && middle == "g1" && right == "g2"
         ));
     }
 
