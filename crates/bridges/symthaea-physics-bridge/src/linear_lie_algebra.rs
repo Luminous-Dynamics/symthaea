@@ -120,7 +120,17 @@ pub struct LieJacobiDiagnosticV1 {
     pub first_generator_id: String,
     pub second_generator_id: String,
     pub third_generator_id: String,
+    /// Local defect normalized by the magnitudes of the three nested brackets,
+    /// unless those magnitudes are at the floating-point roundoff floor.
     pub relative_defect: f64,
+    /// Sum of the norms of the three nested-bracket terms.
+    pub local_term_scale: f64,
+    /// Defect against the square of the largest structure constant. This
+    /// remains interpretable when the three local terms are all near zero.
+    pub global_scale_relative_defect: f64,
+    /// True when local normalization would amplify roundoff; in that case
+    /// relative_defect uses the global algebra scale and this field is true.
+    pub used_global_scale_fallback: bool,
 }
 
 /// Aggregate diagnostics for the complete admitted generator family.
@@ -306,6 +316,19 @@ pub fn qualify_linear_lie_algebra(
 
     let closure_passed =
         maximum_bracket_closure_defect <= profile.bracket_closure_relative_tolerance;
+    let maximum_structure_constant = structure
+        .iter()
+        .flat_map(|plane| plane.iter())
+        .flat_map(|row| row.iter())
+        .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+    let global_jacobi_scale = maximum_structure_constant * maximum_structure_constant;
+    if !global_jacobi_scale.is_finite() {
+        return Err(LinearLieAlgebraQualificationErrorV1::NonFiniteStructureConstant);
+    }
+    let jacobi_roundoff_floor = 64.0
+        * f64::EPSILON
+        * generator_count.max(1) as f64
+        * global_jacobi_scale;
     let mut jacobi_checks = Vec::new();
     let mut maximum_jacobi_defect = None;
 
@@ -331,16 +354,29 @@ pub fn qualify_linear_lie_algebra(
                             first_term[component] + second_term[component] + third_term[component];
                     }
 
-                    let denominator = vector_norm(&first_term)
+                    let local_term_scale = vector_norm(&first_term)
                         + vector_norm(&second_term)
                         + vector_norm(&third_term);
                     let numerator = vector_norm(&residual);
-                    let defect = if denominator == 0.0 {
-                        0.0
+                    let global_scale_relative_defect = if global_jacobi_scale == 0.0 {
+                        if numerator == 0.0 { 0.0 } else { f64::INFINITY }
                     } else {
-                        numerator / denominator
+                        numerator / global_jacobi_scale
                     };
-                    if !defect.is_finite() {
+                    // A local ratio is unstable when all three nested brackets
+                    // are at roundoff scale. Preserve the raw local scale, but
+                    // normalize that case against the largest admitted
+                    // structure constant squared. This avoids reporting a
+                    // unit-sized Jacobi defect for an algebra whose exact
+                    // Jacobi terms are zero and whose floating residue is tiny.
+                    let used_global_scale_fallback =
+                        local_term_scale <= jacobi_roundoff_floor;
+                    let defect = if used_global_scale_fallback {
+                        global_scale_relative_defect
+                    } else {
+                        numerator / local_term_scale
+                    };
+                    if !defect.is_finite() || !global_scale_relative_defect.is_finite() {
                         return Err(
                             LinearLieAlgebraQualificationErrorV1::NonFiniteJacobiResidual,
                         );
@@ -351,6 +387,9 @@ pub fn qualify_linear_lie_algebra(
                         second_generator_id: generator_ids[second].clone(),
                         third_generator_id: generator_ids[third].clone(),
                         relative_defect: defect,
+                        local_term_scale,
+                        global_scale_relative_defect,
+                        used_global_scale_fallback,
                     });
                 }
             }
@@ -998,6 +1037,86 @@ mod tests {
                 .abs()
                 < 1.0e-12
         );
+    }
+
+    #[test]
+    fn accepts_invertible_mixed_and_rescaled_so3_generator_basis() {
+        let original = so3_generators();
+        let basis_change = [
+            [2.0, 1.0, 0.0],
+            [0.0, 1.0, 3.0],
+            [1.0, 0.0, -1.0],
+        ];
+        let mixed = basis_change
+            .iter()
+            .enumerate()
+            .map(|(index, coefficients)| {
+                let mut matrix = vec![vec![0.0_f64; 3]; 3];
+                for (generator_index, coefficient) in coefficients.iter().enumerate() {
+                    for row in 0..3 {
+                        for column in 0..3 {
+                            matrix[row][column] +=
+                                coefficient * original[generator_index].matrix[row][column];
+                        }
+                    }
+                }
+                generator(&format!("mixed-{index}"), matrix)
+            })
+            .collect();
+        let admitted = action(mixed, identity(3));
+        let report = qualify_linear_lie_algebra(
+            &admitted,
+            LinearLieAlgebraQualificationProfileV1::default(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            report.status,
+            LinearLieAlgebraQualificationStatusV1::NumericallyClosedAndJacobiConsistent
+        );
+        assert_eq!(report.diagnostics.numerical_rank, 3);
+        assert!(report.diagnostics.maximum_bracket_closure_defect < 1.0e-12);
+        assert!(report.diagnostics.maximum_jacobi_defect.unwrap() < 1.0e-12);
+    }
+
+    #[test]
+    fn jacobi_normalization_does_not_amplify_zero_nested_bracket_roundoff() {
+        let admitted = action(so3_generators(), identity(3));
+        let report = qualify_linear_lie_algebra(
+            &admitted,
+            LinearLieAlgebraQualificationProfileV1::default(),
+        )
+        .unwrap();
+
+        let jacobi = &report.jacobi_checks[0];
+        assert!(jacobi.used_global_scale_fallback);
+        assert!(jacobi.global_scale_relative_defect < 1.0e-12);
+        assert!(jacobi.relative_defect < 1.0e-12);
+        assert!(jacobi.local_term_scale < 1.0e-12);
+    }
+
+    #[test]
+    fn rejects_pair_and_jacobi_work_budgets_before_allocation() {
+        let admitted = action(so3_generators(), identity(3));
+        let mut pair_profile = LinearLieAlgebraQualificationProfileV1::default();
+        pair_profile.maximum_pair_checks = 2;
+        assert!(matches!(
+            qualify_linear_lie_algebra(&admitted, pair_profile),
+            Err(LinearLieAlgebraQualificationErrorV1::PairBudgetExceeded {
+                required: 3,
+                maximum: 2
+            })
+        ));
+
+        let mut jacobi_profile = LinearLieAlgebraQualificationProfileV1::default();
+        jacobi_profile.maximum_jacobi_checks = 0;
+        assert!(matches!(
+            qualify_linear_lie_algebra(&admitted, jacobi_profile),
+            Err(LinearLieAlgebraQualificationErrorV1::JacobiBudgetExceeded {
+                required: 1,
+                maximum: 0
+            })
+        ));
     }
 
     #[test]
