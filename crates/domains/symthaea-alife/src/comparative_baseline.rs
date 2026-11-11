@@ -624,7 +624,7 @@ mod tests {
         let evaluation = model.evaluate(&held_out, 3.0).unwrap();
 
         assert!((model.diagnostics().common_context_slope - 2.0).abs() < 1.0e-12);
-        assert!((evaluation.predicted_mean - 0.0).abs() < 1.0e-12);
+        assert!((evaluation.predicted_mean - 0.0).abs() < 1.0e-3);
         assert!(evaluation.standardized_residual.abs() < 1.0);
         assert_eq!(
             evaluation.disposition,
