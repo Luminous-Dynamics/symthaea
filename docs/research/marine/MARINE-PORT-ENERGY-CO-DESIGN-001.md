@@ -75,13 +75,17 @@ For V0.1 use integer quantities only:
 
 No floating-point accumulation. Round delivered Wh down, never up. Preserve unserved requested energy.
 
-### 4.1 Usable connection time
+### 4.1 Join to the #11558 service call
+
+The port case embeds the exact parent service-call identity and timing contract. The port-call ID must match the root call ID, the service fingerprint must be the same value as the parent service, and the copied service-call timing must resolve to an evidence-source record. The planned arrival must be within the contractual earliest/latest window; departure must satisfy minimum turnaround and latest departure. This is a consistency check, not a signature or independent re-computation of the parent's service fingerprint.
+
+### 4.2 Usable connection time
 
 `usable_seconds = max(0, planned_departure - planned_arrival - connect_seconds - disconnect_seconds)`
 
 The arrival and departure must lie inside the declared berth interval. If another schedule owner supplies a stricter port-call/turnaround window, use that resolved window; this audit does not relax it.
 
-### 4.2 Power and energy ceiling
+### 4.3 Power and energy ceiling
 
 `connection_power_w = min(ship_max_input_power_w, berth_connection_limit_w, port_reserved_power_w)`
 
@@ -93,7 +97,7 @@ The arrival and departure must lie inside the declared berth interval. If anothe
 
 If compatibility or availability is unknown, disposition is INCOMPLETE and no eligibility claim is made. If known incompatible or unavailable, the case is BLOCKED and delivered energy is zero. A zero reservation is not interpreted as unknown.
 
-### 4.3 GHG comparison
+### 4.4 GHG comparison
 
 Only calculate the grid-versus-generator GHG delta when:
 - both emission factors are present and positive/known as quantities;
@@ -116,6 +120,7 @@ Positive:
 2. Power-limited berth; energy capped by the smallest of ship/berth/reserved limits.
 3. Port-energy-limited call; energy cap independent of peak power.
 4. Connection/disconnection consumes real berth time.
+5. Port call identity, service fingerprint, earliest/latest arrival, minimum turnaround and departure cutoff join exactly to the service flexibility contract.
 5. Grid and generator factors share a boundary and yield exact integer GHG arithmetic.
 
 Negative/adversarial:
