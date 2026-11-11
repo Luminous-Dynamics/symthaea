@@ -391,7 +391,8 @@ mod tests {
         let control_idx = v["fixtures"].as_array().unwrap().iter()
             .position(|f| f["pair_id"] == pair && f["pair_member"] == "continue_control")
             .unwrap();
-        v["fixtures"][idx]["runtime_context"]["trigger"] = v["fixtures"][control_idx]["runtime_context"]["trigger"].clone();
+        let control_trigger = v["fixtures"][control_idx]["runtime_context"]["trigger"].clone();
+        v["fixtures"][idx]["runtime_context"]["trigger"] = control_trigger;
         v["fixtures"][idx]["expected_disposition"] = Value::String("ContinueWithinAuthorizedScope".into());
         assert!(validate_manifest(&v).is_err());
     }
