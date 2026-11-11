@@ -1,5 +1,5 @@
 {
-  "schema_version": "aced-query-source-manifest-v0.1",
+  "schema_version": "aced-query-source-manifest-v0.2",
   "benchmark_id": "ACED-QUERY-ADAPTER-001",
   "status": "pinned_query_metadata_only_no_candidate_world_payloads",
   "upstream": {
@@ -12,10 +12,10 @@
   },
   "artifacts": {
     "inventory_path": "research/aced-adapter-001/upstream/aced_query_world_inventory.json",
-    "inventory_sha256": "4b4d2177b572a11736b062c2fd3db80cf138a7a56bf7fd0a3b94d2f015e63ee4",
+    "inventory_sha256": "46976235b1a2c6226b7f4c5ccc1259fd839d1b4bb172744d0a53864630a86b27",
     "upstream_checksums_path": "data/SHA256SUMS",
     "upstream_checksums_git_blob_sha": "f14afb97a6b7979c737e5465c2fee26beca81e9b",
-    "upstream_checksums_sha256": "0653bb6bd5394e2efb4597359b7709e81664281c3e420ed0f4ff29577f4fb8c1"
+    "upstream_checksums_sha256": "7b30d8c48945aff0df36e080e6c0f2fd80831f7291656d57499e1ca2026f8915"
   },
   "track_counts": {
     "core_struct": 10,
@@ -38,28 +38,21 @@
       },
       "families": {
         "random_graph": 10
+      },
+      "scenario_subtypes": {
+        "none": 10
       }
     },
     "core_decision": {
       "count": 60,
       "domains": {
-        "Criminal_Justice": 11,
-        "valid_proposed_intervention_Education": 1,
-        "valid_proposed_intervention_Hospital_data": 1,
-        "valid_proposed_intervention_Labor_and_Policy": 1,
-        "valid_proposed_intervention_Screening_and_diagnosis": 1,
-        "valid_proposed_intervention_Social_Science": 1,
-        "valid_proposed_intervention_Treatment_effectiveness": 1,
-        "wrong_side_intervention_Criminal_Justice": 1,
-        "wrong_side_intervention_Education": 1,
-        "wrong_side_intervention_Labor_and_Policy": 1,
-        "wrong_side_intervention_Treatment_effectiveness": 1,
-        "Hospital_data": 13,
-        "Labor_and_Policy": 6,
-        "Education": 10,
-        "Screening_and_diagnosis": 4,
-        "Treatment_effectiveness": 2,
-        "Social_Science": 2,
+        "Criminal_Justice": 12,
+        "Education": 12,
+        "Hospital_data": 14,
+        "Labor_and_Policy": 8,
+        "Screening_and_diagnosis": 5,
+        "Social_Science": 3,
+        "Treatment_effectiveness": 4,
         "User_Behavior": 2
       },
       "families": {
@@ -71,6 +64,11 @@
         "safety_constrained": 12,
         "satisficing": 12,
         "subgroup_robust": 12
+      },
+      "scenario_subtypes": {
+        "none": 50,
+        "valid_proposed_intervention": 6,
+        "wrong_side_intervention": 4
       }
     },
     "guess_struct": {
@@ -87,6 +85,9 @@
       },
       "families": {
         "random_graph": 30
+      },
+      "scenario_subtypes": {
+        "none": 30
       }
     },
     "guess_decision": {
@@ -110,20 +111,23 @@
         "safety_constrained": 15,
         "satisficing": 10,
         "subgroup_robust": 5
+      },
+      "scenario_subtypes": {
+        "none": 48
       }
     }
   },
   "split_relationships": {
     "core_struct_guess_struct_exact_content_overlap": 10,
     "core_decision_guess_decision_exact_content_overlap": 0,
-    "total_track_entries": 148,
-    "unique_payload_sha256_count": 138,
-    "uniqueness_note": "The 10 core_struct payloads are exact content duplicates in guess_struct. Two core_decision and guess_decision rows share a filename but have different Git blob and SHA-256 digests; they are distinct payloads and their full track paths must remain separate. There are 148 track entries and 138 unique payload digests. Do not infer identity from filename alone or pool overlapping track entries as independent.",
     "core_decision_guess_decision_filename_collision_count": 2,
     "core_decision_guess_decision_filename_collision_files": [
       "world_safety_constrained_Hospital_data_n10_seed3202.json",
       "world_safety_constrained_Screening_and_diagnosis_n10_seed3000.json"
-    ]
+    ],
+    "total_track_entries": 148,
+    "unique_payload_sha256_count": 138,
+    "uniqueness_note": "The 10 core_struct payloads are exact content duplicates in guess_struct. Two core_decision and guess_decision rows share a filename but have different Git blob and SHA-256 digests; they are distinct payloads and their full track paths must remain separate. There are 148 track entries and 138 unique payload digests. Do not infer identity from filename alone or pool overlapping track entries as independent."
   },
   "candidate_data_boundary": {
     "copied_payloads": false,
@@ -138,12 +142,13 @@
       "sha256",
       "domain",
       "task_family",
+      "scenario_subtype",
       "seed",
       "variables_n",
       "edge_k",
       "sample_n"
     ],
-    "evaluator_note": "The world payloads include causal data and answer-bearing structure. A future Query runner must expose only the permitted task prompt and question through a controlled evaluator/tool interface; never mount the raw world file or hidden oracle in the candidate process."
+    "evaluator_note": "World JSON files contain answer-bearing causal data. Keep full payloads and hidden scoring in an evaluator-only process. Candidate agents must use a controlled tool interface and must not mount raw Query world files."
   },
-  "claim_ceiling": "The source inventory binds metadata and upstream checksum-ledger entries only. It does not validate the world payload bytes, paper grading, query-agent execution or causal reasoning."
+  "claim_ceiling": "This manifest qualifies upstream metadata, payload checksums, taxonomy distributions and content-identity relationships only. It does not reproduce the Query grader or run models."
 }
