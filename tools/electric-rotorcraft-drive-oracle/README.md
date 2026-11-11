@@ -60,7 +60,7 @@ Additional negative controls reject zero, negative, non-finite and numerically u
 The v0.3 additive API connects a caller-supplied, already-qualified motor efficiency interval to the independent drive-chain calculation without introducing a dependency on a map library.
 
 1. `derive_motor_shaft_operating_point` computes motor torque and speed from rotor demand, the explicit gearbox speed ratio and transmission efficiency. It does not require motor or inverter efficiency, so it can be used before a motor-map query.
-2. The caller constructs `MotorEfficiencyEvidence` from the map lookup output, including map ID, configuration digest, context digest, evidence-manifest digest, exact motor torque/RPM query and lower/nominal/upper efficiency bounds.
+2. The caller constructs `MotorEfficiencyEvidence` from the map lookup output, including map ID, exact map-content digest, configuration digest, context digest, evidence-manifest digest, exact motor torque/RPM query and lower/nominal/upper efficiency bounds.
 3. `evaluate_drive_with_map_evidence` verifies the expected configuration/context, requires the map query point to match the current derived motor shaft point exactly, and independently evaluates all three efficiency values.
 
 The result contains:
@@ -68,8 +68,13 @@ The result contains:
 - **Nominal efficiency scenario:** nominal map value.
 - **Favourable efficiency scenario:** upper motor efficiency, therefore lowest DC-bus demand.
 
-Each scenario retains its own `Result<DriveReport, DriveError>`. A nominal PASS cannot hide an adverse-case bus power/current failure. The result carries map, configuration, context and evidence-manifest identities unchanged.
+Each scenario retains its own `Result<DriveReport, DriveError>`. A nominal PASS cannot hide an adverse-case bus power/current failure. The result carries map ID, map-content digest, configuration, context and evidence-manifest identities unchanged. The map-content digest is distinct from the evidence-manifest digest: one identifies the exact efficiency surface, the other identifies its underlying observations, calibration and transformations.
 
 The efficiency interval is only as meaningful as the upstream map/evidence process. The current map oracle's weighted absolute bounds are not Gaussian confidence intervals. No joint uncertainty or correlation is inferred for transmission, inverter, battery, thermal system or rotor aerodynamics. These must be evaluated by their respective owners.
 
 All fixtures remain synthetic analytical cases; no physical motor efficiency map is embedded. The envelope does not establish a continuous rating, motor limit, safe operating point, aircraft mission capability or airworthiness.
+
+
+### Exact map-content identity (v0.4)
+
+The drive consumer requires both `map_id` and `map_digest`, in addition to the source evidence-manifest digest. The map-content digest identifies the exact axes, nodes, uncertainty values and serialization used to create the efficiency surface. The evidence-manifest digest identifies the underlying measurements/calibration/transformations. Neither can substitute for the other. The caller must copy both from the exact map lookup result; this oracle checks non-empty identity and propagates it but does not recompute cryptographic hashes.
