@@ -87,6 +87,8 @@ For each intervention, report:
 
 Do not infer daily speed-fuel response from annual fleet averages, or call a before/after comparison causal when route, load, sea state or configuration changed.
 
+A structural before/after condition match is not performance qualification. It does not establish calibration, sensor authenticity, causal attribution, or a physical fuel-saving result.
+
 ## 6. Benchmark ladder
 
 | ID | Intervention | Isolated contribution |
