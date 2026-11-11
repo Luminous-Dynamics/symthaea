@@ -1,0 +1,36 @@
+name: Home Service Metrology Study Design Synthetic Gate
+on:
+  push:
+    paths:
+      - "docs/research/home-service-metrology/**"
+      - "tools/home-service-metrology-study/**"
+      - ".github/workflows/home-service-metrology-study.yml"
+  pull_request:
+    paths:
+      - "docs/research/home-service-metrology/**"
+      - "tools/home-service-metrology-study/**"
+      - ".github/workflows/home-service-metrology-study.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: home-service-metrology-study-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  study-design:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked --manifest-path tools/home-service-metrology-study/Cargo.toml
+      - name: Format check
+        run: cargo fmt --manifest-path tools/home-service-metrology-study/Cargo.toml --all -- --check
+      - name: Offline tests
+        run: cargo test --locked --offline --manifest-path tools/home-service-metrology-study/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --offline --manifest-path tools/home-service-metrology-study/Cargo.toml --all-targets -- -D warnings
+      - name: Validate tracked protocol and corpus
+        run: cargo run --locked --offline --manifest-path tools/home-service-metrology-study/Cargo.toml
