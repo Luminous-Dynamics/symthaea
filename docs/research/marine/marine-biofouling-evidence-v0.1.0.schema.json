@@ -1,0 +1,586 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-biofouling-evidence:0.1.0",
+  "title": "Luminous Marine Biofouling Inspection and Cleaning Evidence v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "record_status",
+    "vessel",
+    "service_fingerprint",
+    "coating_system",
+    "inspection",
+    "evidence_sources",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "enum": [
+        "synthetic",
+        "measured",
+        "modelled"
+      ]
+    },
+    "vessel": {
+      "$ref": "#/$defs/vessel"
+    },
+    "service_fingerprint": {
+      "$ref": "#/$defs/sha256"
+    },
+    "coating_system": {
+      "$ref": "#/$defs/coating_system"
+    },
+    "inspection": {
+      "$ref": "#/$defs/inspection"
+    },
+    "cleaning_event": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/cleaning_event"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "performance_comparison": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/performance_comparison"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidence_sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence_source"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "vessel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "length_overall_m",
+        "ship_type"
+      ],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "length_overall_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "ship_type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "coating_system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_identity",
+        "system_family",
+        "application_date",
+        "condition_status",
+        "maintenance_history"
+      ],
+      "properties": {
+        "system_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "system_family": {
+          "enum": [
+            "biocidal_antifouling",
+            "foul_release",
+            "non_biocidal",
+            "hybrid",
+            "none",
+            "unknown"
+          ]
+        },
+        "active_substance_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "application_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "last_drydock_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "condition_status": {
+          "enum": [
+            "intact",
+            "degraded",
+            "damaged",
+            "unknown"
+          ]
+        },
+        "maintenance_history": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "zone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "zone_id",
+        "zone_area_m2",
+        "inspected_area_m2",
+        "declared_inspection_coverage_fraction",
+        "fouling_class",
+        "estimated_fouling_coverage_fraction",
+        "inspection_confidence"
+      ],
+      "properties": {
+        "zone_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "zone_area_m2": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "inspected_area_m2": {
+          "type": "number",
+          "minimum": 0
+        },
+        "declared_inspection_coverage_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "fouling_class": {
+          "enum": [
+            "none",
+            "slime",
+            "weed",
+            "soft_animal",
+            "hard_shell",
+            "mixed",
+            "unknown"
+          ]
+        },
+        "estimated_fouling_coverage_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_fouling_thickness_mm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "inspection_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "species_status": {
+          "enum": [
+            "not_assessed",
+            "none_observed",
+            "suspected",
+            "confirmed",
+            "unknown"
+          ]
+        },
+        "taxonomic_identification": {
+          "type": "string",
+          "minLength": 1
+        },
+        "species_evidence_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inspection_id",
+        "method",
+        "inspection_date",
+        "inspector_identity",
+        "total_hull_area_m2",
+        "inspected_area_m2",
+        "declared_total_coverage_fraction",
+        "minimum_required_coverage_fraction",
+        "raw_data_sha256",
+        "image_or_observation_count",
+        "zones",
+        "limitations"
+      ],
+      "properties": {
+        "inspection_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "enum": [
+            "rov_imaging",
+            "diver_visual",
+            "drydock_visual",
+            "laser_or_optical_scan",
+            "ultrasound_or_sensor",
+            "mixed",
+            "unknown"
+          ]
+        },
+        "inspection_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "inspector_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "total_hull_area_m2": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "inspected_area_m2": {
+          "type": "number",
+          "minimum": 0
+        },
+        "declared_total_coverage_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_required_coverage_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "image_or_observation_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "zones": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/zone"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "cleaning_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cleaning_id",
+        "method",
+        "start",
+        "end",
+        "area_cleaned_m2",
+        "local_authorization_status",
+        "containment_method",
+        "waste_disposition",
+        "waste_evidence_sha256",
+        "limitations"
+      ],
+      "properties": {
+        "cleaning_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "enum": [
+            "no_cleaning",
+            "in_water_diver",
+            "in_water_rov",
+            "drydock_mechanical",
+            "drydock_waterjet",
+            "coating_treatment",
+            "other"
+          ]
+        },
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "area_cleaned_m2": {
+          "type": "number",
+          "minimum": 0
+        },
+        "contractor_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "local_authorization_status": {
+          "enum": [
+            "approved",
+            "not_required",
+            "pending",
+            "denied",
+            "unknown"
+          ]
+        },
+        "authorization_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorization_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "containment_method": {
+          "enum": [
+            "full_capture",
+            "partial_capture",
+            "none",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "waste_disposition": {
+          "enum": [
+            "contained_disposed",
+            "filtered_return",
+            "permitted_discharge",
+            "uncontrolled_release",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "waste_authorization_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "captured_waste_mass_kg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "waste_evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "coating_damage_observed": {
+          "type": "boolean"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "performance_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "observed_at",
+        "condition_fingerprint",
+        "speed_through_water_kn",
+        "shaft_power_kw",
+        "shaft_rpm",
+        "draft_m",
+        "trim_m",
+        "sea_state"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "condition_fingerprint": {
+          "$ref": "#/$defs/sha256"
+        },
+        "speed_through_water_kn": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "shaft_power_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shaft_rpm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "draft_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "trim_m": {
+          "type": "number"
+        },
+        "sea_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fuel_flow_kg_per_h": {
+          "type": "number",
+          "minimum": 0
+        },
+        "source_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "performance_comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_standard",
+        "before",
+        "after",
+        "limitations"
+      ],
+      "properties": {
+        "method_standard": {
+          "enum": [
+            "ISO 19030-1:2016",
+            "ISO 19030-2:2016",
+            "other_declared_method"
+          ]
+        },
+        "before": {
+          "$ref": "#/$defs/performance_point"
+        },
+        "after": {
+          "$ref": "#/$defs/performance_point"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "evidence_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "evidence_class",
+        "rights_status",
+        "limitations"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_status": {
+          "enum": [
+            "public",
+            "permissioned",
+            "restricted",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
