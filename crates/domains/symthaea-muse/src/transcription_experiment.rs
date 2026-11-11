@@ -648,14 +648,14 @@ mod tests {
             split: "heldout".into(),
             input_audio_sha256: sha256_hex(audio),
             model_input_audio_sha256: sha256_hex(b"canonical-model-input"),
-            dataset_manifest_sha256: "2".repeat(64),
+            dataset_manifest_sha256: sha256_hex(b"dataset-manifest"),
             input_rights_basis: TranscriptionRightsBasisV1::ConsentedResearch,
             input_rights_reference: Some("consent-register:corpus-v1".into()),
             input_usage_scope: TranscriptionUsageScopeV1::PublicBenchmarkResults,
             model_name: "FixtureAMT".into(),
             model_revision: "v1.2.3".into(),
             model_delivery: TranscriptionModelDeliveryV1::OpenWeights,
-            model_artifact_sha256: Some("d".repeat(64)),
+            model_artifact_sha256: Some(sha256_hex(b"model-weights")),
             model_code_revision: Some("e".repeat(40)),
             adapter_id: "symthaea-muse-amt-adapter".into(),
             adapter_revision: "git:adapter-fixture-v1".into(),
@@ -663,7 +663,7 @@ mod tests {
             model_license: "Apache-2.0".into(),
             model_license_reference: Some("https://example.invalid/model-license".into()),
             model_usage_scope: TranscriptionUsageScopeV1::PublicBenchmarkResults,
-            inference_config_sha256: "f".repeat(64),
+            inference_config_sha256: sha256_hex(b"inference-config"),
             inference_config_reference: "artifact://experiment-config/exp-001".into(),
             random_seed: Some(7),
             preprocessing: TranscriptionAudioPreprocessingV1 {
@@ -676,7 +676,7 @@ mod tests {
                 chunk_duration_ms: 5_000,
                 chunk_overlap_ms: 500,
             },
-            preprocessing_config_sha256: "3".repeat(64),
+            preprocessing_config_sha256: sha256_hex(b"preprocessing-config"),
             conditioning_source: TranscriptionConditioningSourceV1::None,
             conditioning_payload_sha256: None,
             runtime: TranscriptionRuntimeReceiptV1 {
@@ -701,13 +701,31 @@ mod tests {
         receipt
     }
 
+    fn validate_fixture(
+        receipt: &TranscriptionExperimentReceiptV1,
+        audio: &[u8],
+        midi: &[u8],
+        report: &MidiTranscriptionEvaluationReportV1,
+    ) -> Vec<TranscriptionExperimentReceiptIssueV1> {
+        let evidence = TranscriptionExperimentEvidenceV1 {
+            source_audio_bytes: audio,
+            model_input_audio_bytes: b"canonical-model-input",
+            dataset_manifest_bytes: b"dataset-manifest",
+            inference_config_bytes: b"inference-config",
+            preprocessing_config_bytes: b"preprocessing-config",
+            model_artifact_bytes: Some(b"model-weights"),
+            prediction_midi_bytes: midi,
+        };
+        validate_transcription_experiment_receipt_v1(receipt, &evidence, report)
+    }
+
     #[test]
     fn valid_open_weights_experiment_receipt_binds_all_artifacts() {
         let audio = b"audio-experiment-fixture";
         let midi = b"midi-experiment-fixture";
         let report = report(midi);
         let receipt = valid_receipt(audio, midi, &report);
-        assert!(validate_transcription_experiment_receipt_v1(
+        assert!(validate_fixture(
             &receipt,
             audio,
             midi,
@@ -723,7 +741,7 @@ mod tests {
         let midi = b"midi-fixture";
         let report = report(midi);
         let receipt = valid_receipt(audio, midi, &report);
-        let issues = validate_transcription_experiment_receipt_v1(
+        let issues = validate_fixture(
             &receipt,
             b"replaced-audio",
             midi,
@@ -738,7 +756,7 @@ mod tests {
         let midi = b"midi-fixture";
         let report = report(midi);
         let receipt = valid_receipt(audio, midi, &report);
-        let issues = validate_transcription_experiment_receipt_v1(
+        let issues = validate_fixture(
             &receipt,
             audio,
             b"replaced-midi",
@@ -754,7 +772,7 @@ mod tests {
         let mut report = report(midi);
         let receipt = valid_receipt(audio, midi, &report);
         report.onset_pitch_metrics.f1 = 1.0;
-        let issues = validate_transcription_experiment_receipt_v1(
+        let issues = validate_fixture(
             &receipt,
             audio,
             midi,
@@ -771,7 +789,7 @@ mod tests {
         let mut receipt = valid_receipt(audio, midi, &report);
         receipt.model_artifact_sha256 = None;
         receipt.receipt_sha256 = transcription_experiment_receipt_commitment_v1(&receipt).unwrap();
-        let issues = validate_transcription_experiment_receipt_v1(
+        let issues = validate_fixture(
             &receipt,
             audio,
             midi,
@@ -790,7 +808,7 @@ mod tests {
         receipt.model_artifact_sha256 = None;
         receipt.model_provider = "VendorCloud".into();
         receipt.receipt_sha256 = transcription_experiment_receipt_commitment_v1(&receipt).unwrap();
-        assert!(validate_transcription_experiment_receipt_v1(
+        assert!(validate_fixture(
             &receipt,
             audio,
             midi,
@@ -808,7 +826,7 @@ mod tests {
         receipt.conditioning_source = TranscriptionConditioningSourceV1::GroundTruthInstrumentPresence;
         receipt.conditioning_payload_sha256 = None;
         receipt.receipt_sha256 = transcription_experiment_receipt_commitment_v1(&receipt).unwrap();
-        let issues = validate_transcription_experiment_receipt_v1(
+        let issues = validate_fixture(
             &receipt,
             audio,
             midi,
@@ -826,7 +844,7 @@ mod tests {
         receipt.conditioning_source = TranscriptionConditioningSourceV1::GroundTruthInstrumentPresence;
         receipt.conditioning_payload_sha256 = Some("1".repeat(64));
         receipt.receipt_sha256 = transcription_experiment_receipt_commitment_v1(&receipt).unwrap();
-        assert!(validate_transcription_experiment_receipt_v1(
+        assert!(validate_fixture(
             &receipt,
             audio,
             midi,
@@ -844,7 +862,7 @@ mod tests {
         receipt.input_rights_basis = TranscriptionRightsBasisV1::Unresolved;
         receipt.input_usage_scope = TranscriptionUsageScopeV1::ResearchOnly;
         receipt.receipt_sha256 = transcription_experiment_receipt_commitment_v1(&receipt).unwrap();
-        assert!(validate_transcription_experiment_receipt_v1(
+        assert!(validate_fixture(
             &receipt,
             audio,
             midi,
@@ -868,6 +886,37 @@ mod tests {
     }
 
     #[test]
+    fn preprocessed_audio_and_config_artifacts_are_verified_by_hash() {
+        let audio = b"audio";
+        let midi = b"midi";
+        let report = report(midi);
+        let receipt = valid_receipt(audio, midi, &report);
+        let mut evidence = TranscriptionExperimentEvidenceV1 {
+            source_audio_bytes: audio,
+            model_input_audio_bytes: b"replaced-model-input",
+            dataset_manifest_bytes: b"dataset-manifest",
+            inference_config_bytes: b"inference-config",
+            preprocessing_config_bytes: b"preprocessing-config",
+            model_artifact_bytes: Some(b"model-weights"),
+            prediction_midi_bytes: midi,
+        };
+        let issues = validate_transcription_experiment_receipt_v1(
+            &receipt, &evidence, &report
+        );
+        assert!(issues.contains(&TranscriptionExperimentReceiptIssueV1::ArtifactDigestMismatch {
+            field: "model_input_audio_sha256".into()
+        }));
+        evidence.model_input_audio_bytes = b"canonical-model-input";
+        evidence.inference_config_bytes = b"replaced-config";
+        let issues = validate_transcription_experiment_receipt_v1(
+            &receipt, &evidence, &report
+        );
+        assert!(issues.contains(&TranscriptionExperimentReceiptIssueV1::ArtifactDigestMismatch {
+            field: "inference_config_sha256".into()
+        }));
+    }
+
+    #[test]
     fn invalid_chunk_overlap_is_rejected() {
         let audio = b"audio";
         let midi = b"midi";
@@ -875,7 +924,7 @@ mod tests {
         let mut receipt = valid_receipt(audio, midi, &report);
         receipt.preprocessing.chunk_overlap_ms = 5_000;
         receipt.receipt_sha256 = transcription_experiment_receipt_commitment_v1(&receipt).unwrap();
-        let issues = validate_transcription_experiment_receipt_v1(
+        let issues = validate_fixture(
             &receipt,
             audio,
             midi,
@@ -893,7 +942,7 @@ mod tests {
         let report = report(midi);
         let mut receipt = valid_receipt(audio, midi, &report);
         receipt.model_revision = "another-checkpoint".into();
-        let issues = validate_transcription_experiment_receipt_v1(
+        let issues = validate_fixture(
             &receipt,
             audio,
             midi,
