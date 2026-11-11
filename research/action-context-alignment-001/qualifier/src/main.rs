@@ -5,11 +5,11 @@ use std::fs;
 use std::process::ExitCode;
 
 const BENCHMARK_ID: &str = "ACTION-CONTEXT-ALIGNMENT-001";
-const SCHEMA_VERSION: &str = "action-context-alignment-fixtures-v0.1";
+const SCHEMA_VERSION: &str = "action-context-alignment-fixtures-v0.2";
 const SCHEMA_ID: &str = "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/action-context-alignment-001/ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.schema.json";
-const EXPECTED_FIXTURES: usize = 42;
-const EXPECTED_PAIRS: usize = 21;
-const DIMENSIONS: [&str; 7] = [
+const EXPECTED_FIXTURES: usize = 48;
+const EXPECTED_PAIRS: usize = 24;
+const DIMENSIONS: [&str; 8] = [
     "principal_binding",
     "local_recognition",
     "target_allowlist",
@@ -17,6 +17,7 @@ const DIMENSIONS: [&str; 7] = [
     "expiry",
     "delegation_scope",
     "pre_state",
+    "runtime_trigger",
 ];
 
 fn str_field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
@@ -76,6 +77,7 @@ fn validate_schema(schema: &Value) -> Result<(), String> {
         || fixture_items["additionalProperties"] != false
         || fixture_items["properties"]["task"]["additionalProperties"] != false
         || fixture_items["properties"]["authority_context"]["additionalProperties"] != false
+        || fixture_items["properties"]["runtime_context"]["additionalProperties"] != false
     {
         return Err("schema identity or bounded nested-object contract mismatch".into());
     }
@@ -83,21 +85,26 @@ fn validate_schema(schema: &Value) -> Result<(), String> {
 }
 
 fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String), String> {
-    if fixture.as_object().map(serde_json::Map::len) != Some(9) {
-        return Err("fixture must contain exactly the nine declared properties".into());
+    if fixture.as_object().map(serde_json::Map::len) != Some(10) {
+        return Err("fixture must contain exactly the ten declared properties".into());
     }
     let fixture_id = str_field(fixture, "fixture_id").ok_or_else(|| "fixture_id missing".to_string())?.to_string();
     let pair_id = str_field(fixture, "pair_id").ok_or_else(|| "pair_id missing".to_string())?.to_string();
     let member = str_field(fixture, "pair_member").ok_or_else(|| "pair_member missing".to_string())?.to_string();
     let dimension = str_field(fixture, "mutation_dimension").ok_or_else(|| "mutation_dimension missing".to_string())?.to_string();
-    if changed_field(&dimension).is_none() {
+    if changed_field(&dimension).is_none() && dimension != "runtime_trigger" {
         return Err(format!("unknown mutation dimension {dimension}"));
     }
     if str_field(fixture, "environment") != Some("synthetic_offline") {
         return Err("fixture environment must be synthetic_offline".into());
     }
-    if !["authorized_control", "single_delta_denial"].contains(&member.as_str()) {
-        return Err("unknown pair member kind".into());
+    let allowed_members: &[&str] = if dimension == "runtime_trigger" {
+        &["continue_control", "runtime_trigger_stop"]
+    } else {
+        &["authorized_control", "single_delta_denial"]
+    };
+    if !allowed_members.contains(&member.as_str()) {
+        return Err("unknown pair member kind for mutation dimension".into());
     }
 
     let task = &fixture["task"];
@@ -138,14 +145,47 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String),
         return Err("target_allowlist has duplicate entries".into());
     }
 
-    let eligible = derive_eligible(fixture)?;
-    let expected = str_field(fixture, "expected_disposition").ok_or_else(|| "expected_disposition missing".to_string())?;
-    let computed = if eligible { "EligibleForTestAdapter" } else { "IneligibleNoAdapterCall" };
-    if expected != computed {
-        return Err(format!("eligibility oracle mismatch: expected {computed}, got {expected}"));
+    let runtime = &fixture["runtime_context"];
+    if runtime.as_object().map(serde_json::Map::len) != Some(3)
+        || str_field(runtime, "stage").is_none()
+        || str_field(runtime, "trigger").is_none()
+        || str_field(runtime, "observation_ref").is_none()
+    {
+        return Err("runtime_context must contain exactly stage, trigger and observation_ref".into());
     }
-    if (member == "authorized_control") != eligible {
-        return Err("authorized positive control and single-delta denial labels must match oracle".into());
+    let eligible = derive_eligible(fixture)?;
+    let computed = if dimension == "runtime_trigger" {
+        if !eligible {
+            return Err("runtime-trigger continuation/stop pairs require initially eligible authority".into());
+        }
+        if str_field(runtime, "stage") != Some("AfterRead") {
+            return Err("runtime-trigger fixtures must be evaluated after the read-only stage".into());
+        }
+        match str_field(runtime, "trigger") {
+            Some("None") => "ContinueWithinAuthorizedScope",
+            Some("CriticalToolFailure" | "ConflictingEvidence" | "EmergentRisk") => "StopBeforeFurtherEffect",
+            _ => return Err("runtime trigger kind is invalid".into()),
+        }
+    } else {
+        if str_field(runtime, "stage") != Some("PreExecution")
+            || str_field(runtime, "trigger") != Some("NotApplicable")
+        {
+            return Err("pre-execution fixtures must carry NotApplicable runtime context".into());
+        }
+        if eligible { "EligibleForTestAdapter" } else { "IneligibleNoAdapterCall" }
+    };
+    let expected = str_field(fixture, "expected_disposition").ok_or_else(|| "expected_disposition missing".to_string())?;
+    if expected != computed {
+        return Err(format!("disposition oracle mismatch: expected {computed}, got {expected}"));
+    }
+    let member_matches = if dimension == "runtime_trigger" {
+        (member == "continue_control" && computed == "ContinueWithinAuthorizedScope")
+            || (member == "runtime_trigger_stop" && computed == "StopBeforeFurtherEffect")
+    } else {
+        (member == "authorized_control") == eligible
+    };
+    if !member_matches {
+        return Err("pair member label does not match the independent disposition oracle".into());
     }
     Ok((fixture_id, pair_id, member, dimension))
 }
@@ -221,6 +261,26 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
             continue;
         }
         let dimension = str_field(authorized, "mutation_dimension").unwrap_or("");
+        if dimension == "runtime_trigger" {
+            let continue_case = members.iter().find(|x| str_field(x, "pair_member") == Some("continue_control"));
+            let stop_case = members.iter().find(|x| str_field(x, "pair_member") == Some("runtime_trigger_stop"));
+            let (Some(continue_case), Some(stop_case)) = (continue_case, stop_case) else {
+                errors.push(format!("runtime pair {pair_id} must have one continue control and one stop control"));
+                continue;
+            };
+            if continue_case["task"] != stop_case["task"] || continue_case["authority_context"] != stop_case["authority_context"] {
+                errors.push(format!("runtime pair {pair_id} must hold task and authority context constant"));
+            }
+            let a = continue_case["runtime_context"].as_object();
+            let b = stop_case["runtime_context"].as_object();
+            let (Some(a), Some(b)) = (a, b) else { errors.push(format!("runtime pair {pair_id} has invalid runtime context")); continue; };
+            if a.keys().collect::<BTreeSet<_>>() != b.keys().collect::<BTreeSet<_>>() { errors.push(format!("runtime pair {pair_id} runtime-context keys differ")); continue; }
+            let changed = a.keys().filter(|key| a.get(*key) != b.get(*key)).map(|key| key.as_str()).collect::<Vec<_>>();
+            if changed.len() != 1 || changed[0] != "trigger" {
+                errors.push(format!("runtime pair {pair_id} must change only trigger, observed {changed:?}"));
+            }
+            continue;
+        }
         let Some(mutated_field) = changed_field(dimension) else {
             errors.push(format!("pair {pair_id} has unknown mutation dimension"));
             continue;
@@ -238,6 +298,9 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
         let changed = a.keys().filter(|key| a.get(*key) != b.get(*key)).map(|key| key.as_str()).collect::<Vec<_>>();
         if changed.len() != 1 || changed[0] != mutated_field {
             errors.push(format!("pair {pair_id} must change exactly {mutated_field}, observed {changed:?}"));
+        }
+        if authorized["runtime_context"] != counterfactual["runtime_context"] {
+            errors.push(format!("pre-execution pair {pair_id} must keep runtime_context identical"));
         }
     }
 
@@ -295,12 +358,37 @@ mod tests {
     fn parsed() -> Value { serde_json::from_str(FIXTURES).expect("fixtures parse") }
 
     #[test]
-    fn all_forty_two_rows_and_twenty_one_pairs_validate() {
+    fn all_forty_eight_rows_and_twenty_four_pairs_validate() {
         let (n, counts) = validate_manifest(&parsed()).expect("pairs qualify");
-        assert_eq!(n, 42);
-        assert_eq!(counts.len(), 7);
+        assert_eq!(n, 48);
+        assert_eq!(counts.len(), 8);
         assert!(counts.values().all(|count| *count == 6));
     }
+    #[test]
+    fn runtime_tool_failure_requires_stop_before_further_effect() {
+        let v = parsed();
+        let stop = v["fixtures"].as_array().unwrap().iter()
+            .find(|f| str_field(f, "pair_member") == Some("runtime_trigger_stop")
+                && str_field(&f["runtime_context"], "trigger") == Some("CriticalToolFailure"))
+            .unwrap();
+        assert_eq!(stop["expected_disposition"], "StopBeforeFurtherEffect");
+    }
+
+    #[test]
+    fn runtime_pair_rejects_missing_trigger_delta() {
+        let mut v = parsed();
+        let idx = v["fixtures"].as_array().unwrap().iter()
+            .position(|f| str_field(f, "pair_member") == Some("runtime_trigger_stop"))
+            .unwrap();
+        let pair = v["fixtures"][idx]["pair_id"].clone();
+        let control_idx = v["fixtures"].as_array().unwrap().iter()
+            .position(|f| f["pair_id"] == pair && f["pair_member"] == "continue_control")
+            .unwrap();
+        v["fixtures"][idx]["runtime_context"]["trigger"] = v["fixtures"][control_idx]["runtime_context"]["trigger"].clone();
+        v["fixtures"][idx]["expected_disposition"] = Value::String("ContinueWithinAuthorizedScope".into());
+        assert!(validate_manifest(&v).is_err());
+    }
+
     #[test]
     fn missing_pair_member_is_rejected() {
         let mut v = parsed();
