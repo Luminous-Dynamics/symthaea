@@ -155,16 +155,24 @@ fn validate_manifest(manifest: &Value) -> Result<BTreeMap<String, usize>, Vec<St
     if fixtures.len() != EXPECTED_FIXTURES { errors.push(format!("expected {EXPECTED_FIXTURES} fixtures, got {}", fixtures.len())); }
     let mut ids = BTreeSet::new();
     let mut counts = BTreeMap::<String, usize>::new();
+    let mut family_counts = BTreeMap::<String, usize>::new();
     let mut pairs = BTreeMap::<String, Vec<&Value>>::new();
     for (index, fixture) in fixtures.iter().enumerate() {
         match validate_fixture(fixture) {
             Ok((id, pair)) => {
                 if !ids.insert(id.clone()) { errors.push(format!("fixtures[{index}] duplicates scenario ID {id}")); }
+                let family = string_field(fixture, "task_family").unwrap_or_default().to_string();
+                *family_counts.entry(family).or_default() += 1;
                 let action = string_field(fixture, "expected_action").unwrap_or_default().to_string();
                 *counts.entry(action).or_default() += 1;
                 if !pair.is_empty() { pairs.entry(pair).or_default().push(fixture); }
             }
             Err(error) => errors.push(format!("fixtures[{index}]: {error}")),
+        }
+    }
+    for family in ["factual_reasoning", "retrieval", "mechanical_diagnosis", "institutional_process"] {
+        if family_counts.get(family).copied().unwrap_or(0) != 10 {
+            errors.push(format!("task family {family} must contain exactly ten fixtures"));
         }
     }
     for action in ACTIONS { if counts.get(action).copied().unwrap_or(0)==0 { errors.push(format!("no fixture makes {action} optimal")); } }
@@ -229,6 +237,11 @@ mod tests {
     }
     #[test] fn missing_fixture_is_rejected() {
         let mut v=parsed();v["fixtures"].as_array_mut().unwrap().pop();assert!(validate_manifest(&v).is_err());
+    }
+    #[test] fn family_imbalance_is_rejected() {
+        let mut v=parsed();
+        v["fixtures"][0]["task_family"]=Value::String("retrieval".into());
+        assert!(validate_manifest(&v).is_err());
     }
     #[test] fn utility_tampering_is_rejected() {
         let mut v=parsed();v["fixtures"][0]["expected_utilities"]["Answer"]["numerator"]=Value::from(999);assert!(validate_manifest(&v).is_err());
