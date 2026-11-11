@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ev_mission_outcome_audit_v0_1",
+  "title": "EV mission outcome audit corpus v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_version",
+    "cases"
+  ],
+  "properties": {
+    "corpus_version": {
+      "const": "ev-mission-outcome-audit/0.1"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vehicle_ref",
+        "pack_ref",
+        "configuration_sha256",
+        "topology_sha256"
+      ],
+      "properties": {
+        "vehicle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "topology_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "required_measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint",
+        "scope_ref",
+        "unit",
+        "limit_value",
+        "relation"
+      ],
+      "properties": {
+        "constraint": {
+          "enum": [
+            "DISCHARGE_POWER",
+            "CHARGE_ACCEPTANCE",
+            "ENERGY_RESERVE",
+            "SOC_MINIMUM",
+            "SOC_MAXIMUM",
+            "VOLTAGE_MINIMUM",
+            "VOLTAGE_MAXIMUM",
+            "TEMPERATURE_MAXIMUM"
+          ]
+        },
+        "scope_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limit_value": {
+          "type": "number"
+        },
+        "relation": {
+          "enum": [
+            "MINIMUM_REQUIRED",
+            "MAXIMUM_ALLOWED"
+          ]
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint",
+        "scope_ref",
+        "unit",
+        "measured_value",
+        "measurement_ref",
+        "measurement_sha256"
+      ],
+      "properties": {
+        "constraint": {
+          "enum": [
+            "DISCHARGE_POWER",
+            "CHARGE_ACCEPTANCE",
+            "ENERGY_RESERVE",
+            "SOC_MINIMUM",
+            "SOC_MAXIMUM",
+            "VOLTAGE_MINIMUM",
+            "VOLTAGE_MAXIMUM",
+            "TEMPERATURE_MAXIMUM"
+          ]
+        },
+        "scope_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measured_value": {
+          "type": "number"
+        },
+        "measurement_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset",
+        "mission_profile_ref",
+        "mission_profile_sha256",
+        "mission_report_ref",
+        "mission_report_sha256",
+        "evaluator_version",
+        "disposition",
+        "required_measurements"
+      ],
+      "properties": {
+        "asset": {
+          "$ref": "#/$defs/asset"
+        },
+        "mission_profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mission_profile_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "mission_report_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mission_report_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evaluator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "enum": [
+            "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+            "INFEASIBLE",
+            "NOT_COMPUTABLE",
+            "UNSUPPORTED_DOMAIN",
+            "CONFLICTING_EVIDENCE",
+            "REJECTED_INPUT"
+          ]
+        },
+        "required_measurements": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/required_measurement"
+          }
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset",
+        "mission_profile_ref",
+        "mission_profile_sha256",
+        "evidence_class",
+        "protocol_ref",
+        "protocol_sha256",
+        "evidence_ref",
+        "evidence_sha256",
+        "outcome",
+        "outcome_reason",
+        "observed_at_ms",
+        "measurements"
+      ],
+      "properties": {
+        "asset": {
+          "$ref": "#/$defs/asset"
+        },
+        "mission_profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mission_profile_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_class": {
+          "enum": [
+            "SYNTHETIC_KNOWN_TRUTH",
+            "INDEPENDENT_PHYSICAL_REFERENCE"
+          ]
+        },
+        "protocol_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "outcome": {
+          "enum": [
+            "MISSION_COMPLETED_WITHIN_LIMITS",
+            "BATTERY_CONSTRAINT_EXCEEDED",
+            "NON_BATTERY_ABORT",
+            "INCONCLUSIVE"
+          ]
+        },
+        "outcome_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "measurements": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/observation"
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "prediction",
+        "reference"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prediction": {
+          "$ref": "#/$defs/prediction"
+        },
+        "reference": {
+          "$ref": "#/$defs/reference"
+        }
+      }
+    }
+  }
+}
