@@ -25,7 +25,7 @@ pub struct RouterConfig {
 impl Default for RouterConfig {
     fn default() -> Self {
         Self {
-            minimum_planned_trials: 30,
+            minimum_planned_trials: 50,
             minimum_known_coverage: 0.90,
             maximum_adverse_risk_upper_bound: 0.10,
             maximum_p95_latency_ms: 1_000.0,
