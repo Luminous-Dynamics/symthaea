@@ -143,3 +143,26 @@ The 22-case corpus also now treats DI18 (compression quality loss) and DI19 (fle
 ## Source-to-actuator AoI implementation
 
 The measurement arithmetic is now owned by [Symtropy #4713](https://github.com/Luminous-Dynamics/symtropy/issues/4713), with a standalone Rust reference in [PR #4715](https://github.com/Luminous-Dynamics/symtropy/pull/4715). The reference preserves a per-source age vector, requires a shared monotonic clock/boot epoch for V0, and reports time-weighted held-command AoI. It does not determine action freshness thresholds or authorize actuation.
+
+
+## Fleet serving must be control-aware, heterogeneous and mission-aware
+
+The current fleet case should be compared against real serving baselines, not only priority admission:
+
+- Round Robin;
+- Earliest Deadline First (EDF);
+- Armory Lookahead scheduler (Bansal et al., arXiv:2608.00337 / project page);
+- a Luminous candidate that uses qualified per-robot action-buffer depletion, actuation-AoI/actuation-deadline risk, decision EVSI and mission-state consequences to decide which optional remote inference requests to admit or batch.
+
+Armory tracks server-side robot action queues and in-flight chunks and reports up to 18% higher throughput in its tested 10-robot real-world heterogeneous PiPER fleet versus conventional scheduling baselines. Its one-fast/nine-slow workload demonstrates that task heterogeneity changes the cost of starvation. These are that paper's platform-specific results, not a guaranteed gain for Luminous or quadrupeds.
+
+Source: https://actionchunkscheduling.github.io/ and https://arxiv.org/abs/2608.00337
+
+A Luminous extension should not merely assign static weights. Candidate scheduling priority should be bounded by:
+- time until the local action buffer reaches its safe fallback boundary;
+- probability of missing a declared actuation deadline (PoMA-style outcome);
+- task-conditioned downstream decision value of the remote result (EVSI, in task-loss units);
+- local thermal/actuator/recovery constraints from Symtropy, used as state features and hard eligibility constraints;
+- per-robot minimum service and starvation bounds.
+
+Keep a lexicographic or constrained formulation: hard local safety and safe-stop are not batch-scheduling rewards; they remain local and non-preemptible. A remote inference response is only a proposal. Report total throughput, per-tier throughput, per-robot starvation, service fairness and safety outcomes separately. Never hide a sacrificed robot in a fleet-average throughput improvement.
