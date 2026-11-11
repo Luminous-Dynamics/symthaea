@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/home-service-metrology-study-design-v0.1/docs/research/home-service-metrology/HOME_SERVICE_METROLOGY_STUDY_CORPUS_V0_1.schema.json",
+  "title": "Home Service Metrology Study Design Corpus v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "classification",
+    "claim_ceiling",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "luminous.home-service-metrology-study-corpus/0.1"
+    },
+    "corpus_id": {
+      "const": "HOME-SVC-METROLOGY-STUDY-CORPUS-V0.1"
+    },
+    "classification": {
+      "const": "synthetic_preregistration_gate_cases"
+    },
+    "claim_ceiling": {
+      "const": "study_design_gate_only_not_evidence_of_product_performance"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 36,
+      "maxItems": 36,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "description",
+          "signals",
+          "expected_disposition"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^HSM-[0-9]{3}$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 20
+          },
+          "expected_disposition": {
+            "enum": [
+              "NOT_COMPARABLE",
+              "REJECTED_FOR_STUDY_SCOPE",
+              "MORE_EVIDENCE_REQUIRED",
+              "ELIGIBLE_FOR_PREREGISTRATION_REVIEW_ONLY"
+            ]
+          },
+          "signals": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "primary_endpoint_defined",
+              "functional_unit_defined",
+              "comparators_pinned",
+              "same_protocol_across_arms",
+              "same_conditions_and_trace",
+              "software_model_versions_pinned",
+              "adaptation_budget_frozen",
+              "repeatability_runs_per_cell",
+              "independent_lab_count",
+              "production_lot_count",
+              "units_per_lot",
+              "household_count",
+              "duty_cycle_profile_count",
+              "holdout_lab_count",
+              "holdout_lot_count",
+              "holdout_household_count",
+              "holdout_not_used_for_tuning",
+              "power_analysis_present",
+              "hierarchical_model_registered",
+              "analysis_code_digest_present",
+              "calibration_and_provenance_complete",
+              "independent_reference_method_present",
+              "randomization_preregistered",
+              "assessor_blinding_or_independent_adjudication",
+              "exclusion_rules_preregistered",
+              "missingness_policy_preregistered",
+              "consent_and_privacy_plan_present",
+              "purpose_bound_data_use",
+              "pseudoreplication_guard",
+              "hard_gates_noncompensatory",
+              "outlier_rule_preregistered",
+              "deviation_log_enabled",
+              "cluster_nesting_declared",
+              "analysis_preregistered",
+              "all_variance_strata_separately_reported",
+              "no_unplanned_product_revision_mixing"
+            ],
+            "properties": {
+              "primary_endpoint_defined": {
+                "type": "boolean"
+              },
+              "functional_unit_defined": {
+                "type": "boolean"
+              },
+              "comparators_pinned": {
+                "type": "boolean"
+              },
+              "same_protocol_across_arms": {
+                "type": "boolean"
+              },
+              "same_conditions_and_trace": {
+                "type": "boolean"
+              },
+              "software_model_versions_pinned": {
+                "type": "boolean"
+              },
+              "adaptation_budget_frozen": {
+                "type": "boolean"
+              },
+              "repeatability_runs_per_cell": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "independent_lab_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "production_lot_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "units_per_lot": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "household_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "duty_cycle_profile_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "holdout_lab_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "holdout_lot_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "holdout_household_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "holdout_not_used_for_tuning": {
+                "type": "boolean"
+              },
+              "power_analysis_present": {
+                "type": "boolean"
+              },
+              "hierarchical_model_registered": {
+                "type": "boolean"
+              },
+              "analysis_code_digest_present": {
+                "type": "boolean"
+              },
+              "calibration_and_provenance_complete": {
+                "type": "boolean"
+              },
+              "independent_reference_method_present": {
+                "type": "boolean"
+              },
+              "randomization_preregistered": {
+                "type": "boolean"
+              },
+              "assessor_blinding_or_independent_adjudication": {
+                "type": "boolean"
+              },
+              "exclusion_rules_preregistered": {
+                "type": "boolean"
+              },
+              "missingness_policy_preregistered": {
+                "type": "boolean"
+              },
+              "consent_and_privacy_plan_present": {
+                "type": "boolean"
+              },
+              "purpose_bound_data_use": {
+                "type": "boolean"
+              },
+              "pseudoreplication_guard": {
+                "type": "boolean"
+              },
+              "hard_gates_noncompensatory": {
+                "type": "boolean"
+              },
+              "outlier_rule_preregistered": {
+                "type": "boolean"
+              },
+              "deviation_log_enabled": {
+                "type": "boolean"
+              },
+              "cluster_nesting_declared": {
+                "type": "boolean"
+              },
+              "analysis_preregistered": {
+                "type": "boolean"
+              },
+              "all_variance_strata_separately_reported": {
+                "type": "boolean"
+              },
+              "no_unplanned_product_revision_mixing": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
