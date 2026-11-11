@@ -264,3 +264,6 @@ It composes with #11122 and #11338: it does not create another EVSI or active-se
 ## Real-time computation and dynamic-world evaluation
 
 The new cross-cutting real-time benchmark is tracked in [Symthaea #11561](https://github.com/Luminous-Dynamics/symthaea/issues/11561) and summarized in [realtime_computation_extension.md](./realtime_computation_extension.md). It distinguishes frozen-world upper bounds from wall-clock real-time operation and charges compute/observation latency against changing physical state.
+
+
+The real-time cognition extension now has ten machine-readable known-answer cases and a strict schema at [realtime_computation_extension.md](./realtime_computation_extension.md) and [fixtures/realtime_cognition_v0_1.json](./fixtures/realtime_cognition_v0_1.json). This tests policy eligibility and measurement semantics only; it does not confer actuation authority or claim hardware timing results.
