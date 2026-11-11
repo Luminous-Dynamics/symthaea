@@ -191,6 +191,11 @@ pub struct SourceBusCapabilityReport {
     pub source_id: Option<String>,
     pub battery_instance_id: Option<String>,
     pub source_boundary_id: String,
+    pub bus_source_evidence_manifest_digest: String,
+    pub as_installed_pack_configuration_digest: Option<String>,
+    pub source_evidence_manifest_digest: Option<String>,
+    pub source_state_manifest_digest: Option<String>,
+    pub energy_evidence_manifest_digest: Option<String>,
     pub source_model_id: Option<String>,
     pub source_model_version: Option<String>,
     pub source_model_output_digest: Option<String>,
@@ -304,6 +309,8 @@ fn validate_profile_identity(
     profile: &SourceCapabilityProfile,
 ) -> Result<(), &'static str> {
     if profile.aircraft_configuration_digest != input.aircraft_configuration_digest
+        || bus.configuration_digest != input.aircraft_configuration_digest
+        || bus.source_evidence_manifest_digest.trim().is_empty()
         || profile.mission_profile_digest != input.mission_profile_digest
         || profile.bus_id != bus.bus_id
         || profile.source_boundary_id != bus.source_boundary_id
@@ -656,6 +663,11 @@ pub fn qualify_source_capability(
                 source_id: None,
                 battery_instance_id: None,
                 source_boundary_id: bus.source_boundary_id.clone(),
+                bus_source_evidence_manifest_digest: bus.source_evidence_manifest_digest.clone(),
+                as_installed_pack_configuration_digest: None,
+                source_evidence_manifest_digest: None,
+                source_state_manifest_digest: None,
+                energy_evidence_manifest_digest: None,
                 source_model_id: None,
                 source_model_version: None,
                 source_model_output_digest: None,
@@ -679,6 +691,13 @@ pub fn qualify_source_capability(
                 source_id: Some(profile.source_id.clone()),
                 battery_instance_id: Some(profile.battery_instance_id.clone()),
                 source_boundary_id: profile.source_boundary_id.clone(),
+                bus_source_evidence_manifest_digest: bus.source_evidence_manifest_digest.clone(),
+                as_installed_pack_configuration_digest: Some(
+                    profile.as_installed_pack_configuration_digest.clone(),
+                ),
+                source_evidence_manifest_digest: Some(profile.source_evidence_manifest_digest.clone()),
+                source_state_manifest_digest: Some(profile.source_state_manifest_digest.clone()),
+                energy_evidence_manifest_digest: Some(profile.energy_evidence_manifest_digest.clone()),
                 source_model_id: Some(profile.source_model_id.clone()),
                 source_model_version: Some(profile.source_model_version.clone()),
                 source_model_output_digest: Some(profile.source_model_output_digest.clone()),
@@ -715,6 +734,13 @@ pub fn qualify_source_capability(
             source_id: Some(profile.source_id.clone()),
             battery_instance_id: Some(profile.battery_instance_id.clone()),
             source_boundary_id: profile.source_boundary_id.clone(),
+            bus_source_evidence_manifest_digest: bus.source_evidence_manifest_digest.clone(),
+            as_installed_pack_configuration_digest: Some(
+                profile.as_installed_pack_configuration_digest.clone(),
+            ),
+            source_evidence_manifest_digest: Some(profile.source_evidence_manifest_digest.clone()),
+            source_state_manifest_digest: Some(profile.source_state_manifest_digest.clone()),
+            energy_evidence_manifest_digest: Some(profile.energy_evidence_manifest_digest.clone()),
             source_model_id: Some(profile.source_model_id.clone()),
             source_model_version: Some(profile.source_model_version.clone()),
             source_model_output_digest: Some(profile.source_model_output_digest.clone()),
@@ -996,7 +1022,10 @@ mod tests {
         let mut input = input();
         input.source_profiles.clear();
         let report = qualify_source_capability(&input).unwrap();
-        assert_eq!(report.buses[0].adverse.disposition, SourceCapabilityDisposition::UnknownMissingCapability);
+        assert_eq!(
+            report.buses[0].adverse.disposition,
+            SourceCapabilityDisposition::UnknownMissingCapability
+        );
         assert_eq!(
             report.buses[0].nominal.disposition,
             SourceCapabilityDisposition::UnknownMissingCapability
