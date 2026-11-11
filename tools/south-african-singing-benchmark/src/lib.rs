@@ -230,7 +230,6 @@ pub fn validate_singing_benchmark_manifest(
     let mut work_split_owners = BTreeMap::new();
     let mut session_split_owners = BTreeMap::new();
     let mut audio_split_owners = BTreeMap::new();
-    let mut audio_digests = BTreeMap::new();
 
     for case in cases {
         validate_case(spec, case, &profiles)?;
@@ -269,17 +268,6 @@ pub fn validate_singing_benchmark_manifest(
             "source audio digest",
             true,
         )?;
-
-        if let Some(previous_case) =
-            audio_digests.insert(case.source_audio_sha256.as_str(), case.case_id.as_str())
-        {
-            if previous_case != case.case_id.as_str() {
-                return Err(SingingManifestError::new(format!(
-                    "source audio digest is reused by cases {} and {}",
-                    previous_case, case.case_id
-                )));
-            }
-        }
 
         *split_counts.entry(case.split).or_insert(0) += 1;
         for language_id in unique_case_languages(case) {
@@ -1030,17 +1018,22 @@ mod tests {
         let mut second = first.clone();
         second.case_id = "case-002".to_owned();
         second.song_work_family_pseudonym_id = "work-pseudo-02".to_owned();
-        second.source_audio_sha256 = digest('d');
+        second.source_audio_sha256 = first.source_audio_sha256.clone();
         let report =
             validate_singing_benchmark_manifest(&spec(), &[first, second]).unwrap();
         assert_eq!(report.case_counts_by_split[&DatasetSplitV1::Development], 2);
     }
 
     #[test]
-    fn duplicate_audio_digest_in_distinct_cases_is_rejected() {
-        let first = valid_case();
+    fn same_source_audio_cannot_cross_dataset_splits() {
+        let mut first = valid_case();
+        first.split = DatasetSplitV1::Calibration;
         let mut second = first.clone();
         second.case_id = "case-002".to_owned();
+        second.performer_pseudonym_id = "performer-pseudo-02".to_owned();
+        second.song_work_family_pseudonym_id = "work-pseudo-02".to_owned();
+        second.recording_session_pseudonym_id = "session-pseudo-02".to_owned();
+        second.split = DatasetSplitV1::Confirmatory;
         assert!(
             validate_singing_benchmark_manifest(&spec(), &[first, second]).is_err()
         );
