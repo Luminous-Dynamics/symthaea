@@ -139,6 +139,9 @@ pub enum CandidateRejectionV1 {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CandidateEvaluationV1 {
     pub candidate_id: String,
+    /// Canonical control vector evaluated for this candidate, retained so the
+    /// report can be replayed without relying on an external search input.
+    pub deltas: Vec<ControlDeltaV1>,
     pub weighted_effort: Option<f64>,
     pub feasible: bool,
     pub predicted_metrics: Vec<PredictedMetricIntervalV1>,
@@ -663,8 +666,18 @@ fn evaluate_candidate(
     }
 
     let feasible = rejections.is_empty();
+    let canonical_candidate_deltas = spec
+        .controls
+        .iter()
+        .map(|control| ControlDeltaV1 {
+            control_id: control.control_id.clone(),
+            unit: control.unit.clone(),
+            delta: candidate_deltas[control.control_id.as_str()],
+        })
+        .collect();
     Ok(CandidateEvaluationV1 {
         candidate_id: candidate.candidate_id.clone(),
+        deltas: canonical_candidate_deltas,
         weighted_effort: weighted_effort.is_finite().then_some(weighted_effort),
         feasible,
         predicted_metrics,
