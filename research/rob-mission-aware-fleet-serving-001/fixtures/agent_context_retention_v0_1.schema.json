@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rob-mission-aware-fleet-serving-001/fixtures/agent_context_retention_v0_1.schema.json",
+  "title": "Decision- and recovery-aware agent context retention fixtures v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "const": "ROB-AGENT-CONTEXT-RETENTION-001"
+    },
+    "status": {
+      "const": "synthetic_known_answers_only"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "CR01_PHASE_AWARE_THINK_ACT_TOOL_RETENTION"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "CR02_LOW_RECENCY_HIGH_RECOVERY_VALUE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "CR03_LONG_VISUAL_CONTEXT_VS_ACTION_CHUNK_BUDGET"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "CR04_ASYNC_ACTION_CONDITIONED_PREFIX_AND_OPENWAM_FACTORS"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "strlist": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "nn": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "serving_baselines",
+        "execution_baselines",
+        "context_policy",
+        "context_horizon_seconds",
+        "kv_capacity_tokens",
+        "resident_tokens",
+        "candidate_context_tokens",
+        "re_prefill_latency_ms",
+        "context_decision_regret_if_evicted",
+        "context_loss_scale_id",
+        "context_future_reuse_probability_ppm",
+        "context_is_recovery_critical",
+        "action_chunk_deadline_ms",
+        "action_chunk_p99_ms",
+        "local_projection_dispatch_guard_ms",
+        "camera_deadline_ms",
+        "camera_p99_ms",
+        "camera_memory_bandwidth_reserved",
+        "local_control_resources_reserved",
+        "executed_prefix_digest_matches",
+        "observation_clock_valid",
+        "held_out_phase_mix"
+      ],
+      "properties": {
+        "serving_baselines": {
+          "$ref": "#/$defs/strlist"
+        },
+        "execution_baselines": {
+          "$ref": "#/$defs/strlist"
+        },
+        "context_policy": {
+          "enum": [
+            "phase_aware",
+            "decision_recovery_aware",
+            "adaptive_causal_history",
+            "executed_prefix_conditioned"
+          ]
+        },
+        "context_horizon_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "kv_capacity_tokens": {
+          "$ref": "#/$defs/nn"
+        },
+        "resident_tokens": {
+          "$ref": "#/$defs/nn"
+        },
+        "candidate_context_tokens": {
+          "$ref": "#/$defs/nn"
+        },
+        "re_prefill_latency_ms": {
+          "$ref": "#/$defs/nn"
+        },
+        "context_decision_regret_if_evicted": {
+          "$ref": "#/$defs/nn"
+        },
+        "context_loss_scale_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_future_reuse_probability_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "context_is_recovery_critical": {
+          "type": "boolean"
+        },
+        "action_chunk_deadline_ms": {
+          "$ref": "#/$defs/nn"
+        },
+        "action_chunk_p99_ms": {
+          "$ref": "#/$defs/nn"
+        },
+        "local_projection_dispatch_guard_ms": {
+          "$ref": "#/$defs/nn"
+        },
+        "camera_deadline_ms": {
+          "$ref": "#/$defs/nn"
+        },
+        "camera_p99_ms": {
+          "$ref": "#/$defs/nn"
+        },
+        "camera_memory_bandwidth_reserved": {
+          "const": true
+        },
+        "local_control_resources_reserved": {
+          "const": true
+        },
+        "executed_prefix_digest_matches": {
+          "type": "boolean"
+        },
+        "observation_clock_valid": {
+          "type": "boolean"
+        },
+        "held_out_phase_mix": {
+          "const": true
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "performance_winner_predeclared",
+        "camera_deadline_must_be_preserved",
+        "local_control_must_be_preserved",
+        "action_chunk_must_meet_deadline",
+        "per_robot_and_phase_metrics_required",
+        "decision_recovery_value_must_be_reported"
+      ],
+      "properties": {
+        "status": {
+          "const": "benchmark_only"
+        },
+        "performance_winner_predeclared": {
+          "const": false
+        },
+        "camera_deadline_must_be_preserved": {
+          "const": true
+        },
+        "local_control_must_be_preserved": {
+          "const": true
+        },
+        "action_chunk_must_meet_deadline": {
+          "const": true
+        },
+        "per_robot_and_phase_metrics_required": {
+          "const": true
+        },
+        "decision_recovery_value_must_be_reported": {
+          "const": true
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "CR01_PHASE_AWARE_THINK_ACT_TOOL_RETENTION",
+            "CR02_LOW_RECENCY_HIGH_RECOVERY_VALUE",
+            "CR03_LONG_VISUAL_CONTEXT_VS_ACTION_CHUNK_BUDGET",
+            "CR04_ASYNC_ACTION_CONDITIONED_PREFIX_AND_OPENWAM_FACTORS"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
