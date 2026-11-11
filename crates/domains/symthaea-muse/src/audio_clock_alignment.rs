@@ -918,6 +918,8 @@ mod tests {
             profile.status,
             AudioClockAlignmentStatusV1::InsufficientAudioCoverage
         );
+        assert_eq!(profile.matched_expected_onset_count, 2);
+        assert!(profile.best_peak_score.is_some());
         assert!(profile.audio_minus_midi_offset_frames.is_none());
     }
 
