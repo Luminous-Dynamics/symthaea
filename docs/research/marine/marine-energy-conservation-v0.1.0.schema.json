@@ -1,0 +1,393 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-energy-conservation:0.1.0",
+  "title": "Luminous Marine Component Energy Conservation Ledger v0.1.0",
+  "description": "First-law component and whole-system energy balance graph. Integer micro-GJ, explicit boundary flows, losses, storage changes and supplied uncertainty budgets. Not exergy, regulatory MRV or physical qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "balance_id",
+    "record_status",
+    "accounting_basis",
+    "vessel_configuration_sha256",
+    "service_fingerprint",
+    "reporting_window",
+    "evidence_source_ids",
+    "components",
+    "flows",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "balance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "enum": [
+        "synthetic",
+        "research_record",
+        "reviewed"
+      ]
+    },
+    "accounting_basis": {
+      "const": "first_law_component_boundary_v1"
+    },
+    "vessel_configuration_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "service_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "reporting_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "window_id",
+        "start",
+        "end",
+        "timebase_id"
+      ],
+      "properties": {
+        "window_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timebase_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evidence_source_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    },
+    "flows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/flow"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "energy_value": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value_micro_gj",
+            "evidence_source_id",
+            "method_id"
+          ],
+          "properties": {
+            "value_micro_gj": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "evidence_source_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "method_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value_micro_gj",
+            "unknown_reason",
+            "evidence_source_id",
+            "method_id"
+          ],
+          "properties": {
+            "value_micro_gj": {
+              "type": "null"
+            },
+            "unknown_reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_source_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "method_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "storage_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "direction",
+        "value_micro_gj",
+        "evidence_source_id",
+        "method_id"
+      ],
+      "properties": {
+        "direction": {
+          "enum": [
+            "increase",
+            "decrease",
+            "none",
+            "unknown"
+          ]
+        },
+        "value_micro_gj": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unknown_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "uncertainty_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "budget_id",
+        "basis",
+        "expanded_uncertainty_micro_gj",
+        "coverage_factor",
+        "propagation_method",
+        "method_id",
+        "evidence_source_id",
+        "limitations"
+      ],
+      "properties": {
+        "budget_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "enum": [
+            "metrology_expanded_uncertainty",
+            "deterministic_rounding",
+            "engineering_allowance",
+            "unknown"
+          ]
+        },
+        "expanded_uncertainty_micro_gj": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coverage_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "propagation_method": {
+          "enum": [
+            "worst_case_linear_sum",
+            "independent_rss",
+            "covariance_matrix",
+            "unknown"
+          ]
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "component_type",
+        "conversion_loss",
+        "storage_change",
+        "uncertainty_budget",
+        "limitations"
+      ],
+      "properties": {
+        "component_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component_type": {
+          "enum": [
+            "prime_mover",
+            "generator",
+            "power_converter",
+            "switchboard",
+            "battery_storage",
+            "thermal_storage",
+            "hydrogen_storage",
+            "electric_motor",
+            "shaft_line",
+            "propeller",
+            "wind_device",
+            "heat_recovery",
+            "hotel_load",
+            "propulsion_control_volume",
+            "other"
+          ]
+        },
+        "conversion_loss": {
+          "$ref": "#/$defs/energy_value"
+        },
+        "storage_change": {
+          "$ref": "#/$defs/storage_change"
+        },
+        "uncertainty_budget": {
+          "$ref": "#/$defs/uncertainty_budget"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "flow_id",
+        "measurement_id",
+        "reporting_window_id",
+        "flow_class",
+        "from_component_id",
+        "to_component_id",
+        "carrier",
+        "energy",
+        "method_id",
+        "limitations"
+      ],
+      "properties": {
+        "flow_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reporting_window_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "flow_class": {
+          "enum": [
+            "external_input",
+            "internal_transfer",
+            "external_output"
+          ]
+        },
+        "from_component_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "to_component_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "carrier": {
+          "enum": [
+            "fuel_chemical",
+            "shore_electricity",
+            "onboard_electricity",
+            "shaft_mechanical",
+            "propulsive_mechanical",
+            "ambient_wind_mechanical",
+            "thermal_recovered",
+            "hotel_service",
+            "other"
+          ]
+        },
+        "energy": {
+          "$ref": "#/$defs/energy_value"
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
