@@ -905,8 +905,11 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                         false
                     } else {
                         request.response_stamp.as_ref().is_some_and(|response| {
-                            response.sequence < chunk.stamp.sequence
+                            request.request_stamp.sequence < response.sequence
+                                && response.sequence < chunk.stamp.sequence
                                 && response.tick <= request.expiry_tick
+                                && request.response_model_digest == chunk.model_digest
+                                && request.context_digest == chunk.observed_executed_prefix_digest
                         })
                     }
                 }
@@ -914,14 +917,34 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             },
             None => true,
         };
+        let decision_source_order_ok = decision.source_observation_ids.iter().all(|id| {
+            observations.get(id.as_str()).is_some_and(|observation| {
+                observation.stamp.sequence < decision.stamp.sequence
+                    && observation.stamp.clock_id == application.stamp.clock_id
+                    && observation.stamp.boot_epoch == application.stamp.boot_epoch
+                    && !observation.sensor_digest.trim().is_empty()
+            })
+        });
+        let decision_receipt_complete = !decision.calibration_id.trim().is_empty()
+            && !decision.calibration_digest.trim().is_empty()
+            && !decision.loss_model_digest.trim().is_empty()
+            && !decision.loss_scale_id.trim().is_empty()
+            && !decision.action_domain_digest.trim().is_empty();
+        let chunk_binding_ok = chunk.decision_id == application.decision_id
+            && chunk.action_id == application.action_id
+            && chunk.model_digest == decision.loss_model_digest
+            && chunk.action_domain_digest == decision.action_domain_digest
+            && chunk.expected_executed_prefix_digest == chunk.observed_executed_prefix_digest;
 
         if findings.len() == findings_before
             && command_aoi_complete
             && gate_ok
             && remote_ok
+            && decision_source_order_ok
+            && decision_receipt_complete
+            && chunk_binding_ok
             && decision.regret_upper_units <= decision.epsilon_task_loss_units
             && decision.calibration_disposition == CalibrationDisposition::Qualified
-            && chunk.expected_executed_prefix_digest == chunk.observed_executed_prefix_digest
         {
             applications_linked += 1;
         }
