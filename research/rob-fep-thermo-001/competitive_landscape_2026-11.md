@@ -214,3 +214,15 @@ These are not thermal locomotion baselines and must not be pooled with quadruped
 2. Separate physical hardware, hardware-in-the-loop, full-physics simulation, reduced-order simulation and synthetic arithmetic in every comparison label.
 3. Include state/ZMP tracking, disturbance observers and impedance/admittance adaptation in the locomotion baseline suite where the platform permits.
 4. Extend beyond locomotion only after the quadruped and single-joint tracks have a repeatable protocol; preserve separate manipulation and hazard benchmarks.
+
+
+## 8. Real-time world-evolves-during-inference benchmarks
+
+The competitive programme now adds a distinct real-time lane, tracked by [Symthaea #11561](https://github.com/Luminous-Dynamics/symthaea/issues/11561):
+- **RoboDyna** (NeurIPS 2026 workshop) evaluates dynamic manipulation in which the world does not pause during inference. It directly motivates charging model/planning time against state freshness and task outcome.
+- **SafeLab** (ICML 2026) has 64 tasks in nine lab manipulation categories, reports safe-success separately from ordinary task completion, and includes 50 open-loop physical replays with 86% simulation/observed safety-outcome agreement.
+- **AM-Bench** (2026) makes policy × low-level-control × embodiment a configurable comparison rather than treating task success as a policy-only property.
+- **Dual control / simultaneous SysID-MPC** is a required alternative to explicit diagnostic probing: it learns while performing task actions. The IEEE TRO 2025 method includes hardware and physics-based simulation.
+- **Long-horizon system identification** on a KUKA LWR iiwa reports measured-input rollouts up to 1000 steps and ID/OOD splits; it is a reminder that one-step fit is not enough for iterative planning.
+
+These lanes are not pooled with quadruped endurance or thermal manipulation metrics. They add an orthogonal comparison: whether more computation, more observations or a richer model improve the action *at the time it is actually applied*, after the environment has evolved and the physical resources have changed.
