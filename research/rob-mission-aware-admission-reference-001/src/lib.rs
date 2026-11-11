@@ -364,12 +364,15 @@ fn compare_request(
                 return risk_order;
             }
 
-            if a.loss_scale_id == b.loss_scale_id {
+            if a.loss_scale_id == b.loss_scale_id
+                && a.gpu_micros > 0
+                && b.gpu_micros > 0
+            {
                 let density = ratio_cmp(
                     b.evsi_units.unwrap_or(0),
-                    b.gpu_micros.max(1),
+                    b.gpu_micros,
                     a.evsi_units.unwrap_or(0),
-                    a.gpu_micros.max(1),
+                    a.gpu_micros,
                 );
                 if density != Ordering::Equal {
                     return density;
