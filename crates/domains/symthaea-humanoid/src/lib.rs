@@ -39,6 +39,7 @@ pub mod oracle_generator_certification;
 #[cfg(feature = "osqp-backend")]
 pub mod osqp_backend;
 pub mod plugin;
+pub mod prosthetic_clock_freshness;
 pub mod prosthetic_sensory;
 pub mod prosthetic_feedback_benchmark;
 pub mod qp_certification;
