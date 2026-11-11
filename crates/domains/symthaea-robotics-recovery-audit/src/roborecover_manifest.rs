@@ -8,8 +8,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::roborecover_score::{
-    BenchmarkPlatform, BenchmarkSplit, DeviationType, ExecutionMode, PlannedScenario,
-    RecoveryStage, RoboRecoverManifest, ScenarioSource, StageTypeGroup,
+    BenchmarkPlatform, BenchmarkSplit, DeviationType, ExecutionMode, ManifestIssue,
+    PlannedScenario, RecoveryStage, RoboRecoverManifest, ScenarioSource, StageTypeGroup,
 };
 
 pub const ROBORECOVER_SOURCE_REPOSITORY: &str = "RUCKBReasoning/RoboRecover";
@@ -120,6 +120,7 @@ pub enum SplitManifestIssue {
     WrongRepository,
     WrongSourceRevision,
     WrongSplitManifestBlobSha,
+    InvalidScoreManifest(Vec<ManifestIssue>),
 }
 
 fn is_hex_digest(value: &str, length: usize) -> bool {
@@ -445,6 +446,10 @@ pub fn parse_pinned_split_csv(
         scenarios,
         macro9_groups,
     };
+
+    if let Err(validation_issues) = super::roborecover_score::validate_manifest(&manifest) {
+        return Err(vec![SplitManifestIssue::InvalidScoreManifest(validation_issues)]);
+    }
 
     Ok(ParsedSplitManifest {
         manifest,
@@ -822,6 +827,21 @@ mod tests {
             deviation: DeviationType::WrongTarget,
         }));
         assert!(super::super::roborecover_score::validate_manifest(&parsed.manifest).is_ok());
+    }
+
+
+    #[test]
+    fn invalid_policy_or_evaluator_digest_cannot_produce_a_parsed_manifest() {
+        let csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test, true);
+        let mut ctx = context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test);
+        ctx.policy_digest = "policy".to_owned();
+
+        let errors = parse_pinned_split_csv(&csv, ctx).unwrap_err();
+        assert!(errors.iter().any(|issue| matches!(
+            issue,
+            SplitManifestIssue::InvalidScoreManifest(manifest_issues)
+                if manifest_issues.contains(&ManifestIssue::InvalidPolicyDigest)
+        )));
     }
 
 }
