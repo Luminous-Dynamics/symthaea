@@ -50,6 +50,7 @@ pub mod discovery;
 pub mod equation_ast;
 pub mod integrated_discovery;
 pub mod linear_group_action;
+pub mod linear_lie_algebra;
 pub mod lyapunov;
 pub mod noise_robustness;
 pub mod pde_wave_stage_a;
@@ -73,6 +74,12 @@ pub use linear_group_action::{
     AdmittedLinearGroupActionV1, GeneratorMetricSkewDiagnosticV1, LinearGeneratorV1,
     LinearGroupActionAdmissionDiagnosticsV1, LinearGroupActionAdmissionError,
     LinearGroupActionAdmissionProfileV1, LinearGroupActionV1,
+};
+pub use linear_lie_algebra::{
+    qualify_linear_lie_algebra, LieBracketDiagnosticV1, LieGeneratorNormalizationV1,
+    LieJacobiDiagnosticV1, LinearLieAlgebraDiagnosticsV1,
+    LinearLieAlgebraQualificationErrorV1, LinearLieAlgebraQualificationProfileV1,
+    LinearLieAlgebraQualificationReportV1, LinearLieAlgebraQualificationStatusV1,
 };
 pub use recognize::{
     RecognitionReport, expr_to_equation_node, recognize_expr, recognize_expr_with_units,
