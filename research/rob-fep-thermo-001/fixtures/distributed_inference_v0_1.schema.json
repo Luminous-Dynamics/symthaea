@@ -22,8 +22,8 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 19,
-      "maxItems": 19,
+      "minItems": 22,
+      "maxItems": 22,
       "uniqueItems": true,
       "allOf": [
         {
@@ -310,6 +310,51 @@
           },
           "minContains": 1,
           "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI20_RESULT_FRESH_AT_RECEIPT_STALE_AT_ACTUATION"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI21_FRESH_UPDATE_HAS_ZERO_DECISION_VALUE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI22_SHARED_MEMORY_CONTENTION_PROTECTS_FOREGROUND"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
         }
       ],
       "items": {
@@ -376,7 +421,16 @@
         "fleet_priority_deadline_ms",
         "fleet_low_priority_deadline_ms",
         "fleet_admission_control_enabled",
-        "low_priority_deferred_or_fallback"
+        "low_priority_deferred_or_fallback",
+        "actuation_aoi_upper_bound_ms",
+        "max_actuation_aoi_ms",
+        "decision_evsi",
+        "decision_evsi_unit",
+        "foreground_deadline_misses_unmanaged",
+        "foreground_deadline_misses_managed",
+        "llm_throughput_retained_pct",
+        "memory_bandwidth_pressure_pct",
+        "safe_suspension_points_available"
       ],
       "properties": {
         "placement": {
@@ -559,6 +613,54 @@
             "boolean",
             "null"
           ]
+        },
+        "actuation_aoi_upper_bound_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "max_actuation_aoi_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "decision_evsi": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "decision_evsi_unit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "task_loss_units",
+            null
+          ]
+        },
+        "foreground_deadline_misses_unmanaged": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "foreground_deadline_misses_managed": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "llm_throughput_retained_pct": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "memory_bandwidth_pressure_pct": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "safe_suspension_points_available": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "allOf": [
@@ -602,6 +704,44 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision_evsi": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "decision_evsi"
+            ]
+          },
+          "then": {
+            "properties": {
+              "decision_evsi_unit": {
+                "const": "task_loss_units"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "actuation_aoi_upper_bound_ms": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "actuation_aoi_upper_bound_ms"
+            ]
+          },
+          "then": {
+            "properties": {
+              "max_actuation_aoi_ms": {
+                "type": "number"
+              }
+            }
+          }
         }
       ]
     },
@@ -614,7 +754,10 @@
         "fallback_required",
         "remote_result_can_enter_local_admission",
         "actuation_authorized",
-        "whole_system_energy_claim"
+        "whole_system_energy_claim",
+        "actuation_aoi_gate",
+        "decision_value_gate",
+        "foreground_deadline_gate"
       ],
       "properties": {
         "disposition": {
@@ -634,7 +777,10 @@
             "robot_battery_saving_only",
             "remote_timeout_fallback",
             "compression_quality_loss_exceeds_tolerance",
-            "fleet_priority_admission_preserves_critical_deadline"
+            "fleet_priority_admission_preserves_critical_deadline",
+            "actuation_aoi_reject",
+            "zero_evsi_no_update",
+            "foreground_deadlines_prioritized"
           ]
         },
         "selected_placement": {
@@ -644,7 +790,8 @@
             "hybrid",
             "edge_but_no_system_energy_claim",
             "local_or_abstain",
-            "none"
+            "none",
+            "onboard_managed"
           ]
         },
         "fallback_required": {
@@ -662,6 +809,27 @@
             "matched_system_energy_equal",
             "whole_system_energy_better",
             "robot_battery_better_system_energy_worse"
+          ]
+        },
+        "actuation_aoi_gate": {
+          "enum": [
+            "pass",
+            "fail",
+            "not_evaluated"
+          ]
+        },
+        "decision_value_gate": {
+          "enum": [
+            "pass",
+            "fail",
+            "not_evaluated"
+          ]
+        },
+        "foreground_deadline_gate": {
+          "enum": [
+            "pass",
+            "fail",
+            "not_evaluated"
           ]
         }
       }
