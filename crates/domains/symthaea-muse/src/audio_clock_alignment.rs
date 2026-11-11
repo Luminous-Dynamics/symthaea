@@ -988,7 +988,12 @@ mod tests {
         let final_frame = expected_frame(final_tick, tempo_us, ppq, sample_rate).unwrap() as usize
             + offset_frames
             + (sample_rate as usize / 2);
-        let mut samples = vec![0.0f32; final_frame.max(sample_rate as usize)];
+        let minimum_frames = if notes.is_empty() {
+            sample_rate as usize * 4
+        } else {
+            sample_rate as usize
+        };
+        let mut samples = vec![0.0f32; final_frame.max(minimum_frames)];
         for (index, (pitch, start_tick, end_tick)) in notes.iter().enumerate() {
             let start = expected_frame(*start_tick, tempo_us, ppq, sample_rate).unwrap() as usize
                 + offset_frames;
