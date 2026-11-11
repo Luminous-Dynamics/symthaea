@@ -1029,6 +1029,13 @@ mod tests {
     }
 
     #[test]
+    fn categorical_primary_outcome_cannot_use_continuous_mean_power_method() {
+        let mut plan = parsed_plan();
+        plan["measurement"]["primary_outcome"]["scale"] = Value::String("binary".into());
+        assert!(validate_experiment_plan(&plan).is_err());
+    }
+
+    #[test]
     fn altered_plan_artifact_is_rejected_by_digest_binding() {
         let first = event(
             "event-0",
