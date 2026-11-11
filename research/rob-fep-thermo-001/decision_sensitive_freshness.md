@@ -154,3 +154,6 @@ Do not identify AoA with the AoI measurement implemented in Symtropy #4713. AoA,
 ## PoMA and fleet service
 
 The corpus now contains DI23 (missed actuation opportunities / declared miss cost) and DI24 (matched fleet scheduler matrix). PoMA is reported as a separate empirical missed-deadline frequency; it is not derived from AoI or EVSI.
+
+
+The 24-case placement corpus's fleet metrics are complemented by the constrained fleet-admission protocol in [#11627](https://github.com/Luminous-Dynamics/symthaea/issues/11627) / [PR #11630](https://github.com/Luminous-Dynamics/symthaea/pull/11630). It treats per-robot starvation and service floors as first-class constraints, not merely aggregate throughput.
