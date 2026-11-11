@@ -1,0 +1,48 @@
+{
+  "protocol_id": "IG-RISK-ACTION-001",
+  "version": "0.1.0",
+  "status": "protocol_and_synthetic_fixture_design",
+  "research_question": "When the same information is evaluated under different error costs, does the system choose the action with the highest declared expected utility, including answer, abstention, evidence acquisition, escalation or deferral?",
+  "actions": [
+    "Answer",
+    "Abstain",
+    "RequestEvidence",
+    "Escalate",
+    "Defer"
+  ],
+  "utility_equation": "EU(a)=p_a*U_correct-(1-p_a)*C_wrong-C_a",
+  "confidence_target": "post_answer_correctness",
+  "probability_source": "SyntheticScenarioOracle",
+  "separation_invariants": [
+    "verbal self-reported confidence != calibrated probability",
+    "pre-reasoning policy-success probability != post-answer correctness probability",
+    "calibrated probability != authority",
+    "expected utility under declared scenario costs != universal value judgement",
+    "synthetic oracle probability != empirically measured model probability"
+  ],
+  "metrics": [
+    "oracle_action_agreement",
+    "expected_utility",
+    "decision_regret",
+    "abstention_quality",
+    "evidence_acquisition_burden",
+    "escalation_burden",
+    "delay_cost",
+    "coverage",
+    "risk_at_coverage",
+    "resource_cost"
+  ],
+  "composed_owners": {
+    "confidence_calibration": "https://github.com/Luminous-Dynamics/symthaea/issues/11367",
+    "debate_trajectory": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
+    "revision_receipts": "https://github.com/Luminous-Dynamics/symthaea/issues/11340",
+    "budget_accounting": "https://github.com/Luminous-Dynamics/symthaea/issues/11415",
+    "effect_security": "https://github.com/Luminous-Dynamics/symthaea/issues/11434"
+  },
+  "external_research": [
+    "RiskEval EMNLP 2026: https://aclanthology.org/2026.emnlp-main.759/",
+    "CALIBER Findings EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.2420/",
+    "SAGE Findings EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1214/"
+  ],
+  "claim_ceiling": "Exact synthetic action-oracle consistency only. Calibration and model action competence require separate empirical experiments."
+}
