@@ -1720,6 +1720,86 @@ pub fn evaluate_metric_aware_linear_action_samples(
 
 
 /// Numerical policy for infinitesimal equivariance of a vector field.
+/// Explicit output-space representation for a vector field under the same
+/// named infinitesimal generators as an admitted state-space action.
+/// Output dimension, basis and units may differ from the state-space representation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LinearVectorFieldOutputRepresentationV1 {
+    pub representation_id: String,
+    pub coordinate_basis_id: String,
+    pub component_names: Vec<String>,
+    pub component_unit_ids: Vec<String>,
+    pub generators: Vec<crate::linear_group_action::LinearGeneratorV1>,
+}
+
+/// Typed errors from exact polynomial vector-field equivariance checking.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExactVectorFieldEquivarianceErrorV1 {
+    InvalidProfile,
+    EmptyOutputRepresentationId,
+    EmptyOutputBasisId,
+    NoOutputComponents,
+    OutputComponentCountMismatch { expected: usize, actual: usize },
+    EmptyOutputComponentName { index: usize },
+    DuplicateOutputComponentName { name: String },
+    EmptyOutputUnitId { index: usize },
+    OutputGeneratorCountMismatch { expected: usize, actual: usize },
+    MissingOutputGenerator { generator_id: String },
+    DuplicateOutputGenerator { generator_id: String },
+    OutputGeneratorRowCountMismatch { generator_id: String, expected: usize, actual: usize },
+    OutputGeneratorColumnCountMismatch {
+        generator_id: String, row: usize, expected: usize, actual: usize
+    },
+    NonFiniteOutputGeneratorEntry {
+        generator_id: String, row: usize, column: usize
+    },
+    UnsupportedExpression,
+    ResourceLimitExceeded,
+}
+
+/// Exact residual term counts for one paired state/output generator.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExactVectorFieldGeneratorResultV1 {
+    pub generator_id: String,
+    pub component_residual_term_counts: Vec<usize>,
+}
+
+impl ExactVectorFieldGeneratorResultV1 {
+    pub fn equivariant(&self) -> bool {
+        self.component_residual_term_counts.iter().all(|count| *count == 0)
+    }
+}
+
+/// Exact polynomial report for D F(x) A x - B F(x).
+///
+/// This establishes only an exact algebraic identity for the interpreted
+/// polynomial components and bounded exact coefficient arithmetic. It does not
+/// establish Lie-algebra representation compatibility, global group integration,
+/// conservation, or physical qualification.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExactVectorFieldEquivarianceReportV1 {
+    pub action_id: String,
+    pub state_coordinate_basis_id: String,
+    pub output_representation: LinearVectorFieldOutputRepresentationV1,
+    pub state_action_declaration: crate::linear_group_action::LinearGroupActionV1,
+    pub original_state_action_declaration: crate::linear_group_action::LinearGroupActionV1,
+    pub state_action_admission_profile: crate::linear_group_action::LinearGroupActionAdmissionProfileV1,
+    pub state_action_admission_diagnostics: crate::linear_group_action::LinearGroupActionAdmissionDiagnosticsV1,
+    pub state_coordinate_names: Vec<String>,
+    pub output_component_names: Vec<String>,
+    pub expression_variables: Vec<String>,
+    pub vector_field_canonical: Vec<String>,
+    pub profile: ExactPolynomialLieProfileV1,
+    pub generator_results: Vec<ExactVectorFieldGeneratorResultV1>,
+}
+
+impl ExactVectorFieldEquivarianceReportV1 {
+    pub fn equivariant_under_every_generator(&self) -> bool {
+        !self.generator_results.is_empty()
+            && self.generator_results.iter().all(ExactVectorFieldGeneratorResultV1::equivariant)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct MetricAwareVectorFieldEquivarianceProfileV1 {
     pub maximum_samples: usize,
