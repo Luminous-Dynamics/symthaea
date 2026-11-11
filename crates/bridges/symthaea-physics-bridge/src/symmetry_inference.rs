@@ -2203,12 +2203,19 @@ pub fn check_exact_vector_field_equivariance(
         }
     }
 
+    let mut total_expression_complexity = 0usize;
     let mut variable_names = Vec::new();
     for component in vector_field {
         if !metric_aware_expression_supported(component) {
             return Err(ExactVectorFieldEquivarianceErrorV1::UnsupportedExpression);
         }
+        total_expression_complexity = total_expression_complexity
+            .checked_add(component.complexity())
+            .ok_or(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded)?;
         collect_var_names(component, &mut variable_names);
+    }
+    if total_expression_complexity > HARD_MAX_METRIC_AWARE_EXPRESSION_NODES {
+        return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
     }
     for coordinate_name in &state_declaration.coordinate_names {
         if !variable_names.contains(coordinate_name) {
@@ -2221,9 +2228,15 @@ pub fn check_exact_vector_field_equivariance(
         return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
     }
 
-    // One shared operation budget spans all component parsing, all state
-    // derivatives, all output-generator contractions and every generator pair.
+    // One shared operation budget spans expression traversal / parsing,
+    // all state derivatives, output-generator contractions and every generator.
     let mut operation_count = 0usize;
+    charge_exact_vector_field_operations(
+        &mut operation_count,
+        total_expression_complexity,
+        profile,
+    )
+    .map_err(|_| ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded)?;
     let mut state_components = Vec::with_capacity(output_dimension);
     for component in vector_field {
         let polynomial = parse_exact_polynomial(component, &variable_names, profile).map_err(
