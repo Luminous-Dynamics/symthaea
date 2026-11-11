@@ -79,6 +79,7 @@ pub struct ParsedMidiTranscriptionV1 {
     pub tempo_points: Vec<MidiTempoPointV1>,
     pub unclosed_note_count: u32,
     pub orphan_note_off_count: u32,
+    pub overlapping_same_pitch_note_on_count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -113,6 +114,8 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub prediction_note_count: u32,
     pub prediction_unclosed_note_count: u32,
     pub prediction_orphan_note_off_count: u32,
+    pub prediction_tempo_point_count: u32,
+    pub prediction_overlapping_same_pitch_note_on_count: u32,
     /// Instrument-agnostic: pitch and onset must match.
     pub onset_pitch_metrics: MidiTranscriptionMetricV1,
     /// Instrument-agnostic: pitch, onset and offset must match.
@@ -173,6 +176,8 @@ struct ReportCommitmentV1<'a> {
     prediction_note_count: u32,
     prediction_unclosed_note_count: u32,
     prediction_orphan_note_off_count: u32,
+    prediction_tempo_point_count: u32,
+    prediction_overlapping_same_pitch_note_on_count: u32,
     onset_pitch_metrics: &'a MidiTranscriptionMetricV1,
     full_note_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_onset_metrics: &'a MidiTranscriptionMetricV1,
@@ -243,7 +248,12 @@ fn tempo_points_from_events(
             return Err(MidiTranscriptionEvaluationIssueV1::InvalidPredictionMidi);
         }
         if tick == previous.start_tick {
-            points.last_mut().expect("tempo point exists").microseconds_per_quarter = tempo;
+            if tempo != previous.microseconds_per_quarter {
+                // Conflicting tempo events at the same absolute tick across
+                // tracks are ambiguous; do not let track ordering choose a
+                // benchmark timebase silently.
+                return Err(MidiTranscriptionEvaluationIssueV1::InvalidTempo);
+            }
             continue;
         }
         let delta_ticks = tick - previous.start_tick;
@@ -314,12 +324,14 @@ pub fn parse_transcribed_midi_v1(
     let mut notes = Vec::new();
     let mut unclosed_note_count = 0usize;
     let mut orphan_note_off_count = 0usize;
+    let mut overlapping_same_pitch_note_on_count = 0usize;
 
     for (track_index, events) in absolute_tracks.iter().enumerate() {
         let track_index_u16 = u16::try_from(track_index)
             .map_err(|_| MidiTranscriptionEvaluationIssueV1::UnsupportedMidiFormat)?;
         let mut programs = [0u8; 16];
         let mut pending: HashMap<(u8, u8), VecDeque<(u64, u8)>> = HashMap::new();
+        let mut pending_note_count = 0usize;
         for (tick, kind) in events {
             match *kind {
                 TrackEventKind::Midi { channel, message } => {
@@ -329,15 +341,24 @@ pub fn parse_transcribed_midi_v1(
                             programs[usize::from(channel)] = program.as_int();
                         }
                         MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
-                            pending
-                                .entry((channel, key.as_int()))
-                                .or_default()
-                                .push_back((*tick, programs[usize::from(channel)]));
+                            if pending_note_count >= MIDI_TRANSCRIPTION_MAX_NOTES_V1 {
+                                return Err(MidiTranscriptionEvaluationIssueV1::TooManyPredictedNotes {
+                                    count: pending_note_count.saturating_add(1),
+                                    maximum: MIDI_TRANSCRIPTION_MAX_NOTES_V1,
+                                });
+                            }
+                            let queue = pending.entry((channel, key.as_int())).or_default();
+                            if !queue.is_empty() {
+                                overlapping_same_pitch_note_on_count += 1;
+                            }
+                            queue.push_back((*tick, programs[usize::from(channel)]));
+                            pending_note_count += 1;
                         }
                         MidiMessage::NoteOff { key, .. }
                         | MidiMessage::NoteOn { key, .. } => {
                             if let Some(queue) = pending.get_mut(&(channel, key.as_int())) {
                                 if let Some((start_tick, program)) = queue.pop_front() {
+                                    pending_note_count = pending_note_count.saturating_sub(1);
                                     let onset_seconds = tick_to_seconds(
                                         start_tick,
                                         &tempo_points,
@@ -352,6 +373,12 @@ pub fn parse_transcribed_midi_v1(
                                     .ok_or(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
                                     if offset_seconds <= onset_seconds {
                                         return Err(MidiTranscriptionEvaluationIssueV1::InvalidPredictionMidi);
+                                    }
+                                    if notes.len() >= MIDI_TRANSCRIPTION_MAX_NOTES_V1 {
+                                        return Err(MidiTranscriptionEvaluationIssueV1::TooManyPredictedNotes {
+                                            count: notes.len().saturating_add(1),
+                                            maximum: MIDI_TRANSCRIPTION_MAX_NOTES_V1,
+                                        });
                                     }
                                     notes.push(MidiTranscribedNoteV1 {
                                         track_index: track_index_u16,
@@ -379,6 +406,12 @@ pub fn parse_transcribed_midi_v1(
 
         for ((channel, pitch), queue) in pending {
             for (start_tick, program) in queue {
+                if notes.len() >= MIDI_TRANSCRIPTION_MAX_NOTES_V1 {
+                    return Err(MidiTranscriptionEvaluationIssueV1::TooManyPredictedNotes {
+                        count: notes.len().saturating_add(1),
+                        maximum: MIDI_TRANSCRIPTION_MAX_NOTES_V1,
+                    });
+                }
                 let onset_seconds = tick_to_seconds(
                     start_tick,
                     &tempo_points,
@@ -421,6 +454,8 @@ pub fn parse_transcribed_midi_v1(
         tempo_points,
         unclosed_note_count: u32::try_from(unclosed_note_count).unwrap_or(u32::MAX),
         orphan_note_off_count: u32::try_from(orphan_note_off_count).unwrap_or(u32::MAX),
+        overlapping_same_pitch_note_on_count:
+            u32::try_from(overlapping_same_pitch_note_on_count).unwrap_or(u32::MAX),
     })
 }
 
@@ -435,6 +470,9 @@ fn validate_reference_artifact_v1(
     use midly::{MetaMessage, MidiMessage, TrackEventKind};
 
     let manifest = &reference.manifest;
+    if manifest.notes.is_empty() || manifest.notes.len() > MIDI_TRANSCRIPTION_MAX_NOTES_V1 {
+        return Err(MidiTranscriptionEvaluationIssueV1::InvalidReference);
+    }
     if manifest.schema != MIDI_PERFORMANCE_SCHEMA_V1
         || manifest.score_digest_schema
             != symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1
@@ -911,6 +949,9 @@ pub fn midi_transcription_evaluation_commitment_v1(
         prediction_note_count: report.prediction_note_count,
         prediction_unclosed_note_count: report.prediction_unclosed_note_count,
         prediction_orphan_note_off_count: report.prediction_orphan_note_off_count,
+        prediction_tempo_point_count: report.prediction_tempo_point_count,
+        prediction_overlapping_same_pitch_note_on_count:
+            report.prediction_overlapping_same_pitch_note_on_count,
         onset_pitch_metrics: &report.onset_pitch_metrics,
         full_note_metrics: &report.full_note_metrics,
         exact_program_onset_metrics: &report.exact_program_onset_metrics,
@@ -1005,6 +1046,9 @@ pub fn evaluate_midi_transcription_v1(
         prediction_note_count: u32::try_from(predicted_notes.len()).unwrap_or(u32::MAX),
         prediction_unclosed_note_count: parsed.unclosed_note_count,
         prediction_orphan_note_off_count: parsed.orphan_note_off_count,
+        prediction_tempo_point_count: parsed.tempo_point_count,
+        prediction_overlapping_same_pitch_note_on_count:
+            parsed.overlapping_same_pitch_note_on_count,
         onset_pitch_metrics: metric_from_matching(
             reference_notes.len(),
             predicted_notes.len(),
