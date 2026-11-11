@@ -368,3 +368,16 @@ The distributed-inference work now distinguishes result age at receipt from actu
 
 
 The source-to-actuator AoI measurement is now implemented as an isolated Symtropy research crate: [issue #4713](https://github.com/Luminous-Dynamics/symtropy/issues/4713) / [draft PR #4715](https://github.com/Luminous-Dynamics/symtropy/pull/4715). Its time-weighted arithmetic is separate from #4117's certificate-validity gate and #4206's command-to-motion response.
+
+
+## Decision, actuation and fleet-service metrics
+
+The programme now distinguishes:
+- actuator-side AoI: source observation age when the command is applied;
+- Age of Actuation (AoA): a related actuation-timeliness metric from the 2026 IEEE communications literature;
+- Probability of Missing Actuation (PoMA): empirical / modelled probability that a required action misses its declared actuation window;
+- EVSI: expected task-loss reduction from a new observation;
+- missed-actuation loss: consequence in declared task-loss units;
+- starvation: fraction of control steps without a valid queued action.
+
+For fleet experiments, add Round Robin, EDF and Armory Lookahead; compare against a Luminous mission-aware admission/batching candidate under equal robot/model/compute budgets. Measure per-tier and per-robot service, not only total throughput.
