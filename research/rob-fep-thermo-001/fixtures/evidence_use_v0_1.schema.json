@@ -110,7 +110,8 @@
         "evsi",
         "selected_probe_cost",
         "fixed_baseline_evsi",
-        "projected_action_admissible"
+        "projected_action_admissible",
+        "fixed_baseline_cost"
       ],
       "properties": {
         "reference_available": {
@@ -142,6 +143,9 @@
         },
         "projected_action_admissible": {
           "$ref": "#/$defs/nullable_boolean"
+        },
+        "fixed_baseline_cost": {
+          "$ref": "#/$defs/nullable_number"
         }
       }
     },
