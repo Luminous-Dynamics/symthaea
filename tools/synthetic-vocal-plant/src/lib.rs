@@ -148,8 +148,9 @@ fn validate_segment(spec: &SyntheticSegmentSpec, sample_rate_hz: u32) -> Result<
     }
     let nyquist = sample_rate_hz as f32 / 2.0;
     if !(100.0..nyquist).contains(&spec.f1_hz)
-        || !(spec.f1_hz..nyquist).contains(&spec.f2_hz)
-        || !(spec.f2_hz..nyquist).contains(&spec.f3_hz)
+        || spec.f1_hz >= spec.f2_hz
+        || spec.f2_hz >= spec.f3_hz
+        || spec.f3_hz >= nyquist
     {
         return Err(format!(
             "segment {} requires 100 Hz <= F1 < F2 < F3 < Nyquist",
@@ -449,15 +450,22 @@ pub fn estimate_f0_hz(
         }
     };
 
-    let mut best_lag = 0usize;
-    let mut best_score = f64::NEG_INFINITY;
-    for lag in min_lag..=max_lag {
-        let score = correlation(lag);
-        if score > best_score {
-            best_score = score;
-            best_lag = lag;
-        }
-    }
+    let scores: Vec<f64> = (min_lag..=max_lag).map(correlation).collect();
+    let first_peak = (1..scores.len().saturating_sub(1)).find(|index| {
+        scores[*index] >= scores[*index - 1]
+            && scores[*index] >= scores[*index + 1]
+            && scores[*index] >= 0.15
+    });
+    let best_index = first_peak.unwrap_or_else(|| {
+        scores
+            .iter()
+            .enumerate()
+            .max_by(|left, right| left.1.total_cmp(right.1))
+            .map(|(index, _)| index)
+            .unwrap_or(0)
+    });
+    let best_lag = min_lag + best_index;
+    let best_score = scores.get(best_index).copied().unwrap_or(f64::NEG_INFINITY);
     if best_lag == 0 || best_score < 0.15 {
         return None;
     }
@@ -913,6 +921,28 @@ mod tests {
         assert!(after.f1_hz > before.f1_hz);
         assert!(after.f2_hz > before.f2_hz);
         assert!(after.f3_hz > before.f3_hz);
+    }
+
+
+    #[test]
+    fn independent_pcm_measurement_tracks_controlled_pitch_shift() {
+        let segments = base();
+        let baseline = render(&segments);
+        let edited_specs = apply_edit(
+            &segments,
+            "proxy-vowel-c",
+            &EditPatch::PitchShiftCents { delta_cents: 100.0 },
+            DEFAULT_SAMPLE_RATE_HZ,
+        )
+        .expect("bounded pitch edit");
+        let edited = render(&edited_specs);
+        let before = measure_segment_f0(&baseline, "proxy-vowel-c", DEFAULT_SAMPLE_RATE_HZ)
+            .expect("baseline measurement")
+            .expect("baseline F0");
+        let after = measure_segment_f0(&edited, "proxy-vowel-c", DEFAULT_SAMPLE_RATE_HZ)
+            .expect("edited measurement")
+            .expect("edited F0");
+        assert!(after > before * 1.04, "expected a positive pitch shift: {before} -> {after}");
     }
 
     #[test]
