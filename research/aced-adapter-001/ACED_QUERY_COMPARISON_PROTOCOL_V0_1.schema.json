@@ -290,11 +290,146 @@
     },
     "published_comparators": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "required": [
+        "best_reported_active_agent",
+        "question_targeted_active_learning",
+        "sample_budget_ablation"
+      ],
+      "properties": {
+        "best_reported_active_agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "core_accuracy",
+            "qual_accuracy",
+            "source",
+            "note"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "core_accuracy": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "qual_accuracy": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "source": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "question_targeted_active_learning": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "core_accuracy",
+            "qual_accuracy",
+            "source",
+            "note"
+          ],
+          "properties": {
+            "core_accuracy": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "qual_accuracy": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "source": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "sample_budget_ablation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "result",
+            "source",
+            "note"
+          ],
+          "properties": {
+            "result": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      }
     },
     "evaluator_reproduction": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "required": [
+        "preserve_official_structural_and_decision_evaluators",
+        "request_parser_model",
+        "parser_identity_source",
+        "pin_parser_model_prompt_temperature_output_limit_and_revision",
+        "preserve_candidate_raw_response",
+        "preserve_extracted_structured_answer",
+        "preserve_official_tolerance_and_exact_match_rules",
+        "report_parse_failures_separately",
+        "diagnostic_parser_arm",
+        "independent_adjudication"
+      ],
+      "properties": {
+        "preserve_official_structural_and_decision_evaluators": {
+          "type": "boolean"
+        },
+        "request_parser_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parser_identity_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pin_parser_model_prompt_temperature_output_limit_and_revision": {
+          "type": "boolean"
+        },
+        "preserve_candidate_raw_response": {
+          "type": "boolean"
+        },
+        "preserve_extracted_structured_answer": {
+          "type": "boolean"
+        },
+        "preserve_official_tolerance_and_exact_match_rules": {
+          "type": "boolean"
+        },
+        "report_parse_failures_separately": {
+          "type": "boolean"
+        },
+        "diagnostic_parser_arm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_adjudication": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "primary_metrics": {
       "type": "object",
@@ -338,11 +473,79 @@
     },
     "statistical_design": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "pairing",
+        "overlap_control",
+        "parser_control",
+        "model_control",
+        "cost_control",
+        "confidence_intervals",
+        "multiplicity"
+      ],
+      "properties": {
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pairing": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overlap_control": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parser_control": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_control": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost_control": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence_intervals": {
+          "type": "string",
+          "minLength": 1
+        },
+        "multiplicity": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "proposed_targets": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "required": [
+        "baseline_reproduction",
+        "primary_stretch",
+        "budget_normalized",
+        "safety"
+      ],
+      "properties": {
+        "baseline_reproduction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primary_stretch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "budget_normalized": {
+          "type": "string",
+          "minLength": 1
+        },
+        "safety": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "security_boundary": {
       "type": "array",
