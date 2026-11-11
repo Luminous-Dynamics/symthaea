@@ -601,7 +601,8 @@ mod tests {
                 && str_field(item, "pair_member") == Some("single_delta_denial"))
             .unwrap().clone();
         assert_eq!(derive_eligible(&fixture), Ok(false));
-        fixture["authority_context"]["actor_ref"] = fixture["task"]["actor_ref"].clone();
+        let task_actor_ref = fixture["task"]["actor_ref"].clone();
+        fixture["authority_context"]["actor_ref"] = task_actor_ref;
         assert_eq!(derive_eligible(&fixture), Ok(true));
     }
 
@@ -613,7 +614,8 @@ mod tests {
                 && str_field(item, "pair_member") == Some("single_delta_denial"))
             .unwrap().clone();
         assert_eq!(derive_eligible(&fixture), Ok(false));
-        fixture["authority_context"]["on_behalf_of_ref"] = fixture["task"]["on_behalf_of_ref"].clone();
+        let task_party_ref = fixture["task"]["on_behalf_of_ref"].clone();
+        fixture["authority_context"]["on_behalf_of_ref"] = task_party_ref;
         assert_eq!(derive_eligible(&fixture), Ok(true));
     }
 
