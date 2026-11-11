@@ -12,7 +12,7 @@ use crate::audio_event_observation::{
     AUDIO_EVENT_OBSERVATION_MAX_TRACKS_V1,
     AUDIO_EVENT_OBSERVATION_MAX_WAV_BYTES_V1,
     AudioEventObservationIssueV1, AudioStemEventObservationReceiptV1,
-    observe_rendered_audio_stem_events_v1,
+    observe_rendered_audio_stem_events_v1, validate_audio_stem_event_observation_v1,
 };
 use crate::midi_performance::{
     MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, MIDI_PERFORMANCE_SCHEMA_V1,
