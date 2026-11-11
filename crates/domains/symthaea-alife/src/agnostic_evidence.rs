@@ -101,8 +101,28 @@ pub struct EvidenceRecord {
     pub independence_group: Option<String>,
 }
 
+/// Explicit reasons that a present property or biosignature could be missed.
+///
+/// These are observation-risk annotations, not assertions that the risk occurred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FalseNegativeRisk {
+    LowAbundance,
+    LowActivityOrDormancy,
+    SpatialHeterogeneity,
+    TemporalAliasing,
+    PreservationOrDegradation,
+    InstrumentSensitivity,
+    MatrixInterference,
+    SignatureMismatch,
+    Unknown,
+}
+
 /// Observation opportunity and detector coverage for a non-detection or
 /// not-observable assessment.
+///
+/// The record captures both what fraction was sampled and known reasons a real signal
+/// could have been missed. A non-detection is never a global statement of absence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObservationCoverage {
     pub modality: String,
@@ -110,8 +130,24 @@ pub struct ObservationCoverage {
     pub observation_duration_seconds: Option<f64>,
     /// Fraction of the relevant spatial domain sampled, in [0, 1].
     pub spatial_coverage_fraction: Option<f64>,
-    /// Instrument- or method-specific detection limit in the stated units.
+    /// Fraction of the relevant temporal window covered, in [0, 1].
+    pub temporal_coverage_fraction: Option<f64>,
+    /// Interval between samples/observations, in seconds.
+    pub temporal_sampling_interval_seconds: Option<f64>,
+    /// Characteristic timescale of the target process, in seconds.
+    pub target_process_timescale_seconds: Option<f64>,
+    /// Instrument- or method-specific detection limit.
     pub detection_limit: Option<f64>,
+    /// Units for the detection limit, required when a limit is present.
+    pub detection_limit_units: Option<String>,
+    /// Reference abundance/concentration at which detection probability was calibrated.
+    pub reference_abundance: Option<f64>,
+    /// Empirically calibrated detection probability at the reference abundance, in [0, 1].
+    pub detection_probability_at_reference: Option<f64>,
+    /// Evidence record that documents the calibration curve or reference standard.
+    pub calibration_evidence_id: Option<String>,
+    /// Known or unresolved failure modes relevant to a false-negative interpretation.
+    pub false_negative_risks: Vec<FalseNegativeRisk>,
 }
 
 impl ObservationCoverage {
@@ -127,22 +163,83 @@ impl ObservationCoverage {
         {
             issues.push(format!("{path}.observation_duration_seconds must be finite and > 0"));
         }
-        if let Some(fraction) = self.spatial_coverage_fraction
-            && (!fraction.is_finite() || !(0.0..=1.0).contains(&fraction))
-        {
-            issues.push(format!("{path}.spatial_coverage_fraction must be finite and in [0, 1]"));
+        for (name, value) in [
+            ("temporal_sampling_interval_seconds", self.temporal_sampling_interval_seconds),
+            ("target_process_timescale_seconds", self.target_process_timescale_seconds),
+        ] {
+            if let Some(value) = value && (!value.is_finite() || value <= 0.0) {
+                issues.push(format!("{path}.{name} must be finite and > 0"));
+            }
+        }
+        for (name, value) in [
+            ("spatial_coverage_fraction", self.spatial_coverage_fraction),
+            ("temporal_coverage_fraction", self.temporal_coverage_fraction),
+        ] {
+            if let Some(value) = value && (!value.is_finite() || !(0.0..=1.0).contains(&value)) {
+                issues.push(format!("{path}.{name} must be finite and in [0, 1]"));
+            }
         }
         if let Some(limit) = self.detection_limit
             && (!limit.is_finite() || limit < 0.0)
         {
             issues.push(format!("{path}.detection_limit must be finite and >= 0"));
         }
+        if self.detection_limit.is_some()
+            && self.detection_limit_units.as_ref().is_none_or(|units| units.trim().is_empty())
+        {
+            issues.push(format!("{path}.detection_limit requires non-empty units"));
+        }
+        if self.detection_limit.is_none() && self.detection_limit_units.is_some() {
+            issues.push(format!("{path}.detection_limit_units requires a detection_limit"));
+        }
+        if let Some(reference) = self.reference_abundance
+            && (!reference.is_finite() || reference < 0.0)
+        {
+            issues.push(format!("{path}.reference_abundance must be finite and >= 0"));
+        }
+        if let Some(probability) = self.detection_probability_at_reference
+            && (!probability.is_finite() || !(0.0..=1.0).contains(&probability))
+        {
+            issues.push(format!("{path}.detection_probability_at_reference must be finite and in [0, 1]"));
+        }
+        if self.detection_probability_at_reference.is_some()
+            && (self.reference_abundance.is_none()
+                || self.calibration_evidence_id.as_ref().is_none_or(|id| id.trim().is_empty()))
+        {
+            issues.push(format!(
+                "{path}.detection_probability_at_reference requires reference_abundance and calibration_evidence_id"
+            ));
+        }
+        if self.detection_probability_at_reference.is_none()
+            && (self.reference_abundance.is_some() || self.calibration_evidence_id.is_some())
+        {
+            issues.push(format!(
+                "{path}.reference_abundance and calibration_evidence_id require detection_probability_at_reference"
+            ));
+        }
+        if let (Some(interval), Some(timescale)) = (
+            self.temporal_sampling_interval_seconds,
+            self.target_process_timescale_seconds,
+        ) {
+            if interval > timescale
+                && !self.false_negative_risks.contains(&FalseNegativeRisk::TemporalAliasing)
+            {
+                issues.push(format!(
+                    "{path} sampling interval exceeds target process timescale and must record TemporalAliasing"
+                ));
+            }
+        }
+        let unique_risks: HashSet<_> = self.false_negative_risks.iter().collect();
+        if unique_risks.len() != self.false_negative_risks.len() {
+            issues.push(format!("{path}.false_negative_risks must not contain duplicates"));
+        }
         if self.observation_duration_seconds.is_none()
             && self.spatial_coverage_fraction.is_none()
+            && self.temporal_coverage_fraction.is_none()
             && self.detection_limit.is_none()
         {
             issues.push(format!(
-                "{path} requires quantitative duration, spatial coverage, or detection limit"
+                "{path} requires quantitative duration, spatial coverage, temporal coverage, or detection limit"
             ));
         }
     }
@@ -289,6 +386,11 @@ impl SystemProfile {
                             "{path} NotObservable requires observation coverage"
                         ));
                     }
+                    if finding.coverage.as_ref().is_some_and(|coverage| coverage.false_negative_risks.is_empty()) {
+                        issues.push(format!(
+                            "{path} NotObservable requires at least one explicit false-negative risk mode"
+                        ));
+                    }
                 }
                 PropertyAssessment::ModelInadequate => {
                     let has_adequacy_diagnostic = finding.evidence_ids.iter().any(|id| {
@@ -309,7 +411,24 @@ impl SystemProfile {
 
             if no_detection {
                 match &finding.coverage {
-                    Some(coverage) => coverage.validate(&format!("{path}.coverage"), &mut issues),
+                    Some(coverage) => {
+                        coverage.validate(&format!("{path}.coverage"), &mut issues);
+                        if coverage.false_negative_risks.is_empty() {
+                            issues.push(format!(
+                                "{path} NoDetection coverage requires at least one explicit false-negative risk mode"
+                            ));
+                        }
+                        if let Some(calibration_id) = &coverage.calibration_evidence_id {
+                            match self.evidence.iter().find(|record| record.id == *calibration_id) {
+                                Some(record)
+                                    if record.outcome != EvidenceOutcome::InvalidMeasurement
+                                        && record.outcome != EvidenceOutcome::NotAcquired => {}
+                                _ => issues.push(format!(
+                                    "{path}.coverage.calibration_evidence_id references missing or unusable evidence: {calibration_id}"
+                                )),
+                            }
+                        }
+                    }
                     None => issues.push(format!(
                         "{path} references NoDetection evidence and therefore requires coverage"
                     )),
