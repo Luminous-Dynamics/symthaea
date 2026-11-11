@@ -22,7 +22,7 @@ pub enum BoundKind {
 }
 
 impl BoundKind {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Proposal,
         Self::Freshness,
         Self::Deadline,
