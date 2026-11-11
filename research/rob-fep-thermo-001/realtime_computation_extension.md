@@ -106,3 +106,8 @@ The real-time comparison now includes actuation-side AoI rather than stopping at
 ## Physical actuation-side AoI reference
 
 The timing measurement owner is [Symtropy #4713](https://github.com/Luminous-Dynamics/symtropy/issues/4713), with implementation in [draft PR #4715](https://github.com/Luminous-Dynamics/symtropy/pull/4715). Real-time task evaluation should use the source observation lineage at actual actuator-command application; result-receive age alone is insufficient.
+
+
+## Task-conditioned information sufficiency
+
+The real-time benchmark now distinguishes chronological age from decision sufficiency. See [decision_sufficiency_horizon.md](./decision_sufficiency_horizon.md). The benchmark asks whether the old action remains within a frozen task-loss regret tolerance and robustly admissible, not simply whether a timestamp is under a fixed number of milliseconds.
