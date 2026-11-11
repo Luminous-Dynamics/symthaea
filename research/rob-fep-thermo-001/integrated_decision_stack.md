@@ -78,7 +78,7 @@ A returned remote result is not trusted because it is newer or came from a faste
 
 A positive horizon is computed only when all required caps are qualified and composable on one canonical context:
 
-`N_commit = min(N_proposal, N_freshness, N_deadline, N_thermal, N_actuator, N_dynamics, N_viability, N_queue, N_continuity)`
+`N_commit = min(N_proposal, N_freshness, N_deadline, N_risk, N_thermal, N_actuator, N_dynamics, N_viability, N_queue, N_continuity)`
 
 Every cap must:
 1. be finite and integer-valued in the same control-tick unit;
@@ -118,3 +118,7 @@ The strongest defensible contribution is not that FEP, WAMs, edge compute or ent
 - whether the exact action remains valid and physically admissible when it is applied.
 
 A negative result for any component is useful and should simplify the architecture.
+
+### Separate probabilistic-risk and robust-viability gates
+
+Symtropy #4010 supplies one-step chance constraints; #4232 preallocates non-recyclable finite-horizon family-wise risk; #4588 supplies robust observation-constrained viability. The commitment cap consumes the contiguous prefix with already allocated per-step/per-constraint risk (`N_risk`) separately from the set-based robust viability prefix (`N_viability`). Never recycle skipped or consumed alpha, never reuse one-step alpha at every footfall, and never treat a chance bound as a robust reachability proof. Both gates are required where the operating profile declares both.
