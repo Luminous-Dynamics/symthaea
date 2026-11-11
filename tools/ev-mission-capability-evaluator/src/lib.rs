@@ -796,6 +796,7 @@ mod tests {
         let row = case(&report, "regen_exceeds_charge_acceptance");
         assert_eq!(row.disposition, "INFEASIBLE");
         assert!(row.worst_charge_acceptance_margin_kw.unwrap() < 0.0);
+        assert_eq!(row.limiting_cell_ref.as_deref(), Some("cell-001"));
     }
 
     #[test]
@@ -894,4 +895,12 @@ mod tests {
         assert_eq!(row.disposition, "FEASIBLE_WITHIN_DECLARED_ENVELOPE");
         assert!((row.minimum_energy_remaining_above_reserve_kwh_lower.unwrap()).abs() < EPS);
     }
+    #[test]
+    fn energy_reserve_shortfall_does_not_fabricate_a_limiting_cell() {
+        let report = report();
+        let row = case(&report, "peak_passes_but_sustained_energy_fails");
+        assert_eq!(row.disposition, "INFEASIBLE");
+        assert_eq!(row.limiting_cell_ref, None);
+    }
+
 }
