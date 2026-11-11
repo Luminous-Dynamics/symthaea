@@ -271,25 +271,20 @@ pub fn qualify_linear_lie_algebra(
                 });
             }
 
-            let (coefficients, relative_defect, classified_as_numerically_zero) =
-                if bracket_norm <= profile.zero_bracket_relative_tolerance {
-                    (vec![0.0_f64; generator_count], 0.0, true)
-                } else {
-                    let (coefficients, defect) = project_and_solve(
-                        &bracket,
-                        &orthonormal_basis,
-                        &triangular,
-                        &permutation,
-                    );
-                    if !defect.is_finite()
-                        || coefficients.iter().any(|coefficient| !coefficient.is_finite())
-                    {
-                        return Err(
-                            LinearLieAlgebraQualificationErrorV1::NonFiniteStructureConstant,
-                        );
-                    }
-                    (coefficients, defect, false)
-                };
+            let (coefficients, relative_defect) = project_and_solve(
+                &bracket,
+                &orthonormal_basis,
+                &triangular,
+                &permutation,
+                profile.zero_bracket_relative_tolerance,
+            );
+            if !relative_defect.is_finite()
+                || coefficients.iter().any(|coefficient| !coefficient.is_finite())
+            {
+                return Err(LinearLieAlgebraQualificationErrorV1::NonFiniteStructureConstant);
+            }
+            let classified_as_numerically_zero =
+                bracket_norm <= profile.zero_bracket_relative_tolerance;
 
             maximum_bracket_closure_defect =
                 maximum_bracket_closure_defect.max(relative_defect);
@@ -628,6 +623,7 @@ fn project_and_solve(
     orthonormal_basis: &[Vec<f64>],
     triangular: &[Vec<f64>],
     permutation: &[usize],
+    denominator_floor: f64,
 ) -> (Vec<f64>, f64) {
     let count = orthonormal_basis.len();
     let projections: Vec<f64> = orthonormal_basis
@@ -642,11 +638,7 @@ fn project_and_solve(
         }
     }
     let input_norm = vector_norm(vector);
-    let relative_defect = if input_norm == 0.0 {
-        0.0
-    } else {
-        vector_norm(&residual) / input_norm
-    };
+    let relative_defect = vector_norm(&residual) / input_norm.max(denominator_floor);
 
     // Solve R c_pivoted = Q^T vector by upper-triangular back substitution.
     let mut pivoted_coefficients = vec![0.0_f64; count];
