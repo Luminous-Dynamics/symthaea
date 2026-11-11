@@ -51,6 +51,8 @@ Five generated vowel-like proxy segments form a short musical phrase. They are a
 | formant scale 1.10 | Orthogonal-control probe | Formants change while declared F0 stays fixed |
 | collateral corruption | Red-team control | A second, protected segment changes and locality fails |
 
+The manifest also records a rejected unsupported-control proposal. Silence, invalid windows and unsupported parameters are treated as indeterminate/rejected inputs; none may be silently replaced by a guessed control.
+
 Each segment is rendered independently with deterministic renderer state. Adjacent blocks are joined using a fixed 5 ms overlap. The target dependency cone includes the block and its seam overlap. Exact preservation is assessed outside that declared cone, not by pretending that crossfade samples are unaffected.
 
 ## Independence and limits
