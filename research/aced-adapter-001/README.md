@@ -198,6 +198,21 @@ The schema is `EXPERIMENT_VALUE_TRACE_V0_1.schema.json`; the Rust implementation
 
 **Important limit:** a hash chain alone does not prove when an event was created. To make a forecast genuinely prospective, the event digest must be anchored outside the agent process at proposal time (for example, by a trusted timestamping/signing service or independently controlled append-only recorder). The current module validates structure and internal hash consistency only; it does not provide trusted time, signer identity or WORM storage.
 
+## Sample-size-aware categorical shift diagnostics
+
+The ACED-Query Active agent currently summarizes interventional-versus-observational category-frequency differences using a fixed two-percentage-point display threshold, and its cross-condition summary uses a five-point maximum-delta threshold. These are descriptive heuristics, not inferential tests: the same absolute shift has different uncertainty at (n=10) and (n=1{,}000), and examining many variables/categories increases the chance of false alarms.
+
+The Rust library now includes `categorical_shift.rs`, a diagnostic comparator that:
+- requires identical declared category sets and valid, non-empty sample counts;
+- reports each category's reference and intervention proportion and signed difference;
+- reports total-variation distance and maximum absolute category shift;
+- calculates Wilson score intervals for each proportion and a Newcombe interval for the difference;
+- keeps the minimum practical effect threshold separate from whether the supplied interval excludes zero.
+
+The caller supplies a **predeclared familywise critical z value**. This module does not infer a multiple-testing policy from the observed data or pretend that unadjusted 95% category intervals control familywise error. Choose the critical value from a preregistered comparison family (for example, a conservative Bonferroni design), record that family size and retain all tested variables/categories in the result receipt. For repeated/adaptive looks, use a sequentially valid method rather than reusing a fixed-look critical value.
+
+Synthetic controls test that a 30-percentage-point shift can remain uncertain at (n=10) while the same shift is detected at (n=1{,}000), and that effect size and interval evidence remain separately reported. This is a statistical diagnostic module, not an intervention-effect estimator, proof of randomization, or ACED agent result. A distribution shift is not automatically a causal effect; it requires a valid assignment/intervention design, comparable measurement, and a correct counterfactual contrast.
+
 ## Baselines and ablations
 
 Reproduce the official scripted/mock controls and official evaluation protocol where licensing and execution contracts allow. Then compare under matched model snapshot, prompts, tools, 15-experiment/32-turn budgets and compute accounting:
