@@ -245,6 +245,21 @@ jobs:
           test "$status" -eq 2
           jq -e '.disposition == "INCOMPLETE" and .hull_coverage_fraction == 0.9 and .zone_count == 3 and .confirmed_species_count == 0 and .performance_pair_conditions_matched == true' "$RUNNER_TEMP/marine-biofouling-report.json"
 
+      - name: Environmental trial v0.4 shared-clock case remains synthetic INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-propulsion-validator -- \
+            docs/research/marine/marine-propulsion-case-v0.4.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-environmental-trial-case-v0.4.0.json \
+            > "$RUNNER_TEMP/marine-environmental-trial-case-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-environmental-trial-case-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE"' "$RUNNER_TEMP/marine-environmental-trial-case-report.json"
+
       - name: Acoustic and propulsion channels bind to one declared timebase; synthetic remains INCOMPLETE
         shell: bash
         run: |
@@ -322,3 +337,4 @@ jobs:
             ${{ runner.temp }}/marine-service-flexibility-report.json
             ${{ runner.temp }}/marine-acoustic-report.json
             ${{ runner.temp }}/marine-acoustic-timebase-report.json
+            ${{ runner.temp }}/marine-environmental-trial-case-report.json
