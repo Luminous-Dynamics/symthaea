@@ -162,7 +162,7 @@
     "status": "reusable_synthetic_trace_validator_not_yet_connected_to_model_runner",
     "event_types": {
       "experiment_proposal": "Pre-observation commitment to belief digest, selector, predicted outcomes, EIG in bits, EVSI in utility, risk, risk-aversion coefficient, cost in utility, and selector-specific predicted_selection_score. EIG score is EIG bits; EVSI score is EVSI minus cost; risk-adjusted EVSI score is EVSI minus cost minus risk-aversion coefficient times risk.",
-      "experiment_observation": "Append-only later record referencing exactly one proposal event, with observed/failed/unknown status, output digest when observed and actual cost.",
+      "experiment_observation": "Append-only later record referencing exactly one proposal event, with observed/failed/unknown status, evaluator-resolved outcome class and output digest when observed, and actual cost. Failed/unknown attempts remain in the event log but are excluded from proper-score denominators.",
       "stop": "Terminal reason and evidence-state digest; it is rejected if any proposal lacks an observation/failure/unknown reconciliation event."
     },
     "integrity_rules": [
@@ -174,6 +174,12 @@
       "No new experiment proposals or observations are permitted after stop."
     ],
     "trust_boundary": "A self-contained hash chain detects changes relative to a trusted checkpoint but does not prove event time or signer identity. Model-run use requires an independently operated append-only recorder that signs or timestamps the proposal digest before the experiment is executed.",
-    "claim_ceiling": "The current module qualifies synthetic trace structure and internal event/hash consistency only. It is not a trusted timestamp authority, WORM store, model-run receipt, ACED model trial or causal-performance result."
+    "claim_ceiling": "The current module computes proper scores for small categorical forecasts from supplied evaluator-resolved labels and validates internal trace consistency. It does not establish real-world calibration, forecast honesty, event time, signer identity or external data correctness. Those require held-out model trials, independent observation adjudication and external timestamp/signature anchoring.",
+    "metrics": {
+      "brier_score": "For observed outcomes, sum squared differences across the preregistered categorical outcome space between predicted probabilities and one-hot evaluator-resolved outcome. Lower is better.",
+      "log_loss": "For observed outcomes with nonzero forecast probability, -ln(probability assigned to the observed class). An observed zero-probability class is represented as infinite/unavailable log loss and counted separately; no silent epsilon clipping.",
+      "denominator": "Only completed observations with an independently resolved outcome class enter Brier/log-loss denominators. Failed/unknown attempts remain visible and receive separate counts; they are not silently discarded.",
+      "adjudication": "Observed outcome class must be determined from the immutable observation by the independent evaluator, under a predeclared outcome taxonomy. The model does not choose its own realized label."
+    }
   }
 }
