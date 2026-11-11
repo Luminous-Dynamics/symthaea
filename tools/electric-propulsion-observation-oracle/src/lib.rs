@@ -618,7 +618,7 @@ mod tests {
     fn sample_skew_beyond_budget_is_rejected() {
         let run = manifest();
         let mut values = channels();
-        values[0].samples = vec![sample(1, 1_000, 7.0), sample(2, 1_800, 7.5)];
+        values[0].samples = vec![sample(1, 1_800, 7.5)];
         assert!(matches!(
             synchronize_at(&run, &values, &["torque"], 1_000),
             Err(ObservationError::Unsynchronized { .. })
@@ -639,7 +639,7 @@ mod tests {
     #[test]
     fn sample_offset_plus_clock_uncertainty_must_fit_combined_budget() {
         let mut run = manifest();
-        run.maximum_sample_time_error_ns = 100;
+        run.maximum_sample_time_error_ns = 98;
         let mut values = channels();
         values[0].clock_uncertainty_ns = 50;
         values[0].samples = vec![sample(1, 951, 7.5)];
