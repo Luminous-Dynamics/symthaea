@@ -307,3 +307,6 @@ The 17-case adaptive-horizon corpus now includes shared-context and prefix-closu
 ## Integrated decision architecture
 
 The current architecture/evaluation composition is summarized in [integrated_decision_stack.md](./integrated_decision_stack.md). It separates (1) which cognitive operation to run, (2) where to run it, (3) how long an action prefix may remain committed, and (4) whether the exact proposal is physically authorized. This is a composition contract; the diagram does not imply all edges are implemented or qualified.
+
+
+The adaptive-horizon fixture corpus now includes PACE- and ChunkTrust-style candidate proposals clipped by thermal and viability caps. REMAC is added as a training-time intra-/inter-chunk mismatch baseline. See the two-stage "propose, then physically cap" protocol in [adaptive_commit_horizon.md](./adaptive_commit_horizon.md).
