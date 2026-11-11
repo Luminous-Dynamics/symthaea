@@ -6,6 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod roborecover_discovery;
 pub mod roborecover_manifest;
 pub mod roborecover_router;
 pub mod roborecover_score;
