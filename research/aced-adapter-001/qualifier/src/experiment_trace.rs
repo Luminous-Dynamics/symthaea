@@ -159,7 +159,9 @@ fn validate_proposal(payload: &Value) -> Result<String, String> {
         "predicted_net_value",
     ];
     if !exact_fields(payload, &FIELDS) {
-        return Err("experiment_proposal payload does not match its closed nine-field contract".into());
+        return Err(
+            "experiment_proposal payload does not match its closed ten-field contract".into(),
+        );
     }
     let id = text(payload, "experiment_id")
         .ok_or_else(|| "experiment proposal has no experiment_id".to_string())?;
@@ -223,7 +225,9 @@ fn validate_observation(
             "actual_cost",
         ],
     ) {
-        return Err("experiment_observation payload does not match its closed four-field contract".into());
+        return Err(
+            "experiment_observation payload does not match its closed four-field contract".into(),
+        );
     }
     let proposal_id = text(payload, "proposal_event_id")
         .ok_or_else(|| "observation has no proposal_event_id".to_string())?;
@@ -240,7 +244,9 @@ fn validate_observation(
             if !text(payload, "observation_sha256").is_some_and(is_sha256)
                 || finite_number(payload, "actual_cost").is_none_or(|cost| cost < 0.0)
             {
-                return Err(format!("observed proposal {proposal_id} lacks a digest or actual cost"));
+                return Err(format!(
+                    "observed proposal {proposal_id} lacks a digest or actual cost"
+                ));
             }
         }
         "failed" | "unknown" => {
@@ -275,7 +281,9 @@ fn validate_stop(
         .keys()
         .any(|proposal_event_id| !observed_proposals.contains(proposal_event_id))
     {
-        return Err("stop event cannot leave a proposed experiment without an observed, failed or unknown reconciliation event".into());
+        return Err(
+            "stop event cannot leave a proposed experiment without an observed, failed or unknown reconciliation event".into(),
+        );
     }
     Ok(())
 }
@@ -451,7 +459,8 @@ mod tests {
             "schema_version": SCHEMA_VERSION,
             "run_id": "run-001",
             "events": events,
-            "claim_ceiling": "Append-only forecast/observation trace structure only; not model capability or trusted time."
+            "claim_ceiling":
+                "Append-only forecast/observation trace structure only; not model capability or trusted time."
         })
     }
 
