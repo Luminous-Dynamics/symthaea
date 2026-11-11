@@ -403,3 +403,12 @@ It composes:
 The matched experiment asks whether asynchronous split-timescale cognition, committed-prefix continuation and independent temporal eligibility improve **sequential legged missions with persistent heat, actuator degradation and recovery state**, against thermal-aware MPC/HQP, robust MPC, thermal-aware RL and direct policies.
 
 WAM methods (Streaming-WAM / AHA-WAM / StreamingWAM) remain manipulation-domain architectural comparators until ported to a platform and evaluated under a matched locomotion protocol. Do not reuse their LIBERO/RoboTwin numbers as quadruped claims.
+
+
+## 13. Combined legged execution × thermodynamic mission lane
+
+The combined quadruped/legged experiment is now owned by [Symtropy #4689 — LOCO-ASYNC-THERMAL-001](https://github.com/Luminous-Dynamics/symtropy/issues/4689), with the first 12-case composition fixture and dedicated validator in [draft PR #4694](https://github.com/Luminous-Dynamics/symtropy/pull/4694).
+
+This lane tests the asynchronous split-timescale / committed-prefix idea under persistent per-node temperature, actuator authority, event order and observation-constrained recovery. It compares to thermal-aware MPC/HQP, robust MPC, thermal-aware RL and direct high-rate policies. WAM methods remain manipulation references until a matched quadruped implementation exists.
+
+The fixtures qualify gate composition only; #4610 remains the physical thermal model owner and #4549/#4555/#4588 retain mission carryover and future-option measurement.
