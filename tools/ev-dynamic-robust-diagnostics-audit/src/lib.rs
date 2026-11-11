@@ -251,7 +251,7 @@ fn validate_problem(problem: &Problem) -> Result<(), String> {
         return Err("v0.1 requires exactly two non-empty latent states".to_owned());
     }
     if problem.actions.is_empty() || problem.actions.len() > MAX_ACTIONS {
-        return Err(format!("v0.1 supports one or two terminal actions only"));
+        return Err("v0.1 supports one or two terminal actions only".to_owned());
     }
     if problem.tests.len() > MAX_TESTS {
         return Err(format!("v0.1 supports at most {MAX_TESTS} tests"));
@@ -299,6 +299,9 @@ fn validate_problem(problem: &Problem) -> Result<(), String> {
                 }
                 let parent = problem.tests.iter().find(|candidate| &candidate.test_id == parent_id)
                     .ok_or_else(|| format!("conditional test {} references unknown predecessor {}", test.test_id, parent_id))?;
+                if parent.requires_prior_outcome_from.is_some() {
+                    return Err(format!("conditional test {} references a conditional predecessor; multi-level chains/cycles are unsupported in v0.1", test.test_id));
+                }
                 if test.available_after_outcomes.iter().any(|outcome| !parent.outcomes.contains(outcome)) {
                     return Err(format!("conditional test {} references an outcome not declared by {}", test.test_id, parent_id));
                 }
@@ -919,6 +922,24 @@ mod tests {
             .expect("follow-up")
             .available_after_outcomes = vec!["unknown-outcome".into()];
         let bytes = serde_json::to_vec(&corpus).expect("invalid conditional corpus");
+        assert!(audit_corpus(SCHEMA, &bytes).is_err());
+    }
+
+    #[test]
+    fn conditional_test_cycles_and_multilevel_chains_are_rejected() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let problem = corpus.problems.iter_mut()
+            .find(|problem| problem.problem_id == "conditional-followup-after-flag")
+            .expect("conditional problem");
+        problem.tests.iter_mut()
+            .find(|test| test.test_id == "initial-screen")
+            .expect("initial screen")
+            .requires_prior_outcome_from = Some("followup-reference-test".into());
+        problem.tests.iter_mut()
+            .find(|test| test.test_id == "initial-screen")
+            .expect("initial screen")
+            .available_after_outcomes = vec!["within_limit".into()];
+        let bytes = serde_json::to_vec(&corpus).expect("cyclic conditional corpus");
         assert!(audit_corpus(SCHEMA, &bytes).is_err());
     }
 
