@@ -38,8 +38,8 @@ jobs:
             --corpus fixtures/ev_battery/mission_capability_v0_1.json \
             > "$RUNNER_TEMP/mission-capability-report.json"
           jq -e '
-            .case_count == 10 and
-            .feasible_count == 3 and
+            .case_count == 11 and
+            .feasible_count == 4 and
             .infeasible_count == 3 and
             .not_computable_count == 1 and
             .unsupported_domain_count == 1 and
