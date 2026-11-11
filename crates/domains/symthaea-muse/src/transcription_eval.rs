@@ -139,6 +139,8 @@ pub struct MidiTranscriptionPartSeparationSummaryV1 {
     pub mixed_prediction_lane_count: u32,
     pub matched_notes_in_mixed_lanes: u32,
     pub total_matched_notes: u32,
+    pub part_attributed_note_count: u32,
+    pub ambiguous_part_assignment_note_count: u32,
     /// Fraction of matched notes assigned to the dominant PartId within each MIDI track.
     pub note_weighted_track_purity: Option<f64>,
     /// Fraction of matched notes assigned to the dominant PartId within each track/channel lane.
@@ -1438,22 +1440,46 @@ fn part_separation_summary_v1(
     reference: &[EvaluationNoteV1],
     predicted: &[MidiTranscribedNoteV1],
     matching: &[(usize, usize)],
+    candidate_part_ids_by_prediction: &[std::collections::BTreeSet<u16>],
 ) -> Option<MidiTranscriptionPartSeparationSummaryV1> {
-    let reference_parts: std::collections::BTreeSet<u16> =
-        reference_part_ids.iter().copied().collect();
+    // PartId::UNASSIGNED is not an identity. It cannot be counted as a
+    // distinct reference part or used to claim an assignment.
+    let reference_parts: std::collections::BTreeSet<u16> = reference_part_ids
+        .iter()
+        .copied()
+        .filter(|part_id| *part_id != u16::MAX)
+        .collect();
     if reference_parts.is_empty() {
         return None;
     }
 
     // Evaluate both the physical MIDI track boundary and the logical
-    // track/channel lane. Type-0 files may place multiple parts on one track
-    // while isolating them on distinct channels.
+    // track/channel lane. Type-0 files may place several logical parts on one
+    // track but separate them by channel.
     let mut by_prediction_track: BTreeMap<u16, BTreeMap<u16, u32>> = BTreeMap::new();
     let mut by_prediction_lane: BTreeMap<(u16, u8), BTreeMap<u16, u32>> = BTreeMap::new();
     let mut matched_reference_parts = std::collections::BTreeSet::new();
+    let mut part_attributed_note_count = 0usize;
+    let mut ambiguous_part_assignment_note_count = 0usize;
+
     for (reference_index, prediction_index) in matching {
         let reference_note = reference.get(*reference_index)?;
         let predicted_note = predicted.get(*prediction_index)?;
+        let possible_parts = candidate_part_ids_by_prediction.get(*prediction_index)?;
+        // A note may be perfectly correct in pitch/onset yet be unable to
+        // identify which logical part produced it (e.g. two parts double the
+        // same pitch on the same onset). Never let deterministic tie-breaking
+        // turn this into a false structural claim.
+        if possible_parts.len() != 1
+            || possible_parts.contains(&u16::MAX)
+            || reference_note.part_id == u16::MAX
+            || !possible_parts.contains(&reference_note.part_id)
+        {
+            ambiguous_part_assignment_note_count += 1;
+            continue;
+        }
+
+        part_attributed_note_count += 1;
         *by_prediction_track
             .entry(predicted_note.track_index)
             .or_default()
@@ -1490,7 +1516,6 @@ fn part_separation_summary_v1(
     let (mixed_lanes, mixed_lane_notes, dominant_lane_notes) =
         summarize_groups(&by_prediction_lane);
 
-    let total_matched_notes = matching.len();
     Some(MidiTranscriptionPartSeparationSummaryV1 {
         reference_part_count: u32::try_from(reference_parts.len()).unwrap_or(u32::MAX),
         matched_reference_part_count: u32::try_from(matched_reference_parts.len())
@@ -1503,11 +1528,17 @@ fn part_separation_summary_v1(
             .unwrap_or(u32::MAX),
         mixed_prediction_lane_count: u32::try_from(mixed_lanes).unwrap_or(u32::MAX),
         matched_notes_in_mixed_lanes: u32::try_from(mixed_lane_notes).unwrap_or(u32::MAX),
-        total_matched_notes: u32::try_from(total_matched_notes).unwrap_or(u32::MAX),
-        note_weighted_track_purity: (total_matched_notes > 0)
-            .then_some(dominant_track_notes as f64 / total_matched_notes as f64),
-        note_weighted_lane_purity: (total_matched_notes > 0)
-            .then_some(dominant_lane_notes as f64 / total_matched_notes as f64),
+        total_matched_notes: u32::try_from(matching.len()).unwrap_or(u32::MAX),
+        part_attributed_note_count: u32::try_from(part_attributed_note_count)
+            .unwrap_or(u32::MAX),
+        ambiguous_part_assignment_note_count: u32::try_from(
+            ambiguous_part_assignment_note_count,
+        )
+        .unwrap_or(u32::MAX),
+        note_weighted_track_purity: (part_attributed_note_count > 0)
+            .then_some(dominant_track_notes as f64 / part_attributed_note_count as f64),
+        note_weighted_lane_purity: (part_attributed_note_count > 0)
+            .then_some(dominant_lane_notes as f64 / part_attributed_note_count as f64),
         reference_part_coverage: Some(
             matched_reference_parts.len() as f64 / reference_parts.len() as f64,
         ),
@@ -1668,11 +1699,18 @@ pub fn evaluate_midi_transcription_v1(
             build_offset_only_adjacency(&reference_notes, &predicted_notes, &config)?;
         maximum_cardinality_matching(&adjacency, predicted_notes.len())?
     };
-    let onset_matching = {
-        let adjacency =
-            build_adjacency(&reference_notes, &predicted_notes, &config, false, false, false)?;
-        maximum_cardinality_matching(&adjacency, predicted_notes.len())?
-    };
+    let onset_adjacency =
+        build_adjacency(&reference_notes, &predicted_notes, &config, false, false, false)?;
+    let onset_matching =
+        maximum_cardinality_matching(&onset_adjacency, predicted_notes.len())?;
+    let mut candidate_part_ids_by_prediction =
+        vec![std::collections::BTreeSet::new(); predicted_notes.len()];
+    for (reference_index, candidate_prediction_indices) in onset_adjacency.iter().enumerate() {
+        for prediction_index in candidate_prediction_indices {
+            candidate_part_ids_by_prediction[*prediction_index]
+                .insert(reference_notes[reference_index].part_id);
+        }
+    }
     let reference_part_ids: Vec<u16> = reference
         .manifest
         .tracks
@@ -1684,6 +1722,7 @@ pub fn evaluate_midi_transcription_v1(
         &reference_notes,
         &predicted_notes,
         &onset_matching,
+        &candidate_part_ids_by_prediction,
     );
 
     let full_matching = {
