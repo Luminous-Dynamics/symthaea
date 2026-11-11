@@ -157,6 +157,7 @@ pub struct SyntheticResponseProfile {
     pub renderer_class: String,
     pub analyzer_id: String,
     pub analyzer_version: String,
+    pub source_revision: String,
     pub fit_method: String,
     pub sample_rate_hz: u32,
     pub target_segment_role: String,
@@ -765,6 +766,7 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
         &calibration_pairs,
         &no_op_calibration,
         &fitted_sensitivities,
+        &control_support_checks,
         &holdout_checks,
     ))
     .map_err(|error| format!("failed to serialize calibration receipt: {error}"))?;
@@ -805,6 +807,8 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
         renderer_class: "legacy_formant_source_filter".into(),
         analyzer_id: LPC_ANALYZER_ID.into(),
         analyzer_version: LPC_ANALYZER_VERSION.into(),
+        source_revision: std::env::var("SYNTH_VOCAL_PLANT_SOURCE_REVISION")
+            .unwrap_or_else(|_| "unknown-at-build".into()),
         fit_method: RESPONSE_FIT_METHOD.into(),
         sample_rate_hz,
         target_segment_role: "synthetic_proxy_event".into(),
@@ -843,6 +847,7 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
         &profile.renderer_backend_id,
         &profile.analyzer_id,
         &profile.analyzer_version,
+        &profile.source_revision,
         &profile.calibration_splits,
         &profile.calibration_pairs,
         &profile.confirmatory_source_case_id,
