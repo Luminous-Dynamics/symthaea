@@ -131,19 +131,19 @@
             "year": 2024,
             "value": 40,
             "unit": "percent",
-            "meaning": "Surrender phase-in for emissions year 2024"
+            "meaning": "Emissions year 2024: 40% of eligible verified emissions must be covered by allowances surrendered in 2025."
           },
           {
             "year": 2025,
             "value": 70,
             "unit": "percent",
-            "meaning": "Surrender phase-in for emissions year 2025, reported/surrendered in 2026"
+            "meaning": "Emissions year 2025: 70% of eligible verified emissions must be covered by allowances surrendered in 2026."
           },
           {
             "year": 2026,
             "value": 100,
             "unit": "percent",
-            "meaning": "Full phase-in for emissions year 2026 onward"
+            "meaning": "Emissions year 2026 onward: 100% of eligible verified emissions must be covered by allowances surrendered in 2027 and subsequent years."
           }
         ]
       },
@@ -152,7 +152,8 @@
       ],
       "limitations": [
         "Surrender phase-in is not the same as the geographic covered-emissions fraction.",
-        "Do not apply one fleet-wide coverage ratio to every voyage or period."
+        "Do not apply one fleet-wide coverage ratio to every voyage or period.",
+        "The phase_in.year field denotes the emissions year, not the surrender year; the meanings explicitly identify the subsequent surrender year. Geographic voyage coverage (100% intra-EU/EEA and in-port; 50% extra-EU/EEA legs) is a separate multiplier."
       ]
     },
     {
@@ -239,14 +240,16 @@
     {
       "authority": "International Maritime Organization",
       "instrument": "MARPOL Annex VI amendment adopted by MEPC 84",
-      "revision_or_resolution": "Resolution MEPC.407(84)",
+      "revision_or_resolution": "Resolution MEPC.407(84); as checked 2026-11-11, the IMO MEPC resolution index labels it AWAITING CERTIFICATION.",
       "rule_status": "adopted",
       "legal_character": "adopted_amendment_future_application",
       "source_ids": [
-        "IMO-NE-ATLANTIC-ECA-2026"
+        "IMO-NE-ATLANTIC-ECA-2026",
+        "IMO-MEPC407-RESOLUTION-INDEX-2026"
       ],
       "limitations": [
-        "Adoption is distinct from application; route geometry alone does not establish fuel compliance."
+        "Adoption is distinct from application; route geometry alone does not establish fuel compliance.",
+        "As of 11 November 2026, the IMO resolution index marks MEPC.407(84) AWAITING CERTIFICATION and its linked PDF is only an awaiting-certification placeholder. The committee adoption outcome is known, but ship-specific interpretation, exceptions and geospatial classification must use the certified amendment and official Appendix VII coordinates."
       ],
       "rule_id": "NE-ATLANTIC-NOX-ECA-2026",
       "title": "North-East Atlantic NOx Emission Control Area — Tier III new-ship applicability",
@@ -257,7 +260,7 @@
       },
       "applicability": {
         "ship_scope": "Ships operating in the designated North-East Atlantic NOx ECA, with relevant marine diesel engines of more than 130 kW and construction/delivery dates meeting the new-ship criteria.",
-        "geographic_scope": "North-East Atlantic ECA, covering designated EEZs and territorial seas extending up to 200 nautical miles from the baselines of Greenland, Iceland, the Faroe Islands, Ireland, the United Kingdom, France, Spain and Portugal; apply the official adopted coordinates.",
+        "geographic_scope": "The North-East Atlantic ECA includes designated EEZs/territorial seas of Greenland, Iceland, Faroe Islands, Ireland, mainland United Kingdom, France, Spain and Portugal, but the EEZs around the Azores, Madeira and Canary Islands are excluded; exact legal applicability requires official Appendix VII coordinates.",
         "voyage_scope": "Operation of eligible ships/engines within the designated North-East Atlantic NOx ECA from the amendment's entry into force.",
         "engine_power_kw_min_exclusive": 130,
         "ship_construction_triggers": [
@@ -284,7 +287,9 @@
         "exclusions_or_unknowns": [
           "Do not apply this rule to all existing ships merely because they enter the ECA.",
           "Confirm engine applicability, certification and construction milestones from the adopted text, EIAPP documentation, build contract and class/flag records.",
-          "Use the official MEPC.407(84) coordinates; a broad country/200-nautical-mile description is not a geospatial compliance boundary."
+          "Use the official MEPC.407(84) coordinates; a broad country/200-nautical-mile description is not a geospatial compliance boundary.",
+          "The official IMO resolution index still marks MEPC.407(84) AWAITING CERTIFICATION as of 11 November 2026; obtain the certified amendment and official Appendix VII coordinates before compliance decisions.",
+          "The ECA excludes the EEZs around the Azores, Madeira and Canary Islands; do not implement the area as a simple country coastline buffer."
         ]
       },
       "output_scope": [
@@ -301,14 +306,16 @@
     {
       "authority": "International Maritime Organization",
       "instrument": "MARPOL Annex VI amendment adopted by MEPC 84",
-      "revision_or_resolution": "Resolution MEPC.407(84)",
+      "revision_or_resolution": "Resolution MEPC.407(84); as checked 2026-11-11, the IMO MEPC resolution index labels it AWAITING CERTIFICATION.",
       "rule_status": "adopted",
       "legal_character": "adopted_amendment_future_application",
       "source_ids": [
-        "IMO-NE-ATLANTIC-ECA-2026"
+        "IMO-NE-ATLANTIC-ECA-2026",
+        "IMO-MEPC407-RESOLUTION-INDEX-2026"
       ],
       "limitations": [
-        "Adoption is distinct from application; route geometry alone does not establish fuel compliance."
+        "Adoption is distinct from application; route geometry alone does not establish fuel compliance.",
+        "As of 11 November 2026, the IMO resolution index marks MEPC.407(84) AWAITING CERTIFICATION and its linked PDF is only an awaiting-certification placeholder. The committee adoption outcome is known, but ship-specific interpretation, exceptions and geospatial classification must use the certified amendment and official Appendix VII coordinates."
       ],
       "rule_id": "NE-ATLANTIC-SOX-PM-ECA-2026",
       "title": "North-East Atlantic SOx/PM Emission Control Area — 0.10% fuel sulphur limit",
@@ -319,7 +326,7 @@
       },
       "applicability": {
         "ship_scope": "Ships subject to MARPOL Annex VI regulation 14 sulphur requirements while operating within the designated North-East Atlantic SOx ECA.",
-        "geographic_scope": "North-East Atlantic ECA, covering designated EEZs and territorial seas extending up to 200 nautical miles from the baselines of Greenland, Iceland, the Faroe Islands, Ireland, the United Kingdom, France, Spain and Portugal; apply the official adopted coordinates.",
+        "geographic_scope": "The North-East Atlantic ECA includes designated EEZs/territorial seas of Greenland, Iceland, Faroe Islands, Ireland, mainland United Kingdom, France, Spain and Portugal, but the EEZs around the Azores, Madeira and Canary Islands are excluded; exact legal applicability requires official Appendix VII coordinates.",
         "voyage_scope": "Fuel oil used on voyage/operational segments within the designated North-East Atlantic SOx ECA from 1 September 2028.",
         "conditions": [
           "The MARPOL Annex VI amendment enters into force on 1 September 2027.",
@@ -328,7 +335,8 @@
         "exclusions_or_unknowns": [
           "Do not apply the SOx/PM fuel limit from 1 September 2027; the operational sulphur requirement starts 1 September 2028.",
           "Use the adopted MEPC.407(84) coordinates and current MARPOL Annex VI requirements.",
-          "This is a local air-pollution rule, not a lifecycle-GHG factor or an IMO CO2e calculation."
+          "This is a local air-pollution rule, not a lifecycle-GHG factor or an IMO CO2e calculation.",
+          "The official IMO resolution index still marks MEPC.407(84) AWAITING CERTIFICATION as of 11 November 2026; obtain the certified amendment and official Appendix VII coordinates before compliance decisions."
         ]
       },
       "output_scope": [
@@ -504,6 +512,19 @@
       "evidence_class": "official_subcommittee_workplan",
       "limitations": [
         "Draft ISSM and SOLAS revisions are not adopted/effective requirements in the dated snapshot."
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC407-RESOLUTION-INDEX-2026",
+      "title": "IMO MEPC 2026-27 resolution index entry for MEPC.407(84)",
+      "publisher": "International Maritime Organization",
+      "uri": "https://www.imo.org/en/knowledgecentre/indexofimoresolutions/pages/mepc-2026-27.aspx",
+      "publication_date": "2026-05-01",
+      "evidence_class": "official_resolution_index_status_snapshot",
+      "limitations": [
+        "As checked on 11 November 2026, the IMO index labels MEPC.407(84) AWAITING CERTIFICATION and the linked PDF is a one-page awaiting-certification placeholder, not the complete certified amendment text.",
+        "The MEPC 84 meeting summary separately reports committee adoption of the North-East Atlantic ECA and states the 1 September 2027 entry-into-force date.",
+        "Do not claim ship-specific legal compliance or derive official coordinates from the summary; obtain the certified amendment and authoritative Appendix VII coordinates."
       ]
     }
   ]
