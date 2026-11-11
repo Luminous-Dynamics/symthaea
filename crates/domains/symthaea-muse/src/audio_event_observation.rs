@@ -22,6 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
 
 pub const AUDIO_EVENT_OBSERVATION_SCHEMA_V1: &str = "muse-audio-event-observation-v1";
+pub const AUDIO_STEM_EVENT_OBSERVATION_SCHEMA_V1: &str = "muse-audio-stem-event-observation-v1";
 pub const AUDIO_EVENT_OBSERVATION_MAX_FFT_FRAMES_V1: usize = 65_536;
 pub const AUDIO_EVENT_OBSERVATION_MIN_FFT_FRAMES_V1: usize = 4_096;
 pub const AUDIO_EVENT_OBSERVATION_HARMONICS_V1: usize = 6;
@@ -98,6 +99,34 @@ pub enum AudioEventObservationIssueV1 {
     ReceiptInputBindingMismatch,
     ReceiptNoteCoverageMismatch,
     ReceiptEventMismatch { ordinal: usize },
+    MissingTrackReceipt { track_index: u16 },
+    EmptyTrackNotes { track_index: u16 },
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AudioStemEventObservationReceiptV1 {
+    pub schema: String,
+    pub track_index: u16,
+    pub score_sha256: String,
+    pub midi_sha256: String,
+    pub midi_manifest_sha256: String,
+    pub wav_sha256: String,
+    pub wav_info: AudioEventObservationWavInfoV1,
+    pub note_observations: Vec<AudioEventPitchObservationV1>,
+    pub receipt_sha256: String,
+}
+
+#[derive(Serialize)]
+struct AudioStemObservationCommitmentV1<'a> {
+    schema: &'a str,
+    track_index: u16,
+    score_sha256: &'a str,
+    midi_sha256: &'a str,
+    midi_manifest_sha256: &'a str,
+    wav_sha256: &'a str,
+    wav_info: &'a AudioEventObservationWavInfoV1,
+    note_observations: &'a [AudioEventPitchObservationV1],
 }
 
 #[derive(Serialize)]
@@ -820,6 +849,224 @@ pub fn validate_audio_event_observation_v1(
     issues
 }
 
+
+
+/// Commitment for a track-scoped audio observation. The MIDI track index is
+/// included in the hash so an otherwise identical note list cannot be
+/// relabelled as evidence for another part/segment.
+pub fn audio_stem_event_observation_commitment_v1(
+    receipt: &AudioStemEventObservationReceiptV1,
+) -> Result<String, serde_json::Error> {
+    let commitment = AudioStemObservationCommitmentV1 {
+        schema: &receipt.schema,
+        track_index: receipt.track_index,
+        score_sha256: &receipt.score_sha256,
+        midi_sha256: &receipt.midi_sha256,
+        midi_manifest_sha256: &receipt.midi_manifest_sha256,
+        wav_sha256: &receipt.wav_sha256,
+        wav_info: &receipt.wav_info,
+        note_observations: &receipt.note_observations,
+    };
+    Ok(domain_separated_sha256(
+        AUDIO_STEM_EVENT_OBSERVATION_SCHEMA_V1,
+        &serde_json::to_vec(&commitment)?,
+    ))
+}
+
+/// Observe only the score-bound notes assigned to one exact MIDI track in a
+/// part-isolated WAV. The supplied MIDI artifact is still verified in full;
+/// only the selected track's source-note ordinals are measured in the WAV.
+pub fn observe_rendered_audio_stem_events_v1(
+    wav_bytes: &[u8],
+    midi: &MidiPerformanceArtifactV1,
+    track_index: u16,
+) -> Result<AudioStemEventObservationReceiptV1, Vec<AudioEventObservationIssueV1>> {
+    let issues = validate_midi_artifact(midi);
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+    let Some(track) = midi
+        .manifest
+        .tracks
+        .iter()
+        .find(|track| track.track_index == track_index)
+    else {
+        return Err(vec![AudioEventObservationIssueV1::MissingTrackReceipt { track_index }]);
+    };
+    let selected_notes: Vec<_> = midi
+        .manifest
+        .notes
+        .iter()
+        .filter(|note| note.track_index == track_index)
+        .collect();
+    if selected_notes.is_empty() {
+        return Err(vec![AudioEventObservationIssueV1::EmptyTrackNotes { track_index }]);
+    }
+    if selected_notes.iter().any(|note| {
+        note.part_id != track.part_id
+            || note.segment_id != track.segment_id
+            || note.instrument_id != track.instrument_id
+    }) {
+        return Err(vec![AudioEventObservationIssueV1::TrackReceiptMismatch {
+            ordinal: selected_notes[0].source_note_ordinal,
+        }]);
+    }
+
+    let wav = decode_wav(wav_bytes).map_err(|issue| vec![issue])?;
+    let mut note_observations: Vec<_> = selected_notes
+        .iter()
+        .map(|note| {
+            observe_note(
+                &wav,
+                note,
+                midi.manifest.tempo_microseconds_per_quarter,
+                midi.manifest.ticks_per_quarter,
+            )
+        })
+        .collect();
+    note_observations.sort_by_key(|note| note.source_note_ordinal);
+    let mut receipt = AudioStemEventObservationReceiptV1 {
+        schema: AUDIO_STEM_EVENT_OBSERVATION_SCHEMA_V1.into(),
+        track_index,
+        score_sha256: midi.manifest.score_sha256.clone(),
+        midi_sha256: midi.manifest.midi_sha256.clone(),
+        midi_manifest_sha256: midi.manifest_sha256.clone(),
+        wav_sha256: sha256_hex(wav_bytes),
+        wav_info: wav.info,
+        note_observations,
+        receipt_sha256: String::new(),
+    };
+    receipt.receipt_sha256 = audio_stem_event_observation_commitment_v1(&receipt)
+        .map_err(|_| vec![AudioEventObservationIssueV1::ReceiptDigestMismatch])?;
+    Ok(receipt)
+}
+
+/// Validate a track-scoped observation receipt against the exact MIDI track
+/// and WAV bytes. This checks commitments and event coverage; it does not
+/// re-run the FFT or authenticate who produced the observation.
+pub fn validate_audio_stem_event_observation_v1(
+    receipt: &AudioStemEventObservationReceiptV1,
+    wav_bytes: &[u8],
+    midi: &MidiPerformanceArtifactV1,
+    track_index: u16,
+) -> Vec<AudioEventObservationIssueV1> {
+    let mut issues = validate_midi_artifact(midi);
+    let Some(track) = midi
+        .manifest
+        .tracks
+        .iter()
+        .find(|track| track.track_index == track_index)
+    else {
+        issues.push(AudioEventObservationIssueV1::MissingTrackReceipt { track_index });
+        return issues;
+    };
+    let decoded_wav = decode_wav(wav_bytes);
+    if receipt.schema != AUDIO_STEM_EVENT_OBSERVATION_SCHEMA_V1
+        || receipt.track_index != track_index
+        || receipt.score_sha256 != midi.manifest.score_sha256
+        || receipt.midi_sha256 != midi.manifest.midi_sha256
+        || receipt.midi_manifest_sha256 != midi.manifest_sha256
+        || receipt.wav_sha256 != sha256_hex(wav_bytes)
+    {
+        issues.push(AudioEventObservationIssueV1::ReceiptInputBindingMismatch);
+    }
+    match &decoded_wav {
+        Ok(decoded) if decoded.info == receipt.wav_info => {}
+        _ => issues.push(AudioEventObservationIssueV1::ReceiptInputBindingMismatch),
+    }
+    let expected: BTreeMap<_, _> = midi
+        .manifest
+        .notes
+        .iter()
+        .filter(|note| note.track_index == track_index)
+        .map(|note| (note.source_note_ordinal, note))
+        .collect();
+    if expected.is_empty() {
+        issues.push(AudioEventObservationIssueV1::EmptyTrackNotes { track_index });
+    }
+    let observed_ordinals: BTreeSet<_> = receipt
+        .note_observations
+        .iter()
+        .map(|note| note.source_note_ordinal)
+        .collect();
+    if expected.keys().copied().collect::<BTreeSet<_>>() != observed_ordinals
+        || observed_ordinals.len() != receipt.note_observations.len()
+    {
+        issues.push(AudioEventObservationIssueV1::ReceiptNoteCoverageMismatch);
+    }
+    let wav_info = decoded_wav.as_ref().ok().map(|wav| &wav.info);
+    for observation in &receipt.note_observations {
+        let Some(source) = expected.get(&observation.source_note_ordinal) else {
+            continue;
+        };
+        let frame_binding_matches = wav_info.is_some_and(|info| {
+            expected_frame(
+                source.start_tick,
+                midi.manifest.tempo_microseconds_per_quarter,
+                midi.manifest.ticks_per_quarter,
+                info.sample_rate_hz,
+            ) == Some(observation.expected_start_frame)
+                && expected_frame(
+                    source.end_tick,
+                    midi.manifest.tempo_microseconds_per_quarter,
+                    midi.manifest.ticks_per_quarter,
+                    info.sample_rate_hz,
+                ) == Some(observation.expected_end_frame)
+        });
+        let frequency = 440.0
+            * 2.0f64.powf((f64::from(source.pitch_midi) - 69.0) / 12.0);
+        let frequency_matches = observation.expected_frequency_hz.is_finite()
+            && (observation.expected_frequency_hz - frequency).abs() <= 1e-9;
+        let salience_is_finite = observation
+            .harmonic_salience_db
+            .into_iter()
+            .chain(observation.fundamental_salience_db)
+            .all(f64::is_finite);
+        let window_is_well_formed = match (
+            observation.window_start_frame,
+            observation.window_frame_count,
+        ) {
+            (None, None) => true,
+            (Some(start), Some(count)) => {
+                count > 0
+                    && start >= observation.expected_start_frame
+                    && start.saturating_add(u64::from(count))
+                        <= observation.expected_end_frame
+                    && wav_info.is_some_and(|info| {
+                        start.saturating_add(u64::from(count)) <= info.frame_count
+                    })
+            }
+            _ => false,
+        };
+        if observation.part_id != source.part_id
+            || observation.segment_id != source.segment_id
+            || observation.instrument_id != source.instrument_id
+            || observation.part_id != track.part_id
+            || observation.segment_id != track.segment_id
+            || observation.instrument_id != track.instrument_id
+            || observation.pitch_midi != source.pitch_midi
+            || !frame_binding_matches
+            || !frequency_matches
+            || !salience_is_finite
+            || !window_is_well_formed
+            || observation.harmonics_measured > AUDIO_EVENT_OBSERVATION_HARMONICS_V1 as u8
+            || (observation.status == AudioEventObservationStatusV1::Measured
+                && (observation.harmonic_salience_db.is_none()
+                    || observation.fundamental_salience_db.is_none()
+                    || observation.window_start_frame.is_none()))
+        {
+            issues.push(AudioEventObservationIssueV1::ReceiptEventMismatch {
+                ordinal: observation.source_note_ordinal,
+            });
+        }
+    }
+    match audio_stem_event_observation_commitment_v1(receipt) {
+        Ok(actual) if actual == receipt.receipt_sha256 => {}
+        _ => issues.push(AudioEventObservationIssueV1::ReceiptDigestMismatch),
+    }
+    issues
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -964,6 +1211,23 @@ mod tests {
             writer.finalize().unwrap();
         }
         cursor.into_inner()
+    }
+
+
+    #[test]
+    fn stem_scoped_observer_only_returns_the_selected_track_and_replays() {
+        let midi = midi_artifact(69, 1_920);
+        let wav = silent_wav(1.0);
+        let receipt = observe_rendered_audio_stem_events_v1(&wav, &midi, 1).unwrap();
+        assert_eq!(receipt.track_index, 1);
+        assert_eq!(receipt.note_observations.len(), 1);
+        assert_eq!(
+            receipt.note_observations[0].status,
+            AudioEventObservationStatusV1::NoMeasurableSpectralEnergy
+        );
+        assert!(validate_audio_stem_event_observation_v1(&receipt, &wav, &midi, 1).is_empty());
+        assert!(validate_audio_stem_event_observation_v1(&receipt, &wav, &midi, 2)
+            .contains(&AudioEventObservationIssueV1::MissingTrackReceipt { track_index: 2 }));
     }
 
     #[test]
