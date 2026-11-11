@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev_dynamic_robust_diagnostic_v0_1",
+  "title": "EV dynamic robust diagnostic model corpus v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_version",
+    "problems"
+  ],
+  "properties": {
+    "corpus_version": {
+      "const": "ev-dynamic-diagnostic-corpus/0.1"
+    },
+    "problems": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/problem"
+      }
+    }
+  },
+  "$defs": {
+    "probabilityRow": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "matrix2x2": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "problem_id",
+        "loss_unit",
+        "states",
+        "actions",
+        "tests",
+        "worlds"
+      ],
+      "properties": {
+        "problem_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "loss_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "states": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action_id",
+              "loss_by_state"
+            ],
+            "properties": {
+              "action_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "loss_by_state": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "tests": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "test_id",
+              "outcomes",
+              "duration_seconds",
+              "test_cost",
+              "downtime_cost",
+              "safety_approved",
+              "calibration_valid",
+              "supported_domain",
+              "equipment_available"
+            ],
+            "properties": {
+              "test_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "outcomes": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 3,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "duration_seconds": {
+                "type": "number",
+                "minimum": 0
+              },
+              "test_cost": {
+                "type": "number",
+                "minimum": 0
+              },
+              "downtime_cost": {
+                "type": "number",
+                "minimum": 0
+              },
+              "safety_approved": {
+                "type": "boolean"
+              },
+              "calibration_valid": {
+                "type": "boolean"
+              },
+              "supported_domain": {
+                "type": "boolean"
+              },
+              "equipment_available": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "worlds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "prior",
+              "test_models"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prior": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "test_models": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "test_id",
+                    "time_transition",
+                    "perturbation_transition",
+                    "observation_by_post_state"
+                  ],
+                  "properties": {
+                    "test_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "time_transition": {
+                      "$ref": "#/$defs/matrix2x2"
+                    },
+                    "perturbation_transition": {
+                      "$ref": "#/$defs/matrix2x2"
+                    },
+                    "observation_by_post_state": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "$ref": "#/$defs/probabilityRow"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
