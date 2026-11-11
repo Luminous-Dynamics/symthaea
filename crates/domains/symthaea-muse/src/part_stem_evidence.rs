@@ -811,6 +811,7 @@ pub fn validate_part_stem_bundle_v1(
     }).unwrap_or(u64::MAX);
     if total_wav_bytes > PART_STEM_MAX_TOTAL_WAV_BYTES_V1 {
         issues.push(PartStemEvidenceIssueV1::TotalWavBytesExceeded);
+        return Err(issues);
     }
 
     let mut seen_tracks = BTreeSet::new();
