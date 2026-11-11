@@ -44,6 +44,8 @@ pub struct FeatureReceipt {
 #[serde(deny_unknown_fields)]
 pub struct TargetReceipt {
     pub target_id: String,
+    pub asset_ref: String,
+    pub configuration_sha256: String,
     pub kind: String,
     pub unit: String,
     pub target_value: Option<f64>,
@@ -52,6 +54,8 @@ pub struct TargetReceipt {
     pub evidence_sha256: String,
     pub reference_protocol_ref: String,
     pub reference_protocol_sha256: String,
+    pub reference_condition_ref: String,
+    pub reference_condition_sha256: String,
     pub reference_time_seconds: f64,
     pub target_window_start_seconds: f64,
     pub target_window_end_seconds: f64,
@@ -171,12 +175,18 @@ fn validate_feature(case: &Case, feature: &FeatureReceipt) -> Result<(), String>
     Ok(())
 }
 
-fn target_audit(target: &TargetReceipt, cutoff: f64) -> Result<TargetAudit, String> {
+fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, String> {
+    let cutoff = case.prediction_cutoff_seconds;
     if !nonempty(&target.target_id)
+        || target.asset_ref != case.asset_ref
+        || target.configuration_sha256 != case.configuration_sha256
+        || !is_sha256(&target.configuration_sha256)
         || !nonempty(&target.evidence_ref)
         || !is_sha256(&target.evidence_sha256)
         || !nonempty(&target.reference_protocol_ref)
         || !is_sha256(&target.reference_protocol_sha256)
+        || !nonempty(&target.reference_condition_ref)
+        || !is_sha256(&target.reference_condition_sha256)
         || !nonempty(&target.unit)
     {
         return Err(format!("TARGET_EVIDENCE_BINDING_INVALID:{}", target.target_id));
@@ -397,7 +407,7 @@ fn validate_case(case: &Case) -> Result<Vec<TargetAudit>, Vec<String>> {
         if !target_ids.insert(target.target_id.clone()) {
             errors.push(format!("DUPLICATE_TARGET_ID:{}", target.target_id));
         }
-        match target_audit(target, case.prediction_cutoff_seconds) {
+        match target_audit(target, case) {
             Ok(audit) => audits.push(audit),
             Err(error) => errors.push(error),
         }
