@@ -18,7 +18,7 @@ It also rejects duplicate trial IDs, blank identity fields, malformed expected-t
     cargo test -p symthaea-robotics-recovery-audit
     cargo fmt --manifest-path crates/domains/symthaea-robotics-recovery-audit/Cargo.toml -- --check
 
-Thirty-four unit tests are included across the audit kernel and RoboRecover scorer. They have not yet been executed in this environment. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
+Thirty-nine unit tests are included across the audit kernel and RoboRecover scorer. They have not yet been executed in this environment. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
 
 
 ## RoboRecover recovery scoring
@@ -29,7 +29,7 @@ The `roborecover_score` module consumes a frozen scenario manifest and normalize
 - **Policy-recovery RSR:** task completion attributable to the policy after handoff.
 - **Physical-safe RSR (Luminous extension):** policy-attributable completion plus continuous physical state, a physically realizable intervention, executed actions and upstream verified compliant safety evidence.
 
-For every family, Overall RSR averages scenario rates equally; Macro-9 averages rates within the nine declared occupied Stage–Type groups, then gives each group equal weight. The returned score receipt carries the canonical upstream repository, exact source revision, split-manifest Git blob SHA, evaluator SHA-256, per-scenario content SHA-256, platform, split and arm. The scorer rejects blank or malformed digests and rejects any trial whose scenario content or evaluator digest differs from the frozen manifest. One score is bound to one platform, one split and one policy/intervention `arm_id`. Do not pool base-policy, correction, monitor or rewind arms.
+For every family, Overall RSR averages scenario rates equally; Macro-9 averages rates within the nine declared occupied Stage–Type groups, then gives each group equal weight. Macro-9 is test-split-only: the pinned train CSV contains an additional Stage–Type combination, so training manifests retain it for Overall RSR without incorrectly forcing it into the test's nine-group metric. Each trial is also matched against the exact source revision, split-manifest blob and checkpoint digest. The returned score receipt carries the canonical upstream repository, exact source revision, split-manifest Git blob SHA, evaluator SHA-256, per-scenario content SHA-256, platform, split and arm. The scorer rejects blank or malformed digests and rejects any trial whose scenario content or evaluator digest differs from the frozen manifest. One score is bound to one platform, one split and one policy/intervention `arm_id`. Do not pool base-policy, correction, monitor or rewind arms.
 
 ### Source status normalization and an upstream ambiguity
 
