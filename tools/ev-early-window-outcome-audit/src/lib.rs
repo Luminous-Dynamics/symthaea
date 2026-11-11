@@ -531,9 +531,9 @@ mod tests {
     #[test]
     fn frozen_corpus_preserves_exact_censored_and_uncomputable_target_states() {
         let report = report();
-        assert_eq!(report.case_count, 13);
+        assert_eq!(report.case_count, 14);
         assert_eq!(report.accepted_count, 5);
-        assert_eq!(report.rejected_count, 8);
+        assert_eq!(report.rejected_count, 9);
         assert_eq!(report.right_censored_rdt_count, 1);
         assert_eq!(report.competing_event_rdt_count, 1);
         assert_eq!(report.not_computable_target_count, 1);
@@ -619,7 +619,7 @@ mod tests {
         case["expected_disposition"] = Value::String("REJECT".into());
         let bytes = serde_json::to_vec(&corpus).expect("mutated corpus");
         let report = audit_corpus(SCHEMA, &bytes).expect("expected reject is recorded");
-        assert_eq!(report.rejected_count, 9);
+        assert_eq!(report.rejected_count, 10);
     }
 
     #[test]
@@ -632,7 +632,7 @@ mod tests {
         case["expected_disposition"] = Value::String("REJECT".into());
         let bytes = serde_json::to_vec(&corpus).expect("mutated corpus");
         let report = audit_corpus(SCHEMA, &bytes).expect("expected reject is recorded");
-        assert_eq!(report.rejected_count, 9);
+        assert_eq!(report.rejected_count, 10);
     }
 
     #[test]
@@ -666,4 +666,14 @@ mod tests {
         assert!(case.targets.iter().any(|target| target.kind == "POWER_ENVELOPE"
             && target.evidence_grade == "MODEL_DERIVED_NOT_PHYSICAL_MEASUREMENT"));
     }
+    #[test]
+    fn every_output_label_must_bind_to_the_prediction_asset_and_configuration() {
+        let report = report();
+        let case = report.cases.iter()
+            .find(|case| case.case_id == "target-asset-configuration-mismatch-rejected")
+            .expect("target identity negative control");
+        assert!(!case.accepted);
+        assert!(case.errors.iter().any(|error| error.contains("TARGET_EVIDENCE_BINDING_INVALID")));
+    }
+
 }
