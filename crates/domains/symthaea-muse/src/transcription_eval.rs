@@ -690,43 +690,67 @@ fn maximum_cardinality_matching(
     adjacency: &[Vec<usize>],
     predicted_count: usize,
 ) -> Vec<(usize, usize)> {
-    fn augment(
-        reference_index: usize,
-        adjacency: &[Vec<usize>],
-        seen_predictions: &mut [bool],
-        prediction_to_reference: &mut [Option<usize>],
-    ) -> bool {
-        for &prediction_index in &adjacency[reference_index] {
-            if seen_predictions[prediction_index] {
-                continue;
-            }
-            seen_predictions[prediction_index] = true;
-            let previous_reference = prediction_to_reference[prediction_index];
-            if previous_reference.is_none()
-                || augment(
-                    previous_reference.unwrap_or_default(),
-                    adjacency,
-                    seen_predictions,
-                    prediction_to_reference,
-                )
-            {
-                prediction_to_reference[prediction_index] = Some(reference_index);
-                return true;
+    // Iterative augmenting-path search avoids recursive DFS stack growth on
+    // long duplicate-heavy passages. The candidate-edge cap is enforced
+    // before this function is called.
+    let reference_count = adjacency.len();
+    let mut reference_to_prediction = vec![None; reference_count];
+    let mut prediction_to_reference = vec![None; predicted_count];
+
+    for root in 0..reference_count {
+        if reference_to_prediction[root].is_some() {
+            continue;
+        }
+        let mut queue = VecDeque::new();
+        let mut seen_references = vec![false; reference_count];
+        let mut seen_predictions = vec![false; predicted_count];
+        let mut parent_prediction = vec![None; predicted_count];
+
+        seen_references[root] = true;
+        queue.push_back(root);
+        let mut free_prediction = None;
+
+        'search: while let Some(reference_index) = queue.pop_front() {
+            for &prediction_index in &adjacency[reference_index] {
+                if prediction_index >= predicted_count || seen_predictions[prediction_index] {
+                    continue;
+                }
+                seen_predictions[prediction_index] = true;
+                parent_prediction[prediction_index] = Some(reference_index);
+
+                match prediction_to_reference[prediction_index] {
+                    None => {
+                        free_prediction = Some(prediction_index);
+                        break 'search;
+                    }
+                    Some(matched_reference) if !seen_references[matched_reference] => {
+                        seen_references[matched_reference] = true;
+                        queue.push_back(matched_reference);
+                    }
+                    Some(_) => {}
+                }
             }
         }
-        false
+
+        let Some(mut prediction_index) = free_prediction else {
+            continue;
+        };
+        loop {
+            let Some(reference_index) = parent_prediction[prediction_index] else {
+                break;
+            };
+            let previous_prediction = reference_to_prediction[reference_index];
+            reference_to_prediction[reference_index] = Some(prediction_index);
+            prediction_to_reference[prediction_index] = Some(reference_index);
+
+            let Some(previous_prediction) = previous_prediction else {
+                break;
+            };
+            prediction_to_reference[previous_prediction] = None;
+            prediction_index = previous_prediction;
+        }
     }
 
-    let mut prediction_to_reference = vec![None; predicted_count];
-    for reference_index in 0..adjacency.len() {
-        let mut seen_predictions = vec![false; predicted_count];
-        let _ = augment(
-            reference_index,
-            adjacency,
-            &mut seen_predictions,
-            &mut prediction_to_reference,
-        );
-    }
     let mut matching: Vec<_> = prediction_to_reference
         .iter()
         .enumerate()
@@ -744,54 +768,64 @@ fn build_adjacency(
     config: &MidiTranscriptionEvaluationConfigV1,
     require_offset: bool,
     require_program: bool,
-) -> Vec<Vec<usize>> {
+) -> Result<Vec<Vec<usize>>, MidiTranscriptionEvaluationIssueV1> {
+    // Prediction events are sorted by onset by parse_transcribed_midi_v1.
+    // Use binary-search time windows and per-pitch candidates rather than the
+    // O(reference_notes * predicted_notes) Cartesian scan.
     let onset_tolerance_seconds = f64::from(config.onset_tolerance_ms) / 1_000.0;
-    let pitch_tolerance_semitones = f64::from(config.pitch_tolerance_cents) / 100.0;
-    reference
-        .iter()
-        .map(|reference_note| {
-            let reference_duration = reference_note
-                .offset_seconds
-                .unwrap_or(reference_note.onset_seconds)
-                - reference_note.onset_seconds;
-            let offset_tolerance = (reference_duration
-                * f64::from(config.offset_ratio_basis_points)
-                / 10_000.0)
-                .max(f64::from(config.offset_min_tolerance_ms) / 1_000.0);
-            predicted
-                .iter()
-                .enumerate()
-                .filter_map(|(prediction_index, predicted_note)| {
-                    let pitch_error = (i16::from(reference_note.pitch_midi)
-                        - i16::from(predicted_note.pitch_midi))
-                    .unsigned_abs() as f64;
-                    if pitch_error > pitch_tolerance_semitones {
-                        return None;
-                    }
-                    if (reference_note.onset_seconds - predicted_note.onset_seconds).abs()
-                        > onset_tolerance_seconds
-                    {
-                        return None;
-                    }
-                    if require_program && reference_note.gm_program != predicted_note.gm_program {
-                        return None;
-                    }
-                    if require_offset {
-                        let Some(predicted_offset) = predicted_note.offset_seconds else {
-                            return None;
-                        };
-                        let Some(reference_offset) = reference_note.offset_seconds else {
-                            return None;
-                        };
-                        if (reference_offset - predicted_offset).abs() > offset_tolerance {
-                            return None;
-                        }
-                    }
-                    Some(prediction_index)
-                })
-                .collect()
-        })
-        .collect()
+    let pitch_tolerance_cents = i32::from(config.pitch_tolerance_cents);
+    let mut adjacency = Vec::with_capacity(reference.len());
+    let mut edge_count = 0usize;
+
+    for reference_note in reference {
+        let lower_time = reference_note.onset_seconds - onset_tolerance_seconds;
+        let upper_time = reference_note.onset_seconds + onset_tolerance_seconds;
+        let start = predicted.partition_point(|note| note.onset_seconds < lower_time);
+        let end = predicted.partition_point(|note| note.onset_seconds <= upper_time);
+        let reference_duration = reference_note
+            .offset_seconds
+            .unwrap_or(reference_note.onset_seconds)
+            - reference_note.onset_seconds;
+        let offset_tolerance = (reference_duration
+            * f64::from(config.offset_ratio_basis_points)
+            / 10_000.0)
+            .max(f64::from(config.offset_min_tolerance_ms) / 1_000.0);
+
+        let mut candidates = Vec::new();
+        for (prediction_index, predicted_note) in predicted.iter().enumerate().take(end).skip(start) {
+            let pitch_error_cents = (i32::from(reference_note.pitch_midi)
+                - i32::from(predicted_note.pitch_midi))
+                .unsigned_abs() as i32
+                * 100;
+            if pitch_error_cents > pitch_tolerance_cents {
+                continue;
+            }
+            if require_program && reference_note.gm_program != predicted_note.gm_program {
+                continue;
+            }
+            if require_offset {
+                let Some(predicted_offset) = predicted_note.offset_seconds else {
+                    continue;
+                };
+                let Some(reference_offset) = reference_note.offset_seconds else {
+                    continue;
+                };
+                if (reference_offset - predicted_offset).abs() > offset_tolerance {
+                    continue;
+                }
+            }
+            candidates.push(prediction_index);
+            edge_count = edge_count.saturating_add(1);
+            if edge_count > MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1 {
+                return Err(MidiTranscriptionEvaluationIssueV1::TooManyCandidatePairs {
+                    count: edge_count,
+                    maximum: MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1,
+                });
+            }
+        }
+        adjacency.push(candidates);
+    }
+    Ok(adjacency)
 }
 
 fn metric_from_matching(
@@ -923,19 +957,19 @@ pub fn evaluate_midi_transcription_v1(
         .collect();
 
     let onset_adjacency =
-        build_adjacency(&reference_notes, &predicted_notes, &config, false, false);
+        build_adjacency(&reference_notes, &predicted_notes, &config, false, false)?;
     let onset_matching =
         maximum_cardinality_matching(&onset_adjacency, predicted_notes.len());
     let full_adjacency =
-        build_adjacency(&reference_notes, &predicted_notes, &config, true, false);
+        build_adjacency(&reference_notes, &predicted_notes, &config, true, false)?;
     let full_matching =
         maximum_cardinality_matching(&full_adjacency, predicted_notes.len());
     let program_onset_adjacency =
-        build_adjacency(&reference_notes, &predicted_notes, &config, false, true);
+        build_adjacency(&reference_notes, &predicted_notes, &config, false, true)?;
     let program_onset_matching =
         maximum_cardinality_matching(&program_onset_adjacency, predicted_notes.len());
     let program_full_adjacency =
-        build_adjacency(&reference_notes, &predicted_notes, &config, true, true);
+        build_adjacency(&reference_notes, &predicted_notes, &config, true, true)?;
     let program_full_matching =
         maximum_cardinality_matching(&program_full_adjacency, predicted_notes.len());
 
@@ -1211,7 +1245,6 @@ mod tests {
             &prediction,
             &reference,
             default_config(),
-            None,
         )
         .unwrap();
         assert_eq!(report.onset_pitch_metrics.f1, 1.0);
