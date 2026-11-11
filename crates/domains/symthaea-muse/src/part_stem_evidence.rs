@@ -1211,6 +1211,23 @@ mod tests {
         assert_eq!(bundle.stems[0].render_method, "single_track_input");
     }
 
+
+    #[test]
+    fn alternate_ppq_is_rejected_even_when_midi_and_manifest_agree() {
+        let (_, mut midi, _) = fixture();
+        midi.midi_bytes[12] = 0x01;
+        midi.midi_bytes[13] = 0xe0; // 480 PPQ
+        midi.manifest.ticks_per_quarter = 480;
+        midi.manifest.midi_sha256 = sha256_hex(&midi.midi_bytes);
+        let manifest_bytes = serde_json::to_vec(&midi.manifest).unwrap();
+        midi.manifest_sha256 = domain_sha256(
+            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
+            &manifest_bytes,
+        );
+        let issues = verify_midi(&midi).unwrap_err();
+        assert!(issues.contains(&PartStemEvidenceIssueV1::WrongMidiSchema));
+    }
+
     #[test]
     fn exact_single_track_bundle_is_structurally_consistent() {
         let (bundle, midi, wavs) = fixture();
