@@ -597,11 +597,7 @@ fn pivoted_modified_gram_schmidt(
     for pivot_index in 0..count {
         let mut selected = pivot_index;
         let mut selected_norm = vector_norm(&residuals[selected]);
-        for (candidate, residual) in residuals
-            .iter()
-            .enumerate()
-            .skip(pivot_index + 1)
-        {
+        for (candidate, residual) in residuals.iter().enumerate().skip(pivot_index + 1) {
             let candidate_norm = vector_norm(residual);
             if candidate_norm > selected_norm {
                 selected = candidate;
