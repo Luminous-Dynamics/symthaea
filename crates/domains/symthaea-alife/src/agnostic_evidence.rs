@@ -17,7 +17,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 /// Property names and states are aligned with OLI M0 fixture v0.1.
-pub const SYMTHAEA_OLI_CONTEXT_VERSION: &str = "symthaea-oli-context-v0.1.0";
+pub const SYMTHAEA_OLI_CONTEXT_VERSION: &str = "symthaea-oli-context-v0.2.0";
 
 /// Substrate-agnostic properties using the canonical OLI M0 property keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -118,6 +118,10 @@ pub enum FalseNegativeRisk {
     Unknown,
 }
 
+fn default_false_negative_risks() -> Vec<FalseNegativeRisk> {
+    vec![FalseNegativeRisk::Unknown]
+}
+
 /// Observation opportunity and detector coverage for a non-detection or
 /// not-observable assessment.
 ///
@@ -131,22 +135,30 @@ pub struct ObservationCoverage {
     /// Fraction of the relevant spatial domain sampled, in [0, 1].
     pub spatial_coverage_fraction: Option<f64>,
     /// Fraction of the relevant temporal window covered, in [0, 1].
+    #[serde(default)]
     pub temporal_coverage_fraction: Option<f64>,
     /// Interval between samples/observations, in seconds.
+    #[serde(default)]
     pub temporal_sampling_interval_seconds: Option<f64>,
     /// Characteristic timescale of the target process, in seconds.
+    #[serde(default)]
     pub target_process_timescale_seconds: Option<f64>,
     /// Instrument- or method-specific detection limit.
     pub detection_limit: Option<f64>,
     /// Units for the detection limit, required when a limit is present.
+    #[serde(default)]
     pub detection_limit_units: Option<String>,
     /// Reference abundance/concentration at which detection probability was calibrated.
+    #[serde(default)]
     pub reference_abundance: Option<f64>,
     /// Empirically calibrated detection probability at the reference abundance, in [0, 1].
+    #[serde(default)]
     pub detection_probability_at_reference: Option<f64>,
     /// Evidence record that documents the calibration curve or reference standard.
+    #[serde(default)]
     pub calibration_evidence_id: Option<String>,
     /// Known or unresolved failure modes relevant to a false-negative interpretation.
+    #[serde(default = "default_false_negative_risks")]
     pub false_negative_risks: Vec<FalseNegativeRisk>,
 }
 
