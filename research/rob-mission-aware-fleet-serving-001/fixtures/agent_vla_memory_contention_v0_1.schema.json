@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rob-mission-aware-fleet-serving-001/fixtures/agent_vla_memory_contention_v0_1.schema.json",
+  "title": "Agent brain / VLA / foreground sensing memory-contention synthetic fixtures v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "const": "ROB-AGENT-VLA-MEMORY-CONTENTION-001"
+    },
+    "status": {
+      "const": "synthetic_known_answers_only"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AV01_KV_CAPACITY_ACTIVE_EPISODE_ADMISSION"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AV02_VLA_DEADLINE_AT_GUARD_BOUNDARY"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AV03_MEMORY_BANDWIDTH_BINDS_BEFORE_GPU"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AV04_KV_EVICTION_PREFILL_EXCEEDS_NEXT_TURN_SLACK"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AV05_NEAR_STARVATION_ROBOT_BEATS_OPTIONAL_BRAIN_PREFILL"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AV06_OVERLOAD_DEGRADES_OPTIONAL_BRAIN_BEFORE_CONTROL_PATH"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "nonnegative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gpu_capacity_units",
+        "gpu_camera_units",
+        "gpu_vla_units",
+        "gpu_brain_units",
+        "memory_bandwidth_capacity_units",
+        "memory_camera_units",
+        "memory_vla_units",
+        "memory_brain_units",
+        "kv_capacity_tokens",
+        "kv_resident_tokens",
+        "kv_new_context_tokens",
+        "kv_eviction_prefill_ticks",
+        "active_brain_sessions",
+        "active_robot_count",
+        "brain_evsi_task_loss_units",
+        "brain_loss_scale_id",
+        "vla_present",
+        "vla_p99_return_ticks",
+        "vla_buffer_slack_ticks",
+        "vla_projection_dispatch_guard_ticks",
+        "camera_present",
+        "camera_p99_ticks",
+        "camera_deadline_slack_ticks",
+        "robot_worst_vla_starvation_ticks",
+        "robot_vla_starvation_cap_ticks",
+        "local_control_reserved"
+      ],
+      "properties": {
+        "gpu_capacity_units": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "gpu_camera_units": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "gpu_vla_units": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "gpu_brain_units": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "memory_bandwidth_capacity_units": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "memory_camera_units": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "memory_vla_units": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "memory_brain_units": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "kv_capacity_tokens": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "kv_resident_tokens": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "kv_new_context_tokens": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "kv_eviction_prefill_ticks": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "active_brain_sessions": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "active_robot_count": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "brain_evsi_task_loss_units": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "brain_loss_scale_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vla_present": {
+          "type": "boolean"
+        },
+        "vla_p99_return_ticks": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "vla_buffer_slack_ticks": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "vla_projection_dispatch_guard_ticks": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "camera_present": {
+          "type": "boolean"
+        },
+        "camera_p99_ticks": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "camera_deadline_slack_ticks": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "robot_worst_vla_starvation_ticks": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "robot_vla_starvation_cap_ticks": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "local_control_reserved": {
+          "const": true
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "brain_admission",
+        "brain_reason",
+        "vla_admission",
+        "camera_deadline_preserved",
+        "kv_state_preserved",
+        "local_control_preserved",
+        "per_robot_metrics_required",
+        "aggregate_winner_claim_allowed"
+      ],
+      "properties": {
+        "brain_admission": {
+          "enum": [
+            "admit",
+            "throttle",
+            "reject",
+            "unknown"
+          ]
+        },
+        "brain_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vla_admission": {
+          "enum": [
+            "admit",
+            "reject",
+            "not_applicable"
+          ]
+        },
+        "camera_deadline_preserved": {
+          "const": true
+        },
+        "kv_state_preserved": {
+          "type": "boolean"
+        },
+        "local_control_preserved": {
+          "const": true
+        },
+        "per_robot_metrics_required": {
+          "const": true
+        },
+        "aggregate_winner_claim_allowed": {
+          "const": false
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "AV01_KV_CAPACITY_ACTIVE_EPISODE_ADMISSION",
+            "AV02_VLA_DEADLINE_AT_GUARD_BOUNDARY",
+            "AV03_MEMORY_BANDWIDTH_BINDS_BEFORE_GPU",
+            "AV04_KV_EVICTION_PREFILL_EXCEEDS_NEXT_TURN_SLACK",
+            "AV05_NEAR_STARVATION_ROBOT_BEATS_OPTIONAL_BRAIN_PREFILL",
+            "AV06_OVERLOAD_DEGRADES_OPTIONAL_BRAIN_BEFORE_CONTROL_PATH"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
