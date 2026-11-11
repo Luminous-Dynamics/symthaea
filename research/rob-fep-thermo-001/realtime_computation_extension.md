@@ -80,3 +80,9 @@ The original real-time cognition protocol should be evaluated against three sepa
 - **RoboDyna**: 30 dynamic manipulation tasks, paired sync/async evaluation, physics-governed object motion and human baselines. https://robodyna.github.io/robodyna/
 
 These public results motivate the action-chunk and temporal coherence contract in [action_chunk_temporal_alignment.md](./action_chunk_temporal_alignment.md).
+
+## Distributed placement and edge/cloud inference
+
+The real-time work now includes [Symthaea #11573](https://github.com/Luminous-Dynamics/symthaea/issues/11573), a matched benchmark for onboard, edge, cloud, hybrid and fleet-shared inference. Microsoft Research's 2026 mobile-manipulation measurement study motivates the comparison: offloading can improve task performance and robot battery life, but latency, bandwidth and remote GPU availability affect the result.
+
+The test charges full capture→encoding→uplink→queue→inference→downlink→local verification/projection→admission latency. It measures robot/edge/cloud/network energy separately and requires local low-level control, RTA and safe-stop to remain functional under remote outage. The 15-case synthetic corpus is linked from the parent README and the issue.
