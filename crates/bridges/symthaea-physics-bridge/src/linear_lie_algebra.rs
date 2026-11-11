@@ -941,13 +941,15 @@ mod tests {
     #[test]
     fn detects_nearly_dependent_generators_and_abstains() {
         let mut generators = so3_generators();
+        let jx = generators[0].matrix.clone();
         let jy = generators[1].matrix.clone();
         for row in 0..3 {
             for column in 0..3 {
-                generators[0].matrix[row][column] += 1.0e-12 * jy[row][column];
+                generators[1].matrix[row][column] =
+                    jx[row][column] + 1.0e-12 * jy[row][column];
             }
         }
-        generators[0].id = "Jx-plus-small-Jy".to_string();
+        generators[1].id = "Jx-plus-small-Jy".to_string();
         let admitted = action(generators, identity(3));
         let error = qualify_linear_lie_algebra(
             &admitted,
