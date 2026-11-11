@@ -568,7 +568,16 @@ fn check_record(record: &Value, findings: &mut Findings) -> (Option<f64>, usize,
 
     let (coverage, zones, species) = check_inspection(record, findings);
     let cleaning = check_cleaning_event(record, findings);
-    let performance_eligible = check_performance_comparison(record, cleaning.as_deref(), findings);
+    let mut performance_eligible =
+        check_performance_comparison(record, cleaning.as_deref(), findings);
+    if record.get("record_status").and_then(Value::as_str) != Some("measured") {
+        performance_eligible = false;
+        findings.push(
+            "/performance_comparison",
+            "INCOMPLETE",
+            "performance comparison may be structurally matched, but eligibility requires measured, source-qualified observations rather than synthetic or modelled records",
+        );
+    }
 
     if record.pointer("/coating_system/condition_status").and_then(Value::as_str) == Some("unknown") {
         findings.push(
@@ -720,6 +729,39 @@ mod tests {
         let mut findings = Findings::default();
         check_record(&record, &mut findings);
         assert!(findings.incomparable);
+    }
+
+    #[test]
+    fn synthetic_performance_pair_is_never_claim_eligible() {
+        let record = fixture();
+        let mut findings = Findings::default();
+        let (_, _, _, cleaning, _) = check_record(&record, &mut findings);
+        let mut findings_again = Findings::default();
+        let mut eligible =
+            check_performance_comparison(&record, cleaning.as_deref(), &mut findings_again);
+        if record["record_status"].as_str() != Some("measured") {
+            eligible = false;
+        }
+        assert!(!eligible);
+    }
+
+    #[test]
+    fn partial_in_water_capture_is_incomplete_not_a_pass() {
+        let mut record = fixture();
+        record["cleaning_event"]["containment_method"] = serde_json::json!("partial_capture");
+        let mut findings = Findings::default();
+        check_record(&record, &mut findings);
+        assert!(findings.incomplete);
+        assert!(!findings.blocked);
+    }
+
+    #[test]
+    fn cleaning_authorization_reference_is_required_when_approved() {
+        let mut record = fixture();
+        record["cleaning_event"].as_object_mut().expect("cleaning event").remove("authorization_reference");
+        let mut findings = Findings::default();
+        check_record(&record, &mut findings);
+        assert!(findings.invalid);
     }
 
     #[test]
