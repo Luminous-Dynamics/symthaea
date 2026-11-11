@@ -1,0 +1,136 @@
+{
+  "schema_version": "0.1.0",
+  "study_id": "SYNTHETIC-MEASUREMENT-RANK-0001",
+  "data_class": "synthetic",
+  "parameters": [
+    {
+      "parameter_id": "P_ALPHA",
+      "meaning": "Synthetic hull-resistance multiplier",
+      "unit": "1"
+    },
+    {
+      "parameter_id": "P_BETA",
+      "meaning": "Synthetic propulsion-conversion multiplier",
+      "unit": "1"
+    },
+    {
+      "parameter_id": "P_WIND",
+      "meaning": "Synthetic environmental contribution multiplier",
+      "unit": "1"
+    },
+    {
+      "parameter_id": "P_ENGINE",
+      "meaning": "Synthetic engine correction multiplier",
+      "unit": "1"
+    },
+    {
+      "parameter_id": "P_AUX",
+      "meaning": "Synthetic auxiliary correction multiplier",
+      "unit": "1"
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "OBS_POWER_A",
+      "physical_quantity": "reported shaft power",
+      "unit": "kW",
+      "observation_operator_id": "TORQUE_RPM_CHANNEL_A",
+      "independence_class": "independent_measured",
+      "calibration_status": "in_tolerance",
+      "timebase_status": "qualified",
+      "source_id": "SYNTHETIC-ONLY",
+      "limitations": [
+        "synthetic rank fixture"
+      ]
+    },
+    {
+      "observation_id": "OBS_FUEL_A",
+      "physical_quantity": "main engine fuel rate",
+      "unit": "kg/h",
+      "observation_operator_id": "FUEL_MASS_FLOW_A",
+      "independence_class": "independent_measured",
+      "calibration_status": "in_tolerance",
+      "timebase_status": "qualified",
+      "source_id": "SYNTHETIC-ONLY",
+      "limitations": [
+        "synthetic rank fixture"
+      ]
+    },
+    {
+      "observation_id": "OBS_POWER_B",
+      "physical_quantity": "derived power estimate",
+      "unit": "kW",
+      "observation_operator_id": "ECU_DERIVED_POWER",
+      "independence_class": "derived",
+      "derived_from_ids": [
+        "OBS_POWER_A"
+      ],
+      "calibration_status": "not_applicable",
+      "timebase_status": "not_applicable",
+      "source_id": "SYNTHETIC-ONLY",
+      "limitations": [
+        "derived from existing power channel; not an independent observation"
+      ]
+    },
+    {
+      "observation_id": "OBS_FUEL_B",
+      "physical_quantity": "manually reported fuel total",
+      "unit": "kg",
+      "observation_operator_id": "NOON_REPORT_FIELD",
+      "independence_class": "manual",
+      "calibration_status": "unknown",
+      "timebase_status": "unknown",
+      "source_id": "SYNTHETIC-ONLY",
+      "limitations": [
+        "manual record; not counted as an independent calibrated sensor"
+      ]
+    }
+  ],
+  "sensitivity_matrix": {
+    "parameter_ids": [
+      "P_ALPHA",
+      "P_BETA",
+      "P_WIND",
+      "P_ENGINE",
+      "P_AUX"
+    ],
+    "row_observation_ids": [
+      "OBS_POWER_A",
+      "OBS_FUEL_A",
+      "OBS_POWER_B",
+      "OBS_FUEL_B"
+    ],
+    "values": [
+      [
+        1,
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0,
+        1
+      ],
+      [
+        2,
+        0,
+        0,
+        2,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0,
+        1
+      ]
+    ],
+    "rank_tolerance": 1e-8
+  },
+  "claim_ceiling": "Synthetic sensitivity-rank demonstration only. The rank is not a measured ship result, a calibration, or proof of physical parameter identifiability."
+}
