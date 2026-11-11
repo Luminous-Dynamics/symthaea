@@ -15,12 +15,14 @@ use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 
 use crate::linear_group_action::AdmittedLinearGroupActionV1;
 
-/// One frozen evaluation state and a full basis of finite-difference directions.
+/// One frozen evaluation state and a set of finite-difference direction probes.
 ///
-/// Each direction is a vector in the action's declared coordinate representation.
-/// The vectors are columns of the direction matrix. Under x' = D x, callers
-/// transform both state and every direction by D. Expression variables outside
-/// the action coordinates remain fixed parameters.
+/// Each probe is a vector in the action's declared coordinate representation.
+/// The probes form the rows of an overdetermined measurement matrix after metric
+/// whitening. At least `dimension` independent directions are required;
+/// additional probes measure local finite-difference consistency. Under x' = D x,
+/// callers transform both the state and every probe by D. Expression variables
+/// outside the action coordinates remain fixed parameters.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinearActionSampleV1 {
     /// Stable identity used to pair the same geometric sample across representations.
@@ -500,12 +502,17 @@ fn collect_variable_names_scoped(
 
 /// Reconstruct the metric-whitened action-coordinate gradient from directional differences.
 ///
-/// If V contains the supplied direction vectors as columns, then q = V^T p.
-/// With G = s L L^T, define V_w = L^T V and p_w = L^-1 p. Then
-/// q = V_w^T p_w. The SVD condition number is therefore measured in the
-/// intrinsic metric geometry. Under x' = D x and G' = D^-T G D^-1,
-/// L'^T D differs from L^T only by an orthogonal factor, so the condition
-/// number is invariant to valid non-orthogonal coordinate re-representations.
+/// Each direction d_j produces q_j approximately equal to p^T d_j. With
+/// G = s L L^T, define d_w = L^T d and p_w = L^-1 p. The stacked measurement
+/// system is M p_w approximately equal to q, where each row of M is one
+/// whitened direction. A square probe set determines p_w but cannot test
+/// cross-direction consistency; overcomplete sets use SVD least squares and
+/// expose disagreement through the reconstruction residual.
+///
+/// The SVD condition number is measured in the intrinsic metric geometry.
+/// Under x' = D x and G' = D^-T G D^-1, L'^T D differs from L^T only by
+/// an orthogonal factor, so the condition number is invariant to valid
+/// non-orthogonal coordinate re-representations.
 fn finite_difference_gradient(
     expr: &Expr,
     variable_names: &[String],
@@ -620,9 +627,11 @@ fn finite_difference_gradient(
         function_pairs.push((plus_value, minus_value));
     }
 
-    // Prefer raw pair differences: subtracting first preserves small changes
-    // on top of a large common function offset. If an opposite-sign pair would
-    // overflow, fall back to the common value scaling above.
+    // Prefer raw pair differences to avoid an extra division before
+    // subtraction. This does not recover changes already lost to floating-point
+    // cancellation when a large common offset dominates; that limitation remains
+    // visible in the reconstruction residual and must not be treated as proof.
+    // If an opposite-sign pair would overflow, fall back to common value scaling.
     let raw_differences: Vec<f64> = function_pairs
         .iter()
         .map(|(plus, minus)| plus - minus)
