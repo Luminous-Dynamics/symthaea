@@ -6,8 +6,7 @@
 
 use crate::midi_performance::{
     MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, MIDI_PERFORMANCE_SCHEMA_V1,
-    MidiPerformanceArtifactV1, MidiPerformanceManifestV1, MidiPerformanceNoteReceiptV1,
-    MidiPerformanceTrackReceiptV1,
+    MidiPerformanceArtifactV1, MidiPerformanceManifestV1, MidiPerformanceTrackReceiptV1,
 };
 use hound::{SampleFormat, WavReader};
 use midly::{Format, MetaMessage, MidiMessage, Timing, TrackEventKind};
