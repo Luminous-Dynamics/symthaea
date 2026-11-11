@@ -37,9 +37,9 @@ jobs:
             --corpus fixtures/ev_battery/early_window_outcomes_v0_1.json \
             > "$RUNNER_TEMP/early-window-outcomes.json"
           jq -e '
-            .case_count == 13 and
+            .case_count == 14 and
             .accepted_count == 5 and
-            .rejected_count == 8 and
+            .rejected_count == 9 and
             .right_censored_rdt_count == 1 and
             .competing_event_rdt_count == 1 and
             .not_computable_target_count == 1 and
