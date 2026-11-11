@@ -1141,10 +1141,11 @@ fn summarize_dc_bus_scenario(
     external_loads: &[&DcBusExternalLoadProfile],
     scenario: DcBusDemandScenario,
 ) -> Result<DcBusScenarioSummary, Vec<DcBusScenarioFailure>> {
-    let Some(reference_path) = branches
-        .first()
-        .and_then(|branch| paths.iter().find(|path| path.drive_path_id == branch.drive_path_id))
-    else {
+    let Some(reference_path) = branches.first().and_then(|branch| {
+        paths
+            .iter()
+            .find(|path| path.drive_path_id == branch.drive_path_id)
+    }) else {
         return Err(vec![DcBusScenarioFailure {
             bus_id: bus.bus_id.clone(),
             segment_id: String::new(),
@@ -1609,7 +1610,9 @@ pub fn evaluate_dc_bus_mission(
                 .drive_paths
                 .iter()
                 .find(|path| path.drive_path_id == branch.drive_path_id)
-                .ok_or_else(|| DcBusCompositionError::MissingDrivePath(branch.drive_path_id.clone()))?;
+                .ok_or_else(|| {
+                    DcBusCompositionError::MissingDrivePath(branch.drive_path_id.clone())
+                })?;
             if path.segments.len() != reference_segments.len() {
                 return Err(DcBusCompositionError::ScheduleMismatch(path.drive_path_id.clone()));
             }
@@ -1780,6 +1783,392 @@ mod tests {
             context_digest: context_digest.to_owned(),
             motor_efficiency_evidence: evidence,
         }
+    }
+
+    fn shared_bus_config(max_power_w: f64, max_current_a: f64) -> DcBusConfig {
+        DcBusConfig {
+            bus_id: "main-bus".to_owned(),
+            source_boundary_id: "battery-source".to_owned(),
+            source_evidence_manifest_digest: "battery-source-evidence".to_owned(),
+            configuration_digest: "aircraft-config-sha256".to_owned(),
+            minimum_voltage_v: 300.0,
+            maximum_continuous_current_a: max_current_a,
+            maximum_continuous_power_w: max_power_w,
+        }
+    }
+
+    fn shared_bus_branch(
+        path_id: &str,
+        max_power_w: f64,
+        max_current_a: f64,
+    ) -> DcBusBranchConfig {
+        let branch_id = format!("branch-{path_id}");
+        DcBusBranchConfig {
+            branch_id: branch_id.clone(),
+            drive_path_id: path_id.to_owned(),
+            bus_id: "main-bus".to_owned(),
+            feeder_id: format!("feeder-{path_id}"),
+            meter_boundary_id: format!("meter-{path_id}"),
+            protection_device_id: format!("breaker-{path_id}"),
+            common_cause_group_id: "propulsion-zone-a".to_owned(),
+            evidence_manifest_digest: format!("branch-evidence-{path_id}"),
+            maximum_continuous_current_a: max_current_a,
+            maximum_continuous_power_w: max_power_w,
+        }
+    }
+
+    fn shared_bus_path(
+        model: &DriveConfig,
+        path_id: &str,
+        rotor_power_w: f64,
+        voltage_v: f64,
+    ) -> MissionDriveProfileReport {
+        let mut segment = mission_segment(
+            "hover",
+            0,
+            2_000_000_000,
+            rotor_power_w,
+            model,
+            TransmissionKinematics {
+                motor_to_rotor_speed_ratio: 1.0,
+            },
+            "hover-context",
+        );
+        segment.dc_bus_voltage_v = voltage_v;
+        evaluate_mission_drive_profile(
+            model,
+            path_id,
+            "aircraft-config-sha256",
+            &[segment],
+        )
+        .unwrap()
+    }
+
+    fn shared_bus_input(
+        profiles: Vec<MissionDriveProfileReport>,
+        bus_power_limit_w: f64,
+        bus_current_limit_a: f64,
+    ) -> DcBusMissionInput {
+        let branches = profiles
+            .iter()
+            .map(|profile| shared_bus_branch(&profile.drive_path_id, 100_000.0, 500.0))
+            .collect();
+        DcBusMissionInput {
+            configuration_digest: "aircraft-config-sha256".to_owned(),
+            buses: vec![shared_bus_config(bus_power_limit_w, bus_current_limit_a)],
+            branches,
+            drive_paths: profiles,
+            external_loads: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn two_propulsors_sum_shared_bus_power_current_and_energy() {
+        let model = config();
+        let left = shared_bus_path(&model, "left", 10_000.0, 400.0);
+        let right = shared_bus_path(&model, "right", 10_000.0, 400.0);
+        let report =
+            evaluate_dc_bus_mission(&shared_bus_input(vec![right, left], 30_000.0, 100.0))
+                .unwrap();
+        let nominal = report.buses[0].nominal_scenario.as_ref().unwrap();
+        let expected_power_w = 2.0 * 10_000.0 / 0.95;
+        assert!((nominal.peak_bus_power_w - expected_power_w).abs() < 1.0e-8);
+        assert!((nominal.peak_bus_current_a - expected_power_w / 400.0).abs() < 1.0e-8);
+        assert!((nominal.total_bus_energy_j - expected_power_w * 2.0).abs() < 1.0e-7);
+        assert_eq!(nominal.segments[0].branches.len(), 2);
+        assert_eq!(nominal.segments[0].branches[0].drive_path_id, "left");
+        assert_eq!(nominal.segments[0].branches[1].drive_path_id, "right");
+    }
+
+    #[test]
+    fn shared_bus_peak_overload_is_not_hidden_by_low_mission_average() {
+        let model = config();
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let high = mission_segment(
+            "high-hover",
+            0,
+            1_000_000_000,
+            10_000.0,
+            &model,
+            transmission,
+            "hover-context",
+        );
+        let low = mission_segment(
+            "low-cruise",
+            1_000_000_000,
+            101_000_000_000,
+            1_000.0,
+            &model,
+            transmission,
+            "cruise-context",
+        );
+        let left = evaluate_mission_drive_profile(
+            &model,
+            "left",
+            "aircraft-config-sha256",
+            &[high.clone(), low.clone()],
+        )
+        .unwrap();
+        let right = evaluate_mission_drive_profile(
+            &model,
+            "right",
+            "aircraft-config-sha256",
+            &[high, low],
+        )
+        .unwrap();
+        let report = evaluate_dc_bus_mission(&shared_bus_input(vec![left, right], 20_000.0, 500.0))
+            .unwrap();
+        assert!(matches!(
+            &report.buses[0].nominal_scenario,
+            Err(failures)
+                if failures.iter().any(|failure| {
+                    failure.segment_id == "high-hover"
+                        && matches!(
+                            &failure.kind,
+                            DcBusFailureKind::BusPowerLimitExceeded { .. }
+                        )
+                })
+        ));
+        let average_w = (2.0 * 10_000.0 / 0.95
+            + 2.0 * 1_000.0 / 0.95 * 100.0)
+            / 101.0;
+        assert!(average_w < 20_000.0);
+    }
+
+    #[test]
+    fn branch_power_and_current_limits_are_checked() {
+        let model = config();
+        let profile = shared_bus_path(&model, "left", 10_000.0, 400.0);
+        let mut input = shared_bus_input(vec![profile], 100_000.0, 500.0);
+        input.branches[0].maximum_continuous_power_w = 10_000.0;
+        input.branches[0].maximum_continuous_current_a = 20.0;
+        let report = evaluate_dc_bus_mission(&input).unwrap();
+        let failures = report.buses[0].nominal_scenario.as_ref().unwrap_err();
+        assert!(failures.iter().any(|failure| matches!(
+            &failure.kind,
+            DcBusFailureKind::BranchPowerLimitExceeded { .. }
+        )));
+        assert!(failures.iter().any(|failure| matches!(
+            &failure.kind,
+            DcBusFailureKind::BranchCurrentLimitExceeded { .. }
+        )));
+        assert_eq!(failures[0].branch_id.as_deref(), Some("branch-left"));
+        assert_eq!(failures[0].feeder_id.as_deref(), Some("feeder-left"));
+    }
+
+    #[test]
+    fn shared_bus_current_limit_is_checked_after_simultaneous_aggregation() {
+        let model = config();
+        let left = shared_bus_path(&model, "left", 10_000.0, 400.0);
+        let right = shared_bus_path(&model, "right", 10_000.0, 400.0);
+        let input = shared_bus_input(vec![left, right], 100_000.0, 50.0);
+        let report = evaluate_dc_bus_mission(&input).unwrap();
+        assert!(matches!(
+            &report.buses[0].nominal_scenario,
+            Err(failures)
+                if failures.iter().any(|failure| matches!(
+                    &failure.kind,
+                    DcBusFailureKind::BusCurrentLimitExceeded { .. }
+                ))
+        ));
+    }
+
+    #[test]
+    fn common_bus_rejects_branch_voltage_mismatch() {
+        let model = config();
+        let left = shared_bus_path(&model, "left", 5_000.0, 400.0);
+        let right = shared_bus_path(&model, "right", 5_000.0, 399.0);
+        assert!(matches!(
+            evaluate_dc_bus_mission(&shared_bus_input(vec![left, right], 100_000.0, 500.0)),
+            Err(DcBusCompositionError::BusVoltageMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn unmodelled_intervals_are_not_interpreted_as_zero_propulsion_load() {
+        let model = config();
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let segments = [
+            mission_segment(
+                "takeoff",
+                0,
+                1_000_000_000,
+                5_000.0,
+                &model,
+                transmission,
+                "takeoff-context",
+            ),
+            mission_segment(
+                "cruise",
+                2_000_000_000,
+                3_000_000_000,
+                2_000.0,
+                &model,
+                transmission,
+                "cruise-context",
+            ),
+        ];
+        let profile = evaluate_mission_drive_profile(
+            &model,
+            "left",
+            "aircraft-config-sha256",
+            &segments,
+        )
+        .unwrap();
+        assert_eq!(profile.unmodelled_intervals.len(), 1);
+        assert!(matches!(
+            evaluate_dc_bus_mission(&shared_bus_input(vec![profile], 100_000.0, 500.0)),
+            Err(DcBusCompositionError::UnmodelledInterval(_))
+        ));
+    }
+
+    #[test]
+    fn external_tms_load_is_separate_and_uses_its_own_uncertainty_envelope() {
+        let model = config();
+        let profile = shared_bus_path(&model, "left", 5_000.0, 400.0);
+        let mut input = shared_bus_input(vec![profile], 100_000.0, 500.0);
+        input.external_loads.push(DcBusExternalLoadProfile {
+            load_id: "coolant-pump".to_owned(),
+            meter_boundary_id: "tms-pump-meter".to_owned(),
+            bus_id: "main-bus".to_owned(),
+            kind: DcBusExternalLoadKind::ThermalManagement,
+            evidence_manifest_digest: "pump-evidence".to_owned(),
+            intervals: vec![DcBusExternalLoadInterval {
+                segment_id: "hover".to_owned(),
+                start_timestamp_ns: 0,
+                end_timestamp_ns: 2_000_000_000,
+                power_lower_bound_w: 450.0,
+                power_nominal_w: 500.0,
+                power_upper_bound_w: 600.0,
+            }],
+        });
+        let report = evaluate_dc_bus_mission(&input).unwrap();
+        let adverse = report.buses[0].adverse_scenario.as_ref().unwrap();
+        let nominal = report.buses[0].nominal_scenario.as_ref().unwrap();
+        let favourable = report.buses[0].favourable_scenario.as_ref().unwrap();
+        assert_eq!(nominal.external_load_energy_j, 1_000.0);
+        assert_eq!(adverse.external_load_energy_j, 1_200.0);
+        assert_eq!(favourable.external_load_energy_j, 900.0);
+        assert_eq!(
+            nominal.segments[0].external_loads[0].kind,
+            DcBusExternalLoadKind::ThermalManagement
+        );
+        assert!(nominal.total_bus_energy_j > nominal.propulsion_energy_j);
+    }
+
+    #[test]
+    fn propulsion_map_failure_retains_branch_and_interval_attribution() {
+        let model = config();
+        let mut segment = mission_segment(
+            "bad-map",
+            0,
+            1_000_000_000,
+            5_000.0,
+            &model,
+            TransmissionKinematics {
+                motor_to_rotor_speed_ratio: 1.0,
+            },
+            "context",
+        );
+        segment.motor_efficiency_evidence.motor_speed_rpm += 1.0;
+        let profile = evaluate_mission_drive_profile(
+            &model,
+            "left",
+            "aircraft-config-sha256",
+            &[segment],
+        )
+        .unwrap();
+        let report = evaluate_dc_bus_mission(&shared_bus_input(vec![profile], 100_000.0, 500.0))
+            .unwrap();
+        assert!(matches!(
+            &report.buses[0].nominal_scenario,
+            Err(failures)
+                if failures.len() == 1
+                    && failures[0].segment_id == "bad-map"
+                    && failures[0].drive_path_id.as_deref() == Some("left")
+                    && matches!(
+                        &failures[0].kind,
+                        DcBusFailureKind::PropulsionDrive(
+                            DriveError::InvalidOperatingPoint(_)
+                        )
+                    )
+        ));
+    }
+
+    #[test]
+    fn duplicate_branch_and_meter_identities_fail_closed() {
+        let model = config();
+        let profile = shared_bus_path(&model, "left", 5_000.0, 400.0);
+        let mut input = shared_bus_input(vec![profile], 100_000.0, 500.0);
+        input.branches.push(input.branches[0].clone());
+        assert!(matches!(
+            evaluate_dc_bus_mission(&input),
+            Err(DcBusCompositionError::DuplicateIdentity(_))
+        ));
+
+        let profile = shared_bus_path(&model, "left", 5_000.0, 400.0);
+        let mut input = shared_bus_input(vec![profile], 100_000.0, 500.0);
+        input.external_loads.push(DcBusExternalLoadProfile {
+            load_id: "tms".to_owned(),
+            meter_boundary_id: "meter-left".to_owned(),
+            bus_id: "main-bus".to_owned(),
+            kind: DcBusExternalLoadKind::ThermalManagement,
+            evidence_manifest_digest: "tms-evidence".to_owned(),
+            intervals: vec![DcBusExternalLoadInterval {
+                segment_id: "hover".to_owned(),
+                start_timestamp_ns: 0,
+                end_timestamp_ns: 2_000_000_000,
+                power_lower_bound_w: 10.0,
+                power_nominal_w: 10.0,
+                power_upper_bound_w: 10.0,
+            }],
+        });
+        assert!(matches!(
+            evaluate_dc_bus_mission(&input),
+            Err(DcBusCompositionError::DuplicateIdentity("meter boundary ID"))
+        ));
+    }
+
+    #[test]
+    fn eight_branch_aggregation_is_deterministic_under_input_reordering() {
+        let model = config();
+        let profiles = (0..8)
+            .map(|index| {
+                shared_bus_path(
+                    &model,
+                    &format!("path-{index:02}"),
+                    2_000.0,
+                    400.0,
+                )
+            })
+            .collect::<Vec<_>>();
+        let first = evaluate_dc_bus_mission(&shared_bus_input(
+            profiles.clone(),
+            100_000.0,
+            500.0,
+        ))
+        .unwrap();
+        let second = evaluate_dc_bus_mission(&shared_bus_input(
+            profiles.into_iter().rev().collect(),
+            100_000.0,
+            500.0,
+        ))
+        .unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            first.buses[0]
+                .nominal_scenario
+                .as_ref()
+                .unwrap()
+                .segments[0]
+                .branches
+                .len(),
+            8
+        );
     }
 
     #[test]
