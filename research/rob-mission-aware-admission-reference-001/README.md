@@ -24,7 +24,7 @@ The caller must preserve per-modality AoI source vectors. This initial admission
 - Round Robin: deterministic robot-order rotation from a declared cursor.
 - EDF: smallest remaining action/deadline slack first.
 - EVSI-per-compute: greatest EVSI per GPU-microsecond, permitted only when all compared requests share one task-loss scale.
-- Luminous constrained admission: service-floor urgency, starvation debt, remaining slack, miss-risk urgency and within-scale EVSI density, lexicographically. It does not add EVSI, physical joules and fairness into one score.
+- Luminous constrained admission: service-floor urgency, starvation debt, remaining slack and miss-risk urgency, followed by a within-scale EVSI/GPU-microsecond tie-break only when both GPU demands are nonzero. It does not add EVSI, physical joules and fairness into one score.
 
 Armory Lookahead and RED remain external matched-scheduler adapters, not claimed implementations in this crate. The reference is a small deterministic admission kernel intended to anchor trace replay and known-answer semantics.
 
@@ -35,7 +35,7 @@ A selected batch must remain within all declared budgets:
 - memory-bandwidth service units;
 - network bytes.
 
-This is deliberately not a detailed GPU/KV-cache runtime model. The next extension must add long-lived brain-context/KV residency, short-deadline VLA chunks, KV eviction/re-prefill cost and foreground sensor memory-bandwidth deadlines, using measured or frozen trace inputs.
+This is deliberately not a detailed GPU/KV-cache runtime model. The next extension must add long-lived brain-context/KV residency, short-deadline VLA chunks, KV eviction/re-prefill cost and foreground sensor memory-bandwidth deadlines, using measured or frozen trace inputs. GPU-time density is only a tie-breaker; memory bandwidth and network remain hard independent budgets.
 
 ## Output and limits
 
