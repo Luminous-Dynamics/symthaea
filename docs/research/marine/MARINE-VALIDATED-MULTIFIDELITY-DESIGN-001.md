@@ -112,3 +112,63 @@ The architecture should orchestrate and qualify specialist tools; it should not 
 ## 9. Claim ceiling
 
 A surrogate improvement is not a validated improvement. A multi-fidelity sample-efficiency gain does not demonstrate better ship performance. Final candidates require independently qualified higher-fidelity or physical validation, matched cargo service and declared uncertainty.
+
+
+## 10. Environmental-condition extensions: acoustic noise and hull biofouling
+
+The validated design frontier now includes two measured environmental dimensions that are coupled to propulsor and afterbody choices:
+
+### 10.1 Underwater radiated noise
+
+The acoustic objective is a frequency-resolved spectrum with standard part, water-depth regime, hydrophone calibration, ambient reference and expanded uncertainty attached. Do not collapse one-third-octave and decidecade results, deep-water and shallow-water methods, or directly measured radiated-noise level and equivalent monopole source level into a single score without a reviewed conversion.
+
+Use the separate measurement and evidence contract in MARINE-ACOUSTIC-ECOLOGY-001 (#11603). F0/F1 acoustic proxies are screening only. F3 acoustic CFD/cavitation prediction remains model evidence until benchmarked against test data; F4/F5 physical acoustic trials qualify the measurement domain independently from hydrodynamic resistance.
+
+An acoustic candidate is not better where an adverse spectral band increases beyond combined measurement/model uncertainty, even if overall energy or integrated dB improves. Report all claimed bands and conditions.
+
+### 10.2 Hull biofouling, cleaning and biosecurity
+
+Hull roughness/fouling state, coating-system revision, inspection coverage, niche-area access, cleaning method, capture/filtration and waste disposition can change resistance, shaft power, cavitation/noise, off-hire time and invasive-species risk. A clean-hull assumption is not free.
+
+Use the hull inspection/cleaning evidence contract in MARINE-BIOFOULING-ENERGY-ECOLOGY-001 (#11608). Inspection, species evidence and cleaning authorization are separate evidence dimensions. Unapproved cleaning or uncontrolled release is a hard block, not a weighted penalty. Partial inspection coverage remains an explicit unknown surface fraction.
+
+### 10.3 Cross-domain join
+
+MARINE-HULL-STATE-EVIDENCE-JOIN-001 (#11612) links the acoustic trace, inspection, cleaning and pre/post propulsion observations through vessel revision, service fingerprint, trace digests, time and condition identity. It provides contextual linkage only; it does not prove causal fuel/noise reduction or biological effect.
+
+### 10.4 Extended Pareto vector and hard gates
+
+For the same service contract, preserve a Pareto vector including:
+- lifecycle cost per delivered cargo work;
+- primary energy and well-to-wake GHG per delivered work;
+- schedule reliability, throughput and availability;
+- frequency-resolved underwater radiated-noise metrics and uncertainty;
+- hull-condition/fouling state, cleaning interval, off-hire and coating damage;
+- captured/uncontrolled cleaning waste and biosecurity evidence;
+- model discrepancy and evidence/inspection completeness.
+
+Non-compensable gates include vessel/propulsor operating limits, trial/data rights, calibration and measurement validity, cleaning authorization, required waste containment, and out-of-domain solver evidence. No lower energy or lifecycle cost may compensate for a blocked environmental or operational hard gate.
+
+### 10.5 Multi-fidelity acquisition and value of measurement
+
+An acoustic test, ROV inspection, coating survey or cleaning-waste sample is an evaluation with cost and decision value. Its acquisition value depends on whether it changes the validated Pareto ranking, reduces uncertainty around a hard gate, or resolves an out-of-domain decision—not just information gain.
+
+The benchmark should compare:
+- optimization that treats acoustic/fouling data as post-hoc annotations;
+- optimization that includes them as explicit objectives and hard constraints;
+- measurement selection by uncertainty reduction;
+- decision-value-aware measurement selection that accounts for candidate rank/feasibility changes and the future validation cost.
+
+Report cost to independently validated environmental-service Pareto improvement, not count of cheap surrogate queries.
+
+## 11. Extended falsification suite
+
+- A low-fidelity acoustic score cannot qualify a candidate for measured-URN superiority.
+- A modelled or uninspected hull cannot be assigned zero fouling or zero invasive-species risk.
+- A synthetic or structurally joined acoustic/hull/performance record cannot be promoted to measured causal evidence.
+- An unauthorized or uncontrolled in-water cleaning event blocks the affected candidate.
+- A candidate with improved energy but unresolved or materially worse declared noise bands cannot be ranked as unconditionally superior.
+- A design may claim improvement only on the held-out fidelity/condition slices for which both the physical performance and environmental evidence are independently eligible.
+
+These additions do not alter the earlier acceptance targets; they extend the benchmark's objective and constraint contract.
+
