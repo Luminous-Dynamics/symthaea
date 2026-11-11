@@ -310,3 +310,14 @@ The current architecture/evaluation composition is summarized in [integrated_dec
 
 
 The adaptive-horizon fixture corpus now includes PACE- and ChunkTrust-style candidate proposals clipped by thermal and viability caps. REMAC is added as a training-time intra-/inter-chunk mismatch baseline. See the two-stage "propose, then physically cap" protocol in [adaptive_commit_horizon.md](./adaptive_commit_horizon.md).
+
+
+### Executable reference
+
+A dependency-free Rust reference combiner and focused workflow are now included:
+- [adaptive-horizon-reference/src/lib.rs](./adaptive-horizon-reference/src/lib.rs)
+- [adaptive-horizon-reference/README.md](./adaptive-horizon-reference/README.md)
+- [adaptive-horizon-reference/Cargo.toml](./adaptive-horizon-reference/Cargo.toml)
+- [adaptive-horizon-reference.yml](../../.github/workflows/adaptive-horizon-reference.yml)
+
+It consumes only prequalified caps, enforces canonical order/common context/prefix closure, preserves all binding ties, and returns Eligible / ZeroHorizon / Blocked. It has 11 authored unit tests and no actuation authorization API. Rust compile/test/Clippy remains an exact-head CI gate.
