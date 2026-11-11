@@ -425,13 +425,13 @@ fn metric_repeatability_map(
         }
         match map.get_mut(&metric.metric_id) {
             Some((existing_unit, existing_delta)) => {
-                if existing_unit != &metric.unit {
+                if existing_unit.as_str() != metric.unit.as_str() {
                     return Err(format!(
                         "no-op calibration metric {} has inconsistent units",
                         metric.metric_id
                     ));
                 }
-                *existing_delta = existing_delta.max(delta);
+                *existing_delta = (*existing_delta).max(delta);
             }
             None => {
                 map.insert(metric.metric_id.clone(), (metric.unit.clone(), delta));
@@ -480,7 +480,7 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
         )?;
         for (metric_id, (unit, _)) in &baseline_metrics {
             if let Some(existing) = units_by_metric.insert(metric_id.clone(), unit.clone()) {
-                if existing != *unit {
+                if existing != unit.clone() {
                     return Err(format!("metric {metric_id} has inconsistent units"));
                 }
             }
