@@ -36,21 +36,22 @@ V1 does **not** establish:
 - that every note must be measured; short events and low-frequency events may explicitly abstain;
 - independent authentication of the receipt producer; a digest detects later mutation relative to a retained copy, but it is not a signature or trusted timestamp.
 
-A high salience value is not proof of note identity. Polyphonic overlap, reverb tails, sample resonances and harmonic collisions can produce false support. The V1 output must not authorize a release or certify a renderer.
+A high salience value is not proof of note identity. The octave-collision test intentionally shows a pure C5 tone producing harmonic support at the expected C4 frequency even with no C4 fundamental. Polyphonic overlap, reverb tails, sample resonances and harmonic collisions can therefore produce false support. The V1 output must not authorize a release or certify a renderer.
 
 ## Test coverage authored
 
-Nine focused tests cover:
+Ten focused tests cover:
 
 1. a synthetic A4 tone produces a measurable expected-pitch observation;
 2. an off-pitch synthetic control has lower expected-fundamental salience;
-3. notes shorter than the analysis window abstain;
-4. MIDI-byte tampering is rejected before analysis;
-5. WAV replacement and receipt-field tampering are detected;
-6. silent audio produces an explicit no-energy abstention;
-7. MIDI tick-to-sample mapping uses checked integer arithmetic and deterministic rounding;
-8. MIDI note-event tampering is rejected even after recomputing the MIDI and manifest digests;
-9. non-finite float audio is rejected.
+3. a C5 octave-harmonic collision can raise C4 harmonic salience without a C4 fundamental, codifying a known false-support case;
+4. notes shorter than the analysis window abstain;
+5. MIDI-byte tampering is rejected before analysis;
+6. WAV replacement and receipt-field tampering are detected;
+7. silent audio produces an explicit no-energy abstention;
+8. MIDI tick-to-sample mapping uses checked integer arithmetic and deterministic rounding;
+9. MIDI note-event tampering is rejected even after recomputing the MIDI and manifest digests;
+10. non-finite float audio is rejected.
 
 The tests are authored but have not been compiled or run in this environment. The focused GitHub Actions workflow checks out the exact PR head and uses Rust 1.96.0.
 
