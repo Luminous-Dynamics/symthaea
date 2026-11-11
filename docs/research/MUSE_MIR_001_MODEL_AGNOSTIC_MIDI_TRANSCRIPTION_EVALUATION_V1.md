@@ -20,10 +20,11 @@ Adds 'crates/domains/symthaea-muse/src/transcription_eval.rs', exported behind t
 - Supports Standard MIDI Type 0 (SingleTrack) and Type 1 (Parallel) with metrical PPQ timing.
 - Rejects Type 2 (Sequential) and SMPTE time division rather than guessing their semantics.
 - Integrates piecewise MIDI tempo events. An explicit tempo at tick zero overrides the MIDI default; conflicting explicit tempo values at the same tick are rejected.
-- Captures NoteOn pitch, velocity, MIDI channel and the active General MIDI program.
+- Merges Type-1 absolute events in a deterministic `(tick, track index, event index)` order before applying channel program state and pairing notes; Type-0 stays within its single track.
+- Captures NoteOn pitch, velocity, MIDI channel and the active General MIDI program. Note events retain a stable source-event ordinal so simultaneous events do not get re-ordered by pitch when building matching graphs.
 - Treats NoteOn velocity zero as NoteOff.
 - Reports orphan NoteOffs, unclosed NoteOns, tempo point count and repeated same-pitch/same-channel overlapping NoteOns.
-- Pairs overlapping same-pitch notes FIFO within a track/channel. Standard MIDI 1.0 does not give a NoteOff a unique note-instance identifier; FIFO is a declared convention, not recovered ground truth.
+- Pairs overlapping same-pitch notes FIFO across the merged channel stream. Standard MIDI 1.0 does not give a NoteOff a unique note-instance identifier; FIFO is a declared convention, not recovered ground truth. Simultaneous conflicting program changes from different tracks on the same channel are rejected rather than guessed.
 
 ### Reference integrity
 
@@ -47,7 +48,7 @@ Defaults follow the documented mir_eval note-matching tolerances:
 - pitch difference ≤ 50 cents;
 - offset difference ≤ max(20% of reference duration, 50 ms).
 
-Each prediction can match at most one reference note and vice versa. V1 uses maximum-cardinality bipartite matching and reports four distinct views:
+Each prediction can match at most one reference note and vice versa. V1 ports the `mir_eval 0.8.2` Hopcroft–Karp matching traversal, including first-seen predicted-node order, and reports four distinct views:
 
 | Metric | Match requirements |
 |---|---|
@@ -58,7 +59,7 @@ Each prediction can match at most one reference note and vice versa. V1 uses max
 
 The two GM-program metrics are stricter additions; they are not substitutes for the instrument-agnostic scores used by many AMT benchmarks. GM program is not a persistent PartId or a fine-grained instrument identity.
 
-V1 also reports separate onset-only and offset-only F1 diagnostics that deliberately ignore pitch, matching the scope of the corresponding mir_eval functions. Average Overlap Ratio (AOR) is reported over full-note matched pairs as the mean intersection duration divided by the union span. AOR is absent when there are no full-note matches; it must not be read as zero transcription quality in that case.
+V1 also reports separate onset-only and offset-only F1 diagnostics that deliberately ignore pitch, matching the scope of the corresponding mir_eval functions. It reproduces `mir_eval 0.8.2`'s four-decimal (`N_DECIMALS = 4`) onset/offset distance rounding before inclusive threshold checks. Average Overlap Ratio (AOR) is reported over full-note matched pairs as the mean intersection duration divided by the union span; it is zero when there are no full-note matches, as in mir_eval.
 
 Timing reports include signed mean onset error plus mean, median, p95 and p99 absolute onset/offset errors. Offset errors are measured over onset-matched pairs even when the offset is outside the full-note acceptance tolerance, so a poor release does not disappear from the timing error summary merely because it failed full-note F1.
 
@@ -102,7 +103,11 @@ Eighteen focused Rust tests currently cover:
 15. velocity metrics absent by default;
 16. onset-only matching can identify a correctly timed event despite an incorrect pitch;
 17. offset-only matching can identify a correct release despite an incorrect pitch and onset;
-18. Average Overlap Ratio reports interval overlap for a tolerance-accepted full-note pair.
+18. Average Overlap Ratio reports interval overlap for a tolerance-accepted full-note pair;
+19. the upstream mir_eval Hopcroft–Karp adversarial graph yields the same deterministic pairing;
+20. Type-1 note-on/note-off events across tracks pair in the shared channel stream;
+21. a conductor-track program change applies to part-track notes on the same channel;
+22. simultaneous conflicting program changes across tracks on the same channel abstain.
 
 These tests are authored, not compiled or run in the authoring environment.
 
@@ -136,7 +141,7 @@ Sources:
 
 The mir_eval documentation describes the 50 ms onset / 50-cent pitch criterion, a separate full-note test with the greater of 20% reference duration or 50 ms offset tolerance, and one-to-one bipartite matching. It also explains that these rules differ from historical MIREX implementations. V1 aims at the documented mir_eval defaults, but a pinned parity test against the actual Python library should still be run before claiming byte-for-byte or score-for-score parity.
 
-Reference: https://mir-eval.readthedocs.io/latest/api/transcription.html
+References: https://mir-eval.readthedocs.io/latest/api/transcription.html and https://github.com/mir-evaluation/mir_eval/tree/0.8.2
 
 ### Complementary corpora
 
