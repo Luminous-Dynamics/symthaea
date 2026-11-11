@@ -98,9 +98,15 @@ This also handles uncertainty intervals that straddle zero: the evaluator checks
 
 For a step of duration (Delta t):
 - subtract worst-case discharge energy (P_{dis,worst}Delta t/3600);
-- add only guaranteed regenerative energy (P_{regen,guaranteed}eta_{regen,lower}Delta t/3600).
+- credit only guaranteed regenerative energy, capped by the conservative charge-acceptance bound:
 
-The lower-bound energy remaining above reserve is updated after every step. It must never cross below zero. A mission that passes every instantaneous power limit but crosses its cumulative energy reserve is INFEASIBLE.
+`E_regen_credit = min(P_regen_guaranteed, P_charge_acceptance_lower) × eta_regen_lower × Delta_t / 3600`
+
+The energy ledger therefore never credits regenerative energy above the upstream qualified acceptance bound. An over-acceptance request remains INFEASIBLE even though the accounting ledger only credits the conservative accepted amount.
+
+The lower-bound energy remaining above reserve is updated after every fully evaluated step. It must never cross below zero. A mission that passes every instantaneous power limit but crosses its cumulative energy reserve is INFEASIBLE.
+
+The report includes `battery_energy_accounting_complete`. If any interval is missing capability evidence, has incomplete cell coverage, conflicts with the mission identity, or is outside the model domain, that flag is false and the mission-wide minimum-reserve value is null. Accumulated discharge/regeneration totals are partial in that case and must not be interpreted as a full-mission result. A fully evaluated but infeasible mission retains its modeled negative reserve result.
 
 ### Cell-level constraints and domain
 
