@@ -1,0 +1,651 @@
+{
+  "schema": "https://luminousdynamics.io/schemas/muse-merge-001-cases-v1.schema.json",
+  "schema_version": "1.0.0",
+  "status": "synthetic_known_answer_fixture_manifest_not_executed",
+  "created": "2026-11-11",
+  "case_count": 15,
+  "expected_outcomes": [
+    "SafeAutomaticMerge",
+    "MergeWithRevalidation",
+    "HumanDecisionRequired",
+    "Conflict",
+    "Unknown",
+    "Rejected",
+    "InDoubt"
+  ],
+  "cases": [
+    {
+      "id": "M01",
+      "title": "Independent parts, independent obligations",
+      "base_version_id": "synthetic:M01:base",
+      "patch_a": {
+        "operation": "set_articulation",
+        "targets": [
+          "event:A1"
+        ],
+        "reads": [
+          "event:A1",
+          "part:A"
+        ],
+        "writes": [
+          "event:A1.articulation"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_articulation"
+      },
+      "patch_b": {
+        "operation": "set_velocity",
+        "targets": [
+          "event:B1"
+        ],
+        "reads": [
+          "event:B1",
+          "part:B"
+        ],
+        "writes": [
+          "event:B1.velocity"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_velocity"
+      },
+      "expected_outcome": "SafeAutomaticMerge",
+      "reason": "No shared identity, time, musical constraint or authority dependency.",
+      "requires_human_decision": false,
+      "requires_render_revalidation": true
+    },
+    {
+      "id": "M02",
+      "title": "Conflicting writes to one pitch",
+      "base_version_id": "synthetic:M02:base",
+      "patch_a": {
+        "operation": "set_pitch",
+        "targets": [
+          "event:E1"
+        ],
+        "reads": [
+          "event:E1.pitch"
+        ],
+        "writes": [
+          "event:E1.pitch"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_pitch"
+      },
+      "patch_b": {
+        "operation": "set_pitch",
+        "targets": [
+          "event:E1"
+        ],
+        "reads": [
+          "event:E1.pitch"
+        ],
+        "writes": [
+          "event:E1.pitch"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_pitch"
+      },
+      "expected_outcome": "Conflict",
+      "reason": "Both branches write incompatible values to the same stable event property.",
+      "requires_human_decision": true,
+      "requires_render_revalidation": true
+    },
+    {
+      "id": "M03",
+      "title": "Pitch and articulation on one event",
+      "base_version_id": "synthetic:M03:base",
+      "patch_a": {
+        "operation": "set_pitch",
+        "targets": [
+          "event:E1"
+        ],
+        "reads": [
+          "event:E1.pitch",
+          "event:E1.register"
+        ],
+        "writes": [
+          "event:E1.pitch"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_pitch"
+      },
+      "patch_b": {
+        "operation": "set_articulation",
+        "targets": [
+          "event:E1"
+        ],
+        "reads": [
+          "event:E1.articulation",
+          "event:E1.duration"
+        ],
+        "writes": [
+          "event:E1.articulation"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_articulation"
+      },
+      "expected_outcome": "Unknown",
+      "reason": "Different properties do not establish semantic independence; operation dependency semantics are not yet qualified.",
+      "requires_human_decision": false,
+      "requires_render_revalidation": true
+    },
+    {
+      "id": "M04",
+      "title": "Tempo map versus absolute-time onset",
+      "base_version_id": "synthetic:M04:base",
+      "patch_a": {
+        "operation": "change_tempo_segment",
+        "targets": [
+          "tempo:segment:2"
+        ],
+        "reads": [
+          "tempo:segment:2",
+          "time_map"
+        ],
+        "writes": [
+          "time_map"
+        ],
+        "time_domain": "beat_and_seconds",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "change_tempo_segment"
+      },
+      "patch_b": {
+        "operation": "set_absolute_onset",
+        "targets": [
+          "event:E8"
+        ],
+        "reads": [
+          "event:E8.onset_seconds",
+          "time_map"
+        ],
+        "writes": [
+          "event:E8.onset_seconds"
+        ],
+        "time_domain": "absolute_seconds",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_absolute_onset"
+      },
+      "expected_outcome": "Conflict",
+      "reason": "The tempo edit changes the mapping used by the absolute-time onset operation.",
+      "requires_human_decision": true,
+      "requires_render_revalidation": true
+    },
+    {
+      "id": "M05",
+      "title": "Harmony and dependent melody",
+      "base_version_id": "synthetic:M05:base",
+      "patch_a": {
+        "operation": "change_chord_function",
+        "targets": [
+          "chord:C1"
+        ],
+        "reads": [
+          "chord:C1",
+          "harmony:bar:4"
+        ],
+        "writes": [
+          "chord:C1.function",
+          "harmony:bar:4"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "change_chord_function"
+      },
+      "patch_b": {
+        "operation": "set_pitch",
+        "targets": [
+          "event:M1"
+        ],
+        "reads": [
+          "event:M1.pitch",
+          "relation:harmony:C1-M1"
+        ],
+        "writes": [
+          "event:M1.pitch"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_pitch"
+      },
+      "expected_outcome": "Conflict",
+      "reason": "Different parts share a declared harmonic obligation and the selected values violate it.",
+      "requires_human_decision": true,
+      "requires_render_revalidation": true
+    },
+    {
+      "id": "M06",
+      "title": "Separate bars with shared phrase constraint",
+      "base_version_id": "synthetic:M06:base",
+      "patch_a": {
+        "operation": "replace_motif_occurrence",
+        "targets": [
+          "event:P1a"
+        ],
+        "reads": [
+          "motif:P1",
+          "section:S1"
+        ],
+        "writes": [
+          "event:P1a.pitch_sequence"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "replace_motif_occurrence"
+      },
+      "patch_b": {
+        "operation": "replace_motif_occurrence",
+        "targets": [
+          "event:P1b"
+        ],
+        "reads": [
+          "motif:P1",
+          "section:S1"
+        ],
+        "writes": [
+          "event:P1b.pitch_sequence"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "replace_motif_occurrence"
+      },
+      "expected_outcome": "HumanDecisionRequired",
+      "reason": "Both branches express distinct valid transformations of a repeated motif; preserving both or selecting a variant is an aesthetic decision.",
+      "requires_human_decision": true,
+      "requires_render_revalidation": true
+    },
+    {
+      "id": "M07",
+      "title": "Global meter change invalidates projections",
+      "base_version_id": "synthetic:M07:base",
+      "patch_a": {
+        "operation": "change_meter",
+        "targets": [
+          "meter:section:S2"
+        ],
+        "reads": [
+          "meter:section:S2",
+          "beat_grid:S2"
+        ],
+        "writes": [
+          "meter:section:S2",
+          "beat_grid:S2"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "change_meter"
+      },
+      "patch_b": {
+        "operation": "set_beat_position",
+        "targets": [
+          "event:E22"
+        ],
+        "reads": [
+          "event:E22.beat_position",
+          "meter:section:S2"
+        ],
+        "writes": [
+          "event:E22.beat_position"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_beat_position"
+      },
+      "expected_outcome": "MergeWithRevalidation",
+      "reason": "The operations may be jointly applied only after recomputing beat/frame projections and checking the resulting meter constraints.",
+      "requires_human_decision": false,
+      "requires_render_revalidation": true
+    },
+    {
+      "id": "M08",
+      "title": "Protected motif edited without authority",
+      "base_version_id": "synthetic:M08:base",
+      "patch_a": {
+        "operation": "replace_motif",
+        "targets": [
+          "motif:protected:P1"
+        ],
+        "reads": [
+          "motif:protected:P1"
+        ],
+        "writes": [
+          "motif:protected:P1.content"
+        ],
+        "time_domain": "beat",
+        "authorization": "missing_scope",
+        "artifact_integrity": "verified",
+        "description": "replace_motif"
+      },
+      "patch_b": {
+        "operation": "set_velocity",
+        "targets": [
+          "event:DR1"
+        ],
+        "reads": [
+          "event:DR1.velocity"
+        ],
+        "writes": [
+          "event:DR1.velocity"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_velocity"
+      },
+      "expected_outcome": "Rejected",
+      "reason": "The actor lacks authority to modify the protected motif; the otherwise independent patch cannot authorize it.",
+      "requires_human_decision": false,
+      "requires_render_revalidation": false
+    },
+    {
+      "id": "M09",
+      "title": "Stale base after preview",
+      "base_version_id": "synthetic:M09:stale-base",
+      "patch_a": {
+        "operation": "set_pitch",
+        "targets": [
+          "event:E3"
+        ],
+        "reads": [
+          "event:E3.pitch"
+        ],
+        "writes": [
+          "event:E3.pitch"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_pitch"
+      },
+      "patch_b": {
+        "operation": "set_articulation",
+        "targets": [
+          "event:E4"
+        ],
+        "reads": [
+          "event:E4.articulation"
+        ],
+        "writes": [
+          "event:E4.articulation"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_articulation"
+      },
+      "expected_outcome": "Rejected",
+      "reason": "At least one patch base digest no longer matches the expected branch head.",
+      "requires_human_decision": false,
+      "requires_render_revalidation": false
+    },
+    {
+      "id": "M10",
+      "title": "Exact idempotent retry",
+      "base_version_id": "synthetic:M10:base",
+      "patch_a": {
+        "operation": "set_velocity",
+        "targets": [
+          "event:E9"
+        ],
+        "reads": [
+          "event:E9.velocity"
+        ],
+        "writes": [
+          "event:E9.velocity"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_velocity"
+      },
+      "patch_b": {
+        "operation": "set_articulation",
+        "targets": [
+          "event:E10"
+        ],
+        "reads": [
+          "event:E10.articulation"
+        ],
+        "writes": [
+          "event:E10.articulation"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_articulation"
+      },
+      "expected_outcome": "SafeAutomaticMerge",
+      "reason": "The same prepared merge and idempotency key are replayed; the second attempt must return the existing result without duplicating ancestry or events.",
+      "requires_human_decision": false,
+      "requires_render_revalidation": true
+    },
+    {
+      "id": "M11",
+      "title": "Two valid but incompatible creative alternatives",
+      "base_version_id": "synthetic:M11:base",
+      "patch_a": {
+        "operation": "reharmonize_section",
+        "targets": [
+          "section:S3"
+        ],
+        "reads": [
+          "section:S3",
+          "motif:M2"
+        ],
+        "writes": [
+          "harmony:S3"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "reharmonize_section"
+      },
+      "patch_b": {
+        "operation": "reharmonize_section",
+        "targets": [
+          "section:S3"
+        ],
+        "reads": [
+          "section:S3",
+          "motif:M2"
+        ],
+        "writes": [
+          "harmony:S3"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "reharmonize_section"
+      },
+      "expected_outcome": "HumanDecisionRequired",
+      "reason": "Both candidate harmonizations satisfy hard constraints but represent different creative directions.",
+      "requires_human_decision": true,
+      "requires_render_revalidation": true
+    },
+    {
+      "id": "M12",
+      "title": "Renderer evidence changed after merge preview",
+      "base_version_id": "synthetic:M12:base",
+      "patch_a": {
+        "operation": "set_pitch",
+        "targets": [
+          "event:E12"
+        ],
+        "reads": [
+          "event:E12.pitch"
+        ],
+        "writes": [
+          "event:E12.pitch"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_pitch"
+      },
+      "patch_b": {
+        "operation": "set_articulation",
+        "targets": [
+          "event:E13"
+        ],
+        "reads": [
+          "event:E13.articulation"
+        ],
+        "writes": [
+          "event:E13.articulation"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "renderer_receipt_stale",
+        "description": "set_articulation"
+      },
+      "expected_outcome": "MergeWithRevalidation",
+      "reason": "The symbolic candidate is compatible, but the existing renderer/performance evidence is stale for the candidate version.",
+      "requires_human_decision": false,
+      "requires_render_revalidation": true
+    },
+    {
+      "id": "M13",
+      "title": "Commit acknowledgement lost",
+      "base_version_id": "synthetic:M13:base",
+      "patch_a": {
+        "operation": "set_pitch",
+        "targets": [
+          "event:E14"
+        ],
+        "reads": [
+          "event:E14.pitch"
+        ],
+        "writes": [
+          "event:E14.pitch"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_pitch"
+      },
+      "patch_b": {
+        "operation": "set_velocity",
+        "targets": [
+          "event:E15"
+        ],
+        "reads": [
+          "event:E15.velocity"
+        ],
+        "writes": [
+          "event:E15.velocity"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_velocity"
+      },
+      "expected_outcome": "InDoubt",
+      "reason": "The durable commit may have occurred but acknowledgement is unavailable; reconcile authoritative state before retry.",
+      "requires_human_decision": false,
+      "requires_render_revalidation": false
+    },
+    {
+      "id": "M14",
+      "title": "Parent artifact bytes substituted",
+      "base_version_id": "synthetic:M14:base",
+      "patch_a": {
+        "operation": "set_pitch",
+        "targets": [
+          "event:E16"
+        ],
+        "reads": [
+          "event:E16.pitch"
+        ],
+        "writes": [
+          "event:E16.pitch"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "digest_mismatch",
+        "description": "set_pitch"
+      },
+      "patch_b": {
+        "operation": "set_velocity",
+        "targets": [
+          "event:E17"
+        ],
+        "reads": [
+          "event:E17.velocity"
+        ],
+        "writes": [
+          "event:E17.velocity"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_velocity"
+      },
+      "expected_outcome": "Unknown",
+      "reason": "The retrieved bytes do not match the referenced parent identity; the merge must not trust the branch contents.",
+      "requires_human_decision": false,
+      "requires_render_revalidation": false
+    },
+    {
+      "id": "M15",
+      "title": "Preserve irregular rhythm and alternate pitch representation",
+      "base_version_id": "synthetic:M15:base",
+      "patch_a": {
+        "operation": "set_velocity",
+        "targets": [
+          "event:E18"
+        ],
+        "reads": [
+          "event:E18.velocity"
+        ],
+        "writes": [
+          "event:E18.velocity"
+        ],
+        "time_domain": "beat",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "set_velocity"
+      },
+      "patch_b": {
+        "operation": "add_non_isochronous_event",
+        "targets": [
+          "event:E19"
+        ],
+        "reads": [
+          "rhythm:cycle:C2",
+          "pitch:non_equal_tempered:P2"
+        ],
+        "writes": [
+          "event:E19",
+          "rhythm:cycle:C2"
+        ],
+        "time_domain": "native_rhythm_and_tuning",
+        "authorization": "authorized",
+        "artifact_integrity": "verified",
+        "description": "add_non_isochronous_event"
+      },
+      "expected_outcome": "SafeAutomaticMerge",
+      "reason": "An unrelated edit must preserve source rhythmic and pitch representations without coercion to a Western beat grid or equal temperament.",
+      "requires_human_decision": false,
+      "requires_render_revalidation": true
+    }
+  ]
+}
