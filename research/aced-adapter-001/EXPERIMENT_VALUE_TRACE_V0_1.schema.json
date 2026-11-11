@@ -221,7 +221,73 @@
                       }
                     ]
                   }
-                }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "observation_status": {
+                          "const": "observed"
+                        }
+                      },
+                      "required": [
+                        "observation_status"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "observation_sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "actual_cost": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "observed_outcome": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "observation_status": {
+                          "enum": [
+                            "failed",
+                            "unknown"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "observation_status"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "observation_sha256": {
+                          "type": "null"
+                        },
+                        "actual_cost": {
+                          "oneOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "observed_outcome": {
+                          "type": "null"
+                        }
+                      }
+                    }
+                  }
+                ]
               }
             }
           },
