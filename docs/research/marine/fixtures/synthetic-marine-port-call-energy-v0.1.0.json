@@ -23,7 +23,15 @@
     "frequency_hz": 50,
     "phase_count": 3,
     "ship_max_input_power_w": 500000,
-    "berth_connection_limit_w": 400000
+    "berth_connection_limit_w": 400000,
+    "ship_connector_standard": "IEC/ISO/IEEE-80005-SYNTHETIC",
+    "berth_connector_standard": "IEC/ISO/IEEE-80005-SYNTHETIC",
+    "ship_voltage_v": 11000,
+    "berth_voltage_v": 11000,
+    "ship_frequency_hz": 50,
+    "berth_frequency_hz": 50,
+    "ship_phase_count": 3,
+    "berth_phase_count": 3
   },
   "demand": {
     "requested_energy_wh": 2000000,
