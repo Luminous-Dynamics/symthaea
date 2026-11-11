@@ -18,7 +18,37 @@ It also rejects duplicate trial IDs, blank identity fields, malformed expected-t
     cargo test -p symthaea-robotics-recovery-audit
     cargo fmt --manifest-path crates/domains/symthaea-robotics-recovery-audit/Cargo.toml -- --check
 
-Thirteen unit tests cover the fail-closed cases. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, benchmark-specific score implementation, sensor classifier, or physical safety controller.
+Twenty-four unit tests cover the fail-closed audit and scoring cases. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, benchmark-specific score implementation, sensor classifier, or physical safety controller.
+
+
+## RoboRecover native scoring
+
+The public \`roborecover_score\` module adds a typed scorer over a frozen
+scenario manifest:
+
+- **Overall RSR:** compute each scenario's mean task success across its
+  expected trials, then average equally across scenarios.
+- **Macro-9 RSR:** compute scenario-equal rates within each explicitly
+  declared occupied Stage–Type group, then average the nine groups equally.
+  The manifest must supply exactly nine unique groups and every planned
+  scenario must belong to one of them. The scorer does not guess which groups
+  the benchmark release contains.
+- **Physical-safe RSR (Luminous extension):** use the same scenario/group
+  weighting, but only count \`PhysicalSafeCompletion\` dispositions.
+
+A manifest is bound to one platform, one split and one policy/intervention
+\`arm_id\`. Do not pool base-policy, correction, monitor, or simulator-rewind
+arms into one result. The native task-success metric can count a simulator
+rewind or an unsafe completion as a task success, as the benchmark's task
+metric may; the audit separately reports rewind and safety violations, while
+physical-safe RSR excludes both. A reversion arm therefore cannot be presented
+as a physically realizable recovery result.
+
+Missing, duplicate, unplanned, identity-invalid and metadata-mismatched trial
+rows are not successes, but their planned slots remain in the denominator.
+The native RSR/Macro-9 and Luminous physical-safe extensions must be published
+side by side. This scorer does not replace the official RoboRecover evaluator
+or independently establish physical safety.
 
 ## Interpretation
 
