@@ -49,6 +49,19 @@ The inventory records full track-relative path, Git blob SHA-1, byte size, SHA-2
 
 The Query README describes four-turn Active, Active+Code and Modular agents plus a guess-only baseline. A future Query trial must reproduce the upstream task/agent/tool/turn budgets and scoring unchanged before adding Luminous metrics. The guess and core tracks are not automatically independent datasets.
 
+## ACED-Query metadata inventory
+
+The repository also pins the four ACED-Query inventory tracks in `upstream/aced_query_world_inventory.json`, with a separate v0.2 source manifest and closed schemas. Only metadata is copied: track path, source blob/digest, size, domain, task family, scenario subtype, seed and filename-declared graph/sample sizes. No Query world JSON or hidden evaluator content is stored in this adapter.
+
+The inventory distinguishes track membership from content identity:
+- 10 exact structural-world payloads appear in both `core_struct` and `guess_struct`;
+- 2 decision-world basenames collide between `core_decision` and `guess_decision`, but the files have different Git blob and SHA-256 digests;
+- 148 track entries contain 138 unique payload digests.
+
+Decision-task domains are parsed separately from task family and scenario subtype. For the Core decision track, `invalid_premise` has six `valid_proposed_intervention` and four `wrong_side_intervention` subtypes. They remain one family and their actual domains remain distinct; they are not mislabeled as extra domains.
+
+The library exposes `query_inventory::qualify_query_inventory`; the `aced-query-index-qualifier` binary validates exact track counts, distributions, path safety, the inventory and source-ledger digests, all 148 path/digest entries, payload overlap, filename collisions and the metadata-only candidate boundary. It does not download or verify payload bytes, execute the four-turn Query protocol, or produce any agent score.
+
 ## Reproduction
 
 From the Symthaea repository root:
@@ -56,10 +69,14 @@ From the Symthaea repository root:
 ```bash
 cargo fmt --manifest-path research/aced-adapter-001/qualifier/Cargo.toml --check
 cargo test --manifest-path research/aced-adapter-001/qualifier/Cargo.toml
-cargo run --manifest-path research/aced-adapter-001/qualifier/Cargo.toml -- \
+cargo run --manifest-path research/aced-adapter-001/qualifier/Cargo.toml --bin aced-repair-index-qualifier -- \
   research/aced-adapter-001/upstream/repair_test_index.json \
   research/aced-adapter-001/upstream/repair_eval_index.json \
   research/aced-adapter-001/ACED_REPAIR_SOURCE_MANIFEST_V0_1.json \
+  research/aced-adapter-001/upstream/SHA256SUMS
+cargo run --manifest-path research/aced-adapter-001/qualifier/Cargo.toml --bin aced-query-index-qualifier -- \
+  research/aced-adapter-001/upstream/aced_query_world_inventory.json \
+  research/aced-adapter-001/ACED_QUERY_SOURCE_MANIFEST_V0_1.json \
   research/aced-adapter-001/upstream/SHA256SUMS
 ```
 
