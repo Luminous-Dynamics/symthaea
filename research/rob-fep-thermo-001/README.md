@@ -345,3 +345,8 @@ Do not conflate the two similarly named Streaming-WAM papers or import the repor
 
 
 The distributed-inference fixture corpus now contains **19** synthetic cases, including compression-induced accuracy loss (DI18) and fleet-batch priority admission under p99 queueing (DI19). The schema requires all 19 case IDs exactly once.
+
+
+## Asynchronous thermodynamic locomotion
+
+The combined physical experiment is now tracked by [Symtropy #4689](https://github.com/Luminous-Dynamics/symtropy/issues/4689). It composes the new real-time/action-chunk contracts with #4610 per-node thermal dynamics, #4549/#4555 persistent mission reserve and #4588 future mobility. It tests split-timescale cognition and prefix-conditioned execution under successive faults without resetting physical state.
