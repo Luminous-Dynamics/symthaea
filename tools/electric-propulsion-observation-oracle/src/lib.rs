@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 use std::f64::consts::TAU;
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-propulsion-observation-oracle-v0.2.0";
+pub const MODEL_VERSION: &str = "electric-propulsion-observation-oracle-v0.3.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimeDomain {
@@ -153,8 +153,6 @@ pub struct SynchronizedOperatingPoint {
     pub observations: Vec<SynchronizedObservation>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-
 /// A motor-shaft operating point projected from two synchronized, calibrated
 /// raw observations. The power interval is a rectangular absolute-bound
 /// propagation; it is not a probabilistic confidence interval.
@@ -170,15 +168,27 @@ pub struct MotorMapOperatingPoint {
     pub anchor_timestamp_ns: i64,
     pub motor_shaft_boundary_id: String,
     pub torque_channel_id: String,
+    pub torque_calibration_id: String,
     pub torque_calibration_certificate_digest: String,
     pub torque_raw_data_digest: String,
+    pub torque_clock_source_id: String,
+    pub torque_clock_uncertainty_ns: u64,
+    pub torque_timestamp_offset_ns: i128,
+    pub torque_sample_skew_ns: u64,
+    pub torque_combined_time_error_ns: u64,
     pub torque_source_sequence: u64,
     pub torque_timestamp_ns: i64,
     pub torque_value_nm: f64,
     pub torque_absolute_uncertainty_nm: f64,
     pub speed_channel_id: String,
+    pub speed_calibration_id: String,
     pub speed_calibration_certificate_digest: String,
     pub speed_raw_data_digest: String,
+    pub speed_clock_source_id: String,
+    pub speed_clock_uncertainty_ns: u64,
+    pub speed_timestamp_offset_ns: i128,
+    pub speed_sample_skew_ns: u64,
+    pub speed_combined_time_error_ns: u64,
     pub speed_source_sequence: u64,
     pub speed_timestamp_ns: i64,
     pub speed_value_rpm: f64,
@@ -189,8 +199,10 @@ pub struct MotorMapOperatingPoint {
     pub shaft_power_upper_bound_w: f64,
     pub shaft_power_absolute_uncertainty_bound_w: f64,
     pub maximum_combined_time_error_ns: u64,
+    pub torque_speed_sample_time_delta_ns: u64,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum ObservationError {
     InvalidManifest(&'static str),
     InvalidChannel(&'static str),
@@ -517,6 +529,11 @@ pub fn derive_motor_map_operating_point(
     speed_channel_id: &str,
     expected_motor_shaft_boundary_id: &str,
 ) -> Result<MotorMapOperatingPoint, ObservationError> {
+    if point.model_version != MODEL_VERSION {
+        return Err(ObservationError::InvalidMotorMapOperatingPoint(
+            "unsupported synchronized observation model version",
+        ));
+    }
     if !non_empty(torque_channel_id)
         || !non_empty(speed_channel_id)
         || !non_empty(expected_motor_shaft_boundary_id)
@@ -537,7 +554,7 @@ pub fn derive_motor_map_operating_point(
         || !non_empty(&point.evidence_manifest_digest)
     {
         return Err(ObservationError::InvalidMotorMapOperatingPoint(
-            "synchronized run, asset, configuration, context and evidence identities must be present",
+            "synchronized provenance identities are required",
         ));
     }
 
@@ -576,7 +593,7 @@ pub fn derive_motor_map_operating_point(
             || !non_empty(&observation.clock_source_id)
         {
             return Err(ObservationError::InvalidMotorMapOperatingPoint(
-                "selected motor-map observations require channel, boundary, calibration, raw-data and clock identities",
+                "selected channel provenance is incomplete",
             ));
         }
         let expected_offset =
@@ -590,10 +607,12 @@ pub fn derive_motor_map_operating_point(
         if observation.timestamp_offset_ns != expected_offset
             || observation.sample_skew_ns != expected_skew
             || observation.combined_time_error_ns != expected_combined
+            || observation.clock_uncertainty_ns > point.maximum_clock_uncertainty_ns
+            || observation.sample_skew_ns > point.maximum_observed_sample_skew_ns
             || observation.combined_time_error_ns > point.maximum_combined_time_error_ns
         {
             return Err(ObservationError::InvalidMotorMapOperatingPoint(
-                "selected observation timing provenance is inconsistent with its timestamp and synchronization envelope",
+                "selected channel timing provenance is inconsistent",
             ));
         }
     }
@@ -681,15 +700,27 @@ pub fn derive_motor_map_operating_point(
         anchor_timestamp_ns: point.anchor_timestamp_ns,
         motor_shaft_boundary_id: expected_motor_shaft_boundary_id.to_owned(),
         torque_channel_id: torque.channel_id.clone(),
+        torque_calibration_id: torque.calibration_id.clone(),
         torque_calibration_certificate_digest: torque.calibration_certificate_digest.clone(),
         torque_raw_data_digest: torque.raw_data_digest.clone(),
+        torque_clock_source_id: torque.clock_source_id.clone(),
+        torque_clock_uncertainty_ns: torque.clock_uncertainty_ns,
+        torque_timestamp_offset_ns: torque.timestamp_offset_ns,
+        torque_sample_skew_ns: torque.sample_skew_ns,
+        torque_combined_time_error_ns: torque.combined_time_error_ns,
         torque_source_sequence: torque.source_sequence,
         torque_timestamp_ns: torque.source_timestamp_ns,
         torque_value_nm: torque.value,
         torque_absolute_uncertainty_nm: torque.absolute_uncertainty,
         speed_channel_id: speed.channel_id.clone(),
+        speed_calibration_id: speed.calibration_id.clone(),
         speed_calibration_certificate_digest: speed.calibration_certificate_digest.clone(),
         speed_raw_data_digest: speed.raw_data_digest.clone(),
+        speed_clock_source_id: speed.clock_source_id.clone(),
+        speed_clock_uncertainty_ns: speed.clock_uncertainty_ns,
+        speed_timestamp_offset_ns: speed.timestamp_offset_ns,
+        speed_sample_skew_ns: speed.sample_skew_ns,
+        speed_combined_time_error_ns: speed.combined_time_error_ns,
         speed_source_sequence: speed.source_sequence,
         speed_timestamp_ns: speed.source_timestamp_ns,
         speed_value_rpm: speed.value,
@@ -702,6 +733,9 @@ pub fn derive_motor_map_operating_point(
         maximum_combined_time_error_ns: torque
             .combined_time_error_ns
             .max(speed.combined_time_error_ns),
+        torque_speed_sample_time_delta_ns: torque
+            .source_timestamp_ns
+            .abs_diff(speed.source_timestamp_ns),
     })
 }
 
@@ -842,12 +876,82 @@ mod tests {
         assert_eq!(result.configuration_digest, "config-sha256");
         assert_eq!(result.evidence_manifest_digest, "manifest-sha256");
         assert_eq!(result.motor_shaft_boundary_id, "motor-shaft");
+        assert_eq!(result.torque_calibration_id, "cal-torque");
+        assert_eq!(result.speed_calibration_id, "cal-rpm");
         assert_eq!(result.torque_calibration_certificate_digest, "cal-sha-torque");
+        assert_eq!(result.torque_clock_source_id, "ptp-grandmaster-01");
+        assert_eq!(result.speed_clock_source_id, "ptp-grandmaster-01");
+        assert_eq!(result.torque_clock_uncertainty_ns, 50);
+        assert_eq!(result.speed_clock_uncertainty_ns, 50);
+        assert_eq!(result.torque_timestamp_offset_ns, 0);
+        assert_eq!(result.speed_timestamp_offset_ns, 0);
+        assert_eq!(result.torque_sample_skew_ns, 0);
+        assert_eq!(result.speed_sample_skew_ns, 0);
+        assert_eq!(result.torque_combined_time_error_ns, 50);
+        assert_eq!(result.speed_combined_time_error_ns, 50);
+        assert_eq!(result.torque_speed_sample_time_delta_ns, 0);
         assert_eq!(result.speed_calibration_certificate_digest, "cal-sha-rpm");
         assert_eq!(result.torque_raw_data_digest, "raw-sha-torque");
         assert_eq!(result.speed_raw_data_digest, "raw-sha-rpm");
         assert_eq!(result.torque_timestamp_ns, 1_000);
         assert_eq!(result.speed_timestamp_ns, 1_000);
+    }
+
+    #[test]
+    fn motor_map_projection_preserves_nonzero_torque_speed_sample_separation() {
+        let run = manifest();
+        let mut values = channels();
+        values[0].samples = vec![sample(1, 980, 7.5)];
+        values[1].samples = vec![sample(1, 1_020, 15_000.0)];
+        let synced = synchronize_at(&run, &values, &required(), 1_000).unwrap();
+        let result = derive_motor_map_operating_point(
+            &synced,
+            "torque",
+            "rpm",
+            "motor-shaft",
+        )
+        .unwrap();
+        assert_eq!(result.torque_timestamp_offset_ns, -20);
+        assert_eq!(result.speed_timestamp_offset_ns, 20);
+        assert_eq!(result.torque_speed_sample_time_delta_ns, 40);
+        assert_eq!(result.maximum_combined_time_error_ns, 70);
+    }
+
+    #[test]
+    fn motor_map_projection_rejects_unsupported_observation_model_version() {
+        let run = manifest();
+        let mut synced = synchronize_at(&run, &channels(), &required(), 1_000).unwrap();
+        synced.model_version = "unrecognized-observation-oracle";
+        assert!(matches!(
+            derive_motor_map_operating_point(
+                &synced,
+                "torque",
+                "rpm",
+                "motor-shaft",
+            ),
+            Err(ObservationError::InvalidMotorMapOperatingPoint(_))
+        ));
+    }
+
+    #[test]
+    fn motor_map_projection_rejects_tampered_timing_provenance() {
+        let run = manifest();
+        let mut synced = synchronize_at(&run, &channels(), &required(), 1_000).unwrap();
+        let torque = synced
+            .observations
+            .iter_mut()
+            .find(|observation| observation.channel_id == "torque")
+            .unwrap();
+        torque.timestamp_offset_ns = 1;
+        assert!(matches!(
+            derive_motor_map_operating_point(
+                &synced,
+                "torque",
+                "rpm",
+                "motor-shaft",
+            ),
+            Err(ObservationError::InvalidMotorMapOperatingPoint(_))
+        ));
     }
 
     #[test]
