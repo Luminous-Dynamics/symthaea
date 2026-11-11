@@ -69,3 +69,14 @@ The wall-clock / stale-action extension has ten machine-readable cases:
 - [fixtures/realtime_cognition_v0_1.schema.json](./fixtures/realtime_cognition_v0_1.schema.json)
 
 The corpus distinguishes frozen-world upper bounds, stale proposals, valid-but-not-yet-authorized proposals, missed deadlines, direct-policy wins after latency costs, anytime-plan expiry, compute thermal throttling, clock uncertainty, no model value-add, and simulation-time-only evidence. It is synthetic and does not itself qualify a runtime clock, hardware deadline or controller.
+
+
+## New external real-time references (11 November 2026)
+
+The original real-time cognition protocol should be evaluated against three separate external lanes, not one pooled score:
+
+- **RT-SAFE** (October 2026 preprint): navigation in which the world evolves during reasoning. Its matched static/real-time comparison reports 91.3%/94.1% task completion but 19.8%/0.7% safe completion, with 12.3× more collisions in real-time. Its snapshot has exploratory/single-seed and incomplete-run caveats. https://arxiv.org/abs/2610.09294
+- **LIBERO-Dynamic**: 40 LIBERO tasks, 1,800 episodes, latency-calibrated inference, physical object motion, synchronous/async/RTC/VLASH arms, and real-robot conditions. Its π0.5 PyTorch results differ across sync hold (43.1%), async queueing (48.4%) and RTC (37.8%) at different best measured action horizons; compare the exact model and horizon strata. https://github.com/renshaojie233/LIBERO-Dynamic
+- **RoboDyna**: 30 dynamic manipulation tasks, paired sync/async evaluation, physics-governed object motion and human baselines. https://robodyna.github.io/robodyna/
+
+These public results motivate the action-chunk and temporal coherence contract in [action_chunk_temporal_alignment.md](./action_chunk_temporal_alignment.md).
