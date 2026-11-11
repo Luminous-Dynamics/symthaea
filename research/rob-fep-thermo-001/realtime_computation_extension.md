@@ -96,3 +96,8 @@ The real-time benchmark should explicitly compare:
 - **StreamingWAM** (Ren et al., arXiv:2610.15585): separate chunk-wise staircase-flow method; reports 57.3 ms real-robot replanning latency.
 
 These are distinct papers and training/robot setups. Compare on the same task/robot/hardware when feasible; otherwise keep results as external reference strata. A Luminous ablation should separate the value of multi-timescale context, action-prefix conditioning and the independent temporal-assurance gate.
+
+
+## Actuation-side freshness and foreground compute contention
+
+The real-time comparison now includes actuation-side AoI rather than stopping at inference return or message receipt. It also includes EdgePace as a foreground-deadline / unified-memory-contention baseline. See [decision_sensitive_freshness.md](./decision_sensitive_freshness.md) for equations, comparison arms and external hardware references.
