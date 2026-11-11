@@ -286,3 +286,31 @@ Use the 2026 IAA SETI update as a governance comparator, while recognizing that 
 
 This is an OLI evidence and governance design goal, not a claim that Mycelix or any partner currently enforces an international post-detection protocol.
 
+
+
+## 3B. Physical memory is not learning: hysteresis as an abiotic negative control
+
+A 2025 review of physical memory and information storage emphasizes that physical state, energetics, dynamics and statistical mechanics are central to understanding information retention. A 2025 *Science Advances* study of the hysteron latch demonstrates return-point memory in bistable elements and richer history storage with frustrated interactions. These are important examples of physical information storage, but they do not by themselves establish task learning or agency.
+
+OLI now has a synthetic Preisach-relay reference in [Symtropy PR #4693](https://github.com/Luminous-Dynamics/symtropy/pull/4693), with frozen case `benchmarks/oli/preisach-hysteresis-memory-v0.json`.
+
+The control demonstrates:
+- the same current input can yield different outputs after different input histories;
+- a nested minor loop returns exactly to a prior hysteron-state vector;
+- opposite saturation erases the stored relay configuration;
+- relay state is invariant to the number of intermediate samples in an equivalent monotone sweep (rate independence);
+- repeated cycles replay identically with fixed thresholds and weights.
+
+The correct inference is **scoped physical information retention**. The model has no task objective, performance improvement, parameter adaptation, generalization, reproduction or agency mechanism. A classifier that calls it "learning" merely because it is history-dependent has failed the abiotic false-positive challenge.
+
+### OLI's required ladder of evidence
+
+1. **State persistence:** a physical state survives beyond the immediate input.
+2. **Information retention:** different past inputs can be distinguished from the present state under a specified readout.
+3. **Adaptive response:** system dynamics change in response to environmental conditions; separate ordinary state dynamics, reversible hysteresis and damage/aging from adaptation.
+4. **Task learning:** experience improves performance against a declared objective, beyond passive memory and fixed dynamics.
+5. **Generalization:** the improvement transfers to held-out tasks or environments.
+6. **Agency:** the system autonomously selects and pursues outcomes under operationally testable conditions.
+
+Each rung requires its own interventions and controls. The same evidence must not automatically promote a finding up the ladder.
+
