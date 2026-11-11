@@ -757,6 +757,17 @@ mod tests {
         );
         assert_eq!(plan_schema["additionalProperties"], false);
         validate_experiment_plan(&parsed_plan()).expect("plan fixture satisfies Rust contract");
+        let fixture_plan = parsed_plan();
+        let sample = &fixture_plan["sample"];
+        let design = TwoSidedMeanPowerDesign {
+            standardized_effect_size: finite_number(sample, "standardized_effect_size").unwrap(),
+            alpha: finite_number(sample, "alpha").unwrap(),
+            target_power: finite_number(sample, "target_power").unwrap(),
+        };
+        let required = design.required_equal_allocation_sample_size().unwrap();
+        assert_eq!(required.total_units, 126);
+        assert_eq!(required.units_per_arm, 63);
+        assert!(required.achieved_power_at_planned_n >= 0.8);
         let mut underpowered = parsed_plan();
         underpowered["sample"]["planned_units"] = Value::from(40);
         assert!(validate_experiment_plan(&underpowered).is_err());
