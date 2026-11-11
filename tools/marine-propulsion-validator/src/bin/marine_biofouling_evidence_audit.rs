@@ -213,7 +213,7 @@ fn check_inspection(record: &Value, findings: &mut Findings) -> (Option<f64>, us
                 "INVALID",
                 "zone inspected area must be between zero and the positive zone area",
             ),
-            _ => findings.push(&path, "INVALID", "zone area and inspected area must be numeric"),
+            _ => findings.push(path.clone(), "INVALID", "zone area and inspected area must be numeric"),
         }
 
         let fouling_class = zone.get("fouling_class").and_then(Value::as_str);
@@ -490,7 +490,7 @@ fn check_performance_comparison(record: &Value, cleaning_method: Option<&str>, f
 
     let before_time = parse_time(before.get("observed_at").and_then(Value::as_str));
     let after_time = parse_time(after.get("observed_at").and_then(Value::as_str));
-    match (before_time, after_time) {
+    match (before_time.as_ref(), after_time.as_ref()) {
         (Some(before_time), Some(after_time)) if before_time < after_time => {}
         (Some(_), Some(_)) => findings.push(
             "/performance_comparison/after/observed_at",
@@ -525,8 +525,8 @@ fn check_performance_comparison(record: &Value, cleaning_method: Option<&str>, f
             let cleaning = record.get("cleaning_event").unwrap_or(&Value::Null);
             let cleaning_end = parse_time(cleaning.get("end").and_then(Value::as_str));
             if let (Some(cleaning_end), Some(after_time)) = (
-                cleaning_end,
-                after_time,
+                cleaning_end.as_ref(),
+                after_time.as_ref(),
             ) {
                 if after_time <= cleaning_end {
                     findings.push(
