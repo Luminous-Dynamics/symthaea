@@ -44,6 +44,11 @@ impl Error for SingingManifestError {}
 #[serde(rename_all = "snake_case")]
 pub enum IntendedUseV1 {
     BenchmarkEvaluationOnly,
+    ModelTraining,
+    VoiceIdentityReference,
+    SyntheticGeneration,
+    CommercialUse,
+    PublicRedistribution,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -430,7 +435,7 @@ fn validate_case(
             &span.language_profile_sha256,
             "language_span_profile_sha256",
         )?;
-        if span.language_profile_sha256 != **expected_profile_sha {
+        if span.language_profile_sha256.as_str() != *expected_profile_sha {
             return Err(SingingManifestError::new(format!(
                 "case {} has a stale language-profile digest for {}",
                 case.case_id, span.language_id
@@ -498,10 +503,30 @@ fn validate_annotation(
             }
         }
         ReferenceKindV1::PhoneTimeAlignment
-        | ReferenceKindV1::ScoreEventMap
-        | ReferenceKindV1::TargetRegionMap
+        | ReferenceKindV1::CodeSwitchBoundaryLabels => {
+            if !annotation.human_adjudicated || !annotation.native_speaker_reviewed {
+                return Err(SingingManifestError::new(format!(
+                    "case {} {:?} reference requires native-speaker adjudication",
+                    case.case_id, annotation.kind
+                )));
+            }
+        }
+        ReferenceKindV1::ScoreEventMap => {
+            if !annotation.human_adjudicated
+                || !matches!(
+                    annotation.method,
+                    AnnotationMethodV1::ScoreAnnotation
+                        | AnnotationMethodV1::HumanExpertAdjudication
+                )
+            {
+                return Err(SingingManifestError::new(format!(
+                    "case {} score event map requires a reviewed score annotation",
+                    case.case_id
+                )));
+            }
+        }
+        ReferenceKindV1::TargetRegionMap
         | ReferenceKindV1::ProtectedRegionMap
-        | ReferenceKindV1::CodeSwitchBoundaryLabels
         | ReferenceKindV1::HumanPerceptualPanel => {
             if !annotation.human_adjudicated {
                 return Err(SingingManifestError::new(format!(
@@ -552,6 +577,7 @@ fn validate_track_evidence(
             ReferenceKindV1::PhoneTimeAlignment,
         ],
         BenchmarkTrackV1::CodeSwitchBoundaries => &[
+            ReferenceKindV1::LyricsText,
             ReferenceKindV1::PhoneSequence,
             ReferenceKindV1::PhoneTimeAlignment,
             ReferenceKindV1::CodeSwitchBoundaryLabels,
@@ -820,12 +846,26 @@ mod tests {
     }
 
     #[test]
-    fn evaluation_receipt_cannot_be_relabelled_as_training_or_synthesis() {
-        let mut case = valid_case();
-        case.rights_receipt.intended_use = IntendedUseV1::BenchmarkEvaluationOnly;
-        let mut spec = spec();
-        spec.intended_use = IntendedUseV1::BenchmarkEvaluationOnly;
-        assert!(validate_singing_benchmark_manifest(&spec, &[case]).is_ok());
+    fn non_evaluation_purposes_are_rejected_at_benchmark_boundary() {
+        for purpose in [
+            IntendedUseV1::ModelTraining,
+            IntendedUseV1::VoiceIdentityReference,
+            IntendedUseV1::SyntheticGeneration,
+            IntendedUseV1::CommercialUse,
+            IntendedUseV1::PublicRedistribution,
+        ] {
+            let mut benchmark_spec = spec();
+            benchmark_spec.intended_use = purpose;
+            assert!(
+                validate_singing_benchmark_manifest(&benchmark_spec, &[valid_case()]).is_err()
+            );
+
+            let mut case = valid_case();
+            case.rights_receipt.intended_use = purpose;
+            assert!(
+                validate_singing_benchmark_manifest(&spec(), &[case]).is_err()
+            );
+        }
     }
 
     #[test]
