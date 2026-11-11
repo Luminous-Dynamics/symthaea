@@ -47,6 +47,23 @@ The audit consumes the full frozen split-manifest payload, not merely a caller-s
 
 The reference must bind to the *same* physical asset/configuration/topology and mission-profile digest as the prediction. A near-match, another pack, a different firmware/configuration or a different mission profile is not a valid reference.
 
+### Independent test-authority admission
+
+A record cannot promote itself to physical ground truth simply by setting `evidence_class=INDEPENDENT_PHYSICAL_REFERENCE`.
+
+The CLI requires a separate `--trust-manifest` input validated against `ev_mission_outcome_trust_v0_1.schema.json`. The trust manifest names public keys, their `INDEPENDENT_TEST_AUTHORITY` role and a validity interval. Each physical reference must carry an Ed25519 signature from one of those authorities. The signature covers the complete reference claims (asset/configuration/topology, mission profile, protocol/evidence digests, outcome/reason/timestamp and all measurement values, sensor/calibration lineage and measurement digests) using canonical measurement ordering; the signature field itself is excluded.
+
+- Missing signer, unknown signer, expired/not-yet-valid authority, malformed signature or any changed reference claim -> REJECTED_REFERENCE.
+- A synthetic known-truth row must not carry an independent physical admission signature.
+- The report records the digest of the external trust-manifest bytes, physical-reference claims, and separately the number admitted by a trusted test authority.
+- Only admitted, fully scorable physical references contribute to the false-feasible / false-infeasible confidence denominators.
+
+The trust manifest is an external trust input: its file and digest must be controlled by the evaluation authority, not supplied by the model under test or bundled as an editable part of the prediction corpus. The public keys and synthetic private test key are not production credentials.
+
+### Blind split and prediction freeze
+
+The corpus also carries the complete split manifest: asset/configuration/topology, physical-group identity and partition. The evaluator recomputes the canonical split digest and checks each prediction binds to the exact frozen manifest. Only `TEST_BLIND` assignments are scoreable. Split freeze must precede prediction freeze, and prediction freeze must precede physical measurement. A model trained/calibrated on the held-out pack, or a prediction revised after test results are observed, is rejected before scoring.
+
 Each observed constraint is replayed against the frozen limit:
 - `MINIMUM_REQUIRED`: observed value must be greater than or equal to the declared limit.
 - `MAXIMUM_ALLOWED`: observed value must be less than or equal to the declared limit.
@@ -74,7 +91,7 @@ The primary v0.1 independent unit is **one pack–mission pair per physical pack
 
 The false-feasible denominator is the number of independent physically scorable pack–mission cases where the frozen evaluator predicted FEASIBLE. The false-feasible numerator is the subset of those cases physically shown to exceed a battery constraint.
 
-The report computes a one-sided exact Clopper–Pearson confidence upper bound. For (k) false-feasible outcomes in (n) independent predicted-feasible cases, the bound (p_U) solves:
+The report computes a one-sided exact Clopper–Pearson confidence upper bound only from references admitted by the external test-authority trust manifest. Physical reference claims without a valid trusted signature are counted as unverified and cannot contribute. For (k) false-feasible outcomes in (n) independent predicted-feasible cases, the bound (p_U) solves:
 
 [
 P(X leq k mid X sim mathrm{Binomial}(n,p_U)) = 0.05
