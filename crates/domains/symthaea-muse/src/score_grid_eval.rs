@@ -155,7 +155,7 @@ struct ScoreKeyV1 {
 struct RhythmKeyV1 {
     bar_index: i32,
     onset_32nd: u16,
-    duration_32nd: u16,
+    duration_32nd: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -170,7 +170,7 @@ struct PartScoreKeyV1 {
 struct TransformedNoteV1 {
     bar_index: i32,
     onset_32nd: u16,
-    duration_32nd: u16,
+    duration_32nd: u32,
     pitch_midi: u8,
     part_id: Option<u16>,
 }
@@ -180,7 +180,7 @@ struct EditTokenV1 {
     bar_index: i32,
     onset_32nd: u16,
     pitch_midi: u8,
-    duration_32nd: u16,
+    duration_32nd: u32,
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -354,7 +354,7 @@ fn multiset_true_positives_v1<K: Ord>(
     true_positives
 }
 
-fn round_scaled_grid_value_v1(value: u16, numerator: u8, denominator: u8) -> Option<u16> {
+fn round_scaled_grid_value_v1(value: u16, numerator: u8, denominator: u8) -> Option<u32> {
     let product = u32::from(value).checked_mul(u32::from(numerator))?;
     let denominator = u32::from(denominator);
     let quotient = product / denominator;
@@ -366,7 +366,7 @@ fn round_scaled_grid_value_v1(value: u16, numerator: u8, denominator: u8) -> Opt
     } else {
         quotient
     };
-    u16::try_from(rounded).ok()
+    Some(rounded)
 }
 
 fn transform_prediction_v1(
@@ -611,13 +611,13 @@ fn edit_tokens_v1(
                     bar_index: note.bar_index,
                     onset_32nd: note.onset_32nd,
                     pitch_midi: note.pitch_midi,
-                    duration_32nd: note.duration_32nd,
+                    duration_32nd: u32::from(note.duration_32nd),
                 },
                 None => EditTokenV1 {
                     bar_index: i32::MAX,
                     onset_32nd: u16::MAX,
                     pitch_midi: u8::MAX,
-                    duration_32nd: u16::MAX.saturating_sub(index.min(usize::from(u16::MAX)) as u16),
+                    duration_32nd: u32::MAX.saturating_sub(index.min(u32::MAX as usize) as u32),
                 },
             })
             .collect();
