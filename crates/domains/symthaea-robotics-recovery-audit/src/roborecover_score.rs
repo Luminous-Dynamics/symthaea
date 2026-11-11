@@ -1,10 +1,11 @@
-//! RoboRecover-native scoring with fail-closed trial admission.
+//! RoboRecover recovery scoring with fail-closed trial admission.
 //!
-//! Overall RSR is scenario-equal: average each scenario's trial success rate,
-//! then average across scenarios. Macro-9 RSR averages the nine explicitly
-//! declared occupied Stage–Type groups equally. Missing, duplicate, unplanned,
-//! identity-invalid, or metadata-mismatched trial rows never become successes;
-//! planned-but-unobserved trials remain in the scenario denominator.
+//! Policy-recovery RSR is scenario-equal: compute policy-attributable success
+//! per scenario, then average scenarios equally. Macro-9 RSR averages the nine
+//! explicitly declared occupied Stage–Type groups equally. Replay-only task
+//! completion is reported separately and never credited to the policy. Missing,
+//! duplicate, unplanned, identity-invalid, or metadata-mismatched trial rows
+//! never become successes; planned-but-unobserved trials stay in the denominator.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -314,12 +315,21 @@ pub fn validate_manifest(
     }
 }
 
-/// Score one platform and one split against a frozen scenario manifest.
+/// Score one platform, split and policy/intervention arm against a frozen manifest.
 ///
-/// The native success outcome is \`TerminalOutcome::TaskCompleted\`, matching
-/// the benchmark's task-completion concept. It intentionally includes unsafe
-/// task completions and simulator-rewind task completions in native RSR; these
-/// are separately exposed and excluded from the physical-safe extension.
+//// The policy-recovery outcome is source-protocol aware:
+/// - RoboTwin requires status=infer_ok, at least one inference action, and
+///   eval_success_at_end=true.
+/// - LIBERO requires status=success and at least one inference action.
+/// - replay_already_done is always a replay-preempted environment completion,
+///   never a policy recovery.
+///
+/// The raw source environment-completion signal is reported separately. The
+/// physical-safe extension additionally requires preserved world continuity,
+/// an executed physically realizable intervention, and upstream verified
+/// compliant safety evidence. This is not a claim that source summary fields
+/// alone are an official reproduction of every paper result; see the README's
+/// adapter caveat.
 ///
 /// Every planned rollout remains in its scenario denominator. Missing,
 /// duplicated, unplanned, identity-invalid and metadata-mismatched rows count
@@ -637,7 +647,7 @@ mod tests {
     }
 
     #[test]
-    fn native_overall_rsr_is_scenario_equal_not_episode_weighted() {
+    fn policy_recovery_rsr_is_scenario_equal_not_episode_weighted() {
         let mut m = manifest();
         m.scenarios[0].expected_trial_ids = vec!["a".into()];
         m.scenarios[1].expected_trial_ids = vec!["b0".into(), "b1".into(), "b2".into()];
@@ -674,7 +684,7 @@ mod tests {
     }
 
     #[test]
-    fn native_success_does_not_imply_physical_safe_success() {
+    fn policy_recovery_success_does_not_imply_physical_safe_success() {
         let m = manifest();
         let mut trial = sample(
             0,
@@ -695,7 +705,7 @@ mod tests {
     }
 
     #[test]
-    fn simulator_rewind_counts_in_native_metric_but_not_physical_safe_metric() {
+    fn simulator_rewind_policy_success_is_not_physical_safe_success() {
         let m = manifest();
         let mut trial = sample(
             0,
@@ -747,7 +757,7 @@ mod tests {
     }
 
     #[test]
-    fn stage_metadata_mismatch_is_not_accepted_as_native_success() {
+    fn stage_metadata_mismatch_is_not_accepted_as_policy_success() {
         let m = manifest();
         let mut trial = sample(
             0,
@@ -977,6 +987,48 @@ mod tests {
         assert_eq!(report.policy_recovery_successes, 0);
         assert_eq!(report.unknown_policy_outcome_rows, 1);
         assert_eq!(report.physical_safe_successes, 0);
+    }
+
+
+    #[test]
+    fn robo_twin_environment_success_without_policy_inference_is_replay_preemption() {
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.source_status = "infer_ok".to_owned();
+        trial.inference_steps = 0;
+        trial.source_terminal_success = Some(true);
+
+        assert_eq!(
+            classify_policy_completion(&trial),
+            PolicyCompletion::ReplayPreempted
+        );
+        assert_eq!(source_reports_environment_completion(&trial), Some(true));
+    }
+
+    #[test]
+    fn policy_success_status_with_non_success_terminal_record_is_contradictory() {
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskFailed,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.source_status = "infer_ok".to_owned();
+        trial.inference_steps = 2;
+        trial.source_terminal_success = Some(true);
+
+        assert_eq!(
+            classify_policy_completion(&trial),
+            PolicyCompletion::Contradictory
+        );
     }
 
 }
