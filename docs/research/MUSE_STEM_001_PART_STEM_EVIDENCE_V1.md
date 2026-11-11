@@ -1,6 +1,6 @@
 # MUSE-STEM-001 — Part-isolated audio evidence contract (V1)
 
-**Status:** research contract and schema; no runtime validator or renderer integration is claimed  
+**Status:** V1 contract/schema plus authored Rust validator and track-scoped observation path; exact-head execution and acoustic qualification remain pending  
 **Date:** 11 November 2026  
 **Parent:** [#11389 — verify rendered audio against the symbolic score](https://github.com/Luminous-Dynamics/symthaea/issues/11389)  
 **Builds on:** [PR #11541 — part-aware MIDI realization](https://github.com/Luminous-Dynamics/symthaea/pull/11541), [PR #11564 — provenance-bound audio pitch observations](https://github.com/Luminous-Dynamics/symthaea/pull/11564)
@@ -125,7 +125,7 @@ The common clock is a structural alignment contract, not evidence that the rende
 
 ## Admission and verification procedure
 
-The future Rust validator should perform these steps in order:
+The V1 Rust validator in `part_stem_evidence.rs` implements these admission steps in order; it still requires exact-head compilation, formatting, test and mutation-test execution before the implementation can be considered qualified:
 
 1. **Schema:** reject unknown fields, wrong schema IDs, malformed digests, empty identities, invalid ranges, and empty stem sets.
 2. **Source binding:** verify the exact Score, MIDI bytes and MIDI-manifest digests; verify the MIDI artifact against its source manifest.
@@ -199,9 +199,9 @@ A fair comparison should therefore report separate scorecards for (a) full-song 
 
 ## Integration and sequencing
 
-1. **This contract:** freeze schema, event-set digest recipe, common clock and negative controls.
-2. **Rust validator:** validate bundle/schema/source/track/asset/WAV identities with bounded inputs and deterministic receipts.
-3. **Stem-scoped observations:** reuse the existing pitch-energy observer on only the notes belonging to the selected stem; preserve its current caveat that spectral support is not note attribution.
+1. **Contract and schema:** frozen in this programme, including event-set digest recipe, common clock and negative controls.
+2. **Rust admission implementation:** authored in `part_stem_evidence.rs`; exact-head build/test and broader mutation coverage remain pending.
+3. **Stem-scoped observations:** authored in `audio_event_observation.rs`, with `observe_rendered_audio_stem_events_v1` and `validate_audio_stem_event_observation_v1` restricting analysis to one exact MIDI track. `validate_and_observe_part_stem_v1` composes structural admission and the stem-scoped observation. Spectral support remains an observation, not proof of note source or audibility.
 4. **Independent transcription:** evaluate SheetSage2 or another permitted transcription model against the exact MIDI source, using #11597's model-agnostic evaluator and matched fixtures.
 5. **Timing:** add separately calibrated onset/offset detection; retain `NOT_ESTIMABLE` when attack/release cannot be distinguished from patch envelope or overlapping same-part material.
 6. **Mix consistency:** only after the renderer's routing/mastering path is pinned, compare the stem-derived mix with the published mix under an explicit summing/mastering contract.
@@ -213,4 +213,4 @@ Adjacent programmes remain authoritative for their own concerns: #11389 for end-
 
 A valid bundle proves that its manifest consistently binds named, isolated WAV artifacts to a source-bound MIDI track set and a declared renderer/asset/configuration identity. It does **not** prove that the renderer actually used the declared binary or assets, that the acoustic signal is perceptually correct, that a patch sounds like its named instrument, or that a musician would approve the result. Those require independent execution observation, calibrated acoustic measurements, and human review.
 
-**Exit condition:** a Rust validator admits a complete part/segment stem set only when source MIDI identity, track-event identity, renderer/asset evidence, WAV bytes and common-clock properties reconcile exactly; all frozen negative controls reject; and the admitted stems can be consumed by the downstream audio-observation and transcription evaluators without inventing part attribution.
+**Exit condition:** the authored Rust validator and stem-scoped observer compile and pass exact-head positive/negative tests, schema validation and mutation testing; a complete part/segment stem set is admitted only when source MIDI identity, track-event identity, renderer/asset declarations, WAV bytes and common-clock properties reconcile; and independent acoustic evaluation is calibrated separately. The current source and test cases are authored, but this exit condition is not yet met because Rust execution has not occurred.
