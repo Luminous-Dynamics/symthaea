@@ -56,6 +56,7 @@ struct JoinReport {
     join_id: Option<String>,
     disposition: &'static str,
     context_links_valid: bool,
+    timebase_binding_valid: bool,
     source_record_statuses: Vec<String>,
     claim_ceiling: &'static str,
     diagnostics: Vec<Diagnostic>,
@@ -415,10 +416,86 @@ fn check_join(join: &Value, acoustic: &Value, bio: &Value, findings: &mut Findin
     statuses
 }
 
+
+fn check_timebase_binding(
+    binding: Option<&Value>,
+    acoustic: &Value,
+    join: &Value,
+    findings: &mut Findings,
+) -> bool {
+    let Some(binding) = binding else {
+        findings.push(
+            "/timebase_binding",
+            "INCOMPLETE",
+            "acoustic-to-trial timebase binding receipt was not supplied",
+        );
+        return false;
+    };
+
+    let mut matched = true;
+    for (report_pointer, expected, label) in [
+        (
+            "/acoustic_record_id",
+            acoustic.get("record_id"),
+            "acoustic record identity",
+        ),
+        (
+            "/service_fingerprint",
+            acoustic.get("service_fingerprint"),
+            "service fingerprint",
+        ),
+        (
+            "/acoustic_raw_trace_sha256",
+            acoustic.get("raw_trace_sha256"),
+            "acoustic raw-trace digest",
+        ),
+        (
+            "/service_fingerprint",
+            join.get("service_fingerprint"),
+            "join service fingerprint",
+        ),
+    ] {
+        if binding.pointer(report_pointer) != expected {
+            findings.push(
+                "/timebase_binding",
+                "INCOMPARABLE",
+                format!("timebase binding receipt does not match the linked {label}"),
+            );
+            matched = false;
+        }
+    }
+
+    if binding.get("binding_valid").and_then(Value::as_bool) != Some(true) {
+        let disposition = binding.get("disposition").and_then(Value::as_str).unwrap_or("unknown");
+        let code = match disposition {
+            "INVALID" => "INVALID",
+            "INCOMPARABLE" => "INCOMPARABLE",
+            _ => "INCOMPLETE",
+        };
+        findings.push(
+            "/timebase_binding/binding_valid",
+            code,
+            "shared-clock binding is absent, unresolved or not structurally valid",
+        );
+        matched = false;
+    }
+    if binding.get("common_reference_clock_id").and_then(Value::as_str).is_none_or(str::is_empty)
+        || binding.get("acoustic_timebase_id").and_then(Value::as_str).is_none_or(str::is_empty)
+    {
+        findings.push(
+            "/timebase_binding",
+            "INCOMPLETE",
+            "binding receipt does not identify the common reference clock and acoustic timebase",
+        );
+        matched = false;
+    }
+    matched
+}
+
 fn run() -> Result<i32, String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 7 {
-        return Err("usage: marine-hull-state-evidence-join-audit <join.schema.json> <join.json> <acoustic.schema.json> <acoustic.json> <bio.schema.json> <bio.json>".to_owned());
+    if args.len() != 7 && args.len() != 8 {
+        return Err("usage: marine-hull-state-evidence-join-audit <join.schema.json> <join.json> <acoustic.schema.json> <acoustic.json> <bio.schema.json> <bio.json> [timebase-binding-report.json]".to_owned());
     }
     let join_schema = read_json(&args[1])?;
     let join = read_json(&args[2])?;
@@ -426,6 +503,11 @@ fn run() -> Result<i32, String> {
     let acoustic = read_json(&args[4])?;
     let bio_schema = read_json(&args[5])?;
     let bio = read_json(&args[6])?;
+    let binding_report = if args.len() == 8 {
+        Some(read_json(&args[7])?)
+    } else {
+        None
+    };
 
     let mut findings = Findings::default();
     validate_schema(&join_schema, &join, "join", &mut findings);
@@ -433,6 +515,8 @@ fn run() -> Result<i32, String> {
     validate_schema(&bio_schema, &bio, "biofouling", &mut findings);
     let statuses = check_join(&join, &acoustic, &bio, &mut findings);
     let context_links_valid = !findings.invalid && !findings.incomparable;
+    let timebase_binding_valid =
+        check_timebase_binding(binding_report.as_ref(), &acoustic, &join, &mut findings);
 
     let report = JoinReport {
         auditor: "marine-hull-state-evidence-join-audit",
@@ -440,8 +524,9 @@ fn run() -> Result<i32, String> {
         join_id: join.get("join_id").and_then(Value::as_str).map(str::to_owned),
         disposition: findings.disposition(),
         context_links_valid,
+        timebase_binding_valid,
         source_record_statuses: statuses,
-        claim_ceiling: "Identity, service, trace-reference and event-time join checks only. A context join is not source authenticity, calibration qualification, causal inference, measured fuel reduction, acoustic reduction, organism identification or ecological impact evidence.",
+        claim_ceiling: "Identity, service, trace-reference, shared-clock/timebase and event-time join checks only. A context join is not source authenticity, calibration qualification, causal inference, measured fuel reduction, acoustic reduction, organism identification or ecological impact evidence.",
         diagnostics: findings.diagnostics,
     };
 
