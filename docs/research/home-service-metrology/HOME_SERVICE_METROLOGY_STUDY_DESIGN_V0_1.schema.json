@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/home-service-metrology-study-design-v0.1/docs/research/home-service-metrology/HOME_SERVICE_METROLOGY_STUDY_DESIGN_V0_1.schema.json",
+  "title": "Home Service Metrology Study Design Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_design_id",
+    "parent_issue",
+    "classification",
+    "claim_ceiling",
+    "product_scope",
+    "evidence_strata",
+    "confirmatory_holdouts",
+    "analysis_contract",
+    "comparison_contract",
+    "evidence_and_rights",
+    "design_state",
+    "planned_counts",
+    "power_analysis",
+    "protocol_digest",
+    "result"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "luminous.home-service-metrology-study-design/0.1"
+    },
+    "study_design_id": {
+      "const": "HOME-SVC-METROLOGY-STUDY-DESIGN-V0.1"
+    },
+    "parent_issue": {
+      "const": "https://github.com/Luminous-Dynamics/symthaea/issues/10341"
+    },
+    "classification": {
+      "const": "requirements_template_only_not_preregistered"
+    },
+    "claim_ceiling": {
+      "const": "study_design_contract_and_synthetic_gate_only"
+    },
+    "product_scope": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_strata": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "unit_of_analysis",
+          "required_identity",
+          "required_controls"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "WITHIN_UNIT_REPEATABILITY",
+              "BETWEEN_LAB_REPRODUCIBILITY",
+              "PRODUCTION_UNIT_VARIATION",
+              "HOUSEHOLD_ECOLOGICAL_VALIDITY"
+            ]
+          },
+          "unit_of_analysis": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minimum_replicates_per_cell": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "minimum_independent_labs": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "minimum_production_lots": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "minimum_units_per_lot": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "minimum_households": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "minimum_duty_cycle_profiles": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "required_identity": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_controls": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "confirmatory_holdouts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_laboratories_required",
+        "production_lots_required",
+        "households_or_sites_required",
+        "reuse_for_adaptive_tuning"
+      ],
+      "properties": {
+        "independent_laboratories_required": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "production_lots_required": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "households_or_sites_required": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reuse_for_adaptive_tuning": {
+          "const": false
+        }
+      }
+    },
+    "analysis_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_size_policy",
+        "model_family",
+        "required_variance_components",
+        "fixed_effects_required",
+        "cluster_nesting_required",
+        "randomization_required",
+        "assessor_blinding_or_independent_adjudication_required",
+        "exclusion_rules_preregistered",
+        "missingness_and_denominator_policy_preregistered",
+        "outlier_rule_preregistered",
+        "deviation_log_required",
+        "independent_analysis_code_digest_required"
+      ],
+      "properties": {
+        "sample_size_policy": {
+          "const": "preregistered_power_or_precision_analysis_from_pilot_variance_components"
+        },
+        "model_family": {
+          "const": "hierarchical_or_cluster_aware"
+        },
+        "required_variance_components": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "fixed_effects_required": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "cluster_nesting_required": {
+          "const": true
+        },
+        "randomization_required": {
+          "const": true
+        },
+        "assessor_blinding_or_independent_adjudication_required": {
+          "const": true
+        },
+        "exclusion_rules_preregistered": {
+          "const": true
+        },
+        "missingness_and_denominator_policy_preregistered": {
+          "const": true
+        },
+        "outlier_rule_preregistered": {
+          "const": true
+        },
+        "deviation_log_required": {
+          "const": true
+        },
+        "independent_analysis_code_digest_required": {
+          "const": true
+        }
+      }
+    },
+    "comparison_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "same_protocol_digest_across_arms",
+        "exact_product_model_and_revision_pinned",
+        "same_exogenous_trace_and_conditions",
+        "same_primary_endpoint_and_functional_unit",
+        "compute_human_time_and_adaptation_budgets_frozen",
+        "holdout_not_used_for_tuning",
+        "hard_safety_service_accessibility_and_consent_floors_noncompensatory",
+        "no_single_scalar_score"
+      ],
+      "properties": {
+        "same_protocol_digest_across_arms": {
+          "const": true
+        },
+        "exact_product_model_and_revision_pinned": {
+          "const": true
+        },
+        "same_exogenous_trace_and_conditions": {
+          "const": true
+        },
+        "same_primary_endpoint_and_functional_unit": {
+          "const": true
+        },
+        "compute_human_time_and_adaptation_budgets_frozen": {
+          "const": true
+        },
+        "holdout_not_used_for_tuning": {
+          "const": true
+        },
+        "hard_safety_service_accessibility_and_consent_floors_noncompensatory": {
+          "const": true
+        },
+        "no_single_scalar_score": {
+          "const": true
+        }
+      }
+    },
+    "evidence_and_rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "current_instrument_calibration_and_method_scope_required",
+        "source_payload_and_sample_lineage_required",
+        "participant_consent_and_withdrawal_required",
+        "purpose_bound_data_use_required",
+        "right_to_withdraw_and_correct_required"
+      ],
+      "properties": {
+        "current_instrument_calibration_and_method_scope_required": {
+          "const": true
+        },
+        "source_payload_and_sample_lineage_required": {
+          "const": true
+        },
+        "participant_consent_and_withdrawal_required": {
+          "const": true
+        },
+        "purpose_bound_data_use_required": {
+          "const": true
+        },
+        "right_to_withdraw_and_correct_required": {
+          "const": true
+        }
+      }
+    },
+    "design_state": {
+      "const": "NOT_PREREGISTERED"
+    },
+    "planned_counts": {
+      "const": "NOT_SELECTED"
+    },
+    "power_analysis": {
+      "const": "NOT_PERFORMED"
+    },
+    "protocol_digest": {
+      "const": "NOT_CREATED"
+    },
+    "result": {
+      "const": "NO_STUDY_AUTHORITY"
+    }
+  }
+}
