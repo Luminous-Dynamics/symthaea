@@ -20,7 +20,7 @@ use crate::observer::{
 };
 use crate::{
     DEFAULT_CROSSFADE_MS, DEFAULT_SAMPLE_RATE_HZ, EditPatch, RENDERER_BACKEND_ID,
-    SampleRange, SyntheticSegmentSpec, apply_edit, default_segments, render_phrase,
+    SyntheticSegmentSpec, apply_edit, default_segments, render_phrase,
     sha256_bytes, sha256_pcm,
 };
 
