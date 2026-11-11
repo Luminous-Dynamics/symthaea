@@ -125,6 +125,8 @@ The module includes negative controls for malformed probability models, determin
 
 The selector is a reference baseline, not a claim of general optimality. In a real trial, posterior probabilities, likelihood calibration, utility functions and risk weights must be supplied from information available to the agent before observing the outcome. The hidden ACED SCM, oracle fix and grader must never be used to fit or backfill those values.
 
+The experiment-plan artifact is separately defined by `ACED_EXPERIMENT_PLAN_V0_1.schema.json`, with a synthetic fixture at `qualifier/tests/fixtures/aced_experiment_plan_v0_1.json`. The Rust library exposes `validate_experiment_plan` and `validate_trace_with_plans(trace, plan_artifacts)`: it validates the closed nested plan fields, recomputes the canonical SHA-256 from the supplied plan object, resolves every proposal digest to exactly one supplied plan, and requires `experiment_id == plan_id`. Substituted controls/interventions, a missing plan artifact or a mismatched plan ID fail closed. This validates the supplied artifact and trace relationship; it does not prove that the proposal was timestamped before execution or that the external runner executed the plan faithfully.
+
 ## Prospective experiment-value trace
 
 The reusable Rust library now also exports `experiment_trace`. Its trace contract records three event types:
