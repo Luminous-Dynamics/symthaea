@@ -69,3 +69,7 @@ path = "src/bin/marine_biofouling_evidence_audit.rs"
 [[bin]]
 name = "marine-hull-state-evidence-join-audit"
 path = "src/bin/marine_hull_state_evidence_join_audit.rs"
+
+[[bin]]
+name = "marine-acoustic-timebase-binding-audit"
+path = "src/bin/marine_acoustic_timebase_binding_audit.rs"
