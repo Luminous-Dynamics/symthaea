@@ -126,3 +126,8 @@ This motivates two additional synthetic controls:
 - DI19: fleet batching with separate p99 latency for priority and low-priority requests; critical tasks can be admitted while low-priority tasks are explicitly deferred or assigned local fallback.
 
 A whole-system claim must not silently treat edge/cloud/network energy as zero. Incomplete accounting remains Unknown even when the remote result is timely and useful.
+
+
+## Thermal mission boundary
+
+The offload benchmark now composes with [Symtropy #4689](https://github.com/Luminous-Dynamics/symtropy/issues/4689) for quadruped missions. Remote deliberation may overlap with local locomotion, but every elapsed interval contributes to physical state evolution. Compute/edge/network heat and energy are included only when instrumented and model-qualified. A remote result remains a proposal and cannot pause or replace local safety, RTA, action projection or safe-stop.
