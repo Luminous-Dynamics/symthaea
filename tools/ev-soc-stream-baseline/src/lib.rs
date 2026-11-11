@@ -45,11 +45,19 @@ impl Config {
             return Err("UNSUPPORTED_CONFIG_VERSION".into());
         }
         let values = [
-            self.initial_soc, self.initial_soc_bound, self.capacity_ah,
-            self.capacity_uncertainty_ah, self.current_bias_a,
-            self.current_bias_uncertainty_a, self.current_measurement_uncertainty_a,
-            self.charge_efficiency, self.discharge_efficiency, self.voltage_min_v,
-            self.voltage_max_v, self.temperature_min_c, self.temperature_max_c,
+            self.initial_soc,
+            self.initial_soc_bound,
+            self.capacity_ah,
+            self.capacity_uncertainty_ah,
+            self.current_bias_a,
+            self.current_bias_uncertainty_a,
+            self.current_measurement_uncertainty_a,
+            self.charge_efficiency,
+            self.discharge_efficiency,
+            self.voltage_min_v,
+            self.voltage_max_v,
+            self.temperature_min_c,
+            self.temperature_max_c,
         ];
         if values.iter().any(|value| !value.is_finite()) {
             return Err("NON_FINITE_CONFIG_VALUE".into());
@@ -66,9 +74,7 @@ impl Config {
         {
             return Err("INVALID_CAPACITY_OR_UNCERTAINTY".into());
         }
-        if self.current_bias_uncertainty_a < 0.0
-            || self.current_measurement_uncertainty_a < 0.0
-        {
+        if self.current_bias_uncertainty_a < 0.0 || self.current_measurement_uncertainty_a < 0.0 {
             return Err("INVALID_CURRENT_UNCERTAINTY".into());
         }
         if !(0.0..=1.0).contains(&self.charge_efficiency)
@@ -78,14 +84,13 @@ impl Config {
         {
             return Err("INVALID_COULOMBIC_EFFICIENCY".into());
         }
-        if self.voltage_min_v <= 0.0 || self.voltage_max_v <= self.voltage_min_v
+        if self.voltage_min_v <= 0.0
+            || self.voltage_max_v <= self.voltage_min_v
             || self.temperature_max_c <= self.temperature_min_c
         {
             return Err("INVALID_OPERATING_DOMAIN".into());
         }
-        if self.identity.vehicle_ref.trim().is_empty()
-            || self.identity.pack_ref.trim().is_empty()
-        {
+        if self.identity.vehicle_ref.trim().is_empty() || self.identity.pack_ref.trim().is_empty() {
             return Err("MISSING_ASSET_IDENTITY".into());
         }
         for digest in [
@@ -216,8 +221,8 @@ impl Estimator {
         }
 
         let corrected_current = sample.current_a - self.config.current_bias_a;
-        let current_radius = self.config.current_measurement_uncertainty_a
-            + self.config.current_bias_uncertainty_a;
+        let current_radius =
+            self.config.current_measurement_uncertainty_a + self.config.current_bias_uncertainty_a;
         let current_bounds = [
             corrected_current - current_radius,
             corrected_current + current_radius,
@@ -231,7 +236,8 @@ impl Estimator {
         for current in current_bounds {
             for capacity in capacity_bounds {
                 let delta = soc_delta(
-                    current, capacity,
+                    current,
+                    capacity,
                     self.config.charge_efficiency,
                     self.config.discharge_efficiency,
                 );
@@ -240,19 +246,26 @@ impl Estimator {
             }
         }
         let nominal_delta = soc_delta(
-            corrected_current, self.config.capacity_ah,
-            self.config.charge_efficiency, self.config.discharge_efficiency,
+            corrected_current,
+            self.config.capacity_ah,
+            self.config.charge_efficiency,
+            self.config.discharge_efficiency,
         );
         let next_soc = self.state.soc + nominal_delta;
-        if !delta_min.is_finite() || !delta_max.is_finite()
-            || !next_soc.is_finite() || !(0.0..=1.0).contains(&next_soc)
+        if !delta_min.is_finite()
+            || !delta_max.is_finite()
+            || !next_soc.is_finite()
+            || !(0.0..=1.0).contains(&next_soc)
         {
             return abstain("SOC_BOUNDARY_OR_NUMERIC_FAILURE", &self.state);
         }
         let lower = (self.state.lower_bound + delta_min).max(0.0);
         let upper = (self.state.upper_bound + delta_max).min(1.0);
-        if !lower.is_finite() || !upper.is_finite()
-            || lower > upper + EPS || next_soc < lower - EPS || next_soc > upper + EPS
+        if !lower.is_finite()
+            || !upper.is_finite()
+            || lower > upper + EPS
+            || next_soc < lower - EPS
+            || next_soc > upper + EPS
         {
             return abstain("INVALID_PROPAGATED_INTERVAL", &self.state);
         }
@@ -329,15 +342,17 @@ pub struct AuditReport {
 }
 
 pub fn audit_corpus(bytes: &[u8]) -> Result<AuditReport, String> {
-    let mut corpus: Corpus = serde_json::from_slice(bytes)
-        .map_err(|error| format!("INVALID_CORPUS:{error}"))?;
+    let mut corpus: Corpus =
+        serde_json::from_slice(bytes).map_err(|error| format!("INVALID_CORPUS:{error}"))?;
     if corpus.corpus_version != CORPUS_VERSION || corpus.cases.is_empty() {
         return Err("UNSUPPORTED_OR_EMPTY_CORPUS".into());
     }
     corpus.cases.sort_by(|a, b| a.case_id.cmp(&b.case_id));
     let mut ids = BTreeSet::new();
-    if corpus.cases.iter().any(|case| case.case_id.trim().is_empty()
-        || !ids.insert(case.case_id.clone()))
+    if corpus
+        .cases
+        .iter()
+        .any(|case| case.case_id.trim().is_empty() || !ids.insert(case.case_id.clone()))
     {
         return Err("EMPTY_OR_DUPLICATE_CASE_ID".into());
     }
@@ -366,8 +381,10 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<AuditReport, String> {
 }
 
 fn audit_case(case: &Case) -> Result<CaseResult, String> {
-    if case.samples.is_empty() || !case.truth_initial_soc.is_finite()
-        || !case.truth_capacity_ah.is_finite() || case.truth_capacity_ah <= 0.0
+    if case.samples.is_empty()
+        || !case.truth_initial_soc.is_finite()
+        || !case.truth_capacity_ah.is_finite()
+        || case.truth_capacity_ah <= 0.0
     {
         return Err(format!("INVALID_FIXTURE_TRUTH:{}", case.case_id));
     }
@@ -385,8 +402,8 @@ fn audit_case(case: &Case) -> Result<CaseResult, String> {
     let mut truth_covered = true;
     for step in &case.samples {
         if step.sample.current_valid {
-            let residual = (step.sample.current_a - case.config.current_bias_a
-                - step.truth_current_a).abs();
+            let residual =
+                (step.sample.current_a - case.config.current_bias_a - step.truth_current_a).abs();
             let allowance = case.config.current_measurement_uncertainty_a
                 + case.config.current_bias_uncertainty_a;
             if residual > allowance + EPS {
@@ -397,10 +414,13 @@ fn audit_case(case: &Case) -> Result<CaseResult, String> {
         match estimator.update(&step.sample) {
             Outcome::Updated(estimate) => {
                 truth_soc += soc_delta(
-                    step.truth_current_a, case.truth_capacity_ah,
-                    case.config.charge_efficiency, case.config.discharge_efficiency,
+                    step.truth_current_a,
+                    case.truth_capacity_ah,
+                    case.config.charge_efficiency,
+                    case.config.discharge_efficiency,
                 );
-                let expected_truth = step.truth_soc
+                let expected_truth = step
+                    .truth_soc
                     .ok_or_else(|| format!("MISSING_STEP_TRUTH:{}", case.case_id))?;
                 if (truth_soc - expected_truth).abs() > 1e-10
                     || truth_soc < estimate.lower_bound - EPS
@@ -410,7 +430,10 @@ fn audit_case(case: &Case) -> Result<CaseResult, String> {
                     return Err(format!("TRUTH_OUTSIDE_ESTIMATED_INTERVAL:{}", case.case_id));
                 }
             }
-            Outcome::Abstained { reason: why, retained } => {
+            Outcome::Abstained {
+                reason: why,
+                retained,
+            } => {
                 if retained != before {
                     return Err(format!("ABSTENTION_MUTATED_STATE:{}", case.case_id));
                 }
@@ -419,18 +442,26 @@ fn audit_case(case: &Case) -> Result<CaseResult, String> {
             }
         }
     }
-    let disposition = if reason.is_some() { "abstain" } else { "estimated" };
+    let disposition = if reason.is_some() {
+        "abstain"
+    } else {
+        "estimated"
+    };
     if case.expected_disposition != disposition {
         return Err(format!("DISPOSITION_MISMATCH:{}", case.case_id));
     }
     if disposition == "estimated" {
-        let expected = case.expected_final_soc
+        let expected = case
+            .expected_final_soc
             .ok_or_else(|| format!("MISSING_EXPECTED_FINAL_SOC:{}", case.case_id))?;
         let tolerance = case.expected_tolerance.unwrap_or(EPS);
         if (estimator.estimate().soc - expected).abs() > tolerance
             || case.expected_abstention_reason.is_some()
         {
-            return Err(format!("FINAL_SOC_OR_EXPECTATION_MISMATCH:{}", case.case_id));
+            return Err(format!(
+                "FINAL_SOC_OR_EXPECTATION_MISMATCH:{}",
+                case.case_id
+            ));
         }
     } else if reason.as_deref() != case.expected_abstention_reason.as_deref()
         || case.expected_final_soc.is_some()
@@ -447,7 +478,10 @@ fn audit_case(case: &Case) -> Result<CaseResult, String> {
 }
 
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -463,7 +497,8 @@ fn sha256(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    const CORPUS: &[u8] = include_bytes!("../../../fixtures/ev_battery/soc_stream_scenarios_v0_1.json");
+    const CORPUS: &[u8] =
+        include_bytes!("../../../fixtures/ev_battery/soc_stream_scenarios_v0_1.json");
 
     fn report() -> AuditReport {
         audit_corpus(CORPUS).expect("frozen known-truth SOC corpus")
@@ -482,8 +517,16 @@ mod tests {
     #[test]
     fn current_sign_convention_is_charge_positive_and_discharge_negative() {
         let result = report();
-        let charge = result.cases.iter().find(|case| case.case_id == "positive-current-charge").unwrap();
-        let discharge = result.cases.iter().find(|case| case.case_id == "negative-current-discharge").unwrap();
+        let charge = result
+            .cases
+            .iter()
+            .find(|case| case.case_id == "positive-current-charge")
+            .unwrap();
+        let discharge = result
+            .cases
+            .iter()
+            .find(|case| case.case_id == "negative-current-discharge")
+            .unwrap();
         assert!(charge.estimate.soc > 0.5);
         assert!(discharge.estimate.soc < 0.6);
     }
@@ -506,7 +549,9 @@ mod tests {
     #[test]
     fn independent_bias_calibration_is_bound_to_each_estimate() {
         let result = report();
-        let case = result.cases.iter()
+        let case = result
+            .cases
+            .iter()
             .find(|item| item.case_id == "independent-current-bias-calibration")
             .unwrap();
         assert!((case.estimate.soc - 0.7).abs() < EPS);
