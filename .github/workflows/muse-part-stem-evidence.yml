@@ -1,0 +1,84 @@
+name: MUSE Part-Stem Evidence
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-muse/src/part_stem_evidence.rs"
+      - "crates/domains/symthaea-muse/src/audio_event_observation.rs"
+      - "crates/domains/symthaea-muse/src/midi_performance.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "docs/research/MUSE_STEM_001_PART_STEM_EVIDENCE_V1.md"
+      - "docs/research/schemas/muse-part-stem-evidence-v1.schema.json"
+      - "docs/research/fixtures/muse-part-stem-evidence-v1.example.json"
+      - ".github/workflows/muse-part-stem-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-part-stem-evidence-\${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: exact-head-part-stem-qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: muse-part-stem-evidence-v1
+
+      - name: Verify checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\n' "$actual"
+
+      - name: Check package formatting
+        run: cargo fmt --package symthaea-muse -- --check
+
+      - name: Test part-stem validator
+        run: cargo test --locked -p symthaea-muse --features theory --lib part_stem_evidence::tests -- --test-threads=1
+
+      - name: Test track-scoped audio observer
+        run: cargo test --locked -p symthaea-muse --features theory --lib audio_event_observation::tests -- --test-threads=1
+
+      - name: Run package Clippy
+        run: cargo clippy --locked -p symthaea-muse --features theory --lib -- -D warnings
+
+      - name: Validate Draft 2020-12 schema and example
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'jsonschema==4.26.0'
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema_path = Path("docs/research/schemas/muse-part-stem-evidence-v1.schema.json")
+          example_path = Path("docs/research/fixtures/muse-part-stem-evidence-v1.example.json")
+          schema = json.loads(schema_path.read_text())
+          example = json.loads(example_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(example)
+          assert schema["properties"]["audio_clock"]["properties"]["frame_count"]["maximum"] == 24_000_000
+          print("schema_meta_validation=PASS")
+          print("example_validation=PASS")
+          PY
