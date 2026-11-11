@@ -201,11 +201,15 @@ pub fn validate_experiment_plan(plan: &Value) -> Result<(), String> {
         || text(primary_outcome, "scale") != Some("continuous")
         || text(primary_outcome, "estimand") != Some("difference_in_means")
         || text(primary_outcome, "unit").is_none()
-        || !measurement["variables"]
-            .as_array()
-            .is_some_and(|variables| variables.iter().any(|variable| variable.as_str() == text(primary_outcome, "variable")))
+        || !measurement["variables"].as_array().is_some_and(|variables| {
+            variables
+                .iter()
+                .any(|variable| variable.as_str() == text(primary_outcome, "variable"))
+        })
     {
-        return Err("power method requires a declared continuous primary mean-difference outcome".into());
+        return Err(
+            "power method requires a declared continuous primary mean-difference outcome".into(),
+        );
     }
 
     let sample = &plan["sample"];
@@ -477,7 +481,7 @@ fn validate_observation(
                 .ok_or_else(|| format!("observed proposal {proposal_id} lacks an outcome label"))?;
             if !prediction.outcome_probabilities.contains_key(observed_outcome) {
                 return Err(format!(
-                    "observed outcome {observed_outcome} was not in the proposal's preregistered outcome space"
+                    "observed outcome {observed_outcome} was not in the proposal's                      preregistered outcome space"
                 ));
             }
             let mut brier_score = 0.0;
@@ -500,7 +504,7 @@ fn validate_observation(
                     && finite_number(payload, "actual_cost").is_none_or(|cost| cost < 0.0))
             {
                 return Err(format!(
-                    "failed/unknown proposal {proposal_id} must not claim an observation digest or outcome"
+                    "failed/unknown proposal {proposal_id} must not claim an observation                      digest or outcome"
                 ));
             }
             Ok(None)
@@ -527,14 +531,15 @@ fn validate_stop(
         .any(|proposal_event_id| !observed_proposals.contains(proposal_event_id))
     {
         return Err(
-            "stop event cannot leave a proposed experiment without an observed, failed or unknown reconciliation event".into(),
+            "stop event cannot leave a proposed experiment without an observed, failed              or unknown reconciliation event".into(),
         );
     }
     Ok(())
 }
 
 /// Qualify append-only proposal/observation/stop events.
-/// The hash chain detects edits relative to a previously anchored event. It does not prove a trusted timestamp.
+/// The hash chain detects edits relative to a previously anchored event.
+/// It does not prove a trusted timestamp.
 pub fn validate_trace(trace: &Value) -> Result<TraceReport, Vec<String>> {
     let mut errors = Vec::new();
     if !exact_fields(trace, &["schema_version", "run_id", "events", "claim_ceiling"])
@@ -716,7 +721,7 @@ pub fn validate_trace_with_plans(
         let expected_digest = text(payload, "experiment_plan_sha256").unwrap_or("");
         let Some(plan) = plans_by_digest.get(expected_digest) else {
             errors.push(format!(
-                "proposal {event_id} references an experiment plan artifact that was not supplied or whose digest differs"
+                "proposal {event_id} references an experiment plan artifact that was not                  supplied or whose digest differs"
             ));
             continue;
         };
