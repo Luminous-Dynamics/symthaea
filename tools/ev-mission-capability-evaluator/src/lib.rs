@@ -631,7 +631,9 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
         let energy_out = worst_discharge * duration / 3600.0;
         total_discharge += energy_out;
         energy_remaining -= energy_out;
-        let energy_in = guaranteed_regen
+        let accepted_regen_lower_kw =
+            guaranteed_regen.min(slice.charge_acceptance_lower_kw);
+        let energy_in = accepted_regen_lower_kw
             * mission.regenerative_efficiency_lower
             * duration
             / 3600.0;
@@ -934,6 +936,17 @@ mod tests {
         assert!((row.total_battery_discharge_energy_kwh_upper - (0.5 * 600.0 / 3600.0)).abs() < EPS);
         assert_eq!(row.step_audits[0].worst_case_discharge_request_kw, 0.5);
         assert_eq!(row.step_audits[0].worst_case_charge_request_kw, 1.5);
+    }
+
+    #[test]
+    fn regenerative_energy_credit_is_capped_by_conservative_charge_acceptance() {
+        let report = report();
+        let row = case(&report, "regen_exceeds_charge_acceptance");
+        assert_eq!(row.disposition, "INFEASIBLE");
+        let expected = 5.0 * 0.95 * 300.0 / 3600.0;
+        assert!((row.total_regenerative_energy_credited_kwh_lower - expected).abs() < EPS);
+        assert!(row.total_regenerative_energy_credited_kwh_lower
+            < 10.0 * 0.95 * 300.0 / 3600.0);
     }
 
 }
