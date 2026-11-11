@@ -21,7 +21,7 @@
 use std::f64::consts::TAU;
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.4.0";
+pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.5.0";
 
 /// Explicit operating-point efficiencies and bus limits.
 ///
