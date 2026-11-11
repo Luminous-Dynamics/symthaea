@@ -86,3 +86,13 @@ These public results motivate the action-chunk and temporal coherence contract i
 The real-time work now includes [Symthaea #11573](https://github.com/Luminous-Dynamics/symthaea/issues/11573), a matched benchmark for onboard, edge, cloud, hybrid and fleet-shared inference. Microsoft Research's 2026 mobile-manipulation measurement study motivates the comparison: offloading can improve task performance and robot battery life, but latency, bandwidth and remote GPU availability affect the result.
 
 The test charges full capture→encoding→uplink→queue→inference→downlink→local verification/projection→admission latency. It measures robot/edge/cloud/network energy separately and requires local low-level control, RTA and safe-stop to remain functional under remote outage. The 15-case synthetic corpus is linked from the parent README and the issue.
+
+
+## Strong asynchronous WAM baselines
+
+The real-time benchmark should explicitly compare:
+- **Streaming-WAM** (Huang et al., arXiv:2609.28927): action-conditioned world prediction that accounts for the committed prefix while the next chunk is prepared; the project reports 41 ms LIBERO chunk time and 98.35% LIBERO average success in its H100 experiment.
+- **AHA-WAM** (arXiv:2606.09811): slow low-frequency world context with a high-frequency action expert; reports 24.17 Hz and 92.80% RoboTwin average success in the authors' setup.
+- **StreamingWAM** (Ren et al., arXiv:2610.15585): separate chunk-wise staircase-flow method; reports 57.3 ms real-robot replanning latency.
+
+These are distinct papers and training/robot setups. Compare on the same task/robot/hardware when feasible; otherwise keep results as external reference strata. A Luminous ablation should separate the value of multi-timescale context, action-prefix conditioning and the independent temporal-assurance gate.
