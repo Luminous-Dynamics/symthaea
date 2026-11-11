@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/aced-adapter-001/ACED_QUERY_SOURCE_MANIFEST_V0_1.schema.json",
+  "title": "ACED-Query source manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "upstream",
+    "artifacts",
+    "track_counts",
+    "distributions",
+    "split_relationships",
+    "candidate_data_boundary",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "aced-query-source-manifest-v0.1"
+    },
+    "benchmark_id": {
+      "const": "ACED-QUERY-ADAPTER-001"
+    },
+    "status": {
+      "const": "pinned_query_metadata_only_no_candidate_world_payloads"
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "license",
+        "paper",
+        "paper_revision",
+        "paper_revision_date"
+      ],
+      "properties": {
+        "repository": {
+          "const": "https://github.com/Rose-STL-Lab/ACED-Bench"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "license": {
+          "const": "MIT"
+        },
+        "paper": {
+          "const": "https://arxiv.org/abs/2610.14381"
+        },
+        "paper_revision": {
+          "const": "v2"
+        },
+        "paper_revision_date": {
+          "const": "2026-11-08"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inventory_path",
+        "inventory_sha256",
+        "upstream_checksums_path",
+        "upstream_checksums_git_blob_sha",
+        "upstream_checksums_sha256"
+      ],
+      "properties": {
+        "inventory_path": {
+          "const": "research/aced-adapter-001/upstream/aced_query_world_inventory.json"
+        },
+        "inventory_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "upstream_checksums_path": {
+          "const": "data/SHA256SUMS"
+        },
+        "upstream_checksums_git_blob_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "upstream_checksums_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "track_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core_struct",
+        "core_decision",
+        "guess_struct",
+        "guess_decision"
+      ],
+      "properties": {
+        "core_struct": {
+          "type": "integer",
+          "minimum": 0,
+          "const": 10
+        },
+        "core_decision": {
+          "type": "integer",
+          "minimum": 0,
+          "const": 60
+        },
+        "guess_struct": {
+          "type": "integer",
+          "minimum": 0,
+          "const": 30
+        },
+        "guess_decision": {
+          "type": "integer",
+          "minimum": 0,
+          "const": 48
+        }
+      }
+    },
+    "distributions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core_struct",
+        "core_decision",
+        "guess_struct",
+        "guess_decision"
+      ],
+      "properties": {
+        "core_struct": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "domains",
+            "families"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "const": 10
+            },
+            "domains": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "families": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "core_decision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "domains",
+            "families"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "const": 60
+            },
+            "domains": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "families": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "guess_struct": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "domains",
+            "families"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "const": 30
+            },
+            "domains": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "families": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "guess_decision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "domains",
+            "families"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "const": 48
+            },
+            "domains": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "families": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "split_relationships": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core_struct_guess_struct_exact_content_overlap",
+        "core_decision_guess_decision_exact_content_overlap",
+        "total_track_entries",
+        "unique_payload_sha256_count",
+        "uniqueness_note"
+      ],
+      "properties": {
+        "core_struct_guess_struct_exact_content_overlap": {
+          "type": "integer",
+          "const": 10
+        },
+        "core_decision_guess_decision_exact_content_overlap": {
+          "type": "integer",
+          "const": 0
+        },
+        "total_track_entries": {
+          "type": "integer",
+          "const": 148
+        },
+        "unique_payload_sha256_count": {
+          "type": "integer",
+          "const": 138
+        },
+        "uniqueness_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "candidate_data_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "copied_payloads",
+        "candidate_visible_world_files",
+        "files_are_metadata_only",
+        "metadata_fields",
+        "evaluator_note"
+      ],
+      "properties": {
+        "copied_payloads": {
+          "const": false
+        },
+        "candidate_visible_world_files": {
+          "const": false
+        },
+        "files_are_metadata_only": {
+          "const": true
+        },
+        "metadata_fields": {
+          "type": "array",
+          "minItems": 11,
+          "items": {
+            "type": "string"
+          }
+        },
+        "evaluator_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
