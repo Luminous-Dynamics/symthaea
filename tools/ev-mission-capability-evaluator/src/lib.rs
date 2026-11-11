@@ -785,8 +785,8 @@ mod tests {
     #[test]
     fn frozen_corpus_replays_expected_mission_dispositions() {
         let report = report();
-        assert_eq!(report.case_count, 10);
-        assert_eq!(report.feasible_count, 3);
+        assert_eq!(report.case_count, 11);
+        assert_eq!(report.feasible_count, 4);
         assert_eq!(report.infeasible_count, 3);
         assert_eq!(report.not_computable_count, 1);
         assert_eq!(report.unsupported_domain_count, 1);
@@ -923,6 +923,17 @@ mod tests {
         assert_eq!(row.limiting_cell_ref, None);
         assert_eq!(row.step_audits[0].limiting_cell_ref, None);
         assert!(row.step_audits[0].hottest_cell_ref.is_some());
+    }
+
+    #[test]
+    fn power_uncertainty_straddling_zero_gets_no_regen_credit() {
+        let report = report();
+        let row = case(&report, "power_uncertainty_straddles_zero_no_regen_credit");
+        assert_eq!(row.disposition, "FEASIBLE_WITHIN_DECLARED_ENVELOPE");
+        assert_eq!(row.total_regenerative_energy_credited_kwh_lower, 0.0);
+        assert!((row.total_battery_discharge_energy_kwh_upper - (0.5 * 600.0 / 3600.0)).abs() < EPS);
+        assert_eq!(row.step_audits[0].worst_case_discharge_request_kw, 0.5);
+        assert_eq!(row.step_audits[0].worst_case_charge_request_kw, 1.5);
     }
 
 }
