@@ -274,6 +274,7 @@ pub fn validate_trace(trace: &Value) -> Result<TraceReport, Vec<String>> {
     let mut previous_hash = GENESIS_SHA256.to_string();
     let mut event_ids = BTreeSet::new();
     let mut proposals = BTreeMap::<String, String>::new();
+    let mut experiment_ids = BTreeSet::<String>::new();
     let mut observed_proposals = BTreeSet::<String>::new();
     let mut stopped = false;
     let mut report = TraceReport::default();
@@ -332,13 +333,12 @@ pub fn validate_trace(trace: &Value) -> Result<TraceReport, Vec<String>> {
                 }
                 match validate_proposal(payload) {
                     Ok(experiment_id) => {
-                        if proposals
-                            .insert(experiment_id.clone(), event_id.to_string())
-                            .is_some()
-                        {
+                        if !experiment_ids.insert(experiment_id.clone()) {
                             errors.push(format!("duplicate experiment proposal {experiment_id}"));
+                        } else {
+                            proposals.insert(event_id.to_string(), experiment_id);
+                            report.proposal_count += 1;
                         }
-                        report.proposal_count += 1;
                     }
                     Err(error) => errors.push(format!("event {event_id}: {error}")),
                 }
