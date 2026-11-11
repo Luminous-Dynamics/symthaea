@@ -43,6 +43,8 @@ Every case binds:
 - per-constraint measurement references, digests, units and observed values; each measurement reference and mission report reference must be unique within the audit corpus;
 - sensor identity plus calibration reference/digest for each physical measurement, with measurement time after prediction freeze and no later than the reference observation time.
 
+The audit consumes the full frozen split-manifest payload, not merely a caller-supplied digest string. It sorts assignments canonically, recomputes SHA-256 over the manifest reference, freeze timestamp and pack/group assignments, then verifies each prediction's manifest reference/digest, freeze timestamp, exact vehicle/pack/configuration/topology and TEST_BLIND partition. Physical-group IDs may not appear more than once in the assignment manifest, which prevents one pack/group from straddling train, calibration and test partitions. The report emits the manifest reference/digest and total, TEST_BLIND and non-TEST_BLIND assignment counts so reviewers can inspect the actual split receipt.
+
 The reference must bind to the *same* physical asset/configuration/topology and mission-profile digest as the prediction. A near-match, another pack, a different firmware/configuration or a different mission profile is not a valid reference.
 
 Each observed constraint is replayed against the frozen limit:
