@@ -12,6 +12,7 @@ pub enum BoundKind {
     Proposal,
     Freshness,
     Deadline,
+    Risk,
     Thermal,
     Actuator,
     Dynamics,
@@ -25,6 +26,7 @@ impl BoundKind {
         Self::Proposal,
         Self::Freshness,
         Self::Deadline,
+        Self::Risk,
         Self::Thermal,
         Self::Actuator,
         Self::Dynamics,
@@ -135,7 +137,7 @@ pub struct HorizonRequest {
     pub executed_prefix_matches: bool,
     pub minimum_commit_ticks: u32,
     /// Bounds must be in the canonical order declared by BoundKind::ALL.
-    pub bounds: [HorizonBound; 9],
+    pub bounds: [HorizonBound; 10],
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -159,7 +161,7 @@ impl HorizonDecision {
     }
 }
 
-/// Select the maximum eligible prefix as the minimum of nine qualified caps.
+/// Select the maximum eligible prefix as the minimum of ten qualified caps.
 ///
 /// A positive result means only "EligibleForIndependentProjection". Every
 /// bound must be qualified, finite, prefix-closed, and tied to the same
@@ -187,7 +189,7 @@ pub fn select_commitment_horizon(request: &HorizonRequest) -> HorizonDecision {
         });
     }
 
-    let mut caps = [0_u32; 9];
+    let mut caps = [0_u32; 10];
 
     for (index, expected_kind) in BoundKind::ALL.iter().copied().enumerate() {
         let bound = &request.bounds[index];
@@ -316,7 +318,7 @@ fn reject_unqualified_payload(
 mod tests {
     use super::*;
 
-    fn request(caps: [u32; 9]) -> HorizonRequest {
+    fn request(caps: [u32; 10]) -> HorizonRequest {
         let context = "test-context-v1";
         let bounds = core::array::from_fn(|index| {
             HorizonBound::qualified(BoundKind::ALL[index], caps[index], context)
@@ -332,7 +334,7 @@ mod tests {
 
     #[test]
     fn minimum_cap_and_all_ties_are_preserved() {
-        let input = request([16, 10, 9, 3, 3, 11, 12, 6, 12]);
+        let input = request([16, 10, 9, 24, 3, 3, 11, 12, 6, 12]);
         assert_eq!(
             select_commitment_horizon(&input),
             HorizonDecision::Eligible {
@@ -344,7 +346,7 @@ mod tests {
 
     #[test]
     fn unknown_bound_blocks_otherwise_finite_caps() {
-        let mut input = request([16, 10, 9, 8, 14, 11, 12, 6, 12]);
+        let mut input = request([16, 10, 9, 24, 8, 14, 11, 12, 6, 12]);
         input.bounds[3] = HorizonBound::unknown(BoundKind::Thermal);
         assert!(matches!(
             select_commitment_horizon(&input),
@@ -355,7 +357,7 @@ mod tests {
 
     #[test]
     fn stale_bound_blocks_selection() {
-        let mut input = request([16, 10, 9, 8, 14, 11, 12, 6, 12]);
+        let mut input = request([16, 10, 9, 24, 8, 14, 11, 12, 6, 12]);
         input.bounds[1] = HorizonBound::stale(BoundKind::Freshness);
         assert!(matches!(
             select_commitment_horizon(&input),
@@ -366,7 +368,7 @@ mod tests {
 
     #[test]
     fn mismatched_context_digest_blocks_selection() {
-        let mut input = request([16, 10, 9, 8, 14, 11, 12, 6, 12]);
+        let mut input = request([16, 10, 9, 24, 8, 14, 11, 12, 6, 12]);
         input.bounds[3].context_digest = Some("different-action-prefix".to_owned());
         assert!(matches!(
             select_commitment_horizon(&input),
@@ -377,7 +379,7 @@ mod tests {
 
     #[test]
     fn non_prefix_closed_bound_is_rejected() {
-        let mut input = request([16, 10, 9, 8, 14, 11, 12, 6, 12]);
+        let mut input = request([16, 10, 9, 24, 8, 14, 11, 12, 6, 12]);
         input.bounds[3].prefix_closed = false;
         assert!(matches!(
             select_commitment_horizon(&input),
@@ -388,7 +390,7 @@ mod tests {
 
     #[test]
     fn digest_mismatch_status_blocks_selection() {
-        let mut input = request([16, 10, 9, 8, 14, 11, 12, 6, 12]);
+        let mut input = request([16, 10, 9, 24, 8, 14, 11, 12, 6, 12]);
         input.bounds[5] = HorizonBound::digest_mismatch(BoundKind::Dynamics);
         assert!(matches!(
             select_commitment_horizon(&input),
@@ -399,7 +401,7 @@ mod tests {
 
     #[test]
     fn zero_cap_requires_fallback() {
-        let input = request([16, 10, 0, 8, 14, 11, 12, 6, 12]);
+        let input = request([16, 10, 0, 24, 8, 14, 11, 12, 6, 12]);
         assert_eq!(
             select_commitment_horizon(&input),
             HorizonDecision::ZeroHorizon {
@@ -410,7 +412,7 @@ mod tests {
 
     #[test]
     fn minimum_commit_threshold_can_force_fallback() {
-        let mut input = request([16, 10, 9, 8, 14, 11, 12, 2, 12]);
+        let mut input = request([16, 10, 9, 24, 8, 14, 11, 12, 2, 12]);
         input.minimum_commit_ticks = 3;
         assert_eq!(
             select_commitment_horizon(&input),
@@ -422,7 +424,7 @@ mod tests {
 
     #[test]
     fn candidate_model_mismatch_blocks_selection() {
-        let mut input = request([16, 10, 9, 8, 14, 11, 12, 6, 12]);
+        let mut input = request([16, 10, 9, 24, 8, 14, 11, 12, 6, 12]);
         input.candidate_model_matches = false;
         assert!(matches!(
             select_commitment_horizon(&input),
@@ -433,7 +435,7 @@ mod tests {
 
     #[test]
     fn executed_prefix_mismatch_blocks_selection() {
-        let mut input = request([16, 10, 9, 8, 14, 11, 12, 6, 12]);
+        let mut input = request([16, 10, 9, 24, 8, 14, 11, 12, 6, 12]);
         input.executed_prefix_matches = false;
         assert!(matches!(
             select_commitment_horizon(&input),
@@ -443,8 +445,31 @@ mod tests {
     }
 
     #[test]
+    fn preallocated_non_recyclable_risk_cap_limits_commitment() {
+        let input = request([16, 10, 9, 2, 8, 14, 11, 12, 6, 12]);
+        assert_eq!(
+            select_commitment_horizon(&input),
+            HorizonDecision::Eligible {
+                max_ticks: 2,
+                binding_constraints: vec![BoundKind::Risk],
+            }
+        );
+    }
+
+    #[test]
+    fn unallocated_risk_budget_blocks_selection() {
+        let mut input = request([16, 10, 9, 24, 8, 14, 11, 12, 6, 12]);
+        input.bounds[3] = HorizonBound::unknown(BoundKind::Risk);
+        assert!(matches!(
+            select_commitment_horizon(&input),
+            HorizonDecision::Blocked { failures }
+                if failures.iter().any(|failure| failure.reason == FailureKind::UnknownEvidence)
+        ));
+    }
+
+    #[test]
     fn no_result_can_authorize_actuation() {
-        let input = request([16, 10, 9, 8, 14, 11, 12, 6, 12]);
+        let input = request([16, 10, 9, 24, 8, 14, 11, 12, 6, 12]);
         let decision = select_commitment_horizon(&input);
         assert!(!decision.actuation_authorized());
     }
