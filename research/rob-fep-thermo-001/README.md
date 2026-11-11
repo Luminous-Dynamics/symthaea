@@ -350,3 +350,8 @@ The distributed-inference fixture corpus now contains **19** synthetic cases, in
 ## Asynchronous thermodynamic locomotion
 
 The combined physical experiment is now tracked by [Symtropy #4689](https://github.com/Luminous-Dynamics/symtropy/issues/4689). It composes the new real-time/action-chunk contracts with #4610 per-node thermal dynamics, #4549/#4555 persistent mission reserve and #4588 future mobility. It tests split-timescale cognition and prefix-conditioned execution under successive faults without resetting physical state.
+
+
+## Thermodynamic asynchronous locomotion lane
+
+Symtropy [#4689](https://github.com/Luminous-Dynamics/symtropy/issues/4689) now owns the combined asynchronous-execution × persistent-thermal locomotion experiment. First finite fixtures and a Draft 2020-12 validator are in [Symtropy draft PR #4694](https://github.com/Luminous-Dynamics/symtropy/pull/4694). The benchmark compares split-timescale/committed-prefix execution against physical legged baselines with no thermal or mission-state reset.
