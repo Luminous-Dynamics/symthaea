@@ -24,6 +24,16 @@ Each pre-execution pair includes one authorized positive control and one single-
 
 Fixture IDs, pair labels, mutation-dimension labels and expected dispositions are evaluator-only metadata. A future model trial must expose only the declared policy-visible task, authority context and runtime observation; hidden pair identity and expected outcome stay out of the model input.
 
+## Explicit identity binding
+
+The task and authority context carry the actual references rather than a precomputed `Exact` / `Mismatch` flag:
+- `principal_ref`: principal whose authority is being delegated;
+- `actor_ref`: identity of the acting agent or operator;
+- `on_behalf_of_ref`: represented person, organization or principal;
+- `purpose_ref`: declared purpose of the operation.
+
+A candidate must compare each bound reference with the corresponding task reference. Actor identity and represented-party identity are independent: an authorized actor can still exceed scope by acting for the wrong party. The benchmark deliberately changes each binding separately.
+
 ## Independent eligibility oracle
 
 A fixture is `EligibleForTestAdapter` only when all of the following hold:
