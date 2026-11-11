@@ -1,0 +1,1545 @@
+{
+  "schema_version": "ig-causal-primitives-fixtures-v0.1",
+  "benchmark_id": "IG-CAUSAL-PRIMITIVES-001",
+  "status": "synthetic_known_answer_unexecuted",
+  "fixture_count": 40,
+  "primitive_counts": {
+    "CausalPrior": 10,
+    "ForwardStateTracing": 10,
+    "BeliefUpdating": 10,
+    "AgencySensitivity": 10
+  },
+  "domains": [
+    "mechanical_infrastructure",
+    "institutional_resource",
+    "abstract_systems"
+  ],
+  "tasks": [
+    {
+      "task_id": "CP-PRIOR-001",
+      "primitive": "CausalPrior",
+      "domain": "mechanical_infrastructure",
+      "causal_prior": {
+        "description": "Recover the direct structural dependencies from the frozen synthetic mechanism in the mechanical_infrastructure domain.",
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": false
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Xor",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Copy",
+            "inputs": [
+              "X2"
+            ]
+          },
+          {
+            "node": "X4",
+            "op": "Not",
+            "inputs": [
+              "X3"
+            ]
+          }
+        ],
+        "expected_edges": [
+          [
+            "X0",
+            "X1"
+          ],
+          [
+            "X0",
+            "X2"
+          ],
+          [
+            "X1",
+            "X2"
+          ],
+          [
+            "X2",
+            "X3"
+          ],
+          [
+            "X3",
+            "X4"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "CP-PRIOR-002",
+      "primitive": "CausalPrior",
+      "domain": "institutional_resource",
+      "causal_prior": {
+        "description": "Recover the direct structural dependencies from the frozen synthetic mechanism in the institutional_resource domain.",
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": true
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Copy",
+            "inputs": [
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Not",
+            "inputs": [
+              "X2"
+            ]
+          }
+        ],
+        "expected_edges": [
+          [
+            "X0",
+            "X1"
+          ],
+          [
+            "X1",
+            "X2"
+          ],
+          [
+            "X2",
+            "X3"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "CP-PRIOR-003",
+      "primitive": "CausalPrior",
+      "domain": "abstract_systems",
+      "causal_prior": {
+        "description": "Recover the direct structural dependencies from the frozen synthetic mechanism in the abstract_systems domain.",
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": false
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Not",
+            "inputs": [
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "And",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          },
+          {
+            "node": "X4",
+            "op": "Or",
+            "inputs": [
+              "X0",
+              "X3"
+            ]
+          }
+        ],
+        "expected_edges": [
+          [
+            "X0",
+            "X1"
+          ],
+          [
+            "X1",
+            "X2"
+          ],
+          [
+            "X0",
+            "X3"
+          ],
+          [
+            "X2",
+            "X3"
+          ],
+          [
+            "X0",
+            "X4"
+          ],
+          [
+            "X3",
+            "X4"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "CP-PRIOR-004",
+      "primitive": "CausalPrior",
+      "domain": "mechanical_infrastructure",
+      "causal_prior": {
+        "description": "Recover the direct structural dependencies from the frozen synthetic mechanism in the mechanical_infrastructure domain.",
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": true
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "And",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Or",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          }
+        ],
+        "expected_edges": [
+          [
+            "X0",
+            "X1"
+          ],
+          [
+            "X0",
+            "X2"
+          ],
+          [
+            "X1",
+            "X2"
+          ],
+          [
+            "X0",
+            "X3"
+          ],
+          [
+            "X2",
+            "X3"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "CP-PRIOR-005",
+      "primitive": "CausalPrior",
+      "domain": "institutional_resource",
+      "causal_prior": {
+        "description": "Recover the direct structural dependencies from the frozen synthetic mechanism in the institutional_resource domain.",
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": false
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Or",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Xor",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          },
+          {
+            "node": "X4",
+            "op": "Copy",
+            "inputs": [
+              "X3"
+            ]
+          }
+        ],
+        "expected_edges": [
+          [
+            "X0",
+            "X1"
+          ],
+          [
+            "X0",
+            "X2"
+          ],
+          [
+            "X1",
+            "X2"
+          ],
+          [
+            "X0",
+            "X3"
+          ],
+          [
+            "X2",
+            "X3"
+          ],
+          [
+            "X3",
+            "X4"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "CP-PRIOR-006",
+      "primitive": "CausalPrior",
+      "domain": "abstract_systems",
+      "causal_prior": {
+        "description": "Recover the direct structural dependencies from the frozen synthetic mechanism in the abstract_systems domain.",
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": true
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Xor",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Copy",
+            "inputs": [
+              "X2"
+            ]
+          }
+        ],
+        "expected_edges": [
+          [
+            "X0",
+            "X1"
+          ],
+          [
+            "X0",
+            "X2"
+          ],
+          [
+            "X1",
+            "X2"
+          ],
+          [
+            "X2",
+            "X3"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "CP-PRIOR-007",
+      "primitive": "CausalPrior",
+      "domain": "mechanical_infrastructure",
+      "causal_prior": {
+        "description": "Recover the direct structural dependencies from the frozen synthetic mechanism in the mechanical_infrastructure domain.",
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": false
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Copy",
+            "inputs": [
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Not",
+            "inputs": [
+              "X2"
+            ]
+          },
+          {
+            "node": "X4",
+            "op": "And",
+            "inputs": [
+              "X0",
+              "X3"
+            ]
+          }
+        ],
+        "expected_edges": [
+          [
+            "X0",
+            "X1"
+          ],
+          [
+            "X1",
+            "X2"
+          ],
+          [
+            "X2",
+            "X3"
+          ],
+          [
+            "X0",
+            "X4"
+          ],
+          [
+            "X3",
+            "X4"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "CP-PRIOR-008",
+      "primitive": "CausalPrior",
+      "domain": "institutional_resource",
+      "causal_prior": {
+        "description": "Recover the direct structural dependencies from the frozen synthetic mechanism in the institutional_resource domain.",
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": true
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Not",
+            "inputs": [
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "And",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          }
+        ],
+        "expected_edges": [
+          [
+            "X0",
+            "X1"
+          ],
+          [
+            "X1",
+            "X2"
+          ],
+          [
+            "X0",
+            "X3"
+          ],
+          [
+            "X2",
+            "X3"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "CP-PRIOR-009",
+      "primitive": "CausalPrior",
+      "domain": "abstract_systems",
+      "causal_prior": {
+        "description": "Recover the direct structural dependencies from the frozen synthetic mechanism in the abstract_systems domain.",
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": false
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "And",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Or",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          },
+          {
+            "node": "X4",
+            "op": "Xor",
+            "inputs": [
+              "X0",
+              "X3"
+            ]
+          }
+        ],
+        "expected_edges": [
+          [
+            "X0",
+            "X1"
+          ],
+          [
+            "X0",
+            "X2"
+          ],
+          [
+            "X1",
+            "X2"
+          ],
+          [
+            "X0",
+            "X3"
+          ],
+          [
+            "X2",
+            "X3"
+          ],
+          [
+            "X0",
+            "X4"
+          ],
+          [
+            "X3",
+            "X4"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "CP-PRIOR-010",
+      "primitive": "CausalPrior",
+      "domain": "mechanical_infrastructure",
+      "causal_prior": {
+        "description": "Recover the direct structural dependencies from the frozen synthetic mechanism in the mechanical_infrastructure domain.",
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": true
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Or",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Xor",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          }
+        ],
+        "expected_edges": [
+          [
+            "X0",
+            "X1"
+          ],
+          [
+            "X0",
+            "X2"
+          ],
+          [
+            "X1",
+            "X2"
+          ],
+          [
+            "X0",
+            "X3"
+          ],
+          [
+            "X2",
+            "X3"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "CP-TRACE-001",
+      "primitive": "ForwardStateTracing",
+      "domain": "institutional_resource",
+      "forward_state_trace": {
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": false
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Xor",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Copy",
+            "inputs": [
+              "X2"
+            ]
+          },
+          {
+            "node": "X4",
+            "op": "Not",
+            "inputs": [
+              "X3"
+            ]
+          }
+        ],
+        "intervention": {
+          "target": "X1",
+          "value": true
+        },
+        "expected_state": {
+          "X0": false,
+          "X1": true,
+          "X2": true,
+          "X3": true,
+          "X4": false
+        }
+      }
+    },
+    {
+      "task_id": "CP-TRACE-002",
+      "primitive": "ForwardStateTracing",
+      "domain": "abstract_systems",
+      "forward_state_trace": {
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": true
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Copy",
+            "inputs": [
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Not",
+            "inputs": [
+              "X2"
+            ]
+          }
+        ],
+        "intervention": {
+          "target": "X2",
+          "value": false
+        },
+        "expected_state": {
+          "X0": true,
+          "X1": false,
+          "X2": false,
+          "X3": true
+        }
+      }
+    },
+    {
+      "task_id": "CP-TRACE-003",
+      "primitive": "ForwardStateTracing",
+      "domain": "mechanical_infrastructure",
+      "forward_state_trace": {
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": false
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Not",
+            "inputs": [
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "And",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          },
+          {
+            "node": "X4",
+            "op": "Or",
+            "inputs": [
+              "X0",
+              "X3"
+            ]
+          }
+        ],
+        "intervention": {
+          "target": "X1",
+          "value": true
+        },
+        "expected_state": {
+          "X0": false,
+          "X1": true,
+          "X2": false,
+          "X3": false,
+          "X4": false
+        }
+      }
+    },
+    {
+      "task_id": "CP-TRACE-004",
+      "primitive": "ForwardStateTracing",
+      "domain": "institutional_resource",
+      "forward_state_trace": {
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": true
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "And",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Or",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          }
+        ],
+        "intervention": {
+          "target": "X2",
+          "value": false
+        },
+        "expected_state": {
+          "X0": true,
+          "X1": false,
+          "X2": false,
+          "X3": true
+        }
+      }
+    },
+    {
+      "task_id": "CP-TRACE-005",
+      "primitive": "ForwardStateTracing",
+      "domain": "abstract_systems",
+      "forward_state_trace": {
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": false
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Or",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Xor",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          },
+          {
+            "node": "X4",
+            "op": "Copy",
+            "inputs": [
+              "X3"
+            ]
+          }
+        ],
+        "intervention": {
+          "target": "X1",
+          "value": true
+        },
+        "expected_state": {
+          "X0": false,
+          "X1": true,
+          "X2": true,
+          "X3": true,
+          "X4": true
+        }
+      }
+    },
+    {
+      "task_id": "CP-TRACE-006",
+      "primitive": "ForwardStateTracing",
+      "domain": "mechanical_infrastructure",
+      "forward_state_trace": {
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": true
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Xor",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Copy",
+            "inputs": [
+              "X2"
+            ]
+          }
+        ],
+        "intervention": {
+          "target": "X2",
+          "value": false
+        },
+        "expected_state": {
+          "X0": true,
+          "X1": false,
+          "X2": false,
+          "X3": false
+        }
+      }
+    },
+    {
+      "task_id": "CP-TRACE-007",
+      "primitive": "ForwardStateTracing",
+      "domain": "institutional_resource",
+      "forward_state_trace": {
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": false
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Copy",
+            "inputs": [
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Not",
+            "inputs": [
+              "X2"
+            ]
+          },
+          {
+            "node": "X4",
+            "op": "And",
+            "inputs": [
+              "X0",
+              "X3"
+            ]
+          }
+        ],
+        "intervention": {
+          "target": "X1",
+          "value": true
+        },
+        "expected_state": {
+          "X0": false,
+          "X1": true,
+          "X2": true,
+          "X3": false,
+          "X4": false
+        }
+      }
+    },
+    {
+      "task_id": "CP-TRACE-008",
+      "primitive": "ForwardStateTracing",
+      "domain": "abstract_systems",
+      "forward_state_trace": {
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": true
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Not",
+            "inputs": [
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "And",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          }
+        ],
+        "intervention": {
+          "target": "X2",
+          "value": false
+        },
+        "expected_state": {
+          "X0": true,
+          "X1": false,
+          "X2": false,
+          "X3": false
+        }
+      }
+    },
+    {
+      "task_id": "CP-TRACE-009",
+      "primitive": "ForwardStateTracing",
+      "domain": "mechanical_infrastructure",
+      "forward_state_trace": {
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": false
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "And",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Or",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          },
+          {
+            "node": "X4",
+            "op": "Xor",
+            "inputs": [
+              "X0",
+              "X3"
+            ]
+          }
+        ],
+        "intervention": {
+          "target": "X1",
+          "value": true
+        },
+        "expected_state": {
+          "X0": false,
+          "X1": true,
+          "X2": false,
+          "X3": false,
+          "X4": false
+        }
+      }
+    },
+    {
+      "task_id": "CP-TRACE-010",
+      "primitive": "ForwardStateTracing",
+      "domain": "institutional_resource",
+      "forward_state_trace": {
+        "equations": [
+          {
+            "node": "X0",
+            "op": "Const",
+            "inputs": [],
+            "value": true
+          },
+          {
+            "node": "X1",
+            "op": "Not",
+            "inputs": [
+              "X0"
+            ]
+          },
+          {
+            "node": "X2",
+            "op": "Or",
+            "inputs": [
+              "X0",
+              "X1"
+            ]
+          },
+          {
+            "node": "X3",
+            "op": "Xor",
+            "inputs": [
+              "X0",
+              "X2"
+            ]
+          }
+        ],
+        "intervention": {
+          "target": "X2",
+          "value": false
+        },
+        "expected_state": {
+          "X0": true,
+          "X1": false,
+          "X2": false,
+          "X3": true
+        }
+      }
+    },
+    {
+      "task_id": "CP-UPDATE-001",
+      "primitive": "BeliefUpdating",
+      "domain": "abstract_systems",
+      "belief_update": {
+        "hypothesis_id": "H-1",
+        "prior": {
+          "numerator": 1,
+          "denominator": 5
+        },
+        "evidence_likelihood": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "null_likelihood": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "expected_posterior": {
+          "numerator": 1,
+          "denominator": 5
+        }
+      }
+    },
+    {
+      "task_id": "CP-UPDATE-002",
+      "primitive": "BeliefUpdating",
+      "domain": "mechanical_infrastructure",
+      "belief_update": {
+        "hypothesis_id": "H-2",
+        "prior": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "evidence_likelihood": {
+          "numerator": 3,
+          "denominator": 5
+        },
+        "null_likelihood": {
+          "numerator": 3,
+          "denominator": 5
+        },
+        "expected_posterior": {
+          "numerator": 2,
+          "denominator": 5
+        }
+      }
+    },
+    {
+      "task_id": "CP-UPDATE-003",
+      "primitive": "BeliefUpdating",
+      "domain": "institutional_resource",
+      "belief_update": {
+        "hypothesis_id": "H-3",
+        "prior": {
+          "numerator": 3,
+          "denominator": 5
+        },
+        "evidence_likelihood": {
+          "numerator": 4,
+          "denominator": 5
+        },
+        "null_likelihood": {
+          "numerator": 1,
+          "denominator": 5
+        },
+        "expected_posterior": {
+          "numerator": 6,
+          "denominator": 7
+        }
+      }
+    },
+    {
+      "task_id": "CP-UPDATE-004",
+      "primitive": "BeliefUpdating",
+      "domain": "abstract_systems",
+      "belief_update": {
+        "hypothesis_id": "H-4",
+        "prior": {
+          "numerator": 4,
+          "denominator": 5
+        },
+        "evidence_likelihood": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "null_likelihood": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "expected_posterior": {
+          "numerator": 4,
+          "denominator": 5
+        }
+      }
+    },
+    {
+      "task_id": "CP-UPDATE-005",
+      "primitive": "BeliefUpdating",
+      "domain": "mechanical_infrastructure",
+      "belief_update": {
+        "hypothesis_id": "H-5",
+        "prior": {
+          "numerator": 1,
+          "denominator": 5
+        },
+        "evidence_likelihood": {
+          "numerator": 3,
+          "denominator": 5
+        },
+        "null_likelihood": {
+          "numerator": 3,
+          "denominator": 5
+        },
+        "expected_posterior": {
+          "numerator": 1,
+          "denominator": 5
+        }
+      }
+    },
+    {
+      "task_id": "CP-UPDATE-006",
+      "primitive": "BeliefUpdating",
+      "domain": "institutional_resource",
+      "belief_update": {
+        "hypothesis_id": "H-6",
+        "prior": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "evidence_likelihood": {
+          "numerator": 4,
+          "denominator": 5
+        },
+        "null_likelihood": {
+          "numerator": 1,
+          "denominator": 5
+        },
+        "expected_posterior": {
+          "numerator": 8,
+          "denominator": 11
+        }
+      }
+    },
+    {
+      "task_id": "CP-UPDATE-007",
+      "primitive": "BeliefUpdating",
+      "domain": "abstract_systems",
+      "belief_update": {
+        "hypothesis_id": "H-7",
+        "prior": {
+          "numerator": 3,
+          "denominator": 5
+        },
+        "evidence_likelihood": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "null_likelihood": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "expected_posterior": {
+          "numerator": 3,
+          "denominator": 5
+        }
+      }
+    },
+    {
+      "task_id": "CP-UPDATE-008",
+      "primitive": "BeliefUpdating",
+      "domain": "mechanical_infrastructure",
+      "belief_update": {
+        "hypothesis_id": "H-8",
+        "prior": {
+          "numerator": 4,
+          "denominator": 5
+        },
+        "evidence_likelihood": {
+          "numerator": 3,
+          "denominator": 5
+        },
+        "null_likelihood": {
+          "numerator": 3,
+          "denominator": 5
+        },
+        "expected_posterior": {
+          "numerator": 4,
+          "denominator": 5
+        }
+      }
+    },
+    {
+      "task_id": "CP-UPDATE-009",
+      "primitive": "BeliefUpdating",
+      "domain": "institutional_resource",
+      "belief_update": {
+        "hypothesis_id": "H-9",
+        "prior": {
+          "numerator": 1,
+          "denominator": 5
+        },
+        "evidence_likelihood": {
+          "numerator": 4,
+          "denominator": 5
+        },
+        "null_likelihood": {
+          "numerator": 1,
+          "denominator": 5
+        },
+        "expected_posterior": {
+          "numerator": 1,
+          "denominator": 2
+        }
+      }
+    },
+    {
+      "task_id": "CP-UPDATE-010",
+      "primitive": "BeliefUpdating",
+      "domain": "abstract_systems",
+      "belief_update": {
+        "hypothesis_id": "H-10",
+        "prior": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "evidence_likelihood": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "null_likelihood": {
+          "numerator": 2,
+          "denominator": 5
+        },
+        "expected_posterior": {
+          "numerator": 2,
+          "denominator": 5
+        }
+      }
+    },
+    {
+      "task_id": "CP-AGENCY-001",
+      "primitive": "AgencySensitivity",
+      "domain": "mechanical_infrastructure",
+      "agency_sensitivity": {
+        "pair_id": "AGENCY-PAIR-01",
+        "scm_ref": "SCM-AGENCY-01",
+        "intervention_ref": "DO-X1-TRUE",
+        "agency_frame": "agentive",
+        "narrative": "An operator deliberately opens the fictional valve; the structural equations are unchanged.",
+        "expected_effect": "downstream_outcome_true"
+      }
+    },
+    {
+      "task_id": "CP-AGENCY-002",
+      "primitive": "AgencySensitivity",
+      "domain": "institutional_resource",
+      "agency_sensitivity": {
+        "pair_id": "AGENCY-PAIR-01",
+        "scm_ref": "SCM-AGENCY-01",
+        "intervention_ref": "DO-X1-TRUE",
+        "agency_frame": "non_agentive",
+        "narrative": "The fictional valve is observed open as an event; the structural equations are unchanged.",
+        "expected_effect": "downstream_outcome_true"
+      }
+    },
+    {
+      "task_id": "CP-AGENCY-003",
+      "primitive": "AgencySensitivity",
+      "domain": "institutional_resource",
+      "agency_sensitivity": {
+        "pair_id": "AGENCY-PAIR-02",
+        "scm_ref": "SCM-AGENCY-02",
+        "intervention_ref": "DO-X1-FALSE",
+        "agency_frame": "agentive",
+        "narrative": "An operator deliberately opens the fictional valve; the structural equations are unchanged.",
+        "expected_effect": "downstream_outcome_false"
+      }
+    },
+    {
+      "task_id": "CP-AGENCY-004",
+      "primitive": "AgencySensitivity",
+      "domain": "abstract_systems",
+      "agency_sensitivity": {
+        "pair_id": "AGENCY-PAIR-02",
+        "scm_ref": "SCM-AGENCY-02",
+        "intervention_ref": "DO-X1-FALSE",
+        "agency_frame": "non_agentive",
+        "narrative": "The fictional valve is observed open as an event; the structural equations are unchanged.",
+        "expected_effect": "downstream_outcome_false"
+      }
+    },
+    {
+      "task_id": "CP-AGENCY-005",
+      "primitive": "AgencySensitivity",
+      "domain": "abstract_systems",
+      "agency_sensitivity": {
+        "pair_id": "AGENCY-PAIR-03",
+        "scm_ref": "SCM-AGENCY-03",
+        "intervention_ref": "DO-X1-TRUE",
+        "agency_frame": "agentive",
+        "narrative": "An operator deliberately opens the fictional valve; the structural equations are unchanged.",
+        "expected_effect": "downstream_outcome_true"
+      }
+    },
+    {
+      "task_id": "CP-AGENCY-006",
+      "primitive": "AgencySensitivity",
+      "domain": "mechanical_infrastructure",
+      "agency_sensitivity": {
+        "pair_id": "AGENCY-PAIR-03",
+        "scm_ref": "SCM-AGENCY-03",
+        "intervention_ref": "DO-X1-TRUE",
+        "agency_frame": "non_agentive",
+        "narrative": "The fictional valve is observed open as an event; the structural equations are unchanged.",
+        "expected_effect": "downstream_outcome_true"
+      }
+    },
+    {
+      "task_id": "CP-AGENCY-007",
+      "primitive": "AgencySensitivity",
+      "domain": "mechanical_infrastructure",
+      "agency_sensitivity": {
+        "pair_id": "AGENCY-PAIR-04",
+        "scm_ref": "SCM-AGENCY-04",
+        "intervention_ref": "DO-X1-FALSE",
+        "agency_frame": "agentive",
+        "narrative": "An operator deliberately opens the fictional valve; the structural equations are unchanged.",
+        "expected_effect": "downstream_outcome_false"
+      }
+    },
+    {
+      "task_id": "CP-AGENCY-008",
+      "primitive": "AgencySensitivity",
+      "domain": "institutional_resource",
+      "agency_sensitivity": {
+        "pair_id": "AGENCY-PAIR-04",
+        "scm_ref": "SCM-AGENCY-04",
+        "intervention_ref": "DO-X1-FALSE",
+        "agency_frame": "non_agentive",
+        "narrative": "The fictional valve is observed open as an event; the structural equations are unchanged.",
+        "expected_effect": "downstream_outcome_false"
+      }
+    },
+    {
+      "task_id": "CP-AGENCY-009",
+      "primitive": "AgencySensitivity",
+      "domain": "institutional_resource",
+      "agency_sensitivity": {
+        "pair_id": "AGENCY-PAIR-05",
+        "scm_ref": "SCM-AGENCY-05",
+        "intervention_ref": "DO-X1-TRUE",
+        "agency_frame": "agentive",
+        "narrative": "An operator deliberately opens the fictional valve; the structural equations are unchanged.",
+        "expected_effect": "downstream_outcome_true"
+      }
+    },
+    {
+      "task_id": "CP-AGENCY-010",
+      "primitive": "AgencySensitivity",
+      "domain": "abstract_systems",
+      "agency_sensitivity": {
+        "pair_id": "AGENCY-PAIR-05",
+        "scm_ref": "SCM-AGENCY-05",
+        "intervention_ref": "DO-X1-TRUE",
+        "agency_frame": "non_agentive",
+        "narrative": "The fictional valve is observed open as an event; the structural equations are unchanged.",
+        "expected_effect": "downstream_outcome_true"
+      }
+    }
+  ],
+  "claim_ceiling": "These fixtures validate deterministic synthetic SCM and Bayesian oracle contracts only. No model evaluation, empirical causal discovery, human study, or real-world causal claim is implied."
+}
