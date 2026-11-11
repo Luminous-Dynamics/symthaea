@@ -6,5 +6,8 @@ license.workspace = true
 description = "Deterministic audit kernel for physically realizable robotic recovery evidence"
 publish = false
 
+[dependencies]
+sha1 = "0.10"
+
 [lib]
 path = "src/lib.rs"
