@@ -365,3 +365,6 @@ Symtropy [#4696](https://github.com/Luminous-Dynamics/symtropy/issues/4696) now 
 ## Decision-sensitive freshness extension
 
 The distributed-inference work now distinguishes result age at receipt from actuation-side AoI and from EVSI. See [decision_sensitive_freshness.md](./decision_sensitive_freshness.md) and the updated 22-case distributed-inference fixtures. This prevents an inference server from reporting a fresh result when its command arrives too late to influence the actuator safely or usefully.
+
+
+The source-to-actuator AoI measurement is now implemented as an isolated Symtropy research crate: [issue #4713](https://github.com/Luminous-Dynamics/symtropy/issues/4713) / [draft PR #4715](https://github.com/Luminous-Dynamics/symtropy/pull/4715). Its time-weighted arithmetic is separate from #4117's certificate-validity gate and #4206's command-to-motion response.
