@@ -88,7 +88,12 @@
       "properties": {
         "kind": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "enum": [
+            "matched_no_intervention_control",
+            "active_control",
+            "sham_control"
+          ]
         },
         "description": {
           "type": "string",
@@ -116,7 +121,11 @@
       "properties": {
         "method": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "enum": [
+            "seeded_randomized_pair_assignment",
+            "blocked_seeded_randomization"
+          ]
         },
         "unit": {
           "type": "string",
