@@ -346,6 +346,41 @@ mod tests {
     }
 
     #[test]
+    fn eig_remains_in_bits_while_evsi_accounts_for_utility_cost() {
+        let (prior, actions, mut experiments) = problem();
+        experiments[0].cost = 100.0;
+
+        let eig = select_experiment(
+            &prior,
+            &actions,
+            &experiments,
+            SelectionMethod::ExpectedInformationGain,
+            0.0,
+            0.0,
+        )
+        .unwrap()
+        .unwrap();
+        let evsi = select_experiment(
+            &prior,
+            &actions,
+            &experiments,
+            SelectionMethod::ExpectedValueOfSampleInformation,
+            0.0,
+            0.0,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(eig.experiment_id, "split_redundant_hypotheses");
+        assert_eq!(eig.selection_score_units, ScoreUnits::Bits);
+        assert!((eig.selection_score - eig.information_gain_bits).abs() < NUMERIC_TOLERANCE);
+        assert_eq!(evsi.experiment_id, "signal_that_can_reverse_the_action");
+        assert_eq!(evsi.selection_score_units, ScoreUnits::Utility);
+        assert!((evsi.selection_score - (evsi.expected_value_of_information - evsi.cost)).abs()
+            < NUMERIC_TOLERANCE);
+    }
+
+    #[test]
     fn risk_adjusted_evsi_avoids_high_value_but_high_risk_probe() {
         let (prior, actions, mut experiments) = problem();
         experiments.push(experiment(
