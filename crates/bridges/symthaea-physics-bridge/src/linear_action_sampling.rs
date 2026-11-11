@@ -1248,6 +1248,17 @@ mod tests {
         .unwrap();
         assert_ne!(first.sample_batch_blake3, changed.sample_batch_blake3);
 
+        let mut changed_directions = sample_batch.clone();
+        changed_directions[0].direction_basis[0][0] = 1.0000000000000002;
+        let changed = evaluate_linear_action_samples(
+            &expression,
+            &action,
+            &changed_directions,
+            sampling_profile(),
+        )
+        .unwrap();
+        assert_ne!(first.sample_batch_blake3, changed.sample_batch_blake3);
+
         let changed_expression = add(square("x"), mul(Expr::Const(2.0), square("y")));
         let changed = evaluate_linear_action_samples(
             &changed_expression,
@@ -1484,10 +1495,23 @@ mod tests {
             UnaryFn::Sqrt,
             Box::new(quadratic_form_expression(&canonical_quadratic, "x", "y")),
         );
-        let canonical_samples = samples(
-            &canonical_states.map(|state| [state[0], state[1]]),
-            [[1.0, 0.0], [0.0, 1.0]],
-        );
+        let canonical_directions = [
+            nalgebra::Vector2::new(1.0, 0.0),
+            nalgebra::Vector2::new(0.0, 1.0),
+            nalgebra::Vector2::new(1.0, 1.0),
+        ];
+        let canonical_samples: Vec<LinearActionSampleV1> = canonical_states
+            .iter()
+            .enumerate()
+            .map(|(sample_index, state)| LinearActionSampleV1 {
+                sample_id: format!("paired-{sample_index}"),
+                state: vec![state[0], state[1]],
+                direction_basis: canonical_directions
+                    .iter()
+                    .map(|direction| vec![direction[0], direction[1]])
+                    .collect(),
+            })
+            .collect();
         let canonical_report = evaluate_linear_action_samples(
             &canonical_expression,
             &canonical_action(),
@@ -1535,9 +1559,12 @@ mod tests {
                     LinearActionSampleV1 {
                         sample_id: format!("paired-{sample_index}"),
                         state: vec![transformed_state[0], transformed_state[1]],
-                        direction_basis: transform
-                            .column_iter()
-                            .map(|column| vec![column[0], column[1]])
+                        direction_basis: canonical_directions
+                            .iter()
+                            .map(|direction| {
+                                let transformed_direction = transform * direction;
+                                vec![transformed_direction[0], transformed_direction[1]]
+                            })
                             .collect(),
                     }
                 })
