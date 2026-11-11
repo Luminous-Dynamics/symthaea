@@ -47,3 +47,10 @@ cargo clippy --locked --manifest-path tools/electric-power-series-oracle/Cargo.t
 ```
 
 All fixtures are synthetic. Passing software tests does not validate sensor synchronization, calibration, physical energy measurement, component capability, aircraft performance, safety or airworthiness.
+
+
+## Current implementation snapshot
+
+The source model is electric-power-series-oracle-v0.1.0 and contains 16 synthetic tests. The package manifest and lockfile are pinned at 0.1.0. The dedicated workflow checks formatting, locked tests and Clippy for this exact path.
+
+The integrator consumes already aligned power observations; it does not calibrate sensors, synchronize independent clocks, convert raw voltage/current to power, or qualify physical energy measurement.
