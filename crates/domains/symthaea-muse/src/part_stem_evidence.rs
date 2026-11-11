@@ -1343,7 +1343,7 @@ mod tests {
         Vec<PartStemWavInputV1>,
     ) {
         let midi_bytes = two_part_midi_bytes_same_pitch();
-        let mut manifest = MidiPerformanceManifestV1 {
+        let manifest = MidiPerformanceManifestV1 {
             schema: MIDI_PERFORMANCE_SCHEMA_V1.into(),
             score_digest_schema: symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
             score_sha256: "a".repeat(64),
