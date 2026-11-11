@@ -81,3 +81,37 @@ The drive consumer requires both `map_id` and `map_digest`, in addition to the s
 
 
 The consumer validates that all four interpolation weights are finite, each lies in [0, 1], and their sum is 1 within 1e-12. It preserves the selected torque/speed cell indices and weights in the resulting drive envelope. This checks the shape of the interpolation evidence but does not independently recompute the interpolation; the exact map-content digest and upstream map implementation version identify the artifact/algorithm that produced it.
+
+
+## Mission-segment robust demand envelope (v0.6)
+
+The mission composer evaluates a frozen, piecewise-constant propulsion demand profile for one drive path using the same gearbox-aware, map-evidence drive calculation as the pointwise API.
+
+Each segment declares:
+- unique segment ID;
+- monotonic start/end timestamps;
+- rotor shaft torque and speed;
+- DC bus voltage;
+- explicit motor-to-rotor speed ratio;
+- exact operating-context digest;
+- motor-map evidence at the derived motor shaft torque/RPM point.
+
+The profile binds one exact aircraft configuration digest. The operating context may change by segment (for example, different measured temperature/cooling contexts), but each map lookup must match the segment's exact context and operating point.
+
+### Temporal semantics
+
+The operating point is treated as constant over its declared segment duration. There is no interpolation between segment endpoints. Segments must be supplied in chronological order and may not overlap. Gaps are preserved as **unmodelled intervals**, not assumed to have zero demand. The reported active propulsion duration is distinct from total elapsed profile duration.
+
+For measured transient power traces, use the separate synchronized power-series oracle; this mission composer is a predicted segment-level calculation.
+
+### Scenario outputs
+
+For each segment, the composer evaluates adverse, nominal and favourable motor-efficiency cases. It retains the map/evidence envelope and each scenario's typed drive result. A failure in one segment appears with its segment ID and cause; it cannot be hidden by another segment's lower power.
+
+Mission summaries are independently produced for all three scenarios only when every segment in that scenario evaluates successfully. Summaries report rotor-shaft energy, transmission/motor/inverter loss energy, DC-bus energy, average DC power, peak DC power and peak DC current.
+
+A profile with time gaps is a partial propulsion profile. Its gap durations are reported explicitly and must be joined with other mission loads/operating policies before a complete aircraft mission claim.
+
+### Claim boundary
+
+All mission fixtures are synthetic. This is a deterministic composition of supplied map evidence and the independent drive-chain reference. It does not validate a real motor map, battery, aircraft, reserve policy, thermal state, rotor aerodynamics, safety or airworthiness.
