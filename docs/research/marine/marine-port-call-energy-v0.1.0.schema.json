@@ -20,7 +20,9 @@
     "ghg_comparison",
     "evidence_sources",
     "record_status",
-    "limitations"
+    "limitations",
+    "service_contract_id",
+    "service_port_call"
   ],
   "properties": {
     "schema_version": {
@@ -86,6 +88,13 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "service_contract_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "service_port_call": {
+      "$ref": "#/$defs/service_port_call"
     }
   },
   "$defs": {
@@ -383,6 +392,44 @@
             "type": "string",
             "minLength": 1
           }
+        }
+      }
+    },
+    "service_port_call": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "port_call_id",
+        "earliest_arrival",
+        "target_arrival",
+        "latest_arrival",
+        "minimum_turnaround_seconds",
+        "latest_departure"
+      ],
+      "properties": {
+        "port_call_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "earliest_arrival": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "target_arrival": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "latest_arrival": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "minimum_turnaround_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latest_departure": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     }
