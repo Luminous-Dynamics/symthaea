@@ -658,9 +658,10 @@ mod tests {
 
     #[test]
     fn one_large_action_tick_error_expands_the_entire_simultaneous_scope() {
-        let mut errors = vec![0; 19];
-        errors[18] = 7;
-        let episodes = nineteen_episodes(&errors);
+        let mut episodes = nineteen_episodes(&[]);
+        // One cell in one independent episode is an outlier. The episode
+        // maximum makes the expansion simultaneous over every action/tick.
+        episodes[18].observations[3].reference_expected_loss.upper_units += 7;
         let receipt = calibrate_simultaneous_episode_envelope(
             &scope(50_000, 2, &["a0", "a1"]),
             &episodes,
@@ -808,6 +809,19 @@ mod tests {
     fn malformed_loss_interval_is_rejected() {
         let mut e = episode("m1", "scope-v1", 2, &["a0", "a1"], 10, 0);
         e.observations[0].predicted = LossInterval::new(5, 2);
+        assert!(matches!(
+            calibrate_simultaneous_episode_envelope(
+                &scope(50_000, 2, &["a0", "a1"]),
+                &[e]
+            ),
+            Err(CalibrationError::InvalidLossInterval { .. })
+        ));
+    }
+
+    #[test]
+    fn invalid_reference_expected_loss_interval_is_rejected() {
+        let mut e = episode("m1", "scope-v1", 2, &["a0", "a1"], 10, 0);
+        e.observations[0].reference_expected_loss = LossInterval::new(9, 4);
         assert!(matches!(
             calibrate_simultaneous_episode_envelope(
                 &scope(50_000, 2, &["a0", "a1"]),
