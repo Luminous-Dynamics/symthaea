@@ -421,3 +421,13 @@ A new child workstream [Symtropy #4696](https://github.com/Luminous-Dynamics/sym
 For queued open-loop execution, the measured p99 total proposal path defines K_min; the earliest qualified physical/evidence horizon defines K_max. If K_min > K_max, queued execution cannot safely cover deliberation. A continuously operating split-timescale local expert is evaluated as a distinct architecture: it does not need to span the slow context latency, but its own cycle must meet the local deadline and its chunks remain bounded by K_max.
 
 Initial 12-case corpus and dedicated validator: [Symtropy draft PR #4704](https://github.com/Luminous-Dynamics/symtropy/pull/4704). This is an arithmetic/evaluation contract, not a new scheduler, certificate validator or controller.
+
+
+## 11. Decision-sensitive actuation freshness
+
+A new benchmark extension is in [decision_sensitive_freshness.md](./decision_sensitive_freshness.md). It adds actuation-side Age of Information (AoI), distinct from receipt latency and result age, and separates AoI from EVSI / stale-decision regret. It also adds external baselines:
+- EdgePace for memory-bandwidth-aware LLM scheduling around foreground sensor deadlines;
+- Jeon et al. (Frontiers 4 Nov 2026) for a physical robot with actuator-side AoI and a payload/freshness saturation result;
+- FASTER, PACT-VLA and REMAC for compatible asynchronous action-chunk / fast reaction comparisons.
+
+Do not pool manipulation and locomotion metrics. The same temporal-event semantics should be preserved across the distinct platform lanes.
