@@ -581,20 +581,6 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
         .map_err(|issue| vec![issue]);
     }
     let best_is_search_boundary = best_index == 0 || best_index + 1 == scores.len();
-    if best_is_search_boundary {
-        return profile_with_no_estimate(
-            midi,
-            wav_bytes,
-            wav.info,
-            config,
-            AudioClockAlignmentStatusV1::SearchBoundaryCandidate,
-            &expected_onsets,
-            u32::try_from(matched_counts[best_index]).unwrap_or(u32::MAX),
-            Some(lags[best_index]),
-            Some(best_score),
-        )
-        .map_err(|issue| vec![issue]);
-    }
     let competing_score = scores
         .iter()
         .enumerate()
@@ -631,11 +617,14 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
 
     let ambiguity_threshold =
         f64::from(config.ambiguity_ratio_basis_points) / 10_000.0;
-    let status = if ratio.is_some_and(|value| value >= ambiguity_threshold) {
+    let status = if best_is_search_boundary {
+        AudioClockAlignmentStatusV1::SearchBoundaryCandidate
+    } else if ratio.is_some_and(|value| value >= ambiguity_threshold) {
         AudioClockAlignmentStatusV1::AmbiguousCandidate
     } else {
         AudioClockAlignmentStatusV1::Candidate
     };
+    let accepted_offset = (!best_is_search_boundary).then_some(refined_offset);
 
     let mut profile = AudioClockAlignmentProfileV1 {
         schema: AUDIO_CLOCK_ALIGNMENT_SCHEMA_V1.into(),
@@ -651,10 +640,10 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
         unique_expected_onset_count: u32::try_from(expected_onsets.len()).unwrap_or(u32::MAX),
         matched_expected_onset_count: u32::try_from(matched_counts[best_index]).unwrap_or(u32::MAX),
         best_candidate_offset_frames: Some(refined_offset),
-        audio_minus_midi_offset_frames: Some(refined_offset),
-        audio_minus_midi_offset_ms: Some(
-            refined_offset as f64 * 1_000.0 / f64::from(sample_rate_hz),
-        ),
+        audio_minus_midi_offset_frames: accepted_offset,
+        audio_minus_midi_offset_ms: accepted_offset.map(|offset| {
+            offset as f64 * 1_000.0 / f64::from(sample_rate_hz)
+        }),
         best_peak_score: Some(best_score),
         competing_peak_score: Some(competing_score),
         peak_margin: Some(margin),
@@ -835,6 +824,18 @@ pub fn validate_audio_clock_alignment_profile_v1(
     match alignment_commitment(profile) {
         Ok(actual) if actual == profile.profile_sha256 => {}
         _ => issues.push(AudioClockAlignmentIssueV1::SerializationFailed),
+    }
+    if issues.is_empty() {
+        match estimate_audio_minus_midi_clock_offset_v1(
+            wav_bytes,
+            midi,
+            profile.config.clone(),
+        ) {
+            Ok(replayed) if replayed == *profile => {}
+            _ => issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
+                field: "deterministic_replay".into(),
+            }),
+        }
     }
     issues
 }
