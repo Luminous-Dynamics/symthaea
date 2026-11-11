@@ -1,0 +1,15 @@
+[package]
+name = "airroad-fault-evidence-join-oracle"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Read-only aircraft electrical fault evidence and topology crosswalk"
+license = "AGPL-3.0-or-later"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+
+[workspace]
