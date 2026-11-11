@@ -117,13 +117,13 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 255,
-          "pattern": ".*\\\\S.*"
+          "pattern": ".*\\S.*"
         },
         "instrument_id": {
           "type": "string",
           "minLength": 1,
           "maxLength": 255,
-          "pattern": ".*\\\\S.*"
+          "pattern": ".*\\S.*"
         },
         "midi_track_index": {
           "type": "integer",
@@ -137,7 +137,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 255,
-          "pattern": ".*\\\\S.*"
+          "pattern": ".*\\S.*"
         },
         "renderer_binary_sha256": {
           "$ref": "#/$defs/sha256"
@@ -146,7 +146,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 255,
-          "pattern": ".*\\\\S.*"
+          "pattern": ".*\\S.*"
         },
         "patch_asset_sha256": {
           "$ref": "#/$defs/sha256"
