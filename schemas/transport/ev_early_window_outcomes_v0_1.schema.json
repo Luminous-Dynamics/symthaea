@@ -78,6 +78,8 @@
       "additionalProperties": false,
       "required": [
         "target_id",
+        "asset_ref",
+        "configuration_sha256",
         "kind",
         "unit",
         "target_value",
@@ -86,6 +88,8 @@
         "evidence_sha256",
         "reference_protocol_ref",
         "reference_protocol_sha256",
+        "reference_condition_ref",
+        "reference_condition_sha256",
         "reference_time_seconds",
         "target_window_start_seconds",
         "target_window_end_seconds",
@@ -217,6 +221,20 @@
             "null"
           ],
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "asset_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "reference_condition_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_condition_sha256": {
+          "$ref": "#/$defs/digest"
         }
       }
     },
