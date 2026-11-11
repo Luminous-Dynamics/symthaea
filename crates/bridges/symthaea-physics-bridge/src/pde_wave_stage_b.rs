@@ -431,6 +431,7 @@ pub fn j_fpu_linear_only(alpha: f64) -> Expr {
 /// Hamiltonian-drift sanity test (`fpu_hamiltonian_drift_is_small`), an
 /// independent check that the new RHS + the existing RK4 integrator behave
 /// physically together -- unrelated to the continuity-equation algebra.
+#[cfg(test)]
 fn fpu_hamiltonian(state: &[f64], alpha: f64) -> f64 {
     let (u1, u2, u3, v1, v2, v3) = (state[0], state[1], state[2], state[3], state[4], state[5]);
     let kinetic = 0.5 * (v1 * v1 + v2 * v2 + v3 * v3);
