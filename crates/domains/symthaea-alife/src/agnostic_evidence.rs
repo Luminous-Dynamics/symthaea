@@ -293,6 +293,7 @@ impl EvidenceConflict {
         &self,
         path: &str,
         evidence: &[EvidenceRecord],
+        property_evidence_ids: &[String],
         assessment: PropertyAssessment,
         issues: &mut Vec<String>,
     ) {
@@ -326,6 +327,11 @@ impl EvidenceConflict {
                 if !seen.insert(id.as_str()) {
                     issues.push(format!(
                         "{path} evidence id {id} appears on both sides of the conflict"
+                    ));
+                }
+                if !property_evidence_ids.iter().any(|property_id| property_id == id) {
+                    issues.push(format!(
+                        "{path} conflict evidence id {id} is not linked by the containing property finding"
                     ));
                 }
                 match evidence.iter().find(|record| record.id == *id) {
@@ -518,6 +524,7 @@ impl SystemProfile {
                 conflict.validate(
                     &format!("{path}.evidence_conflicts[{conflict_index}]"),
                     &self.evidence,
+                    &finding.evidence_ids,
                     finding.assessment,
                     &mut issues,
                 );
