@@ -214,7 +214,8 @@
     "safety_rights_contamination_and_authority_are_non_tradable": true,
     "discovery_reserve_fraction_basis": "data_storage_units",
     "nominal_reserve_fraction": 0.2,
-    "reserve_fraction_calculation": "R_DISCOVERY_REANALYSIS reserves 2 of 10 data-storage units; reserve is a budget allocation, not an already executed measurement."
+    "reserve_fraction_calculation": "R_DISCOVERY_REANALYSIS reserves 2 of 10 data-storage units; reserve is a budget allocation, not an already executed measurement.",
+    "resource_enumeration": "exact finite subset enumeration of five action flags; reserve action is selected as a budget commitment and is not itself an observation"
   },
   "dependence_model": {
     "principle": "Outcomes from actions sharing a common_cause_group must not be assumed conditionally independent without a justified model.",
@@ -294,5 +295,90 @@
     "deterministic_generation": true,
     "data_digest_sha256": null,
     "status": "SYNTHETIC_SPECIFICATION_ONLY_NOT_EXECUTED"
+  },
+  "joint_observation_model": {
+    "description": "Synthetic known-truth probability model. The targeted and untargeted channels share SAMPLE_PREP_A and therefore use an explicit joint distribution, not a product of marginal probabilities. Context and QC are declared conditionally independent of that group given the hidden world.",
+    "target_untargeted_joint_by_world": [
+      {
+        "world_id": "W1",
+        "target_positive_then_untargeted": [
+          [
+            0.65,
+            0.18,
+            0.07
+          ],
+          [
+            0.05,
+            0.02,
+            0.03
+          ]
+        ]
+      },
+      {
+        "world_id": "W2",
+        "target_positive_then_untargeted": [
+          [
+            0.07,
+            0.005,
+            0.005
+          ],
+          [
+            0.58,
+            0.095,
+            0.245
+          ]
+        ]
+      },
+      {
+        "world_id": "W3",
+        "target_positive_then_untargeted": [
+          [
+            0.02,
+            0.095,
+            0.005
+          ],
+          [
+            0.08,
+            0.705,
+            0.095
+          ]
+        ]
+      },
+      {
+        "world_id": "W4",
+        "target_positive_then_untargeted": [
+          [
+            0.015,
+            0.03,
+            0.005
+          ],
+          [
+            0.185,
+            0.62,
+            0.145
+          ]
+        ]
+      }
+    ],
+    "contextual_abiotic_context_match_probability_by_world": {
+      "W1": 0.25,
+      "W2": 0.85,
+      "W3": 0.2,
+      "W4": 0.75
+    },
+    "quality_control_pass_probability_by_world": {
+      "W1": 0.95,
+      "W2": 0.95,
+      "W3": 0.95,
+      "W4": 0.95
+    },
+    "discovery_reserve_recoverability_by_world": {
+      "W1": 0.3,
+      "W2": 0.25,
+      "W3": 0.9,
+      "W4": 0.85
+    },
+    "discovery_reserve_utility_weight": 0.8,
+    "conditional_independence_assumption": "Contextual geology and QC are conditionally independent of the shared sample-preparation group given the hidden world. This is an explicit synthetic assumption to be challenged in later fixtures."
   }
 }
