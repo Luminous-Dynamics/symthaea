@@ -50,7 +50,8 @@
       "decision_receipt_sha256",
       "effect_witness"
     ],
-    "policy_input_hash": "SHA-256 of canonical JSON for the exact task + authority_context + runtime_context projection supplied to the candidate. Evaluator-only fields must be absent from this input."
+    "policy_input_hash": "SHA-256 of RFC-like deterministic compact UTF-8 JSON over the exact object {task,authority_context,runtime_context}, with recursively lexicographically sorted object keys, array order preserved, JSON strings/numbers/booleans/null, no insignificant whitespace. Candidate model MUST receive only this object; all evaluator-only fields are excluded.",
+    "policy_input_hash_verification": "The Rust receipt qualifier recomputes this digest from the matching fixture manifest and rejects any result row whose policy_input_sha256 differs."
   },
   "metrics": [
     "paired_both_members_correct_rate",
