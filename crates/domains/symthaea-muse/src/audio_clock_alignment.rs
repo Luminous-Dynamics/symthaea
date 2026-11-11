@@ -355,6 +355,7 @@ fn local_novelty(
 fn candidate_score(
     flux: &[f64],
     expected_onsets: &[u64],
+    audio_frame_count: u64,
     lag_frames: i64,
     fft_frames: usize,
     hop_frames: usize,
@@ -370,6 +371,9 @@ fn candidate_score(
         let Some(target) = expected.checked_add(lag_frames) else {
             continue;
         };
+        if target < 0 || target as u64 >= audio_frame_count {
+            continue;
+        }
         let centered = target.saturating_add((fft_frames / 2) as i64);
         if centered < 0 {
             continue;
@@ -522,6 +526,7 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
         let (score, matched) = candidate_score(
             &flux,
             &expected_onsets,
+            wav.info.frame_count,
             lag,
             fft_frames,
             hop_frames,
