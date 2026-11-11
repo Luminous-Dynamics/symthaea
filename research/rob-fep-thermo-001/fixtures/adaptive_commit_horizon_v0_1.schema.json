@@ -315,7 +315,8 @@
             "qualified",
             "unknown",
             "stale",
-            "digest_mismatch"
+            "digest_mismatch",
+            "invalid_prefix_closure"
           ]
         },
         "max_ticks": {
@@ -371,7 +372,8 @@
                 "enum": [
                   "unknown",
                   "stale",
-                  "digest_mismatch"
+                  "digest_mismatch",
+                  "invalid_prefix_closure"
                 ]
               }
             },
