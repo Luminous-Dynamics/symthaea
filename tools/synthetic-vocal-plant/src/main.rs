@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use synthetic_vocal_plant::{default_output_dir, generate_suite};
 use synthetic_vocal_plant::observer::generate_observer_bundle;
+use synthetic_vocal_plant::calibration::generate_response_profile;
 
 fn main() {
     let output_dir = std::env::args_os()
@@ -29,6 +30,18 @@ fn main() {
                 }
                 Err(error) => {
                     eprintln!("independent observer failed: {error}");
+                    std::process::exit(1);
+                }
+            }
+            match generate_response_profile(&output_dir) {
+                Ok(profile) => {
+                    println!("response profile: response-profile.json");
+                    println!("VCCA sensitivity cells: {}", profile.fitted_sensitivities.len());
+                    println!("held-out prediction coverage: {:.3}", profile.holdout_coverage_fraction);
+                    println!("response profile promotable: {}", profile.promotable);
+                }
+                Err(error) => {
+                    eprintln!("response calibration failed closed: {error}");
                     std::process::exit(1);
                 }
             }
