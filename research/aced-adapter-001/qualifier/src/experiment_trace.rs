@@ -156,7 +156,7 @@ fn validate_proposal(payload: &Value) -> Result<String, String> {
         "predicted_risk",
         "risk_aversion_coefficient",
         "predicted_cost",
-        "predicted_net_value",
+        "predicted_selection_score",
     ];
     if !exact_fields(payload, &FIELDS) {
         return Err(
@@ -195,8 +195,8 @@ fn validate_proposal(payload: &Value) -> Result<String, String> {
     let evsi = finite_number(payload, "predicted_evsi").unwrap_or_default();
     let risk = finite_number(payload, "predicted_risk").unwrap_or_default();
     let cost = finite_number(payload, "predicted_cost").unwrap_or_default();
-    let net = finite_number(payload, "predicted_net_value")
-        .ok_or_else(|| format!("experiment {id} has invalid predicted_net_value"))?;
+    let net = finite_number(payload, "predicted_selection_score")
+        .ok_or_else(|| format!("experiment {id} has invalid predicted_selection_score"))?;
     let expected_net = match text(payload, "selector").unwrap_or("") {
         "EIG" => eig - cost,
         "EVSI" => evsi - cost,
@@ -205,7 +205,7 @@ fn validate_proposal(payload: &Value) -> Result<String, String> {
     };
     if (net - expected_net).abs() > TOLERANCE {
         return Err(format!(
-            "experiment {id} predicted_net_value is inconsistent with selector arithmetic"
+            "experiment {id} predicted_selection_score is inconsistent with selector arithmetic"
         ));
     }
     Ok(id.to_string())
@@ -474,7 +474,7 @@ mod tests {
             "predicted_risk": 0.01,
             "risk_aversion_coefficient": 1.0,
             "predicted_cost": 0.02,
-            "predicted_net_value": 0.15
+            "predicted_selection_score": 0.15
         })
     }
 
@@ -545,9 +545,9 @@ mod tests {
     }
 
     #[test]
-    fn inconsistent_predicted_net_value_is_rejected() {
+    fn inconsistent_predicted_selection_score_is_rejected() {
         let mut payload = proposal();
-        payload["predicted_net_value"] = json!(0.42);
+        payload["predicted_selection_score"] = json!(0.42);
         let first = event(
             "event-0",
             0,
