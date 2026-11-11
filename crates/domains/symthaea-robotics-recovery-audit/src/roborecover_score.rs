@@ -446,10 +446,10 @@ mod tests {
         vec![
             StageTypeGroup { stage: RecoveryStage::Approach, deviation: DeviationType::WrongTarget },
             StageTypeGroup { stage: RecoveryStage::Approach, deviation: DeviationType::WrongPose },
-            StageTypeGroup { stage: RecoveryStage::Contact, deviation: DeviationType::WrongTarget },
+            StageTypeGroup { stage: RecoveryStage::Approach, deviation: DeviationType::StageRollback },
+            StageTypeGroup { stage: RecoveryStage::Approach, deviation: DeviationType::SceneChange },
             StageTypeGroup { stage: RecoveryStage::Contact, deviation: DeviationType::WrongPose },
-            StageTypeGroup { stage: RecoveryStage::Move, deviation: DeviationType::StageRollback },
-            StageTypeGroup { stage: RecoveryStage::Move, deviation: DeviationType::SceneChange },
+            StageTypeGroup { stage: RecoveryStage::Move, deviation: DeviationType::WrongPose },
             StageTypeGroup { stage: RecoveryStage::Place, deviation: DeviationType::WrongTarget },
             StageTypeGroup { stage: RecoveryStage::Place, deviation: DeviationType::WrongPose },
             StageTypeGroup { stage: RecoveryStage::Place, deviation: DeviationType::SceneChange },
