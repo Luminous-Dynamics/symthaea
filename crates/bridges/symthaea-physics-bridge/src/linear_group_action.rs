@@ -372,7 +372,7 @@ impl LinearGroupActionV1 {
     }
 }
 
-fn validate_square_matrix(
+pub(crate) fn validate_square_matrix(
     matrix: &[Vec<f64>],
     dimension: usize,
     matrix_id: &str,
@@ -442,21 +442,21 @@ fn validate_generator_matrix(
     Ok(())
 }
 
-fn max_abs(matrix: &[Vec<f64>]) -> f64 {
+pub(crate) fn max_abs(matrix: &[Vec<f64>]) -> f64 {
     matrix
         .iter()
         .flatten()
         .fold(0.0_f64, |maximum, value| maximum.max(value.abs()))
 }
 
-fn scaled_frobenius_norm(matrix: &[Vec<f64>], scale: f64) -> f64 {
+pub(crate) fn scaled_frobenius_norm(matrix: &[Vec<f64>], scale: f64) -> f64 {
     matrix
         .iter()
         .flatten()
         .fold(0.0_f64, |norm, value| norm.hypot(value / scale))
 }
 
-fn relative_symmetry_defect(
+pub(crate) fn relative_symmetry_defect(
     metric: &[Vec<f64>],
     scale: f64,
     scaled_metric_cholesky_lower: &[Vec<f64>],
@@ -523,7 +523,7 @@ fn relative_symmetry_defect(
     scaled_frobenius_norm(&whitened, 1.0) / (dimension as f64).sqrt()
 }
 
-fn cholesky_lower_scaled_metric(
+pub(crate) fn cholesky_lower_scaled_metric(
     metric: &[Vec<f64>],
     scale: f64,
 ) -> Result<Vec<Vec<f64>>, LinearGroupActionAdmissionError> {
