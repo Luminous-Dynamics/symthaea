@@ -1246,9 +1246,9 @@
             "prefix_closed": true
           },
           "thermal": {
-            "status": "qualified",
-            "max_ticks": 8,
-            "context_digest": "ctx-ah01_queue_is_tightest",
+            "status": "invalid_prefix_closure",
+            "max_ticks": null,
+            "context_digest": null,
             "prefix_closed": false
           },
           "actuator": {
