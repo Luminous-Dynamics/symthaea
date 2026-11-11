@@ -12,7 +12,27 @@ const EPS: f64 = 1e-9;
 #[serde(deny_unknown_fields)]
 pub struct Corpus {
     pub corpus_version: String,
+    pub split_manifest: SplitManifest,
     pub cases: Vec<ValidationCase>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SplitManifest {
+    pub manifest_ref: String,
+    pub frozen_at_ms: u64,
+    pub assignments: Vec<SplitAssignment>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SplitAssignment {
+    pub vehicle_ref: String,
+    pub pack_ref: String,
+    pub configuration_sha256: String,
+    pub topology_sha256: String,
+    pub physical_group_ref: String,
+    pub partition: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -223,6 +243,10 @@ fn measurement_key(constraint: &str, scope_ref: &str, unit: &str) -> String {
 }
 
 fn canonicalize(corpus: &mut Corpus) {
+    corpus
+        .split_manifest
+        .assignments
+        .sort_by(|left, right| left.pack_ref.cmp(&right.pack_ref));
     corpus.cases.sort_by(|left, right| left.case_id.cmp(&right.case_id));
     for case in &mut corpus.cases {
         case.prediction.required_measurements.sort_by(|left, right| {
@@ -234,6 +258,86 @@ fn canonicalize(corpus: &mut Corpus) {
                 .cmp(&(&right.constraint, &right.scope_ref, &right.unit))
         });
     }
+}
+
+fn validate_split_manifest(corpus: &Corpus) -> Result<BTreeMap<String, &SplitAssignment>, String> {
+    let manifest = &corpus.split_manifest;
+    if !nonempty(&manifest.manifest_ref) || manifest.assignments.is_empty() {
+        return Err("split manifest identity or assignment set is empty".to_owned());
+    }
+    let mut assignments = BTreeMap::new();
+    let mut group_refs = BTreeSet::new();
+    for assignment in &manifest.assignments {
+        if !nonempty(&assignment.vehicle_ref)
+            || !nonempty(&assignment.pack_ref)
+            || !is_sha256(&assignment.configuration_sha256)
+            || !is_sha256(&assignment.topology_sha256)
+            || !nonempty(&assignment.physical_group_ref)
+            || !["TRAIN", "VALIDATION", "CALIBRATION", "TEST_BLIND"]
+                .contains(&assignment.partition.as_str())
+        {
+            return Err(format!(
+                "split manifest contains an invalid group assignment for pack {}",
+                assignment.pack_ref
+            ));
+        }
+        if assignments
+            .insert(assignment.pack_ref.clone(), assignment)
+            .is_some()
+        {
+            return Err(format!(
+                "split manifest duplicates physical pack {}",
+                assignment.pack_ref
+            ));
+        }
+        if !group_refs.insert(assignment.physical_group_ref.clone()) {
+            return Err(format!(
+                "physical group {} appears more than once across split assignments",
+                assignment.physical_group_ref
+            ));
+        }
+    }
+
+    let manifest_bytes = serde_json::to_vec(manifest)
+        .map_err(|error| format!("split manifest serialization: {error}"))?;
+    let manifest_digest = sha256(&manifest_bytes);
+    for case in &corpus.cases {
+        let prediction = &case.prediction;
+        if prediction.split_manifest_ref != manifest.manifest_ref
+            || prediction.split_manifest_sha256 != manifest_digest
+            || prediction.split_frozen_at_ms != manifest.frozen_at_ms
+        {
+            return Err(format!(
+                "prediction {} does not bind to the frozen split-manifest payload",
+                case.case_id
+            ));
+        }
+        let assignment = assignments
+            .get(&prediction.asset.pack_ref)
+            .ok_or_else(|| {
+                format!(
+                    "prediction {} pack {} is absent from the frozen split manifest",
+                    case.case_id, prediction.asset.pack_ref
+                )
+            })?;
+        if assignment.vehicle_ref != prediction.asset.vehicle_ref
+            || assignment.configuration_sha256 != prediction.asset.configuration_sha256
+            || assignment.topology_sha256 != prediction.asset.topology_sha256
+            || assignment.partition != prediction.evaluation_partition
+        {
+            return Err(format!(
+                "prediction {} does not match its frozen split group assignment",
+                case.case_id
+            ));
+        }
+        if assignment.physical_group_ref != prediction.asset.pack_ref {
+            return Err(format!(
+                "prediction {} is not bound to the pack-level independent group key",
+                case.case_id
+            ));
+        }
+    }
+    Ok(assignments)
 }
 
 fn validate_case_structure(case: &ValidationCase) -> Vec<String> {
@@ -619,6 +723,7 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
 
     let canonical = serde_json::to_vec(&corpus)
         .map_err(|error| format!("canonical corpus serialization: {error}"))?;
+    let _split_assignments = validate_split_manifest(&corpus)?;
     let mut case_ids = BTreeSet::new();
     let mut pack_ids = BTreeSet::new();
     let mut mission_report_ids = BTreeSet::new();
