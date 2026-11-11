@@ -1,0 +1,56 @@
+name: EV early-window multi-output outcome audit v0.1
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_EARLY_WINDOW_OUTCOMES_V0_1.md"
+      - "schemas/transport/ev_early_window_outcomes_v0_1.schema.json"
+      - "fixtures/ev_battery/early_window_outcomes_v0_1.json"
+      - "tools/ev-early-window-outcome-audit/**"
+      - ".github/workflows/ev-early-window-outcome-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-early-window-outcome-audit/Cargo.toml -- --check
+
+      - name: Run causal-feature, reference-lineage and censoring tests
+        run: cargo test --manifest-path tools/ev-early-window-outcome-audit/Cargo.toml
+
+      - name: Audit frozen early-window outcome corpus
+        run: |
+          cargo run --manifest-path tools/ev-early-window-outcome-audit/Cargo.toml -- \
+            --schema schemas/transport/ev_early_window_outcomes_v0_1.schema.json \
+            --corpus fixtures/ev_battery/early_window_outcomes_v0_1.json \
+            > "$RUNNER_TEMP/early-window-outcomes.json"
+          jq -e '
+            .case_count == 13 and
+            .accepted_count == 5 and
+            .rejected_count == 8 and
+            .right_censored_rdt_count == 1 and
+            .competing_event_rdt_count == 1 and
+            .not_computable_target_count == 1 and
+            any(.cases[]; .case_id == "multioutput-30s-accepted" and
+              (.targets | length) == 4 and
+              any(.targets[]; .kind == "SOH" and .evidence_grade == "INDEPENDENT_PHYSICAL_REFERENCE") and
+              any(.targets[]; .kind == "POWER_ENVELOPE" and .evidence_grade == "MODEL_DERIVED_NOT_PHYSICAL_MEASUREMENT")) and
+            any(.cases[]; .case_id == "rdt-right-censored-preserved" and
+              .targets[0].disposition == "ADMISSIBLE_RIGHT_CENSORED") and
+            any(.cases[]; .case_id == "rdt-competing-event-preserved" and
+              .targets[0].disposition == "ADMISSIBLE_COMPETING_EVENT") and
+            any(.cases[]; .case_id == "thermal-coverage-not-computable" and
+              .targets[0].disposition == "NOT_COMPUTABLE")
+          ' "$RUNNER_TEMP/early-window-outcomes.json"
