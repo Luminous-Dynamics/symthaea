@@ -873,7 +873,192 @@
         "expected": {
           "$ref": "#/$defs/expected"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "expected": {
+                "properties": {
+                  "remote_result_can_enter_local_admission": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "remote_result_can_enter_local_admission"
+                ]
+              }
+            },
+            "required": [
+              "expected"
+            ]
+          },
+          "then": {
+            "properties": {
+              "inputs": {
+                "properties": {
+                  "remote_endpoint_authenticated": {
+                    "const": true
+                  },
+                  "remote_model_digest_matches": {
+                    "const": true
+                  },
+                  "observation_anchor_matches": {
+                    "const": true
+                  },
+                  "clock_mapping_known": {
+                    "const": true
+                  },
+                  "privacy_policy_allows_remote_data": {
+                    "const": true
+                  },
+                  "local_rta_admissible": {
+                    "const": true
+                  },
+                  "result_age_upper_bound_ms": {
+                    "type": "number"
+                  },
+                  "actuation_aoi_upper_bound_ms": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "remote_endpoint_authenticated",
+                  "remote_model_digest_matches",
+                  "observation_anchor_matches",
+                  "clock_mapping_known",
+                  "privacy_policy_allows_remote_data",
+                  "local_rta_admissible",
+                  "result_age_upper_bound_ms",
+                  "actuation_aoi_upper_bound_ms"
+                ]
+              },
+              "expected": {
+                "properties": {
+                  "actuation_aoi_gate": {
+                    "const": "pass"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "expected": {
+                "properties": {
+                  "actuation_aoi_gate": {
+                    "const": "pass"
+                  }
+                }
+              }
+            },
+            "required": [
+              "expected"
+            ]
+          },
+          "then": {
+            "properties": {
+              "inputs": {
+                "properties": {
+                  "actuation_aoi_upper_bound_ms": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "actuation_aoi_upper_bound_ms"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "expected": {
+                "properties": {
+                  "decision_value_gate": {
+                    "const": "pass"
+                  }
+                }
+              }
+            },
+            "required": [
+              "expected"
+            ]
+          },
+          "then": {
+            "properties": {
+              "inputs": {
+                "properties": {
+                  "decision_evsi": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "decision_evsi_unit": {
+                    "const": "task_loss_units"
+                  }
+                },
+                "required": [
+                  "decision_evsi",
+                  "decision_evsi_unit"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "expected": {
+                "properties": {
+                  "foreground_deadline_gate": {
+                    "const": "pass"
+                  }
+                }
+              }
+            },
+            "required": [
+              "expected"
+            ]
+          },
+          "then": {
+            "properties": {
+              "inputs": {
+                "properties": {
+                  "foreground_deadline_misses_unmanaged": {
+                    "type": "integer"
+                  },
+                  "foreground_deadline_misses_managed": {
+                    "type": "integer"
+                  },
+                  "llm_throughput_retained_pct": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "memory_bandwidth_pressure_pct": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "safe_suspension_points_available": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "foreground_deadline_misses_unmanaged",
+                  "foreground_deadline_misses_managed",
+                  "llm_throughput_retained_pct",
+                  "memory_bandwidth_pressure_pct",
+                  "safe_suspension_points_available"
+                ]
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
