@@ -75,6 +75,12 @@ Compare:
 
 Report the best / worst / mean-descriptive scenario value, minimum net EVSI, selection reversals, regret under each realized held-out model, stop rate and performance as the uncertainty set expands. The uncertainty set must be frozen before the trial and include plausible prior, likelihood and utility variation; a model cannot choose a convenient set after it sees the observations. This is a Luminous research extension, not an upstream ACED metric or reported SOTA result.
 
+### B3. ACED-Query and statistical measurement validity
+
+ACED-Query supplies three official agent architectures—Active, Active+Code and Modular—under a four-outer-turn protocol, with a separate guess-only baseline. Core and Guess tracks must be reported separately and payload identity must be controlled by SHA-256, not basename. Preserve the upstream evaluator and its LLM extraction step for official reproduction, while adding a deterministic-parser diagnostic lane and independent adjudication of a stratified sample.
+
+The upstream Active agent displays categorical distribution shifts using fixed absolute thresholds. Symthaea's diagnostic implementation reports total-variation distance, per-category effect sizes and Wilson/Newcombe intervals, with an externally supplied familywise critical value. Compare fixed-threshold alerts against the preregistered interval/measurement-validity arm across low and high sample sizes, rare categories and multi-category outcomes. Keep distribution shift distinct from identified causal effect and preserve the intervention-assignment mechanism.
+
 ### C. Abstention and runtime stop
 
 **Stretch target:** exceed 70% paired act/abstain accuracy on a regenerated, independently authored suite of at least 500 pairs, across multiple harnesses, while preserving actionable completion.
