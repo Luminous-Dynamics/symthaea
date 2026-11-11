@@ -33,6 +33,7 @@ pub enum AudioEventObservationStatusV1 {
     TruncatedByAudio,
     FundamentalAboveNyquist,
     InsufficientFrequencyResolution,
+    NoMeasurableSpectralEnergy,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -319,17 +320,27 @@ fn median(values: &mut [f64]) -> f64 {
     }
 }
 
+enum SpectralProbeResultV1 {
+    Measured {
+        harmonic_salience_db: f64,
+        fundamental_salience_db: f64,
+        harmonics_measured: u8,
+    },
+    NoMeasurableEnergy,
+    NoResolvableHarmonics,
+}
+
 fn spectral_salience(
     wav: &DecodedWavV1,
     window_start: usize,
     window_frames: usize,
     frequency_hz: f64,
-) -> Option<(f64, f64, u8)> {
+) -> SpectralProbeResultV1 {
     let sample_rate = f64::from(wav.info.sample_rate_hz);
     let channels = usize::from(wav.info.channels);
     let nyquist = sample_rate * 0.5;
     if frequency_hz >= nyquist {
-        return None;
+        return SpectralProbeResultV1::NoResolvableHarmonics;
     }
     let mut planner = FftPlanner::<f32>::new();
     let fft = planner.plan_fft_forward(window_frames);
@@ -354,7 +365,7 @@ fn spectral_salience(
     }
     let global_peak = spectrum.iter().copied().fold(0.0f64, f64::max);
     if global_peak <= 1e-12 {
-        return Some((f64::NEG_INFINITY, f64::NEG_INFINITY, 0));
+        return SpectralProbeResultV1::NoMeasurableEnergy;
     }
     let noise_floor = (global_peak * 1e-8).max(1e-12);
     let mut saliences = Vec::new();
@@ -379,11 +390,15 @@ fn spectral_salience(
         saliences.push(ratio_db);
     }
     if saliences.is_empty() {
-        return None;
+        return SpectralProbeResultV1::NoResolvableHarmonics;
     }
     let fundamental = saliences[0];
     let mean = saliences.iter().sum::<f64>() / saliences.len() as f64;
-    Some((mean, fundamental, saliences.len() as u8))
+    SpectralProbeResultV1::Measured {
+        harmonic_salience_db: mean,
+        fundamental_salience_db: fundamental,
+        harmonics_measured: saliences.len() as u8,
+    }
 }
 
 fn observe_note(
@@ -434,18 +449,26 @@ fn observe_note(
         return result;
     }
     let window_start = start as usize + (event_frames - window_frames) / 2;
-    let Some((harmonic_db, fundamental_db, harmonic_count)) =
-        spectral_salience(wav, window_start, window_frames, frequency)
-    else {
-        result.status = AudioEventObservationStatusV1::InsufficientFrequencyResolution;
-        return result;
-    };
     result.window_start_frame = Some(window_start as u64);
     result.window_frame_count = Some(window_frames as u32);
-    result.harmonic_salience_db = Some(harmonic_db);
-    result.fundamental_salience_db = Some(fundamental_db);
-    result.harmonics_measured = harmonic_count;
-    result.status = AudioEventObservationStatusV1::Measured;
+    match spectral_salience(wav, window_start, window_frames, frequency) {
+        SpectralProbeResultV1::Measured {
+            harmonic_salience_db,
+            fundamental_salience_db,
+            harmonics_measured,
+        } => {
+            result.harmonic_salience_db = Some(harmonic_salience_db);
+            result.fundamental_salience_db = Some(fundamental_salience_db);
+            result.harmonics_measured = harmonics_measured;
+            result.status = AudioEventObservationStatusV1::Measured;
+        }
+        SpectralProbeResultV1::NoMeasurableEnergy => {
+            result.status = AudioEventObservationStatusV1::NoMeasurableSpectralEnergy;
+        }
+        SpectralProbeResultV1::NoResolvableHarmonics => {
+            result.status = AudioEventObservationStatusV1::InsufficientFrequencyResolution;
+        }
+    }
     result
 }
 
@@ -518,6 +541,7 @@ pub fn validate_audio_event_observation_v1(
     midi: &MidiPerformanceArtifactV1,
 ) -> Vec<AudioEventObservationIssueV1> {
     let mut issues = validate_midi_artifact(midi);
+    let decoded_wav = decode_wav(wav_bytes);
     if receipt.schema != AUDIO_EVENT_OBSERVATION_SCHEMA_V1
         || receipt.score_sha256 != midi.manifest.score_sha256
         || receipt.midi_sha256 != midi.manifest.midi_sha256
@@ -525,6 +549,10 @@ pub fn validate_audio_event_observation_v1(
         || receipt.wav_sha256 != sha256_hex(wav_bytes)
     {
         issues.push(AudioEventObservationIssueV1::ReceiptInputBindingMismatch);
+    }
+    match decoded_wav {
+        Ok(decoded) if decoded.info == receipt.wav_info => {}
+        _ => issues.push(AudioEventObservationIssueV1::ReceiptInputBindingMismatch),
     }
     let expected: BTreeSet<_> = midi
         .manifest
@@ -704,6 +732,31 @@ mod tests {
             validate_audio_event_observation_v1(&receipt, &wav, &midi)
                 .contains(&AudioEventObservationIssueV1::ReceiptDigestMismatch)
         );
+    }
+
+    #[test]
+    fn silent_audio_is_an_explicit_observation_abstention() {
+        let midi = midi_artifact(69, 1_920);
+        let silent = sine_wav(440.0, 1.0)
+            .into_iter()
+            .collect::<Vec<_>>();
+        let mut reader = WavReader::new(Cursor::new(silent)).unwrap();
+        let spec = reader.spec();
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut writer = hound::WavWriter::new(&mut cursor, spec).unwrap();
+            for _ in 0..reader.duration() {
+                let _ = reader.samples::<f32>();
+                writer.write_sample(0.0f32).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+        let receipt = observe_rendered_audio_events_v1(&cursor.into_inner(), &midi).unwrap();
+        assert_eq!(
+            receipt.note_observations[0].status,
+            AudioEventObservationStatusV1::NoMeasurableSpectralEnergy
+        );
+        assert!(receipt.note_observations[0].harmonic_salience_db.is_none());
     }
 
     #[test]
