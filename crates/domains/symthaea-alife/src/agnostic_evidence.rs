@@ -409,26 +409,28 @@ impl SystemProfile {
                 PropertyAssessment::InsufficientEvidence | PropertyAssessment::NotTested => {}
             }
 
+            if let Some(coverage) = &finding.coverage {
+                coverage.validate(&format!("{path}.coverage"), &mut issues);
+                if let Some(calibration_id) = &coverage.calibration_evidence_id {
+                    match self.evidence.iter().find(|record| record.id == *calibration_id) {
+                        Some(record)
+                            if record.outcome != EvidenceOutcome::InvalidMeasurement
+                                && record.outcome != EvidenceOutcome::NotAcquired => {}
+                        _ => issues.push(format!(
+                            "{path}.coverage.calibration_evidence_id references missing or unusable evidence: {calibration_id}"
+                        )),
+                    }
+                }
+            }
+
             if no_detection {
                 match &finding.coverage {
-                    Some(coverage) => {
-                        coverage.validate(&format!("{path}.coverage"), &mut issues);
-                        if coverage.false_negative_risks.is_empty() {
-                            issues.push(format!(
-                                "{path} NoDetection coverage requires at least one explicit false-negative risk mode"
-                            ));
-                        }
-                        if let Some(calibration_id) = &coverage.calibration_evidence_id {
-                            match self.evidence.iter().find(|record| record.id == *calibration_id) {
-                                Some(record)
-                                    if record.outcome != EvidenceOutcome::InvalidMeasurement
-                                        && record.outcome != EvidenceOutcome::NotAcquired => {}
-                                _ => issues.push(format!(
-                                    "{path}.coverage.calibration_evidence_id references missing or unusable evidence: {calibration_id}"
-                                )),
-                            }
-                        }
+                    Some(coverage) if coverage.false_negative_risks.is_empty() => {
+                        issues.push(format!(
+                            "{path} NoDetection coverage requires at least one explicit false-negative risk mode"
+                        ));
                     }
+                    Some(_) => {}
                     None => issues.push(format!(
                         "{path} references NoDetection evidence and therefore requires coverage"
                     )),
