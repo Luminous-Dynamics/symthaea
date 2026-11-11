@@ -53,5 +53,8 @@ jobs:
               .total_battery_discharge_energy_kwh_upper == 1) and
             any(.cases[]; .case_id == "exact_reserve_boundary" and
               .disposition == "FEASIBLE_WITHIN_DECLARED_ENVELOPE" and
-              .minimum_energy_remaining_above_reserve_kwh_lower == 0)
+              .minimum_energy_remaining_above_reserve_kwh_lower == 0) and
+            any(.cases[]; .case_id == "regen_exceeds_charge_acceptance" and
+              .disposition == "INFEASIBLE" and
+              (.total_regenerative_energy_credited_kwh_lower - 0.3958333333333333 | fabs) < 1e-9)
           ' "$RUNNER_TEMP/mission-capability-report.json"
