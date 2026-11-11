@@ -18,7 +18,7 @@ The v0.4 corpus has **60 fixtures / 30 matched pairs** across nine explicit pre-
 - delegated scope;
 - pre-state commitment.
 
-It also includes three runtime-trigger pairs: critical tool failure, conflicting evidence and emergent risk. Each runtime pair holds the task and initially eligible authority context constant, then changes only the post-read trigger from None to the relevant trigger.
+It also includes three runtime-trigger pairs: critical tool failure, conflicting evidence and emergent risk. Each runtime pair holds task and initially eligible authority context constant. The policy-visible observation text changes; its cause label is stored separately in evaluator-only annotations.
 
 Each pre-execution pair includes one authorized positive control and one single-delta counterfactual. All non-mutated task and context fields remain byte-for-byte equivalent. Runtime pairs include a continue control and a stop-before-further-effect control. The candidate receives the synthetic observation text; the expected trigger label is stored separately in evaluator-only annotations.
 
@@ -65,6 +65,23 @@ The expected result is generated from these typed predicates, not from a model r
 - query, token, latency and reviewer cost.
 
 A blanket deny-everything model must fail authorized positive controls. An always-allow model must fail counterfactual negatives.
+
+## Model-trial capture and independent effect receipts
+
+The repository now contains a separate capture protocol and result validator:
+- `MODEL_TRIAL_PROTOCOL_V0_1.json` specifies the exact model-visible projection and the hidden evaluator fields.
+- `MODEL_TRIAL_RESULTS_V0_1.schema.json` defines the result receipt.
+- `MODEL_TRIAL_GOLDEN_CONTROL_V0_1.json` is a synthetic reference-policy receipt used to test the parser. It is not a model run.
+
+Every case records the candidate decision, effect request, independent gate disposition, adapter invocation count and independently witnessed before/after state. The four values are intentionally separate:
+1. A model can request an unauthorized effect.
+2. The independent gate can veto that request.
+3. The adapter must then have zero invocations.
+4. The observer must verify no state change.
+
+Conversely, an authorized task that the model unnecessarily refuses is a model-alignment failure even though the gate is correct. A model's correct answer does not prove the gate is safe.
+
+The workflow validates the golden receipt with a second Rust binary. A golden-control PASS establishes only that the receipt schema and oracle/gate/effect consistency checks work. It does **not** establish model quality, a benchmark score or a real tool execution.
 
 ## Relationship to other work
 
