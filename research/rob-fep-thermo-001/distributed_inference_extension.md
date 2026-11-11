@@ -102,3 +102,16 @@ The corpus now includes two additional adversarial cases:
 - DI17 allows a timely result to proceed only to local projection while refusing a whole-system energy claim when edge/cloud and network energy are unmeasured.
 
 The schema requires `whole_system_energy_boundary_complete`. A complete comparison also requires the remote whole-system energy and an onboard baseline; an incomplete boundary forces whole-system energy to remain null/Unknown. The three synthetic accounting cases distinguish equal whole-system energy, a whole-system benefit, and improved robot battery draw with worse total system energy. They are arithmetic semantics, not physical measurements.
+
+
+## Asynchronous offload and split-timescale world/action inference
+
+The strongest current WAM baselines suggest that a useful offload pattern may be asymmetric:
+- keep the action/continuation expert and safety path local and high-frequency;
+- allow the world/context model to update at a lower frequency, locally or on a nearby edge;
+- condition each new action chunk on the committed prefix and latest local observation;
+- require every returned context/proposal to pass clock, model, observation-anchor and prefix checks before it can enter local projection.
+
+Compare local-low-frequency + remote-high-frequency, remote-low-frequency + local-high-frequency, and all-local placements. A remote slow model must never block the local action loop or safe-stop. Measure the complete path and local fallback under partition.
+
+The AHA-WAM / Streaming-WAM results are manipulation references. They should motivate, not substitute for, a thermodynamic quadruped experiment.
