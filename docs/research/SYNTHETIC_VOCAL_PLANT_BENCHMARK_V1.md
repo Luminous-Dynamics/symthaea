@@ -1,6 +1,6 @@
 # SYNTH-VOCAL-001 — synthetic vocal acoustic plant and known-answer benchmark
 
-**Status:** implementation draft; 24 authored synthetic tests across the plant and observer; Rust compilation, tests and exact-head CI are pending.
+**Status:** implementation draft; 30 authored synthetic tests across the plant, observer and response-profile compiler; Rust compilation, tests and exact-head CI are pending.
 
 **Policy:** synthetic-only. No performer recordings, voice identities, external corpus assets, participant recruitment or permission requests are part of this track.
 
@@ -382,3 +382,55 @@ We should maintain four independent result boards:
 4. **Evidence integrity:** provenance coverage, repeatability, calibration validity, false-safe rate, reproducibility and correct abstention.
 
 The synthetic-only work can substantially advance boards 1, 2 and 4 without permissions. It can provide signal-processing baselines for board 3, but it cannot qualify human naturalness, singer identity or listener preference. The immediate win condition is a reliable, reproducible editing/control instrument that can later host better renderers, not an unsupported claim to have surpassed 42K-hour or 15.8K-hour trained generation systems.
+
+
+## 13. SYNTH-CAL-001 — measured response-profile compiler for VCCA
+
+The third slice (#11578) now fits a local control-response profile from actual synthetic PCM interventions. It is the missing producer between SYNTH-OBS-001 observations and the existing VCCA-001 allocator inputs.
+
+### One-factor calibration design
+
+Three input controls are perturbed independently and in both directions:
+
+| Control | Unit | Measured calibration amplitudes |
+|---|---|---|
+| Pitch shift | cents | −50, −25, +25, +50 |
+| Formant scale | unitless scale delta | −0.10, −0.05, +0.05, +0.10 |
+| Energy scale | unitless scale delta | −0.20, −0.10, +0.10, +0.20 |
+
+The same control amplitudes run over two distinct synthetic source families. For every baseline/intervention pair, the runner measures F0, LPC F0, F1/F2/F3, relative energy and voicing coverage using the PCM-only observer. The compiler records each control's off-diagonal effects as well as its intended target effect.
+
+### Local fit and uncertainty
+
+For metric m and control i, the initial local slope is fitted through the origin:
+
+~~~text
+J[m,i] = Σ(u[i] × Δy[m]) / Σ(u[i]²)
+~~~
+
+Coefficient uncertainty is bounded by the largest calibration residual ratio:
+
+~~~text
+epsilon_J[m,i] = max |Δy[m] − J[m,i] × u[i]| / |u[i]|
+~~~
+
+A separate no-op repeatability family supplies each metric's residual envelope. Both are derived from rendered/observed PCM, not from parameter values. They are engineering bounds for this deterministic synthetic backend, not confidence intervals or a guarantee of global linearity.
+
+The output includes a VCCA-shaped adapter with complete control bounds, metric residuals and sensitivity cells, but no duplicated allocator implementation. VCCA remains proposal-only and downstream capability admission and fresh post-render measurements remain mandatory.
+
+### Held-out promotion gate
+
+A third synthetic phrase family supplies a confirmatory baseline and one unseen intervention per control. The compiler compares each measured metric delta against the prediction interval derived from calibration coefficients and residual bounds.
+
+The profile is marked promotable only if:
+- all metric × control cells are present and finite;
+- each supported control has positive and negative excitation;
+- the calibration and confirmatory parameter digests/identities are disjoint;
+- no-op PCM repeatability and metric repeatability are complete;
+- every held-out metric response falls inside its predicted interval.
+
+A profile can be generated while remaining `promotable=false`. That is a fail-closed finding of model inadequacy, not a CI failure and not a reason to widen the interval after seeing the result. No claim of VCCA superiority or measured real-performer convergence is made.
+
+### Current source and evidence state
+
+The stacked branch now includes the original plant, two independent PCM observation paths, a no-op calibration report, metric-level VCRB-shaped observations, a response-profile compiler and a VCCA-shaped profile adapter. Total authored test count is 30 across the three slices. Rust execution remains pending until exact-head CI runs; no compilation, test, Clippy or generated-WAV pass is claimed from the local authoring environment.
