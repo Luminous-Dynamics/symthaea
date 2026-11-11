@@ -127,7 +127,7 @@ A disposition is a read-only model/evidence evaluation, not a permit to operate 
 
 ## Frozen synthetic corpus
 
-Ten cases exercise:
+Eleven cases exercise:
 1. Mixed discharge, regen and cruise mission that fits.
 2. Peak power fits but sustained energy crosses reserve.
 3. Repeated pulse mission whose later temperature bound crosses the mission limit.
@@ -138,6 +138,7 @@ Ten cases exercise:
 8. External/trolley energy recorded separately and not credited to the pack reserve.
 9. Non-contiguous mission steps -> REJECTED_INPUT.
 10. Exact end-reserve boundary -> FEASIBLE.
+11. Power uncertainty interval straddles zero -> check both possible discharge and charge acceptance, but credit zero guaranteed regen.
 
 All values, assets, identities, model references, trajectories and evidence digests are synthetic. The fixtures validate software arithmetic and fail-closed contract behavior only. They are not measured vehicle missions, real battery limits, or physically validated thermal trajectories.
 
