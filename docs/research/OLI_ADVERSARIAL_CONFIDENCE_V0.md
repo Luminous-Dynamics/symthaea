@@ -63,6 +63,21 @@ For 300 proposed mutations plus the initial baseline score, use `max_model_queri
 These remain work under #11451. A toy model in a unit test verifies the attack API only; it is not evidence of a reproduced scientific result.
 
 
+
+## Separate public 8-mer oracle: useful bridge, not a 9-mer substitute
+
+A distinct Avida dataset is publicly identified for the 2017 study:
+- C G, Nitash et al., *Origin of life in a digital microcosm*, DOI 10.1098/rsta.2016.0350.
+- 914 length-8 self-replicator sequences, Figshare DOI `10.6084/m9.figshare.4551559`.
+- The study uses Avida v2.14 and defines the positive phenotype by ability to form a growing colony.
+
+This is a useful first oracle-adapter integration case, but it is not the 36,171 length-9 map used in Gupta & Adami (2026). The 2021 paper's 36,171 raw 9-mer count has a separate circular-rotation convention: 30,547 rotation-distinct representatives vs 36,171 raw sequences. Do not mix the corpora or silently canonicalize sequence IDs.
+
+The 8-mer source profile still needs the exact Figshare file list, artifact checksum, file-specific reuse licence and a verified source-to-oracle mapping. It should be a separate `Avida-8mer-914` benchmark track. The 9-mer reproduction remains blocked on the exact 36,171 sequence list or source-faithful exhaustive oracle. The 8-mer artifact cannot satisfy that blocker.
+
+The cited Avida 2.14 fork `joshf93/MappingThePeaks` is useful implementation lineage, but its public `dataLink.txt` points at files for that repository's own final-analysis project; I have not verified that it contains the 9-mer map.
+
+
 ## Avida ground-truth identity trap: circular code rotations
 
 The underlying complete-map paper (C G & Adami, 2021) explicitly notes a distinction between 30,547 replicator representatives when circular code rotations are treated as equivalent and 36,171 raw length-9 sequences when rotation variants are counted. The 2026 adversarial study uses 36,171 unique lower-case length-9 strings in its classification split.
