@@ -21,7 +21,7 @@
 use std::f64::consts::TAU;
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.1.0";
+pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.2.0";
 
 /// Explicit operating-point efficiencies and bus limits.
 ///
@@ -92,6 +92,16 @@ pub struct DriveInput {
     pub duration_s: f64,
 }
 
+/// Positive motoring speed ratio, defined as motor speed divided by rotor speed.
+///
+/// This is a kinematic ratio only. Transmission efficiency remains separately
+/// supplied through DriveConfig. Reverse power flow and direction changes are
+/// outside this motoring-only reference.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TransmissionKinematics {
+    pub motor_to_rotor_speed_ratio: f64,
+}
+
 /// Component-boundary power and energy accounting for one drive path.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DriveReport {
@@ -118,6 +128,16 @@ pub struct DriveReport {
     pub dc_bus_input_energy_j: f64,
     /// DC input energy minus rotor energy and all component loss energies (J).
     pub energy_balance_residual_j: f64,
+}
+
+/// Drive-chain power report augmented with the motor-side shaft operating point.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DriveKinematicReport {
+    pub drive: DriveReport,
+    pub motor_to_rotor_speed_ratio: f64,
+    pub motor_angular_velocity_rad_s: f64,
+    pub motor_speed_rpm: f64,
+    pub motor_shaft_output_torque_nm: f64,
 }
 
 /// Explicit non-PASS outcomes for unsupported or infeasible operating points.
@@ -293,6 +313,50 @@ pub fn evaluate_drive(config: &DriveConfig, input: DriveInput) -> Result<DriveRe
         inverter_loss_energy_j,
         dc_bus_input_energy_j,
         energy_balance_residual_j,
+    })
+}
+
+/// Evaluate the existing rotor-side drive-chain reference and derive the motor
+/// shaft operating point using an explicit gearbox speed ratio.
+///
+/// The ratio convention is g = motor_speed / rotor_speed for positive
+/// motoring. The existing transmission efficiency determines motor-side
+/// mechanical power; this function uses that power and the transformed motor
+/// angular velocity to calculate motor shaft torque. It does not infer a
+/// gearbox ratio, efficiency map, motor limit, or physical operating domain.
+pub fn evaluate_drive_with_kinematics(
+    config: &DriveConfig,
+    input: DriveInput,
+    transmission: TransmissionKinematics,
+) -> Result<DriveKinematicReport, DriveError> {
+    let ratio = transmission.motor_to_rotor_speed_ratio;
+    if !ratio.is_finite() || ratio <= 0.0 {
+        return Err(DriveError::InvalidConfiguration(
+            "motor-to-rotor speed ratio must be finite and positive for motoring",
+        ));
+    }
+
+    let drive = evaluate_drive(config, input)?;
+    let motor_angular_velocity_rad_s = drive.rotor_angular_velocity_rad_s * ratio;
+    let motor_speed_rpm = motor_angular_velocity_rad_s * 60.0 / TAU;
+    let motor_shaft_output_torque_nm =
+        drive.motor_shaft_output_power_w / motor_angular_velocity_rad_s;
+
+    let derived = [
+        motor_angular_velocity_rad_s,
+        motor_speed_rpm,
+        motor_shaft_output_torque_nm,
+    ];
+    if derived.iter().any(|value| !value.is_finite()) || derived.iter().any(|value| *value <= 0.0) {
+        return Err(DriveError::NumericalOverflow);
+    }
+
+    Ok(DriveKinematicReport {
+        drive,
+        motor_to_rotor_speed_ratio: ratio,
+        motor_angular_velocity_rad_s,
+        motor_speed_rpm,
+        motor_shaft_output_torque_nm,
     })
 }
 
@@ -553,5 +617,124 @@ mod tests {
             evaluate_drive(&model, input),
             Err(DriveError::NumericalOverflow)
         );
+    }
+
+    #[test]
+    fn five_to_one_gearbox_maps_rotor_demand_to_motor_torque_speed() {
+        let mut model = config();
+        model.transmission_efficiency = 0.90;
+        model.motor_efficiency = 0.95;
+        model.inverter_efficiency = 0.98;
+        let input = input_for_power(10_000.0, 400.0, 12.0);
+        let report = evaluate_drive_with_kinematics(
+            &model,
+            input,
+            TransmissionKinematics {
+                motor_to_rotor_speed_ratio: 5.0,
+            },
+        )
+        .unwrap();
+
+        let expected_motor_angular_velocity = input.rotor_speed_rpm * TAU / 60.0 * 5.0;
+        let expected_motor_power = 10_000.0 / 0.90;
+        let expected_motor_torque = expected_motor_power / expected_motor_angular_velocity;
+        assert!((report.motor_speed_rpm - 15_000.0).abs() < 1.0e-9);
+        assert!(
+            (report.motor_angular_velocity_rad_s - expected_motor_angular_velocity).abs() < 1.0e-12
+        );
+        assert!((report.drive.motor_shaft_output_power_w - expected_motor_power).abs() < 1.0e-8);
+        assert!((report.motor_shaft_output_torque_nm - expected_motor_torque).abs() < 1.0e-12);
+        assert!(
+            (report.motor_shaft_output_torque_nm * report.motor_angular_velocity_rad_s
+                - report.drive.motor_shaft_output_power_w)
+                .abs()
+                < 1.0e-8
+        );
+        assert!(
+            (report.drive.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.95 * 0.98)).abs() < 1.0e-8
+        );
+    }
+
+    #[test]
+    fn direct_drive_kinematics_preserve_rotor_speed_and_torque() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let report = evaluate_drive_with_kinematics(
+            &model,
+            input,
+            TransmissionKinematics {
+                motor_to_rotor_speed_ratio: 1.0,
+            },
+        )
+        .unwrap();
+        assert!((report.motor_speed_rpm - input.rotor_speed_rpm).abs() < 1.0e-12);
+        assert!(
+            (report.motor_shaft_output_torque_nm - input.rotor_shaft_torque_nm).abs() < 1.0e-12
+        );
+    }
+
+    #[test]
+    fn invalid_gear_ratios_are_rejected() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        for ratio in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(matches!(
+                evaluate_drive_with_kinematics(
+                    &model,
+                    input,
+                    TransmissionKinematics {
+                        motor_to_rotor_speed_ratio: ratio,
+                    }
+                ),
+                Err(DriveError::InvalidConfiguration(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn gear_ratio_overflow_and_underflow_fail_closed() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        for ratio in [f64::MAX, f64::MIN_POSITIVE] {
+            assert_eq!(
+                evaluate_drive_with_kinematics(
+                    &model,
+                    input,
+                    TransmissionKinematics {
+                        motor_to_rotor_speed_ratio: ratio,
+                    }
+                ),
+                Err(DriveError::NumericalOverflow)
+            );
+        }
+    }
+
+    #[test]
+    fn changing_gear_ratio_changes_motor_torque_speed_not_chain_power() {
+        let mut model = config();
+        model.transmission_efficiency = 0.90;
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let low_ratio = evaluate_drive_with_kinematics(
+            &model,
+            input,
+            TransmissionKinematics {
+                motor_to_rotor_speed_ratio: 2.0,
+            },
+        )
+        .unwrap();
+        let high_ratio = evaluate_drive_with_kinematics(
+            &model,
+            input,
+            TransmissionKinematics {
+                motor_to_rotor_speed_ratio: 5.0,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            low_ratio.drive.dc_bus_input_power_w,
+            high_ratio.drive.dc_bus_input_power_w
+        );
+        assert!(high_ratio.motor_speed_rpm > low_ratio.motor_speed_rpm);
+        assert!(high_ratio.motor_shaft_output_torque_nm < low_ratio.motor_shaft_output_torque_nm);
     }
 }
