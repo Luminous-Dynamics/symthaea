@@ -36,8 +36,8 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 15,
-      "maxItems": 15,
+      "minItems": 17,
+      "maxItems": 17,
       "uniqueItems": true,
       "allOf": [
         {
@@ -264,6 +264,36 @@
           },
           "minContains": 1,
           "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH16_BOUND_FROM_DIFFERENT_ACTION_CONTEXT"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH17_BOUND_IS_NOT_PREFIX_CLOSED"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
         }
       ],
       "items": {
@@ -294,6 +324,16 @@
             "null"
           ],
           "minimum": 0
+        },
+        "context_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "prefix_closed": {
+          "type": "boolean"
         }
       },
       "allOf": [
@@ -313,6 +353,13 @@
               "max_ticks": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "context_digest": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prefix_closed": {
+                "const": true
               }
             }
           }
@@ -336,6 +383,12 @@
             "properties": {
               "max_ticks": {
                 "type": "null"
+              },
+              "context_digest": {
+                "type": "null"
+              },
+              "prefix_closed": {
+                "const": false
               }
             }
           }
@@ -394,7 +447,8 @@
         "progress_only_recommended_ticks",
         "executed_prefix_matches",
         "model_digest_matches",
-        "minimum_commit_ticks"
+        "minimum_commit_ticks",
+        "common_context_digest"
       ],
       "properties": {
         "bounds": {
@@ -413,6 +467,10 @@
         "minimum_commit_ticks": {
           "type": "integer",
           "minimum": 0
+        },
+        "common_context_digest": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -432,7 +490,8 @@
             "eligible",
             "unknown_hold",
             "zero_horizon_fallback",
-            "provenance_mismatch"
+            "provenance_mismatch",
+            "invalid_bound_semantics"
           ]
         },
         "selected_horizon_ticks": {
