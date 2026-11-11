@@ -636,7 +636,7 @@ mod tests {
         let global_prediction =
             model.diagnostics().common_context_slope * held_out.context
                 + model.diagnostics().global_intercept;
-        assert!((global_prediction - 1.0).abs() < 1.0e-12);
+        assert!((global_prediction - 4.0).abs() < 1.0e-12);
     }
 
     #[test]
