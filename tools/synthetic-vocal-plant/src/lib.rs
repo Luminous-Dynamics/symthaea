@@ -1164,6 +1164,23 @@ mod tests {
     }
 
     #[test]
+    fn formant_observer_keeps_high_register_synthetic_frames_voiced() {
+        let mut high = base();
+        let target = high
+            .iter_mut()
+            .find(|segment| segment.segment_id == "proxy-vowel-c")
+            .expect("target");
+        target.f0_hz = 600.0;
+        target.vibrato_depth_cents = 0.0;
+        let rendered = render(&high);
+        let observed =
+            measure_segment_formants(&rendered, "proxy-vowel-c", DEFAULT_SAMPLE_RATE_HZ)
+                .expect("high-register formants should be analyzed");
+        assert_eq!(observed.f0_max_hz, 700.0);
+        assert!(observed.voiced_frame_count > 0);
+    }
+
+    #[test]
     fn formant_observer_does_not_report_voiced_frames_for_silenced_pcm() {
         let mut rendered = render(&base());
         let range = range_by_id(&rendered, "proxy-vowel-c").expect("target range");
