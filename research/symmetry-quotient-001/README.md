@@ -20,7 +20,7 @@ The exact discrete task contract records domain membership, admissibility, feasi
 
 The certificate includes problem/action/group identities, group order, candidate count, deterministic orbit representatives, every orbit member, forward and inverse group-element witnesses, and recomputed check counts.
 
-The verifier does not trust the certificate's counts or orbit listing. It revalidates the group and action, checks every forward and inverse witness, checks exact task-semantic equality, verifies that each orbit is complete under every group element, and requires a disjoint cover of the original candidate universe.
+The verifier does not trust the certificate's counts, orbit listing, or stabilizers. It revalidates the group and action, checks every forward and inverse witness, checks exact task-semantic equality, verifies that each orbit is complete under every group element, reconstructs each stabilizer from the action, checks subgroup closure, verifies |G| = |orbit| × |stabilizer|, and requires a disjoint cover of the original candidate universe.
 
 The lift operation first replays the certificate, then maps a selected representative to every original candidate in its orbit. In this finite-indexed v0.1 reference, lifting returns candidate identities and transformation witnesses; it is not a continuous-state lifting mechanism.
 
