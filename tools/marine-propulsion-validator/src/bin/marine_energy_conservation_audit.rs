@@ -346,7 +346,6 @@ fn calculate(record: &Value) -> AuditReport {
     let components = record.get("components").and_then(Value::as_array).cloned().unwrap_or_default();
     let flows = record.get("flows").and_then(Value::as_array).cloned().unwrap_or_default();
     let mut component_ids = BTreeSet::new();
-    let mut component_by_id = BTreeMap::new();
     for (index, component) in components.iter().enumerate() {
         let path = format!("/components/{index}");
         let id = component.get("component_id").and_then(Value::as_str).unwrap_or("");
@@ -356,8 +355,6 @@ fn calculate(record: &Value) -> AuditReport {
                 "INVALID",
                 format!("missing or duplicate component id '{id}'"),
             );
-        } else {
-            component_by_id.insert(id.to_owned(), component.clone());
         }
     }
 
@@ -465,8 +462,7 @@ fn calculate(record: &Value) -> AuditReport {
 
         let amount = flow
             .get("energy")
-            .map(|value| read_energy(value, &format!("{path}/energy"), &evidence_ids, &mut findings))
-            .flatten();
+            .and_then(|value| read_energy(value, &format!("{path}/energy"), &evidence_ids, &mut findings));
 
         if let Some(energy) = flow.get("energy") {
             if energy.get("method_id") != flow.get("method_id") {
@@ -544,12 +540,10 @@ fn calculate(record: &Value) -> AuditReport {
 
         let loss = component
             .get("conversion_loss")
-            .map(|value| read_energy(value, &format!("{path}/conversion_loss"), &evidence_ids, &mut findings))
-            .flatten();
+            .and_then(|value| read_energy(value, &format!("{path}/conversion_loss"), &evidence_ids, &mut findings));
         let storage = component
             .get("storage_change")
-            .map(|value| read_storage_delta(value, &format!("{path}/storage_change"), &evidence_ids, &mut findings))
-            .flatten();
+            .and_then(|value| read_storage_delta(value, &format!("{path}/storage_change"), &evidence_ids, &mut findings));
 
         if let Some(loss) = loss {
             add_i128(&mut total_loss, loss.value, &path, &mut findings);
