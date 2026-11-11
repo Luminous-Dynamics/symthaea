@@ -433,10 +433,11 @@ mod tests {
         fs::write(frame_dir.join("first.rgb"), &first_pixels).unwrap();
         fs::write(frame_dir.join("second.rgb"), &second_pixels).unwrap();
 
-        let first_state = VehicleState::cruising(10.0);
+        let mut first_state = VehicleState::cruising(10.0);
+        first_state.timestamp = 0.01;
         let mut second_state = VehicleState::cruising(10.0);
         second_state.timestamp = 0.02;
-        let first_upstream = test_upstream_receipt(&first_pixels, 1, 1, 10_000);
+        let first_upstream = test_upstream_receipt(&first_pixels, 2, 1, 10_000);
         // Upstream world tick advances from 1 to 2, and the capture clock and
         // vehicle-state clock advance, but the second observation sequence
         // rolls back from 1 to 1. This passes upstream identity checks and is
@@ -449,7 +450,7 @@ mod tests {
             "vision_config": VisionConfig::default(),
             "observations": [
                 {
-                    "sequence": 1,
+                    "sequence": 2,
                     "timestamp_us": 10_000,
                     "vehicle_state_timestamp_us": 10_000,
                     "pixels_file": "frames/first.rgb",
