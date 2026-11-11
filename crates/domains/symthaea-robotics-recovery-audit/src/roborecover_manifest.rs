@@ -663,7 +663,8 @@ mod tests {
     #[test]
     fn rejects_malformed_hashes_nonpositive_actions_and_prefix_mismatches() {
         let mut csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test, true);
-        csv = csv.replacen(&"c".repeat(64), "not-a-sha", 1);
+        let valid_hash = "c".repeat(64);
+        csv = csv.replacen(valid_hash.as_str(), "not-a-sha", 1);
         let errors = parse_pinned_split_csv(
             &csv,
             context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
@@ -761,7 +762,7 @@ mod tests {
             "Approach",
             "Wrong Pose",
         );
-        csv = csv.replacen(&old, &first, 1);
+        csv = csv.replacen(old.as_str(), first.as_str(), 1);
 
         let errors = parse_pinned_split_csv(&csv, context(platform, BenchmarkSplit::Test))
             .unwrap_err();
@@ -769,6 +770,58 @@ mod tests {
             issue,
             SplitManifestIssue::TestGroupCountMismatch { .. }
         )));
+    }
+
+
+    #[test]
+    fn training_manifest_retains_the_tenth_training_only_group() {
+        let platform = BenchmarkPlatform::Libero;
+        let split = BenchmarkSplit::Train;
+        let groups = [
+            StageTypeGroup { stage: RecoveryStage::Approach, deviation: DeviationType::WrongPose },
+            StageTypeGroup { stage: RecoveryStage::Approach, deviation: DeviationType::WrongTarget },
+            StageTypeGroup { stage: RecoveryStage::Approach, deviation: DeviationType::StageRollback },
+            StageTypeGroup { stage: RecoveryStage::Approach, deviation: DeviationType::SceneChange },
+            StageTypeGroup { stage: RecoveryStage::Contact, deviation: DeviationType::WrongPose },
+            StageTypeGroup { stage: RecoveryStage::Move, deviation: DeviationType::WrongPose },
+            StageTypeGroup { stage: RecoveryStage::Move, deviation: DeviationType::WrongTarget },
+            StageTypeGroup { stage: RecoveryStage::Place, deviation: DeviationType::WrongPose },
+            StageTypeGroup { stage: RecoveryStage::Place, deviation: DeviationType::WrongTarget },
+            StageTypeGroup { stage: RecoveryStage::Place, deviation: DeviationType::SceneChange },
+        ];
+        let mut rows = vec![EXPECTED_HEADER.to_owned()];
+        for index in 0..800 {
+            let group = groups[index % groups.len()];
+            let stage = match group.stage {
+                RecoveryStage::Approach => "Approach",
+                RecoveryStage::Contact => "Contact",
+                RecoveryStage::Move => "Move",
+                RecoveryStage::Place => "Place",
+            };
+            let deviation = match group.deviation {
+                DeviationType::WrongTarget => "Wrong Target",
+                DeviationType::WrongPose => "Wrong Pose",
+                DeviationType::StageRollback => "Stage Rollback",
+                DeviationType::SceneChange => "Scene Change",
+            };
+            rows.push(row(
+                &format!("train-{index:03}"),
+                platform,
+                split,
+                stage,
+                deviation,
+            ));
+        }
+        let parsed = parse_pinned_split_csv(
+            &(rows.join("\n") + "\n"),
+            context(platform, split),
+        ).unwrap();
+        assert_eq!(parsed.manifest.macro9_groups.len(), 0);
+        assert!(parsed.group_counts.contains_key(&StageTypeGroup {
+            stage: RecoveryStage::Move,
+            deviation: DeviationType::WrongTarget,
+        }));
+        assert!(super::super::roborecover_score::validate_manifest(&parsed.manifest).is_ok());
     }
 
 }
