@@ -412,14 +412,6 @@ fn check_join(join: &Value, acoustic: &Value, bio: &Value, findings: &mut Findin
 
     let context_links_valid =
         !findings.invalid && !findings.incomparable;
-    if context_links_valid {
-        findings.push(
-            "/claim_mode",
-            "INCOMPLETE",
-            "the cross-record context is structurally linked, but this is not source authentication, metrological qualification or causal attribution",
-        );
-    }
-
     statuses
 }
 
@@ -519,6 +511,21 @@ mod tests {
         assert!(!findings.invalid);
         assert!(!findings.incomparable);
         assert!(findings.incomplete);
+    }
+
+    #[test]
+    fn measured_source_records_can_resolve_context_without_claiming_causality() {
+        let (mut join, mut acoustic, mut bio) = records();
+        join["record_status"] = serde_json::json!("measured");
+        acoustic["record_status"] = serde_json::json!("measured");
+        bio["record_status"] = serde_json::json!("measured");
+        let mut findings = Findings::default();
+        let statuses = check_join(&join, &acoustic, &bio, &mut findings);
+        assert_eq!(findings.disposition(), "CONTEXT_LINKS_RESOLVED");
+        assert_eq!(statuses, vec!["acoustic:measured", "biofouling:measured"]);
+        assert!(!findings.invalid);
+        assert!(!findings.incomparable);
+        assert!(!findings.incomplete);
     }
 
     #[test]
