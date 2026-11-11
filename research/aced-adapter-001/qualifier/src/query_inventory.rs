@@ -323,16 +323,32 @@ pub fn qualify_query_inventory(
         errors.push("ACED-Query inventory identity or track set mismatch".into());
     }
 
-    if manifest["candidate_data_boundary"]["copied_payloads"] != false
+    if !exact_fields(
+        &manifest["candidate_data_boundary"],
+        &[
+            "copied_payloads",
+            "candidate_visible_world_files",
+            "files_are_metadata_only",
+            "metadata_fields",
+            "evaluator_note",
+        ],
+    )
+        || manifest["candidate_data_boundary"]["copied_payloads"] != false
         || manifest["candidate_data_boundary"]["candidate_visible_world_files"] != false
         || manifest["candidate_data_boundary"]["files_are_metadata_only"] != true
+        || !manifest["candidate_data_boundary"]["metadata_fields"].is_array()
+        || text(&manifest["candidate_data_boundary"], "evaluator_note").is_none()
     {
         errors.push("ACED-Query candidate data boundary must remain metadata-only".into());
     }
 
     let mut reports = BTreeMap::new();
     for (track, expected_total) in TRACKS.iter().zip(EXPECTED_COUNTS) {
-        if manifest["track_counts"][*track].as_u64() != Some(expected_total as u64) {
+        if !exact_fields(&manifest["track_counts"], &TRACKS)
+            || !exact_fields(&manifest["distributions"], &TRACKS)
+            || manifest["track_counts"][*track].as_u64() != Some(expected_total as u64)
+            || manifest["distributions"][*track]["count"].as_u64() != Some(expected_total as u64)
+        {
             errors.push(format!("manifest track count mismatch for {track}"));
         }
         match validate_track(track, &inventory["tracks"][*track], manifest) {
@@ -443,5 +459,138 @@ pub fn qualify_query_inventory(
         errors.sort();
         errors.dedup();
         Err(errors)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const INVENTORY: &str = include_str!("../../upstream/aced_query_world_inventory.json");
+    const MANIFEST: &str = include_str!("../../ACED_QUERY_SOURCE_MANIFEST_V0_1.json");
+    const CHECKSUMS: &str = include_str!("../../upstream/SHA256SUMS");
+
+    fn parsed(source: &str) -> Value {
+        serde_json::from_str(source).expect("checked-in JSON must parse")
+    }
+
+    #[test]
+    fn pinned_query_metadata_and_exact_payload_identity_qualify() {
+        let inventory = parsed(INVENTORY);
+        let manifest = parsed(MANIFEST);
+        let report = qualify_query_inventory(
+            &inventory,
+            &manifest,
+            INVENTORY.as_bytes(),
+            CHECKSUMS.as_bytes(),
+        )
+        .expect("pinned metadata inventory qualifies");
+        assert_eq!(report.total_track_entries, 148);
+        assert_eq!(report.unique_payload_sha256_count, 138);
+        assert_eq!(report.core_struct_guess_struct_exact_content_overlap, 10);
+        assert_eq!(report.core_decision_guess_decision_exact_content_overlap, 0);
+        assert_eq!(report.core_decision_guess_decision_filename_collision_count, 2);
+        assert_eq!(report.per_track_counts["core_struct"], 10);
+        assert_eq!(report.per_track_counts["core_decision"], 60);
+        assert_eq!(report.per_track_counts["guess_struct"], 30);
+        assert_eq!(report.per_track_counts["guess_decision"], 48);
+    }
+
+    #[test]
+    fn duplicate_filename_inside_one_track_is_rejected() {
+        let mut inventory = parsed(INVENTORY);
+        let manifest = parsed(MANIFEST);
+        let rows = inventory["tracks"]["core_struct"].as_array_mut().unwrap();
+        let duplicate = rows[0]["file"].clone();
+        rows[1]["file"] = duplicate;
+        assert!(validate_track("core_struct", &inventory["tracks"]["core_struct"], &manifest).is_err());
+    }
+
+    #[test]
+    fn path_traversal_in_metadata_is_rejected() {
+        let mut inventory = parsed(INVENTORY);
+        let manifest = parsed(MANIFEST);
+        inventory["tracks"]["core_struct"][0]["path"] =
+            Value::String("query/core_struct/../../hidden.json".into());
+        assert!(validate_track("core_struct", &inventory["tracks"]["core_struct"], &manifest).is_err());
+    }
+
+    #[test]
+    fn same_filename_with_different_content_is_not_payload_overlap() {
+        let inventory = parsed(INVENTORY);
+        let core = inventory["tracks"]["core_decision"].as_array().unwrap();
+        let guess = inventory["tracks"]["guess_decision"].as_array().unwrap();
+        let same_name = core
+            .iter()
+            .find(|a| guess.iter().any(|b| text(a, "file") == text(b, "file")))
+            .unwrap();
+        let counterpart = guess
+            .iter()
+            .find(|b| text(same_name, "file") == text(b, "file"))
+            .unwrap();
+        assert_eq!(text(same_name, "git_blob_sha") == text(counterpart, "git_blob_sha"), false);
+        assert_eq!(text(same_name, "sha256") == text(counterpart, "sha256"), false);
+    }
+
+    #[test]
+    fn altered_inventory_bytes_are_rejected() {
+        let inventory = parsed(INVENTORY);
+        let manifest = parsed(MANIFEST);
+        let mut altered = INVENTORY.as_bytes().to_vec();
+        altered[0] = b' ';
+        assert!(qualify_query_inventory(
+            &inventory,
+            &manifest,
+            &altered,
+            CHECKSUMS.as_bytes(),
+        ).is_err());
+    }
+
+    #[test]
+    fn altered_upstream_checksum_artifact_is_rejected() {
+        let inventory = parsed(INVENTORY);
+        let manifest = parsed(MANIFEST);
+        let mut altered = CHECKSUMS.as_bytes().to_vec();
+        altered[0] = b'0';
+        assert!(qualify_query_inventory(
+            &inventory,
+            &manifest,
+            INVENTORY.as_bytes(),
+            &altered,
+        ).is_err());
+    }
+
+    #[test]
+    fn missing_source_checksum_entry_is_rejected() {
+        let inventory = parsed(INVENTORY);
+        let mut manifest = parsed(MANIFEST);
+        let first_path = inventory["tracks"]["core_struct"][0]["path"].as_str().unwrap();
+        let altered_source = CHECKSUMS.replace(
+            &format!("query/core_struct/{}", inventory["tracks"]["core_struct"][0]["file"].as_str().unwrap()),
+            "query/core_struct/missing-world.json",
+        );
+        manifest["artifacts"]["upstream_checksums_sha256"] =
+            Value::String(sha256(altered_source.as_bytes()));
+        assert!(qualify_query_inventory(
+            &inventory,
+            &manifest,
+            INVENTORY.as_bytes(),
+            altered_source.as_bytes(),
+        ).is_err());
+        assert!(first_path.starts_with("query/core_struct/"));
+    }
+
+    #[test]
+    fn candidate_world_payload_exposure_is_rejected() {
+        let inventory = parsed(INVENTORY);
+        let mut manifest = parsed(MANIFEST);
+        manifest["candidate_data_boundary"]["candidate_visible_world_files"] = Value::Bool(true);
+        assert!(qualify_query_inventory(
+            &inventory,
+            &manifest,
+            INVENTORY.as_bytes(),
+            CHECKSUMS.as_bytes(),
+        ).is_err());
     }
 }
