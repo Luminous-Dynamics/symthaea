@@ -1,0 +1,35 @@
+name: ACED-REPAIR-ADAPTER-001 Qualifier
+
+on:
+  pull_request:
+    paths:
+      - "research/aced-adapter-001/**"
+      - ".github/workflows/aced-repair-index-qualifier.yml"
+  push:
+    paths:
+      - "research/aced-adapter-001/**"
+      - ".github/workflows/aced-repair-index-qualifier.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+      - name: Format
+        run: cargo fmt --manifest-path research/aced-adapter-001/qualifier/Cargo.toml --check
+      - name: Unit and negative-control tests
+        run: cargo test --manifest-path research/aced-adapter-001/qualifier/Cargo.toml
+      - name: Qualify pinned upstream inventory
+        run: |
+          cargo run --manifest-path research/aced-adapter-001/qualifier/Cargo.toml -- \
+            research/aced-adapter-001/upstream/repair_test_index.json \
+            research/aced-adapter-001/upstream/repair_eval_index.json \
+            research/aced-adapter-001/ACED_REPAIR_SOURCE_MANIFEST_V0_1.json \
+            research/aced-adapter-001/upstream/SHA256SUMS
