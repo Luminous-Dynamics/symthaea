@@ -431,3 +431,32 @@ A new benchmark extension is in [decision_sensitive_freshness.md](./decision_sen
 - FASTER, PACT-VLA and REMAC for compatible asynchronous action-chunk / fast reaction comparisons.
 
 Do not pool manipulation and locomotion metrics. The same temporal-event semantics should be preserved across the distinct platform lanes.
+
+
+## 12. Multi-robot serving and deadline-aware inference scheduling
+
+### Armory: action-chunk lookahead serving
+
+Armory (Bansal et al., arXiv:2608.00337) is a direct industry-relevant comparator for remote robot inference serving. It maintains a server-side mirror of each robot's action queue, in-flight chunks, execution horizon and communication delay. It compares Round Robin, EDF and a Lookahead policy that simulates candidate batch effects. On a real fleet of ten AgileX PiPER arms served by a single cloud L40S GPU, the authors report up to 18% overall throughput improvement in their heterogeneous workload. The dynamic fast task is more starvation-sensitive than static sorting. This is a preprint/benchmark reference; don't present its numbers as Luminous results or assume quadruped transfer.
+
+- Project / method / real-robot demo: https://actionchunkscheduling.github.io/
+- Paper: https://arxiv.org/abs/2608.00337
+
+### RED: real-time inference DAG scheduling
+
+RED (Li et al., arXiv:2605.24044) proposes adaptive real-time DAG scheduling for robotic multi-task inference under environmental dynamics, with intermediate sub-deadlines and workload-graph reconstruction. The authors report evaluations on NVIDIA Jetson platforms and Apple M-series hardware. Treat its claimed end-to-end timing guarantees as conditional on the scheduler's modeling assumptions; it is a scheduling baseline, not a certified runtime-assurance authority.
+
+- Paper: https://arxiv.org/abs/2605.24044
+
+### Luminous comparison
+
+For fleet-shared inference, require:
+1. Round Robin;
+2. EDF;
+3. Armory Lookahead;
+4. RED-style DAG/sub-deadline scheduling where workloads match;
+5. Luminous constrained mission-aware admission / batching.
+
+The candidate Luminous scheduler must consume existing qualified action-buffer, actuation-AoI, clock/freshness, EVSI, thermal, actuator and recovery evidence. It may schedule optional deliberation, not safety control. Compare matched workloads and model quality, and disclose model/hardware differences.
+
+Required metrics: throughput and safe-success by robot tier; per-robot starvation/control-step no-action rate; p50/p95/p99 request-to-actuator latency; actuation deadline miss probability and miss cost; fairness/service-floor violations; queue wait; useful result rate (fresh, decision-positive, locally admissible); energy by robot/network/edge/cloud; and recovery degradation. A fleet average cannot conceal a single robot that starves or loses its safe-stop path.
