@@ -984,10 +984,15 @@ mod tests {
         assert!(!adapter.calibration_receipt_sha256.is_empty());
         assert_eq!(adapter.controls.len(), 3);
         assert!(adapter.controls.iter().all(|control| {
-            control.supported
-                && control.effort_scale > 0.0
+            control.effort_scale > 0.0
                 && (control.supported == (control.trust_radius > 0.0))
+                && (control.supported
+                    || (control.minimum_delta == 0.0 && control.maximum_delta == 0.0))
         }));
+        assert_eq!(
+            profile.all_controls_supported,
+            profile.control_support_checks.iter().all(|check| check.supported)
+        );
         assert!(!adapter.metrics.is_empty());
         assert_eq!(
             adapter.sensitivities.len(),
