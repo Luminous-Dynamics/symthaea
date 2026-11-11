@@ -10,7 +10,7 @@
 
 use crate::linear_group_action::{
     LinearGroupActionAdmissionError, cholesky_lower_scaled_metric, max_abs,
-    relative_symmetry_defect, scaled_frobenius_norm, validate_square_matrix,
+    relative_symmetry_defect, validate_square_matrix,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
