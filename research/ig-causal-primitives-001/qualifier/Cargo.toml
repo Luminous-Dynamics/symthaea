@@ -6,3 +6,7 @@ publish = false
 
 [dependencies]
 serde_json = "1.0"
+
+[workspace]
+members = ["."]
+resolver = "2"
