@@ -1,0 +1,3242 @@
+[
+ {
+  "file": "world_clinical_confounded_chain_43000000.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000000
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000018.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000018
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000036.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000036
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000054.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000054
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000072.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000072
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000108.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000108
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000126.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000126
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000144.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000144
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000162.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000162
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000198.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000198
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000270.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000270
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000090.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000090
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000216.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000216
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000252.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000252
+ },
+ {
+  "file": "world_clinical_collider_selection_43000020.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000020
+ },
+ {
+  "file": "world_clinical_collider_selection_43000038.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000038
+ },
+ {
+  "file": "world_clinical_collider_selection_43000110.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000110
+ },
+ {
+  "file": "world_clinical_collider_selection_43000128.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000128
+ },
+ {
+  "file": "world_clinical_collider_selection_43000146.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000146
+ },
+ {
+  "file": "world_clinical_collider_selection_43000182.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000182
+ },
+ {
+  "file": "world_clinical_collider_selection_43000218.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000218
+ },
+ {
+  "file": "world_clinical_collider_selection_43000236.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000236
+ },
+ {
+  "file": "world_clinical_collider_selection_43000254.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000254
+ },
+ {
+  "file": "world_clinical_collider_selection_43000308.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000308
+ },
+ {
+  "file": "world_clinical_collider_selection_43000326.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000326
+ },
+ {
+  "file": "world_clinical_collider_selection_43000200.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000200
+ },
+ {
+  "file": "world_clinical_collider_selection_43000002.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000002
+ },
+ {
+  "file": "world_clinical_collider_selection_43000056.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000056
+ },
+ {
+  "file": "world_clinical_collider_selection_43000164.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000164
+ },
+ {
+  "file": "world_clinical_competing_causes_43000010.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000010
+ },
+ {
+  "file": "world_clinical_competing_causes_43000028.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000028
+ },
+ {
+  "file": "world_clinical_competing_causes_43000046.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000046
+ },
+ {
+  "file": "world_clinical_competing_causes_43000064.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000064
+ },
+ {
+  "file": "world_clinical_competing_causes_43000082.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000082
+ },
+ {
+  "file": "world_clinical_competing_causes_43000100.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000100
+ },
+ {
+  "file": "world_clinical_competing_causes_43000118.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000118
+ },
+ {
+  "file": "world_clinical_competing_causes_43000136.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000136
+ },
+ {
+  "file": "world_clinical_competing_causes_43000172.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000172
+ },
+ {
+  "file": "world_clinical_competing_causes_43000190.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000190
+ },
+ {
+  "file": "world_clinical_competing_causes_43000208.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000208
+ },
+ {
+  "file": "world_clinical_competing_causes_43000244.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000244
+ },
+ {
+  "file": "world_clinical_competing_causes_43000262.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000262
+ },
+ {
+  "file": "world_clinical_competing_causes_43000280.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000280
+ },
+ {
+  "file": "world_clinical_competing_causes_43000298.json.gz",
+  "domain": "clinical",
+  "archetype": "competing_causes",
+  "seed": 43000298
+ },
+ {
+  "file": "world_clinical_dose_window_43000014.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000014
+ },
+ {
+  "file": "world_clinical_dose_window_43000032.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000032
+ },
+ {
+  "file": "world_clinical_dose_window_43000050.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000050
+ },
+ {
+  "file": "world_clinical_dose_window_43000068.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000068
+ },
+ {
+  "file": "world_clinical_dose_window_43000086.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000086
+ },
+ {
+  "file": "world_clinical_dose_window_43000104.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000104
+ },
+ {
+  "file": "world_clinical_dose_window_43000122.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000122
+ },
+ {
+  "file": "world_clinical_dose_window_43000140.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000140
+ },
+ {
+  "file": "world_clinical_dose_window_43000158.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000158
+ },
+ {
+  "file": "world_clinical_dose_window_43000176.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000176
+ },
+ {
+  "file": "world_clinical_dose_window_43000194.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000194
+ },
+ {
+  "file": "world_clinical_dose_window_43000212.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000212
+ },
+ {
+  "file": "world_clinical_dose_window_43000248.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000248
+ },
+ {
+  "file": "world_clinical_dose_window_43000266.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000266
+ },
+ {
+  "file": "world_clinical_dose_window_43000284.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000284
+ },
+ {
+  "file": "world_clinical_instrument_only_43000008.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000008
+ },
+ {
+  "file": "world_clinical_instrument_only_43000026.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000026
+ },
+ {
+  "file": "world_clinical_instrument_only_43000044.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000044
+ },
+ {
+  "file": "world_clinical_instrument_only_43000062.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000062
+ },
+ {
+  "file": "world_clinical_instrument_only_43000080.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000080
+ },
+ {
+  "file": "world_clinical_instrument_only_43000098.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000098
+ },
+ {
+  "file": "world_clinical_instrument_only_43000116.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000116
+ },
+ {
+  "file": "world_clinical_instrument_only_43000134.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000134
+ },
+ {
+  "file": "world_clinical_instrument_only_43000152.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000152
+ },
+ {
+  "file": "world_clinical_instrument_only_43000170.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000170
+ },
+ {
+  "file": "world_clinical_instrument_only_43000188.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000188
+ },
+ {
+  "file": "world_clinical_instrument_only_43000206.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000206
+ },
+ {
+  "file": "world_clinical_instrument_only_43000224.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000224
+ },
+ {
+  "file": "world_clinical_instrument_only_43000242.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000242
+ },
+ {
+  "file": "world_clinical_instrument_only_43000260.json.gz",
+  "domain": "clinical",
+  "archetype": "instrument_only",
+  "seed": 43000260
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000016.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000016
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000052.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000052
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000070.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000070
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000088.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000088
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000106.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000106
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000124.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000124
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000142.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000142
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000160.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000160
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000196.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000196
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000214.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000214
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000232.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000232
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000250.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000250
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000268.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000268
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000286.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000286
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000304.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000304
+ },
+ {
+  "file": "world_clinical_confounded_reversal_43000322.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_reversal",
+  "seed": 43000322
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000058.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000058
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000076.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000076
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000202.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000202
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000220.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000220
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000238.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000238
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000256.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000256
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000292.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000292
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000310.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000310
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000328.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000328
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000040.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000040
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000148.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000148
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000274.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000274
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000004.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000004
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000130.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000130
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000006.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000006
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000024.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000024
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000042.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000042
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000060.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000060
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000078.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000078
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000096.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000096
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000114.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000114
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000132.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000132
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000168.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000168
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000186.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000186
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000204.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000204
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000222.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000222
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000240.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000240
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000276.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000276
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000012.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000012
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000048.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000048
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000084.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000084
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000102.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000102
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000138.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000138
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000156.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000156
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000210.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000210
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000300.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000300
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000030.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000030
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000120.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000120
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000192.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000192
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000246.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000246
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000264.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000264
+ },
+ {
+  "file": "world_clinical_synergy_pair_43000282.json.gz",
+  "domain": "clinical",
+  "archetype": "synergy_pair",
+  "seed": 43000282
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000019.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000019
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000055.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000055
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000109.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000109
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000127.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000127
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000163.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000163
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000181.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000181
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000217.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000217
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000001.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000001
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000073.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000073
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000145.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000145
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000199.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000199
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000271.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000271
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000037.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000037
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000091.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000091
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000235.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000235
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000253.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000253
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000003.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000003
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000021.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000021
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000111.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000111
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000129.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000129
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000165.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000165
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000183.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000183
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000219.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000219
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000255.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000255
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000273.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000273
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000291.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000291
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000237.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000237
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000327.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000327
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000057.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000057
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000075.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000075
+ },
+ {
+  "file": "world_fermentation_collider_selection_43000201.json.gz",
+  "domain": "fermentation",
+  "archetype": "collider_selection",
+  "seed": 43000201
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000011.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000011
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000029.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000029
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000047.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000047
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000065.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000065
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000083.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000083
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000101.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000101
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000119.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000119
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000137.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000137
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000155.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000155
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000173.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000173
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000191.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000191
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000209.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000209
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000245.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000245
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000263.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000263
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000281.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000281
+ },
+ {
+  "file": "world_fermentation_dose_window_43000015.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000015
+ },
+ {
+  "file": "world_fermentation_dose_window_43000033.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000033
+ },
+ {
+  "file": "world_fermentation_dose_window_43000051.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000051
+ },
+ {
+  "file": "world_fermentation_dose_window_43000069.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000069
+ },
+ {
+  "file": "world_fermentation_dose_window_43000087.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000087
+ },
+ {
+  "file": "world_fermentation_dose_window_43000105.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000105
+ },
+ {
+  "file": "world_fermentation_dose_window_43000123.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000123
+ },
+ {
+  "file": "world_fermentation_dose_window_43000141.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000141
+ },
+ {
+  "file": "world_fermentation_dose_window_43000159.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000159
+ },
+ {
+  "file": "world_fermentation_dose_window_43000177.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000177
+ },
+ {
+  "file": "world_fermentation_dose_window_43000195.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000195
+ },
+ {
+  "file": "world_fermentation_dose_window_43000213.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000213
+ },
+ {
+  "file": "world_fermentation_dose_window_43000231.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000231
+ },
+ {
+  "file": "world_fermentation_dose_window_43000249.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000249
+ },
+ {
+  "file": "world_fermentation_dose_window_43000267.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000267
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000009.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000009
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000027.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000027
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000045.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000045
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000063.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000063
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000081.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000081
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000099.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000099
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000117.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000117
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000135.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000135
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000153.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000153
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000171.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000171
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000189.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000189
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000207.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000207
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000225.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000225
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000243.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000243
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000261.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000261
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000035.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000035
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000071.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000071
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000089.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000089
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000107.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000107
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000125.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000125
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000143.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000143
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000179.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000179
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000197.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000197
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000233.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000233
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000251.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000251
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000269.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000269
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000287.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000287
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000305.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000305
+ },
+ {
+  "file": "world_fermentation_confounded_reversal_43000323.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_reversal",
+  "seed": 43000323
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000023.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000023
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000041.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000041
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000059.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000059
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000077.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000077
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000095.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000095
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000113.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000113
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000149.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000149
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000221.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000221
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000257.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000257
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000275.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000275
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000293.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000293
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000311.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000311
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000203.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000203
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000005.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000005
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000131.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000131
+ },
+ {
+  "file": "world_fermentation_hidden_subtype_43000167.json.gz",
+  "domain": "fermentation",
+  "archetype": "hidden_subtype",
+  "seed": 43000167
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000007.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000007
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000025.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000025
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000043.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000043
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000061.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000061
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000079.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000079
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000097.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000097
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000115.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000115
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000133.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000133
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000151.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000151
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000169.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000169
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000187.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000187
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000205.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000205
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000223.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000223
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000241.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000241
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000259.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000259
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000277.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000277
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000013.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000013
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000067.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000067
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000085.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000085
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000103.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000103
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000121.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000121
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000157.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000157
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000175.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000175
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000193.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000193
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000265.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000265
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000283.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000283
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000301.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000301
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000031.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000031
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000049.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000049
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000139.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000139
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000211.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000211
+ },
+ {
+  "file": "world_fermentation_synergy_pair_43000247.json.gz",
+  "domain": "fermentation",
+  "archetype": "synergy_pair",
+  "seed": 43000247
+ },
+ {
+  "file": "world_agronomy_confounded_chain_53000000.json.gz",
+  "domain": "agronomy",
+  "archetype": "confounded_chain",
+  "seed": 53000000
+ },
+ {
+  "file": "world_agronomy_confounded_chain_53000144.json.gz",
+  "domain": "agronomy",
+  "archetype": "confounded_chain",
+  "seed": 53000144
+ },
+ {
+  "file": "world_agronomy_confounded_chain_53000072.json.gz",
+  "domain": "agronomy",
+  "archetype": "confounded_chain",
+  "seed": 53000072
+ },
+ {
+  "file": "world_agronomy_confounded_chain_53000216.json.gz",
+  "domain": "agronomy",
+  "archetype": "confounded_chain",
+  "seed": 53000216
+ },
+ {
+  "file": "world_agronomy_confounded_chain_53000288.json.gz",
+  "domain": "agronomy",
+  "archetype": "confounded_chain",
+  "seed": 53000288
+ },
+ {
+  "file": "world_agronomy_collider_selection_53000080.json.gz",
+  "domain": "agronomy",
+  "archetype": "collider_selection",
+  "seed": 53000080
+ },
+ {
+  "file": "world_agronomy_collider_selection_53000152.json.gz",
+  "domain": "agronomy",
+  "archetype": "collider_selection",
+  "seed": 53000152
+ },
+ {
+  "file": "world_agronomy_collider_selection_53000296.json.gz",
+  "domain": "agronomy",
+  "archetype": "collider_selection",
+  "seed": 53000296
+ },
+ {
+  "file": "world_agronomy_collider_selection_53000224.json.gz",
+  "domain": "agronomy",
+  "archetype": "collider_selection",
+  "seed": 53000224
+ },
+ {
+  "file": "world_agronomy_competing_causes_53000040.json.gz",
+  "domain": "agronomy",
+  "archetype": "competing_causes",
+  "seed": 53000040
+ },
+ {
+  "file": "world_agronomy_competing_causes_53000112.json.gz",
+  "domain": "agronomy",
+  "archetype": "competing_causes",
+  "seed": 53000112
+ },
+ {
+  "file": "world_agronomy_competing_causes_53000184.json.gz",
+  "domain": "agronomy",
+  "archetype": "competing_causes",
+  "seed": 53000184
+ },
+ {
+  "file": "world_agronomy_competing_causes_53000256.json.gz",
+  "domain": "agronomy",
+  "archetype": "competing_causes",
+  "seed": 53000256
+ },
+ {
+  "file": "world_agronomy_dose_window_53000056.json.gz",
+  "domain": "agronomy",
+  "archetype": "dose_window",
+  "seed": 53000056
+ },
+ {
+  "file": "world_agronomy_dose_window_53000128.json.gz",
+  "domain": "agronomy",
+  "archetype": "dose_window",
+  "seed": 53000128
+ },
+ {
+  "file": "world_agronomy_dose_window_53000200.json.gz",
+  "domain": "agronomy",
+  "archetype": "dose_window",
+  "seed": 53000200
+ },
+ {
+  "file": "world_agronomy_dose_window_53000272.json.gz",
+  "domain": "agronomy",
+  "archetype": "dose_window",
+  "seed": 53000272
+ },
+ {
+  "file": "world_agronomy_instrument_only_53000032.json.gz",
+  "domain": "agronomy",
+  "archetype": "instrument_only",
+  "seed": 53000032
+ },
+ {
+  "file": "world_agronomy_instrument_only_53000104.json.gz",
+  "domain": "agronomy",
+  "archetype": "instrument_only",
+  "seed": 53000104
+ },
+ {
+  "file": "world_agronomy_instrument_only_53000176.json.gz",
+  "domain": "agronomy",
+  "archetype": "instrument_only",
+  "seed": 53000176
+ },
+ {
+  "file": "world_agronomy_instrument_only_53000248.json.gz",
+  "domain": "agronomy",
+  "archetype": "instrument_only",
+  "seed": 53000248
+ },
+ {
+  "file": "world_agronomy_instrument_only_53000320.json.gz",
+  "domain": "agronomy",
+  "archetype": "instrument_only",
+  "seed": 53000320
+ },
+ {
+  "file": "world_agronomy_confounded_reversal_53000136.json.gz",
+  "domain": "agronomy",
+  "archetype": "confounded_reversal",
+  "seed": 53000136
+ },
+ {
+  "file": "world_agronomy_confounded_reversal_53000208.json.gz",
+  "domain": "agronomy",
+  "archetype": "confounded_reversal",
+  "seed": 53000208
+ },
+ {
+  "file": "world_agronomy_confounded_reversal_53000352.json.gz",
+  "domain": "agronomy",
+  "archetype": "confounded_reversal",
+  "seed": 53000352
+ },
+ {
+  "file": "world_agronomy_hidden_subtype_53000016.json.gz",
+  "domain": "agronomy",
+  "archetype": "hidden_subtype",
+  "seed": 53000016
+ },
+ {
+  "file": "world_agronomy_hidden_subtype_53000232.json.gz",
+  "domain": "agronomy",
+  "archetype": "hidden_subtype",
+  "seed": 53000232
+ },
+ {
+  "file": "world_agronomy_hidden_subtype_53000304.json.gz",
+  "domain": "agronomy",
+  "archetype": "hidden_subtype",
+  "seed": 53000304
+ },
+ {
+  "file": "world_agronomy_surrogate_trap_53000024.json.gz",
+  "domain": "agronomy",
+  "archetype": "surrogate_trap",
+  "seed": 53000024
+ },
+ {
+  "file": "world_agronomy_surrogate_trap_53000096.json.gz",
+  "domain": "agronomy",
+  "archetype": "surrogate_trap",
+  "seed": 53000096
+ },
+ {
+  "file": "world_agronomy_surrogate_trap_53000240.json.gz",
+  "domain": "agronomy",
+  "archetype": "surrogate_trap",
+  "seed": 53000240
+ },
+ {
+  "file": "world_agronomy_surrogate_trap_53000312.json.gz",
+  "domain": "agronomy",
+  "archetype": "surrogate_trap",
+  "seed": 53000312
+ },
+ {
+  "file": "world_agronomy_synergy_pair_53000048.json.gz",
+  "domain": "agronomy",
+  "archetype": "synergy_pair",
+  "seed": 53000048
+ },
+ {
+  "file": "world_agronomy_synergy_pair_53000192.json.gz",
+  "domain": "agronomy",
+  "archetype": "synergy_pair",
+  "seed": 53000192
+ },
+ {
+  "file": "world_agronomy_synergy_pair_53000336.json.gz",
+  "domain": "agronomy",
+  "archetype": "synergy_pair",
+  "seed": 53000336
+ },
+ {
+  "file": "world_agronomy_synergy_pair_53000120.json.gz",
+  "domain": "agronomy",
+  "archetype": "synergy_pair",
+  "seed": 53000120
+ },
+ {
+  "file": "world_agronomy_synergy_pair_53000264.json.gz",
+  "domain": "agronomy",
+  "archetype": "synergy_pair",
+  "seed": 53000264
+ },
+ {
+  "file": "world_aquaculture_confounded_chain_53000073.json.gz",
+  "domain": "aquaculture",
+  "archetype": "confounded_chain",
+  "seed": 53000073
+ },
+ {
+  "file": "world_aquaculture_confounded_chain_53000289.json.gz",
+  "domain": "aquaculture",
+  "archetype": "confounded_chain",
+  "seed": 53000289
+ },
+ {
+  "file": "world_aquaculture_confounded_chain_53000001.json.gz",
+  "domain": "aquaculture",
+  "archetype": "confounded_chain",
+  "seed": 53000001
+ },
+ {
+  "file": "world_aquaculture_collider_selection_53000009.json.gz",
+  "domain": "aquaculture",
+  "archetype": "collider_selection",
+  "seed": 53000009
+ },
+ {
+  "file": "world_aquaculture_collider_selection_53000153.json.gz",
+  "domain": "aquaculture",
+  "archetype": "collider_selection",
+  "seed": 53000153
+ },
+ {
+  "file": "world_aquaculture_competing_causes_53000041.json.gz",
+  "domain": "aquaculture",
+  "archetype": "competing_causes",
+  "seed": 53000041
+ },
+ {
+  "file": "world_aquaculture_competing_causes_53000113.json.gz",
+  "domain": "aquaculture",
+  "archetype": "competing_causes",
+  "seed": 53000113
+ },
+ {
+  "file": "world_aquaculture_competing_causes_53000185.json.gz",
+  "domain": "aquaculture",
+  "archetype": "competing_causes",
+  "seed": 53000185
+ },
+ {
+  "file": "world_aquaculture_competing_causes_53000257.json.gz",
+  "domain": "aquaculture",
+  "archetype": "competing_causes",
+  "seed": 53000257
+ },
+ {
+  "file": "world_aquaculture_dose_window_53000057.json.gz",
+  "domain": "aquaculture",
+  "archetype": "dose_window",
+  "seed": 53000057
+ },
+ {
+  "file": "world_aquaculture_dose_window_53000129.json.gz",
+  "domain": "aquaculture",
+  "archetype": "dose_window",
+  "seed": 53000129
+ },
+ {
+  "file": "world_aquaculture_dose_window_53000201.json.gz",
+  "domain": "aquaculture",
+  "archetype": "dose_window",
+  "seed": 53000201
+ },
+ {
+  "file": "world_aquaculture_dose_window_53000273.json.gz",
+  "domain": "aquaculture",
+  "archetype": "dose_window",
+  "seed": 53000273
+ },
+ {
+  "file": "world_aquaculture_instrument_only_53000033.json.gz",
+  "domain": "aquaculture",
+  "archetype": "instrument_only",
+  "seed": 53000033
+ },
+ {
+  "file": "world_aquaculture_instrument_only_53000105.json.gz",
+  "domain": "aquaculture",
+  "archetype": "instrument_only",
+  "seed": 53000105
+ },
+ {
+  "file": "world_aquaculture_instrument_only_53000177.json.gz",
+  "domain": "aquaculture",
+  "archetype": "instrument_only",
+  "seed": 53000177
+ },
+ {
+  "file": "world_aquaculture_instrument_only_53000249.json.gz",
+  "domain": "aquaculture",
+  "archetype": "instrument_only",
+  "seed": 53000249
+ },
+ {
+  "file": "world_aquaculture_instrument_only_53000321.json.gz",
+  "domain": "aquaculture",
+  "archetype": "instrument_only",
+  "seed": 53000321
+ },
+ {
+  "file": "world_aquaculture_confounded_reversal_53000065.json.gz",
+  "domain": "aquaculture",
+  "archetype": "confounded_reversal",
+  "seed": 53000065
+ },
+ {
+  "file": "world_aquaculture_confounded_reversal_53000137.json.gz",
+  "domain": "aquaculture",
+  "archetype": "confounded_reversal",
+  "seed": 53000137
+ },
+ {
+  "file": "world_aquaculture_confounded_reversal_53000209.json.gz",
+  "domain": "aquaculture",
+  "archetype": "confounded_reversal",
+  "seed": 53000209
+ },
+ {
+  "file": "world_aquaculture_confounded_reversal_53000281.json.gz",
+  "domain": "aquaculture",
+  "archetype": "confounded_reversal",
+  "seed": 53000281
+ },
+ {
+  "file": "world_aquaculture_hidden_subtype_53000017.json.gz",
+  "domain": "aquaculture",
+  "archetype": "hidden_subtype",
+  "seed": 53000017
+ },
+ {
+  "file": "world_aquaculture_hidden_subtype_53000161.json.gz",
+  "domain": "aquaculture",
+  "archetype": "hidden_subtype",
+  "seed": 53000161
+ },
+ {
+  "file": "world_aquaculture_hidden_subtype_53000305.json.gz",
+  "domain": "aquaculture",
+  "archetype": "hidden_subtype",
+  "seed": 53000305
+ },
+ {
+  "file": "world_aquaculture_hidden_subtype_53000089.json.gz",
+  "domain": "aquaculture",
+  "archetype": "hidden_subtype",
+  "seed": 53000089
+ },
+ {
+  "file": "world_aquaculture_hidden_subtype_53000233.json.gz",
+  "domain": "aquaculture",
+  "archetype": "hidden_subtype",
+  "seed": 53000233
+ },
+ {
+  "file": "world_aquaculture_surrogate_trap_53000025.json.gz",
+  "domain": "aquaculture",
+  "archetype": "surrogate_trap",
+  "seed": 53000025
+ },
+ {
+  "file": "world_aquaculture_surrogate_trap_53000097.json.gz",
+  "domain": "aquaculture",
+  "archetype": "surrogate_trap",
+  "seed": 53000097
+ },
+ {
+  "file": "world_aquaculture_surrogate_trap_53000169.json.gz",
+  "domain": "aquaculture",
+  "archetype": "surrogate_trap",
+  "seed": 53000169
+ },
+ {
+  "file": "world_aquaculture_surrogate_trap_53000241.json.gz",
+  "domain": "aquaculture",
+  "archetype": "surrogate_trap",
+  "seed": 53000241
+ },
+ {
+  "file": "world_aquaculture_synergy_pair_53000193.json.gz",
+  "domain": "aquaculture",
+  "archetype": "synergy_pair",
+  "seed": 53000193
+ },
+ {
+  "file": "world_aquaculture_synergy_pair_53000049.json.gz",
+  "domain": "aquaculture",
+  "archetype": "synergy_pair",
+  "seed": 53000049
+ },
+ {
+  "file": "world_aquaculture_synergy_pair_53000121.json.gz",
+  "domain": "aquaculture",
+  "archetype": "synergy_pair",
+  "seed": 53000121
+ },
+ {
+  "file": "world_aquaculture_synergy_pair_53000265.json.gz",
+  "domain": "aquaculture",
+  "archetype": "synergy_pair",
+  "seed": 53000265
+ },
+ {
+  "file": "world_battery_confounded_chain_53000002.json.gz",
+  "domain": "battery",
+  "archetype": "confounded_chain",
+  "seed": 53000002
+ },
+ {
+  "file": "world_battery_confounded_chain_53000146.json.gz",
+  "domain": "battery",
+  "archetype": "confounded_chain",
+  "seed": 53000146
+ },
+ {
+  "file": "world_battery_confounded_chain_53000218.json.gz",
+  "domain": "battery",
+  "archetype": "confounded_chain",
+  "seed": 53000218
+ },
+ {
+  "file": "world_battery_confounded_chain_53000290.json.gz",
+  "domain": "battery",
+  "archetype": "confounded_chain",
+  "seed": 53000290
+ },
+ {
+  "file": "world_battery_collider_selection_53000010.json.gz",
+  "domain": "battery",
+  "archetype": "collider_selection",
+  "seed": 53000010
+ },
+ {
+  "file": "world_battery_collider_selection_53000082.json.gz",
+  "domain": "battery",
+  "archetype": "collider_selection",
+  "seed": 53000082
+ },
+ {
+  "file": "world_battery_collider_selection_53000154.json.gz",
+  "domain": "battery",
+  "archetype": "collider_selection",
+  "seed": 53000154
+ },
+ {
+  "file": "world_battery_collider_selection_53000226.json.gz",
+  "domain": "battery",
+  "archetype": "collider_selection",
+  "seed": 53000226
+ },
+ {
+  "file": "world_battery_competing_causes_53000042.json.gz",
+  "domain": "battery",
+  "archetype": "competing_causes",
+  "seed": 53000042
+ },
+ {
+  "file": "world_battery_competing_causes_53000114.json.gz",
+  "domain": "battery",
+  "archetype": "competing_causes",
+  "seed": 53000114
+ },
+ {
+  "file": "world_battery_competing_causes_53000186.json.gz",
+  "domain": "battery",
+  "archetype": "competing_causes",
+  "seed": 53000186
+ },
+ {
+  "file": "world_battery_dose_window_53000058.json.gz",
+  "domain": "battery",
+  "archetype": "dose_window",
+  "seed": 53000058
+ },
+ {
+  "file": "world_battery_dose_window_53000130.json.gz",
+  "domain": "battery",
+  "archetype": "dose_window",
+  "seed": 53000130
+ },
+ {
+  "file": "world_battery_dose_window_53000202.json.gz",
+  "domain": "battery",
+  "archetype": "dose_window",
+  "seed": 53000202
+ },
+ {
+  "file": "world_battery_dose_window_53000274.json.gz",
+  "domain": "battery",
+  "archetype": "dose_window",
+  "seed": 53000274
+ },
+ {
+  "file": "world_battery_instrument_only_53000106.json.gz",
+  "domain": "battery",
+  "archetype": "instrument_only",
+  "seed": 53000106
+ },
+ {
+  "file": "world_battery_instrument_only_53000178.json.gz",
+  "domain": "battery",
+  "archetype": "instrument_only",
+  "seed": 53000178
+ },
+ {
+  "file": "world_battery_instrument_only_53000250.json.gz",
+  "domain": "battery",
+  "archetype": "instrument_only",
+  "seed": 53000250
+ },
+ {
+  "file": "world_battery_confounded_reversal_53000066.json.gz",
+  "domain": "battery",
+  "archetype": "confounded_reversal",
+  "seed": 53000066
+ },
+ {
+  "file": "world_battery_confounded_reversal_53000138.json.gz",
+  "domain": "battery",
+  "archetype": "confounded_reversal",
+  "seed": 53000138
+ },
+ {
+  "file": "world_battery_confounded_reversal_53000210.json.gz",
+  "domain": "battery",
+  "archetype": "confounded_reversal",
+  "seed": 53000210
+ },
+ {
+  "file": "world_battery_confounded_reversal_53000282.json.gz",
+  "domain": "battery",
+  "archetype": "confounded_reversal",
+  "seed": 53000282
+ },
+ {
+  "file": "world_battery_hidden_subtype_53000018.json.gz",
+  "domain": "battery",
+  "archetype": "hidden_subtype",
+  "seed": 53000018
+ },
+ {
+  "file": "world_battery_hidden_subtype_53000090.json.gz",
+  "domain": "battery",
+  "archetype": "hidden_subtype",
+  "seed": 53000090
+ },
+ {
+  "file": "world_battery_hidden_subtype_53000162.json.gz",
+  "domain": "battery",
+  "archetype": "hidden_subtype",
+  "seed": 53000162
+ },
+ {
+  "file": "world_battery_hidden_subtype_53000234.json.gz",
+  "domain": "battery",
+  "archetype": "hidden_subtype",
+  "seed": 53000234
+ },
+ {
+  "file": "world_battery_surrogate_trap_53000026.json.gz",
+  "domain": "battery",
+  "archetype": "surrogate_trap",
+  "seed": 53000026
+ },
+ {
+  "file": "world_battery_surrogate_trap_53000098.json.gz",
+  "domain": "battery",
+  "archetype": "surrogate_trap",
+  "seed": 53000098
+ },
+ {
+  "file": "world_battery_surrogate_trap_53000170.json.gz",
+  "domain": "battery",
+  "archetype": "surrogate_trap",
+  "seed": 53000170
+ },
+ {
+  "file": "world_battery_surrogate_trap_53000242.json.gz",
+  "domain": "battery",
+  "archetype": "surrogate_trap",
+  "seed": 53000242
+ },
+ {
+  "file": "world_battery_synergy_pair_53000050.json.gz",
+  "domain": "battery",
+  "archetype": "synergy_pair",
+  "seed": 53000050
+ },
+ {
+  "file": "world_battery_synergy_pair_53000122.json.gz",
+  "domain": "battery",
+  "archetype": "synergy_pair",
+  "seed": 53000122
+ },
+ {
+  "file": "world_battery_synergy_pair_53000194.json.gz",
+  "domain": "battery",
+  "archetype": "synergy_pair",
+  "seed": 53000194
+ },
+ {
+  "file": "world_battery_synergy_pair_53000266.json.gz",
+  "domain": "battery",
+  "archetype": "synergy_pair",
+  "seed": 53000266
+ },
+ {
+  "file": "world_bioprocess_confounded_chain_53000075.json.gz",
+  "domain": "bioprocess",
+  "archetype": "confounded_chain",
+  "seed": 53000075
+ },
+ {
+  "file": "world_bioprocess_confounded_chain_53000219.json.gz",
+  "domain": "bioprocess",
+  "archetype": "confounded_chain",
+  "seed": 53000219
+ },
+ {
+  "file": "world_bioprocess_confounded_chain_53000147.json.gz",
+  "domain": "bioprocess",
+  "archetype": "confounded_chain",
+  "seed": 53000147
+ },
+ {
+  "file": "world_bioprocess_confounded_chain_53000003.json.gz",
+  "domain": "bioprocess",
+  "archetype": "confounded_chain",
+  "seed": 53000003
+ },
+ {
+  "file": "world_bioprocess_collider_selection_53000083.json.gz",
+  "domain": "bioprocess",
+  "archetype": "collider_selection",
+  "seed": 53000083
+ },
+ {
+  "file": "world_bioprocess_collider_selection_53000155.json.gz",
+  "domain": "bioprocess",
+  "archetype": "collider_selection",
+  "seed": 53000155
+ },
+ {
+  "file": "world_bioprocess_collider_selection_53000227.json.gz",
+  "domain": "bioprocess",
+  "archetype": "collider_selection",
+  "seed": 53000227
+ },
+ {
+  "file": "world_bioprocess_collider_selection_53000011.json.gz",
+  "domain": "bioprocess",
+  "archetype": "collider_selection",
+  "seed": 53000011
+ },
+ {
+  "file": "world_bioprocess_competing_causes_53000043.json.gz",
+  "domain": "bioprocess",
+  "archetype": "competing_causes",
+  "seed": 53000043
+ },
+ {
+  "file": "world_bioprocess_competing_causes_53000115.json.gz",
+  "domain": "bioprocess",
+  "archetype": "competing_causes",
+  "seed": 53000115
+ },
+ {
+  "file": "world_bioprocess_competing_causes_53000187.json.gz",
+  "domain": "bioprocess",
+  "archetype": "competing_causes",
+  "seed": 53000187
+ },
+ {
+  "file": "world_bioprocess_competing_causes_53000259.json.gz",
+  "domain": "bioprocess",
+  "archetype": "competing_causes",
+  "seed": 53000259
+ },
+ {
+  "file": "world_bioprocess_dose_window_53000059.json.gz",
+  "domain": "bioprocess",
+  "archetype": "dose_window",
+  "seed": 53000059
+ },
+ {
+  "file": "world_bioprocess_dose_window_53000131.json.gz",
+  "domain": "bioprocess",
+  "archetype": "dose_window",
+  "seed": 53000131
+ },
+ {
+  "file": "world_bioprocess_dose_window_53000203.json.gz",
+  "domain": "bioprocess",
+  "archetype": "dose_window",
+  "seed": 53000203
+ },
+ {
+  "file": "world_bioprocess_dose_window_53000275.json.gz",
+  "domain": "bioprocess",
+  "archetype": "dose_window",
+  "seed": 53000275
+ },
+ {
+  "file": "world_bioprocess_instrument_only_53000035.json.gz",
+  "domain": "bioprocess",
+  "archetype": "instrument_only",
+  "seed": 53000035
+ },
+ {
+  "file": "world_bioprocess_instrument_only_53000107.json.gz",
+  "domain": "bioprocess",
+  "archetype": "instrument_only",
+  "seed": 53000107
+ },
+ {
+  "file": "world_bioprocess_instrument_only_53000179.json.gz",
+  "domain": "bioprocess",
+  "archetype": "instrument_only",
+  "seed": 53000179
+ },
+ {
+  "file": "world_bioprocess_instrument_only_53000251.json.gz",
+  "domain": "bioprocess",
+  "archetype": "instrument_only",
+  "seed": 53000251
+ },
+ {
+  "file": "world_bioprocess_confounded_reversal_53000067.json.gz",
+  "domain": "bioprocess",
+  "archetype": "confounded_reversal",
+  "seed": 53000067
+ },
+ {
+  "file": "world_bioprocess_confounded_reversal_53000139.json.gz",
+  "domain": "bioprocess",
+  "archetype": "confounded_reversal",
+  "seed": 53000139
+ },
+ {
+  "file": "world_bioprocess_confounded_reversal_53000211.json.gz",
+  "domain": "bioprocess",
+  "archetype": "confounded_reversal",
+  "seed": 53000211
+ },
+ {
+  "file": "world_bioprocess_confounded_reversal_53000283.json.gz",
+  "domain": "bioprocess",
+  "archetype": "confounded_reversal",
+  "seed": 53000283
+ },
+ {
+  "file": "world_bioprocess_hidden_subtype_53000019.json.gz",
+  "domain": "bioprocess",
+  "archetype": "hidden_subtype",
+  "seed": 53000019
+ },
+ {
+  "file": "world_bioprocess_hidden_subtype_53000091.json.gz",
+  "domain": "bioprocess",
+  "archetype": "hidden_subtype",
+  "seed": 53000091
+ },
+ {
+  "file": "world_bioprocess_hidden_subtype_53000163.json.gz",
+  "domain": "bioprocess",
+  "archetype": "hidden_subtype",
+  "seed": 53000163
+ },
+ {
+  "file": "world_bioprocess_hidden_subtype_53000235.json.gz",
+  "domain": "bioprocess",
+  "archetype": "hidden_subtype",
+  "seed": 53000235
+ },
+ {
+  "file": "world_bioprocess_surrogate_trap_53000027.json.gz",
+  "domain": "bioprocess",
+  "archetype": "surrogate_trap",
+  "seed": 53000027
+ },
+ {
+  "file": "world_bioprocess_surrogate_trap_53000099.json.gz",
+  "domain": "bioprocess",
+  "archetype": "surrogate_trap",
+  "seed": 53000099
+ },
+ {
+  "file": "world_bioprocess_surrogate_trap_53000171.json.gz",
+  "domain": "bioprocess",
+  "archetype": "surrogate_trap",
+  "seed": 53000171
+ },
+ {
+  "file": "world_bioprocess_surrogate_trap_53000243.json.gz",
+  "domain": "bioprocess",
+  "archetype": "surrogate_trap",
+  "seed": 53000243
+ },
+ {
+  "file": "world_bioprocess_synergy_pair_53000051.json.gz",
+  "domain": "bioprocess",
+  "archetype": "synergy_pair",
+  "seed": 53000051
+ },
+ {
+  "file": "world_bioprocess_synergy_pair_53000123.json.gz",
+  "domain": "bioprocess",
+  "archetype": "synergy_pair",
+  "seed": 53000123
+ },
+ {
+  "file": "world_bioprocess_synergy_pair_53000267.json.gz",
+  "domain": "bioprocess",
+  "archetype": "synergy_pair",
+  "seed": 53000267
+ },
+ {
+  "file": "world_catalysis_confounded_chain_53000076.json.gz",
+  "domain": "catalysis",
+  "archetype": "confounded_chain",
+  "seed": 53000076
+ },
+ {
+  "file": "world_catalysis_confounded_chain_53000148.json.gz",
+  "domain": "catalysis",
+  "archetype": "confounded_chain",
+  "seed": 53000148
+ },
+ {
+  "file": "world_catalysis_confounded_chain_53000220.json.gz",
+  "domain": "catalysis",
+  "archetype": "confounded_chain",
+  "seed": 53000220
+ },
+ {
+  "file": "world_catalysis_collider_selection_53000012.json.gz",
+  "domain": "catalysis",
+  "archetype": "collider_selection",
+  "seed": 53000012
+ },
+ {
+  "file": "world_catalysis_collider_selection_53000228.json.gz",
+  "domain": "catalysis",
+  "archetype": "collider_selection",
+  "seed": 53000228
+ },
+ {
+  "file": "world_catalysis_collider_selection_53000084.json.gz",
+  "domain": "catalysis",
+  "archetype": "collider_selection",
+  "seed": 53000084
+ },
+ {
+  "file": "world_catalysis_collider_selection_53000156.json.gz",
+  "domain": "catalysis",
+  "archetype": "collider_selection",
+  "seed": 53000156
+ },
+ {
+  "file": "world_catalysis_competing_causes_53000044.json.gz",
+  "domain": "catalysis",
+  "archetype": "competing_causes",
+  "seed": 53000044
+ },
+ {
+  "file": "world_catalysis_competing_causes_53000116.json.gz",
+  "domain": "catalysis",
+  "archetype": "competing_causes",
+  "seed": 53000116
+ },
+ {
+  "file": "world_catalysis_competing_causes_53000188.json.gz",
+  "domain": "catalysis",
+  "archetype": "competing_causes",
+  "seed": 53000188
+ },
+ {
+  "file": "world_catalysis_competing_causes_53000260.json.gz",
+  "domain": "catalysis",
+  "archetype": "competing_causes",
+  "seed": 53000260
+ },
+ {
+  "file": "world_catalysis_dose_window_53000060.json.gz",
+  "domain": "catalysis",
+  "archetype": "dose_window",
+  "seed": 53000060
+ },
+ {
+  "file": "world_catalysis_dose_window_53000132.json.gz",
+  "domain": "catalysis",
+  "archetype": "dose_window",
+  "seed": 53000132
+ },
+ {
+  "file": "world_catalysis_dose_window_53000204.json.gz",
+  "domain": "catalysis",
+  "archetype": "dose_window",
+  "seed": 53000204
+ },
+ {
+  "file": "world_catalysis_dose_window_53000276.json.gz",
+  "domain": "catalysis",
+  "archetype": "dose_window",
+  "seed": 53000276
+ },
+ {
+  "file": "world_catalysis_instrument_only_53000036.json.gz",
+  "domain": "catalysis",
+  "archetype": "instrument_only",
+  "seed": 53000036
+ },
+ {
+  "file": "world_catalysis_instrument_only_53000108.json.gz",
+  "domain": "catalysis",
+  "archetype": "instrument_only",
+  "seed": 53000108
+ },
+ {
+  "file": "world_catalysis_instrument_only_53000252.json.gz",
+  "domain": "catalysis",
+  "archetype": "instrument_only",
+  "seed": 53000252
+ },
+ {
+  "file": "world_catalysis_confounded_reversal_53000068.json.gz",
+  "domain": "catalysis",
+  "archetype": "confounded_reversal",
+  "seed": 53000068
+ },
+ {
+  "file": "world_catalysis_confounded_reversal_53000140.json.gz",
+  "domain": "catalysis",
+  "archetype": "confounded_reversal",
+  "seed": 53000140
+ },
+ {
+  "file": "world_catalysis_confounded_reversal_53000212.json.gz",
+  "domain": "catalysis",
+  "archetype": "confounded_reversal",
+  "seed": 53000212
+ },
+ {
+  "file": "world_catalysis_confounded_reversal_53000284.json.gz",
+  "domain": "catalysis",
+  "archetype": "confounded_reversal",
+  "seed": 53000284
+ },
+ {
+  "file": "world_catalysis_hidden_subtype_53000020.json.gz",
+  "domain": "catalysis",
+  "archetype": "hidden_subtype",
+  "seed": 53000020
+ },
+ {
+  "file": "world_catalysis_hidden_subtype_53000164.json.gz",
+  "domain": "catalysis",
+  "archetype": "hidden_subtype",
+  "seed": 53000164
+ },
+ {
+  "file": "world_catalysis_hidden_subtype_53000092.json.gz",
+  "domain": "catalysis",
+  "archetype": "hidden_subtype",
+  "seed": 53000092
+ },
+ {
+  "file": "world_catalysis_hidden_subtype_53000236.json.gz",
+  "domain": "catalysis",
+  "archetype": "hidden_subtype",
+  "seed": 53000236
+ },
+ {
+  "file": "world_catalysis_surrogate_trap_53000100.json.gz",
+  "domain": "catalysis",
+  "archetype": "surrogate_trap",
+  "seed": 53000100
+ },
+ {
+  "file": "world_catalysis_surrogate_trap_53000172.json.gz",
+  "domain": "catalysis",
+  "archetype": "surrogate_trap",
+  "seed": 53000172
+ },
+ {
+  "file": "world_catalysis_surrogate_trap_53000244.json.gz",
+  "domain": "catalysis",
+  "archetype": "surrogate_trap",
+  "seed": 53000244
+ },
+ {
+  "file": "world_catalysis_synergy_pair_53000052.json.gz",
+  "domain": "catalysis",
+  "archetype": "synergy_pair",
+  "seed": 53000052
+ },
+ {
+  "file": "world_catalysis_synergy_pair_53000124.json.gz",
+  "domain": "catalysis",
+  "archetype": "synergy_pair",
+  "seed": 53000124
+ },
+ {
+  "file": "world_catalysis_synergy_pair_53000196.json.gz",
+  "domain": "catalysis",
+  "archetype": "synergy_pair",
+  "seed": 53000196
+ },
+ {
+  "file": "world_catalysis_synergy_pair_53000268.json.gz",
+  "domain": "catalysis",
+  "archetype": "synergy_pair",
+  "seed": 53000268
+ },
+ {
+  "file": "world_datacenter_confounded_chain_53000005.json.gz",
+  "domain": "datacenter",
+  "archetype": "confounded_chain",
+  "seed": 53000005
+ },
+ {
+  "file": "world_datacenter_confounded_chain_53000077.json.gz",
+  "domain": "datacenter",
+  "archetype": "confounded_chain",
+  "seed": 53000077
+ },
+ {
+  "file": "world_datacenter_confounded_chain_53000149.json.gz",
+  "domain": "datacenter",
+  "archetype": "confounded_chain",
+  "seed": 53000149
+ },
+ {
+  "file": "world_datacenter_confounded_chain_53000221.json.gz",
+  "domain": "datacenter",
+  "archetype": "confounded_chain",
+  "seed": 53000221
+ },
+ {
+  "file": "world_datacenter_collider_selection_53000013.json.gz",
+  "domain": "datacenter",
+  "archetype": "collider_selection",
+  "seed": 53000013
+ },
+ {
+  "file": "world_datacenter_collider_selection_53000157.json.gz",
+  "domain": "datacenter",
+  "archetype": "collider_selection",
+  "seed": 53000157
+ },
+ {
+  "file": "world_datacenter_collider_selection_53000229.json.gz",
+  "domain": "datacenter",
+  "archetype": "collider_selection",
+  "seed": 53000229
+ },
+ {
+  "file": "world_datacenter_collider_selection_53000085.json.gz",
+  "domain": "datacenter",
+  "archetype": "collider_selection",
+  "seed": 53000085
+ },
+ {
+  "file": "world_datacenter_competing_causes_53000045.json.gz",
+  "domain": "datacenter",
+  "archetype": "competing_causes",
+  "seed": 53000045
+ },
+ {
+  "file": "world_datacenter_competing_causes_53000117.json.gz",
+  "domain": "datacenter",
+  "archetype": "competing_causes",
+  "seed": 53000117
+ },
+ {
+  "file": "world_datacenter_competing_causes_53000189.json.gz",
+  "domain": "datacenter",
+  "archetype": "competing_causes",
+  "seed": 53000189
+ },
+ {
+  "file": "world_datacenter_competing_causes_53000261.json.gz",
+  "domain": "datacenter",
+  "archetype": "competing_causes",
+  "seed": 53000261
+ },
+ {
+  "file": "world_datacenter_dose_window_53000061.json.gz",
+  "domain": "datacenter",
+  "archetype": "dose_window",
+  "seed": 53000061
+ },
+ {
+  "file": "world_datacenter_dose_window_53000205.json.gz",
+  "domain": "datacenter",
+  "archetype": "dose_window",
+  "seed": 53000205
+ },
+ {
+  "file": "world_datacenter_dose_window_53000277.json.gz",
+  "domain": "datacenter",
+  "archetype": "dose_window",
+  "seed": 53000277
+ },
+ {
+  "file": "world_datacenter_instrument_only_53000037.json.gz",
+  "domain": "datacenter",
+  "archetype": "instrument_only",
+  "seed": 53000037
+ },
+ {
+  "file": "world_datacenter_instrument_only_53000109.json.gz",
+  "domain": "datacenter",
+  "archetype": "instrument_only",
+  "seed": 53000109
+ },
+ {
+  "file": "world_datacenter_instrument_only_53000181.json.gz",
+  "domain": "datacenter",
+  "archetype": "instrument_only",
+  "seed": 53000181
+ },
+ {
+  "file": "world_datacenter_instrument_only_53000253.json.gz",
+  "domain": "datacenter",
+  "archetype": "instrument_only",
+  "seed": 53000253
+ },
+ {
+  "file": "world_datacenter_confounded_reversal_53000069.json.gz",
+  "domain": "datacenter",
+  "archetype": "confounded_reversal",
+  "seed": 53000069
+ },
+ {
+  "file": "world_datacenter_confounded_reversal_53000141.json.gz",
+  "domain": "datacenter",
+  "archetype": "confounded_reversal",
+  "seed": 53000141
+ },
+ {
+  "file": "world_datacenter_confounded_reversal_53000213.json.gz",
+  "domain": "datacenter",
+  "archetype": "confounded_reversal",
+  "seed": 53000213
+ },
+ {
+  "file": "world_datacenter_confounded_reversal_53000285.json.gz",
+  "domain": "datacenter",
+  "archetype": "confounded_reversal",
+  "seed": 53000285
+ },
+ {
+  "file": "world_datacenter_hidden_subtype_53000093.json.gz",
+  "domain": "datacenter",
+  "archetype": "hidden_subtype",
+  "seed": 53000093
+ },
+ {
+  "file": "world_datacenter_hidden_subtype_53000021.json.gz",
+  "domain": "datacenter",
+  "archetype": "hidden_subtype",
+  "seed": 53000021
+ },
+ {
+  "file": "world_datacenter_surrogate_trap_53000029.json.gz",
+  "domain": "datacenter",
+  "archetype": "surrogate_trap",
+  "seed": 53000029
+ },
+ {
+  "file": "world_datacenter_surrogate_trap_53000101.json.gz",
+  "domain": "datacenter",
+  "archetype": "surrogate_trap",
+  "seed": 53000101
+ },
+ {
+  "file": "world_datacenter_surrogate_trap_53000173.json.gz",
+  "domain": "datacenter",
+  "archetype": "surrogate_trap",
+  "seed": 53000173
+ },
+ {
+  "file": "world_datacenter_synergy_pair_53000053.json.gz",
+  "domain": "datacenter",
+  "archetype": "synergy_pair",
+  "seed": 53000053
+ },
+ {
+  "file": "world_datacenter_synergy_pair_53000269.json.gz",
+  "domain": "datacenter",
+  "archetype": "synergy_pair",
+  "seed": 53000269
+ },
+ {
+  "file": "world_datacenter_synergy_pair_53000125.json.gz",
+  "domain": "datacenter",
+  "archetype": "synergy_pair",
+  "seed": 53000125
+ },
+ {
+  "file": "world_semiconductor_confounded_chain_53000006.json.gz",
+  "domain": "semiconductor",
+  "archetype": "confounded_chain",
+  "seed": 53000006
+ },
+ {
+  "file": "world_semiconductor_confounded_chain_53000078.json.gz",
+  "domain": "semiconductor",
+  "archetype": "confounded_chain",
+  "seed": 53000078
+ },
+ {
+  "file": "world_semiconductor_confounded_chain_53000150.json.gz",
+  "domain": "semiconductor",
+  "archetype": "confounded_chain",
+  "seed": 53000150
+ },
+ {
+  "file": "world_semiconductor_confounded_chain_53000222.json.gz",
+  "domain": "semiconductor",
+  "archetype": "confounded_chain",
+  "seed": 53000222
+ },
+ {
+  "file": "world_semiconductor_collider_selection_53000014.json.gz",
+  "domain": "semiconductor",
+  "archetype": "collider_selection",
+  "seed": 53000014
+ },
+ {
+  "file": "world_semiconductor_collider_selection_53000158.json.gz",
+  "domain": "semiconductor",
+  "archetype": "collider_selection",
+  "seed": 53000158
+ },
+ {
+  "file": "world_semiconductor_collider_selection_53000086.json.gz",
+  "domain": "semiconductor",
+  "archetype": "collider_selection",
+  "seed": 53000086
+ },
+ {
+  "file": "world_semiconductor_collider_selection_53000230.json.gz",
+  "domain": "semiconductor",
+  "archetype": "collider_selection",
+  "seed": 53000230
+ },
+ {
+  "file": "world_semiconductor_competing_causes_53000046.json.gz",
+  "domain": "semiconductor",
+  "archetype": "competing_causes",
+  "seed": 53000046
+ },
+ {
+  "file": "world_semiconductor_competing_causes_53000118.json.gz",
+  "domain": "semiconductor",
+  "archetype": "competing_causes",
+  "seed": 53000118
+ },
+ {
+  "file": "world_semiconductor_competing_causes_53000190.json.gz",
+  "domain": "semiconductor",
+  "archetype": "competing_causes",
+  "seed": 53000190
+ },
+ {
+  "file": "world_semiconductor_competing_causes_53000262.json.gz",
+  "domain": "semiconductor",
+  "archetype": "competing_causes",
+  "seed": 53000262
+ },
+ {
+  "file": "world_semiconductor_dose_window_53000062.json.gz",
+  "domain": "semiconductor",
+  "archetype": "dose_window",
+  "seed": 53000062
+ },
+ {
+  "file": "world_semiconductor_dose_window_53000134.json.gz",
+  "domain": "semiconductor",
+  "archetype": "dose_window",
+  "seed": 53000134
+ },
+ {
+  "file": "world_semiconductor_dose_window_53000278.json.gz",
+  "domain": "semiconductor",
+  "archetype": "dose_window",
+  "seed": 53000278
+ },
+ {
+  "file": "world_semiconductor_instrument_only_53000038.json.gz",
+  "domain": "semiconductor",
+  "archetype": "instrument_only",
+  "seed": 53000038
+ },
+ {
+  "file": "world_semiconductor_instrument_only_53000182.json.gz",
+  "domain": "semiconductor",
+  "archetype": "instrument_only",
+  "seed": 53000182
+ },
+ {
+  "file": "world_semiconductor_instrument_only_53000254.json.gz",
+  "domain": "semiconductor",
+  "archetype": "instrument_only",
+  "seed": 53000254
+ },
+ {
+  "file": "world_semiconductor_confounded_reversal_53000070.json.gz",
+  "domain": "semiconductor",
+  "archetype": "confounded_reversal",
+  "seed": 53000070
+ },
+ {
+  "file": "world_semiconductor_confounded_reversal_53000142.json.gz",
+  "domain": "semiconductor",
+  "archetype": "confounded_reversal",
+  "seed": 53000142
+ },
+ {
+  "file": "world_semiconductor_confounded_reversal_53000214.json.gz",
+  "domain": "semiconductor",
+  "archetype": "confounded_reversal",
+  "seed": 53000214
+ },
+ {
+  "file": "world_semiconductor_confounded_reversal_53000286.json.gz",
+  "domain": "semiconductor",
+  "archetype": "confounded_reversal",
+  "seed": 53000286
+ },
+ {
+  "file": "world_semiconductor_hidden_subtype_53000022.json.gz",
+  "domain": "semiconductor",
+  "archetype": "hidden_subtype",
+  "seed": 53000022
+ },
+ {
+  "file": "world_semiconductor_hidden_subtype_53000166.json.gz",
+  "domain": "semiconductor",
+  "archetype": "hidden_subtype",
+  "seed": 53000166
+ },
+ {
+  "file": "world_semiconductor_hidden_subtype_53000238.json.gz",
+  "domain": "semiconductor",
+  "archetype": "hidden_subtype",
+  "seed": 53000238
+ },
+ {
+  "file": "world_semiconductor_hidden_subtype_53000094.json.gz",
+  "domain": "semiconductor",
+  "archetype": "hidden_subtype",
+  "seed": 53000094
+ },
+ {
+  "file": "world_semiconductor_surrogate_trap_53000030.json.gz",
+  "domain": "semiconductor",
+  "archetype": "surrogate_trap",
+  "seed": 53000030
+ },
+ {
+  "file": "world_semiconductor_surrogate_trap_53000102.json.gz",
+  "domain": "semiconductor",
+  "archetype": "surrogate_trap",
+  "seed": 53000102
+ },
+ {
+  "file": "world_semiconductor_surrogate_trap_53000174.json.gz",
+  "domain": "semiconductor",
+  "archetype": "surrogate_trap",
+  "seed": 53000174
+ },
+ {
+  "file": "world_semiconductor_surrogate_trap_53000246.json.gz",
+  "domain": "semiconductor",
+  "archetype": "surrogate_trap",
+  "seed": 53000246
+ },
+ {
+  "file": "world_semiconductor_synergy_pair_53000126.json.gz",
+  "domain": "semiconductor",
+  "archetype": "synergy_pair",
+  "seed": 53000126
+ },
+ {
+  "file": "world_semiconductor_synergy_pair_53000198.json.gz",
+  "domain": "semiconductor",
+  "archetype": "synergy_pair",
+  "seed": 53000198
+ },
+ {
+  "file": "world_semiconductor_synergy_pair_53000270.json.gz",
+  "domain": "semiconductor",
+  "archetype": "synergy_pair",
+  "seed": 53000270
+ },
+ {
+  "file": "world_watertreatment_confounded_chain_53000007.json.gz",
+  "domain": "watertreatment",
+  "archetype": "confounded_chain",
+  "seed": 53000007
+ },
+ {
+  "file": "world_watertreatment_confounded_chain_53000079.json.gz",
+  "domain": "watertreatment",
+  "archetype": "confounded_chain",
+  "seed": 53000079
+ },
+ {
+  "file": "world_watertreatment_confounded_chain_53000151.json.gz",
+  "domain": "watertreatment",
+  "archetype": "confounded_chain",
+  "seed": 53000151
+ },
+ {
+  "file": "world_watertreatment_collider_selection_53000015.json.gz",
+  "domain": "watertreatment",
+  "archetype": "collider_selection",
+  "seed": 53000015
+ },
+ {
+  "file": "world_watertreatment_collider_selection_53000087.json.gz",
+  "domain": "watertreatment",
+  "archetype": "collider_selection",
+  "seed": 53000087
+ },
+ {
+  "file": "world_watertreatment_collider_selection_53000159.json.gz",
+  "domain": "watertreatment",
+  "archetype": "collider_selection",
+  "seed": 53000159
+ },
+ {
+  "file": "world_watertreatment_collider_selection_53000231.json.gz",
+  "domain": "watertreatment",
+  "archetype": "collider_selection",
+  "seed": 53000231
+ },
+ {
+  "file": "world_watertreatment_competing_causes_53000047.json.gz",
+  "domain": "watertreatment",
+  "archetype": "competing_causes",
+  "seed": 53000047
+ },
+ {
+  "file": "world_watertreatment_competing_causes_53000119.json.gz",
+  "domain": "watertreatment",
+  "archetype": "competing_causes",
+  "seed": 53000119
+ },
+ {
+  "file": "world_watertreatment_competing_causes_53000191.json.gz",
+  "domain": "watertreatment",
+  "archetype": "competing_causes",
+  "seed": 53000191
+ },
+ {
+  "file": "world_watertreatment_dose_window_53000063.json.gz",
+  "domain": "watertreatment",
+  "archetype": "dose_window",
+  "seed": 53000063
+ },
+ {
+  "file": "world_watertreatment_dose_window_53000135.json.gz",
+  "domain": "watertreatment",
+  "archetype": "dose_window",
+  "seed": 53000135
+ },
+ {
+  "file": "world_watertreatment_dose_window_53000207.json.gz",
+  "domain": "watertreatment",
+  "archetype": "dose_window",
+  "seed": 53000207
+ },
+ {
+  "file": "world_watertreatment_dose_window_53000279.json.gz",
+  "domain": "watertreatment",
+  "archetype": "dose_window",
+  "seed": 53000279
+ },
+ {
+  "file": "world_watertreatment_instrument_only_53000039.json.gz",
+  "domain": "watertreatment",
+  "archetype": "instrument_only",
+  "seed": 53000039
+ },
+ {
+  "file": "world_watertreatment_instrument_only_53000111.json.gz",
+  "domain": "watertreatment",
+  "archetype": "instrument_only",
+  "seed": 53000111
+ },
+ {
+  "file": "world_watertreatment_instrument_only_53000255.json.gz",
+  "domain": "watertreatment",
+  "archetype": "instrument_only",
+  "seed": 53000255
+ },
+ {
+  "file": "world_watertreatment_confounded_reversal_53000071.json.gz",
+  "domain": "watertreatment",
+  "archetype": "confounded_reversal",
+  "seed": 53000071
+ },
+ {
+  "file": "world_watertreatment_confounded_reversal_53000143.json.gz",
+  "domain": "watertreatment",
+  "archetype": "confounded_reversal",
+  "seed": 53000143
+ },
+ {
+  "file": "world_watertreatment_confounded_reversal_53000215.json.gz",
+  "domain": "watertreatment",
+  "archetype": "confounded_reversal",
+  "seed": 53000215
+ },
+ {
+  "file": "world_watertreatment_hidden_subtype_53000095.json.gz",
+  "domain": "watertreatment",
+  "archetype": "hidden_subtype",
+  "seed": 53000095
+ },
+ {
+  "file": "world_watertreatment_hidden_subtype_53000167.json.gz",
+  "domain": "watertreatment",
+  "archetype": "hidden_subtype",
+  "seed": 53000167
+ },
+ {
+  "file": "world_watertreatment_hidden_subtype_53000023.json.gz",
+  "domain": "watertreatment",
+  "archetype": "hidden_subtype",
+  "seed": 53000023
+ },
+ {
+  "file": "world_watertreatment_hidden_subtype_53000239.json.gz",
+  "domain": "watertreatment",
+  "archetype": "hidden_subtype",
+  "seed": 53000239
+ },
+ {
+  "file": "world_watertreatment_surrogate_trap_53000031.json.gz",
+  "domain": "watertreatment",
+  "archetype": "surrogate_trap",
+  "seed": 53000031
+ },
+ {
+  "file": "world_watertreatment_surrogate_trap_53000103.json.gz",
+  "domain": "watertreatment",
+  "archetype": "surrogate_trap",
+  "seed": 53000103
+ },
+ {
+  "file": "world_watertreatment_surrogate_trap_53000175.json.gz",
+  "domain": "watertreatment",
+  "archetype": "surrogate_trap",
+  "seed": 53000175
+ },
+ {
+  "file": "world_watertreatment_surrogate_trap_53000247.json.gz",
+  "domain": "watertreatment",
+  "archetype": "surrogate_trap",
+  "seed": 53000247
+ },
+ {
+  "file": "world_watertreatment_synergy_pair_53000055.json.gz",
+  "domain": "watertreatment",
+  "archetype": "synergy_pair",
+  "seed": 53000055
+ },
+ {
+  "file": "world_watertreatment_synergy_pair_53000127.json.gz",
+  "domain": "watertreatment",
+  "archetype": "synergy_pair",
+  "seed": 53000127
+ },
+ {
+  "file": "world_watertreatment_synergy_pair_53000199.json.gz",
+  "domain": "watertreatment",
+  "archetype": "synergy_pair",
+  "seed": 53000199
+ },
+ {
+  "file": "world_watertreatment_synergy_pair_53000271.json.gz",
+  "domain": "watertreatment",
+  "archetype": "synergy_pair",
+  "seed": 53000271
+ }
+]
