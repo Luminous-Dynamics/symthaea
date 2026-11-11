@@ -273,7 +273,7 @@ pub fn validate_singing_benchmark_manifest(
         if let Some(previous_case) =
             audio_digests.insert(case.source_audio_sha256.as_str(), case.case_id.as_str())
         {
-            if previous_case != case.case_id {
+            if previous_case != case.case_id.as_str() {
                 return Err(SingingManifestError::new(format!(
                     "source audio digest is reused by cases {} and {}",
                     previous_case, case.case_id
@@ -950,7 +950,9 @@ mod tests {
         case.references.retain(|item| {
             matches!(
                 item.kind,
-                ReferenceKindV1::PhoneSequence | ReferenceKindV1::PhoneTimeAlignment
+                ReferenceKindV1::LyricsText
+                    | ReferenceKindV1::PhoneSequence
+                    | ReferenceKindV1::PhoneTimeAlignment
             )
         });
         case.references.push(annotation(
