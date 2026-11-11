@@ -90,10 +90,12 @@ pub use symmetry_inference::{
     MetricAwareLinearActionSampleProfileV1, MetricAwareLinearActionSampleReportV1,
     MetricAwareVectorFieldEquivarianceErrorV1, MetricAwareVectorFieldEquivarianceProfileV1,
     MetricAwareVectorFieldEquivarianceReportV1, MetricAwareVectorFieldGeneratorResultV1,
+    ExactVectorFieldEquivarianceErrorV1, ExactVectorFieldEquivarianceReportV1,
+    ExactVectorFieldGeneratorResultV1, LinearVectorFieldOutputRepresentationV1,
     NumericLieDerivativeProfileV2, LieDerivativeSampleStatisticsV1,
     StructuralSymmetryPattern, SymmetryClaimScope, SymmetryInferenceEvidence,
     SymmetryInferenceReport, SymmetryInferenceSearchStatus,
-    evaluate_metric_aware_linear_action_samples,
+    check_exact_vector_field_equivariance, evaluate_metric_aware_linear_action_samples,
     evaluate_metric_aware_vector_field_equivariance, infer_symmetry, infer_symmetry_numeric,
     infer_symmetry_numeric_with_evidence, infer_symmetry_with_evidence,
 };
