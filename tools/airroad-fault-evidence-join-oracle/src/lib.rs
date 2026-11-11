@@ -221,6 +221,7 @@ pub enum FaultEvidenceJoinError {
         expected: PowerElementKind,
     },
     MissingProtectionDevice(String),
+    UnknownScenario(String),
 }
 
 impl fmt::Display for FaultEvidenceJoinError {
@@ -244,6 +245,16 @@ fn required_evidence_for(
     tree_id: &str,
 ) -> Vec<EvidenceRequirement> {
     let mut required = BTreeSet::new();
+    let fault_requires_device_protection = matches!(
+        scenario.fault_kind,
+        FaultKind::BranchShortCircuit
+            | FaultKind::FeederToGroundFault
+            | FaultKind::BusSegmentShort
+            | FaultKind::ProtectionFailedToTrip
+            | FaultKind::ProtectionOutsideDeclaredCurve
+            | FaultKind::BusTieStuckClosed
+            | FaultKind::SourceUnavailable
+    );
     let mut add = |kind, subject: &str| {
         required.insert(EvidenceRequirement {
             kind,
@@ -283,6 +294,16 @@ fn required_evidence_for(
     for device_id in &scenario.required_protection_device_ids {
         add(FaultEvidenceKind::ProtectionTimeCurrentCurve, device_id);
         add(FaultEvidenceKind::InterruptingCapacity, device_id);
+    }
+    if fault_requires_device_protection && scenario.required_protection_device_ids.is_empty() {
+        add(
+            FaultEvidenceKind::ProtectionTimeCurrentCurve,
+            "UNDECLARED_PROTECTION_DEVICE",
+        );
+        add(
+            FaultEvidenceKind::InterruptingCapacity,
+            "UNDECLARED_PROTECTION_DEVICE",
+        );
     }
 
     if scenario
@@ -490,9 +511,47 @@ fn validate_topology(
             }
         }
         for device_id in &scenario.required_protection_device_ids {
-            if !device_ids.contains(device_id) {
+            let device = input
+                .protection_devices
+                .iter()
+                .find(|device| device.protection_device_id == *device_id)
+                .ok_or_else(|| {
+                    FaultEvidenceJoinError::MissingProtectionDevice(device_id.clone())
+                })?;
+            let attached_to_targeted_path = input.propulsion_paths.iter().any(|path| {
+                let path_is_targeted = [
+                    path.propulsor_element_id.as_str(),
+                    path.bus_element_id.as_str(),
+                    path.branch_element_id.as_str(),
+                    path.feeder_element_id.as_str(),
+                ]
+                .iter()
+                .any(|element_id| {
+                    scenario
+                        .target_aircraft_element_ids
+                        .iter()
+                        .any(|target| target == element_id)
+                });
+                path_is_targeted
+                    && path
+                        .protection_device_element_ids
+                        .contains(&device.aircraft_element_id)
+            });
+            if !attached_to_targeted_path {
+                return Err(FaultEvidenceJoinError::InvalidInput(
+                    "required protection device is not attached to a targeted propulsion path",
+                ));
+            }
+        }
+    }
+
+    for path in &input.propulsion_paths {
+        for device_element_id in &path.protection_device_element_ids {
+            if !input.protection_devices.iter().any(|device| {
+                device.aircraft_element_id == *device_element_id
+            }) {
                 return Err(FaultEvidenceJoinError::MissingProtectionDevice(
-                    device_id.clone(),
+                    device_element_id.clone(),
                 ));
             }
         }
@@ -518,7 +577,17 @@ pub fn join_fault_evidence(
     }
 
     let mut artifact_ids = BTreeSet::new();
+    let known_scenarios = input
+        .scenarios
+        .iter()
+        .map(|scenario| scenario.scenario_id.as_str())
+        .collect::<BTreeSet<_>>();
     for artifact in &input.artifacts {
+        if !known_scenarios.contains(artifact.scenario_id.as_str()) {
+            return Err(FaultEvidenceJoinError::UnknownScenario(
+                artifact.scenario_id.clone(),
+            ));
+        }
         if !non_empty(&artifact.artifact_id) {
             return Err(FaultEvidenceJoinError::InvalidInput("artifact ID must not be empty"));
         }
@@ -532,7 +601,7 @@ pub fn join_fault_evidence(
     let mut reports = Vec::with_capacity(scenarios.len());
 
     for scenario in &scenarios {
-        let required = required_evidence_for(scenario, &input.topology.tree_id);
+        let mut required = required_evidence_for(scenario, &input.topology.tree_id);
         let mut missing = Vec::new();
         let mut mismatches = Vec::new();
         let mut used_ids = BTreeSet::new();
@@ -607,16 +676,19 @@ pub fn join_fault_evidence(
                 if let Some(device) = input.protection_devices.iter().find(|device| {
                     device.protection_device_id == requirement.subject_id
                 }) {
-                    if device.trip_curve_digest.as_deref().is_none()
-                        || matches.iter().all(|artifact| {
-                            Some(artifact.artifact_digest.as_str())
-                                != device.trip_curve_digest.as_deref()
-                        })
-                    {
-                        mismatches.push(format!(
-                            "protection curve for device {} does not match its pinned digest",
-                            requirement.subject_id
-                        ));
+                    match device.trip_curve_digest.as_deref() {
+                        None => missing.push(requirement.clone()),
+                        Some(expected_digest)
+                            if matches.iter().all(|artifact| {
+                                artifact.artifact_digest != expected_digest
+                            }) =>
+                        {
+                            mismatches.push(format!(
+                                "protection curve for device {} does not match its pinned digest",
+                                requirement.subject_id
+                            ));
+                        }
+                        Some(_) => {}
                     }
                 }
             }
@@ -627,13 +699,14 @@ pub fn join_fault_evidence(
                 }) {
                     if device.interrupting_capacity_a.is_none()
                         || device.interrupting_capacity_evidence_digest.as_deref().is_none()
-                        || matches.iter().all(|artifact| {
-                            Some(artifact.artifact_digest.as_str())
-                                != device.interrupting_capacity_evidence_digest.as_deref()
-                        })
                     {
+                        missing.push(requirement.clone());
+                    } else if matches.iter().all(|artifact| {
+                        Some(artifact.artifact_digest.as_str())
+                            != device.interrupting_capacity_evidence_digest.as_deref()
+                    }) {
                         mismatches.push(format!(
-                            "interrupting capacity for device {} is absent or has a different digest",
+                            "interrupting capacity for device {} has a different digest",
                             requirement.subject_id
                         ));
                     }
@@ -851,13 +924,14 @@ mod tests {
     }
 
     #[test]
-    fn missing_curve_or_interrupt_rating_is_not_review_ready() {
+    fn missing_curve_or_interrupt_rating_is_unknown_not_review_ready() {
         let mut input = base_input();
         input.protection_devices[0].trip_curve_digest = None;
         input.protection_devices[0].interrupting_capacity_a = None;
         input.protection_devices[0].interrupting_capacity_evidence_digest = None;
         let report = join_fault_evidence(&input).unwrap();
-        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::NonPassIdentityOrProvenanceMismatch);
+        assert_eq!(report.scenario_reports[0].disposition, EvidenceJoinDisposition::UnknownMissingEvidence);
+        assert!(report.scenario_reports[0].missing_evidence.len() >= 2);
     }
 
     #[test]
