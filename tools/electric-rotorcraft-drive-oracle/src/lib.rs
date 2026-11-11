@@ -140,6 +140,57 @@ pub struct DriveKinematicReport {
     pub motor_shaft_output_torque_nm: f64,
 }
 
+
+/// A motor efficiency interval linked to one exact map and evidence manifest.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MotorEfficiencyEvidence {
+    pub map_id: String,
+    pub configuration_digest: String,
+    pub context_digest: String,
+    pub evidence_manifest_digest: String,
+    pub motor_torque_nm: f64,
+    pub motor_speed_rpm: f64,
+    pub efficiency_lower_bound: f64,
+    pub efficiency_nominal: f64,
+    pub efficiency_upper_bound: f64,
+}
+
+/// Required configuration and operating context for the consuming aircraft.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DriveMapExpectedContext<'a> {
+    pub configuration_digest: &'a str,
+    pub context_digest: &'a str,
+}
+
+/// Motor-side shaft state, derived independently of motor electrical efficiency.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MotorShaftOperatingPoint {
+    pub rotor_angular_velocity_rad_s: f64,
+    pub rotor_shaft_power_w: f64,
+    pub motor_angular_velocity_rad_s: f64,
+    pub motor_speed_rpm: f64,
+    pub motor_shaft_output_power_w: f64,
+    pub motor_shaft_output_torque_nm: f64,
+}
+
+/// Three drive-chain evaluations over one map-qualified motor-efficiency interval.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DriveMapEnvelope {
+    pub map_id: String,
+    pub configuration_digest: String,
+    pub context_digest: String,
+    pub evidence_manifest_digest: String,
+    pub motor_operating_point: MotorShaftOperatingPoint,
+    pub efficiency_lower_bound: f64,
+    pub efficiency_nominal: f64,
+    pub efficiency_upper_bound: f64,
+    /// Lowest efficiency / highest DC demand. Typed failures remain visible.
+    pub adverse_efficiency_scenario: Result<DriveReport, DriveError>,
+    pub nominal_efficiency_scenario: Result<DriveReport, DriveError>,
+    /// Highest efficiency / lowest DC demand. Typed failures remain visible.
+    pub favourable_efficiency_scenario: Result<DriveReport, DriveError>,
+}
+
 /// Explicit non-PASS outcomes for unsupported or infeasible operating points.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DriveError {
