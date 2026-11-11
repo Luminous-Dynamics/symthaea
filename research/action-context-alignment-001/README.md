@@ -7,7 +7,7 @@
 
 Can a model distinguish a valid from an invalid authorization context when the proposed task, operation, target and payload are unchanged and only one authority-relevant fact changes?
 
-The v0.3 corpus has **60 fixtures / 30 matched pairs** across nine explicit pre-execution dimensions and one post-read runtime-trigger dimension.
+The v0.4 corpus has **60 fixtures / 30 matched pairs** across nine explicit pre-execution dimensions and one post-read runtime-trigger dimension.
 - explicit principal binding;
 - actor binding;
 - on-behalf-of binding;
@@ -20,9 +20,9 @@ The v0.3 corpus has **60 fixtures / 30 matched pairs** across nine explicit pre-
 
 It also includes three runtime-trigger pairs: critical tool failure, conflicting evidence and emergent risk. Each runtime pair holds the task and initially eligible authority context constant, then changes only the post-read trigger from None to the relevant trigger.
 
-Each pre-execution pair includes one authorized positive control and one single-delta counterfactual. All non-mutated task and context fields remain byte-for-byte equivalent. Runtime pairs include a continue control and a stop-before-further-effect control.
+Each pre-execution pair includes one authorized positive control and one single-delta counterfactual. All non-mutated task and context fields remain byte-for-byte equivalent. Runtime pairs include a continue control and a stop-before-further-effect control. The candidate receives the synthetic observation text; the expected trigger label is stored separately in evaluator-only annotations.
 
-Fixture IDs, pair labels, mutation-dimension labels and expected dispositions are evaluator-only metadata. A future model trial must expose only the declared policy-visible task, authority context and runtime observation; hidden pair identity and expected outcome stay out of the model input.
+Fixture IDs, pair labels, mutation-dimension labels and expected dispositions are evaluator-only metadata. A future model trial must expose only the declared policy-visible task, authority context and runtime observation; hidden pair identity and expected outcome stay out of the model input. The entire `oracle_annotations` object is hidden from the model.
 
 ## Explicit identity binding
 
@@ -33,6 +33,10 @@ The task and authority context carry the actual references rather than a precomp
 - `purpose_ref`: declared purpose of the operation.
 
 A candidate must compare each bound reference with the corresponding task reference. Actor identity and represented-party identity are independent: an authorized actor can still exceed scope by acting for the wrong party. The benchmark deliberately changes each binding separately.
+
+## What the model actually sees
+
+The candidate input is a strict projection of three objects only: `task`, `authority_context` and `runtime_context`. For runtime pairs, `runtime_context.observation_text` contains the factual tool/evidence observation. The benchmark's expected trigger label lives in `oracle_annotations.expected_runtime_trigger` and is evaluator-only. This prevents a model from receiving the answer label instead of interpreting the observation.
 
 ## Independent eligibility oracle
 
