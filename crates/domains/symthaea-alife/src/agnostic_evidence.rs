@@ -17,7 +17,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 /// Property names and states are aligned with OLI M0 fixture v0.1.
-pub const SYMTHAEA_OLI_CONTEXT_VERSION: &str = "symthaea-oli-context-v0.2.0";
+pub const SYMTHAEA_OLI_CONTEXT_VERSION: &str = "symthaea-oli-context-v0.3.0";
 
 /// Substrate-agnostic properties using the canonical OLI M0 property keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -80,6 +80,9 @@ pub enum EvidenceOutcome {
     InterventionResponse,
     SimulationResult,
     DerivedResult,
+    /// Qualified instrument or method capability evidence showing that a property
+    /// cannot be resolved within the declared operating envelope.
+    InstrumentLimitation,
     InvalidMeasurement,
     NotAcquired,
 }
@@ -388,9 +391,15 @@ impl SystemProfile {
                     }
                 }
                 PropertyAssessment::NotObservableWithCurrentInstrument => {
-                    if finding.evidence_ids.is_empty() {
+                    let has_instrument_limitation = finding.evidence_ids.iter().any(|id| {
+                        self.evidence.iter().any(|record| {
+                            record.id == *id
+                                && record.outcome == EvidenceOutcome::InstrumentLimitation
+                        })
+                    });
+                    if !has_instrument_limitation {
                         issues.push(format!(
-                            "{path} NotObservable requires evidence about the instrument or measurement"
+                            "{path} NotObservable requires linked InstrumentLimitation evidence; InvalidMeasurement and NoDetection are not instrument-capability proofs"
                         ));
                     }
                     if finding.coverage.is_none() {
