@@ -107,6 +107,20 @@ The protocol also pre-registers stopping comparisons: premature-stop regret when
 
 The 54-world upstream evaluation split is useful for an initial matched reproduction, but its domain counts are only five or six worlds in most groups. It is not automatically powered for all subgroup claims. Confirmatory comparisons require a preregistered power analysis and world-clustered uncertainty; the test/eval parent/subset relationship must not be treated as independent samples.
 
+## Decision-value experiment selector
+
+The Rust qualifier now includes a small executable reference selector in `qualifier/src/decision_value.rs`. It implements three distinct policies over an explicit finite hypothesis distribution, downstream action-utility table and likelihood model for each experiment:
+
+- **EIG:** maximize expected entropy reduction minus experiment cost.
+- **EVSI:** maximize expected improvement in the best downstream decision minus experiment cost.
+- **Risk-adjusted EVSI:** subtract a declared experiment-risk penalty as well.
+
+This deliberately separates *learning about the world* from *learning what would change the decision*. In the synthetic counterexample, a high-entropy probe separates two hypotheses that recommend the same action; it reduces entropy but has effectively zero decision value. A lower-entropy signal can reverse the optimal action and therefore has positive EVSI. A third probe reveals the world perfectly but has high declared intervention risk, so ordinary EVSI chooses it while risk-adjusted EVSI chooses the safer decision-relevant signal.
+
+The module includes negative controls for malformed probability models, deterministic tie-breaking and stopping when every experiment has negative net value. These are synthetic algorithmic tests, not ACED model-run results.
+
+The selector is a reference baseline, not a claim of general optimality. In a real trial, posterior probabilities, likelihood calibration, utility functions and risk weights must be supplied from information available to the agent before observing the outcome. The hidden ACED SCM, oracle fix and grader must never be used to fit or backfill those values.
+
 ## Baselines and ablations
 
 Reproduce the official scripted/mock controls and official evaluation protocol where licensing and execution contracts allow. Then compare under matched model snapshot, prompts, tools, 15-experiment/32-turn budgets and compute accounting:
