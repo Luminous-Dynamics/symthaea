@@ -927,4 +927,51 @@ mod tests {
         assert!(upper < 0.05 && upper > 0.049);
     }
 
+    #[test]
+    fn only_test_blind_predictions_can_enter_the_outcome_scoreboard() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        corpus.cases[0].prediction.evaluation_partition = "TRAIN".to_owned();
+        let bytes = serde_json::to_vec(&corpus).expect("training partition corpus");
+        let report = audit_corpus(SCHEMA, &bytes).expect("invalid prediction is recorded");
+        assert_eq!(row(&report, "feasible_correct").classification, "REJECTED_REFERENCE");
+    }
+
+    #[test]
+    fn prediction_and_split_must_be_frozen_before_physical_observation() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let item = corpus.cases.iter_mut()
+            .find(|item| item.case_id == "feasible_correct")
+            .unwrap();
+        item.prediction.prediction_frozen_at_ms = item.reference.observed_at_ms;
+        let bytes = serde_json::to_vec(&corpus).expect("late prediction corpus");
+        let report = audit_corpus(SCHEMA, &bytes).expect("late prediction is rejected");
+        assert_eq!(row(&report, "feasible_correct").classification, "REJECTED_REFERENCE");
+    }
+
+    #[test]
+    fn physical_measurements_must_be_after_prediction_freeze_and_calibration_bound() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let item = corpus.cases.iter_mut()
+            .find(|item| item.case_id == "feasible_correct")
+            .unwrap();
+        item.reference.measurements[0].measured_at_ms =
+            item.prediction.prediction_frozen_at_ms;
+        let bytes = serde_json::to_vec(&corpus).expect("pre-freeze measurement corpus");
+        let report = audit_corpus(SCHEMA, &bytes).expect("pre-freeze observation rejected");
+        assert_eq!(row(&report, "feasible_correct").classification, "REJECTED_REFERENCE");
+        assert!(row(&report, "feasible_correct").reason.as_deref().unwrap().contains("REFERENCE_MEASUREMENT_INVALID"));
+    }
+
+    #[test]
+    fn battery_constraint_failure_requires_an_explicit_reason() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let item = corpus.cases.iter_mut()
+            .find(|item| item.case_id == "false_feasible_thermal")
+            .unwrap();
+        item.reference.outcome_reason = None;
+        let bytes = serde_json::to_vec(&corpus).expect("missing failure reason corpus");
+        let report = audit_corpus(SCHEMA, &bytes).expect("missing failure reason rejected");
+        assert_eq!(row(&report, "false_feasible_thermal").classification, "REJECTED_REFERENCE");
+    }
+
 }
