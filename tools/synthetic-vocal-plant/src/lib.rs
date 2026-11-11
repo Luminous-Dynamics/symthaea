@@ -24,6 +24,7 @@ pub const RENDERER_CLASS: &str = "legacy_formant_source_filter";
 pub const FRAME_RATE_HZ: u32 = 200;
 pub const DEFAULT_SAMPLE_RATE_HZ: u32 = 24_000;
 pub const DEFAULT_CROSSFADE_MS: u32 = 5;
+pub const MIN_F0_AUTOCORRELATION: f64 = 0.5;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SyntheticSegmentSpec {
@@ -472,7 +473,7 @@ pub fn estimate_f0_hz(
     let first_peak = (1..scores.len().saturating_sub(1)).find(|index| {
         scores[*index] >= scores[*index - 1]
             && scores[*index] >= scores[*index + 1]
-            && scores[*index] >= 0.15
+            && scores[*index] >= MIN_F0_AUTOCORRELATION
     });
     let best_index = first_peak.unwrap_or_else(|| {
         scores
@@ -484,7 +485,7 @@ pub fn estimate_f0_hz(
     });
     let best_lag = min_lag + best_index;
     let best_score = scores.get(best_index).copied().unwrap_or(f64::NEG_INFINITY);
-    if best_lag == 0 || best_score < 0.15 {
+    if best_lag == 0 || best_score < MIN_F0_AUTOCORRELATION {
         return None;
     }
 
