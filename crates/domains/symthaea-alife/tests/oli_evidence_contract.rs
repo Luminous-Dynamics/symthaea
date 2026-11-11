@@ -282,11 +282,20 @@ fn calibrated_detection_probability_requires_a_linked_reference_record() {
 
 #[test]
 fn detection_limit_requires_units() {
+    let mut candidate = profile();
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::NoDetection));
+    let mut property = finding(
+        Property::SelfMaintenance,
+        PropertyAssessment::InsufficientEvidence,
+        &["m1"],
+    );
     let mut measured = coverage();
     measured.detection_limit_units = None;
-    let mut issues = Vec::new();
-    measured.validate("coverage", &mut issues);
-    assert!(issues.iter().any(|error| error.contains("detection_limit requires non-empty units")));
+    property.coverage = Some(measured);
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("detection-limit units are mandatory");
+    assert!(errors.iter().any(|error| error.contains("detection_limit requires non-empty units")));
 }
 
 #[test]
