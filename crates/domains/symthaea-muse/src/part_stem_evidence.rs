@@ -1197,6 +1197,19 @@ mod tests {
         assert!(valid_sha256(&receipt.receipt_sha256));
     }
 
+
+    #[test]
+    fn published_example_fixture_deserializes_to_v1_contract() {
+        let bytes = include_bytes!(
+            "../../../../docs/research/fixtures/muse-part-stem-evidence-v1.example.json"
+        );
+        let bundle = parse_part_stem_bundle_v1(bytes).unwrap();
+        assert_eq!(bundle.schema, PART_STEM_EVIDENCE_SCHEMA_V1);
+        assert_eq!(bundle.stems.len(), 2);
+        assert_eq!(bundle.audio_clock.sample_rate_hz, 48_000);
+        assert_eq!(bundle.stems[0].render_method, "single_track_input");
+    }
+
     #[test]
     fn exact_single_track_bundle_is_structurally_consistent() {
         let (bundle, midi, wavs) = fixture();
