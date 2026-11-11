@@ -115,3 +115,14 @@ The strongest current WAM baselines suggest that a useful offload pattern may be
 Compare local-low-frequency + remote-high-frequency, remote-low-frequency + local-high-frequency, and all-local placements. A remote slow model must never block the local action loop or safe-stop. Measure the complete path and local fallback under partition.
 
 The AHA-WAM / Streaming-WAM results are manipulation references. They should motivate, not substitute for, a thermodynamic quadruped experiment.
+
+
+## Compression and fleet admission are first-class factors
+
+Microsoft's 2026 platform measurement study reports that tens of milliseconds of network delay can reduce manipulation accuracy by over 10% in its evaluated workloads, and that naive video compression can reduce manipulation and semantic-mapping accuracy by nearly 20%. Its fleet-multiplexing results show statistical multiplexing can save compute, but queueing and latency increase under contention; admission control or resource management is needed for high-priority tasks. These are study-specific observations, not universal constants.
+
+This motivates two additional synthetic controls:
+- DI18: payload compression ratio / accuracy loss versus a declared task tolerance; the remote result is rejected when compression loss exceeds the frozen limit.
+- DI19: fleet batching with separate p99 latency for priority and low-priority requests; critical tasks can be admitted while low-priority tasks are explicitly deferred or assigned local fallback.
+
+A whole-system claim must not silently treat edge/cloud/network energy as zero. Incomplete accounting remains Unknown even when the remote result is timely and useful.
