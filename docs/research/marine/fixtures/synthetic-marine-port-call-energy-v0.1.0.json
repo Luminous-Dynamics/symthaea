@@ -1,16 +1,16 @@
 {
   "schema_version": "0.1.0",
   "scenario_id": "SYNTHETIC-PORT-OPS-0001",
-  "service_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "port_call_id": "SYNTHETIC-CALL-0001",
+  "service_fingerprint": "a5a0a5a0b5b5c6c6d7d7e8e8f9f9010101121212232323233434343456565656",
+  "port_call_id": "PORT-A",
   "port_id": "SYNTHETIC-PORT-001",
   "berth_id": "SYNTHETIC-BERTH-004",
   "vessel_id": "SYNTHETIC-VESSEL-001",
   "berth_window": {
-    "berth_start": "2026-11-11T12:00:00Z",
-    "berth_end": "2026-11-11T20:00:00Z",
-    "planned_arrival": "2026-11-11T12:00:00Z",
-    "planned_departure": "2026-11-11T18:00:00Z",
+    "berth_start": "2026-12-10T10:00:00Z",
+    "berth_end": "2026-12-10T18:00:00Z",
+    "planned_arrival": "2026-12-10T10:00:00Z",
+    "planned_departure": "2026-12-10T16:00:00Z",
     "connection_time_seconds": 600,
     "disconnection_time_seconds": 600
   },
@@ -90,5 +90,14 @@
     "Entire case is synthetic.",
     "No actual port/ship compatibility or grid reservation is established.",
     "No physical OPS performance, emissions or savings claim is made."
-  ]
+  ],
+  "service_contract_id": "SYNTHETIC-CARGO-CONTRACT-001",
+  "service_port_call": {
+    "port_call_id": "PORT-A",
+    "earliest_arrival": "2026-12-10T06:00:00Z",
+    "target_arrival": "2026-12-10T09:00:00Z",
+    "latest_arrival": "2026-12-10T12:00:00Z",
+    "minimum_turnaround_seconds": 7200,
+    "latest_departure": "2026-12-10T18:00:00Z"
+  }
 }
