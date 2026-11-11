@@ -1,0 +1,2518 @@
+{
+  "schema_version": "ig-risk-action-fixtures-v0.1",
+  "benchmark_id": "IG-RISK-ACTION-001",
+  "status": "synthetic_known_answer_unexecuted",
+  "fixture_count": 40,
+  "action_set": [
+    "Answer",
+    "Abstain",
+    "RequestEvidence",
+    "Escalate",
+    "Defer"
+  ],
+  "tie_break_policy": "per_fixture_explicit_order",
+  "utility_profile": "EU(action)=p_correct*correct_reward-(1-p_correct)*wrong_answer_penalty-action_cost; probabilities are synthetic scenario oracle inputs, not model confidence",
+  "fixtures": [
+    {
+      "scenario_id": "RA-PAIR-1-LOW",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "abstain_cost": 3,
+        "request_evidence_cost": 4,
+        "escalation_cost": 6,
+        "delay_cost": 2,
+        "wrong_answer_penalty": 5
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 7,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 9,
+          "denominator": 2
+        },
+        "Escalate": {
+          "numerator": 13,
+          "denominator": 4
+        },
+        "Defer": {
+          "numerator": 23,
+          "denominator": 4
+        }
+      },
+      "expected_action": "Answer",
+      "sensitivity_pair_id": "RA-LOSS-PAIR-1",
+      "sensitivity_pair_level": "low_penalty"
+    },
+    {
+      "scenario_id": "RA-PAIR-1-HIGH",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "abstain_cost": 3,
+        "request_evidence_cost": 4,
+        "escalation_cost": 6,
+        "delay_cost": 2,
+        "wrong_answer_penalty": 40
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 0,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 1,
+          "denominator": 1
+        },
+        "Escalate": {
+          "numerator": 3,
+          "denominator": 2
+        },
+        "Defer": {
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "expected_action": "Escalate",
+      "sensitivity_pair_id": "RA-LOSS-PAIR-1",
+      "sensitivity_pair_level": "high_penalty"
+    },
+    {
+      "scenario_id": "RA-PAIR-2-LOW",
+      "task_family": "retrieval",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "abstain_cost": 3,
+        "request_evidence_cost": 4,
+        "escalation_cost": 6,
+        "delay_cost": 2,
+        "wrong_answer_penalty": 5
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 7,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 9,
+          "denominator": 2
+        },
+        "Escalate": {
+          "numerator": 13,
+          "denominator": 4
+        },
+        "Defer": {
+          "numerator": 23,
+          "denominator": 4
+        }
+      },
+      "expected_action": "Answer",
+      "sensitivity_pair_id": "RA-LOSS-PAIR-2",
+      "sensitivity_pair_level": "low_penalty"
+    },
+    {
+      "scenario_id": "RA-PAIR-2-HIGH",
+      "task_family": "retrieval",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "abstain_cost": 3,
+        "request_evidence_cost": 4,
+        "escalation_cost": 6,
+        "delay_cost": 2,
+        "wrong_answer_penalty": 40
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 0,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 1,
+          "denominator": 1
+        },
+        "Escalate": {
+          "numerator": 3,
+          "denominator": 2
+        },
+        "Defer": {
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "expected_action": "Escalate",
+      "sensitivity_pair_id": "RA-LOSS-PAIR-2",
+      "sensitivity_pair_level": "high_penalty"
+    },
+    {
+      "scenario_id": "RA-PAIR-3-LOW",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "abstain_cost": 3,
+        "request_evidence_cost": 4,
+        "escalation_cost": 6,
+        "delay_cost": 2,
+        "wrong_answer_penalty": 5
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 7,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 9,
+          "denominator": 2
+        },
+        "Escalate": {
+          "numerator": 13,
+          "denominator": 4
+        },
+        "Defer": {
+          "numerator": 23,
+          "denominator": 4
+        }
+      },
+      "expected_action": "Answer",
+      "sensitivity_pair_id": "RA-LOSS-PAIR-3",
+      "sensitivity_pair_level": "low_penalty"
+    },
+    {
+      "scenario_id": "RA-PAIR-3-HIGH",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "abstain_cost": 3,
+        "request_evidence_cost": 4,
+        "escalation_cost": 6,
+        "delay_cost": 2,
+        "wrong_answer_penalty": 40
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 0,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 1,
+          "denominator": 1
+        },
+        "Escalate": {
+          "numerator": 3,
+          "denominator": 2
+        },
+        "Defer": {
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "expected_action": "Escalate",
+      "sensitivity_pair_id": "RA-LOSS-PAIR-3",
+      "sensitivity_pair_level": "high_penalty"
+    },
+    {
+      "scenario_id": "RA-PAIR-4-LOW",
+      "task_family": "institutional_process",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "abstain_cost": 3,
+        "request_evidence_cost": 4,
+        "escalation_cost": 6,
+        "delay_cost": 2,
+        "wrong_answer_penalty": 5
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 7,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 9,
+          "denominator": 2
+        },
+        "Escalate": {
+          "numerator": 13,
+          "denominator": 4
+        },
+        "Defer": {
+          "numerator": 23,
+          "denominator": 4
+        }
+      },
+      "expected_action": "Answer",
+      "sensitivity_pair_id": "RA-LOSS-PAIR-4",
+      "sensitivity_pair_level": "low_penalty"
+    },
+    {
+      "scenario_id": "RA-PAIR-4-HIGH",
+      "task_family": "institutional_process",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "abstain_cost": 3,
+        "request_evidence_cost": 4,
+        "escalation_cost": 6,
+        "delay_cost": 2,
+        "wrong_answer_penalty": 40
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 0,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 1,
+          "denominator": 1
+        },
+        "Escalate": {
+          "numerator": 3,
+          "denominator": 2
+        },
+        "Defer": {
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "expected_action": "Escalate",
+      "sensitivity_pair_id": "RA-LOSS-PAIR-4",
+      "sensitivity_pair_level": "high_penalty"
+    },
+    {
+      "scenario_id": "RA-PAIR-5-LOW",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "abstain_cost": 3,
+        "request_evidence_cost": 4,
+        "escalation_cost": 6,
+        "delay_cost": 2,
+        "wrong_answer_penalty": 5
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 7,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 9,
+          "denominator": 2
+        },
+        "Escalate": {
+          "numerator": 13,
+          "denominator": 4
+        },
+        "Defer": {
+          "numerator": 23,
+          "denominator": 4
+        }
+      },
+      "expected_action": "Answer",
+      "sensitivity_pair_id": "RA-LOSS-PAIR-5",
+      "sensitivity_pair_level": "low_penalty"
+    },
+    {
+      "scenario_id": "RA-PAIR-5-HIGH",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "abstain_cost": 3,
+        "request_evidence_cost": 4,
+        "escalation_cost": 6,
+        "delay_cost": 2,
+        "wrong_answer_penalty": 40
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 0,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 1,
+          "denominator": 1
+        },
+        "Escalate": {
+          "numerator": 3,
+          "denominator": 2
+        },
+        "Defer": {
+          "numerator": 1,
+          "denominator": 2
+        }
+      },
+      "expected_action": "Escalate",
+      "sensitivity_pair_id": "RA-LOSS-PAIR-5",
+      "sensitivity_pair_level": "high_penalty"
+    },
+    {
+      "scenario_id": "RA-ANSWER-01",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 94,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 96,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 20,
+        "abstain_cost": 4,
+        "request_evidence_cost": 5,
+        "escalation_cost": 8,
+        "delay_cost": 8
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 41,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -4,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 19,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -1,
+          "denominator": 1
+        },
+        "Defer": {
+          "numerator": -5,
+          "denominator": 2
+        }
+      },
+      "expected_action": "Answer"
+    },
+    {
+      "scenario_id": "RA-ANSWER-02",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 97,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 91,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 86,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 20,
+        "abstain_cost": 5,
+        "request_evidence_cost": 6,
+        "escalation_cost": 9,
+        "delay_cost": 9
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 17,
+          "denominator": 2
+        },
+        "Abstain": {
+          "numerator": -5,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 31,
+          "denominator": 10
+        },
+        "Escalate": {
+          "numerator": -17,
+          "denominator": 10
+        },
+        "Defer": {
+          "numerator": -16,
+          "denominator": 5
+        }
+      },
+      "expected_action": "Answer"
+    },
+    {
+      "scenario_id": "RA-ANSWER-03",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 96,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 98,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 92,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 87,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 20,
+        "abstain_cost": 6,
+        "request_evidence_cost": 7,
+        "escalation_cost": 10,
+        "delay_cost": 10
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 44,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -6,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 12,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -12,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": -39,
+          "denominator": 10
+        }
+      },
+      "expected_action": "Answer"
+    },
+    {
+      "scenario_id": "RA-ANSWER-04",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 97,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 99,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 93,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 88,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 20,
+        "abstain_cost": 4,
+        "request_evidence_cost": 5,
+        "escalation_cost": 8,
+        "delay_cost": 8
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 91,
+          "denominator": 10
+        },
+        "Abstain": {
+          "numerator": -4,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 47,
+          "denominator": 10
+        },
+        "Escalate": {
+          "numerator": -1,
+          "denominator": 10
+        },
+        "Defer": {
+          "numerator": -8,
+          "denominator": 5
+        }
+      },
+      "expected_action": "Answer"
+    },
+    {
+      "scenario_id": "RA-ANSWER-05",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 98,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 96,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 94,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 89,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 20,
+        "abstain_cost": 5,
+        "request_evidence_cost": 6,
+        "escalation_cost": 9,
+        "delay_cost": 9
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 47,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -5,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 14,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -4,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": -23,
+          "denominator": 10
+        }
+      },
+      "expected_action": "Answer"
+    },
+    {
+      "scenario_id": "RA-ANSWER-06",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 99,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 97,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 90,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 20,
+        "abstain_cost": 6,
+        "request_evidence_cost": 7,
+        "escalation_cost": 10,
+        "delay_cost": 10
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": 97,
+          "denominator": 10
+        },
+        "Abstain": {
+          "numerator": -6,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 21,
+          "denominator": 10
+        },
+        "Escalate": {
+          "numerator": -3,
+          "denominator": 2
+        },
+        "Defer": {
+          "numerator": -3,
+          "denominator": 1
+        }
+      },
+      "expected_action": "Answer"
+    },
+    {
+      "scenario_id": "RA-ABSTAIN-01",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 5,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 20,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 60,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 20,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 70,
+        "abstain_cost": 1,
+        "request_evidence_cost": 25,
+        "escalation_cost": 35,
+        "delay_cost": 30
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -66,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -1,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -79,
+          "denominator": 1
+        },
+        "Escalate": {
+          "numerator": -57,
+          "denominator": 1
+        },
+        "Defer": {
+          "numerator": -84,
+          "denominator": 1
+        }
+      },
+      "expected_action": "Abstain"
+    },
+    {
+      "scenario_id": "RA-ABSTAIN-02",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 6,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 21,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 61,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 21,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 70,
+        "abstain_cost": 2,
+        "request_evidence_cost": 26,
+        "escalation_cost": 36,
+        "delay_cost": 31
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -326,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -2,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -396,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -286,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": -421,
+          "denominator": 5
+        }
+      },
+      "expected_action": "Abstain"
+    },
+    {
+      "scenario_id": "RA-ABSTAIN-03",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 7,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 22,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 62,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 22,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 70,
+        "abstain_cost": 3,
+        "request_evidence_cost": 27,
+        "escalation_cost": 37,
+        "delay_cost": 32
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -322,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -3,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -397,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -287,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": -422,
+          "denominator": 5
+        }
+      },
+      "expected_action": "Abstain"
+    },
+    {
+      "scenario_id": "RA-ABSTAIN-04",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 8,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 23,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 63,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 23,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 70,
+        "abstain_cost": 4,
+        "request_evidence_cost": 28,
+        "escalation_cost": 38,
+        "delay_cost": 33
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -318,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -4,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -398,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -288,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": -423,
+          "denominator": 5
+        }
+      },
+      "expected_action": "Abstain"
+    },
+    {
+      "scenario_id": "RA-ABSTAIN-05",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 9,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 24,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 64,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 24,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 70,
+        "abstain_cost": 1,
+        "request_evidence_cost": 29,
+        "escalation_cost": 39,
+        "delay_cost": 34
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -314,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -1,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -399,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -289,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": -424,
+          "denominator": 5
+        }
+      },
+      "expected_action": "Abstain"
+    },
+    {
+      "scenario_id": "RA-ABSTAIN-06",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 10,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 25,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 65,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 25,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 70,
+        "abstain_cost": 2,
+        "request_evidence_cost": 25,
+        "escalation_cost": 35,
+        "delay_cost": 30
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -62,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -2,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -75,
+          "denominator": 1
+        },
+        "Escalate": {
+          "numerator": -53,
+          "denominator": 1
+        },
+        "Defer": {
+          "numerator": -80,
+          "denominator": 1
+        }
+      },
+      "expected_action": "Abstain"
+    },
+    {
+      "scenario_id": "RA-REQUESTEVIDENCE-01",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 45,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 80,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 60,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 50,
+        "abstain_cost": 8,
+        "request_evidence_cost": 1,
+        "escalation_cost": 18,
+        "delay_cost": 18
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -23,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -8,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 6,
+          "denominator": 1
+        },
+        "Escalate": {
+          "numerator": -20,
+          "denominator": 1
+        },
+        "Defer": {
+          "numerator": -32,
+          "denominator": 1
+        }
+      },
+      "expected_action": "RequestEvidence"
+    },
+    {
+      "scenario_id": "RA-REQUESTEVIDENCE-02",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 46,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 96,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 81,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 61,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 50,
+        "abstain_cost": 9,
+        "request_evidence_cost": 2,
+        "escalation_cost": 19,
+        "delay_cost": 19
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -112,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -9,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 28,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -102,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": -162,
+          "denominator": 5
+        }
+      },
+      "expected_action": "RequestEvidence"
+    },
+    {
+      "scenario_id": "RA-REQUESTEVIDENCE-03",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 47,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 97,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 82,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 62,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 50,
+        "abstain_cost": 10,
+        "request_evidence_cost": 3,
+        "escalation_cost": 20,
+        "delay_cost": 20
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -109,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -10,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 26,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -104,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": -164,
+          "denominator": 5
+        }
+      },
+      "expected_action": "RequestEvidence"
+    },
+    {
+      "scenario_id": "RA-REQUESTEVIDENCE-04",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 48,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 98,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 83,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 63,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 50,
+        "abstain_cost": 8,
+        "request_evidence_cost": 1,
+        "escalation_cost": 18,
+        "delay_cost": 18
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -106,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -8,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 39,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -91,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": -151,
+          "denominator": 5
+        }
+      },
+      "expected_action": "RequestEvidence"
+    },
+    {
+      "scenario_id": "RA-REQUESTEVIDENCE-05",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 49,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 99,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 84,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 64,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 50,
+        "abstain_cost": 9,
+        "request_evidence_cost": 2,
+        "escalation_cost": 19,
+        "delay_cost": 19
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -103,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -9,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 37,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -93,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": -153,
+          "denominator": 5
+        }
+      },
+      "expected_action": "RequestEvidence"
+    },
+    {
+      "scenario_id": "RA-REQUESTEVIDENCE-06",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 50,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 95,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 85,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 65,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 50,
+        "abstain_cost": 10,
+        "request_evidence_cost": 3,
+        "escalation_cost": 20,
+        "delay_cost": 20
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -20,
+          "denominator": 1
+        },
+        "Abstain": {
+          "numerator": -10,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": 4,
+          "denominator": 1
+        },
+        "Escalate": {
+          "numerator": -19,
+          "denominator": 1
+        },
+        "Defer": {
+          "numerator": -31,
+          "denominator": 1
+        }
+      },
+      "expected_action": "RequestEvidence"
+    },
+    {
+      "scenario_id": "RA-ESCALATE-01",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 30,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 45,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 98,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 50,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 12,
+        "request_evidence_cost": 24,
+        "escalation_cost": 1,
+        "delay_cost": 24
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -57,
+          "denominator": 2
+        },
+        "Abstain": {
+          "numerator": -12,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -177,
+          "denominator": 4
+        },
+        "Escalate": {
+          "numerator": 79,
+          "denominator": 10
+        },
+        "Defer": {
+          "numerator": -83,
+          "denominator": 2
+        }
+      },
+      "expected_action": "Escalate"
+    },
+    {
+      "scenario_id": "RA-ESCALATE-02",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 31,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 46,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 99,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 51,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 13,
+        "request_evidence_cost": 25,
+        "escalation_cost": 2,
+        "delay_cost": 25
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -559,
+          "denominator": 20
+        },
+        "Abstain": {
+          "numerator": -13,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -447,
+          "denominator": 10
+        },
+        "Escalate": {
+          "numerator": 149,
+          "denominator": 20
+        },
+        "Defer": {
+          "numerator": -839,
+          "denominator": 20
+        }
+      },
+      "expected_action": "Escalate"
+    },
+    {
+      "scenario_id": "RA-ESCALATE-03",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 32,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 47,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 100,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 52,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 14,
+        "request_evidence_cost": 26,
+        "escalation_cost": 1,
+        "delay_cost": 26
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -137,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -14,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -903,
+          "denominator": 20
+        },
+        "Escalate": {
+          "numerator": 9,
+          "denominator": 1
+        },
+        "Defer": {
+          "numerator": -212,
+          "denominator": 5
+        }
+      },
+      "expected_action": "Escalate"
+    },
+    {
+      "scenario_id": "RA-ESCALATE-04",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 33,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 48,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 98,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 53,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 12,
+        "request_evidence_cost": 27,
+        "escalation_cost": 2,
+        "delay_cost": 27
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -537,
+          "denominator": 20
+        },
+        "Abstain": {
+          "numerator": -12,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -228,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": 69,
+          "denominator": 10
+        },
+        "Defer": {
+          "numerator": -857,
+          "denominator": 20
+        }
+      },
+      "expected_action": "Escalate"
+    },
+    {
+      "scenario_id": "RA-ESCALATE-05",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 34,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 49,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 99,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 54,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 13,
+        "request_evidence_cost": 24,
+        "escalation_cost": 1,
+        "delay_cost": 24
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -263,
+          "denominator": 10
+        },
+        "Abstain": {
+          "numerator": -13,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -841,
+          "denominator": 20
+        },
+        "Escalate": {
+          "numerator": 169,
+          "denominator": 20
+        },
+        "Defer": {
+          "numerator": -393,
+          "denominator": 10
+        }
+      },
+      "expected_action": "Escalate"
+    },
+    {
+      "scenario_id": "RA-ESCALATE-06",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 35,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 50,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 100,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 55,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 14,
+        "request_evidence_cost": 25,
+        "escalation_cost": 2,
+        "delay_cost": 25
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -103,
+          "denominator": 4
+        },
+        "Abstain": {
+          "numerator": -14,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -85,
+          "denominator": 2
+        },
+        "Escalate": {
+          "numerator": 8,
+          "denominator": 1
+        },
+        "Defer": {
+          "numerator": -159,
+          "denominator": 4
+        }
+      },
+      "expected_action": "Escalate"
+    },
+    {
+      "scenario_id": "RA-DEFER-01",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 30,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 45,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 30,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 98,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 18,
+        "request_evidence_cost": 20,
+        "escalation_cost": 25,
+        "delay_cost": 1
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -57,
+          "denominator": 2
+        },
+        "Abstain": {
+          "numerator": -18,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -161,
+          "denominator": 4
+        },
+        "Escalate": {
+          "numerator": -107,
+          "denominator": 2
+        },
+        "Defer": {
+          "numerator": 79,
+          "denominator": 10
+        }
+      },
+      "expected_action": "Defer"
+    },
+    {
+      "scenario_id": "RA-DEFER-02",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 31,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 46,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 31,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 99,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 19,
+        "request_evidence_cost": 21,
+        "escalation_cost": 26,
+        "delay_cost": 2
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -559,
+          "denominator": 20
+        },
+        "Abstain": {
+          "numerator": -19,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -407,
+          "denominator": 10
+        },
+        "Escalate": {
+          "numerator": -1079,
+          "denominator": 20
+        },
+        "Defer": {
+          "numerator": 149,
+          "denominator": 20
+        }
+      },
+      "expected_action": "Defer"
+    },
+    {
+      "scenario_id": "RA-DEFER-03",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 32,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 47,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 32,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 100,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 20,
+        "request_evidence_cost": 22,
+        "escalation_cost": 27,
+        "delay_cost": 1
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -137,
+          "denominator": 5
+        },
+        "Abstain": {
+          "numerator": -20,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -823,
+          "denominator": 20
+        },
+        "Escalate": {
+          "numerator": -272,
+          "denominator": 5
+        },
+        "Defer": {
+          "numerator": 9,
+          "denominator": 1
+        }
+      },
+      "expected_action": "Defer"
+    },
+    {
+      "scenario_id": "RA-DEFER-04",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 33,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 48,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 33,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 98,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 18,
+        "request_evidence_cost": 23,
+        "escalation_cost": 28,
+        "delay_cost": 2
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -537,
+          "denominator": 20
+        },
+        "Abstain": {
+          "numerator": -18,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -208,
+          "denominator": 5
+        },
+        "Escalate": {
+          "numerator": -1097,
+          "denominator": 20
+        },
+        "Defer": {
+          "numerator": 69,
+          "denominator": 10
+        }
+      },
+      "expected_action": "Defer"
+    },
+    {
+      "scenario_id": "RA-DEFER-05",
+      "task_family": "mechanical_diagnosis",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 34,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 49,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 34,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 99,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 19,
+        "request_evidence_cost": 20,
+        "escalation_cost": 25,
+        "delay_cost": 1
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -263,
+          "denominator": 10
+        },
+        "Abstain": {
+          "numerator": -19,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -761,
+          "denominator": 20
+        },
+        "Escalate": {
+          "numerator": -513,
+          "denominator": 10
+        },
+        "Defer": {
+          "numerator": 169,
+          "denominator": 20
+        }
+      },
+      "expected_action": "Defer"
+    },
+    {
+      "scenario_id": "RA-DEFER-06",
+      "task_family": "factual_reasoning",
+      "probability_source": "SyntheticScenarioOracle",
+      "confidence_target": "post_answer_correctness",
+      "probabilities": {
+        "answer_correctness": {
+          "numerator": 35,
+          "denominator": 100
+        },
+        "evidence_adjusted_correctness": {
+          "numerator": 50,
+          "denominator": 100
+        },
+        "reviewer_correctness": {
+          "numerator": 35,
+          "denominator": 100
+        },
+        "deferred_correctness": {
+          "numerator": 100,
+          "denominator": 100
+        }
+      },
+      "loss_matrix": {
+        "correct_reward": 10,
+        "wrong_answer_penalty": 45,
+        "abstain_cost": 20,
+        "request_evidence_cost": 21,
+        "escalation_cost": 26,
+        "delay_cost": 2
+      },
+      "tie_break_order": [
+        "Abstain",
+        "Escalate",
+        "RequestEvidence",
+        "Defer",
+        "Answer"
+      ],
+      "expected_utilities": {
+        "Answer": {
+          "numerator": -103,
+          "denominator": 4
+        },
+        "Abstain": {
+          "numerator": -20,
+          "denominator": 1
+        },
+        "RequestEvidence": {
+          "numerator": -77,
+          "denominator": 2
+        },
+        "Escalate": {
+          "numerator": -207,
+          "denominator": 4
+        },
+        "Defer": {
+          "numerator": 8,
+          "denominator": 1
+        }
+      },
+      "expected_action": "Defer"
+    }
+  ],
+  "claim_ceiling": "This corpus tests exact decision-theoretic arithmetic and action selection over synthetic declared probabilities and costs. It does not establish model calibration, actual value-of-information quality, human-review performance, deployment safety, or real-world optimality."
+}
