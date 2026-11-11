@@ -1434,12 +1434,13 @@ fn metric_from_set_counts(
 }
 
 fn part_separation_summary_v1(
+    reference_part_ids: &[u16],
     reference: &[EvaluationNoteV1],
     predicted: &[MidiTranscribedNoteV1],
     matching: &[(usize, usize)],
 ) -> Option<MidiTranscriptionPartSeparationSummaryV1> {
     let reference_parts: std::collections::BTreeSet<u16> =
-        reference.iter().map(|note| note.part_id).collect();
+        reference_part_ids.iter().copied().collect();
     if reference_parts.is_empty() {
         return None;
     }
@@ -1672,7 +1673,14 @@ pub fn evaluate_midi_transcription_v1(
             build_adjacency(&reference_notes, &predicted_notes, &config, false, false, false)?;
         maximum_cardinality_matching(&adjacency, predicted_notes.len())?
     };
+    let reference_part_ids: Vec<u16> = reference
+        .manifest
+        .tracks
+        .iter()
+        .map(|track| track.part_id)
+        .collect();
     let part_separation = part_separation_summary_v1(
+        &reference_part_ids,
         &reference_notes,
         &predicted_notes,
         &onset_matching,
@@ -2076,7 +2084,7 @@ mod tests {
             predicted_eval_note(9, 48, 1),
         ];
         let summary =
-            part_separation_summary_v1(&reference, &predicted, &[(0, 0), (1, 1)]).unwrap();
+            part_separation_summary_v1(&[1, 2], &reference, &predicted, &[(0, 0), (1, 1)]).unwrap();
         assert_eq!(summary.reference_part_count, 2);
         assert_eq!(summary.matched_reference_part_count, 2);
         assert_eq!(summary.matched_prediction_track_count, 2);
@@ -2150,10 +2158,33 @@ mod tests {
         ];
         let predicted = vec![predicted_eval_note(4, 60, 0)];
         let summary =
-            part_separation_summary_v1(&reference, &predicted, &[(0, 0)]).unwrap();
+            part_separation_summary_v1(&[1, 2], &reference, &predicted, &[(0, 0)]).unwrap();
         assert_eq!(summary.matched_reference_part_count, 1);
         assert_eq!(summary.reference_part_coverage, Some(0.5));
         assert_eq!(summary.note_weighted_track_purity, Some(1.0));
+    }
+
+    #[test]
+    fn declared_silent_reference_part_still_reduces_part_coverage() {
+        let reference = vec![reference_eval_note(1, 60)];
+        let predicted = vec![predicted_eval_note(4, 60, 0)];
+        // Part 2 is declared in the reference manifest but has no note in
+        // this excerpt. It must still be part of the coverage denominator.
+        let summary =
+            part_separation_summary_v1(&[1, 2], &reference, &predicted, &[(0, 0)]).unwrap();
+        assert_eq!(summary.reference_part_count, 2);
+        assert_eq!(summary.matched_reference_part_count, 1);
+        assert_eq!(summary.reference_part_coverage, Some(0.5));
+    }
+
+    #[test]
+    fn zero_matched_notes_has_zero_part_coverage_and_no_purity_estimate() {
+        let reference = vec![reference_eval_note(1, 60)];
+        let predicted = vec![predicted_eval_note(4, 72, 0)];
+        let summary = part_separation_summary_v1(&[1, 2], &reference, &predicted, &[]).unwrap();
+        assert_eq!(summary.reference_part_coverage, Some(0.0));
+        assert_eq!(summary.note_weighted_track_purity, None);
+        assert_eq!(summary.note_weighted_lane_purity, None);
     }
 
     #[test]
