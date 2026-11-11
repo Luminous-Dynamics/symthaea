@@ -191,7 +191,7 @@
         "control / comparison design",
         "randomization or allocation procedure when applicable",
         "measurement variables, measurement timing and outcome taxonomy",
-        "planned sample size and statistical power / precision assumptions",
+        "numeric sample design: planned total units, standardized effect size, two-sided alpha, target power, and named power method",
         "budget, cost model, safety limits and reversible/irreversible effect classification",
         "predeclared stop, continue, replicate and conflict-resolution rules",
         "expected confounders, selection effects and known identification assumptions"
@@ -199,8 +199,31 @@
       "immutability_rule": "The full plan artifact must be durably recorded before an experiment is authorized or executed. The digest in experiment_proposal binds to that exact artifact. Any plan change requires a new proposal event and new plan digest; do not overwrite the prior artifact.",
       "verification_rule": "The Rust function validate_trace_with_plans(trace, plan_artifacts) validates each closed plan's required nested objects and recomputes canonical SHA-256; every proposal digest must resolve to exactly one supplied plan artifact, and proposal experiment_id must equal plan_id. Altered plan artifacts and ID mismatches fail closed.",
       "claim_ceiling": "A plan digest is not proof of prospective timing or execution fidelity. Trusted timestamp/signature anchoring and an independent execution observer are still required.",
-      "schema": "ACED_EXPERIMENT_PLAN_V0_1.schema.json",
-      "rust_fixture": "qualifier/tests/fixtures/aced_experiment_plan_v0_1.json"
+      "schema": "ACED_EXPERIMENT_PLAN_V0_2.schema.json",
+      "rust_fixture": "qualifier/tests/fixtures/aced_experiment_plan_v0_2.json",
+      "power_design": {
+        "module": "qualifier/src/power_design.rs",
+        "method": "two_sided_equal_allocation_independent_means_normal_approximation",
+        "validated_parameters": [
+          "standardized effect size",
+          "two-sided alpha",
+          "target power",
+          "even total planned units"
+        ],
+        "outputs": [
+          "required units per arm",
+          "required total units",
+          "approximate achieved power at planned sample size"
+        ],
+        "example": {
+          "standardized_effect_size": 0.5,
+          "alpha": 0.05,
+          "target_power": 0.8,
+          "required_units_per_arm": 63,
+          "required_total_units": 126
+        },
+        "claim_limit": "A normal-approximation planning calculator for independent, equal-allocation, continuous outcomes. Not a substitute for exact or design-specific power analysis for clustered, paired, binary, ordinal, survival, adaptive, sequential, repeated-look or multiplicity-adjusted experiments."
+      }
     }
   },
   "external_benchmark_crosswalk": [
@@ -257,7 +280,8 @@
     "decision: dose/combination, utility, risk and uncertainty",
     "stopping: premature stop, delayed stop and unreconciled effects",
     "execution: tool/sandbox failures, reproducibility and observer mismatch",
-    "reporting: unsupported mechanism claims, citations and evidence-to-claim alignment"
+    "reporting: unsupported mechanism claims, citations and evidence-to-claim alignment",
+    "design adequacy: underpowered sample, invalid allocation, multiplicity, repeated looks and measurement error"
   ],
   "forecast_quality": {
     "scores": [
