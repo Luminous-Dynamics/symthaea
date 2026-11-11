@@ -127,12 +127,12 @@
     "methods": [
       {
         "id": "expected_information_gain",
-        "objective": "Expected entropy reduction in bits minus experiment cost.",
-        "known_limitation": "Can prefer informative observations that do not alter the best downstream action."
+        "objective": "Expected reduction in predictive uncertainty, measured in bits. It is deliberately not combined arithmetically with utility-valued experiment costs.",
+        "known_limitation": "Measures uncertainty reduction, not whether learning changes the best action; a bit-valued score is not commensurable with utility without a separately calibrated conversion."
       },
       {
         "id": "expected_value_of_sample_information",
-        "objective": "Expected improvement in optimal downstream action utility after an observation, minus experiment cost.",
+        "objective": "Expected improvement in optimal downstream action utility after an observation, minus experiment cost, both measured in the declared utility scale.",
         "known_limitation": "Does not account for intervention risk unless a separate risk term is added."
       },
       {
@@ -148,14 +148,20 @@
       "deterministic identifier tie-break",
       "risk-adjusted EVSI rejects the high-risk perfect-information experiment in the synthetic counterexample"
     ],
-    "claim_ceiling": "Purely synthetic algorithmic reference and unit tests. No ACED worlds, hidden world payloads, external data, model calls or human evaluations are executed by this module."
+    "claim_ceiling": "Purely synthetic algorithmic reference and unit tests. No ACED worlds, hidden world payloads, external data, model calls or human evaluations are executed by this module.",
+    "selection_score_units": {
+      "expected_information_gain": "bits",
+      "expected_value_of_sample_information": "utility",
+      "risk_adjusted_evsi": "utility",
+      "comparison_rule": "Compare candidates only within the same selection method and declared unit system. Do not rank EIG bits directly against EVSI utility scores."
+    }
   },
   "prospective_experiment_trace": {
     "schema": "EXPERIMENT_VALUE_TRACE_V0_1.schema.json",
     "rust_module": "qualifier/src/experiment_trace.rs",
     "status": "reusable_synthetic_trace_validator_not_yet_connected_to_model_runner",
     "event_types": {
-      "experiment_proposal": "Pre-observation commitment to belief digest, selector, predicted outcomes, EIG, EVSI, risk, risk-aversion coefficient, cost and net value.",
+      "experiment_proposal": "Pre-observation commitment to belief digest, selector, predicted outcomes, EIG in bits, EVSI in utility, risk, risk-aversion coefficient, cost in utility, and selector-specific predicted_selection_score. EIG score is EIG bits; EVSI score is EVSI minus cost; risk-adjusted EVSI score is EVSI minus cost minus risk-aversion coefficient times risk.",
       "experiment_observation": "Append-only later record referencing exactly one proposal event, with observed/failed/unknown status, output digest when observed and actual cost.",
       "stop": "Terminal reason and evidence-state digest; it is rejected if any proposal lacks an observation/failure/unknown reconciliation event."
     },
@@ -164,7 +170,7 @@
       "Event digest covers canonical JSON for event ID, sequence, event type, previous digest and payload; the digest field itself is excluded.",
       "Proposal event IDs and experiment IDs are unique; every observation references one prior proposal exactly once.",
       "Observed, failed and unknown attempts are all recorded; missing outcomes are not silently dropped.",
-      "Predicted net value must equal EIG-cost, EVSI-cost, or EVSI-cost-risk_aversion*predicted_risk according to the declared selector.",
+      "Predicted selection score must match the selector's dimensional contract: EIG score = EIG bits; EVSI score = EVSI minus cost; risk-adjusted EVSI score = EVSI minus cost minus risk_aversion*predicted_risk.",
       "No new experiment proposals or observations are permitted after stop."
     ],
     "trust_boundary": "A self-contained hash chain detects changes relative to a trusted checkpoint but does not prove event time or signer identity. Model-run use requires an independently operated append-only recorder that signs or timestamps the proposal digest before the experiment is executed.",
