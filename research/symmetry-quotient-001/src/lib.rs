@@ -1229,9 +1229,10 @@ mod tests {
             vec![2, 1, 2]
         );
         assert!(
-            certificate.orbits.iter().all(|orbit| {
-                orbit.members.len() * orbit.stabilizer_group_elements.len() == 8
-            })
+            certificate
+                .orbits
+                .iter()
+                .all(|orbit| { orbit.members.len() * orbit.stabilizer_group_elements.len() == 8 })
         );
         verify_certificate(
             &problem,
