@@ -52,9 +52,16 @@ impl LossInterval {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CoverageSemantics {
     /// Joint/family-wise coverage for all action intervals in the declared set.
-    SimultaneousAcrossActionSet,
-    /// Separate marginal coverage for each action; insufficient for a minimum over alternatives.
-    MarginalPerAction,
+    SimultaneousAcrossActionSetAndHorizon,
+    /// Separate marginal coverage for each action/tick; insufficient after selection.
+    MarginalPerActionOrTick,
+}
+
+/// Calibration procedure used to produce the expected-loss intervals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CalibrationMethod {
+    /// Split conformal with one maximum nonconformity score per complete episode.
+    EpisodeMaximumSplitConformal,
 }
 
 /// Loss-model calibration evidence supplied by an independent evaluator.
@@ -62,8 +69,18 @@ pub enum CoverageSemantics {
 pub struct CalibrationEvidence {
     /// Stable calibration identity.
     pub calibration_id: String,
-    /// Digest of the independent validation evidence.
+    /// Calibration algorithm producing this receipt.
+    pub method: CalibrationMethod,
+    /// Digest of the independent validation/exchangeability evidence.
     pub validation_digest: String,
+    /// Digest of the frozen calibration split.
+    pub calibration_split_digest: String,
+    /// Number of independent complete calibration episodes.
+    pub calibration_episode_count: u64,
+    /// Target miscoverage in parts per million.
+    pub alpha_ppm: u32,
+    /// Nonconformity expansion applied to each expected-loss interval.
+    pub expansion_units: u64,
     /// Loss-model digest covered by this calibration.
     pub loss_model_digest: String,
     /// Versioned task-loss scale covered by this calibration.
@@ -114,6 +131,8 @@ pub struct DecisionTickEvidence {
     pub action_domain_digest: String,
     /// Independent calibration evidence for the supplied expected-loss bounds.
     pub calibration: Option<CalibrationEvidence>,
+    /// Amount by which the raw expected-loss intervals were expanded.
+    pub applied_calibration_expansion_units: u64,
     /// Complete set of candidate actions and their evidence.
     pub actions: Vec<ActionEvidence>,
 }
@@ -170,8 +189,21 @@ pub enum UnknownReason {
         /// Minimum contract coverage.
         required_ppm: u32,
     },
-    /// Calibration is only marginal per action, not simultaneous over the set.
+    /// Calibration is only marginal per action/tick, not simultaneous over the set/horizon.
     CalibrationCoverageNotSimultaneous,
+    /// Calibration method is not the required episode-maximum split-conformal procedure.
+    UnsupportedCalibrationMethod,
+    /// Calibration metadata is internally inconsistent or incomplete.
+    CalibrationMetadataInvalid,
+    /// Calibration sample size cannot support the declared finite-sample coverage target.
+    CalibrationSampleTooSmall {
+        /// Number of independent calibration episodes.
+        sample_count: u64,
+        /// Required one-indexed conformal rank.
+        required_rank: u64,
+    },
+    /// Loss intervals were not expanded by the exact amount in the calibration receipt.
+    CalibrationExpansionMismatch,
     /// Candidate action set exceeds the calibration study's covered cardinality.
     CalibrationActionSetTooLarge {
         /// Number of actions in the supplied candidate set.
@@ -386,6 +418,7 @@ fn assess_tick(
     };
     if calibration.calibration_id.trim().is_empty()
         || calibration.validation_digest.trim().is_empty()
+        || calibration.calibration_split_digest.trim().is_empty()
         || calibration.loss_model_digest != contract.loss_model_digest
         || calibration.loss_scale_id != contract.loss_scale_id
         || calibration.action_domain_digest.trim().is_empty()
@@ -400,6 +433,31 @@ fn assess_tick(
             coverage_ppm: calibration.coverage_ppm,
         });
     }
+    if calibration.method != CalibrationMethod::EpisodeMaximumSplitConformal {
+        return Ok(TickDisposition::Unknown {
+            reason: UnknownReason::UnsupportedCalibrationMethod,
+        });
+    }
+    if calibration.alpha_ppm == 0
+        || calibration.alpha_ppm >= 1_000_000
+        || calibration.coverage_ppm != 1_000_000 - calibration.alpha_ppm
+        || calibration.calibration_episode_count == 0
+    {
+        return Ok(TickDisposition::Unknown {
+            reason: UnknownReason::CalibrationMetadataInvalid,
+        });
+    }
+    let numerator = (calibration.calibration_episode_count as u128 + 1)
+        * (1_000_000 - calibration.alpha_ppm) as u128;
+    let required_rank = (numerator + 999_999) / 1_000_000;
+    if required_rank > calibration.calibration_episode_count as u128 {
+        return Ok(TickDisposition::Unknown {
+            reason: UnknownReason::CalibrationSampleTooSmall {
+                sample_count: calibration.calibration_episode_count,
+                required_rank: required_rank as u64,
+            },
+        });
+    }
     if calibration.coverage_ppm < contract.minimum_coverage_ppm {
         return Ok(TickDisposition::Unknown {
             reason: UnknownReason::CalibrationCoverageInsufficient {
@@ -408,9 +466,16 @@ fn assess_tick(
             },
         });
     }
-    if calibration.coverage_semantics != CoverageSemantics::SimultaneousAcrossActionSet {
+    if calibration.coverage_semantics
+        != CoverageSemantics::SimultaneousAcrossActionSetAndHorizon
+    {
         return Ok(TickDisposition::Unknown {
             reason: UnknownReason::CalibrationCoverageNotSimultaneous,
+        });
+    }
+    if calibration.expansion_units != evidence.applied_calibration_expansion_units {
+        return Ok(TickDisposition::Unknown {
+            reason: UnknownReason::CalibrationExpansionMismatch,
         });
     }
     if evidence.actions.len() > calibration.maximum_action_count as usize {
@@ -546,16 +611,16 @@ pub fn decision_sufficiency_horizon(
     if let Some(first_calibration) = first.calibration.as_ref() {
         if steps.len() as u64 > first_calibration.maximum_horizon_ticks {
             return Ok(HorizonResult {
-            first_tick: first.tick,
-            last_sufficient_tick: None,
-            stopped_at_tick: Some(first.tick),
-            stop_reason: Some(HorizonStopReason::EvidenceUnknown(
-                UnknownReason::HorizonExceedsCalibrationScope {
-                    observed_ticks: steps.len(),
-                    maximum_ticks: first_calibration.maximum_horizon_ticks,
-                },
-            )),
-            max_regret_upper_units: None,
+                first_tick: first.tick,
+                last_sufficient_tick: None,
+                stopped_at_tick: Some(first.tick),
+                stop_reason: Some(HorizonStopReason::EvidenceUnknown(
+                    UnknownReason::HorizonExceedsCalibrationScope {
+                        observed_ticks: steps.len(),
+                        maximum_ticks: first_calibration.maximum_horizon_ticks,
+                    },
+                )),
+                max_regret_upper_units: None,
                 assessments: vec![TickAssessment {
                     tick: first.tick,
                     disposition: TickDisposition::Unknown {
@@ -717,11 +782,16 @@ mod tests {
     fn calibration(valid_through_tick: u64) -> CalibrationEvidence {
         CalibrationEvidence {
             calibration_id: "calibration-v1".to_owned(),
+            method: CalibrationMethod::EpisodeMaximumSplitConformal,
             validation_digest: "validation-sha256".to_owned(),
+            calibration_split_digest: "calibration-split-sha256".to_owned(),
+            calibration_episode_count: 19,
+            alpha_ppm: 10_000,
+            expansion_units: 0,
             loss_model_digest: "loss-model-sha256".to_owned(),
             loss_scale_id: "task-loss-v1".to_owned(),
             coverage_ppm: 990_000,
-            coverage_semantics: CoverageSemantics::SimultaneousAcrossActionSet,
+            coverage_semantics: CoverageSemantics::SimultaneousAcrossActionSetAndHorizon,
             maximum_action_count: 8,
             maximum_horizon_ticks: 100,
             action_domain_digest: "action-domain-v1".to_owned(),
@@ -752,6 +822,7 @@ mod tests {
             loss_scale_id: "task-loss-v1".to_owned(),
             loss_model_digest: "loss-model-sha256".to_owned(),
             action_domain_digest: "action-domain-v1".to_owned(),
+            applied_calibration_expansion_units: 0,
             calibration: Some(calibration(100)),
             actions,
         }
@@ -1021,6 +1092,45 @@ mod tests {
     }
 
     #[test]
+    fn receipt_cannot_claim_coverage_with_an_insufficient_episode_count() {
+        let mut evidence = step(
+            1,
+            Admissibility::Yes,
+            Some(LossInterval::new(1, 2)),
+            None,
+        );
+        let calibration = evidence.calibration.as_mut().unwrap();
+        calibration.coverage_ppm = 990_000;
+        calibration.alpha_ppm = 10_000;
+        calibration.calibration_episode_count = 98;
+        let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
+        assert!(matches!(
+            result.stop_reason,
+            Some(HorizonStopReason::EvidenceUnknown(
+                UnknownReason::CalibrationSampleTooSmall { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn interval_expansion_must_match_the_calibration_receipt() {
+        let mut evidence = step(
+            1,
+            Admissibility::Yes,
+            Some(LossInterval::new(1, 2)),
+            None,
+        );
+        evidence.applied_calibration_expansion_units = 4;
+        let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
+        assert!(matches!(
+            result.stop_reason,
+            Some(HorizonStopReason::EvidenceUnknown(
+                UnknownReason::CalibrationExpansionMismatch
+            ))
+        ));
+    }
+
+    #[test]
     fn marginal_action_coverage_cannot_bound_the_minimum_alternative() {
         let mut evidence = step(
             1,
@@ -1032,7 +1142,7 @@ mod tests {
             )),
         );
         evidence.calibration.as_mut().unwrap().coverage_semantics =
-            CoverageSemantics::MarginalPerAction;
+            CoverageSemantics::MarginalPerActionOrTick;
         let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
         assert!(matches!(
             result.stop_reason,
@@ -1272,6 +1382,7 @@ mod tests {
             loss_scale_id: "task-loss-v1".to_owned(),
             loss_model_digest: "loss-model-sha256".to_owned(),
             action_domain_digest: "action-domain-v1".to_owned(),
+            applied_calibration_expansion_units: 0,
             calibration: Some(calibration(100)),
             actions: Vec::new(),
         };
