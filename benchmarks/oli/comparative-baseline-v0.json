@@ -1,0 +1,253 @@
+{
+  "schema_version": "oli-comparative-baseline-v0.1",
+  "case_id": "OLI-SYSTEMIC-ABIOTIC-BASELINE-001",
+  "status": "SYNTHETIC_KNOWN_TRUTH_REFERENCE_AWAITING_RUST_VALIDATION",
+  "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+  "claim_ceiling": "Empirical-Bayes random-intercept reference baseline for related environments with one scalar context covariate; not a full hierarchical Bayesian retrieval and not a life detector.",
+  "literature_comparator": {
+    "citation": "Constantinou, Shorttle, Cranmer & Rimmer (2026), Comparative biosignatures with systemic retrievals, MNRAS 547, stag316",
+    "doi": "10.1093/mnras/stag316",
+    "url": "https://doi.org/10.1093/mnras/stag316",
+    "reported_method": "Hierarchical Bayesian model of system-linked abiotic trends, Bayesian leave-one-out prediction and comparative biosignature anomalies; poor fit under both abiotic and biotic models remains unknown unknown.",
+    "this_implementation": "Small empirical-Bayes method-of-moments random-intercept reference only. Does not claim parity with the paper's HBM or evolutionary retrieval."
+  },
+  "model": {
+    "observation_unit": "one independent world/site/sample per independence_group",
+    "hierarchy": [
+      "supersystem or source family",
+      "system or related-environment group",
+      "world/site/sample",
+      "observation"
+    ],
+    "signal_model": "signal = common_context_slope * context + system_intercept + residual",
+    "slope_estimator": "within-system centered least squares",
+    "system_effect": "normal random-intercept empirical-Bayes partial pooling, with method-of-moments between-system variance",
+    "fit_population": "only observations explicitly tagged qualified_abiotic_control and carrying a qualification evidence reference",
+    "target_evaluation": "leave-target-out by construction; candidate/unresolved observations never enter the fit",
+    "predictive_variance": "within-system residual + posterior system-intercept variance + candidate measurement variance + approximate common-slope variance",
+    "unsupported_context_rule": "reject extrapolation outside the qualified-control context range for that system",
+    "threshold": "caller-declared standardized residual threshold; no universal biological threshold"
+  },
+  "cases": [
+    {
+      "id": "SYSTEM_CONDITIONING_REMOVES_SHARED_OFFSET_FALSE_POSITIVE",
+      "purpose": "Show how a pooled baseline can falsely flag a target because related systems have different abiotic offsets.",
+      "controls": [
+        {
+          "id": "a0",
+          "system_id": "system-a",
+          "independence_group": "world-a0",
+          "context": 0,
+          "signal": 5,
+          "measurement_stddev": 0.05,
+          "role": "qualified_abiotic_control",
+          "qualification_evidence_ref": "qualification:a0"
+        },
+        {
+          "id": "a1",
+          "system_id": "system-a",
+          "independence_group": "world-a1",
+          "context": 1,
+          "signal": 7,
+          "measurement_stddev": 0.05,
+          "role": "qualified_abiotic_control",
+          "qualification_evidence_ref": "qualification:a1"
+        },
+        {
+          "id": "a2",
+          "system_id": "system-a",
+          "independence_group": "world-a2",
+          "context": 2,
+          "signal": 9,
+          "measurement_stddev": 0.05,
+          "role": "qualified_abiotic_control",
+          "qualification_evidence_ref": "qualification:a2"
+        },
+        {
+          "id": "b0",
+          "system_id": "system-b",
+          "independence_group": "world-b0",
+          "context": 0,
+          "signal": -3,
+          "measurement_stddev": 0.05,
+          "role": "qualified_abiotic_control",
+          "qualification_evidence_ref": "qualification:b0"
+        },
+        {
+          "id": "b1",
+          "system_id": "system-b",
+          "independence_group": "world-b1",
+          "context": 1,
+          "signal": -1,
+          "measurement_stddev": 0.05,
+          "role": "qualified_abiotic_control",
+          "qualification_evidence_ref": "qualification:b1"
+        },
+        {
+          "id": "b2",
+          "system_id": "system-b",
+          "independence_group": "world-b2",
+          "context": 2,
+          "signal": 1,
+          "measurement_stddev": 0.05,
+          "role": "qualified_abiotic_control",
+          "qualification_evidence_ref": "qualification:b2"
+        }
+      ],
+      "target": {
+        "id": "b-target",
+        "system_id": "system-b",
+        "independence_group": "target:b-target",
+        "context": 1.5,
+        "signal": 0,
+        "measurement_stddev": 0.05,
+        "role": "candidate"
+      },
+      "expected": {
+        "common_context_slope": 2,
+        "global_intercept": 1,
+        "target_system_b_predicted_mean_approximately": 0.00010417,
+        "local_standardized_residual_absolute_less_than": 1,
+        "comparative_disposition": "consistent_with_qualified_abiotic_baseline",
+        "global_pooled_prediction": 4,
+        "interpretation": "The candidate follows its own system's abiotic trend despite differing strongly from a global pooled line."
+      }
+    },
+    {
+      "id": "COMPARATIVE_ANOMALY_WITHIN_SYSTEM",
+      "purpose": "Detect a target that departs from its own system baseline while remaining inside the qualified context range.",
+      "target": {
+        "id": "b-outlier",
+        "system_id": "system-b",
+        "independence_group": "target:b-outlier",
+        "context": 1.5,
+        "signal": 2,
+        "measurement_stddev": 0.05,
+        "role": "candidate"
+      },
+      "expected": {
+        "standardized_residual_greater_than": 3,
+        "disposition": "comparative_anomaly",
+        "interpretation": "Model-relative outlier only; not evidence of life or biogenicity."
+      }
+    },
+    {
+      "id": "UNRESOLVED_CONTROL_EXCLUSION",
+      "purpose": "Ensure high-valued but unqualified observations do not contaminate the abiotic baseline.",
+      "unresolved_observation": {
+        "id": "unresolved-1",
+        "system_id": "system-a",
+        "independence_group": "unknown-world",
+        "context": 1.5,
+        "signal": 1000,
+        "measurement_stddev": 0.05,
+        "role": "unresolved"
+      },
+      "expected": {
+        "qualified_control_count": 6,
+        "unresolved_contribution_to_fit": 0
+      }
+    },
+    {
+      "id": "CONTEXT_EXTRAPOLATION_ABSTENTION",
+      "purpose": "Avoid converting out-of-support model extrapolation into a confident anomaly.",
+      "target": {
+        "id": "out-of-context",
+        "system_id": "system-b",
+        "independence_group": "target:out-of-context",
+        "context": 3,
+        "signal": 100,
+        "measurement_stddev": 0.05,
+        "role": "candidate"
+      },
+      "expected": {
+        "disposition": "unsupported_context_or_model_inadequacy",
+        "not": "comparative_anomaly"
+      }
+    },
+    {
+      "id": "UNSEEN_SYSTEM_ABSTENTION",
+      "purpose": "Require a qualified local baseline before evaluating a new system.",
+      "target": {
+        "id": "unknown-system",
+        "system_id": "system-c",
+        "independence_group": "target:unknown-system",
+        "context": 1,
+        "signal": 100,
+        "measurement_stddev": 0.05,
+        "role": "candidate"
+      },
+      "expected": {
+        "disposition": "uncalibrated_system_abstain"
+      }
+    },
+    {
+      "id": "UNEQUAL_CONTROL_COUNT_PARTIAL_POOLING",
+      "purpose": "Ensure the system-level prior center is not dominated by systems with more sampled worlds.",
+      "controls_override": {
+        "system_a": [
+          {
+            "context": 0,
+            "signal": 5
+          },
+          {
+            "context": 1,
+            "signal": 7
+          },
+          {
+            "context": 2,
+            "signal": 9
+          }
+        ],
+        "system_b": [
+          {
+            "context": 0,
+            "signal": -3
+          },
+          {
+            "context": 2,
+            "signal": 1
+          }
+        ]
+      },
+      "expected": {
+        "global_intercept": 1,
+        "system_b_candidate_at_context_1_predicted_mean_approximately": -1
+      }
+    }
+  ],
+  "anti_leakage": [
+    "Only QualifiedAbioticControl observations are used in fitting.",
+    "Every qualified control requires an explicit qualification evidence reference.",
+    "Each qualified control must have a unique independence_group.",
+    "Candidate and Unresolved observations are excluded even when present in the fit input slice.",
+    "Target observations are evaluated against a model fitted without the target.",
+    "Time frames and repeated measurements from the same physical world are not independent worlds.",
+    "Context outside the qualified control range is rejected rather than extrapolated."
+  ],
+  "metrics": [
+    "leave_one_world_out_log_predictive_density",
+    "standardized_predictive_residual",
+    "system_conditioned_false_positive_rate",
+    "system_conditioned_false_negative_rate",
+    "context_support_and_abstention_rate",
+    "calibration_by_system",
+    "between_system_variance",
+    "within_system_variance",
+    "control_qualification_coverage"
+  ],
+  "limitations": [
+    "One scalar context covariate only.",
+    "Normal random-intercept and residual approximations.",
+    "Empirical-Bayes moment estimates, not full HBM posterior inference.",
+    "No explicit biotic evolutionary model is included; the output is an anomaly score/disposition only.",
+    "System-specific stochastic processes not represented by the covariate may produce anomalies.",
+    "Qualification errors in the abiotic controls can bias the baseline."
+  ],
+  "reproducibility": {
+    "code_module": "crates/domains/symthaea-alife/src/comparative_baseline.rs",
+    "output_digest_sha256": null,
+    "rust_validation_status": "NOT_RUN_IN_AUTHORING_ENVIRONMENT",
+    "exact_head_ci_status": "PENDING"
+  }
+}
