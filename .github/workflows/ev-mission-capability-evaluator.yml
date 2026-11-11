@@ -52,6 +52,10 @@ jobs:
               .disposition == "NOT_COMPUTABLE" and
               .battery_energy_accounting_complete == false and
               .minimum_energy_remaining_above_reserve_kwh_lower == null) and
+            any(.cases[]; .case_id == "thermal_limit_crossed_in_later_segment" and
+              .disposition == "INFEASIBLE" and
+              .battery_energy_accounting_complete == false and
+              .minimum_energy_remaining_above_reserve_kwh_lower == null) and
             any(.cases[]; .case_id == "peak_passes_but_sustained_energy_fails" and
               .battery_energy_accounting_complete == true and
               .minimum_energy_remaining_above_reserve_kwh_lower < 0) and
