@@ -354,10 +354,14 @@ pub fn render_phrase(
         } else {
             let overlap = fade_samples.min(output.len());
             let start = output.len() - overlap;
-            for index in 0..overlap {
+            for (index, (output_sample, input_sample)) in output[start..start + overlap]
+                .iter_mut()
+                .zip(block.iter())
+                .enumerate()
+            {
                 let alpha = (index + 1) as f32 / (overlap + 1) as f32;
-                output[start + index] =
-                    output[start + index] * (1.0 - alpha) + block[index] * alpha;
+                *output_sample =
+                    *output_sample * (1.0 - alpha) + *input_sample * alpha;
             }
             output.extend_from_slice(&block[overlap..]);
             start
@@ -489,9 +493,7 @@ pub fn estimate_f0_hz(
         let mut cross = 0.0;
         let mut left_energy = 0.0;
         let mut right_energy = 0.0;
-        for index in 0..count {
-            let left = centered[index];
-            let right = centered[index + lag];
+        for (&left, &right) in centered.iter().zip(centered[lag..].iter()) {
             cross += left * right;
             left_energy += left * left;
             right_energy += right * right;
@@ -969,7 +971,11 @@ pub fn generate_suite(output_dir: &Path) -> Result<SuiteManifest, String> {
         voice_identity_targeting: false,
         renderer_backend_id: RENDERER_BACKEND_ID.into(),
         renderer_class: RENDERER_CLASS.into(),
-        renderer_claim_boundary: "legacy formant source-filter test plant; not Series 23 physical rendering and not human-naturalness evidence".into(),
+        renderer_claim_boundary: concat!(
+            "legacy formant source-filter test plant; ",
+            "not Series 23 physical rendering and not human-naturalness evidence"
+        )
+        .to_owned(),
         tool_source_revision: std::env::var("SYNTH_VOCAL_PLANT_SOURCE_REVISION")
             .unwrap_or_else(|_| "unknown-at-build".into()),
         sample_rate_hz,
