@@ -37,6 +37,8 @@ pub const MIDI_TRANSCRIPTION_DEFAULT_OFFSET_RATIO_BPS_V1: u16 = 2_000;
 pub const MIDI_TRANSCRIPTION_DEFAULT_OFFSET_MIN_TOLERANCE_MS_V1: u32 = 50;
 pub const MIDI_TRANSCRIPTION_DEFAULT_FRAME_STEP_MS_V1: u16 = 10;
 pub const MIDI_TRANSCRIPTION_MAX_NOTES_V1: usize = 20_000;
+pub const MIDI_TRANSCRIPTION_MAX_MIDI_BYTES_V1: usize = 64 * 1024 * 1024;
+pub const MIDI_TRANSCRIPTION_MAX_MIDI_EVENTS_V1: usize = 1_000_000;
 pub const MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATION_SCANS_V1: usize = 10_000_000;
 pub const MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATIONS_V1: usize = 2_000_000;
 pub const MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1: usize = 2_000_000;
@@ -176,6 +178,8 @@ pub enum MidiTranscriptionEvaluationIssueV1 {
     ReferenceMidiDoesNotMatchManifest,
     InvalidReference,
     InvalidPredictionMidi,
+    MidiTooLarge { count: usize, maximum: usize },
+    TooManyMidiEvents { count: usize, maximum: usize },
     UnsupportedMidiFormat,
     UnsupportedSmpteTiming,
     InvalidTempo,
@@ -259,6 +263,11 @@ fn validate_config(
     if config.pitch_tolerance_cents > 1_200 {
         return Err(MidiTranscriptionEvaluationIssueV1::InvalidConfig {
             field: "pitch_tolerance_cents".into(),
+        });
+    }
+    if config.velocity_tolerance > 127 {
+        return Err(MidiTranscriptionEvaluationIssueV1::InvalidConfig {
+            field: "velocity_tolerance".into(),
         });
     }
     if config.frame_step_ms == 0 || config.frame_step_ms > 1_000 {
@@ -352,6 +361,12 @@ fn tick_to_seconds(tick: u64, tempo_points: &[MidiTempoPointV1], ticks_per_quart
 pub fn parse_transcribed_midi_v1(
     midi_bytes: &[u8],
 ) -> Result<ParsedMidiTranscriptionV1, MidiTranscriptionEvaluationIssueV1> {
+    if midi_bytes.len() > MIDI_TRANSCRIPTION_MAX_MIDI_BYTES_V1 {
+        return Err(MidiTranscriptionEvaluationIssueV1::MidiTooLarge {
+            count: midi_bytes.len(),
+            maximum: MIDI_TRANSCRIPTION_MAX_MIDI_BYTES_V1,
+        });
+    }
     let smf = Smf::parse(midi_bytes)
         .map_err(|_| MidiTranscriptionEvaluationIssueV1::InvalidPredictionMidi)?;
     if !matches!(smf.header.format, Format::SingleTrack | Format::Parallel) {
@@ -372,6 +387,7 @@ pub fn parse_transcribed_midi_v1(
 
     let mut tempo_events = Vec::new();
     let mut absolute_events = Vec::new();
+    let mut midi_event_count = 0usize;
     let mut program_at_tick: BTreeMap<(u64, u8), (usize, u8)> = BTreeMap::new();
 
     // Type-1 MIDI tracks are parallel parts on a shared channel namespace.
@@ -380,6 +396,13 @@ pub fn parse_transcribed_midi_v1(
     for (track_index, track) in smf.tracks.iter().enumerate() {
         let mut tick = 0u64;
         for (event_index, event) in track.iter().enumerate() {
+            midi_event_count = midi_event_count.saturating_add(1);
+            if midi_event_count > MIDI_TRANSCRIPTION_MAX_MIDI_EVENTS_V1 {
+                return Err(MidiTranscriptionEvaluationIssueV1::TooManyMidiEvents {
+                    count: midi_event_count,
+                    maximum: MIDI_TRANSCRIPTION_MAX_MIDI_EVENTS_V1,
+                });
+            }
             tick = tick
                 .checked_add(u64::from(event.delta.as_int()))
                 .ok_or(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
@@ -574,8 +597,14 @@ fn validate_reference_artifact_v1(
     use midly::{MetaMessage, MidiMessage, TrackEventKind};
 
     let manifest = &reference.manifest;
-    if manifest.notes.is_empty() || manifest.notes.len() > MIDI_TRANSCRIPTION_MAX_NOTES_V1 {
+    if manifest.notes.len() > MIDI_TRANSCRIPTION_MAX_NOTES_V1 {
         return Err(MidiTranscriptionEvaluationIssueV1::InvalidReference);
+    }
+    if reference.midi_bytes.len() > MIDI_TRANSCRIPTION_MAX_MIDI_BYTES_V1 {
+        return Err(MidiTranscriptionEvaluationIssueV1::MidiTooLarge {
+            count: reference.midi_bytes.len(),
+            maximum: MIDI_TRANSCRIPTION_MAX_MIDI_BYTES_V1,
+        });
     }
     if manifest.schema != MIDI_PERFORMANCE_SCHEMA_V1
         || manifest.score_digest_schema
@@ -711,12 +740,20 @@ fn validate_reference_artifact_v1(
     let mut actual_programs: BTreeMap<ProgramKey, usize> = BTreeMap::new();
     let mut tempo_events = 0usize;
     let mut meter_events = 0usize;
+    let mut reference_event_count = 0usize;
 
     for (track_index, events) in smf.tracks.iter().enumerate() {
         let track_index = u16::try_from(track_index)
             .map_err(|_| MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest)?;
         let mut absolute_tick = 0u64;
         for event in events {
+            reference_event_count = reference_event_count.saturating_add(1);
+            if reference_event_count > MIDI_TRANSCRIPTION_MAX_MIDI_EVENTS_V1 {
+                return Err(MidiTranscriptionEvaluationIssueV1::TooManyMidiEvents {
+                    count: reference_event_count,
+                    maximum: MIDI_TRANSCRIPTION_MAX_MIDI_EVENTS_V1,
+                });
+            }
             absolute_tick = absolute_tick
                 .checked_add(u64::from(event.delta.as_int()))
                 .ok_or(MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest)?;
@@ -2237,6 +2274,60 @@ mod tests {
             MidiTranscriptionEvaluationIssueV1::ConflictingProgramChange {
                 tick: 0,
                 channel: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn empty_reference_and_empty_prediction_are_scored_as_negative_examples() {
+        let reference = reference_artifact(&[], 40);
+        let prediction = build_midi(&[], 40, &[(0, 500_000)]);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_note_count, 0);
+        assert_eq!(report.prediction_note_count, 0);
+        assert_eq!(report.onset_pitch_metrics.f1, 0.0);
+        assert_eq!(report.full_note_metrics.f1, 0.0);
+        assert_eq!(report.average_overlap_ratio, 0.0);
+    }
+
+    #[test]
+    fn empty_reference_counts_transcribed_notes_as_false_positives() {
+        let reference = reference_artifact(&[], 40);
+        let prediction = build_midi(&[(60, 0, 480)], 40, &[(0, 500_000)]);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_note_count, 0);
+        assert_eq!(report.prediction_note_count, 1);
+        assert_eq!(report.onset_pitch_metrics.true_positives, 0);
+        assert_eq!(report.onset_pitch_metrics.false_positives, 1);
+        assert_eq!(report.onset_pitch_metrics.false_negatives, 0);
+    }
+
+    #[test]
+    fn velocity_tolerance_above_midi_range_is_rejected() {
+        let error = evaluate_midi_transcription_v1(
+            &build_midi(&[], 40, &[(0, 500_000)]),
+            &reference_artifact(&[(60, 0, 480)], 40),
+            MidiTranscriptionEvaluationConfigV1 {
+                velocity_tolerance: 128,
+                velocity_metrics_enabled: true,
+                ..default_config()
+            },
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            MidiTranscriptionEvaluationIssueV1::InvalidConfig {
+                field: "velocity_tolerance".into()
             }
         );
     }
