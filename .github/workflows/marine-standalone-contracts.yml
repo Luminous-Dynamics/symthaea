@@ -215,6 +215,21 @@ jobs:
           test "$status" -eq 2
           jq -e '.disposition == "INCOMPLETE" and .port_calls_checked == 6 and ([.port_call_results[] | select(.case_id == "SYNTHETIC-SCHEDULE-FLEX" and .port_call_id == "PORT-A")][0] | .window_slack_available_seconds == 10800 and .window_slack_consumed_seconds == 7200 and .window_slack_remaining_seconds == 3600)' "$RUNNER_TEMP/marine-service-flexibility-report.json"
 
+      - name: Underwater acoustic evidence fixture remains explicitly INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-acoustic-evidence-audit -- \
+            docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-acoustic-evidence-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-acoustic-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-acoustic-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .spectral_band_count == 4 and .raw_trace_present == true' "$RUNNER_TEMP/marine-acoustic-report.json"
+
       - name: Preserve generated lockfile and audit receipts
         if: always()
         uses: actions/upload-artifact@v4
@@ -233,3 +248,4 @@ jobs:
             ${{ runner.temp }}/marine-emissions-report.json
             ${{ runner.temp }}/marine-emissions-v0.2-report.json
             ${{ runner.temp }}/marine-service-flexibility-report.json
+            ${{ runner.temp }}/marine-acoustic-report.json
