@@ -199,10 +199,10 @@ pub fn evaluate_electrical_loads(
                 "electrical load power must be finite and non-negative",
             ));
         }
-        if !load_ids.insert(load.load_id.as_str()) {
+        if !load_ids.insert(load.load_id.clone()) {
             return Err(LedgerError::DuplicateIdentity("electrical load ID"));
         }
-        if !boundary_ids.insert(load.meter_boundary_id.as_str()) {
+        if !boundary_ids.insert(load.meter_boundary_id.clone()) {
             return Err(LedgerError::DuplicateIdentity("meter boundary ID"));
         }
         if load.kind == ElectricalLoadKind::BatteryTerminalTotal {
@@ -322,7 +322,7 @@ pub fn allocate_loss_heat(
                 "source, component and evidence identities must not be empty",
             ));
         }
-        if !source_ids.insert(source.source_id.as_str()) {
+        if !source_ids.insert(source.source_id.clone()) {
             return Err(LedgerError::DuplicateIdentity("thermal loss source ID"));
         }
         if !source.loss_power_w.is_finite() || source.loss_power_w < 0.0 {
@@ -341,7 +341,7 @@ pub fn allocate_loss_heat(
                     "thermal node ID must not be empty",
                 ));
             }
-            if !seen_nodes.insert(allocation.thermal_node_id.as_str()) {
+            if !seen_nodes.insert(allocation.thermal_node_id.clone()) {
                 return Err(LedgerError::DuplicateIdentity(
                     "thermal node allocation within one source",
                 ));
