@@ -48,6 +48,15 @@ impl LossInterval {
     }
 }
 
+/// Semantics of the coverage guarantee for loss intervals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CoverageSemantics {
+    /// Joint/family-wise coverage for all action intervals in the declared set.
+    SimultaneousAcrossActionSet,
+    /// Separate marginal coverage for each action; insufficient for a minimum over alternatives.
+    MarginalPerAction,
+}
+
 /// Loss-model calibration evidence supplied by an independent evaluator.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CalibrationEvidence {
@@ -61,6 +70,10 @@ pub struct CalibrationEvidence {
     pub loss_scale_id: String,
     /// Declared empirical coverage in parts per million.
     pub coverage_ppm: u32,
+    /// Whether coverage holds jointly across the candidate action set.
+    pub coverage_semantics: CoverageSemantics,
+    /// Largest candidate-set cardinality covered by the calibration study.
+    pub maximum_action_count: u32,
     /// Last control tick for which this calibration evidence is valid.
     pub valid_through_tick: u64,
 }
@@ -150,6 +163,15 @@ pub enum UnknownReason {
         observed_ppm: u32,
         /// Minimum contract coverage.
         required_ppm: u32,
+    },
+    /// Calibration is only marginal per action, not simultaneous over the set.
+    CalibrationCoverageNotSimultaneous,
+    /// Candidate action set exceeds the calibration study's covered cardinality.
+    CalibrationActionSetTooLarge {
+        /// Number of actions in the supplied candidate set.
+        observed_count: usize,
+        /// Maximum calibrated candidate-set size.
+        maximum_count: u32,
     },
     /// Calibration evidence has expired before this tick.
     CalibrationExpired {
@@ -354,6 +376,19 @@ fn assess_tick(
             reason: UnknownReason::CalibrationCoverageInsufficient {
                 observed_ppm: calibration.coverage_ppm,
                 required_ppm: contract.minimum_coverage_ppm,
+            },
+        });
+    }
+    if calibration.coverage_semantics != CoverageSemantics::SimultaneousAcrossActionSet {
+        return Ok(TickDisposition::Unknown {
+            reason: UnknownReason::CalibrationCoverageNotSimultaneous,
+        });
+    }
+    if evidence.actions.len() > calibration.maximum_action_count as usize {
+        return Ok(TickDisposition::Unknown {
+            reason: UnknownReason::CalibrationActionSetTooLarge {
+                observed_count: evidence.actions.len(),
+                maximum_count: calibration.maximum_action_count,
             },
         });
     }
@@ -583,6 +618,8 @@ mod tests {
             loss_model_digest: "loss-model-sha256".to_owned(),
             loss_scale_id: "task-loss-v1".to_owned(),
             coverage_ppm: 990_000,
+            coverage_semantics: CoverageSemantics::SimultaneousAcrossActionSet,
+            maximum_action_count: 8,
             valid_through_tick,
         }
     }
@@ -873,6 +910,49 @@ mod tests {
             result.stop_reason,
             Some(HorizonStopReason::EvidenceUnknown(
                 UnknownReason::CalibrationCoverageInsufficient { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn marginal_action_coverage_cannot_bound_the_minimum_alternative() {
+        let mut evidence = step(
+            1,
+            Admissibility::Yes,
+            Some(LossInterval::new(1, 2)),
+            Some(alternative(
+                Admissibility::Yes,
+                Some(LossInterval::new(1, 2)),
+            )),
+        );
+        evidence.calibration.as_mut().unwrap().coverage_semantics =
+            CoverageSemantics::MarginalPerAction;
+        let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
+        assert!(matches!(
+            result.stop_reason,
+            Some(HorizonStopReason::EvidenceUnknown(
+                UnknownReason::CalibrationCoverageNotSimultaneous
+            ))
+        ));
+    }
+
+    #[test]
+    fn action_set_larger_than_calibrated_envelope_returns_unknown() {
+        let mut evidence = step(
+            1,
+            Admissibility::Yes,
+            Some(LossInterval::new(1, 2)),
+            Some(alternative(
+                Admissibility::Yes,
+                Some(LossInterval::new(1, 2)),
+            )),
+        );
+        evidence.calibration.as_mut().unwrap().maximum_action_count = 1;
+        let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
+        assert!(matches!(
+            result.stop_reason,
+            Some(HorizonStopReason::EvidenceUnknown(
+                UnknownReason::CalibrationActionSetTooLarge { .. }
             ))
         ));
     }
