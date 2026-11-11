@@ -525,19 +525,25 @@ fn validate_topology(
                     FaultEvidenceJoinError::MissingProtectionDevice(device_id.clone())
                 })?;
             let attached_to_targeted_path = input.propulsion_paths.iter().any(|path| {
-                let path_is_targeted = [
+                let fixed_path_elements = [
                     path.propulsor_element_id.as_str(),
                     path.bus_element_id.as_str(),
                     path.branch_element_id.as_str(),
                     path.feeder_element_id.as_str(),
-                ]
-                .iter()
-                .any(|element_id| {
-                    scenario
-                        .target_aircraft_element_ids
-                        .iter()
-                        .any(|target| target.as_str() == *element_id)
-                });
+                ];
+                let path_is_targeted = fixed_path_elements
+                    .iter()
+                    .any(|element_id| {
+                        scenario
+                            .target_aircraft_element_ids
+                            .iter()
+                            .any(|target| target.as_str() == *element_id)
+                    })
+                    || path.protection_device_element_ids.iter().any(|element_id| {
+                        scenario
+                            .target_aircraft_element_ids
+                            .contains(element_id)
+                    });
                 path_is_targeted
                     && path
                         .protection_device_element_ids
