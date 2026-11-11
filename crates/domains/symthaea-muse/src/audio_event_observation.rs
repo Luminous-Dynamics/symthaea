@@ -922,7 +922,7 @@ pub fn observe_rendered_audio_stem_events_v1(
         .iter()
         .find(|track| track.track_index == track_index)
     else {
-        return Err(vec![AudioEventObservationIssueV1::MissingTrackReceipt { track_index }]);
+        return Err(vec![AudioEventObservationIssueV1::UnknownTrackIndex { track_index }]);
     };
     let selected_notes: Vec<_> = midi
         .manifest
@@ -988,7 +988,7 @@ pub fn validate_audio_stem_event_observation_v1(
         .iter()
         .find(|track| track.track_index == track_index)
     else {
-        issues.push(AudioEventObservationIssueV1::MissingTrackReceipt { track_index });
+        issues.push(AudioEventObservationIssueV1::UnknownTrackIndex { track_index });
         return issues;
     };
     let decoded_wav = decode_wav(wav_bytes);
@@ -1258,7 +1258,7 @@ mod tests {
         );
         assert!(validate_audio_stem_event_observation_v1(&receipt, &wav, &midi, 1).is_empty());
         assert!(validate_audio_stem_event_observation_v1(&receipt, &wav, &midi, 2)
-            .contains(&AudioEventObservationIssueV1::MissingTrackReceipt { track_index: 2 }));
+            .contains(&AudioEventObservationIssueV1::UnknownTrackIndex { track_index: 2 }));
     }
 
     #[test]
