@@ -15,8 +15,10 @@ use crate::audio_event_observation::{
     expected_frame, observe_rendered_audio_stem_events_v1, validate_audio_stem_event_observation_v1,
 };
 use crate::midi_performance::{
+    MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1,
+    MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1,
     MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, MIDI_PERFORMANCE_SCHEMA_V1,
-    MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1,
+    MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1, MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1,
     MidiPerformanceArtifactV1, MidiPerformanceManifestV1, MidiPerformanceTrackReceiptV1,
 };
 use hound::{SampleFormat, WavReader};
@@ -371,6 +373,11 @@ fn verify_midi(
         return Err(vec![PartStemEvidenceIssueV1::TooManyNotes]);
     }
     if manifest.schema != MIDI_PERFORMANCE_SCHEMA_V1
+        || manifest.score_digest_schema
+            != symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1
+        || manifest.timeline_digest_schema != MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1
+        || manifest.binding_digest_schema != MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1
+        || manifest.capability_digest_schema != MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1
         || manifest.ticks_per_quarter != MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1
         || manifest.tempo_microseconds_per_quarter == 0
         || manifest.tempo_microseconds_per_quarter > 16_777_215
@@ -1746,6 +1753,20 @@ mod tests {
                 declared_frame_count: 12_000
             }
         )));
+    }
+
+
+    #[test]
+    fn unknown_midi_digest_schema_is_rejected_even_when_manifest_is_resealed() {
+        let (_, mut midi, _) = fixture();
+        midi.manifest.timeline_digest_schema = "attacker-selected-digest-v0".into();
+        let bytes = serde_json::to_vec(&midi.manifest).unwrap();
+        midi.manifest_sha256 = domain_sha256(
+            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
+            &bytes,
+        );
+        let issues = verify_midi(&midi).unwrap_err();
+        assert!(issues.contains(&PartStemEvidenceIssueV1::WrongMidiSchema));
     }
 
     #[test]
