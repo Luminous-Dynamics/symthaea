@@ -83,6 +83,15 @@
       "limitations": [
         "Software test only."
       ]
+    },
+    {
+      "source_id": "MARINE-SERVICE-FLEXIBILITY-SYNTHETIC-CASE-001",
+      "evidence_class": "synthetic",
+      "rights_status": "not_applicable",
+      "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/research/marine-waps-co-design-20261110/docs/research/marine/fixtures/synthetic-service-flexibility-v0.1.0.json",
+      "limitations": [
+        "Synthetic schedule contract from #11558; test binding only, not a real cargo contract."
+      ]
     }
   ],
   "record_status": "synthetic",
@@ -98,6 +107,7 @@
     "target_arrival": "2026-12-10T09:00:00Z",
     "latest_arrival": "2026-12-10T12:00:00Z",
     "minimum_turnaround_seconds": 7200,
-    "latest_departure": "2026-12-10T18:00:00Z"
+    "latest_departure": "2026-12-10T18:00:00Z",
+    "source_id": "MARINE-SERVICE-FLEXIBILITY-SYNTHETIC-CASE-001"
   }
 }
