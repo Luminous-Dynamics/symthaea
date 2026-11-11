@@ -1,3 +1,4 @@
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use jsonschema::{Validator, draft202012};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -115,6 +116,8 @@ pub struct PhysicalReference {
     pub outcome_reason: Option<String>,
     pub observed_at_ms: u64,
     pub measurements: Vec<ObservedMeasurement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admission: Option<ReferenceAdmission>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -149,6 +152,7 @@ pub struct AuditReport {
     pub test_blind_assignment_count: usize,
     pub non_test_blind_assignment_count: usize,
     pub canonical_corpus_sha256: String,
+    pub trust_manifest_sha256: String,
     pub report_sha256: String,
     pub case_count: usize,
     pub true_feasible_count: usize,
@@ -462,7 +466,80 @@ fn validate_case_structure(case: &ValidationCase) -> Vec<String> {
     errors
 }
 
-fn classify_reference(case: &ValidationCase) -> (String, Vec<String>, usize, Option<String>) {
+fn decode_hex<const N: usize>(value: &str, label: &str) -> Result<[u8; N], String> {
+    let bytes = hex::decode(value).map_err(|_| format!("{label} is not valid hexadecimal"))?;
+    if value.bytes().any(|byte| byte.is_ascii_uppercase()) || bytes.len() != N {
+        return Err(format!("{label} must be exactly {} lowercase-hex bytes", N));
+    }
+    let mut output = [0u8; N];
+    output.copy_from_slice(&bytes);
+    Ok(output)
+}
+
+fn reference_signing_bytes(reference: &PhysicalReference) -> Result<Vec<u8>, String> {
+    let mut claims = reference.clone();
+    claims.admission = None;
+    serde_json::to_vec(&claims).map_err(|error| format!("reference claims serialization: {error}"))
+}
+
+fn validate_trust_manifest(manifest: &TrustManifest) -> Result<(), String> {
+    if manifest.trust_manifest_version != "ev-mission-outcome-trust/0.1" {
+        return Err("unsupported physical reference trust manifest version".to_owned());
+    }
+    let mut authority_ids = BTreeSet::new();
+    let mut public_keys = BTreeSet::new();
+    for authority in &manifest.trusted_authorities {
+        let key = decode_hex::<32>(&authority.public_key_hex, "authority public key")?;
+        if !nonempty(&authority.authority_ref)
+            || authority.role != "INDEPENDENT_TEST_AUTHORITY"
+            || authority.valid_until_ms.is_some_and(|end| end < authority.valid_from_ms)
+            || !authority_ids.insert(authority.authority_ref.clone())
+            || !public_keys.insert(key)
+        {
+            return Err("trust manifest contains invalid or duplicate authority identity/key/validity".to_owned());
+        }
+    }
+    Ok(())
+}
+
+fn verify_physical_admission(
+    reference: &PhysicalReference,
+    manifest: &TrustManifest,
+) -> Result<(), String> {
+    match (reference.evidence_class.as_str(), reference.admission.as_ref()) {
+        ("SYNTHETIC_KNOWN_TRUTH", None) => Ok(()),
+        ("SYNTHETIC_KNOWN_TRUTH", Some(_)) => {
+            Err("synthetic reference must not carry physical authority admission".to_owned())
+        }
+        ("INDEPENDENT_PHYSICAL_REFERENCE", None) => {
+            Err("physical reference has no independent test-authority signature".to_owned())
+        }
+        ("INDEPENDENT_PHYSICAL_REFERENCE", Some(admission)) => {
+            let authority = manifest
+                .trusted_authorities
+                .iter()
+                .find(|authority| authority.authority_ref == admission.authority_ref)
+                .ok_or_else(|| "physical reference signer is not in external trust manifest".to_owned())?;
+            if reference.observed_at_ms < authority.valid_from_ms
+                || authority.valid_until_ms.is_some_and(|end| reference.observed_at_ms > end)
+            {
+                return Err("physical reference signature time is outside authority validity".to_owned());
+            }
+            let public_key = decode_hex::<32>(&authority.public_key_hex, "authority public key")?;
+            let signature_bytes = decode_hex::<64>(&admission.signature_hex, "reference signature")?;
+            let verifying_key = VerifyingKey::from_bytes(&public_key)
+                .map_err(|_| "trusted physical test-authority public key is malformed".to_owned())?;
+            let signature = Signature::from_bytes(&signature_bytes);
+            let signed_bytes = reference_signing_bytes(reference)?;
+            verifying_key
+                .verify_strict(&signed_bytes, &signature)
+                .map_err(|_| "physical test-authority signature does not verify".to_owned())
+        }
+        _ => Err("unsupported reference evidence class".to_owned()),
+    }
+}
+
+fn classify_reference(case: &ValidationCase, manifest: &TrustManifest) -> (String, Vec<String>, usize, Option<String>) {
     let prediction = &case.prediction;
     let reference = &case.reference;
     if prediction.asset != reference.asset
@@ -476,17 +553,12 @@ fn classify_reference(case: &ValidationCase) -> (String, Vec<String>, usize, Opt
             Some("independent reference does not bind to the prediction asset/configuration/profile".to_owned()),
         );
     }
-    if ![
-        "SYNTHETIC_KNOWN_TRUTH",
-        "INDEPENDENT_PHYSICAL_REFERENCE",
-    ]
-    .contains(&reference.evidence_class.as_str())
-    {
+    if let Err(reason) = verify_physical_admission(reference, manifest) {
         return (
             "REJECTED_REFERENCE".to_owned(),
             Vec::new(),
             0,
-            Some("reference evidence class is not admitted".to_owned()),
+            Some(reason),
         );
     }
 
@@ -590,7 +662,7 @@ fn classify_reference(case: &ValidationCase) -> (String, Vec<String>, usize, Opt
     }
 }
 
-fn audit_case(case: &ValidationCase) -> CaseAudit {
+fn audit_case(case: &ValidationCase, manifest: &TrustManifest) -> CaseAudit {
     let errors = validate_case_structure(case);
     if !errors.is_empty() {
         return CaseAudit {
@@ -608,7 +680,7 @@ fn audit_case(case: &ValidationCase) -> CaseAudit {
         };
     }
 
-    let (reference_state, violations, covered, reason) = classify_reference(case);
+    let (reference_state, violations, covered, reason) = classify_reference(case, manifest);
     let classification = match reference_state.as_str() {
         "SCORABLE_FEASIBLE" => match case.prediction.disposition.as_str() {
             "FEASIBLE_WITHIN_DECLARED_ENVELOPE" => "TRUE_FEASIBLE",
@@ -723,12 +795,26 @@ pub fn clopper_pearson_upper(
 }
 
 pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditReport, String> {
+    let empty_manifest = br#"{"trust_manifest_version":"ev-mission-outcome-trust/0.1","trusted_authorities":[]}"#;
+    audit_corpus_with_trust(schema_bytes, empty_manifest, corpus_bytes)
+}
+
+pub fn audit_corpus_with_trust(
+    schema_bytes: &[u8],
+    trust_manifest_bytes: &[u8],
+    corpus_bytes: &[u8],
+) -> Result<AuditReport, String> {
     let validator = compile_schema(schema_bytes)?;
     let value: Value =
         serde_json::from_slice(corpus_bytes).map_err(|error| format!("corpus JSON: {error}"))?;
     validate_schema(&validator, &value)?;
     let mut corpus: Corpus =
         serde_json::from_value(value).map_err(|error| format!("corpus decode: {error}"))?;
+    let trust_value: Value = serde_json::from_slice(trust_manifest_bytes)
+        .map_err(|error| format!("trust manifest JSON: {error}"))?;
+    let trust_manifest: TrustManifest = serde_json::from_value(trust_value)
+        .map_err(|error| format!("trust manifest decode: {error}"))?;
+    validate_trust_manifest(&trust_manifest)?;
     if corpus.corpus_version != CORPUS_VERSION || corpus.cases.is_empty() {
         return Err("unsupported or empty mission outcome audit corpus".to_owned());
     }
@@ -782,7 +868,11 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
         }
     }
 
-    let cases: Vec<CaseAudit> = corpus.cases.iter().map(audit_case).collect();
+    let cases: Vec<CaseAudit> = corpus
+        .cases
+        .iter()
+        .map(|case| audit_case(case, &trust_manifest))
+        .collect();
     let count = |classification: &str| {
         cases
             .iter()
@@ -838,6 +928,7 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
         test_blind_assignment_count,
         non_test_blind_assignment_count,
         canonical_corpus_sha256: sha256(&canonical),
+        trust_manifest_sha256: sha256(trust_manifest_bytes),
         report_sha256: String::new(),
         case_count: cases.len(),
         true_feasible_count: count("TRUE_FEASIBLE"),
