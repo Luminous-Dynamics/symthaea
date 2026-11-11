@@ -16,24 +16,24 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "action-context-alignment-fixtures-v0.1"
+      "const": "action-context-alignment-fixtures-v0.2"
     },
     "benchmark_id": {
       "const": "ACTION-CONTEXT-ALIGNMENT-001"
     },
     "status": {
-      "const": "synthetic_pair_design_unexecuted"
+      "const": "synthetic_preflight_and_runtime_pair_design_unexecuted"
     },
     "fixture_count": {
-      "const": 42
+      "const": 48
     },
     "pair_count": {
-      "const": 21
+      "const": 24
     },
     "mutation_dimensions": {
       "type": "array",
       "minItems": 7,
-      "maxItems": 7,
+      "maxItems": 8,
       "uniqueItems": true,
       "items": {
         "enum": [
@@ -43,7 +43,8 @@
           "purpose_binding",
           "expiry",
           "delegation_scope",
-          "pre_state"
+          "pre_state",
+          "runtime_trigger"
         ]
       }
     },
@@ -63,7 +64,8 @@
           "task",
           "authority_context",
           "expected_disposition",
-          "claim_ceiling"
+          "claim_ceiling",
+          "runtime_context"
         ],
         "properties": {
           "fixture_id": {
@@ -77,7 +79,9 @@
           "pair_member": {
             "enum": [
               "authorized_control",
-              "single_delta_denial"
+              "single_delta_denial",
+              "continue_control",
+              "runtime_trigger_stop"
             ]
           },
           "mutation_dimension": {
@@ -88,7 +92,8 @@
               "purpose_binding",
               "expiry",
               "delegation_scope",
-              "pre_state"
+              "pre_state",
+              "runtime_trigger"
             ]
           },
           "environment": {
@@ -211,12 +216,44 @@
           "expected_disposition": {
             "enum": [
               "EligibleForTestAdapter",
-              "IneligibleNoAdapterCall"
+              "IneligibleNoAdapterCall",
+              "ContinueWithinAuthorizedScope",
+              "StopBeforeFurtherEffect"
             ]
           },
           "claim_ceiling": {
             "type": "string",
             "minLength": 1
+          },
+          "runtime_context": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stage",
+              "trigger",
+              "observation_ref"
+            ],
+            "properties": {
+              "stage": {
+                "enum": [
+                  "PreExecution",
+                  "AfterRead"
+                ]
+              },
+              "trigger": {
+                "enum": [
+                  "NotApplicable",
+                  "None",
+                  "CriticalToolFailure",
+                  "ConflictingEvidence",
+                  "EmergentRisk"
+                ]
+              },
+              "observation_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         }
       }
