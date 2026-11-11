@@ -48,6 +48,13 @@ jobs:
             any(.cases[]; .case_id == "peak_passes_but_sustained_energy_fails" and
               .disposition == "INFEASIBLE" and
               .minimum_energy_remaining_above_reserve_kwh_lower < 0) and
+            any(.cases[]; .case_id == "missing_cell_coverage" and
+              .disposition == "NOT_COMPUTABLE" and
+              .battery_energy_accounting_complete == false and
+              .minimum_energy_remaining_above_reserve_kwh_lower == null) and
+            any(.cases[]; .case_id == "peak_passes_but_sustained_energy_fails" and
+              .battery_energy_accounting_complete == true and
+              .minimum_energy_remaining_above_reserve_kwh_lower < 0) and
             any(.cases[]; .case_id == "external_energy_not_double_counted" and
               .total_external_energy_kwh_not_credited == 10 and
               .total_battery_discharge_energy_kwh_upper == 1) and
@@ -56,5 +63,6 @@ jobs:
               .minimum_energy_remaining_above_reserve_kwh_lower == 0) and
             any(.cases[]; .case_id == "regen_exceeds_charge_acceptance" and
               .disposition == "INFEASIBLE" and
+              .battery_energy_accounting_complete == true and
               (.total_regenerative_energy_credited_kwh_lower - 0.3958333333333333 | fabs) < 1e-9)
           ' "$RUNNER_TEMP/mission-capability-report.json"
