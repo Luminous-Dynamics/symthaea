@@ -37,6 +37,7 @@ pub const MIDI_TRANSCRIPTION_DEFAULT_OFFSET_RATIO_BPS_V1: u16 = 2_000;
 pub const MIDI_TRANSCRIPTION_DEFAULT_OFFSET_MIN_TOLERANCE_MS_V1: u32 = 50;
 pub const MIDI_TRANSCRIPTION_MAX_NOTES_V1: usize = 20_000;
 pub const MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1: usize = 2_000_000;
+pub const MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1: usize = 10_000_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MidiTranscriptionEvaluationConfigV1 {
@@ -95,6 +96,7 @@ pub struct MidiTranscriptionMetricV1 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MidiTranscriptionTimingErrorSummaryV1 {
     pub sample_count: u32,
+    pub mean_signed_error_ms: Option<f64>,
     pub mean_absolute_error_ms: Option<f64>,
     pub median_absolute_error_ms: Option<f64>,
     pub p95_absolute_error_ms: Option<f64>,
@@ -145,6 +147,7 @@ pub enum MidiTranscriptionEvaluationIssueV1 {
     InvalidReferenceTrack { track_index: u16 },
     InvalidReferenceNote { ordinal: usize },
     TooManyCandidatePairs { count: usize, maximum: usize },
+    MatchingWorkBudgetExceeded { scans: usize, maximum: usize },
     SerializationFailed,
 }
 
@@ -727,13 +730,14 @@ fn reference_notes(
 fn maximum_cardinality_matching(
     adjacency: &[Vec<usize>],
     predicted_count: usize,
-) -> Vec<(usize, usize)> {
+) -> Result<Vec<(usize, usize)>, MidiTranscriptionEvaluationIssueV1> {
     // Iterative augmenting-path search avoids recursive DFS stack growth on
-    // long duplicate-heavy passages. The candidate-edge cap is enforced
-    // before this function is called.
+    // long duplicate-heavy passages. The candidate-edge and work budgets are
+    // hard fail-closed limits.
     let reference_count = adjacency.len();
     let mut reference_to_prediction = vec![None; reference_count];
     let mut prediction_to_reference = vec![None; predicted_count];
+    let mut edge_scans = 0usize;
 
     for root in 0..reference_count {
         if reference_to_prediction[root].is_some() {
@@ -750,6 +754,13 @@ fn maximum_cardinality_matching(
 
         'search: while let Some(reference_index) = queue.pop_front() {
             for &prediction_index in &adjacency[reference_index] {
+                edge_scans = edge_scans.saturating_add(1);
+                if edge_scans > MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1 {
+                    return Err(MidiTranscriptionEvaluationIssueV1::MatchingWorkBudgetExceeded {
+                        scans: edge_scans,
+                        maximum: MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1,
+                    });
+                }
                 if prediction_index >= predicted_count || seen_predictions[prediction_index] {
                     continue;
                 }
@@ -797,7 +808,7 @@ fn maximum_cardinality_matching(
         })
         .collect();
     matching.sort_unstable_by_key(|(reference_index, _)| *reference_index);
-    matching
+    Ok(matching)
 }
 
 fn build_adjacency(
@@ -902,16 +913,16 @@ fn timing_error_summary(values_seconds: &[f64]) -> MidiTranscriptionTimingErrorS
     if values_seconds.is_empty() {
         return MidiTranscriptionTimingErrorSummaryV1 {
             sample_count: 0,
+            mean_signed_error_ms: None,
             mean_absolute_error_ms: None,
             median_absolute_error_ms: None,
             p95_absolute_error_ms: None,
             p99_absolute_error_ms: None,
         };
     }
-    let mut values: Vec<f64> = values_seconds
-        .iter()
-        .map(|value| value.abs() * 1_000.0)
-        .collect();
+    let signed_values: Vec<f64> = values_seconds.iter().map(|value| value * 1_000.0).collect();
+    let mean_signed = signed_values.iter().sum::<f64>() / signed_values.len() as f64;
+    let mut values: Vec<f64> = signed_values.iter().map(|value| value.abs()).collect();
     values.sort_by(f64::total_cmp);
     let mean = values.iter().sum::<f64>() / values.len() as f64;
     let percentile = |percent: f64| {
@@ -927,6 +938,7 @@ fn timing_error_summary(values_seconds: &[f64]) -> MidiTranscriptionTimingErrorS
     };
     MidiTranscriptionTimingErrorSummaryV1 {
         sample_count: u32::try_from(values.len()).unwrap_or(u32::MAX),
+        mean_signed_error_ms: Some(mean_signed),
         mean_absolute_error_ms: Some(mean),
         median_absolute_error_ms: Some(median),
         p95_absolute_error_ms: Some(percentile(0.95)),
@@ -997,22 +1009,26 @@ pub fn evaluate_midi_transcription_v1(
         })
         .collect();
 
-    let onset_adjacency =
-        build_adjacency(&reference_notes, &predicted_notes, &config, false, false)?;
-    let onset_matching =
-        maximum_cardinality_matching(&onset_adjacency, predicted_notes.len());
-    let full_adjacency =
-        build_adjacency(&reference_notes, &predicted_notes, &config, true, false)?;
-    let full_matching =
-        maximum_cardinality_matching(&full_adjacency, predicted_notes.len());
-    let program_onset_adjacency =
-        build_adjacency(&reference_notes, &predicted_notes, &config, false, true)?;
-    let program_onset_matching =
-        maximum_cardinality_matching(&program_onset_adjacency, predicted_notes.len());
-    let program_full_adjacency =
-        build_adjacency(&reference_notes, &predicted_notes, &config, true, true)?;
-    let program_full_matching =
-        maximum_cardinality_matching(&program_full_adjacency, predicted_notes.len());
+    let onset_matching = {
+        let adjacency =
+            build_adjacency(&reference_notes, &predicted_notes, &config, false, false)?;
+        maximum_cardinality_matching(&adjacency, predicted_notes.len())?
+    };
+    let full_matching = {
+        let adjacency =
+            build_adjacency(&reference_notes, &predicted_notes, &config, true, false)?;
+        maximum_cardinality_matching(&adjacency, predicted_notes.len())?
+    };
+    let program_onset_matching = {
+        let adjacency =
+            build_adjacency(&reference_notes, &predicted_notes, &config, false, true)?;
+        maximum_cardinality_matching(&adjacency, predicted_notes.len())?
+    };
+    let program_full_matching = {
+        let adjacency =
+            build_adjacency(&reference_notes, &predicted_notes, &config, true, true)?;
+        maximum_cardinality_matching(&adjacency, predicted_notes.len())?
+    };
 
     let onset_errors: Vec<_> = onset_matching
         .iter()
