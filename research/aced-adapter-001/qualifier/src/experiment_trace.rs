@@ -195,15 +195,15 @@ fn validate_proposal(payload: &Value) -> Result<String, String> {
     let evsi = finite_number(payload, "predicted_evsi").unwrap_or_default();
     let risk = finite_number(payload, "predicted_risk").unwrap_or_default();
     let cost = finite_number(payload, "predicted_cost").unwrap_or_default();
-    let net = finite_number(payload, "predicted_selection_score")
+    let observed_score = finite_number(payload, "predicted_selection_score")
         .ok_or_else(|| format!("experiment {id} has invalid predicted_selection_score"))?;
-    let expected_net = match text(payload, "selector").unwrap_or("") {
-        "EIG" => eig - cost,
+    let expected_score = match text(payload, "selector").unwrap_or("") {
+        "EIG" => eig,
         "EVSI" => evsi - cost,
         "RISK_ADJUSTED_EVSI" => evsi - cost - risk_aversion * risk,
         _ => unreachable!("selector validated above"),
     };
-    if (net - expected_net).abs() > TOLERANCE {
+    if (observed_score - expected_score).abs() > TOLERANCE {
         return Err(format!(
             "experiment {id} predicted_selection_score is inconsistent with selector arithmetic"
         ));
