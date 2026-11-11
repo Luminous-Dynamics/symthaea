@@ -12,7 +12,7 @@ use crate::audio_event_observation::{
     AUDIO_EVENT_OBSERVATION_MAX_TRACKS_V1,
     AUDIO_EVENT_OBSERVATION_MAX_WAV_BYTES_V1,
     AudioEventObservationIssueV1, AudioStemEventObservationReceiptV1,
-    observe_rendered_audio_stem_events_v1, validate_audio_stem_event_observation_v1,
+    expected_frame, observe_rendered_audio_stem_events_v1, validate_audio_stem_event_observation_v1,
 };
 use crate::midi_performance::{
     MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, MIDI_PERFORMANCE_SCHEMA_V1,
@@ -109,6 +109,11 @@ pub enum PartStemEvidenceIssueV1 {
     MidiArtifactTooLarge,
     EmptyStemSet,
     InvalidAudioClock,
+    ScoreEventBeyondAudioClock {
+        source_note_ordinal: usize,
+        required_end_frame: u64,
+        declared_frame_count: u64,
+    },
     InvalidIdentity { field: String },
     InvalidRenderMethod { track_index: u16 },
     DuplicateTrackIndex { track_index: u16 },
@@ -781,6 +786,24 @@ pub fn validate_part_stem_bundle_v1(
     match part_stem_bundle_commitment_v1(bundle) {
         Ok(value) if value == bundle.bundle_sha256 => {}
         _ => issues.push(PartStemEvidenceIssueV1::BundleCommitmentMismatch),
+    }
+    for note in &midi.manifest.notes {
+        match expected_frame(
+            note.end_tick,
+            midi.manifest.tempo_microseconds_per_quarter,
+            midi.manifest.ticks_per_quarter,
+            bundle.audio_clock.sample_rate_hz,
+        ) {
+            Some(required_end_frame) if required_end_frame <= bundle.audio_clock.frame_count => {}
+            Some(required_end_frame) => {
+                issues.push(PartStemEvidenceIssueV1::ScoreEventBeyondAudioClock {
+                    source_note_ordinal: note.source_note_ordinal,
+                    required_end_frame,
+                    declared_frame_count: bundle.audio_clock.frame_count,
+                });
+            }
+            None => issues.push(PartStemEvidenceIssueV1::InvalidAudioClock),
+        }
     }
 
     let program_map = match verify_midi(midi) {
@@ -1698,6 +1721,30 @@ mod tests {
         assert!(issues.iter().any(|issue| matches!(
             issue,
             PartStemEvidenceIssueV1::WavSampleCountMismatch { .. }
+        )));
+    }
+
+
+    #[test]
+    fn audio_clock_must_cover_the_last_score_event() {
+        let (mut bundle, midi, _) = fixture();
+        let truncated_wav = pcm_wav(12_000);
+        let digest = sha256_hex(&truncated_wav);
+        bundle.audio_clock.frame_count = 12_000;
+        bundle.stems[0].wav_sha256 = digest.clone();
+        bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
+        let wavs = vec![PartStemWavInputV1 {
+            wav_sha256: digest,
+            wav_bytes: truncated_wav,
+        }];
+        let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            PartStemEvidenceIssueV1::ScoreEventBeyondAudioClock {
+                source_note_ordinal: 0,
+                required_end_frame: 24_000,
+                declared_frame_count: 12_000
+            }
         )));
     }
 
