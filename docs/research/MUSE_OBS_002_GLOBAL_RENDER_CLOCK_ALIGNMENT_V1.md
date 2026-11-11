@@ -27,7 +27,7 @@ The estimator:
 1. Revalidates the exact MIDI bytes against the part-aware manifest using MUSE-OBS-001's MIDI parser and event-accounting rules.
 2. Decodes the exact WAV bytes and binds its digest, format, sample rate, channels and frame count.
 3. Converts each distinct MIDI note-on tick to a sample frame using checked integer arithmetic and the manifest's integer tempo/PPQ.
-4. Builds a mono, Hann-windowed, positive spectral-flux envelope with a 2,048-frame FFT and 256-frame hop by default.
+4. Builds a Hann-windowed, positive spectral-flux envelope with a 2,048-frame FFT and 256-frame hop by default. Stereo channels are transformed independently and their magnitude spectra are averaged; PCM downmixing is avoided so anti-phase content cannot cancel the timing evidence.
 5. Searches a caller-declared audio-minus-MIDI offset range, defaulting to −250 ms through +2,000 ms.
 6. Scores candidate offsets against the full distinct MIDI onset sequence, penalizing candidates that cannot account for expected events.
 7. Measures the winning correlation peak, best competing peak, peak margin, peak ratio, matched-onset coverage, and the contiguous high-support peak width.
@@ -38,14 +38,15 @@ The high-support width is an empirical correlation-peak width, **not** a statist
 
 ## Tests authored
 
-Six focused tests cover:
+Seven focused tests cover:
 
 1. recovery of a known global 200 ms audio-minus-MIDI offset on irregularly spaced note onsets;
 2. silence returning no estimate;
 3. simultaneous events without enough unique onset times abstaining;
 4. truncated WAV coverage of only part of the expected MIDI event sequence abstaining;
 5. tampered MIDI bytes being rejected before alignment;
-6. WAV replacement invalidating the profile's input binding.
+6. WAV replacement invalidating the profile's input binding;
+7. anti-phase stereo preserving timing evidence instead of cancelling during channel downmix.
 
 The tests have not been compiled or run in the authoring environment.
 
