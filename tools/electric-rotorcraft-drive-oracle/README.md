@@ -55,9 +55,9 @@ With 95% motor efficiency, 98% inverter efficiency and a 400 V DC bus, the chain
 Additional negative controls reject zero, negative, non-finite and numerically unrepresentable ratios.
 
 
-## Map-qualified efficiency envelope (v0.3)
+## Map-qualified efficiency envelope (v0.4)
 
-The v0.3 additive API connects a caller-supplied, already-qualified motor efficiency interval to the independent drive-chain calculation without introducing a dependency on a map library.
+The v0.4 additive API connects a caller-supplied, already-qualified motor efficiency interval to the independent drive-chain calculation without introducing a dependency on a map library.
 
 1. `derive_motor_shaft_operating_point` computes motor torque and speed from rotor demand, the explicit gearbox speed ratio and transmission efficiency. It does not require motor or inverter efficiency, so it can be used before a motor-map query.
 2. The caller constructs `MotorEfficiencyEvidence` from the map lookup output, including map ID, exact map-content digest, configuration digest, context digest, evidence-manifest digest, exact motor torque/RPM query and lower/nominal/upper efficiency bounds.
