@@ -386,3 +386,20 @@ For any Symthaea/HDC/CfC/FEP contribution, compare:
 Report chunk latency, closed-loop frequency, queue-underflow, boundary discontinuity, task success, safe-success, action regret at application time, observation age, compute/battery/thermal cost and recovery viability. Do not optimize success alone by lengthening chunks or allowing stale commands.
 
 The contribution we should aim to establish is not "another WAM". It is whether this asynchronous split-timescale pattern can be made evidence-qualified and thermodynamically viable across different embodiments and persistent degradation—not whether it wins a LIBERO score against a different training recipe.
+
+
+## 12. Thermodynamic asynchronous locomotion benchmark
+
+The physical quadruped lane now has a dedicated experiment owner: [Symtropy #4689 — LOCO-ASYNC-THERMAL-001](https://github.com/Luminous-Dynamics/symtropy/issues/4689).
+
+It composes:
+- #4610 qualified per-node thermal transitions;
+- #4179/#4206 actuator loss and command-to-motion dynamics;
+- #4549/#4555 persistent mission reserve and event order;
+- #4588 observation-constrained future mobility;
+- #4117 timing/certificate validity and #4382 dynamics projection;
+- Symthaea #11561 real-time cognition and #11573 inference placement.
+
+The matched experiment asks whether asynchronous split-timescale cognition, committed-prefix continuation and independent temporal eligibility improve **sequential legged missions with persistent heat, actuator degradation and recovery state**, against thermal-aware MPC/HQP, robust MPC, thermal-aware RL and direct policies.
+
+WAM methods (Streaming-WAM / AHA-WAM / StreamingWAM) remain manipulation-domain architectural comparators until ported to a platform and evaluated under a matched locomotion protocol. Do not reuse their LIBERO/RoboTwin numbers as quadruped claims.
