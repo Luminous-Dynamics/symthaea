@@ -113,6 +113,7 @@ pub struct TranscriptionExperimentReceiptV1 {
     /// hash a documented canonical byte encoding with shape and dtype.
     pub model_input_audio_sha256: String,
     pub dataset_manifest_sha256: String,
+    pub dataset_manifest_reference: String,
     pub input_rights_basis: TranscriptionRightsBasisV1,
     pub input_rights_reference: Option<String>,
     pub input_usage_scope: TranscriptionUsageScopeV1,
@@ -139,6 +140,7 @@ pub struct TranscriptionExperimentReceiptV1 {
     /// Digest of any additional preprocessing parameters not represented as
     /// first-class fields above (e.g. filter coefficients or tensor layout).
     pub preprocessing_config_sha256: String,
+    pub preprocessing_config_reference: String,
     pub conditioning_source: TranscriptionConditioningSourceV1,
     /// Digest of the exact instrument labels/conditioning payload. Required
     /// for every non-None conditioning source.
@@ -185,6 +187,7 @@ struct ReceiptCommitmentV1<'a> {
     dataset_id: &'a str,
     dataset_revision: &'a str,
     dataset_manifest_sha256: &'a str,
+    dataset_manifest_reference: &'a str,
     sample_id: &'a str,
     split: &'a str,
     input_audio_sha256: &'a str,
@@ -208,6 +211,7 @@ struct ReceiptCommitmentV1<'a> {
     random_seed: Option<u64>,
     preprocessing: &'a TranscriptionAudioPreprocessingV1,
     preprocessing_config_sha256: &'a str,
+    preprocessing_config_reference: &'a str,
     conditioning_source: TranscriptionConditioningSourceV1,
     conditioning_payload_sha256: &'a Option<String>,
     runtime: &'a TranscriptionRuntimeReceiptV1,
@@ -272,6 +276,7 @@ pub fn transcription_experiment_receipt_commitment_v1(
         dataset_id: &receipt.dataset_id,
         dataset_revision: &receipt.dataset_revision,
         dataset_manifest_sha256: &receipt.dataset_manifest_sha256,
+        dataset_manifest_reference: &receipt.dataset_manifest_reference,
         sample_id: &receipt.sample_id,
         split: &receipt.split,
         input_audio_sha256: &receipt.input_audio_sha256,
@@ -295,6 +300,7 @@ pub fn transcription_experiment_receipt_commitment_v1(
         random_seed: receipt.random_seed,
         preprocessing: &receipt.preprocessing,
         preprocessing_config_sha256: &receipt.preprocessing_config_sha256,
+        preprocessing_config_reference: &receipt.preprocessing_config_reference,
         conditioning_source: receipt.conditioning_source,
         conditioning_payload_sha256: &receipt.conditioning_payload_sha256,
         runtime: &receipt.runtime,
@@ -376,6 +382,8 @@ pub fn validate_transcription_experiment_receipt_v1(
         ("benchmark_id", receipt.benchmark_id.as_str()),
         ("dataset_id", receipt.dataset_id.as_str()),
         ("dataset_revision", receipt.dataset_revision.as_str()),
+        ("dataset_manifest_reference", receipt.dataset_manifest_reference.as_str()),
+        ("preprocessing_config_reference", receipt.preprocessing_config_reference.as_str()),
         ("sample_id", receipt.sample_id.as_str()),
         ("split", receipt.split.as_str()),
         ("adapter_id", receipt.adapter_id.as_str()),
@@ -420,6 +428,13 @@ pub fn validate_transcription_experiment_receipt_v1(
     if let Some(digest) = receipt.model_artifact_sha256.as_deref() {
         if let Err(issue) = validate_digest("model_artifact_sha256", digest) {
             issues.push(issue);
+        }
+    }
+    if let Some(reference) = receipt.input_rights_reference.as_deref() {
+        if reference.trim().is_empty() {
+            issues.push(TranscriptionExperimentReceiptIssueV1::MissingField {
+                field: "input_rights_reference".into(),
+            });
         }
     }
     if let Some(reference) = receipt.model_license_reference.as_deref() {
@@ -496,6 +511,16 @@ pub fn validate_transcription_experiment_receipt_v1(
     if receipt.runtime.batch_size == 0 {
         issues.push(TranscriptionExperimentReceiptIssueV1::InvalidRuntime {
             field: "batch_size".into(),
+        });
+    }
+    if receipt.runtime.wall_time_ms == 0 {
+        issues.push(TranscriptionExperimentReceiptIssueV1::InvalidRuntime {
+            field: "wall_time_ms".into(),
+        });
+    }
+    if receipt.created_unix_ms.is_none_or(|timestamp| timestamp == 0) {
+        issues.push(TranscriptionExperimentReceiptIssueV1::MissingField {
+            field: "created_unix_ms".into(),
         });
     }
 
@@ -649,6 +674,7 @@ mod tests {
             input_audio_sha256: sha256_hex(audio),
             model_input_audio_sha256: sha256_hex(b"canonical-model-input"),
             dataset_manifest_sha256: sha256_hex(b"dataset-manifest"),
+            dataset_manifest_reference: "artifact://dataset-manifest/corpus-v1".into(),
             input_rights_basis: TranscriptionRightsBasisV1::ConsentedResearch,
             input_rights_reference: Some("consent-register:corpus-v1".into()),
             input_usage_scope: TranscriptionUsageScopeV1::PublicBenchmarkResults,
@@ -677,6 +703,7 @@ mod tests {
                 chunk_overlap_ms: 500,
             },
             preprocessing_config_sha256: sha256_hex(b"preprocessing-config"),
+            preprocessing_config_reference: "artifact://preprocessing-config/preprocess-v1".into(),
             conditioning_source: TranscriptionConditioningSourceV1::None,
             conditioning_payload_sha256: None,
             runtime: TranscriptionRuntimeReceiptV1 {
@@ -815,6 +842,27 @@ mod tests {
             &report,
         )
         .is_empty());
+    }
+
+    #[test]
+    fn open_weights_artifact_bytes_must_match_the_model_digest() {
+        let audio = b"audio";
+        let midi = b"midi";
+        let report = report(midi);
+        let receipt = valid_receipt(audio, midi, &report);
+        let evidence = TranscriptionExperimentEvidenceV1 {
+            source_audio_bytes: audio,
+            model_input_audio_bytes: b"canonical-model-input",
+            dataset_manifest_bytes: b"dataset-manifest",
+            inference_config_bytes: b"inference-config",
+            preprocessing_config_bytes: b"preprocessing-config",
+            model_artifact_bytes: Some(b"different-model-weights"),
+            prediction_midi_bytes: midi,
+        };
+        let issues = validate_transcription_experiment_receipt_v1(
+            &receipt, &evidence, &report,
+        );
+        assert!(issues.contains(&TranscriptionExperimentReceiptIssueV1::ModelArtifactDigestMismatch));
     }
 
     #[test]
