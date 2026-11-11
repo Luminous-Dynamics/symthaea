@@ -321,7 +321,7 @@ pub fn validate_tracked()->Result<usize,String>{
 mod tests{
  use super::*;
 
- #[test] fn both_tracked_json_schemas_are_applied(){assert_eq!(validate_tracked().unwrap(),36);}
+ #[test] fn both_tracked_json_schemas_are_applied(){assert_eq!(validate_tracked().unwrap(),40);}
  #[test] fn stratum_specific_minimum_cannot_be_removed(){let mut m=parse(MANIFEST_JSON).unwrap();m["evidence_strata"][2]["minimum_units_per_lot"]=Value::from(1);assert!(validate_manifest(&m).is_err());}
  #[test] fn analysis_contract_cannot_omit_variance_components(){let mut m=parse(MANIFEST_JSON).unwrap();m["analysis_contract"]["required_variance_components"].as_array_mut().unwrap().pop();assert!(validate_manifest(&m).is_err());}
  #[test] fn comparison_contract_cannot_enable_a_scalar_score(){let mut m=parse(MANIFEST_JSON).unwrap();m["comparison_contract"]["no_single_scalar_score"]=Value::Bool(false);assert!(validate_manifest(&m).is_err());}
@@ -330,7 +330,7 @@ mod tests{
  #[test] fn exact_lab_scope_schedule_is_required(){let c=parse(CORPUS_JSON).unwrap();let mut s=c["cases"][0]["signals"].clone();s["laboratory_scope_schedule_current"]=Value::Bool(false);assert_eq!(classify_signals(&s),"MORE_EVIDENCE_REQUIRED");}
  #[test] fn proficiency_testing_is_not_reproducibility(){let c=parse(CORPUS_JSON).unwrap();let mut s=c["cases"][0]["signals"].clone();s["proficiency_evidence_not_substituted_for_reproducibility"]=Value::Bool(false);assert_eq!(classify_signals(&s),"NOT_COMPARABLE");}
  #[test] fn withdrawn_interlaboratory_method_edition_is_not_current(){let c=parse(CORPUS_JSON).unwrap();let mut s=c["cases"][0]["signals"].clone();s["method_edition_current"]=Value::Bool(false);assert_eq!(classify_signals(&s),"NOT_COMPARABLE");}
- #[test] fn tracked_36_known_answers_validate(){assert_eq!(validate_tracked().unwrap(),36);}
+ #[test] fn tracked_40_known_answers_validate(){assert_eq!(validate_tracked().unwrap(),40);}
  #[test] fn duplicate_json_members_are_rejected(){assert!(parse(r#"{"x":1,"x":2}"#).is_err());}
  #[test] fn one_lab_cannot_claim_reproducibility(){let c=parse(CORPUS_JSON).unwrap();assert_eq!(classify_signals(&c["cases"][1]["signals"]),"NOT_COMPARABLE");}
  #[test] fn production_lot_and_unit_variance_are_separate(){let c=parse(CORPUS_JSON).unwrap();assert_eq!(classify_signals(&c["cases"][2]["signals"]),"NOT_COMPARABLE");assert_eq!(classify_signals(&c["cases"][3]["signals"]),"NOT_COMPARABLE");}
