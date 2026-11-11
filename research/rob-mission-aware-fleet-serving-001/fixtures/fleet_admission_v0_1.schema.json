@@ -1,0 +1,444 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rob-fep-thermo-001/fixtures/fleet_admission_v0_1.schema.json",
+  "title": "ROB-MISSION-AWARE-FLEET-SERVING-001 synthetic known answers v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "const": "ROB-MISSION-AWARE-FLEET-SERVING-001"
+    },
+    "status": {
+      "const": "synthetic_known_answers_only"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "uniqueItems": true,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA01_HOMOGENEOUS_NO_WINNER_ASSUMED"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA02_ONE_FAST_NINE_SLOW_HETEROGENEOUS_FLEET"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA03_ZERO_EVSI_OPTIONAL_REQUEST_DECLINED"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA04_POSITIVE_EVSI_BUT_DEADLINE_MISS"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA05_PER_ROBOT_SERVICE_FLOOR_DUE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA06_REMOTE_BATCH_CANNOT_DISPLACE_LOCAL_SAFETY"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA07_UNKNOWN_CLOCK_OR_IDENTITY_REJECTS_REMOTE_USE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA08_THERMAL_PRESSURE_REMOTE_DELiberation_LOCAL_SAFETY"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA09_THROUGHPUT_WIN_WITH_STARVATION_BREACH_REJECTED"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA10_INCOMPLETE_EDGE_ENERGY_BOUNDARY_UNKNOWN"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA11_EQUAL_THROUGHPUT_DIFFERENT_POMA_NO_AGGREGATE_WINNER"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "FA12_COMPLETE_MATCHED_BASELINE_MATRIX_NO_PREDECLARED_WINNER"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "nullable_number": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scheduler_policy",
+        "robot_count",
+        "dynamic_robot_count",
+        "static_robot_count",
+        "candidate_evsi_task_loss_units",
+        "task_loss_scale_id",
+        "p99_return_latency_ms",
+        "action_buffer_slack_ms",
+        "actuation_deadline_slack_ms",
+        "actuation_aoi_upper_bound_ms",
+        "max_actuation_aoi_ms",
+        "poma_upper_bound",
+        "poma_limit",
+        "endpoint_and_model_identity_valid",
+        "clock_mapping_valid",
+        "local_fallback_ready",
+        "privacy_policy_allows_remote_data",
+        "local_hard_safety_displaced",
+        "per_robot_service_floor_due",
+        "thermal_headroom_c",
+        "edge_cloud_energy_boundary_complete",
+        "any_robot_starvation_cap_breached",
+        "per_robot_metrics_available",
+        "scheduler_arms"
+      ],
+      "properties": {
+        "scheduler_policy": {
+          "enum": [
+            "comparison",
+            "luminous_candidate"
+          ]
+        },
+        "robot_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dynamic_robot_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "static_robot_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_evsi_task_loss_units": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "task_loss_scale_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "p99_return_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "action_buffer_slack_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "actuation_deadline_slack_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "actuation_aoi_upper_bound_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "max_actuation_aoi_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "poma_upper_bound": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "poma_limit": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "endpoint_and_model_identity_valid": {
+          "type": "boolean"
+        },
+        "clock_mapping_valid": {
+          "type": "boolean"
+        },
+        "local_fallback_ready": {
+          "type": "boolean"
+        },
+        "privacy_policy_allows_remote_data": {
+          "type": "boolean"
+        },
+        "local_hard_safety_displaced": {
+          "type": "boolean"
+        },
+        "per_robot_service_floor_due": {
+          "type": "boolean"
+        },
+        "thermal_headroom_c": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "edge_cloud_energy_boundary_complete": {
+          "type": "boolean"
+        },
+        "any_robot_starvation_cap_breached": {
+          "type": "boolean"
+        },
+        "per_robot_metrics_available": {
+          "type": "boolean"
+        },
+        "scheduler_arms": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "round_robin",
+              "edf",
+              "armory_lookahead",
+              "red",
+              "luminous_candidate"
+            ]
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "remote_compute_admitted",
+        "fleet_policy_accepted",
+        "local_safety_remains_local",
+        "actuation_authorized",
+        "per_robot_metrics_required",
+        "aggregate_winner_claim_allowed",
+        "whole_system_energy_claim"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "benchmark_only",
+            "benchmark_only_heterogeneous",
+            "zero_evsi_declined",
+            "deadline_risk_rejected",
+            "service_floor_constrains_batch",
+            "local_safety_displacement_blocked",
+            "unknown_freshness_rejected",
+            "remote_deliberation_eligible_local_safety",
+            "policy_rejected_starvation_floor",
+            "whole_system_energy_unknown",
+            "per_robot_poma_tradeoff_no_scalar_winner",
+            "complete_matched_matrix_no_predeclared_winner"
+          ]
+        },
+        "remote_compute_admitted": {
+          "type": "boolean"
+        },
+        "fleet_policy_accepted": {
+          "type": "boolean"
+        },
+        "local_safety_remains_local": {
+          "const": true
+        },
+        "actuation_authorized": {
+          "const": false
+        },
+        "per_robot_metrics_required": {
+          "const": true
+        },
+        "aggregate_winner_claim_allowed": {
+          "const": false
+        },
+        "whole_system_energy_claim": {
+          "enum": [
+            "unknown",
+            "not_evaluated"
+          ]
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "FA01_HOMOGENEOUS_NO_WINNER_ASSUMED",
+            "FA02_ONE_FAST_NINE_SLOW_HETEROGENEOUS_FLEET",
+            "FA03_ZERO_EVSI_OPTIONAL_REQUEST_DECLINED",
+            "FA04_POSITIVE_EVSI_BUT_DEADLINE_MISS",
+            "FA05_PER_ROBOT_SERVICE_FLOOR_DUE",
+            "FA06_REMOTE_BATCH_CANNOT_DISPLACE_LOCAL_SAFETY",
+            "FA07_UNKNOWN_CLOCK_OR_IDENTITY_REJECTS_REMOTE_USE",
+            "FA08_THERMAL_PRESSURE_REMOTE_DELiberation_LOCAL_SAFETY",
+            "FA09_THROUGHPUT_WIN_WITH_STARVATION_BREACH_REJECTED",
+            "FA10_INCOMPLETE_EDGE_ENERGY_BOUNDARY_UNKNOWN",
+            "FA11_EQUAL_THROUGHPUT_DIFFERENT_POMA_NO_AGGREGATE_WINNER",
+            "FA12_COMPLETE_MATCHED_BASELINE_MATRIX_NO_PREDECLARED_WINNER"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
