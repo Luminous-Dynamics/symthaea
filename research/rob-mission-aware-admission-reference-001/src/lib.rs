@@ -994,6 +994,29 @@ mod tests {
     }
 
     #[test]
+    fn round_robin_cursor_is_preserved_when_no_request_is_admitted() {
+        let report = admit_batch(
+            SchedulerPolicy::RoundRobin,
+            &SchedulerCursor {
+                last_robot_id: Some("robot-m".to_owned()),
+            },
+            ResourceBudget {
+                gpu_micros: 0,
+                memory_bandwidth_units: 0,
+                network_bytes: 0,
+                kv_cache_growth_tokens: 0,
+            },
+            &[request("q1", "robot-a")],
+        )
+        .unwrap();
+        assert!(report.admitted_request_ids.is_empty());
+        assert_eq!(
+            report.next_cursor_robot_id.as_deref(),
+            Some("robot-m")
+        );
+    }
+
+    #[test]
     fn empty_batch_is_a_valid_noop() {
         let report = admit_batch(
             SchedulerPolicy::Luminous,
