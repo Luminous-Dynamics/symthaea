@@ -1,0 +1,360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/aced-adapter-001/ACED_QUERY_COMPARISON_PROTOCOL_V0_1.schema.json",
+  "title": "ACED-Query comparison protocol v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_id",
+    "version",
+    "status",
+    "upstream",
+    "source_artifacts",
+    "track_to_question_projection",
+    "official_resource_regimes",
+    "agent_arms",
+    "published_comparators",
+    "evaluator_reproduction",
+    "primary_metrics",
+    "statistical_design",
+    "proposed_targets",
+    "security_boundary",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "protocol_id": {
+      "const": "ACED-QUERY-COMPARISON-001"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "preregistered_comparison_design_not_model_results"
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "paper",
+        "paper_revision",
+        "paper_revision_date",
+        "license"
+      ],
+      "properties": {
+        "repository": {
+          "const": "https://github.com/Rose-STL-Lab/ACED-Bench"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "paper": {
+          "const": "https://arxiv.org/abs/2610.14381"
+        },
+        "paper_revision": {
+          "const": "v2"
+        },
+        "paper_revision_date": {
+          "const": "2026-11-08"
+        },
+        "license": {
+          "const": "MIT"
+        }
+      }
+    },
+    "source_artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metadata_manifest",
+        "metadata_inventory",
+        "metadata_inventory_sha256",
+        "upstream_sha256sums_sha256",
+        "metadata_only"
+      ],
+      "properties": {
+        "metadata_manifest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metadata_inventory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metadata_inventory_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "upstream_sha256sums_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "metadata_only": {
+          "const": true
+        }
+      }
+    },
+    "track_to_question_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_inventory_counts",
+        "active_agent_questions",
+        "guess_only_questions",
+        "derivation",
+        "interpretation"
+      ],
+      "properties": {
+        "world_inventory_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "core_struct",
+            "core_decision",
+            "guess_struct",
+            "guess_decision"
+          ],
+          "properties": {
+            "core_struct": {
+              "const": 10
+            },
+            "core_decision": {
+              "const": 60
+            },
+            "guess_struct": {
+              "const": 30
+            },
+            "guess_decision": {
+              "const": 48
+            }
+          }
+        },
+        "active_agent_questions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "core_list_queries",
+            "core_decision_tasks",
+            "core_total",
+            "qual_questions"
+          ],
+          "properties": {
+            "core_list_queries": {
+              "const": 10
+            },
+            "core_decision_tasks": {
+              "const": 60
+            },
+            "core_total": {
+              "const": 70
+            },
+            "qual_questions": {
+              "const": 50
+            }
+          }
+        },
+        "guess_only_questions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "core_list_queries",
+            "core_decision_tasks",
+            "core_total",
+            "qual_questions"
+          ],
+          "properties": {
+            "core_list_queries": {
+              "const": 30
+            },
+            "core_decision_tasks": {
+              "const": 48
+            },
+            "core_total": {
+              "const": 78
+            },
+            "qual_questions": {
+              "const": 150
+            }
+          }
+        },
+        "derivation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "core_struct",
+            "core_decision",
+            "guess_struct",
+            "guess_decision"
+          ],
+          "properties": {
+            "core_struct": {
+              "type": "string"
+            },
+            "core_decision": {
+              "type": "string"
+            },
+            "guess_struct": {
+              "type": "string"
+            },
+            "guess_decision": {
+              "type": "string"
+            }
+          }
+        },
+        "interpretation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "official_resource_regimes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "max_outer_turns",
+          "arms",
+          "score_split",
+          "note"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "four_turn",
+              "sample_budget"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "max_outer_turns": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_sampled_rows_per_task": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "arms": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "score_split": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "agent_arms": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "published_comparators": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "evaluator_reproduction": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "primary_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core",
+        "qual",
+        "trajectory",
+        "measurement_validity"
+      ],
+      "properties": {
+        "core": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "qual": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "trajectory": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "measurement_validity": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "statistical_design": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "proposed_targets": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "security_boundary": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
