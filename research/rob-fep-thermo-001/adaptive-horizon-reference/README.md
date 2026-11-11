@@ -2,7 +2,7 @@
 
 Standalone, dependency-free Rust research reference for the min-of-qualified-bounds contract in ../adaptive_commit_horizon.md.
 
-It consumes nine already-qualified caps and returns:
+It consumes ten already-qualified caps and returns:
 - Eligible with max_ticks and binding_constraints;
 - ZeroHorizon with binding_constraints; or
 - Blocked with explicit failures.
