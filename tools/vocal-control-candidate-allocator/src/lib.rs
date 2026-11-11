@@ -217,6 +217,7 @@ pub fn allocate_vocal_control_candidate(
         )?;
         evaluations.push(evaluation);
     }
+    evaluations.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
 
     let feasible_candidate_count = evaluations.iter().filter(|result| result.feasible).count();
 
@@ -886,7 +887,7 @@ mod tests {
     #[test]
     fn protected_uncertainty_crossing_guard_rejects_candidate() {
         let mut spec = spec();
-        spec.metrics[1].residual_uncertainty = 4.0;
+        spec.metrics[1].residual_uncertainty = 4.9;
         let report = allocate_vocal_control_candidate(
             &spec,
             &[candidate("guard-edge", 1.0, 0.0)],
@@ -1104,6 +1105,10 @@ mod tests {
         assert_eq!(
             first.selected_proposal.unwrap().candidate_id,
             second.selected_proposal.unwrap().candidate_id
+        );
+        assert_eq!(
+            first.candidate_evaluations.iter().map(|item| item.candidate_id.as_str()).collect::<Vec<_>>(),
+            second.candidate_evaluations.iter().map(|item| item.candidate_id.as_str()).collect::<Vec<_>>()
         );
     }
 }
