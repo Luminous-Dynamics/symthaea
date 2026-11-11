@@ -911,6 +911,10 @@ mod tests {
     fn frozen_corpus_separates_false_feasible_false_infeasible_and_abstention() {
         let report = report();
         assert_eq!(report.case_count, 11);
+        assert_eq!(report.split_assignment_count, 11);
+        assert_eq!(report.test_blind_assignment_count, 11);
+        assert_eq!(report.non_test_blind_assignment_count, 0);
+        assert!(is_sha256(&report.split_manifest_sha256));
         assert_eq!(report.true_feasible_count, 1);
         assert_eq!(report.false_feasible_count, 2);
         assert_eq!(report.true_infeasible_count, 1);
@@ -1093,6 +1097,8 @@ mod tests {
         let bytes = serde_json::to_vec(&corpus).expect("physical holdout corpus");
         let report = audit_corpus(SCHEMA, &bytes).expect("physical holdout audit");
         assert_eq!(report.physical_reference_case_count, 59);
+        assert_eq!(report.split_assignment_count, 59);
+        assert_eq!(report.test_blind_assignment_count, 59);
         assert_eq!(report.physical_predicted_feasible_count, 59);
         assert_eq!(report.physical_false_feasible_count, 0);
         let upper = report.physical_false_feasible_upper_95_one_sided.unwrap();
