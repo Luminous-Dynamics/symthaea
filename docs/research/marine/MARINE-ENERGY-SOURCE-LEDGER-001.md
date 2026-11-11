@@ -23,7 +23,7 @@ For the declared source-input boundary, only primary and substitute inputs contr
 ## 2. Internal numeric representation
 
 The kernel uses integer micro-gigajoules:
-- 1 micro-GJ = 10^-6 GJ = 1 joule.
+- 1 micro-GJ = 10^-6 GJ = 1,000 joules = 1 kJ.
 - Energy input values are non-negative integers.
 - Missing/unknown input is an explicit null plus reason, never zero.
 - Totals use checked integer addition; overflow is invalid.
