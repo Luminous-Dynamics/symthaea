@@ -17,7 +17,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 /// Property names and states are aligned with OLI M0 fixture v0.1.
-pub const SYMTHAEA_OLI_CONTEXT_VERSION: &str = "symthaea-oli-context-v0.3.0";
+pub const SYMTHAEA_OLI_CONTEXT_VERSION: &str = "symthaea-oli-context-v0.4.0";
 
 /// Substrate-agnostic properties using the canonical OLI M0 property keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -260,6 +260,141 @@ impl ObservationCoverage {
     }
 }
 
+/// Adjudication state for a declared evidence conflict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConflictResolution {
+    /// Conflicting observations are retained but do not justify a definitive disposition.
+    Unresolved,
+    /// The conflict has been adjudicated in favour of the supporting evidence.
+    ResolvedForSupport,
+    /// The conflict has been adjudicated in favour of the contradicting evidence.
+    ResolvedForContradiction,
+}
+
+/// Explicitly records evidence on both sides of one scoped proposition.
+///
+/// `independently_sourced` is a claim about provenance groups, not a truth score. When
+/// true, every record on both sides must declare a non-empty `independence_group`, and
+/// the supporting and contradicting group sets must be disjoint. Distinct evidence IDs
+/// alone never establish independent evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceConflict {
+    pub proposition: String,
+    pub supporting_evidence_ids: Vec<String>,
+    pub contradicting_evidence_ids: Vec<String>,
+    pub independently_sourced: bool,
+    pub resolution: ConflictResolution,
+    pub rationale: String,
+}
+
+impl EvidenceConflict {
+    fn validate(
+        &self,
+        path: &str,
+        evidence: &[EvidenceRecord],
+        assessment: PropertyAssessment,
+        issues: &mut Vec<String>,
+    ) {
+        if self.proposition.trim().is_empty() {
+            issues.push(format!("{path}.proposition must not be empty"));
+        }
+        if self.rationale.trim().is_empty() {
+            issues.push(format!("{path}.rationale must not be empty"));
+        }
+        if self.supporting_evidence_ids.is_empty() {
+            issues.push(format!("{path} requires supporting evidence ids"));
+        }
+        if self.contradicting_evidence_ids.is_empty() {
+            issues.push(format!("{path} requires contradicting evidence ids"));
+        }
+
+        let mut seen = HashSet::new();
+        let mut supporting_groups = HashSet::new();
+        let mut contradicting_groups = HashSet::new();
+        let mut groups_complete = true;
+
+        for (side, ids, groups) in [
+            ("supporting", &self.supporting_evidence_ids, &mut supporting_groups),
+            ("contradicting", &self.contradicting_evidence_ids, &mut contradicting_groups),
+        ] {
+            let mut side_seen = HashSet::new();
+            for id in ids {
+                if !side_seen.insert(id.as_str()) {
+                    issues.push(format!("{path}.{side}_evidence_ids contains duplicate id {id}"));
+                }
+                if !seen.insert(id.as_str()) {
+                    issues.push(format!(
+                        "{path} evidence id {id} appears on both sides of the conflict"
+                    ));
+                }
+                match evidence.iter().find(|record| record.id == *id) {
+                    Some(record) => match &record.independence_group {
+                        Some(group) if !group.trim().is_empty() => {
+                            groups.insert(group.as_str());
+                        }
+                        _ => groups_complete = false,
+                    },
+                    None => issues.push(format!(
+                        "{path} references unknown {side} evidence id: {id}"
+                    )),
+                }
+            }
+        }
+
+        if self.independently_sourced {
+            if !groups_complete {
+                issues.push(format!(
+                    "{path} cannot claim independent sourcing when an evidence record lacks a non-empty independence_group"
+                ));
+            }
+            if !supporting_groups.is_disjoint(&contradicting_groups) {
+                issues.push(format!(
+                    "{path} cannot claim independent sourcing because supporting and contradicting evidence share a common-cause group"
+                ));
+            }
+        }
+
+        match self.resolution {
+            ConflictResolution::Unresolved => {
+                if matches!(
+                    assessment,
+                    PropertyAssessment::SupportedWithinScope
+                        | PropertyAssessment::ContradictedWithinScope
+                ) {
+                    issues.push(format!(
+                        "{path} is unresolved and cannot accompany a definitive property disposition"
+                    ));
+                }
+            }
+            ConflictResolution::ResolvedForSupport => {
+                if !self.independently_sourced {
+                    issues.push(format!(
+                        "{path} cannot resolve in favour of support without independently sourced evidence"
+                    ));
+                }
+                if assessment != PropertyAssessment::SupportedWithinScope {
+                    issues.push(format!(
+                        "{path} resolves for support but the property assessment is not SupportedWithinScope"
+                    ));
+                }
+            }
+            ConflictResolution::ResolvedForContradiction => {
+                if !self.independently_sourced {
+                    issues.push(format!(
+                        "{path} cannot resolve in favour of contradiction without independently sourced evidence"
+                    ));
+                }
+                if assessment != PropertyAssessment::ContradictedWithinScope {
+                    issues.push(format!(
+                        "{path} resolves for contradiction but the property assessment is not ContradictedWithinScope"
+                    ));
+                }
+            }
+        }
+    }
+}
+
 /// Evidence for one property, retaining the canonical M0 assessment vocabulary.
 ///
 /// A `NoDetection` evidence record requires coverage metadata. It cannot be used as the
@@ -273,6 +408,9 @@ pub struct PropertyFinding {
     /// IDs of evidence records in the containing SystemProfile.
     pub evidence_ids: Vec<String>,
     pub coverage: Option<ObservationCoverage>,
+    /// Explicit supporting/contradicting evidence relationships and their adjudication.
+    #[serde(default)]
+    pub evidence_conflicts: Vec<EvidenceConflict>,
     pub notes: String,
 }
 
@@ -365,6 +503,15 @@ impl SystemProfile {
             let path = format!("findings[{index}]");
             if !properties.insert(finding.property) {
                 issues.push(format!("duplicate property finding: {:?}", finding.property));
+            }
+
+            for (conflict_index, conflict) in finding.evidence_conflicts.iter().enumerate() {
+                conflict.validate(
+                    &format!("{path}.evidence_conflicts[{conflict_index}]"),
+                    &self.evidence,
+                    finding.assessment,
+                    &mut issues,
+                );
             }
 
             let mut no_detection = false;
