@@ -583,6 +583,7 @@ pub fn score_roborecover(
             && trial.evidence.arm_id == manifest.arm_id
             && trial.stage == scenario.stage
             && trial.deviation == scenario.deviation
+            && trial.source == scenario.source
             && trial.evidence.scenario_id == scenario.scenario_id
             && trial.source_path == scenario.source_path
             && trial.scenario_content_sha256 == scenario.scenario_content_sha256
@@ -748,6 +749,7 @@ pub fn score_roborecover(
                             && trial.evidence.arm_id == manifest.arm_id
                             && trial.stage == scenario.stage
                             && trial.deviation == scenario.deviation
+                            && trial.source == scenario.source
                             && trial.evidence.scenario_id == scenario.scenario_id
                             && trial.source_path == scenario.source_path
                             && trial.scenario_content_sha256 == scenario.scenario_content_sha256
@@ -1627,6 +1629,52 @@ mod tests {
             classify_policy_completion(&trial),
             PolicyCompletion::Unknown
         );
+    }
+
+
+    #[test]
+    fn source_construction_classification_must_match_frozen_scenario_record() {
+        let m = manifest();
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        trial.source = ScenarioSource::HumanConstructed;
+
+        let report = score_roborecover(&m, &[trial]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 0);
+        assert_eq!(report.metadata_mismatch_rows, 1);
+    }
+
+    #[test]
+    fn source_path_original_trajectory_task_and_replay_metadata_are_bound() {
+        let m = manifest();
+        for field in 0..4 {
+            let mut trial = sample(
+                0, 0, TerminalOutcome::TaskCompleted,
+                SafetyEvidence::VerifiedCompliant,
+                super::super::InterventionKind::DirectPolicy,
+                super::super::WorldStateContinuity::Preserved,
+            );
+            trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+            match field {
+                0 => trial.source_path.push_str(".tampered"),
+                1 => trial.original_trajectory_sha256 = "f".repeat(64),
+                2 => trial.task_name.push_str("-tampered"),
+                3 => trial.replay_prefix_steps += 1,
+                _ => unreachable!(),
+            }
+
+            let report = score_roborecover(&m, &[trial]).unwrap();
+            assert_eq!(report.accepted_trial_rows, 0);
+            assert_eq!(report.metadata_mismatch_rows, 1);
+            assert_eq!(report.policy_recovery_successes, 0);
+        }
     }
 
 }
