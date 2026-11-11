@@ -18,8 +18,8 @@
 
 #![forbid(unsafe_code)]
 
-use std::fmt;
 use std::f64::consts::TAU;
+use std::fmt;
 
 pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.2.0";
 
@@ -181,10 +181,7 @@ impl std::error::Error for DriveError {}
 /// The caller supplies measured or explicitly modelled efficiencies for the
 /// exact torque/RPM/temperature operating point. This function does not
 /// interpolate maps, extrapolate outside a map, or silently derate demand.
-pub fn evaluate_drive(
-    config: &DriveConfig,
-    input: DriveInput,
-) -> Result<DriveReport, DriveError> {
+pub fn evaluate_drive(config: &DriveConfig, input: DriveInput) -> Result<DriveReport, DriveError> {
     config.validate()?;
 
     let finite_inputs = [
@@ -222,14 +219,11 @@ pub fn evaluate_drive(
 
     let rotor_angular_velocity_rad_s = input.rotor_speed_rpm * TAU / 60.0;
     let rotor_shaft_power_w = input.rotor_shaft_torque_nm * rotor_angular_velocity_rad_s;
-    let motor_shaft_output_power_w =
-        rotor_shaft_power_w / config.transmission_efficiency;
+    let motor_shaft_output_power_w = rotor_shaft_power_w / config.transmission_efficiency;
     let transmission_loss_w = motor_shaft_output_power_w - rotor_shaft_power_w;
-    let motor_electrical_input_power_w =
-        motor_shaft_output_power_w / config.motor_efficiency;
+    let motor_electrical_input_power_w = motor_shaft_output_power_w / config.motor_efficiency;
     let motor_loss_w = motor_electrical_input_power_w - motor_shaft_output_power_w;
-    let dc_bus_input_power_w =
-        motor_electrical_input_power_w / config.inverter_efficiency;
+    let dc_bus_input_power_w = motor_electrical_input_power_w / config.inverter_efficiency;
     let inverter_loss_w = dc_bus_input_power_w - motor_electrical_input_power_w;
     let dc_bus_current_a = dc_bus_input_power_w / input.dc_bus_voltage_v;
     let total_conversion_loss_w = transmission_loss_w + motor_loss_w + inverter_loss_w;
@@ -321,7 +315,6 @@ pub fn evaluate_drive(
         energy_balance_residual_j,
     })
 }
-
 
 /// Evaluate the existing rotor-side drive-chain reference and derive the motor
 /// shaft operating point using an explicit gearbox speed ratio.
@@ -457,7 +450,9 @@ mod tests {
         let model = config();
         let low_voltage = evaluate_drive(&model, input_for_power(20_000.0, 400.0, 1.0)).unwrap();
         let high_voltage = evaluate_drive(&model, input_for_power(20_000.0, 800.0, 1.0)).unwrap();
-        assert!((low_voltage.dc_bus_input_power_w - high_voltage.dc_bus_input_power_w).abs() < 1.0e-9);
+        assert!(
+            (low_voltage.dc_bus_input_power_w - high_voltage.dc_bus_input_power_w).abs() < 1.0e-9
+        );
         assert!((low_voltage.dc_bus_current_a - 50.0).abs() < 1.0e-12);
         assert!((high_voltage.dc_bus_current_a - 25.0).abs() < 1.0e-12);
     }
