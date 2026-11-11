@@ -5,6 +5,8 @@ on:
     paths:
       - "docs/transport/EV_MISSION_OUTCOME_AUDIT_V0_1.md"
       - "schemas/transport/ev_mission_outcome_audit_v0_1.schema.json"
+      - "schemas/transport/ev_mission_outcome_trust_v0_1.schema.json"
+      - "fixtures/ev_battery/mission_outcome_trust_empty_v0_1.json"
       - "fixtures/ev_battery/mission_outcome_audit_v0_1.json"
       - "tools/ev-mission-outcome-audit/**"
       - ".github/workflows/ev-mission-outcome-audit.yml"
@@ -38,6 +40,7 @@ jobs:
         run: |
           cargo run --manifest-path tools/ev-mission-outcome-audit/Cargo.toml -- \
             --schema schemas/transport/ev_mission_outcome_audit_v0_1.schema.json \
+            --trust-manifest fixtures/ev_battery/mission_outcome_trust_empty_v0_1.json \
             --corpus fixtures/ev_battery/mission_outcome_audit_v0_1.json \
             > "$RUNNER_TEMP/mission-outcome-report.json"
           jq -e '
@@ -55,7 +58,8 @@ jobs:
             .conflicting_reference_count == 2 and
             .rejected_reference_count == 0 and
             .synthetic_scorable_count == 5 and
-            .physical_reference_case_count == 0 and
+            .physical_reference_claim_count == 0 and
+            .admitted_physical_reference_count == 0 and
             all(.cases[]; .classification != "TRUE_FEASIBLE" or
               (.scoring_eligible == true and .evidence_class == "SYNTHETIC_KNOWN_TRUTH")) and
             .physical_scorable_count == 0 and
