@@ -175,3 +175,12 @@ The distributed-inference corpus now has 24 cases and distinguishes:
 - DI24: comparator-completeness case for a heterogeneous ten-robot fleet. It requires Round Robin, EDF, Armory Lookahead and the proposed Luminous scheduler to report per-robot starvation, per-tier throughput and per-robot safety outcomes. It asserts no performance winner.
 
 PoMA is an adapted empirical missed-deadline frequency for the declared robot benchmark. It is not asserted to be numerically identical to the analytical PoMA definition in the IEEE wireless-power-transfer paper.
+
+
+## Fleet-serving implementation track
+
+The protocol and synthetic corpus now live on a separate public branch and draft PR:
+- [Issue #11627](https://github.com/Luminous-Dynamics/symthaea/issues/11627)
+- [PR #11630](https://github.com/Luminous-Dynamics/symthaea/pull/11630)
+
+This keeps the admission/batching comparator separate from the broad onboard/edge/cloud placement experiment while consuming its qualified measurements.
