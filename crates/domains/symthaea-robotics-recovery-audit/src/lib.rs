@@ -6,6 +6,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod roborecover_score;
+
 /// How a recovery intervention changes or preserves the physical execution.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum InterventionKind {
