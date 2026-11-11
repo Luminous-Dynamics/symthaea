@@ -282,7 +282,7 @@ fn hermitian_eigenvalues(matrix: &DensityMatrix, tolerance: f64) -> Result<Vec<f
 /// maximum-pivot search before each individual rotation.
 fn jacobi_eigenvalues(a: &mut [f64], n: usize, tol: f64) -> Result<Vec<f64>, QuantumInformationError> {
     const MAX_SWEEPS: usize = 80;
-    let mut residual = f64::INFINITY;
+    let mut residual: f64;
     for _ in 0..MAX_SWEEPS {
         let mut scale: f64 = 1.0;
         residual = 0.0;
@@ -370,6 +370,18 @@ mod tests {
         assert!(e[0].abs() < 1e-10 && e[1].abs() < 1e-10);
         assert!((e[2] - 0.5).abs() < 1e-10 && (e[3] - 0.5).abs() < 1e-10);
         assert!((rho.von_neumann_entropy(TOL).unwrap() - 2.0_f64.ln()).abs() < 1e-10);
+    }
+
+    #[test]
+    fn complementary_pure_state_reductions_have_equal_entropy() {
+        let a = 1.0 / 2.0_f64.sqrt();
+        let mut state = vec![Complex64::new(0.0, 0.0); 8];
+        state[0] = Complex64::new(a, 0.0);
+        state[7] = Complex64::new(a, 0.0);
+        let left = DensityMatrix::from_pure_state(&state, 3, &[0], TOL).unwrap();
+        let right = DensityMatrix::from_pure_state(&state, 3, &[1, 2], TOL).unwrap();
+        assert!((left.von_neumann_entropy(TOL).unwrap()
+            - right.von_neumann_entropy(TOL).unwrap()).abs() < 1e-10);
     }
 
     #[test]
