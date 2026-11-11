@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rob-fep-thermo-001/fixtures/realtime_cognition_v0_1.schema.json",
+  "title": "ROB-REALTIME-COGNITION-001 synthetic known answers v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "const": "ROB-REALTIME-COGNITION-001"
+    },
+    "status": {
+      "const": "synthetic_known_answers_only"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "nullable_number": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "environment_advances_during_compute",
+        "wall_clock_measured",
+        "wall_clock_latency_ms",
+        "simulation_time_ms",
+        "action_deadline_ms",
+        "application_age_ms",
+        "proposal_valid_until_ms",
+        "clock_age_upper_bound_ms",
+        "world_speed_m_per_s",
+        "compute_energy_j",
+        "temperature_before_c",
+        "temperature_after_c",
+        "temperature_limit_c",
+        "direct_policy_latency_ms",
+        "direct_policy_energy_j",
+        "model_policy_latency_ms",
+        "model_policy_energy_j",
+        "direct_quality",
+        "model_quality",
+        "direct_safe",
+        "model_safe",
+        "intermediate_proposal_applied_ms",
+        "refined_proposal_applied_ms"
+      ],
+      "properties": {
+        "environment_advances_during_compute": {
+          "type": "boolean"
+        },
+        "wall_clock_measured": {
+          "type": "boolean"
+        },
+        "wall_clock_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "simulation_time_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "action_deadline_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "application_age_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "proposal_valid_until_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "clock_age_upper_bound_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "world_speed_m_per_s": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "compute_energy_j": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "temperature_before_c": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "temperature_after_c": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "temperature_limit_c": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "direct_policy_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "direct_policy_energy_j": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "model_policy_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "model_policy_energy_j": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "direct_quality": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "model_quality": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "direct_safe": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "model_safe": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "intermediate_proposal_applied_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "refined_proposal_applied_ms": {
+          "$ref": "#/$defs/nullable_number"
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "action_application_allowed",
+        "success_credit_allowed",
+        "selected_policy"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "upper_bound_only",
+            "stale_proposal_reject",
+            "eligible_for_independent_admission",
+            "deadline_miss",
+            "direct_policy_preferred_after_time_cost",
+            "intermediate_applied_refinement_rejected",
+            "deadline_miss_fallback_required",
+            "freshness_unknown",
+            "direct_policy_preferred_resource_dominance",
+            "real_time_evidence_unknown"
+          ]
+        },
+        "action_application_allowed": {
+          "type": "boolean"
+        },
+        "success_credit_allowed": {
+          "type": "boolean"
+        },
+        "selected_policy": {
+          "enum": [
+            "none",
+            "proposal",
+            "direct",
+            "intermediate",
+            "direct_fallback"
+          ]
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "RT01_FROZEN_WORLD_IS_UPPER_BOUND_ONLY",
+            "RT02_SLOW_PLAN_STALE_AT_APPLICATION",
+            "RT03_FAST_PLAN_REMAINS_FRESH",
+            "RT04_COMPUTE_MISSES_HARD_DEADLINE",
+            "RT05_MORE_ACCURATE_MODEL_LOSES_AFTER_WORLD_EVOLVES",
+            "RT06_ANYTIME_INTERMEDIATE_VALID_REFINEMENT_STALE",
+            "RT07_COMPUTE_THERMAL_THROTTLING_CAUSES_DEADLINE_MISS",
+            "RT08_CLOCK_UNCERTAINTY_MAKES_FRESHNESS_UNKNOWN",
+            "RT09_MODEL_NO_VALUE_ADD_AFTER_RESOURCE_CHARGE",
+            "RT10_SIMULATION_TIME_IS_NOT_WALL_CLOCK"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
