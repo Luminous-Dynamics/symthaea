@@ -81,6 +81,70 @@ pub struct SplitImportContext {
     pub arm_id: String,
 }
 
+
+/// One scenario entry from a successfully parsed, pinned training split.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TrainingParentScenario {
+    pub scenario_sha256: String,
+    pub task_name: String,
+    pub stage: RecoveryStage,
+    pub deviation: DeviationType,
+}
+
+/// Opaque parent frame emitted only by the split-manifest parser.
+///
+/// The private fields prevent callers from constructing an arbitrary "train
+/// frame" with a test ID or a hand-written scenario map. The parser still
+/// relies on its caller to obtain the split CSV and Git blob SHA from the
+/// pinned upstream commit; it does not download or re-hash external artifacts.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PinnedTrainingParentFrame {
+    source_repository: String,
+    source_revision: String,
+    split_manifest_blob_sha: String,
+    entries: BTreeMap<String, TrainingParentScenario>,
+}
+
+impl PinnedTrainingParentFrame {
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn get(&self, sample_id: &str) -> Option<&TrainingParentScenario> {
+        self.entries.get(sample_id)
+    }
+
+    pub fn matches_source(
+        &self,
+        repository: &str,
+        revision: &str,
+        split_manifest_blob_sha: &str,
+    ) -> bool {
+        self.source_repository == repository
+            && self.source_revision == revision
+            && self.split_manifest_blob_sha == split_manifest_blob_sha
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fixture(
+        source_repository: &str,
+        source_revision: &str,
+        split_manifest_blob_sha: &str,
+        entries: BTreeMap<String, TrainingParentScenario>,
+    ) -> Self {
+        Self {
+            source_repository: source_repository.to_owned(),
+            source_revision: source_revision.to_owned(),
+            split_manifest_blob_sha: split_manifest_blob_sha.to_owned(),
+            entries,
+        }
+    }
+}
+
 /// A reproducible import result. Scenario source is Unknown because the upstream
 /// split CSV does not encode Natural / ActionPerturbed / HumanConstructed labels.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -89,6 +153,14 @@ pub struct ParsedSplitManifest {
     pub row_count: usize,
     pub group_counts: BTreeMap<StageTypeGroup, usize>,
     pub source_csv_header: String,
+    /// Present only for a successfully parsed training split.
+    pinned_training_parent_frame: Option<PinnedTrainingParentFrame>,
+}
+
+impl ParsedSplitManifest {
+    pub fn pinned_training_parent_frame(&self) -> Option<&PinnedTrainingParentFrame> {
+        self.pinned_training_parent_frame.as_ref()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -451,11 +523,38 @@ pub fn parse_pinned_split_csv(
         return Err(vec![SplitManifestIssue::InvalidScoreManifest(validation_issues)]);
     }
 
+    let pinned_training_parent_frame = if context.split == BenchmarkSplit::Train {
+        let entries = manifest
+            .scenarios
+            .iter()
+            .map(|scenario| {
+                (
+                    scenario.scenario_id.clone(),
+                    TrainingParentScenario {
+                        scenario_sha256: scenario.scenario_content_sha256.clone(),
+                        task_name: scenario.task_name.clone(),
+                        stage: scenario.stage,
+                        deviation: scenario.deviation,
+                    },
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        Some(PinnedTrainingParentFrame {
+            source_repository: manifest.source_repository.clone(),
+            source_revision: manifest.source_revision.clone(),
+            split_manifest_blob_sha: manifest.split_manifest_blob_sha.clone(),
+            entries,
+        })
+    } else {
+        None
+    };
+
     Ok(ParsedSplitManifest {
         manifest,
         row_count: expected,
         group_counts,
         source_csv_header: header.to_owned(),
+        pinned_training_parent_frame,
     })
 }
 
@@ -842,6 +941,37 @@ mod tests {
             SplitManifestIssue::InvalidScoreManifest(manifest_issues)
                 if manifest_issues.contains(&ManifestIssue::InvalidPolicyDigest)
         )));
+    }
+
+
+    #[test]
+    fn training_parent_frame_is_emitted_from_parsed_train_split_only() {
+        let csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Train, false);
+        let parsed = parse_pinned_split_csv(
+            &csv,
+            context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Train),
+        ).unwrap();
+
+        let frame = parsed.pinned_training_parent_frame().unwrap();
+        assert_eq!(frame.len(), 800);
+        assert!(frame.matches_source(
+            ROBORECOVER_SOURCE_REPOSITORY,
+            ROBORECOVER_SOURCE_REVISION,
+            pinned_split_blob_sha(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Train),
+        ));
+        let first = parsed.manifest.scenarios.first().unwrap();
+        let parent = frame.get(&first.scenario_id).unwrap();
+        assert_eq!(parent.scenario_sha256, first.scenario_content_sha256);
+        assert_eq!(parent.task_name, first.task_name);
+        assert_eq!(parent.stage, first.stage);
+        assert_eq!(parent.deviation, first.deviation);
+
+        let test_csv = synthetic_csv(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test, true);
+        let parsed_test = parse_pinned_split_csv(
+            &test_csv,
+            context(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Test),
+        ).unwrap();
+        assert!(parsed_test.pinned_training_parent_frame().is_none());
     }
 
 }
