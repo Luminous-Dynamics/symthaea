@@ -68,7 +68,7 @@ Each exact mission interval must have a corresponding upstream slice. The slice 
 - SOC and temperature support domain;
 - conservative lower bound for pack discharge power;
 - conservative lower bound for pack charge acceptance;
-- complete cell population with SOC lower/upper, temperature upper and voltage lower/upper bounds.
+- complete cell population with SOC lower/upper, temperature lower/upper and voltage lower/upper bounds.
 
 The capability slices may originate from synthetic known truth for software tests or an upstream qualified physical model. A model input classified as QUALIFIED_PHYSICAL_MODEL is **not independently revalidated by this evaluator**; the output says so explicitly.
 
@@ -112,7 +112,7 @@ The report includes `battery_energy_accounting_complete`. If any interval is mis
 
 For every declared cell and every time slice, compare its supplied conservative trajectory bounds against:
 - mission minimum/maximum SOC;
-- mission maximum temperature;
+- mission maximum temperature (which may be below 0 °C for cold-soak missions);
 - mission minimum/maximum voltage;
 - the model's declared SOC and temperature support domain.
 
@@ -190,6 +190,8 @@ For a binary false-feasible endpoint, use a one-sided exact binomial confidence 
 A small synthetic fixture pass does not validate physical model accuracy or safety.
 
 ## Research and standards context
+
+SAE J1634's current 2026 revision is **J1634_202604**, revised 13 April 2026. It defines light-duty BEV whole-vehicle energy/range test procedures using UDDS/HFEDS and supplementary US06/SC03/cold-FTP cycles. These profiles are useful whole-vehicle baselines; a battery-only capability report must not be presented as a J1634 range result: https://doi.org/10.4271/J1634_202604
 
 Le (28 September 2026), *Beyond standard battery testing: a physics-informed framework for validating next-generation battery packs*, proposes a progression from protocol-oriented to stress-, mechanism-, physics-informed and predictive validation. Its practical direction is application-specific duty cycles, coupled physical loads, distributed sensing and mechanism-relevant metrics. This supports extending standardized testing rather than claiming to replace it:
 https://doi.org/10.3389/fbael.2026.1966110
