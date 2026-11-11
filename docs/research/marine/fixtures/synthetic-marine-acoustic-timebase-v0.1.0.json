@@ -1,0 +1,133 @@
+{
+  "schema_version": "0.1.0",
+  "record_id": "SYNTHETIC-ACOUSTIC-TRIAL-0001",
+  "record_status": "synthetic",
+  "standard_id": "ISO 17208-1:2016",
+  "standard_amendments": [
+    "Amendment 1:2024"
+  ],
+  "metric_kind": "radiated_noise_level",
+  "vessel": {
+    "identity": {
+      "id": "SYNTHETIC-CARGO-001",
+      "revision": "A"
+    },
+    "length_overall_m": 180
+  },
+  "service_fingerprint": "e3ec23f5308213b6d7ea3743e6cf483623436bec5384e29d3044d525d736fca9",
+  "test_site": {
+    "site_id": "SYNTHETIC-DEEP-SEA-TEST-SITE",
+    "water_depth_m": 320,
+    "water_depth_method": "surveyed",
+    "seabed_description": "synthetic fixture only"
+  },
+  "measurement_window": {
+    "start": "2026-10-15T10:00:00Z",
+    "end": "2026-10-15T10:01:00Z"
+  },
+  "hydrophone": {
+    "instrument_identity": {
+      "id": "SYNTHETIC-HYDROPHONE-001",
+      "revision": "A"
+    },
+    "calibration_record_id": "SYNTHETIC-CAL-001",
+    "calibration_provider": "Synthetic calibration provider",
+    "calibration_certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "calibration_rights_status": "unknown",
+    "calibration_valid_from": "2026-10-01T00:00:00Z",
+    "calibration_valid_until": "2027-10-01T00:00:00Z",
+    "calibration_frequency_min_hz": 10,
+    "calibration_frequency_max_hz": 20000,
+    "calibration_uncertainty_db": 0.5
+  },
+  "operating_condition": {
+    "loading_condition": "design",
+    "speed_through_water_kn": 12,
+    "shaft_power_kw": 2800,
+    "shaft_rpm": 85,
+    "draft_m": 9,
+    "trim_m": 0.2,
+    "rudder_angle_deg": 1.5,
+    "significant_wave_height_m": 1.2,
+    "wind_speed_kn": 8,
+    "wind_from_bow_deg": 35,
+    "wind_assist_installation": "installed",
+    "wind_device_states": [
+      {
+        "device_id": "WAPS-001",
+        "commanded_state": "active",
+        "achieved_state": "active"
+      }
+    ]
+  },
+  "measurement_geometry": {
+    "hydrophone_depth_m": 25,
+    "source_depth_m": 7,
+    "range_at_closest_point_of_approach_m": 450,
+    "closest_point_of_approach_bearing_deg": 90,
+    "aspect": "broadside"
+  },
+  "sample_window": {
+    "sample_rate_hz": 48000,
+    "expected_sample_count": 2880000,
+    "observed_sample_count": 2880000,
+    "missing_sample_count": 0,
+    "minimum_observed_fraction": 0.99,
+    "window_semantics": "start_inclusive_end_exclusive"
+  },
+  "ambient_reference": {
+    "record_id": "SYNTHETIC-AMBIENT-001",
+    "standard_id": "ISO 7605:2025",
+    "raw_trace_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "measurement_window": {
+      "start": "2026-10-15T09:55:00Z",
+      "end": "2026-10-15T09:56:00Z"
+    },
+    "limitations": [
+      "Synthetic background reference; not field ambient data."
+    ]
+  },
+  "raw_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "spectral_bands": [
+    {
+      "band_type": "one_third_octave",
+      "lower_frequency_hz": 56.1,
+      "centre_frequency_hz": 63,
+      "upper_frequency_hz": 70.7,
+      "rms_sound_pressure_level_db_re_1upa": 121,
+      "expanded_uncertainty_db": 1.2,
+      "coverage_factor": 2
+    },
+    {
+      "band_type": "one_third_octave",
+      "lower_frequency_hz": 112.2,
+      "centre_frequency_hz": 125,
+      "upper_frequency_hz": 140.3,
+      "rms_sound_pressure_level_db_re_1upa": 119.5,
+      "expanded_uncertainty_db": 1.2,
+      "coverage_factor": 2
+    },
+    {
+      "band_type": "one_third_octave",
+      "lower_frequency_hz": 224.5,
+      "centre_frequency_hz": 250,
+      "upper_frequency_hz": 280.6,
+      "rms_sound_pressure_level_db_re_1upa": 116,
+      "expanded_uncertainty_db": 1.3,
+      "coverage_factor": 2
+    },
+    {
+      "band_type": "one_third_octave",
+      "lower_frequency_hz": 449,
+      "centre_frequency_hz": 500,
+      "upper_frequency_hz": 561.2,
+      "rms_sound_pressure_level_db_re_1upa": 113,
+      "expanded_uncertainty_db": 1.4,
+      "coverage_factor": 2
+    }
+  ],
+  "limitations": [
+    "Entire record is synthetic software-test data.",
+    "No ecological-impact inference is permitted from this fixture."
+  ]
+}
