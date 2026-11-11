@@ -52,6 +52,10 @@ pub struct ObservedMeasurement {
     pub scope_ref: String,
     pub unit: String,
     pub measured_value: f64,
+    pub sensor_ref: String,
+    pub calibration_ref: String,
+    pub calibration_sha256: String,
+    pub measured_at_ms: u64,
     pub measurement_ref: String,
     pub measurement_sha256: String,
 }
@@ -65,6 +69,13 @@ pub struct Prediction {
     pub mission_report_ref: String,
     pub mission_report_sha256: String,
     pub evaluator_version: String,
+    pub model_artifact_ref: String,
+    pub model_artifact_sha256: String,
+    pub split_manifest_ref: String,
+    pub split_manifest_sha256: String,
+    pub evaluation_partition: String,
+    pub split_frozen_at_ms: u64,
+    pub prediction_frozen_at_ms: u64,
     pub disposition: String,
     pub required_measurements: Vec<RequiredMeasurement>,
 }
@@ -235,8 +246,15 @@ fn validate_case_structure(case: &ValidationCase) -> Vec<String> {
         || !nonempty(&prediction.mission_report_ref)
         || !is_sha256(&prediction.mission_report_sha256)
         || !nonempty(&prediction.evaluator_version)
+        || !nonempty(&prediction.model_artifact_ref)
+        || !is_sha256(&prediction.model_artifact_sha256)
+        || !nonempty(&prediction.split_manifest_ref)
+        || !is_sha256(&prediction.split_manifest_sha256)
+        || prediction.evaluation_partition != "TEST_BLIND"
+        || prediction.split_frozen_at_ms > prediction.prediction_frozen_at_ms
+        || prediction.prediction_frozen_at_ms >= reference.observed_at_ms
     {
-        errors.push("PREDICTION_IDENTITY_OR_DIGEST_INVALID".to_owned());
+        errors.push("PREDICTION_IDENTITY_SPLIT_OR_FREEZE_INVALID".to_owned());
     }
     if ![
         "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
@@ -299,7 +317,7 @@ fn validate_case_structure(case: &ValidationCase) -> Vec<String> {
     }
     if matches!(
         reference.outcome.as_str(),
-        "NON_BATTERY_ABORT" | "INCONCLUSIVE"
+        "BATTERY_CONSTRAINT_EXCEEDED" | "NON_BATTERY_ABORT" | "INCONCLUSIVE"
     ) && reference
         .outcome_reason
         .as_deref()
@@ -312,6 +330,11 @@ fn validate_case_structure(case: &ValidationCase) -> Vec<String> {
             || !nonempty(&observed.scope_ref)
             || !nonempty(&observed.unit)
             || !observed.measured_value.is_finite()
+            || !nonempty(&observed.sensor_ref)
+            || !nonempty(&observed.calibration_ref)
+            || !is_sha256(&observed.calibration_sha256)
+            || observed.measured_at_ms <= prediction.prediction_frozen_at_ms
+            || observed.measured_at_ms > reference.observed_at_ms
             || !nonempty(&observed.measurement_ref)
             || !is_sha256(&observed.measurement_sha256)
         {
