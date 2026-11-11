@@ -891,12 +891,27 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         }
 
         let remote_ok = match &application.request_id {
-            Some(request_id) => requests
-                .get(request_id.as_str())
-                .is_some_and(|request| request.admission == AdmissionDisposition::Admitted
-                    && request.response_stamp.as_ref().is_some_and(|response|
-                        response.sequence < chunk.stamp.sequence
-                            && response.tick <= request.expiry_tick)),
+            Some(request_id) => match requests.get(request_id.as_str()) {
+                Some(request) => {
+                    if request.admission != AdmissionDisposition::Admitted {
+                        false
+                    } else if application.stamp.tick > request.expiry_tick {
+                        push_finding(
+                            &mut findings,
+                            FindingSeverity::Invalid,
+                            "REMOTE_RESULT_APPLIED_AFTER_EXPIRY",
+                            &application.command_id,
+                        );
+                        false
+                    } else {
+                        request.response_stamp.as_ref().is_some_and(|response| {
+                            response.sequence < chunk.stamp.sequence
+                                && response.tick <= request.expiry_tick
+                        })
+                    }
+                }
+                None => false,
+            },
             None => true,
         };
 
@@ -1271,6 +1286,36 @@ mod tests {
         let report = replay_mission(&trace);
         assert_eq!(report.disposition, ReplayDisposition::Rejected);
         assert!(has_finding(&report, "REMOTE_RESPONSE_CAUSAL_OR_EXPIRY_VIOLATION"));
+    }
+
+    #[test]
+    fn remote_result_cannot_be_applied_after_expiry_even_if_it_arrived_on_time() {
+        let mut trace = valid_trace();
+        trace.remote_requests.push(RemoteInferenceRecord {
+            request_id: "request-1".to_owned(),
+            request_stamp: stamp("event-r1", 3, 1, 112),
+            admission: AdmissionDisposition::Admitted,
+            response_stamp: Some(stamp("event-r2", 4, 2, 140)),
+            response_model_digest: "loss-model-sha256".to_owned(),
+            context_digest: "prefix-0".to_owned(),
+            expiry_tick: 2,
+        });
+        trace.chunks[0].request_id = Some("request-1".to_owned());
+        trace.chunks[0].stamp.sequence = 5;
+        trace.chunks[0].stamp.event_id = "event-3b".to_owned();
+        trace.assurance[0].stamp.sequence = 6;
+        trace.assurance[0].stamp.event_id = "event-4b".to_owned();
+        trace.applications[0].stamp.sequence = 7;
+        trace.applications[0].stamp.event_id = "event-5b".to_owned();
+        trace.applications[0].stamp.tick = 3;
+        trace.applications[0].request_id = Some("request-1".to_owned());
+        trace.physical_transitions[0].stamp.sequence = 8;
+        trace.physical_transitions[0].stamp.event_id = "event-6b".to_owned();
+        trace.terminal.as_mut().unwrap().stamp.sequence = 9;
+        trace.terminal.as_mut().unwrap().stamp.event_id = "event-7b".to_owned();
+        let report = replay_mission(&trace);
+        assert_eq!(report.disposition, ReplayDisposition::Rejected);
+        assert!(has_finding(&report, "REMOTE_RESULT_APPLIED_AFTER_EXPIRY"));
     }
 
     #[test]
