@@ -3116,6 +3116,73 @@ mod tests {
     }
 
     #[test]
+    fn exact_vector_field_equivariance_is_covariant_under_independent_state_and_output_bases() {
+        // State coordinates use D=[[1,1],[0,1]]; output coordinates use
+        // E=[[1,0],[1,2]]. The complex-square vector field is transformed as
+        // F'(X)=E F(D^-1 X), A'=D A D^-1, B'=E (2J) E^-1.
+        let state_change = nalgebra::Matrix2::new(1.0, 1.0, 0.0, 1.0);
+        let state_inverse = state_change.try_inverse().unwrap();
+        let output_change = nalgebra::Matrix2::new(1.0, 0.0, 1.0, 2.0);
+        let output_inverse = output_change.try_inverse().unwrap();
+        let rotation_generator = nalgebra::Matrix2::new(0.0, -1.0, 1.0, 0.0);
+        let state_generator =
+            state_change * rotation_generator * state_inverse;
+        let output_generator = output_change
+            * (2.0 * rotation_generator)
+            * output_inverse;
+        let metric = state_inverse.transpose() * state_inverse;
+        let transformed_action = crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "exact-so2-independent-state-basis".to_string(),
+            coordinate_basis_id: "state-XY".to_string(),
+            coordinate_names: vec!["X".to_string(), "Y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: metric
+                .row_iter()
+                .map(|row| row.iter().copied().collect())
+                .collect(),
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "J-prime".to_string(),
+                matrix: state_generator
+                    .row_iter()
+                    .map(|row| row.iter().copied().collect())
+                    .collect(),
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+        let output = output_representation(
+            "independent-output-basis",
+            &["w", "z"],
+            &["1", "1"],
+            "J-prime",
+            output_generator
+                .row_iter()
+                .map(|row| row.iter().copied().collect())
+                .collect(),
+        );
+        let transformed_field = vec![
+            sub(pow2("X"), mul(Expr::Const(2.0), mul(var("X"), var("Y")))),
+            sub(
+                add(pow2("X"), mul(Expr::Const(2.0), mul(var("X"), var("Y")))),
+                mul(Expr::Const(4.0), pow2("Y")),
+            ),
+        ];
+
+        let report = check_exact_vector_field_equivariance(
+            &transformed_field,
+            &transformed_action,
+            &output,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.generator_results[0].component_residual_term_counts, vec![0, 0]);
+        assert_eq!(report.state_coordinate_basis_id, "state-XY");
+        assert_eq!(report.output_representation.coordinate_basis_id, "output-basis");
+    }
+
+    #[test]
     fn exact_vector_field_equivariance_supports_scalar_output_with_distinct_dimension() {
         let scalar_output = vec![add(pow2("x"), pow2("y"))];
         let output = output_representation(
