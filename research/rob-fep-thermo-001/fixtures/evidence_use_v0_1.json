@@ -24,7 +24,8 @@
         "evsi": null,
         "selected_probe_cost": null,
         "fixed_baseline_evsi": null,
-        "projected_action_admissible": null
+        "projected_action_admissible": null,
+        "fixed_baseline_cost": null
       },
       "expected": {
         "gate_status": {
@@ -51,7 +52,8 @@
         "evsi": null,
         "selected_probe_cost": null,
         "fixed_baseline_evsi": null,
-        "projected_action_admissible": null
+        "projected_action_admissible": null,
+        "fixed_baseline_cost": null
       },
       "expected": {
         "gate_status": {
@@ -78,7 +80,8 @@
         "evsi": null,
         "selected_probe_cost": 0.5,
         "fixed_baseline_evsi": 0,
-        "projected_action_admissible": null
+        "projected_action_admissible": null,
+        "fixed_baseline_cost": null
       },
       "expected": {
         "gate_status": {
@@ -105,7 +108,8 @@
         "evsi": 0,
         "selected_probe_cost": 0.5,
         "fixed_baseline_evsi": 0,
-        "projected_action_admissible": null
+        "projected_action_admissible": null,
+        "fixed_baseline_cost": null
       },
       "expected": {
         "gate_status": {
@@ -132,7 +136,8 @@
         "evsi": 1,
         "selected_probe_cost": 0.8,
         "fixed_baseline_evsi": 1,
-        "projected_action_admissible": null
+        "projected_action_admissible": null,
+        "fixed_baseline_cost": 0.2
       },
       "expected": {
         "gate_status": {
@@ -159,7 +164,8 @@
         "evsi": 1.25,
         "selected_probe_cost": 0.25,
         "fixed_baseline_evsi": 0.25,
-        "projected_action_admissible": false
+        "projected_action_admissible": false,
+        "fixed_baseline_cost": 0.5
       },
       "expected": {
         "gate_status": {
@@ -186,7 +192,8 @@
         "evsi": 1.5,
         "selected_probe_cost": 0.25,
         "fixed_baseline_evsi": 0.2,
-        "projected_action_admissible": true
+        "projected_action_admissible": true,
+        "fixed_baseline_cost": 0.5
       },
       "expected": {
         "gate_status": {
@@ -213,7 +220,8 @@
         "evsi": null,
         "selected_probe_cost": 0.1,
         "fixed_baseline_evsi": null,
-        "projected_action_admissible": null
+        "projected_action_admissible": null,
+        "fixed_baseline_cost": null
       },
       "expected": {
         "gate_status": {
