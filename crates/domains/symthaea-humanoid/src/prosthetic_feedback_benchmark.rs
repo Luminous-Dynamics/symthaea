@@ -3,14 +3,14 @@
 //! Per-participant/session evaluation for prosthetic sensory cue recognition.
 //!
 //! This benchmark layer evaluates whether a participant correctly recognizes
-//! an expected semantic event under one fixed modality, codebook and session.
-//! It is intentionally separate from hand mechanics, task success, clinical
-//! outcomes and the physical haptic renderer.
+//! an expected semantic event under one fixed modality, information source,
+//! codebook and session. Modality (visual/audio/vibration) is distinct from the
+//! information conveyed (EMG intent, requested control, measured contact/force,
+//! or an estimated physical outcome). Never pool those source classes.
 //!
-//! Never pool different participants, sessions, modalities or mappings through
-//! this evaluator. Call it once per stratum and preserve the returned identity.
-//! Synthetic/simulated evidence is retained as such and cannot establish human
-//! sensory performance.
+//! It is intentionally separate from hand mechanics, task success, clinical
+//! outcomes and the physical haptic renderer. Synthetic/simulated evidence is
+//! retained as such and cannot establish human sensory performance.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -99,7 +99,7 @@ pub struct CueClassMetrics {
     pub f1: Option<f64>,
 }
 
-/// Metrics for exactly one participant × session × modality × mapping stratum.
+/// Metrics for exactly one participant × session × modality × information-source × mapping stratum.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FeedbackRecognitionSummaryV1 {
     pub participant_ref: String,
@@ -178,8 +178,9 @@ pub struct PairedFeedbackComparisonV1 {
 }
 
 /// Compare two conditions using exactly matched stimuli for one participant
-/// and session. Mapping IDs may differ because each modality can have its own
-/// user-configured codebook; both identities are retained in the output.
+/// and session. Conditions may differ by modality, information source, or
+/// mapping; all identities are retained in the output. The paired reference
+/// label must still represent the same preregistered event in both conditions.
 pub fn compare_paired_feedback_conditions(
     reference: &[FeedbackRecognitionTrialV1],
     candidate: &[FeedbackRecognitionTrialV1],
@@ -327,7 +328,7 @@ pub fn compare_paired_feedback_conditions(
 }
 
 /// Evaluate one immutable stratum. Callers must group data by participant,
-/// session, condition and mapping before invoking this function.
+/// session, condition, information source and mapping before invoking this function.
 pub fn evaluate_feedback_recognition(
     trials: &[FeedbackRecognitionTrialV1],
 ) -> Result<FeedbackRecognitionSummaryV1, FeedbackBenchmarkError> {
