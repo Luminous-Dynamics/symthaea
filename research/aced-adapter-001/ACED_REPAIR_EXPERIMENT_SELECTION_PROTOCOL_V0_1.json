@@ -321,5 +321,40 @@
     "caveat": "Brier score combines reliability/calibration, resolution/discrimination and outcome uncertainty; it is not a pure calibration metric. Report reliability diagrams or a proper decomposition alongside proper scores where sample size permits.",
     "zero_probability": "An observed outcome assigned zero forecast probability remains an explicit infinite-log-loss event; do not silently clip.",
     "denominators": "Observed outcomes only for proper scores; failed/unknown attempts remain separately counted, not silently dropped."
+  },
+  "robust_model_uncertainty": {
+    "status": "implemented_reference_module_synthetic_tests_not_model_trial",
+    "module": "qualifier/src/robust_decision_value.rs",
+    "method": "Set-based lower-envelope EVSI across at least two predeclared plausible decision models. For each experiment, evaluate EVSI under every scenario and choose the experiment maximizing the minimum(EVSI - fixed_cost - declared_risk_penalty).",
+    "scenario_fields": [
+      "scenario_id",
+      "prior",
+      "action_utilities",
+      "experiments_and_outcome_likelihoods"
+    ],
+    "invariants": [
+      "scenario identities are unique and non-empty",
+      "each scenario declares the exact same experiment ID set",
+      "the same experiment has the same cost and risk exposure across scenarios",
+      "every scenario's priors, utility tables and likelihood distributions pass the existing selector validation",
+      "the remaining budget and risk aversion are finite and non-negative"
+    ],
+    "outputs": [
+      "scenario_count",
+      "minimum_evsi",
+      "maximum_evsi",
+      "minimum_scenario_net_value",
+      "maximum_scenario_net_value",
+      "mean_scenario_net_value_descriptive_only"
+    ],
+    "selection_policy": "No model probability is assigned to scenarios. The descriptive arithmetic mean must not be reported as expected value. Selection uses the worst-case net value and stops if no candidate clears the predeclared positive threshold.",
+    "preregistration": "Freeze the scenario set and its source before observing experiment outcomes. Derive the set from independent calibration, held-out parameter uncertainty or declared prior/likelihood/utility bounds. Report scenario coverage, sensitivity to set construction and worst-case outcomes.",
+    "limitations": [
+      "Finite declared scenario set only; no guarantee outside it.",
+      "May be conservative; compare as a separate arm against nominal EVSI and EIG.",
+      "Requires utility scales to be commensurate across scenarios.",
+      "Does not solve sequential multi-stage planning or general POMDPs.",
+      "Synthetic module tests are not ACED results."
+    ]
   }
 }
