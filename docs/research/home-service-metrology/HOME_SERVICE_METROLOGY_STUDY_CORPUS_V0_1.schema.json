@@ -26,8 +26,8 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 36,
-      "maxItems": 36,
+      "minItems": 40,
+      "maxItems": 40,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -93,7 +93,11 @@
               "cluster_nesting_declared",
               "analysis_preregistered",
               "all_variance_strata_separately_reported",
-              "no_unplanned_product_revision_mixing"
+              "no_unplanned_product_revision_mixing",
+              "laboratory_scope_schedule_current",
+              "proficiency_assessment_applicability_resolved",
+              "proficiency_evidence_not_substituted_for_reproducibility",
+              "method_edition_current"
             ],
             "properties": {
               "primary_endpoint_defined": {
@@ -211,6 +215,18 @@
                 "type": "boolean"
               },
               "no_unplanned_product_revision_mixing": {
+                "type": "boolean"
+              },
+              "laboratory_scope_schedule_current": {
+                "type": "boolean"
+              },
+              "proficiency_assessment_applicability_resolved": {
+                "type": "boolean"
+              },
+              "proficiency_evidence_not_substituted_for_reproducibility": {
+                "type": "boolean"
+              },
+              "method_edition_current": {
                 "type": "boolean"
               }
             }
