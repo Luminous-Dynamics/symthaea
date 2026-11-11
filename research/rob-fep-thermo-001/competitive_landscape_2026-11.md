@@ -316,3 +316,8 @@ The new action commitment benchmark (#11581) now compares against four distinct 
 These results are task/training/hardware-specific. They should not be combined into a cross-paper ranking. The Luminous research question is narrower: do physical hard bounds and observation-constrained viability give a better committed-prefix horizon than fixed K, task-progress monitoring, or model-architecture-specific chunking on a matched platform/task?
 
 The reference formula is a minimum over qualified integer caps—not a composite score. Any Unknown/stale/mismatched required cap blocks new-prefix eligibility; the output never grants actuation authority.
+
+
+### Adaptive horizon composition conditions
+
+The #11581 minimum-of-bounds reference is only sound when all qualified caps refer to the same state/action/model/uncertainty/clock/control-period context and each cap is prefix-closed over every intermediate tick. The 17-case corpus contains explicit mixed-context and non-prefix-closed negative controls. These prevent a superficially safe minimum from combining incompatible evidence or hiding an intermediate constraint violation.
