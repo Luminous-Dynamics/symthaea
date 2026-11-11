@@ -91,3 +91,12 @@ The fixtures cover onboard baseline, remote deadline loss, stale returned observ
 ## Claim boundary
 
 A passing fixture establishes only the finite synthetic placement disposition. It does not qualify a real network, cloud provider, endpoint identity, privacy/security posture, clock synchronization, energy boundary, hardware thermal model or robot. Remote results never receive actuation authority.
+
+
+### Energy-boundary and endpoint-authentication negatives
+
+The corpus now includes two additional adversarial cases:
+- DI16 rejects an otherwise fresh/model-matched result from an unauthenticated remote endpoint.
+- DI17 allows a timely result to proceed only to local projection while refusing a whole-system energy claim when edge/cloud and network energy are unmeasured.
+
+The schema requires `whole_system_energy_boundary_complete`. A complete comparison also requires the remote whole-system energy and an onboard baseline; an incomplete boundary forces whole-system energy to remain null/Unknown. The three synthetic accounting cases distinguish equal whole-system energy, a whole-system benefit, and improved robot battery draw with worse total system energy. They are arithmetic semantics, not physical measurements.
