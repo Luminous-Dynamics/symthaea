@@ -2164,22 +2164,61 @@ pub fn evaluate_metric_aware_vector_field_equivariance(
                 continue;
             };
 
+            // Both sides of DF(x) A x = A F(x) are linear in A and
+            // homogeneous of degree one in the pair (x, F(x)). Divide A by
+            // one common matrix scale and x/F(x) by one common state/field
+            // scale before multiplication. This preserves the relative defect
+            // while preventing finite inputs from overflowing in A*x or A*F.
+            let generator_scale = generator
+                .matrix
+                .iter()
+                .flatten()
+                .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+            let state_field_scale = sample
+                .iter()
+                .chain(evaluated.values.iter())
+                .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+            if generator_scale == 0.0 || !generator_scale.is_finite() {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                sample_relative_defects.push(None);
+                continue;
+            }
+            let state_field_scale = if state_field_scale == 0.0 {
+                1.0
+            } else {
+                state_field_scale
+            };
+
             let mut orbit_tangent = vec![0.0_f64; dimension];
             let mut pushed_forward_field = vec![0.0_f64; dimension];
             let mut derivative_along_orbit = vec![0.0_f64; dimension];
 
             for (row_index, generator_row) in generator.matrix.iter().enumerate() {
                 for (column_index, coefficient) in generator_row.iter().enumerate() {
-                    orbit_tangent[row_index] += coefficient * sample[column_index];
-                    pushed_forward_field[row_index] += coefficient * evaluated.values[column_index];
+                    let normalized_coefficient = coefficient / generator_scale;
+                    orbit_tangent[row_index] += normalized_coefficient
+                        * (sample[column_index] / state_field_scale);
+                    pushed_forward_field[row_index] += normalized_coefficient
+                        * (evaluated.values[column_index] / state_field_scale);
                 }
             }
+
+            // A second common scale for the Jacobian and push-forward terms
+            // keeps DF*x products bounded. Both compared vectors are divided
+            // by exactly the same positive factor.
+            let jacobian_scale = evaluated
+                .jacobian
+                .iter()
+                .flatten()
+                .fold(0.0_f64, |maximum, value| maximum.max(value.abs()))
+                .max(1.0);
             for (row_index, jacobian_row) in evaluated.jacobian.iter().enumerate() {
                 derivative_along_orbit[row_index] = jacobian_row
                     .iter()
                     .zip(orbit_tangent.iter())
-                    .map(|(derivative, tangent)| derivative * tangent)
+                    .map(|(derivative, tangent)| (derivative / jacobian_scale) * tangent)
                     .sum::<f64>();
+                pushed_forward_field[row_index] /= jacobian_scale;
             }
 
             if orbit_tangent.iter().any(|value| !value.is_finite())
@@ -2614,6 +2653,43 @@ mod tests {
             );
             assert!(report.generator_results[0].maximum_relative_defect < 1.0e-14);
         }
+    }
+
+    #[test]
+    fn vector_field_equivariance_is_scale_safe_for_large_generator_and_state() {
+        let generator_scale = 1.0e160;
+        let action = crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "large-scale-so2".to_string(),
+            coordinate_basis_id: "xy-large".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "large-J".to_string(),
+                matrix: vec![
+                    vec![0.0, -generator_scale],
+                    vec![generator_scale, 0.0],
+                ],
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+        let report = evaluate_metric_aware_vector_field_equivariance(
+            &rotational_vector_field(),
+            &action,
+            &[vec![2.0e150, 1.0e150]],
+            &[],
+            MetricAwareVectorFieldEquivarianceProfileV1 {
+                maximum_samples: 1,
+                minimum_informative_samples_per_generator: 1,
+                ..MetricAwareVectorFieldEquivarianceProfileV1::default()
+            },
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.generator_results[0].invalid_sample_count, 0);
+        assert!(report.generator_results[0].maximum_relative_defect < 1.0e-14);
     }
 
     #[test]
