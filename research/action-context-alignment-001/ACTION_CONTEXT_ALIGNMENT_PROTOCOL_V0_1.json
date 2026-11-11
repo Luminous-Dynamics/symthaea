@@ -49,5 +49,10 @@
     "CriticalToolFailure",
     "ConflictingEvidence",
     "EmergentRisk"
+  ],
+  "policy_visibility": [
+    "fixture_id, pair_id, pair_member, mutation_dimension and expected_disposition are evaluator-only metadata and must not be shown to candidate agents",
+    "the policy-visible runtime event is the observation content bound by an opaque observation reference, not the evaluator's trigger label",
+    "hidden holdout pair identities and expected outcomes remain inaccessible until scoring"
   ]
 }
