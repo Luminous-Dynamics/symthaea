@@ -779,6 +779,7 @@ mod tests {
             gpu_micros: 10,
             memory_bandwidth_units: 10,
             network_bytes: 10,
+            kv_cache_growth_tokens: 10,
         };
         let report = admit_batch(
             SchedulerPolicy::Luminous,
@@ -826,6 +827,7 @@ mod tests {
                 gpu_micros: 0,
                 memory_bandwidth_units: 0,
                 network_bytes: 0,
+                kv_cache_growth_tokens: 0,
             }, &[floor]).unwrap();
         assert!(!report.service_floors_met);
         assert_eq!(report.service_floor_violations, vec!["r1"]);
@@ -876,6 +878,7 @@ mod tests {
             gpu_micros: 100,
             memory_bandwidth_units: 100,
             network_bytes: 100,
+            kv_cache_growth_tokens: 100,
         };
         let report = admit_batch(
             SchedulerPolicy::RoundRobin,
@@ -916,6 +919,7 @@ mod tests {
             gpu_micros: 10,
             memory_bandwidth_units: 20,
             network_bytes: 20,
+            kv_cache_growth_tokens: 10,
         };
         let report = admit_batch(
             SchedulerPolicy::EvsiPerCompute,
@@ -939,6 +943,7 @@ mod tests {
             gpu_micros: 10,
             memory_bandwidth_units: 10,
             network_bytes: 10,
+            kv_cache_growth_tokens: 10,
         };
         let report = admit_batch(
             SchedulerPolicy::EarliestDeadlineFirst,
@@ -959,6 +964,7 @@ mod tests {
             gpu_micros: 10,
             memory_bandwidth_units: 10,
             network_bytes: 10,
+            kv_cache_growth_tokens: 10,
         };
         let report = admit_batch(
             SchedulerPolicy::RoundRobin,
