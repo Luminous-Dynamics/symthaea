@@ -160,9 +160,9 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     /// Full-note match plus MIDI velocity within the configured tolerance.
     pub velocity_aware_full_note_metrics: Option<MidiTranscriptionMetricV1>,
     /// Framewise pitch activity; simultaneous same-pitch notes collapse into one active cell.
-    pub frame_pitch_metrics: MidiTranscriptionMetricV1,
+    pub frame_pitch_metrics: Option<MidiTranscriptionMetricV1>,
     /// Framewise GM-program/pitch activity; not a persistent instrument identity metric.
-    pub frame_program_pitch_metrics: MidiTranscriptionMetricV1,
+    pub frame_program_pitch_metrics: Option<MidiTranscriptionMetricV1>,
     pub frame_step_ms: u16,
     pub velocity_error: Option<MidiTranscriptionValueErrorSummaryV1>,
     pub onset_error_ms: MidiTranscriptionTimingErrorSummaryV1,
@@ -232,8 +232,8 @@ struct ReportCommitmentV1<'a> {
     exact_program_onset_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_full_note_metrics: &'a MidiTranscriptionMetricV1,
     velocity_aware_full_note_metrics: &'a Option<MidiTranscriptionMetricV1>,
-    frame_pitch_metrics: &'a MidiTranscriptionMetricV1,
-    frame_program_pitch_metrics: &'a MidiTranscriptionMetricV1,
+    frame_pitch_metrics: &'a Option<MidiTranscriptionMetricV1>,
+    frame_program_pitch_metrics: &'a Option<MidiTranscriptionMetricV1>,
     frame_step_ms: u16,
     velocity_error: &'a Option<MidiTranscriptionValueErrorSummaryV1>,
     onset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
@@ -263,6 +263,11 @@ fn validate_config(
     if config.pitch_tolerance_cents > 1_200 {
         return Err(MidiTranscriptionEvaluationIssueV1::InvalidConfig {
             field: "pitch_tolerance_cents".into(),
+        });
+    }
+    if config.velocity_tolerance > 127 {
+        return Err(MidiTranscriptionEvaluationIssueV1::InvalidConfig {
+            field: "velocity_tolerance".into(),
         });
     }
     if config.velocity_tolerance > 127 {
@@ -1599,22 +1604,39 @@ pub fn evaluate_midi_transcription_v1(
         })
         .collect();
 
-    let (reference_pitch_frames, reference_program_frames) =
-        frame_activation_sets(&reference_notes, config.frame_step_ms)?;
-    let (prediction_pitch_frames, prediction_program_frames) =
-        frame_activation_sets(&predicted_notes, config.frame_step_ms)?;
-    let frame_pitch_true_positives = reference_pitch_frames
-        .intersection(&prediction_pitch_frames)
-        .count();
-    let frame_program_true_positives = reference_program_frames
-        .intersection(&prediction_program_frames)
-        .count();
+    // Frame occupancy requires known note releases. Do not score an
+    // unclosed prediction as if its missing tail did not exist.
+    let frame_metrics = if parsed.unclosed_note_count == 0 {
+        let (reference_pitch_frames, reference_program_frames) =
+            frame_activation_sets(&reference_notes, config.frame_step_ms)?;
+        let (prediction_pitch_frames, prediction_program_frames) =
+            frame_activation_sets(&predicted_notes, config.frame_step_ms)?;
+        let frame_pitch_true_positives = reference_pitch_frames
+            .intersection(&prediction_pitch_frames)
+            .count();
+        let frame_program_true_positives = reference_program_frames
+            .intersection(&prediction_program_frames)
+            .count();
+        Some((
+            metric_from_set_counts(
+                reference_pitch_frames.len(),
+                prediction_pitch_frames.len(),
+                frame_pitch_true_positives,
+            ),
+            metric_from_set_counts(
+                reference_program_frames.len(),
+                prediction_program_frames.len(),
+                frame_program_true_positives,
+            ),
+        ))
+    } else {
+        None
+    };
 
-    // Velocity MAE is measured on full-note matches, independently of the
-    // stricter velocity-aware match F1, so the error does not disappear when
-    // a transcriber gets the velocity wrong.
+    // Velocity MAE is measured on onset+pitch matched pairs, independently
+    // of the stricter velocity-aware full-note F1.
     let velocity_errors: Vec<_> = if config.velocity_metrics_enabled {
-        full_matching
+        onset_matching
             .iter()
             .map(|(reference_index, prediction_index)| {
                 (i16::from(predicted_notes[*prediction_index].velocity_midi)
@@ -1683,16 +1705,8 @@ pub fn evaluate_midi_transcription_v1(
                 matching.len(),
             )
         }),
-        frame_pitch_metrics: metric_from_set_counts(
-            reference_pitch_frames.len(),
-            prediction_pitch_frames.len(),
-            frame_pitch_true_positives,
-        ),
-        frame_program_pitch_metrics: metric_from_set_counts(
-            reference_program_frames.len(),
-            prediction_program_frames.len(),
-            frame_program_true_positives,
-        ),
+        frame_pitch_metrics: frame_metrics.as_ref().map(|metrics| metrics.0.clone()),
+        frame_program_pitch_metrics: frame_metrics.as_ref().map(|metrics| metrics.1.clone()),
         frame_step_ms: config.frame_step_ms,
         velocity_error: config
             .velocity_metrics_enabled
@@ -2330,6 +2344,75 @@ mod tests {
                 field: "velocity_tolerance".into()
             }
         );
+    }
+
+    #[test]
+    fn frame_metrics_are_withheld_when_prediction_has_unclosed_notes() {
+        let reference = reference_artifact(&[(60, 0, 480)], 40);
+        let raw = {
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(b"MThd");
+            bytes.extend_from_slice(&6u32.to_be_bytes());
+            bytes.extend_from_slice(&1u16.to_be_bytes());
+            bytes.extend_from_slice(&1u16.to_be_bytes());
+            bytes.extend_from_slice(&MIDI_TRANSCRIPTION_TEST_PPQ.to_be_bytes());
+            let track = [0x00, 0xc0, 40, 0x00, 0x90, 60, 100, 0x00, 0xff, 0x2f, 0x00];
+            bytes.extend_from_slice(b"MTrk");
+            bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+            bytes.extend_from_slice(&track);
+            bytes
+        };
+        let report = evaluate_midi_transcription_v1(
+            &raw,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert!(report.frame_pitch_metrics.is_none());
+        assert!(report.frame_program_pitch_metrics.is_none());
+    }
+
+    #[test]
+    fn velocity_error_is_measured_for_onset_matches_even_when_offset_is_wrong() {
+        let notes = vec![(60, 0, 480)];
+        let reference = reference_artifact_with_velocity(&notes, 40, 100);
+        let prediction = build_midi_with_velocity(
+            &[(60, 0, 960)],
+            40,
+            &[(0, 500_000)],
+            40,
+        );
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            MidiTranscriptionEvaluationConfigV1 {
+                velocity_metrics_enabled: true,
+                ..default_config()
+            },
+        )
+        .unwrap();
+        assert_eq!(report.onset_pitch_metrics.f1, 1.0);
+        assert_eq!(report.full_note_metrics.f1, 0.0);
+        assert_eq!(report.velocity_error.as_ref().unwrap().sample_count, 1);
+        assert_eq!(
+            report.velocity_error.as_ref().unwrap().mean_absolute_error,
+            Some(60.0)
+        );
+    }
+
+    #[test]
+    fn empty_reference_is_a_valid_all_false_positive_evaluation_case() {
+        let reference = reference_artifact(&[], 40);
+        let prediction = build_midi(&[(60, 0, 480)], 40, &[(0, 500_000)]);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_note_count, 0);
+        assert_eq!(report.onset_pitch_metrics.true_positives, 0);
+        assert_eq!(report.onset_pitch_metrics.false_positives, 1);
     }
 
     #[test]
