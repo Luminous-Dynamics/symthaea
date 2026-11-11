@@ -232,7 +232,7 @@ fn check_channel_window_and_samples(
     let sample_rate_unit = channel.pointer("/sample_rate_hz/unit").and_then(Value::as_str);
     match (sample_rate, sample_rate_unit.and_then(frequency_to_hz)) {
         (Some(rate), Some(scale)) if rate.is_finite() && rate > 0.0 => {
-            let expected_count = (end.signed_duration_since(start).num_nanoseconds().unwrap_or(0) as f64)
+            let expected_count = (end.signed_duration_since(start.clone()).num_nanoseconds().unwrap_or(0) as f64)
                 / 1_000_000_000.0
                 * rate
                 * scale;
