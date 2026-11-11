@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use za_click_gesture_bench::{build_manifest, generate_fixture_bundle, render_timeline};
+use za_click_gesture_bench::{generate_fixture_bundle, render_timeline};
 
 fn main() {
     let output_dir = std::env::args_os()
