@@ -1,0 +1,57 @@
+name: EV mission capability evaluator v0.1
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_MISSION_CAPABILITY_V0_1.md"
+      - "schemas/transport/ev_mission_capability_v0_1.schema.json"
+      - "fixtures/ev_battery/mission_capability_v0_1.json"
+      - "tools/ev-mission-capability-evaluator/**"
+      - ".github/workflows/ev-mission-capability-evaluator.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-mission-capability-evaluator/Cargo.toml -- --check
+
+      - name: Run mission coverage, power, energy, thermal and evidence tests
+        run: cargo test --manifest-path tools/ev-mission-capability-evaluator/Cargo.toml
+
+      - name: Audit frozen mission capability corpus
+        run: |
+          cargo run --manifest-path tools/ev-mission-capability-evaluator/Cargo.toml -- \
+            --schema schemas/transport/ev_mission_capability_v0_1.schema.json \
+            --corpus fixtures/ev_battery/mission_capability_v0_1.json \
+            > "$RUNNER_TEMP/mission-capability-report.json"
+          jq -e '
+            .case_count == 10 and
+            .feasible_count == 3 and
+            .infeasible_count == 3 and
+            .not_computable_count == 1 and
+            .unsupported_domain_count == 1 and
+            .conflicting_evidence_count == 1 and
+            .rejected_input_count == 1 and
+            any(.cases[]; .case_id == "peak_passes_but_sustained_energy_fails" and
+              .disposition == "INFEASIBLE" and
+              .minimum_energy_remaining_above_reserve_kwh_lower < 0) and
+            any(.cases[]; .case_id == "external_energy_not_double_counted" and
+              .total_external_energy_kwh_not_credited == 10 and
+              .total_battery_discharge_energy_kwh_upper == 1) and
+            any(.cases[]; .case_id == "exact_reserve_boundary" and
+              .disposition == "FEASIBLE_WITHIN_DECLARED_ENVELOPE" and
+              .minimum_energy_remaining_above_reserve_kwh_lower == 0)
+          ' "$RUNNER_TEMP/mission-capability-report.json"
