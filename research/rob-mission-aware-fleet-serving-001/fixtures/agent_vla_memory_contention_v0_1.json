@@ -32,7 +32,8 @@
         "camera_deadline_slack_ticks": 25,
         "robot_worst_vla_starvation_ticks": 20,
         "robot_vla_starvation_cap_ticks": 40,
-        "local_control_reserved": true
+        "local_control_reserved": true,
+        "brain_turn_slack_ticks": 120
       },
       "expected": {
         "brain_admission": "throttle",
@@ -74,7 +75,8 @@
         "camera_deadline_slack_ticks": 20,
         "robot_worst_vla_starvation_ticks": 15,
         "robot_vla_starvation_cap_ticks": 30,
-        "local_control_reserved": true
+        "local_control_reserved": true,
+        "brain_turn_slack_ticks": 100
       },
       "expected": {
         "brain_admission": "reject",
@@ -116,7 +118,8 @@
         "camera_deadline_slack_ticks": 18,
         "robot_worst_vla_starvation_ticks": 5,
         "robot_vla_starvation_cap_ticks": 30,
-        "local_control_reserved": true
+        "local_control_reserved": true,
+        "brain_turn_slack_ticks": 100
       },
       "expected": {
         "brain_admission": "reject",
@@ -141,7 +144,7 @@
         "memory_camera_units": 25,
         "memory_vla_units": 20,
         "memory_brain_units": 35,
-        "kv_capacity_tokens": 1000,
+        "kv_capacity_tokens": 900,
         "kv_resident_tokens": 780,
         "kv_new_context_tokens": 160,
         "kv_eviction_prefill_ticks": 90,
@@ -158,7 +161,8 @@
         "camera_deadline_slack_ticks": 22,
         "robot_worst_vla_starvation_ticks": 18,
         "robot_vla_starvation_cap_ticks": 35,
-        "local_control_reserved": true
+        "local_control_reserved": true,
+        "brain_turn_slack_ticks": 50
       },
       "expected": {
         "brain_admission": "throttle",
@@ -182,7 +186,7 @@
         "memory_bandwidth_capacity_units": 100,
         "memory_camera_units": 20,
         "memory_vla_units": 25,
-        "memory_brain_units": 40,
+        "memory_brain_units": 60,
         "kv_capacity_tokens": 3000,
         "kv_resident_tokens": 1000,
         "kv_new_context_tokens": 300,
@@ -200,7 +204,8 @@
         "camera_deadline_slack_ticks": 20,
         "robot_worst_vla_starvation_ticks": 39,
         "robot_vla_starvation_cap_ticks": 40,
-        "local_control_reserved": true
+        "local_control_reserved": true,
+        "brain_turn_slack_ticks": 120
       },
       "expected": {
         "brain_admission": "reject",
@@ -242,7 +247,8 @@
         "camera_deadline_slack_ticks": 30,
         "robot_worst_vla_starvation_ticks": 25,
         "robot_vla_starvation_cap_ticks": 40,
-        "local_control_reserved": true
+        "local_control_reserved": true,
+        "brain_turn_slack_ticks": 120
       },
       "expected": {
         "brain_admission": "reject",
