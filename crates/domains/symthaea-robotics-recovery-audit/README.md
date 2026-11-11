@@ -18,7 +18,7 @@ It also rejects duplicate trial IDs, blank identity fields, malformed expected-t
     cargo test -p symthaea-robotics-recovery-audit
     cargo fmt --manifest-path crates/domains/symthaea-robotics-recovery-audit/Cargo.toml -- --check
 
-Forty-three unit tests are included across the audit kernel and RoboRecover scorer. They have not yet been executed in this environment. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
+Forty-four unit tests are included across the audit kernel and RoboRecover scorer. They have not yet been executed in this environment. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
 
 
 ## RoboRecover recovery scoring
@@ -42,7 +42,7 @@ The adapter uses source-specific completion rules:
 
 This distinction is necessary because the inspected RoboTwin source can emit `status=replay_already_done`, `infer_steps=0` and `eval_success_at_end=true`. Its source summary counts the raw boolean as success while its failed-files list includes the same row. The ambiguity is documented in [upstream RoboRecover issue #2](https://github.com/RUCKBReasoning/RoboRecover/issues/2). That issue's constructed reproducer is not evidence that a published result was affected.
 
-The scorer therefore reports source environment completion, replay-preempted rows, policy-attributable recovery, unknown outcomes and contradictory outcomes separately. This is a policy-attribution clarification, not a claim that we have reproduced the paper's published leaderboard results. Full scenario data hosting and redistribution terms remain pending in the upstream repository.
+The scorer therefore reports source environment completion, replay-preempted rows, policy-attributable recovery, unknown outcomes and contradictory outcomes separately. It also reports known policy non-completions separately. Its nested `identity_audit` is the low-level trial-ID/expected-manifest audit; `accepted_trial_rows` is the stricter count after source revision, split, execution mode, checkpoint, evaluator and scenario-content matching. This is a policy-attribution clarification, not a claim that we have reproduced the paper's published leaderboard results. Full scenario data hosting and redistribution terms remain pending in the upstream repository.
 
 The nine Macro-9 groups are explicitly frozen in the manifest and matched to the paper's declared test groups. No group is inferred from whichever scenarios happened to execute. Missing, duplicate, unplanned, identity-invalid and metadata-mismatched trials remain failures in the planned denominator.
 
