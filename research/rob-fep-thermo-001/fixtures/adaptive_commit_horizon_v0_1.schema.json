@@ -36,8 +36,8 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 17,
-      "maxItems": 17,
+      "minItems": 19,
+      "maxItems": 19,
       "uniqueItems": true,
       "allOf": [
         {
@@ -294,6 +294,36 @@
           },
           "minContains": 1,
           "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH18_PACE_PHASE_BOUNDARY_CLIPPED_BY_THERMAL_LIMIT"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH19_CHUNKTRUST_PROPOSAL_CLIPPED_BY_VIABILITY"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
         }
       ],
       "items": {
@@ -448,19 +478,16 @@
       "additionalProperties": false,
       "required": [
         "bounds",
-        "progress_only_recommended_ticks",
         "executed_prefix_matches",
         "model_digest_matches",
         "minimum_commit_ticks",
-        "common_context_digest"
+        "common_context_digest",
+        "candidate_strategy",
+        "candidate_recommended_ticks"
       ],
       "properties": {
         "bounds": {
           "$ref": "#/$defs/bounds"
-        },
-        "progress_only_recommended_ticks": {
-          "type": "integer",
-          "minimum": 0
         },
         "executed_prefix_matches": {
           "type": "boolean"
@@ -475,6 +502,19 @@
         "common_context_digest": {
           "type": "string",
           "minLength": 1
+        },
+        "candidate_strategy": {
+          "enum": [
+            "fixed_k",
+            "progress_monitor",
+            "pace_phase_aware",
+            "chunktrust_action_evidence",
+            "model_planner"
+          ]
+        },
+        "candidate_recommended_ticks": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
