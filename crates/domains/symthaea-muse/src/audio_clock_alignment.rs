@@ -31,6 +31,8 @@ pub enum AudioClockAlignmentStatusV1 {
     AmbiguousCandidate,
     /// The MIDI artifact has too few distinct note-on times for this estimator.
     InsufficientOnsetDiversity,
+    /// The WAV does not contain enough of the expected onset sequence to estimate one global offset.
+    InsufficientAudioCoverage,
     /// No positive onset evidence was measured in the WAV.
     NoPositiveEvidence,
 }
@@ -492,6 +494,17 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
     else {
         return Err(vec![AudioClockAlignmentIssueV1::TooFewAudioFrames]);
     };
+    if matched_counts[best_index] < usize::from(config.minimum_unique_onsets) {
+        return profile_with_no_estimate(
+            midi,
+            wav_bytes,
+            wav.info,
+            config,
+            AudioClockAlignmentStatusV1::InsufficientAudioCoverage,
+            &expected_onsets,
+        )
+        .map_err(|issue| vec![issue]);
+    }
     let best_score = scores[best_index];
     let competing_score = scores
         .iter()
@@ -666,7 +679,6 @@ mod tests {
         bytes.extend_from_slice(&(tempo_track.len() as u32).to_be_bytes());
         bytes.extend_from_slice(&tempo_track);
         bytes.extend_from_slice(b"MTrk");
-        bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
         bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
         bytes.extend_from_slice(&track);
         bytes
@@ -863,6 +875,28 @@ mod tests {
         assert_eq!(
             profile.status,
             AudioClockAlignmentStatusV1::InsufficientOnsetDiversity
+        );
+        assert!(profile.audio_minus_midi_offset_frames.is_none());
+    }
+
+    #[test]
+    fn truncated_wav_cannot_estimate_from_only_a_subset_of_expected_onsets() {
+        let notes = irregular_notes();
+        let midi = artifact(&notes);
+        let wav = rendered_bursts(&notes[..2], 0, 48_000);
+        let profile = estimate_audio_minus_midi_clock_offset_v1(
+            &wav,
+            &midi,
+            AudioClockAlignmentConfigV1 {
+                minimum_offset_ms: -100,
+                maximum_offset_ms: 500,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            profile.status,
+            AudioClockAlignmentStatusV1::InsufficientAudioCoverage
         );
         assert!(profile.audio_minus_midi_offset_frames.is_none());
     }
