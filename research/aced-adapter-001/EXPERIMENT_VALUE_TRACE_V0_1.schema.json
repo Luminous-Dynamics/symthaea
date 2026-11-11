@@ -59,6 +59,7 @@
                 "additionalProperties": false,
                 "required": [
                   "experiment_id",
+                  "experiment_plan_sha256",
                   "belief_state_sha256",
                   "selector",
                   "predicted_outcome_distribution",
@@ -130,6 +131,10 @@
                   },
                   "predicted_selection_score": {
                     "type": "number"
+                  },
+                  "experiment_plan_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
                   }
                 }
               }
