@@ -297,3 +297,8 @@ Sources:
 - https://www.microsoft.com/en-us/research/publication/offload-or-overload-a-platform-measurement-study-of-mobile-robotic-manipulation-workloads/
 
 Implementation/evaluation owner: [Symthaea #11573](https://github.com/Luminous-Dynamics/symthaea/issues/11573).
+
+
+### Distributed inference claim boundary refinement
+
+The distributed-inference fixture corpus now requires an explicit whole-system energy-boundary completeness flag and an onboard baseline for a whole-system comparison. It also adds an unauthenticated-endpoint negative control. A remote result may be eligible for local projection while its whole-system energy benefit remains Unknown; endpoint identity, freshness and physical action admission are separate gates.
