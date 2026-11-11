@@ -17,6 +17,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 pub const REQUIRED_SAMPLE_COUNT: usize = 500;
 pub const OFFICIAL_MANIFEST_NAME: &str = "submission.jsonl";
+pub const MAX_OFFICIAL_MANIFEST_BYTES: usize = 1024 * 1024;
 pub const OFFICIAL_MANIFEST_MAX_BYTES: usize = 1024 * 1024;
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -180,6 +181,12 @@ pub fn export_submission_manifest(
         return Err(ExportError::new(format!(
             "submission.jsonl exceeds the official {}-byte manifest limit",
             OFFICIAL_MANIFEST_MAX_BYTES
+        )));
+    }
+    if manifest.len() > MAX_OFFICIAL_MANIFEST_BYTES {
+        return Err(ExportError::new(format!(
+            "official submission.jsonl exceeds the SDK 1 MiB limit: {} bytes",
+            manifest.len()
         )));
     }
     let manifest_sha256 = sha256_bytes(&manifest);
@@ -542,6 +549,17 @@ mod tests {
             let extended_id = format!("sample-{index:03}-{}", "x".repeat(2200));
             expected[index] = extended_id.clone();
             mappings[index].sample_id = extended_id;
+        }
+        assert!(export_submission_manifest(&expected, &mappings, &directory.0).is_err());
+    }
+
+    #[test]
+    fn rejects_manifest_larger_than_official_sdk_limit() {
+        let (directory, mut expected, mut mappings) = fixture();
+        for (index, (sample_id, mapping)) in expected.iter_mut().zip(mappings.iter_mut()).enumerate() {
+            let long_id = format!("{}-{index}", "x".repeat(2100));
+            *sample_id = long_id.clone();
+            mapping.sample_id = long_id;
         }
         assert!(export_submission_manifest(&expected, &mappings, &directory.0).is_err());
     }
