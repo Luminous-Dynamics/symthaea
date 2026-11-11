@@ -372,7 +372,8 @@ impl ComparativeBaselineModel {
         let between_system_variance =
             (between_observed_variance - average_group_sampling_variance).max(0.0);
 
-        let slope_variance = within_system_variance / sxx;
+        let slope_variance =
+            (within_system_variance + mean_control_measurement_variance) / sxx;
         let slope_standard_error = slope_variance.sqrt();
 
         let mut systems = BTreeMap::new();
