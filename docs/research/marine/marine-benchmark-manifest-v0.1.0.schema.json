@@ -490,6 +490,7 @@
             "BLOCKED",
             "INCOMPLETE",
             "INVALID",
+            "INCOMPARABLE",
             "OUT_OF_DOMAIN"
           ]
         }
