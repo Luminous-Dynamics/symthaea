@@ -184,8 +184,10 @@ pub struct ScenarioScore {
     pub deviation: DeviationType,
     pub expected_trials: usize,
     pub accepted_trial_rows: usize,
+    pub source_environment_completions: usize,
     pub policy_recovery_successes: usize,
     pub physical_safe_successes: usize,
+    pub source_environment_completion_rsr: f64,
     pub policy_recovery_rsr: f64,
     pub physical_safe_rsr: f64,
 }
@@ -194,6 +196,7 @@ pub struct ScenarioScore {
 pub struct GroupScore {
     pub group: StageTypeGroup,
     pub scenario_count: usize,
+    pub source_environment_completion_rsr: f64,
     pub policy_recovery_rsr: f64,
     pub physical_safe_rsr: f64,
 }
@@ -219,6 +222,10 @@ pub struct RoboRecoverScoreReport {
     pub audit: AuditReport,
     pub scenarios: Vec<ScenarioScore>,
     pub groups: Vec<GroupScore>,
+    /// Scenario-equal source-reported environment completion rate. May include replay preemption.
+    pub source_environment_completion_overall_rsr: f64,
+    /// Equal-weight mean of source environment-completion rates across Macro-9.
+    pub source_environment_completion_macro9_rsr: f64,
     /// Scenario-equal policy-attributable recovery RSR, excluding prefix replay.
     pub policy_recovery_overall_rsr: f64,
     /// Equal-weight mean across the nine occupied Stage–Type groups.
@@ -232,6 +239,7 @@ pub struct RoboRecoverScoreReport {
 #[derive(Default)]
 struct ScenarioAccumulator {
     accepted_trial_rows: usize,
+    source_environment_completions: usize,
     policy_recovery_successes: usize,
     physical_safe_successes: usize,
 }
@@ -413,6 +421,7 @@ pub fn score_roborecover(
 
         if source_reports_environment_completion(trial) == Some(true) {
             source_environment_completions += 1;
+            accumulator.source_environment_completions += 1;
         }
         match classify_policy_completion(trial) {
             PolicyCompletion::PolicyCompleted => {
@@ -447,8 +456,10 @@ pub fn score_roborecover(
             deviation: scenario.deviation,
             expected_trials: scenario.expected_trial_ids.len(),
             accepted_trial_rows: accumulator.accepted_trial_rows,
+            source_environment_completions: accumulator.source_environment_completions,
             policy_recovery_successes: accumulator.policy_recovery_successes,
             physical_safe_successes: accumulator.physical_safe_successes,
+            source_environment_completion_rsr: accumulator.source_environment_completions as f64 / denominator,
             policy_recovery_rsr: accumulator.policy_recovery_successes as f64 / denominator,
             physical_safe_rsr: accumulator.physical_safe_successes as f64 / denominator,
         });
@@ -457,6 +468,11 @@ pub fn score_roborecover(
     // Each scenario receives equal weight in the overall metric, irrespective
     // of how many repeated trials the frozen manifest assigns to it.
     let scenario_count = scenario_scores.len() as f64;
+    let source_environment_completion_overall_rsr = scenario_scores
+        .iter()
+        .map(|score| score.source_environment_completion_rsr)
+        .sum::<f64>()
+        / scenario_count;
     let policy_recovery_overall_rsr = scenario_scores
         .iter()
         .map(|score| score.policy_recovery_rsr)
@@ -477,6 +493,11 @@ pub fn score_roborecover(
             .filter(|score| score.stage == group.stage && score.deviation == group.deviation)
             .collect::<Vec<_>>();
         let member_count = members.len() as f64;
+        let group_source_environment = members
+            .iter()
+            .map(|score| score.source_environment_completion_rsr)
+            .sum::<f64>()
+            / member_count;
         let group_recovery = members
             .iter()
             .map(|score| score.policy_recovery_rsr)
@@ -491,11 +512,17 @@ pub fn score_roborecover(
         group_scores.push(GroupScore {
             group: *group,
             scenario_count: members.len(),
+            source_environment_completion_rsr: group_source_environment,
             policy_recovery_rsr: group_recovery,
             physical_safe_rsr: group_safe,
         });
     }
 
+    let source_environment_completion_macro9_rsr = group_scores
+        .iter()
+        .map(|score| score.source_environment_completion_rsr)
+        .sum::<f64>()
+        / 9.0;
     let policy_recovery_macro9_rsr = group_scores
         .iter()
         .map(|score| score.policy_recovery_rsr)
@@ -551,6 +578,8 @@ pub fn score_roborecover(
         audit,
         scenarios: scenario_scores,
         groups: group_scores,
+        source_environment_completion_overall_rsr,
+        source_environment_completion_macro9_rsr,
         policy_recovery_overall_rsr,
         policy_recovery_macro9_rsr,
         physical_safe_overall_rsr,
