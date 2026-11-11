@@ -45,6 +45,12 @@ This is the first deterministic reference baseline for Symthaea #11545. Compare 
 
 A positive result requires paired held-out improvement in Overall RSR and preservation of Macro-9 RSR, no increase in adverse outcomes, correct selective abstention under out-of-support contexts, and matched latency/compute. The router itself does not establish physical recovery; the RoboRecover audit/scorer or an equivalent independently reviewed evidence pipeline must produce its inputs.
 
+## Validation status
+
+- Twenty-one unit tests are included.
+- They have not been executed in this environment because rustc, cargo and rustfmt are unavailable here.
+- The workspace lockfile contains the new dependency-free package entry; exact-head CI/format/test evidence is still pending.
+
 ## Nonclaims
 
 This crate does not train a router, establish calibration, validate the cross-fit receipt, verify robot sensors, implement backtracking, control an arm, or certify any safety property. It is a deterministic selection baseline over supplied evidence.
