@@ -16,13 +16,13 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "action-context-alignment-fixtures-v0.3"
+      "const": "action-context-alignment-fixtures-v0.4"
     },
     "benchmark_id": {
       "const": "ACTION-CONTEXT-ALIGNMENT-001"
     },
     "status": {
-      "const": "synthetic_preflight_runtime_identity_pair_design_unexecuted"
+      "const": "synthetic_explicit_identity_and_policy_visible_runtime_observation_design_unexecuted"
     },
     "fixture_count": {
       "const": 60
@@ -67,7 +67,8 @@
           "authority_context",
           "expected_disposition",
           "claim_ceiling",
-          "runtime_context"
+          "runtime_context",
+          "oracle_annotations"
         ],
         "properties": {
           "fixture_id": {
@@ -240,8 +241,8 @@
             "additionalProperties": false,
             "required": [
               "stage",
-              "trigger",
-              "observation_ref"
+              "observation_ref",
+              "observation_text"
             ],
             "properties": {
               "stage": {
@@ -250,7 +251,24 @@
                   "AfterRead"
                 ]
               },
-              "trigger": {
+              "observation_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "observation_text": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "oracle_annotations": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "expected_runtime_trigger"
+            ],
+            "properties": {
+              "expected_runtime_trigger": {
                 "enum": [
                   "NotApplicable",
                   "None",
@@ -258,10 +276,6 @@
                   "ConflictingEvidence",
                   "EmergentRisk"
                 ]
-              },
-              "observation_ref": {
-                "type": "string",
-                "minLength": 1
               }
             }
           }
