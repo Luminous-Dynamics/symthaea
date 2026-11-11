@@ -736,7 +736,8 @@
   "candidate_metrics": [],
   "notes": [
     "This fixture is intentionally synthetic. All hashes and quantitative placeholders are not operational evidence.",
-    "Additional synthetic acoustic/propulsion channels exercise shared-timebase binding only; they are not physical vessel measurements."
+    "Additional synthetic acoustic/propulsion channels exercise shared-timebase binding only; they are not physical vessel measurements.",
+    "Additional synthetic propeller-state channels exercise dimensional reduction linkage only; no physical vessel, propeller or fluid measurements exist."
   ],
   "trial_evidence": {
     "trial_id": "SYNTHETIC-TRIAL-0001",
@@ -1255,6 +1256,426 @@
         "expected_sample_count": 60000,
         "observed_sample_count": 60000,
         "sample_rate_basis": "nominal"
+      },
+      {
+        "channel_id": "SYNTHETIC-PROPELLER-ADVANCE-VELOCITY-CHANNEL",
+        "physical_quantity": "propeller_advance_velocity",
+        "unit": "m/s",
+        "instrument_identity": {
+          "id": "SYNTHETIC-PROP-ADVANCE-001",
+          "revision": "A"
+        },
+        "measurement_location": "synthetic propeller operating-state reference location",
+        "sample_rate_hz": {
+          "value": 20,
+          "unit": "Hz",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical acquisition clock exists in this fixture."
+          }
+        },
+        "calibration_record_id": "SYNTHETIC-CAL-PROP-ADVANCE-001",
+        "calibration_status": "in_tolerance",
+        "timebase_id": "SYNTHETIC-ACOUSTIC-TIMEBASE-001",
+        "time_alignment_uncertainty": {
+          "value": 0.002,
+          "unit": "s",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical channel alignment exists in this fixture."
+          }
+        },
+        "sample_window_start": "2026-10-15T10:00:00Z",
+        "sample_window_end": "2026-10-15T10:01:00Z",
+        "expected_sample_count": 1200,
+        "observed_sample_count": 1200,
+        "missing_sample_count": 0,
+        "raw_trace_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No physical measurement uncertainty exists."
+        },
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+          "method": "hand-authored synthetic engineering fixture",
+          "limitations": [
+            "No physical ship, propeller, sensor, calibration or observation exists."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "limitations": [
+          "Synthetic software test data only."
+        ],
+        "sample_rate_basis": "nominal"
+      },
+      {
+        "channel_id": "SYNTHETIC-PROPELLER-THRUST-CHANNEL",
+        "physical_quantity": "propeller_thrust",
+        "unit": "N",
+        "instrument_identity": {
+          "id": "SYNTHETIC-PROP-THRUST-001",
+          "revision": "A"
+        },
+        "measurement_location": "synthetic propeller operating-state reference location",
+        "sample_rate_hz": {
+          "value": 100,
+          "unit": "Hz",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical acquisition clock exists in this fixture."
+          }
+        },
+        "calibration_record_id": "SYNTHETIC-CAL-PROP-THRUST-001",
+        "calibration_status": "in_tolerance",
+        "timebase_id": "SYNTHETIC-ACOUSTIC-TIMEBASE-001",
+        "time_alignment_uncertainty": {
+          "value": 0.002,
+          "unit": "s",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical channel alignment exists in this fixture."
+          }
+        },
+        "sample_window_start": "2026-10-15T10:00:00Z",
+        "sample_window_end": "2026-10-15T10:01:00Z",
+        "expected_sample_count": 6000,
+        "observed_sample_count": 6000,
+        "missing_sample_count": 0,
+        "raw_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No physical measurement uncertainty exists."
+        },
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+          "method": "hand-authored synthetic engineering fixture",
+          "limitations": [
+            "No physical ship, propeller, sensor, calibration or observation exists."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "limitations": [
+          "Synthetic software test data only."
+        ],
+        "sample_rate_basis": "nominal"
+      },
+      {
+        "channel_id": "SYNTHETIC-SHAFT-POWER-CHANNEL",
+        "physical_quantity": "shaft_power",
+        "unit": "kW",
+        "instrument_identity": {
+          "id": "SYNTHETIC-SHAFT-POWER-001",
+          "revision": "A"
+        },
+        "measurement_location": "synthetic propeller operating-state reference location",
+        "sample_rate_hz": {
+          "value": 100,
+          "unit": "Hz",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical acquisition clock exists in this fixture."
+          }
+        },
+        "calibration_record_id": "SYNTHETIC-CAL-SHAFT-POWER-001",
+        "calibration_status": "in_tolerance",
+        "timebase_id": "SYNTHETIC-ACOUSTIC-TIMEBASE-001",
+        "time_alignment_uncertainty": {
+          "value": 0.002,
+          "unit": "s",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical channel alignment exists in this fixture."
+          }
+        },
+        "sample_window_start": "2026-10-15T10:00:00Z",
+        "sample_window_end": "2026-10-15T10:01:00Z",
+        "expected_sample_count": 6000,
+        "observed_sample_count": 6000,
+        "missing_sample_count": 0,
+        "raw_trace_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No physical measurement uncertainty exists."
+        },
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+          "method": "hand-authored synthetic engineering fixture",
+          "limitations": [
+            "No physical ship, propeller, sensor, calibration or observation exists."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "limitations": [
+          "Synthetic software test data only."
+        ],
+        "sample_rate_basis": "nominal"
+      },
+      {
+        "channel_id": "SYNTHETIC-WATER-DENSITY-CHANNEL",
+        "physical_quantity": "water_density",
+        "unit": "kg/m3",
+        "instrument_identity": {
+          "id": "SYNTHETIC-WATER-DENSITY-001",
+          "revision": "A"
+        },
+        "measurement_location": "synthetic propeller operating-state reference location",
+        "sample_rate_hz": {
+          "value": 1,
+          "unit": "Hz",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical acquisition clock exists in this fixture."
+          }
+        },
+        "calibration_record_id": "SYNTHETIC-CAL-WATER-DENSITY-001",
+        "calibration_status": "in_tolerance",
+        "timebase_id": "SYNTHETIC-ACOUSTIC-TIMEBASE-001",
+        "time_alignment_uncertainty": {
+          "value": 0.002,
+          "unit": "s",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical channel alignment exists in this fixture."
+          }
+        },
+        "sample_window_start": "2026-10-15T10:00:00Z",
+        "sample_window_end": "2026-10-15T10:01:00Z",
+        "expected_sample_count": 60,
+        "observed_sample_count": 60,
+        "missing_sample_count": 0,
+        "raw_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No physical measurement uncertainty exists."
+        },
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+          "method": "hand-authored synthetic engineering fixture",
+          "limitations": [
+            "No physical ship, propeller, sensor, calibration or observation exists."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "limitations": [
+          "Synthetic software test data only."
+        ],
+        "sample_rate_basis": "nominal"
+      },
+      {
+        "channel_id": "SYNTHETIC-AMBIENT-PRESSURE-CHANNEL",
+        "physical_quantity": "ambient_static_pressure",
+        "unit": "Pa",
+        "instrument_identity": {
+          "id": "SYNTHETIC-AMBIENT-PRESSURE-001",
+          "revision": "A"
+        },
+        "measurement_location": "synthetic propeller operating-state reference location",
+        "sample_rate_hz": {
+          "value": 10,
+          "unit": "Hz",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical acquisition clock exists in this fixture."
+          }
+        },
+        "calibration_record_id": "SYNTHETIC-CAL-AMBIENT-PRESSURE-001",
+        "calibration_status": "in_tolerance",
+        "timebase_id": "SYNTHETIC-ACOUSTIC-TIMEBASE-001",
+        "time_alignment_uncertainty": {
+          "value": 0.002,
+          "unit": "s",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical channel alignment exists in this fixture."
+          }
+        },
+        "sample_window_start": "2026-10-15T10:00:00Z",
+        "sample_window_end": "2026-10-15T10:01:00Z",
+        "expected_sample_count": 600,
+        "observed_sample_count": 600,
+        "missing_sample_count": 0,
+        "raw_trace_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No physical measurement uncertainty exists."
+        },
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+          "method": "hand-authored synthetic engineering fixture",
+          "limitations": [
+            "No physical ship, propeller, sensor, calibration or observation exists."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "limitations": [
+          "Synthetic software test data only."
+        ],
+        "sample_rate_basis": "nominal"
+      },
+      {
+        "channel_id": "SYNTHETIC-WATER-VAPOUR-PRESSURE-CHANNEL",
+        "physical_quantity": "water_vapour_pressure",
+        "unit": "Pa",
+        "instrument_identity": {
+          "id": "SYNTHETIC-WATER-VAPOUR-001",
+          "revision": "A"
+        },
+        "measurement_location": "synthetic propeller operating-state reference location",
+        "sample_rate_hz": {
+          "value": 1,
+          "unit": "Hz",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical acquisition clock exists in this fixture."
+          }
+        },
+        "calibration_record_id": "SYNTHETIC-CAL-WATER-VAPOUR-001",
+        "calibration_status": "in_tolerance",
+        "timebase_id": "SYNTHETIC-ACOUSTIC-TIMEBASE-001",
+        "time_alignment_uncertainty": {
+          "value": 0.002,
+          "unit": "s",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+            "method": "hand-authored synthetic engineering fixture",
+            "limitations": [
+              "No physical ship, propeller, sensor, calibration or observation exists."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical channel alignment exists in this fixture."
+          }
+        },
+        "sample_window_start": "2026-10-15T10:00:00Z",
+        "sample_window_end": "2026-10-15T10:01:00Z",
+        "expected_sample_count": 60,
+        "observed_sample_count": 60,
+        "missing_sample_count": 0,
+        "raw_trace_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No physical measurement uncertainty exists."
+        },
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+          "method": "hand-authored synthetic engineering fixture",
+          "limitations": [
+            "No physical ship, propeller, sensor, calibration or observation exists."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "limitations": [
+          "Synthetic software test data only."
+        ],
+        "sample_rate_basis": "nominal"
       }
     ],
     "raw_dataset_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -1468,6 +1889,186 @@
         "evidence_source_id": "SYNTHETIC-ACOUSTIC-TIMEBASE-FIXTURE-ONLY",
         "rights_status": "not_applicable",
         "certificate_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "reviewer_id": "SYNTHETIC-REVIEWER-0001"
+      },
+      {
+        "calibration_record_id": "SYNTHETIC-CAL-PROP-ADVANCE-001",
+        "revision": "0.1.0",
+        "instrument_identity": {
+          "id": "SYNTHETIC-PROP-ADVANCE-001",
+          "revision": "A"
+        },
+        "physical_quantity": "propeller_advance_velocity",
+        "unit": "m/s",
+        "range_min": 0,
+        "range_max": 20,
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No calibration uncertainty exists in this synthetic fixture."
+        },
+        "calibration_date": "2026-10-01T00:00:00Z",
+        "valid_from": "2026-10-01T00:00:00Z",
+        "valid_until": "2027-10-01T00:00:00Z",
+        "disposition": "in_tolerance",
+        "calibration_provider": "synthetic fixture generator",
+        "traceability_reference": "not_applicable_synthetic",
+        "limitations": [
+          "Synthetic registry record, not metrology evidence."
+        ],
+        "calibration_method": "synthetic",
+        "evidence_source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+        "rights_status": "not_applicable",
+        "certificate_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "reviewer_id": "SYNTHETIC-REVIEWER-0001"
+      },
+      {
+        "calibration_record_id": "SYNTHETIC-CAL-PROP-THRUST-001",
+        "revision": "0.1.0",
+        "instrument_identity": {
+          "id": "SYNTHETIC-PROP-THRUST-001",
+          "revision": "A"
+        },
+        "physical_quantity": "propeller_thrust",
+        "unit": "N",
+        "range_min": 0,
+        "range_max": 1000000,
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No calibration uncertainty exists in this synthetic fixture."
+        },
+        "calibration_date": "2026-10-01T00:00:00Z",
+        "valid_from": "2026-10-01T00:00:00Z",
+        "valid_until": "2027-10-01T00:00:00Z",
+        "disposition": "in_tolerance",
+        "calibration_provider": "synthetic fixture generator",
+        "traceability_reference": "not_applicable_synthetic",
+        "limitations": [
+          "Synthetic registry record, not metrology evidence."
+        ],
+        "calibration_method": "synthetic",
+        "evidence_source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+        "rights_status": "not_applicable",
+        "certificate_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "reviewer_id": "SYNTHETIC-REVIEWER-0001"
+      },
+      {
+        "calibration_record_id": "SYNTHETIC-CAL-SHAFT-POWER-001",
+        "revision": "0.1.0",
+        "instrument_identity": {
+          "id": "SYNTHETIC-SHAFT-POWER-001",
+          "revision": "A"
+        },
+        "physical_quantity": "shaft_power",
+        "unit": "kW",
+        "range_min": 0,
+        "range_max": 10000,
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No calibration uncertainty exists in this synthetic fixture."
+        },
+        "calibration_date": "2026-10-01T00:00:00Z",
+        "valid_from": "2026-10-01T00:00:00Z",
+        "valid_until": "2027-10-01T00:00:00Z",
+        "disposition": "in_tolerance",
+        "calibration_provider": "synthetic fixture generator",
+        "traceability_reference": "not_applicable_synthetic",
+        "limitations": [
+          "Synthetic registry record, not metrology evidence."
+        ],
+        "calibration_method": "synthetic",
+        "evidence_source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+        "rights_status": "not_applicable",
+        "certificate_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "reviewer_id": "SYNTHETIC-REVIEWER-0001"
+      },
+      {
+        "calibration_record_id": "SYNTHETIC-CAL-WATER-DENSITY-001",
+        "revision": "0.1.0",
+        "instrument_identity": {
+          "id": "SYNTHETIC-WATER-DENSITY-001",
+          "revision": "A"
+        },
+        "physical_quantity": "water_density",
+        "unit": "kg/m3",
+        "range_min": 0,
+        "range_max": 1500,
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No calibration uncertainty exists in this synthetic fixture."
+        },
+        "calibration_date": "2026-10-01T00:00:00Z",
+        "valid_from": "2026-10-01T00:00:00Z",
+        "valid_until": "2027-10-01T00:00:00Z",
+        "disposition": "in_tolerance",
+        "calibration_provider": "synthetic fixture generator",
+        "traceability_reference": "not_applicable_synthetic",
+        "limitations": [
+          "Synthetic registry record, not metrology evidence."
+        ],
+        "calibration_method": "synthetic",
+        "evidence_source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+        "rights_status": "not_applicable",
+        "certificate_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "reviewer_id": "SYNTHETIC-REVIEWER-0001"
+      },
+      {
+        "calibration_record_id": "SYNTHETIC-CAL-AMBIENT-PRESSURE-001",
+        "revision": "0.1.0",
+        "instrument_identity": {
+          "id": "SYNTHETIC-AMBIENT-PRESSURE-001",
+          "revision": "A"
+        },
+        "physical_quantity": "ambient_static_pressure",
+        "unit": "Pa",
+        "range_min": 0,
+        "range_max": 1000000,
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No calibration uncertainty exists in this synthetic fixture."
+        },
+        "calibration_date": "2026-10-01T00:00:00Z",
+        "valid_from": "2026-10-01T00:00:00Z",
+        "valid_until": "2027-10-01T00:00:00Z",
+        "disposition": "in_tolerance",
+        "calibration_provider": "synthetic fixture generator",
+        "traceability_reference": "not_applicable_synthetic",
+        "limitations": [
+          "Synthetic registry record, not metrology evidence."
+        ],
+        "calibration_method": "synthetic",
+        "evidence_source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+        "rights_status": "not_applicable",
+        "certificate_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "reviewer_id": "SYNTHETIC-REVIEWER-0001"
+      },
+      {
+        "calibration_record_id": "SYNTHETIC-CAL-WATER-VAPOUR-001",
+        "revision": "0.1.0",
+        "instrument_identity": {
+          "id": "SYNTHETIC-WATER-VAPOUR-001",
+          "revision": "A"
+        },
+        "physical_quantity": "water_vapour_pressure",
+        "unit": "Pa",
+        "range_min": 0,
+        "range_max": 100000,
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "No calibration uncertainty exists in this synthetic fixture."
+        },
+        "calibration_date": "2026-10-01T00:00:00Z",
+        "valid_from": "2026-10-01T00:00:00Z",
+        "valid_until": "2027-10-01T00:00:00Z",
+        "disposition": "in_tolerance",
+        "calibration_provider": "synthetic fixture generator",
+        "traceability_reference": "not_applicable_synthetic",
+        "limitations": [
+          "Synthetic registry record, not metrology evidence."
+        ],
+        "calibration_method": "synthetic",
+        "evidence_source_id": "SYNTHETIC-PROPELLER-STATE-FIXTURE-ONLY",
+        "rights_status": "not_applicable",
+        "certificate_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
         "reviewer_id": "SYNTHETIC-REVIEWER-0001"
       }
     ],
