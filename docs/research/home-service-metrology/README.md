@@ -31,3 +31,15 @@ Consent, withdrawal, purpose limitation and privacy are hard gates. Safety, serv
 ## Claim ceiling
 
 This is a preregistration gate only. The manifest is not a study protocol, product selection, performance result, lab qualification or household approval. All results are synthetic. Its maximum outcome is `ELIGIBLE_FOR_PREREGISTRATION_REVIEW_ONLY`.
+
+## Current standards crosswalk — 11 November 2026
+
+- **ISO 5725-1:2023** supplies the general trueness/precision principles, definitions and study organization. It concerns continuous-scale methods yielding a single reported result and points to other standards for proficiency testing and reference-material production.
+- **ISO 5725-2:2025 (Edition 3)** is the current published basic interlaboratory method for repeatability/reproducibility of a standard measurement method. ISO 5725-2:2019 is withdrawn and must not be described as current.
+- **ISO 5725-3:2023** covers intermediate precision and alternative collaborative-study designs; use where day/operator/equipment/time effects require intermediate-precision analysis.
+- **ISO/IEC 17043:2023** covers competence and impartiality of proficiency-testing providers. **ISO 13528:2022**, together with **Amendment 1:2026**, provides statistical methods for proficiency testing by interlaboratory comparison.
+- **IEC TR 63250:2021** remains a household-appliance test-method reference for repeatability, reproducibility, uncertainty and round-robin testing; its scope explicitly excludes production-unit variability and the representativeness of normal household use.
+
+These standards serve different questions. A proficiency test evaluates participant performance against an assigned value or consensus criterion; it is not itself a crossed product reproducibility study. A successful method round-robin does not establish manufactured-population variation or household ecological validity. Therefore the four strata remain distinct, and laboratory proficiency/scope evidence is a separate applicability/competence gate rather than a fifth replication label.
+
+Official references: [ISO 5725-1:2023](https://www.iso.org/standard/69418.html), [ISO 5725-2:2025](https://www.iso.org/standard/90054.html), [ISO 5725-3:2023](https://www.iso.org/ics/17.020/x/), [ISO/IEC 17043:2023](https://www.iso.org/standard/80864.html), [ISO 13528:2022/Amd 1:2026](https://www.iso.org/standard/90057.html), [IEC TR 63250:2021](https://webstore.iec.ch/en/publication/65090).
