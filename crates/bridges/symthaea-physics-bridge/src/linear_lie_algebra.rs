@@ -840,9 +840,11 @@ mod tests {
 
     #[test]
     fn detects_duplicate_generators_without_silently_reducing_the_basis() {
+        let mut duplicate = so3_generators()[0].clone();
+        duplicate.id = "Jx-duplicate".to_string();
         let generators = vec![
             so3_generators()[0].clone(),
-            so3_generators()[0].clone(),
+            duplicate,
             so3_generators()[2].clone(),
         ];
         let admitted = action(generators, identity(3));
