@@ -32,7 +32,7 @@
     },
     "mutation_dimensions": {
       "type": "array",
-      "minItems": 7,
+      "minItems": 10,
       "maxItems": 10,
       "uniqueItems": true,
       "items": {
