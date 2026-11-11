@@ -166,13 +166,14 @@ This matrix should be generated in budgeted deterministic batches. The first com
 | Pitch | Median absolute F0 error | <= 5 cents on clean known-answer signals |
 | Pitch | F0 estimates within 10 cents | >= 99% of eligible clean voiced windows |
 | Formants | F1–F3 median absolute percentage error | <= 10% on clean, calibrated synthetic resonances (proposed target; not yet measured) |
+| Observer coverage | Qualified, non-fallback F1–F3 frame coverage | >= 90% of voiced frames on supported clean strata; report fallback-sentinel and abstention rates separately (proposed target) |
 | Locality | Changed samples outside dependency cone | 0 |
 | Negative controls | No-op / wrong-direction / collateral detection | 100% on declared fixture cases |
 | Uncertainty | False-safe decisions | 0 on deterministic synthetic boundary and adversarial cases |
 | Correction | Convergence on held-out supported perturbations | >= 95% within 3 interventions, as a later target |
 | Evidence | Required provenance and report coverage | 100% |
 
-These are proposed targets, not results. The initial 16 authored tests are contract tests. Rust compilation, test execution, audio fixture generation, and CI qualification are still pending.
+These are proposed targets, not results. The initial 19 authored tests are contract tests. Rust compilation, test execution, audio fixture generation, and CI qualification are still pending.
 
 ### 4.4 Controller experiment
 
@@ -220,6 +221,14 @@ MusicJudge (Interspeech 2026) couples block-aligned lyric correctness with pitch
 
 UniVocal (ACL 2026) studies speech-to-singing mode transitions and introduces SCSBench. That task is distinct from switching between isiZulu and English while continuing to sing. Muse should keep mode-switching and language-switching as separate graph annotations and benchmark strata. [ACL Anthology](https://aclanthology.org/2026.acl-long.1452/)
 
+### 5.7 Commercial singing-editor baseline: Synthesizer V Studio 2
+
+Synthesizer V Studio 2 is a strong commercial baseline for fine-grained vocal authoring, not a straw man. Its 2.3.0 update (2 November 2026) introduced a language-independent X-SAMPA option with 150 phonetic symbols, an updated phoneme system, a vocal-fry phoneme, phoneme candidate assistance, cross-lingual synthesis support for French, German, Brazilian Portuguese and Italian with updated voices, and faster/more reproducible rendering. Dreamtonics reports 30–50% faster rendering on modern CPUs with four or more cores. [Official 2.3.0 release notes](https://dreamtonics.com/synthesizer-v-studio-2-pro-2-3-0-update-and-improvements/)
+
+This changes the competitive question. Muse should not try to win merely by exposing note-level pitch curves, phoneme overrides, AI retakes or a better editing surface. Commercial tools already offer extensive authoring controls. Muse's differentiator should be the **verified execution layer** underneath any editor: a backend-neutral performance graph, explicit capability declarations, typed dependency cones, independently measured output, preservation receipts and replayable multi-turn constraints.
+
+X-SAMPA availability is not evidence of a language-specific G2P, lexical-tone, click-gesture or singing-phonology capability. Each language profile and each articulatory event family needs its own provenance and qualification stratum. The current synthetic plant and ZA-CLICK-001 are foundations for those contracts, not language competence.
+
 ### 5.6 Independent pitch estimation
 
 Pitch Detection Benchmark v2 compares 19 monophonic trackers across 10 corpora and includes clean and perturbed audio. Its published aggregate pitch F1@50c numbers include SwiftF0 0.778, RMVPE 0.768 and FCPE 0.728. This is a mixed-corpus benchmark, not a singing-only ground truth and not a score-conditioned singing test. [Benchmark report](https://github.com/lars76/pitch-benchmark)
@@ -242,8 +251,8 @@ A claim of SOTA should require a matched external benchmark and a paired confide
 
 The following work remains possible without contacting any performer or rights-holder:
 
-1. Expand the procedural plant to consonant classes, stop closures/releases, fricative noise, nasality, vowel transitions, coarticulation, melisma and rests. Keep its phonetic labels abstract until the mapping is grounded in licensed references.
-2. Add independent spectral/formant measurements from PCM, with a separately calibrated analyzer and reference windows; do not reuse the synthesizer's internal controls.
+1. Expand the procedural plant to consonant classes, explicit stop closure/release, fricative noise, nasality, vowel transitions, coarticulation, melisma and rests. Do not force clicks into the legacy single-source renderer; use [ZA-CLICK-001 / PR #11588](https://github.com/Luminous-Dynamics/symthaea/pull/11588) for symbolic multi-source click gestures and keep acoustic click rendering a separate unqualified capability.
+2. Calibrate the new PCM-only LPC F1–F3 observer against independent known-resonance sweeps, including the estimator's documented default-value fallbacks. The current code reports fallback sentinels and widens its voiced-pitch gate to the plant's 700 Hz ceiling; its bias and coverage are not yet measured.
 3. Build a many-to-many symbolic alignment known-answer suite from generated syllable and note events, exercising #10876 without claiming natural phonology.
 4. Export versioned observations and calibration receipts to the VCRB-001 schema, then consume the VCCA proposal and VCCR trajectory contracts on held-out synthetic interventions.
 5. Add adversarial edit sequences and multi-turn instruction supersession; reuse MMAE-TRACE rather than create a new ledger.
@@ -263,7 +272,7 @@ This work does not:
 
 ## 9. Validation record
 
-The branch currently contains a standalone crate, deterministic fixture generator, 18 authored tests, README and exact-head workflow. The workflow is designed to pin Rust 1.96, check formatting, run tests and Clippy, generate WAV fixtures, and verify the synthetic-only manifest.
+The branch currently contains a standalone crate, deterministic fixture generator, 19 authored tests, README and exact-head workflow. The workflow is designed to pin Rust 1.96, check formatting, run tests and Clippy, generate WAV fixtures, and verify the synthetic-only manifest.
 
 No local Cargo/rustc toolchain was available during authoring. Therefore no Rust compile, rustfmt, unit-test, Clippy, WAV generation or CI pass is claimed. The workflow's generated standalone lockfile is a CI-time lock, not a committed lockfile; a later hardening step should commit and digest a reviewed lockfile once a Rust toolchain is available.
 
@@ -280,3 +289,6 @@ No local Cargo/rustc toolchain was available during authoring. Therefore no Rust
 - Task-aware edit assurance: PR #11506
 - Multi-turn ledger: PR #11517
 - Conservative allocator: PR #11544
+- Synthetic click gestures (separate symbolic track): issue #11586 / PR #11588
+- Renderer-neutral typed local-edit receipts: issue #11356
+- Independent score-to-audio conformance: issue #11389
