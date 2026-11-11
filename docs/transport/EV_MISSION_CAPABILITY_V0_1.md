@@ -178,6 +178,8 @@ Future physical benchmark:
 - report 90%/95% coverage of conservative power/energy/thermal envelopes by chemistry, temperature, SOC, age and duty domain;
 - measure useful-work delivered, missed service, reserve violations and downtime at matched mission boundaries.
 
+For a binary false-feasible endpoint, use a one-sided exact binomial confidence bound and count independent pack–mission pairs, not time intervals from one pack as independent trials. With zero false-feasible outcomes, 59 independent cases give a one-sided 95% upper bound of 4.95%; 299 independent cases are required for an upper bound below 1%. These are sample-size implications under the independent Bernoulli assumption, not evidence that the current fixtures or any physical model meet those rates. Clustered missions from the same pack/vehicle require cluster-aware analysis and a larger effective sample.
+
 A small synthetic fixture pass does not validate physical model accuracy or safety.
 
 ## Research and standards context
