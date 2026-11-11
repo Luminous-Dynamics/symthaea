@@ -417,6 +417,30 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    const TRACE_SCHEMA: &str =
+        include_str!("../../EXPERIMENT_VALUE_TRACE_V0_1.schema.json");
+
+    #[test]
+    fn checked_in_trace_schema_matches_the_closed_rust_contract() {
+        let schema: Value = serde_json::from_str(TRACE_SCHEMA).expect("trace schema JSON");
+        assert_eq!(
+            text(&schema, "$schema"),
+            Some("https://json-schema.org/draft/2020-12/schema")
+        );
+        assert_eq!(
+            text(&schema, "title"),
+            Some("ACED experiment-value append-only trace v0.1")
+        );
+        assert_eq!(schema["additionalProperties"], false);
+        assert_eq!(
+            schema["properties"]["events"]["items"]["oneOf"]
+                .as_array()
+                .unwrap()
+                .len(),
+            3
+        );
+    }
+
     fn event(
         event_id: &str,
         sequence: u64,
