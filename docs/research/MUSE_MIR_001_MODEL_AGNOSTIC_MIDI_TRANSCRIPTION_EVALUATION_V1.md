@@ -134,6 +134,8 @@ Thirty-six focused Rust tests currently cover:
 32. frame metrics are withheld when predicted notes have unclosed releases;
 33. velocity error is still measured for onset+pitch matches when note offsets are wrong;
 34. an empty reference is accepted as a valid all-false-positive evaluation case.
+35. a declared-but-silent manifest PartId remains in the part-coverage denominator;
+36. zero matched notes yields zero part coverage and no purity estimate.
 35. a declared reference part with no notes in the excerpt remains in the part-coverage denominator;
 36. zero matched notes yields zero part coverage and no undefined purity value.
 
