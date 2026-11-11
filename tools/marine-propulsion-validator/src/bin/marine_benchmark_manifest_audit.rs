@@ -93,8 +93,8 @@ fn validate_schema(schema: &Value, manifest: &Value, findings: &mut Findings) {
     }
 }
 
-fn collect_ids<'a>(
-    array: Option<&'a Vec<Value>>,
+fn collect_ids(
+    array: Option<&Vec<Value>>,
     id_field: &str,
     path: &str,
     findings: &mut Findings,
@@ -134,10 +134,10 @@ fn check_semantics(manifest: &Value, findings: &mut Findings) {
     let claim_stage = manifest.get("claim_stage").and_then(Value::as_str).unwrap_or("");
 
     let source_ids = collect_ids(source_registry, "source_id", "/source_registry", findings);
-    let dataset_ids = collect_ids(datasets, "dataset_id", "/datasets", findings);
-    let baseline_ids = collect_ids(baselines, "baseline_id", "/baselines", findings);
-    let metric_ids = collect_ids(metrics, "metric_id", "/metric_contracts", findings);
-    let gate_ids = collect_ids(gates, "gate_id", "/hard_gates", findings);
+    let _dataset_ids = collect_ids(datasets, "dataset_id", "/datasets", findings);
+    let _baseline_ids = collect_ids(baselines, "baseline_id", "/baselines", findings);
+    let _metric_ids = collect_ids(metrics, "metric_id", "/metric_contracts", findings);
+    let _gate_ids = collect_ids(gates, "gate_id", "/hard_gates", findings);
 
     if datasets.is_none_or(Vec::is_empty) {
         findings.push("/datasets", "INVALID", "at least one dataset record is required");
@@ -151,7 +151,6 @@ fn check_semantics(manifest: &Value, findings: &mut Findings) {
     if gates.is_none_or(Vec::is_empty) {
         findings.push("/hard_gates", "INVALID", "at least one non-compensable hard gate is required");
     }
-    let _ = (&dataset_ids, &baseline_ids, &metric_ids, &gate_ids);
 
     let mut any_synthetic = false;
     if let Some(datasets) = datasets {
