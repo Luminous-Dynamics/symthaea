@@ -305,11 +305,16 @@ fn validate_group(
 
     let mut inverses = vec![usize::MAX; order];
     for element in 0..order {
-        let inverse = (0..order).find(|candidate| {
-            group.multiplication[element][*candidate] == group.identity
-                && group.multiplication[*candidate][element] == group.identity
-        });
-        checks += order;
+        let mut inverse = None;
+        for candidate in 0..order {
+            checks += 1;
+            if group.multiplication[element][candidate] == group.identity
+                && group.multiplication[candidate][element] == group.identity
+            {
+                inverse = Some(candidate);
+                break;
+            }
+        }
         inverses[element] = inverse.ok_or(QuotientErrorV1::MissingInverse)?;
     }
     Ok(ValidatedGroupV1 { inverses, checks })
@@ -794,6 +799,43 @@ mod tests {
         let outcome = compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
         let CompileOutcomeV1::Authorized(certificate) = outcome else { panic!("expected trivial quotient"); };
         assert_eq!(certificate.orbits.iter().map(|orbit| orbit.representative_id.as_str()).collect::<Vec<_>>(), vec!["a", "b", "c"]);
+        verify_certificate(&problem, &action, &certificate, QualificationBudgetV1::default()).unwrap();
+    }
+
+    #[test]
+    fn cyclic_group_of_order_three_produces_one_exact_orbit() {
+        let problem = SearchProblemV1 {
+            problem_id: "cyclic-three-search".to_owned(),
+            candidate_ids: vec!["x0".to_owned(), "x1".to_owned(), "x2".to_owned()],
+            semantics: vec![
+                semantics(5, 1, "same-boundary", "same-output"),
+                semantics(5, 1, "same-boundary", "same-output"),
+                semantics(5, 1, "same-boundary", "same-output"),
+            ],
+        };
+        let action = FiniteActionV1 {
+            action_id: "cyclic-three-rotation".to_owned(),
+            group: FiniteGroupV1 {
+                group_id: "C3".to_owned(),
+                identity: 0,
+                multiplication: vec![
+                    vec![0, 1, 2],
+                    vec![1, 2, 0],
+                    vec![2, 0, 1],
+                ],
+            },
+            permutations: vec![
+                vec![0, 1, 2],
+                vec![1, 2, 0],
+                vec![2, 0, 1],
+            ],
+        };
+        let outcome = compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
+        let CompileOutcomeV1::Authorized(certificate) = outcome else {
+            panic!("expected an exact C3 quotient");
+        };
+        assert_eq!(certificate.orbits.len(), 1);
+        assert_eq!(certificate.orbits[0].members.len(), 3);
         verify_certificate(&problem, &action, &certificate, QualificationBudgetV1::default()).unwrap();
     }
 
