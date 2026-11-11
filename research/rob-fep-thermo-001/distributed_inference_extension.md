@@ -166,3 +166,12 @@ A Luminous extension should not merely assign static weights. Candidate scheduli
 - per-robot minimum service and starvation bounds.
 
 Keep a lexicographic or constrained formulation: hard local safety and safe-stop are not batch-scheduling rewards; they remain local and non-preemptible. A remote inference response is only a proposal. Report total throughput, per-tier throughput, per-robot starvation, service fairness and safety outcomes separately. Never hide a sacrificed robot in a fleet-average throughput improvement.
+
+
+## Latest fixture extension: PoMA and matched fleet scheduling
+
+The distributed-inference corpus now has 24 cases and distinguishes:
+- DI23: empirical PoMA-style miss probability from 7 misses in 100 required actuation opportunities (0.07), with 28 declared task-loss units of missed-actuation cost; AoI, EVSI, miss probability and miss cost remain separate.
+- DI24: comparator-completeness case for a heterogeneous ten-robot fleet. It requires Round Robin, EDF, Armory Lookahead and the proposed Luminous scheduler to report per-robot starvation, per-tier throughput and per-robot safety outcomes. It asserts no performance winner.
+
+PoMA is an adapted empirical missed-deadline frequency for the declared robot benchmark. It is not asserted to be numerically identical to the analytical PoMA definition in the IEEE wireless-power-transfer paper.
