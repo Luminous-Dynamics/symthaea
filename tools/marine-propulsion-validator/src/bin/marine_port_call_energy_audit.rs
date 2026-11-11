@@ -614,7 +614,7 @@ mod tests {
         assert_eq!(report.grid_ghg_micro_kg_co2e, Some(340_000_000));
         assert_eq!(report.displaced_generator_ghg_micro_kg_co2e, Some(1_360_000_000));
         assert_eq!(report.net_ghg_delta_micro_kg_co2e, None);
-        assert_eq!(report.disposition, "INCOMPLETE"); // synthetic record precedence
+        assert_eq!(report.disposition, "INCOMPARABLE");
         assert!(report.diagnostics.iter().any(|diagnostic| diagnostic.code == "INCOMPARABLE"));
     }
 
