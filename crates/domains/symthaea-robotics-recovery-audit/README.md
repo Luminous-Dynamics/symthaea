@@ -18,7 +18,7 @@ It also rejects duplicate trial IDs, blank identity fields, malformed expected-t
     cargo test -p symthaea-robotics-recovery-audit
     cargo fmt --manifest-path crates/domains/symthaea-robotics-recovery-audit/Cargo.toml -- --check
 
-94 unit tests are included: 14 audit-kernel, 16 split-manifest importer, 37 scorer, 15 policy-router and 12 discovery-accounting tests. They have not been executed in this environment; no local Rust compile/test receipt or passing exact-head CI run is available. The only direct external dependency is `sha1`, used to recompute Git blob identities for pinned CSV bytes. The crate does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
+101 unit tests are included: 16 audit-kernel, 16 split-manifest importer, 37 scorer, 20 policy-router and 12 discovery-accounting tests. They have not been executed in this environment; no local Rust compile/test receipt or passing exact-head CI run is available. The only direct external dependency is `sha1`, used to recompute Git blob identities for pinned CSV bytes. The crate does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
 
 
 ## Pinned split-manifest importer
@@ -37,6 +37,18 @@ It checks the exact header, row count (800 train / 200 test), unique sample IDs 
 The importer recomputes the Git blob SHA-1 from the exact CSV bytes using Git's canonical `blob <length>\0<content>` preimage and requires equality with the pinned split blob identity. A modified CSV cannot pass by merely supplying the expected blob SHA. The test suite includes a known-vector comparison against `git hash-object`. The importer maps the CSV `sha256` to the scenario JSON digest and `original_sha256` to its original-trajectory lineage digest. It carries task name, relative source path, action count and replay-prefix length into the scenario and trial records; the scorer rejects any mismatch.
 
 The source CSV does not expose scenario construction source (Natural / ActionPerturbed / HumanConstructed), nor does the split record include the scenario JSON bytes. The importer therefore assigns `ScenarioSource::Unknown` and validates hash syntax only. It does not claim to fetch or re-hash the scenario artifacts. The caller must still fetch the CSV from the exact pinned commit; the importer independently verifies that its bytes produce the pinned Git blob SHA-1. This does not fetch or verify the referenced scenario JSON artifacts or third-party simulator assets.
+
+## Recovery intervention comparison: Backtrack and achieved-motion retrace
+
+Backtrack (Landeg & Tambe, arXiv:2610.32941, 2026-10-23) is a required comparator for future recovery runs. It adds a small failure-prediction head to frozen VLA representations and physically retraces achieved arm motion before handing control back to the unchanged policy. The paper reports 19.0–48.2% relative failure-rate reductions on LIBERO-Long and up to +7.40 percentage points success. Those are author-reported simulator results; the experiments are simulation-only and five-seed/50-episode per-task.
+
+Backtrack does not restore object poses or the full scene. Retracing can itself perturb objects, so it must not be equated with simulator state rewind or assumed to reverse the task world. The audit therefore distinguishes:
+
+- `AchievedMotionRetrace`: executed reversal of the robot's achieved motion in the current world;
+- `RetreatOrRelease`: a retreat/release without claiming trajectory retrace;
+- `SimulatorStateRewind`: simulator-only restoration, never physical recovery.
+
+An achieved-motion retrace counts as a physical-safe completion only when the world remains continuous, an action actually executes, the task is completed, and upstream safety evidence is verified compliant. Unknown or changed object/scene state fails closed. This is an audit classification, not an implementation of Backtrack or a claim of hardware qualification.
 
 ## RoboRecover recovery scoring
 
