@@ -68,6 +68,8 @@ pub struct RoboRecoverManifest {
     pub source_revision: String,
     /// Git blob SHA of the exact upstream splits/<platform>_<split>.csv file.
     pub split_manifest_blob_sha: String,
+    /// SHA-256 of the exact policy checkpoint/configuration used by this arm.
+    pub policy_digest: String,
     /// SHA-256 of the exact policy-specific evaluator adapter.
     pub evaluator_digest: String,
     /// One score is one policy/intervention arm; never pool arm IDs.
@@ -97,6 +99,8 @@ pub enum PolicyCompletion {
 pub struct RoboRecoverTrial {
     pub platform: BenchmarkPlatform,
     pub split: BenchmarkSplit,
+    pub source_revision: String,
+    pub split_manifest_blob_sha: String,
     pub stage: RecoveryStage,
     pub deviation: DeviationType,
     /// Exact status string emitted by the pinned source adapter.
@@ -178,9 +182,11 @@ pub enum ManifestIssue {
     BlankSourceRepository,
     BlankSourceRevision,
     BlankSplitManifestBlobSha,
+    BlankPolicyDigest,
     BlankEvaluatorDigest,
     InvalidSourceRevision,
     InvalidSplitManifestBlobSha,
+    InvalidPolicyDigest,
     InvalidEvaluatorDigest,
     BlankScenarioDigest(String),
     InvalidScenarioDigest(String),
@@ -191,6 +197,7 @@ pub enum ManifestIssue {
     BlankExpectedTrialId(String),
     DuplicateExpectedTrialId(String),
     Macro9GroupCount(usize),
+    Macro9OnlyAppliesToTest,
     DuplicateMacro9Group(StageTypeGroup),
     Macro9GroupHasNoScenarios(StageTypeGroup),
 }
@@ -227,6 +234,7 @@ pub struct RoboRecoverScoreReport {
     pub source_repository: String,
     pub source_revision: String,
     pub split_manifest_blob_sha: String,
+    pub policy_digest: String,
     pub evaluator_digest: String,
     pub arm_id: String,
     pub scenario_count: usize,
@@ -247,16 +255,16 @@ pub struct RoboRecoverScoreReport {
     pub groups: Vec<GroupScore>,
     /// Scenario-equal source-reported environment completion rate. May include replay preemption.
     pub source_environment_completion_overall_rsr: f64,
-    /// Equal-weight mean of source environment-completion rates across Macro-9.
-    pub source_environment_completion_macro9_rsr: f64,
+    /// Equal-weight mean of source environment-completion rates across Macro-9 (test only).
+    pub source_environment_completion_macro9_rsr: Option<f64>,
     /// Scenario-equal policy-attributable recovery RSR, excluding prefix replay.
     pub policy_recovery_overall_rsr: f64,
     /// Equal-weight mean across the nine occupied Stage–Type groups.
-    pub policy_recovery_macro9_rsr: f64,
+    pub policy_recovery_macro9_rsr: Option<f64>,
     /// Luminous extension: scenario-equal safe completion without state rewind.
     pub physical_safe_overall_rsr: f64,
     /// Luminous extension: equal-weight group mean of physical-safe RSR.
-    pub physical_safe_macro9_rsr: f64,
+    pub physical_safe_macro9_rsr: Option<f64>,
 }
 
 #[derive(Default)]
@@ -298,6 +306,11 @@ pub fn validate_manifest(
         issues.push(ManifestIssue::BlankSplitManifestBlobSha);
     } else if !is_lower_or_upper_hex_digest(&manifest.split_manifest_blob_sha, 40) {
         issues.push(ManifestIssue::InvalidSplitManifestBlobSha);
+    }
+    if manifest.policy_digest.trim().is_empty() {
+        issues.push(ManifestIssue::BlankPolicyDigest);
+    } else if !is_lower_or_upper_hex_digest(&manifest.policy_digest, 64) {
+        issues.push(ManifestIssue::InvalidPolicyDigest);
     }
     if manifest.evaluator_digest.trim().is_empty() {
         issues.push(ManifestIssue::BlankEvaluatorDigest);
@@ -351,10 +364,13 @@ pub fn validate_manifest(
         }
     }
 
-    if manifest.macro9_groups.len() != 9 {
+    if manifest.split == BenchmarkSplit::Test && manifest.macro9_groups.len() != 9 {
         issues.push(ManifestIssue::Macro9GroupCount(
             manifest.macro9_groups.len(),
         ));
+    }
+    if manifest.split == BenchmarkSplit::Train && !manifest.macro9_groups.is_empty() {
+        issues.push(ManifestIssue::Macro9OnlyAppliesToTest);
     }
 
     let mut declared_groups = BTreeSet::new();
@@ -365,9 +381,11 @@ pub fn validate_manifest(
             issues.push(ManifestIssue::Macro9GroupHasNoScenarios(*group));
         }
     }
-    for group in &group_presence {
-        if !declared_groups.contains(group) {
-            issues.push(ManifestIssue::ScenarioGroupNotInMacro9(*group));
+    if manifest.split == BenchmarkSplit::Test {
+        for group in &group_presence {
+            if !declared_groups.contains(group) {
+                issues.push(ManifestIssue::ScenarioGroupNotInMacro9(*group));
+            }
         }
     }
 
@@ -458,6 +476,9 @@ pub fn score_roborecover(
 
         let metadata_matches = trial.platform == manifest.platform
             && trial.split == manifest.split
+            && trial.source_revision == manifest.source_revision
+            && trial.split_manifest_blob_sha == manifest.split_manifest_blob_sha
+            && trial.evidence.policy_digest == manifest.policy_digest
             && trial.evidence.arm_id == manifest.arm_id
             && trial.stage == scenario.stage
             && trial.deviation == scenario.deviation
@@ -544,7 +565,7 @@ pub fn score_roborecover(
 
     // Each declared occupied Stage–Type group receives equal weight. Within a
     // group, scenarios receive equal weight regardless of rollout count.
-    let mut group_scores = Vec::with_capacity(9);
+    let mut group_scores = Vec::with_capacity(manifest.macro9_groups.len());
     for group in &manifest.macro9_groups {
         let members = scenario_scores
             .iter()
@@ -576,21 +597,26 @@ pub fn score_roborecover(
         });
     }
 
-    let source_environment_completion_macro9_rsr = group_scores
-        .iter()
-        .map(|score| score.source_environment_completion_rsr)
-        .sum::<f64>()
-        / 9.0;
-    let policy_recovery_macro9_rsr = group_scores
-        .iter()
-        .map(|score| score.policy_recovery_rsr)
-        .sum::<f64>()
-        / 9.0;
-    let physical_safe_macro9_rsr = group_scores
-        .iter()
-        .map(|score| score.physical_safe_rsr)
-        .sum::<f64>()
-        / 9.0;
+    let (
+        source_environment_completion_macro9_rsr,
+        policy_recovery_macro9_rsr,
+        physical_safe_macro9_rsr,
+    ) = if manifest.split == BenchmarkSplit::Test {
+        (
+            Some(
+                group_scores.iter().map(|score| score.source_environment_completion_rsr).sum::<f64>()
+                    / 9.0,
+            ),
+            Some(
+                group_scores.iter().map(|score| score.policy_recovery_rsr).sum::<f64>() / 9.0,
+            ),
+            Some(
+                group_scores.iter().map(|score| score.physical_safe_rsr).sum::<f64>() / 9.0,
+            ),
+        )
+    } else {
+        (None, None, None)
+    };
 
     let accepted_ids = trials
         .iter()
@@ -601,6 +627,9 @@ pub fn score_roborecover(
                     .is_some_and(|scenario| {
                         trial.platform == manifest.platform
                             && trial.split == manifest.split
+                            && trial.source_revision == manifest.source_revision
+                            && trial.split_manifest_blob_sha == manifest.split_manifest_blob_sha
+                            && trial.evidence.policy_digest == manifest.policy_digest
                             && trial.evidence.arm_id == manifest.arm_id
                             && trial.stage == scenario.stage
                             && trial.deviation == scenario.deviation
@@ -624,6 +653,7 @@ pub fn score_roborecover(
         source_repository: manifest.source_repository.clone(),
         source_revision: manifest.source_revision.clone(),
         split_manifest_blob_sha: manifest.split_manifest_blob_sha.clone(),
+        policy_digest: manifest.policy_digest.clone(),
         evaluator_digest: manifest.evaluator_digest.clone(),
         arm_id: manifest.arm_id.clone(),
         scenario_count: manifest.scenarios.len(),
@@ -689,6 +719,7 @@ mod tests {
             source_repository: "RUCKBReasoning/RoboRecover".to_owned(),
             source_revision: "089b9420e8b7c303e2338a8212a8b6c27c26a79b".to_owned(),
             split_manifest_blob_sha: "c9b40e12d6f8d2dab723815dfc2e966ea7e62cd5".to_owned(),
+            policy_digest: "d".repeat(64),
             evaluator_digest: "e335523db8ad4a2e06def1180f0e734334dbbd3b873df69d46873e17face700d".to_owned(),
             arm_id: "base-policy".to_owned(),
             scenarios,
@@ -709,6 +740,8 @@ mod tests {
         RoboRecoverTrial {
             platform: manifest.platform,
             split: manifest.split,
+            source_revision: manifest.source_revision.clone(),
+            split_manifest_blob_sha: manifest.split_manifest_blob_sha.clone(),
             stage: scenario.stage,
             deviation: scenario.deviation,
             source_status: "infer_ok".to_owned(),
@@ -721,6 +754,7 @@ mod tests {
                 policy_digest: "sha256:policy".to_owned(),
                 scenario_digest: format!("{scenario_index:064x}"),
                 evaluator_digest: manifest().evaluator_digest,
+                policy_digest: manifest().policy_digest,
                 intervention,
                 world_state,
                 executed_action_count: 3,
