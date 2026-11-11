@@ -52,68 +52,163 @@
       "minItems": 4,
       "maxItems": 4,
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "unit_of_analysis",
-          "required_identity",
-          "required_controls"
-        ],
-        "properties": {
-          "id": {
-            "enum": [
-              "WITHIN_UNIT_REPEATABILITY",
-              "BETWEEN_LAB_REPRODUCIBILITY",
-              "PRODUCTION_UNIT_VARIATION",
-              "HOUSEHOLD_ECOLOGICAL_VALIDITY"
-            ]
-          },
-          "unit_of_analysis": {
-            "type": "string",
-            "minLength": 1
-          },
-          "minimum_replicates_per_cell": {
-            "type": "integer",
-            "minimum": 2
-          },
-          "minimum_independent_labs": {
-            "type": "integer",
-            "minimum": 2
-          },
-          "minimum_production_lots": {
-            "type": "integer",
-            "minimum": 2
-          },
-          "minimum_units_per_lot": {
-            "type": "integer",
-            "minimum": 2
-          },
-          "minimum_households": {
-            "type": "integer",
-            "minimum": 2
-          },
-          "minimum_duty_cycle_profiles": {
-            "type": "integer",
-            "minimum": 2
-          },
-          "required_identity": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "type": "string"
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "unit_of_analysis",
+              "minimum_replicates_per_cell",
+              "required_identity",
+              "required_controls"
+            ],
+            "properties": {
+              "id": {
+                "const": "WITHIN_UNIT_REPEATABILITY"
+              },
+              "unit_of_analysis": {
+                "const": "run_within_unit_lab_operator_cell"
+              },
+              "required_identity": {
+                "const": [
+                  "unit_revision",
+                  "laboratory_id",
+                  "operator_id",
+                  "protocol_digest"
+                ]
+              },
+              "required_controls": {
+                "const": [
+                  "randomized_run_order",
+                  "conditioning_state",
+                  "current_calibration"
+                ]
+              },
+              "minimum_replicates_per_cell": {
+                "const": 2
+              }
             }
           },
-          "required_controls": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "type": "string"
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "unit_of_analysis",
+              "minimum_independent_labs",
+              "required_identity",
+              "required_controls"
+            ],
+            "properties": {
+              "id": {
+                "const": "BETWEEN_LAB_REPRODUCIBILITY"
+              },
+              "unit_of_analysis": {
+                "const": "independent_laboratory"
+              },
+              "required_identity": {
+                "const": [
+                  "laboratory_id",
+                  "protocol_digest",
+                  "reference_artifact_id",
+                  "calibration_scope_digest"
+                ]
+              },
+              "required_controls": {
+                "const": [
+                  "round_robin_or_equivalent",
+                  "same_method_revision",
+                  "lab_scope_applicability"
+                ]
+              },
+              "minimum_independent_labs": {
+                "const": 2
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "unit_of_analysis",
+              "minimum_production_lots",
+              "minimum_units_per_lot",
+              "required_identity",
+              "required_controls"
+            ],
+            "properties": {
+              "id": {
+                "const": "PRODUCTION_UNIT_VARIATION"
+              },
+              "unit_of_analysis": {
+                "const": "production_unit_within_lot"
+              },
+              "required_identity": {
+                "const": [
+                  "unit_serial",
+                  "production_lot",
+                  "product_revision",
+                  "critical_supplier_revisions"
+                ]
+              },
+              "required_controls": {
+                "const": [
+                  "production_representative_sampling",
+                  "supplier_substitution_tracking"
+                ]
+              },
+              "minimum_production_lots": {
+                "const": 2
+              },
+              "minimum_units_per_lot": {
+                "const": 2
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "unit_of_analysis",
+              "minimum_households",
+              "minimum_duty_cycle_profiles",
+              "required_identity",
+              "required_controls"
+            ],
+            "properties": {
+              "id": {
+                "const": "HOUSEHOLD_ECOLOGICAL_VALIDITY"
+              },
+              "unit_of_analysis": {
+                "const": "household_site_period"
+              },
+              "required_identity": {
+                "const": [
+                  "household_site_id",
+                  "service_boundary",
+                  "duty_cycle_profile",
+                  "environmental_context"
+                ]
+              },
+              "required_controls": {
+                "const": [
+                  "consent_and_withdrawal",
+                  "privacy_minimization",
+                  "maintenance_and_operator_burden"
+                ]
+              },
+              "minimum_households": {
+                "const": 2
+              },
+              "minimum_duty_cycle_profiles": {
+                "const": 2
+              }
             }
           }
-        }
+        ]
       }
     },
     "confirmatory_holdouts": {
