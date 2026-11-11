@@ -138,7 +138,10 @@ fn schema_validator(bytes: &[u8]) -> Result<Validator, String> {
 }
 
 fn validate_schema(validator: &Validator, value: &Value) -> Result<(), String> {
-    let errors: Vec<String> = validator.iter_errors(value).map(|error| error.to_string()).collect();
+    let errors: Vec<String> = validator
+        .iter_errors(value)
+        .map(|error| error.to_string())
+        .collect();
     if errors.is_empty() {
         Ok(())
     } else {
@@ -152,7 +155,10 @@ fn finite_nonnegative(value: f64) -> bool {
 
 fn validate_feature(case: &Case, feature: &FeatureReceipt) -> Result<(), String> {
     if !nonempty(&feature.feature_id) || !is_sha256(&feature.feature_sha256) {
-        return Err(format!("FEATURE_ID_OR_DIGEST_INVALID:{}", feature.feature_id));
+        return Err(format!(
+            "FEATURE_ID_OR_DIGEST_INVALID:{}",
+            feature.feature_id
+        ));
     }
     if !finite_nonnegative(feature.source_window_start_seconds)
         || !finite_nonnegative(feature.source_window_end_seconds)
@@ -162,15 +168,24 @@ fn validate_feature(case: &Case, feature: &FeatureReceipt) -> Result<(), String>
         return Err(format!("FEATURE_TIME_INVALID:{}", feature.feature_id));
     }
     if feature.uses_target_or_future_data {
-        return Err(format!("FEATURE_TARGET_OR_FUTURE_LEAKAGE:{}", feature.feature_id));
+        return Err(format!(
+            "FEATURE_TARGET_OR_FUTURE_LEAKAGE:{}",
+            feature.feature_id
+        ));
     }
-    if !matches!(feature.source_class.as_str(), "OBSERVED_PREFIX" | "DERIVED_PREFIX") {
+    if !matches!(
+        feature.source_class.as_str(),
+        "OBSERVED_PREFIX" | "DERIVED_PREFIX"
+    ) {
         return Err(format!("FEATURE_SOURCE_NOT_CAUSAL:{}", feature.feature_id));
     }
     if feature.source_window_end_seconds > case.prediction_cutoff_seconds + EPS
         || feature.available_at_seconds > case.prediction_cutoff_seconds + EPS
     {
-        return Err(format!("FEATURE_UNAVAILABLE_AT_CUTOFF:{}", feature.feature_id));
+        return Err(format!(
+            "FEATURE_UNAVAILABLE_AT_CUTOFF:{}",
+            feature.feature_id
+        ));
     }
     Ok(())
 }
@@ -189,7 +204,10 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
         || !is_sha256(&target.reference_condition_sha256)
         || !nonempty(&target.unit)
     {
-        return Err(format!("TARGET_EVIDENCE_BINDING_INVALID:{}", target.target_id));
+        return Err(format!(
+            "TARGET_EVIDENCE_BINDING_INVALID:{}",
+            target.target_id
+        ));
     }
     for value in [
         target.reference_time_seconds,
@@ -199,7 +217,10 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
         target.coverage_fraction,
     ] {
         if !value.is_finite() {
-            return Err(format!("TARGET_TIME_OR_COVERAGE_NONFINITE:{}", target.target_id));
+            return Err(format!(
+                "TARGET_TIME_OR_COVERAGE_NONFINITE:{}",
+                target.target_id
+            ));
         }
     }
     if target.reference_time_seconds <= cutoff + EPS
@@ -209,7 +230,10 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
         || target.coverage_fraction < 0.0
         || target.coverage_fraction > 1.0
     {
-        return Err(format!("TARGET_WINDOW_OR_REFERENCE_INVALID:{}", target.target_id));
+        return Err(format!(
+            "TARGET_WINDOW_OR_REFERENCE_INVALID:{}",
+            target.target_id
+        ));
     }
     if target
         .uncertainty
@@ -235,7 +259,11 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
                 return Err(format!("SOH_TARGET_CONTRACT_INVALID:{}", target.target_id));
             }
             let value = target.target_value.expect("checked");
-            let upper = if target.unit == "fraction" { 1.0 } else { 100.0 };
+            let upper = if target.unit == "fraction" {
+                1.0
+            } else {
+                100.0
+            };
             if !(0.0..=upper).contains(&value) {
                 return Err(format!("SOH_TARGET_OUT_OF_RANGE:{}", target.target_id));
             }
@@ -259,11 +287,17 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
                 || !is_sha256(target.load_profile_sha256.as_deref().unwrap_or(""))
                 || !finite_nonnegative(target.observed_duration_seconds.unwrap_or(f64::NAN))
             {
-                return Err(format!("RDT_PROTOCOL_OR_DURATION_INVALID:{}", target.target_id));
+                return Err(format!(
+                    "RDT_PROTOCOL_OR_DURATION_INVALID:{}",
+                    target.target_id
+                ));
             }
             let observed = target.observed_duration_seconds.expect("checked");
             if observed <= 0.0 || observed > target.horizon_seconds + EPS {
-                return Err(format!("RDT_OBSERVED_DURATION_OUT_OF_RANGE:{}", target.target_id));
+                return Err(format!(
+                    "RDT_OBSERVED_DURATION_OUT_OF_RANGE:{}",
+                    target.target_id
+                ));
             }
             match target.censoring_state.as_str() {
                 "EXACT_ENDPOINT_EVENT" => {
@@ -284,7 +318,10 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
                 }
                 "RIGHT_CENSORED" => {
                     if target.target_value.is_some() || target.competing_event_code.is_some() {
-                        return Err(format!("RDT_CENSORING_CONVERTED_TO_POINT_LABEL:{}", target.target_id));
+                        return Err(format!(
+                            "RDT_CENSORING_CONVERTED_TO_POINT_LABEL:{}",
+                            target.target_id
+                        ));
                     }
                     Ok(TargetAudit {
                         target_id: target.target_id.clone(),
@@ -305,15 +342,23 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
                         kind: target.kind.clone(),
                         disposition: "ADMISSIBLE_COMPETING_EVENT".to_owned(),
                         evidence_grade: "COMPETING_RISK_PRESERVED".to_owned(),
-                        reason: Some("Preserve event type; do not relabel as endpoint time".to_owned()),
+                        reason: Some(
+                            "Preserve event type; do not relabel as endpoint time".to_owned(),
+                        ),
                     })
                 }
-                _ => Err(format!("RDT_CENSORING_STATE_UNSUPPORTED:{}", target.target_id)),
+                _ => Err(format!(
+                    "RDT_CENSORING_STATE_UNSUPPORTED:{}",
+                    target.target_id
+                )),
             }
         }
         "PEAK_TEMPERATURE" => {
             if target.unit != "degC"
-                || !matches!(target.target_resolution.as_str(), "CELL" | "MODULE" | "PACK")
+                || !matches!(
+                    target.target_resolution.as_str(),
+                    "CELL" | "MODULE" | "PACK"
+                )
                 || !matches!(
                     target.label_source.as_str(),
                     "INDEPENDENT_THERMAL_MEASUREMENT" | "OPERATIONAL_DERIVED"
@@ -321,22 +366,33 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
                 || target.censoring_state != "NOT_APPLICABLE"
                 || target.target_window_end_seconds > cutoff + target.horizon_seconds + EPS
             {
-                return Err(format!("PEAK_TEMPERATURE_TARGET_CONTRACT_INVALID:{}", target.target_id));
+                return Err(format!(
+                    "PEAK_TEMPERATURE_TARGET_CONTRACT_INVALID:{}",
+                    target.target_id
+                ));
             }
             if target.coverage_fraction < 1.0 - EPS {
                 if target.target_value.is_some() {
-                    return Err(format!("INCOMPLETE_THERMAL_COVERAGE_CLAIMED_AS_PEAK:{}", target.target_id));
+                    return Err(format!(
+                        "INCOMPLETE_THERMAL_COVERAGE_CLAIMED_AS_PEAK:{}",
+                        target.target_id
+                    ));
                 }
                 return Ok(TargetAudit {
                     target_id: target.target_id.clone(),
                     kind: target.kind.clone(),
                     disposition: "NOT_COMPUTABLE".to_owned(),
                     evidence_grade: "INCOMPLETE_THERMAL_OBSERVABILITY".to_owned(),
-                    reason: Some("Observed population does not establish the declared maximum".to_owned()),
+                    reason: Some(
+                        "Observed population does not establish the declared maximum".to_owned(),
+                    ),
                 });
             }
             if target.uncertainty.is_none() {
-                return Err(format!("PEAK_TEMPERATURE_UNCERTAINTY_MISSING:{}", target.target_id));
+                return Err(format!(
+                    "PEAK_TEMPERATURE_UNCERTAINTY_MISSING:{}",
+                    target.target_id
+                ));
             }
             let value = target
                 .target_value
@@ -351,7 +407,10 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
                     "OPERATIONAL_THERMAL_REFERENCE_NOT_INDEPENDENT"
                 }
                 .to_owned(),
-                reason: Some(format!("Maximum is qualified only at {} resolution", target.target_resolution)),
+                reason: Some(format!(
+                    "Maximum is qualified only at {} resolution",
+                    target.target_resolution
+                )),
             })
         }
         "POWER_ENVELOPE" => {
@@ -365,14 +424,19 @@ fn target_audit(target: &TargetReceipt, case: &Case) -> Result<TargetAudit, Stri
                 || target.censoring_state != "NOT_APPLICABLE"
                 || target.target_window_end_seconds > cutoff + target.horizon_seconds + EPS
             {
-                return Err(format!("POWER_ENVELOPE_TARGET_CONTRACT_INVALID:{}", target.target_id));
+                return Err(format!(
+                    "POWER_ENVELOPE_TARGET_CONTRACT_INVALID:{}",
+                    target.target_id
+                ));
             }
             Ok(TargetAudit {
                 target_id: target.target_id.clone(),
                 kind: target.kind.clone(),
                 disposition: "ADMISSIBLE_MODEL_OUTPUT".to_owned(),
                 evidence_grade: "MODEL_DERIVED_NOT_PHYSICAL_MEASUREMENT".to_owned(),
-                reason: Some("Must not be presented as an independently measured power label".to_owned()),
+                reason: Some(
+                    "Must not be presented as an independently measured power label".to_owned(),
+                ),
             })
         }
         _ => Err(format!("TARGET_KIND_UNSUPPORTED:{}", target.kind)),
@@ -385,7 +449,10 @@ fn validate_case(case: &Case) -> Result<Vec<TargetAudit>, Vec<String>> {
         || !nonempty(&case.asset_ref)
         || !nonempty(&case.prediction_event_ref)
         || !is_sha256(&case.configuration_sha256)
-        || !matches!(case.modality.as_str(), "PARTIAL_DISCHARGE" | "PARTIAL_CHARGE")
+        || !matches!(
+            case.modality.as_str(),
+            "PARTIAL_DISCHARGE" | "PARTIAL_CHARGE"
+        )
         || !finite_nonnegative(case.prediction_cutoff_seconds)
         || case.prediction_cutoff_seconds <= 0.0
     {
@@ -425,10 +492,14 @@ fn validate_case(case: &Case) -> Result<Vec<TargetAudit>, Vec<String>> {
 }
 
 fn canonicalize(corpus: &mut Corpus) {
-    corpus.cases.sort_by(|left, right| left.case_id.cmp(&right.case_id));
+    corpus
+        .cases
+        .sort_by(|left, right| left.case_id.cmp(&right.case_id));
     for case in &mut corpus.cases {
-        case.features.sort_by(|left, right| left.feature_id.cmp(&right.feature_id));
-        case.targets.sort_by(|left, right| left.target_id.cmp(&right.target_id));
+        case.features
+            .sort_by(|left, right| left.feature_id.cmp(&right.feature_id));
+        case.targets
+            .sort_by(|left, right| left.target_id.cmp(&right.target_id));
     }
 }
 
@@ -513,8 +584,8 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
         not_computable_target_count,
         cases: reports,
     };
-    let bytes = serde_json::to_vec(&report)
-        .map_err(|error| format!("report serialization: {error}"))?;
+    let bytes =
+        serde_json::to_vec(&report).map_err(|error| format!("report serialization: {error}"))?;
     report.report_sha256 = sha256(&bytes);
     Ok(report)
 }
@@ -547,7 +618,9 @@ mod tests {
     #[test]
     fn right_censored_rdt_is_not_scored_as_an_exact_remaining_time() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "rdt-right-censored-preserved")
             .expect("censored case");
         assert_eq!(case.targets[0].disposition, "ADMISSIBLE_RIGHT_CENSORED");
@@ -556,7 +629,9 @@ mod tests {
     #[test]
     fn competing_event_is_preserved_as_a_distinct_event_type() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "rdt-competing-event-preserved")
             .expect("competing event case");
         assert_eq!(case.targets[0].disposition, "ADMISSIBLE_COMPETING_EVENT");
@@ -565,7 +640,9 @@ mod tests {
     #[test]
     fn incomplete_thermal_coverage_is_not_promoted_to_a_pack_peak() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "thermal-coverage-not-computable")
             .expect("thermal coverage case");
         assert_eq!(case.targets[0].disposition, "NOT_COMPUTABLE");
@@ -574,7 +651,9 @@ mod tests {
     #[test]
     fn operational_soh_label_is_not_misrepresented_as_independent_ground_truth() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "operational-soh-reference-labelled")
             .expect("operational label case");
         assert_eq!(
@@ -586,7 +665,9 @@ mod tests {
     #[test]
     fn model_derived_power_envelope_is_not_labelled_as_physical_measurement() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "multioutput-30s-accepted")
             .expect("multioutput case");
         assert_eq!(
@@ -606,7 +687,10 @@ mod tests {
         }
         let bytes = serde_json::to_vec(&corpus).expect("permuted corpus");
         let replay = audit_corpus(SCHEMA, &bytes).expect("permuted audit");
-        assert_eq!(original.canonical_corpus_sha256, replay.canonical_corpus_sha256);
+        assert_eq!(
+            original.canonical_corpus_sha256,
+            replay.canonical_corpus_sha256
+        );
         assert_eq!(
             serde_json::to_value(&original.cases).unwrap(),
             serde_json::to_value(&replay.cases).unwrap()
@@ -617,8 +701,11 @@ mod tests {
     #[test]
     fn feature_after_cutoff_is_rejected() {
         let mut corpus: Value = serde_json::from_slice(CORPUS).expect("corpus");
-        let case = corpus["cases"].as_array_mut().unwrap()
-            .iter_mut().find(|case| case["case_id"] == "multioutput-30s-accepted")
+        let case = corpus["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|case| case["case_id"] == "multioutput-30s-accepted")
             .expect("multioutput case");
         case["features"][0]["available_at_seconds"] = Value::from(31.0);
         case["expected_disposition"] = Value::String("REJECT".into());
@@ -630,8 +717,11 @@ mod tests {
     #[test]
     fn censored_rdt_cannot_be_relabelled_with_a_point_estimate() {
         let mut corpus: Value = serde_json::from_slice(CORPUS).expect("corpus");
-        let case = corpus["cases"].as_array_mut().unwrap()
-            .iter_mut().find(|case| case["case_id"] == "rdt-right-censored-preserved")
+        let case = corpus["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|case| case["case_id"] == "rdt-right-censored-preserved")
             .expect("censored case");
         case["targets"][0]["target_value"] = Value::from(900.0);
         case["expected_disposition"] = Value::String("REJECT".into());
@@ -643,8 +733,11 @@ mod tests {
     #[test]
     fn partial_thermal_coverage_cannot_claim_a_numeric_global_maximum() {
         let mut corpus: Value = serde_json::from_slice(CORPUS).expect("corpus");
-        let case = corpus["cases"].as_array_mut().unwrap()
-            .iter_mut().find(|case| case["case_id"] == "thermal-coverage-not-computable")
+        let case = corpus["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|case| case["case_id"] == "thermal-coverage-not-computable")
             .expect("thermal case");
         case["targets"][0]["target_value"] = Value::from(61.0);
         case["expected_disposition"] = Value::String("REJECT".into());
@@ -662,33 +755,51 @@ mod tests {
     #[test]
     fn multioutput_case_contains_independent_evidence_grades_per_target() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "multioutput-30s-accepted")
             .expect("multioutput case");
         assert_eq!(case.targets.len(), 4);
         assert!(case.targets.iter().any(|target| target.kind == "SOH"
             && target.evidence_grade == "INDEPENDENT_PHYSICAL_REFERENCE"));
-        assert!(case.targets.iter().any(|target| target.kind == "POWER_ENVELOPE"
-            && target.evidence_grade == "MODEL_DERIVED_NOT_PHYSICAL_MEASUREMENT"));
+        assert!(
+            case.targets
+                .iter()
+                .any(|target| target.kind == "POWER_ENVELOPE"
+                    && target.evidence_grade == "MODEL_DERIVED_NOT_PHYSICAL_MEASUREMENT")
+        );
     }
     #[test]
     fn every_output_label_must_bind_to_the_prediction_asset_and_configuration() {
         let report = report();
-        let case = report.cases.iter()
+        let case = report
+            .cases
+            .iter()
             .find(|case| case.case_id == "target-asset-configuration-mismatch-rejected")
             .expect("target identity negative control");
         assert!(!case.accepted);
-        assert!(case.errors.iter().any(|error| error.contains("TARGET_EVIDENCE_BINDING_INVALID")));
+        assert!(
+            case.errors
+                .iter()
+                .any(|error| error.contains("TARGET_EVIDENCE_BINDING_INVALID"))
+        );
     }
 
     #[test]
     fn exact_rdt_requires_measurement_uncertainty() {
         let mut corpus: Value = serde_json::from_slice(CORPUS).expect("corpus");
-        let case = corpus["cases"].as_array_mut().unwrap()
-            .iter_mut().find(|case| case["case_id"] == "multioutput-30s-accepted")
+        let case = corpus["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|case| case["case_id"] == "multioutput-30s-accepted")
             .expect("multioutput case");
-        let rdt = case["targets"].as_array_mut().unwrap()
-            .iter_mut().find(|target| target["kind"] == "REMAINING_DISCHARGE_TIME")
+        let rdt = case["targets"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|target| target["kind"] == "REMAINING_DISCHARGE_TIME")
             .expect("RDT target");
         rdt["uncertainty"] = Value::Null;
         case["expected_disposition"] = Value::String("REJECT".into());
@@ -696,5 +807,4 @@ mod tests {
         let report = audit_corpus(SCHEMA, &bytes).expect("expected reject is audited");
         assert_eq!(report.rejected_count, 10);
     }
-
 }
