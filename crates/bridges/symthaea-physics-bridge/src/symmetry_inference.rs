@@ -1628,10 +1628,29 @@ pub fn evaluate_metric_aware_linear_action_samples(
                 gradient[coordinate_index] = dual.gradient[*variable_index];
             }
 
+            // The residual is directional, so common positive scales on A*x
+            // and df do not change it. Normalize the generator and state before
+            // multiplication to avoid overflowing a finite but badly scaled
+            // coordinate representation.
+            let generator_scale = generator
+                .matrix
+                .iter()
+                .flatten()
+                .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+            let state_scale = sample
+                .iter()
+                .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+            if generator_scale == 0.0 || !generator_scale.is_finite() {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            }
             let mut flow = vec![0.0_f64; dimension];
-            for (row_index, row) in generator.matrix.iter().enumerate() {
-                for (column_index, coefficient) in row.iter().enumerate() {
-                    flow[row_index] += coefficient * sample[column_index];
+            if state_scale > 0.0 {
+                for (row_index, row) in generator.matrix.iter().enumerate() {
+                    for (column_index, coefficient) in row.iter().enumerate() {
+                        flow[row_index] += (coefficient / generator_scale)
+                            * (sample[column_index] / state_scale);
+                    }
                 }
             }
             if flow.iter().any(|value| !value.is_finite()) {
@@ -1639,7 +1658,18 @@ pub fn evaluate_metric_aware_linear_action_samples(
                 continue;
             }
 
-            let Some(whitened_gradient) = solve_lower_triangular(lower, &gradient) else {
+            // Only the gradient direction is needed by the cosine residual.
+            // Normalize before the triangular solve to protect extreme expression
+            // amplitudes and metric-whitened coordinates.
+            let gradient_scale = gradient
+                .iter()
+                .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+            let normalized_gradient = if gradient_scale > 0.0 {
+                gradient.iter().map(|value| value / gradient_scale).collect::<Vec<_>>()
+            } else {
+                vec![0.0_f64; dimension]
+            };
+            let Some(whitened_gradient) = solve_lower_triangular(lower, &normalized_gradient) else {
                 invalid_sample_count = invalid_sample_count.saturating_add(1);
                 continue;
             };
@@ -2181,6 +2211,41 @@ mod tests {
         .unwrap();
         assert_eq!(first_report.expression_display, second_report.expression_display);
         assert_ne!(first_report.expression_canonical, second_report.expression_canonical);
+    }
+
+    #[test]
+    fn metric_aware_sampler_is_scale_safe_for_large_generator_and_state() {
+        // A and x are finite, but the unscaled product A*x would overflow:
+        // 1e160 * 1e150 > f64::MAX. Directional normalization preserves it.
+        let scale = 1.0e160;
+        let action = crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "large-scale-so2".to_string(),
+            coordinate_basis_id: "xy-large".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "large-J".to_string(),
+                matrix: vec![vec![0.0, -scale], vec![scale, 0.0]],
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+        let report = evaluate_metric_aware_linear_action_samples(
+            &add(pow2("x"), pow2("y")),
+            &action,
+            &[vec![2.0e150, 1.0e150]],
+            &[],
+            MetricAwareLinearActionSampleProfileV1 {
+                maximum_samples: 1,
+                minimum_informative_samples_per_generator: 1,
+                ..MetricAwareLinearActionSampleProfileV1::default()
+            },
+        )
+        .unwrap();
+        assert!(report.invariant_under_every_generator());
+        assert_eq!(report.generator_results[0].invalid_sample_count, 0);
+        assert!(report.generator_results[0].maximum_squared_residual < 1.0e-20);
     }
 
     #[test]
