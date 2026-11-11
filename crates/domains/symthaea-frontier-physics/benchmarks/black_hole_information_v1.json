@@ -1,0 +1,362 @@
+{
+  "schema": "luminous.black_hole_information_benchmark.v1",
+  "programme": "BH-INFO-001",
+  "title": "Finite-dimensional black-hole information and Page-curve laboratory",
+  "created": "2026-11-11",
+  "status": "planned_replication_manifest",
+  "execution_status": "not_run",
+  "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11631",
+  "repository": "Luminous-Dynamics/symthaea",
+  "owner": "symthaea-frontier-physics",
+  "claim_ceiling": "Finite-dimensional quantum-information model validation only. This manifest does not derive the island formula, model a four-dimensional evaporating black hole, or solve the black-hole information paradox.",
+  "model_ontology": {
+    "subsystems": [
+      {
+        "id": "B",
+        "name": "remaining black-hole register",
+        "meaning": "The degrees of freedom still acted on by the declared evaporation circuit."
+      },
+      {
+        "id": "R",
+        "name": "collected radiation",
+        "meaning": "The emitted register factors that are no longer acted on by later circuit layers."
+      },
+      {
+        "id": "Q",
+        "name": "reference",
+        "meaning": "Optional external system purifying or entangled with the initial black-hole state."
+      },
+      {
+        "id": "E",
+        "name": "bath or environment",
+        "meaning": "Optional explicit environment; never silently traced out."
+      }
+    ],
+    "factorization_status": "explicit_model_assumption",
+    "required_distinctions": [
+      "global unitary evolution versus reduced-state mixedness",
+      "partial trace versus fundamental non-unitary evolution",
+      "existence of a recovery map versus an efficient operational decoder",
+      "Page-curve reproduction versus microscopic gravitational explanation",
+      "HDC concept encoding versus density matrix or quantum entropy"
+    ]
+  },
+  "implementation_contract": {
+    "numeric_representation": "complex f64 initially; high-precision references are independent fixtures",
+    "qubit_ordering": "most-significant-bit-first, matching symthaea-core quantum_circuit.rs",
+    "entropy_units": "nats unless a case explicitly declares bits",
+    "required_error_states": [
+      "invalid_dimension",
+      "non_finite_state",
+      "normalization_error",
+      "non_hermitian_density_matrix",
+      "trace_error",
+      "non_positive_density_matrix",
+      "eigensolver_nonconvergence",
+      "ill_conditioned",
+      "unsupported_subsystem",
+      "unresolved"
+    ],
+    "forbidden_behaviors": [
+      "diagonal-only von Neumann entropy for non-diagonal density matrices",
+      "silent density-matrix projection onto the PSD cone",
+      "post-hoc state renormalization that hides accumulated drift",
+      "treating one random circuit draw as a Haar-ensemble expectation",
+      "treating circuit outputs as a gravitational path-integral calculation"
+    ]
+  },
+  "benchmark_ladder": [
+    {
+      "id": "QI-0",
+      "name": "known-state partial trace and entropy",
+      "status": "planned",
+      "fixtures": [
+        "product_state",
+        "bell_state",
+        "ghz_state",
+        "maximally_mixed_state",
+        "schmidt_rank_k_state",
+        "random_local_basis_rotation"
+      ],
+      "observables": [
+        "reduced_density_matrix",
+        "trace",
+        "hermiticity_residual",
+        "minimum_eigenvalue",
+        "purity",
+        "von_neumann_entropy",
+        "renyi_2_entropy",
+        "renyi_3_entropy"
+      ],
+      "acceptance": {
+        "small_well_conditioned_absolute_error": 1e-10,
+        "oracle": "independent small-matrix eigensolver or analytic spectrum",
+        "failure_policy": "typed rejection; do not silently repair invalid states"
+      }
+    },
+    {
+      "id": "QI-1",
+      "name": "pure-state bipartition identities",
+      "status": "planned",
+      "assertions": [
+        "global_pure_state_entropy_is_zero",
+        "complementary_reductions_have_equal_nonzero_spectra",
+        "complementary_reductions_have_equal_von_neumann_entropy",
+        "local_unitary_basis_change_preserves_subsystem_entropy",
+        "partial_trace_is_independent_of_environment_basis"
+      ],
+      "acceptance": {
+        "small_well_conditioned_absolute_error": 1e-10,
+        "independent_oracle": "Schmidt spectrum or analytic state"
+      }
+    },
+    {
+      "id": "QI-2",
+      "name": "Haar random-state Page benchmark",
+      "status": "planned",
+      "model": "finite-dimensional Haar-random pure bipartite state",
+      "reference": {
+        "expected_entropy_nats": "H_(m*n) - H_max(m,n) - (min(m,n)-1)/(2*max(m,n))",
+        "definitions": {
+          "m": "dimension of subsystem A",
+          "n": "dimension of subsystem B",
+          "H_k": "k-th harmonic number"
+        },
+        "source": "Page 1993; exact Haar average, not an evaporation Hamiltonian"
+      },
+      "observables": [
+        "mean_von_neumann_entropy",
+        "variance_von_neumann_entropy",
+        "mean_renyi_entropy",
+        "entanglement_spectrum",
+        "sample_count",
+        "confidence_interval"
+      ],
+      "acceptance": {
+        "ensemble_mean": "inside preregistered sampling confidence interval",
+        "single_sample_is_not_ensemble_claim": true,
+        "seeds": "frozen before evaluation"
+      }
+    },
+    {
+      "id": "QI-3",
+      "name": "sequential unitary evaporation toy model",
+      "status": "planned",
+      "model": "apply a declared scrambler only to remaining B, then move one output factor into R and never act on it again",
+      "ensembles": [
+        "all_to_all_random_two_qubit_circuits",
+        "one_dimensional_brickwork_random_circuits",
+        "energy_conserving_circuits_when_explicitly_implemented"
+      ],
+      "observables": [
+        "radiation_von_neumann_entropy_by_emission_step",
+        "remaining_register_entropy",
+        "global_purity",
+        "radiation_purity",
+        "mutual_information",
+        "circuit_depth",
+        "two_qubit_gate_count"
+      ],
+      "acceptance": {
+        "global_unitarity_and_state_norm_drift_reported_per_step": true,
+        "emitted_subsystems_are_immutable_after_emission": true,
+        "late_complete_radiation_state_is_pure_for_closed_unitary_model": true,
+        "finite_size_variance_reported": true
+      }
+    },
+    {
+      "id": "QI-4",
+      "name": "Hayden-Preskill decoupling and reference recovery",
+      "status": "planned",
+      "model": "message register Q injected into a black-hole register entangled with an explicit reference",
+      "observables": [
+        "mutual_information_QR",
+        "mutual_information_QB",
+        "decoupling_error",
+        "recovery_fidelity",
+        "success_probability",
+        "decoder_gate_count",
+        "decoder_depth",
+        "classical_runtime",
+        "memory_bytes"
+      ],
+      "decoder_baselines": [
+        "exact_small_dimension_optimal_reference",
+        "Petz_recovery",
+        "declared_approximate_decoder"
+      ],
+      "acceptance": {
+        "information_recovery_claim_requires_measured_fidelity_and_cost": true,
+        "existence_of_recovery_map_is_not_called_efficient_decoder": true,
+        "null_controls_required": true
+      }
+    },
+    {
+      "id": "QI-5",
+      "name": "finite-size transition and ensemble diagnostics",
+      "status": "planned",
+      "comparators": [
+        "exact_haar_ensemble",
+        "finite_depth_all_to_all_circuit",
+        "finite_depth_local_circuit",
+        "energy_conserving_circuit",
+        "generalized_entropy_minimum_as_separate_analytic_model"
+      ],
+      "observables": [
+        "transition_width",
+        "higher_renyi_hierarchy",
+        "entanglement_spectrum",
+        "annealed_quenched_gap",
+        "seed_to_seed_variance",
+        "scrambling_depth"
+      ],
+      "acceptance": {
+        "model_assumptions_are_kept_separate": true,
+        "finite_n_effects_are_measured_not_assumed": true,
+        "island_saddle_is_not_inferred_from_random_circuit": true
+      }
+    },
+    {
+      "id": "QI-6",
+      "name": "tensor-network scaling and truncation",
+      "status": "planned",
+      "observables": [
+        "bond_dimension",
+        "discarded_weight",
+        "entropy_error",
+        "fidelity_error",
+        "wall_time",
+        "peak_memory"
+      ],
+      "acceptance": {
+        "cost_comparison_at_matched_accuracy": true,
+        "truncation_error_reported": true,
+        "exact_small_system_reference_required": true
+      }
+    },
+    {
+      "id": "QI-7",
+      "name": "held-out model discrimination and abstention",
+      "status": "planned",
+      "holdouts": [
+        "circuit_seeds",
+        "system_sizes",
+        "initial_state_classes",
+        "scrambling_families",
+        "decoder_families"
+      ],
+      "observables": [
+        "model_identification_accuracy",
+        "uncertainty_calibration",
+        "false_discovery_rate",
+        "abstention_risk_coverage",
+        "OOD_error"
+      ],
+      "acceptance": {
+        "whole_circuit_instance_is_split_unit": true,
+        "heldout_seed_leakage_prohibited": true,
+        "unsupported_models_return_unresolved": true
+      }
+    }
+  ],
+  "negative_controls": [
+    "no_scrambling",
+    "no_reference_entanglement",
+    "reference_disconnected_from_emitted_degrees",
+    "wrong_radiation_subsystem",
+    "intentionally_non_unitary_channel",
+    "post_emission_interaction_with_collected_radiation",
+    "diagonal_entropy_proxy_on_coherent_state",
+    "non_positive_density_matrix",
+    "trace_not_equal_to_one",
+    "state_normalization_drift_hidden_by_renormalization",
+    "decoder_training_leakage_from_heldout_seed",
+    "Haar_formula_claimed_for_finite_depth_local_circuit_without_sampling_validation",
+    "island_saddle_claimed_from_random_circuit_output"
+  ],
+  "competitive_baselines": [
+    {
+      "name": "Page Haar-random bipartite-state theorem",
+      "role": "analytic ensemble-mean reference",
+      "not_a": "microscopic evaporation dynamics"
+    },
+    {
+      "name": "Hayden-Preskill random-unitary model",
+      "role": "scrambling and operational information-release reference",
+      "not_a": "complete model of gravitational evaporation"
+    },
+    {
+      "name": "local and all-to-all random unitary circuits",
+      "role": "finite-depth and locality-sensitive scrambling comparators",
+      "not_a": "gravitational path-integral calculation"
+    },
+    {
+      "name": "JT gravity with bath and island/QES calculations",
+      "role": "generalized-entropy and replica-saddle comparator",
+      "not_a": "same model or observable as a closed random circuit"
+    },
+    {
+      "name": "MPS/tensor-network methods",
+      "role": "scaling comparator with truncation and discarded-weight accounting",
+      "not_a": "exact result unless truncation error is controlled"
+    }
+  ],
+  "references": [
+    {
+      "id": "page-1993",
+      "citation": "Page, Information in black hole radiation, Physical Review Letters 71 (1993) 3743",
+      "url": "https://doi.org/10.1103/PhysRevLett.71.3743",
+      "role": "Haar/Page entropy reference"
+    },
+    {
+      "id": "hayden-preskill-2007",
+      "citation": "Hayden and Preskill, Black holes as mirrors: quantum information in random subsystems, JHEP 09 (2007) 120",
+      "url": "https://arxiv.org/abs/0708.4025",
+      "role": "random-unitary decoding and scrambling"
+    },
+    {
+      "id": "harlow-2016",
+      "citation": "Harlow, Jerusalem lectures on black holes and quantum information, Reviews of Modern Physics 88 (2016) 015002",
+      "url": "https://doi.org/10.1103/RevModPhys.88.015002",
+      "role": "review and conceptual framework"
+    },
+    {
+      "id": "miyata-ugajin-2026",
+      "citation": "Miyata and Ugajin, Black hole interior and quantum error correction with dynamical gravity, JHEP (2026) 68",
+      "url": "https://doi.org/10.1007/JHEP08(2026)068",
+      "role": "dynamical-gravity QEC comparator"
+    },
+    {
+      "id": "zhong-2026",
+      "citation": "Zhong, An algebraic description of the Page transition, JHEP (2026) 160",
+      "url": "https://doi.org/10.1007/JHEP04(2026)160",
+      "role": "channel-recovery and algebraic formulation comparator"
+    },
+    {
+      "id": "corbeel-deharo-2026",
+      "citation": "Corbeel and De Haro, Black Holes are about Quantum Information, arXiv:2610.28185 (2026)",
+      "url": "https://arxiv.org/abs/2610.28185",
+      "role": "current review of Page, circuit models and Hayden-Preskill assumptions"
+    },
+    {
+      "id": "saha-finite-n-2026",
+      "citation": "Saha, Non-perturbative transitions in the island formula: A finite-N resolution of the Page curve kink, Physics Letters B 882 (2026) 140981",
+      "url": "https://doi.org/10.1016/j.physletb.2026.140981",
+      "role": "recent finite-N smoothing proposal; reproduce independently, not treated as universal ground truth"
+    }
+  ],
+  "provenance": {
+    "code_refs": [
+      "crates/core/symthaea-core/src/hdc/quantum_circuit.rs",
+      "crates/core/symthaea-core/src/physics/quantum_gravity.rs",
+      "crates/domains/symthaea-continuum-physics/src/open_quantum.rs",
+      "crates/domains/symthaea-frontier-physics/src/dmrg.rs",
+      "crates/domains/symthaea-frontier-physics/src/tensor_networks.rs",
+      "crates/domains/symthaea-frontier-physics/src/quantum_darwinism.rs"
+    ],
+    "code_execution": "not_run",
+    "rust_tests": "not_run",
+    "ci": "not_started",
+    "results_claimed": false
+  }
+}
