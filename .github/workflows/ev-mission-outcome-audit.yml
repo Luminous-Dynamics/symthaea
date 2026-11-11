@@ -28,6 +28,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt --manifest-path tools/ev-mission-outcome-audit/Cargo.toml -- --check
 
+      - name: Run Clippy with warnings denied
+        run: cargo clippy --manifest-path tools/ev-mission-outcome-audit/Cargo.toml --all-targets -- -D warnings
+
       - name: Run independent outcome, censoring, reference-binding and statistical tests
         run: cargo test --manifest-path tools/ev-mission-outcome-audit/Cargo.toml
 
