@@ -302,3 +302,17 @@ Implementation/evaluation owner: [Symthaea #11573](https://github.com/Luminous-D
 ### Distributed inference claim boundary refinement
 
 The distributed-inference fixture corpus now requires an explicit whole-system energy-boundary completeness flag and an onboard baseline for a whole-system comparison. It also adds an unauthenticated-endpoint negative control. A remote result may be eligible for local projection while its whole-system energy benefit remains Unknown; endpoint identity, freshness and physical action admission are separate gates.
+
+
+## 11. Action-horizon baselines: latest 2026 WAM execution research
+
+The new action commitment benchmark (#11581) now compares against four distinct advances:
+
+- **TempoWAM** (arXiv:2608.09492): progress-monitoring-driven replanning; reports 26.9% fewer WAM inferences on easy real-world tasks while maintaining success, and +13.3 percentage points on difficult tasks. https://arxiv.org/abs/2608.09492
+- **AHA-WAM** (arXiv:2606.09811): slow world planner / fast action expert with observation-guided context routing. Crucially, the authors state that "horizon-adaptive" describes decoupled world and action horizons, not online action-prefix-length selection. It reports 92.80% RoboTwin success, 78.3% over four real-world tasks and 24.17 Hz in its stated setting. https://arxiv.org/abs/2606.09811
+- **Streaming-WAM** (arXiv:2609.28927): conditions future visual prediction on actions already committed during asynchronous inference; reports 98.35% LIBERO average success, 2.93× lower episode time than Fast-WAM, and a Stamp Paper real-world task reduction from 90 s synchronous to 38 s asynchronous. https://arxiv.org/abs/2609.28927
+- **Reuse-then-Refine** (ICML 2026): latent-space high-frequency action chunks plus asynchronous refinement; evaluates three real-world contact-rich tasks and targets temporal/spatial consistency at up to 60 Hz. https://proceedings.mlr.press/v306/wang26lj.html
+
+These results are task/training/hardware-specific. They should not be combined into a cross-paper ranking. The Luminous research question is narrower: do physical hard bounds and observation-constrained viability give a better committed-prefix horizon than fixed K, task-progress monitoring, or model-architecture-specific chunking on a matched platform/task?
+
+The reference formula is a minimum over qualified integer caps—not a composite score. Any Unknown/stale/mismatched required cap blocks new-prefix eligibility; the output never grants actuation authority.
