@@ -580,6 +580,50 @@ mod tests {
     }
 
     #[test]
+    fn non_positive_map_axes_are_rejected() {
+        let nodes = vec![
+            MapNode {
+                efficiency: 0.9,
+                absolute_uncertainty_bound: 0.01,
+            };
+            4
+        ];
+        let invalid = [
+            EfficiencyMap2D::new(
+                "m",
+                "c",
+                "x",
+                "evidence",
+                vec![0.0, 1.0],
+                vec![1_000.0, 2_000.0],
+                nodes.clone(),
+                0.0,
+            ),
+            EfficiencyMap2D::new(
+                "m",
+                "c",
+                "x",
+                "evidence",
+                vec![-1.0, 1.0],
+                vec![1_000.0, 2_000.0],
+                nodes.clone(),
+                0.0,
+            ),
+            EfficiencyMap2D::new(
+                "m",
+                "c",
+                "x",
+                "evidence",
+                vec![1.0, 2.0],
+                vec![0.0, 2_000.0],
+                nodes,
+                0.0,
+            ),
+        ];
+        assert!(invalid.into_iter().all(|result| result.is_err()));
+    }
+
+    #[test]
     fn invalid_efficiency_and_uncertainty_nodes_are_rejected() {
         for node in [
             MapNode { efficiency: 0.0, absolute_uncertainty_bound: 0.0 },
