@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-propulsion-map-oracle-v0.1.0";
+pub const MODEL_VERSION: &str = "electric-propulsion-map-oracle-v0.2.0";
 
 /// One measured or otherwise evidence-qualified map node.
 ///
@@ -685,6 +685,7 @@ mod tests {
             assert!(
                 EfficiencyMap2D::new(
                     map_id,
+                    "map-content-sha-001",
                     config,
                     context,
                     "evidence",
@@ -703,6 +704,20 @@ mod tests {
                 "c",
                 "x",
                 "",
+                vec![1.0, 2.0],
+                vec![1_000.0, 2_000.0],
+                nodes.clone(),
+                0.0,
+            )
+            .is_err()
+        );
+        assert!(
+            EfficiencyMap2D::new(
+                "m",
+                "",
+                "c",
+                "x",
+                "evidence",
                 vec![1.0, 2.0],
                 vec![1_000.0, 2_000.0],
                 nodes.clone(),
