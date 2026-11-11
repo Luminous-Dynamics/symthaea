@@ -97,9 +97,9 @@ pub enum ComparativeDisposition {
 /// Separately derived prediction from an alternative mechanism/model.
 ///
 /// This model is not trained or validated by the comparative abiotic baseline module.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AlternativeModelPrediction {
-    pub model_id: &'static str,
+    pub model_id: String,
     pub predicted_mean: f64,
     pub predictive_stddev: f64,
 }
@@ -129,7 +129,7 @@ pub struct ComparativeModelComparison {
     pub adequacy_threshold: f64,
     pub minimum_log_score_advantage: f64,
     pub outcome: ComparativeHypothesisOutcome,
-    pub claim_ceiling: &'static str,
+    pub claim_ceiling: String,
 }
 
 /// Evaluation of one held-out candidate against its own system's baseline.
@@ -534,7 +534,7 @@ impl ComparativeBaselineModel {
         }
         if !alternative.predicted_mean.is_finite() {
             return Err(ComparativeBaselineError::InvalidAlternativePrediction {
-                model_id: alternative.model_id.to_owned(),
+                model_id: alternative.model_id.clone(),
                 field: "predicted_mean",
                 value: alternative.predicted_mean,
             });
@@ -602,7 +602,7 @@ impl ComparativeBaselineModel {
         Ok(ComparativeModelComparison {
             observation_id: candidate.observation_id.clone(),
             system_id: candidate.system_id.clone(),
-            alternative_model_id: alternative.model_id.to_owned(),
+            alternative_model_id: alternative.model_id.clone(),
             abiotic_log_predictive_density: abiotic.gaussian_log_predictive_density,
             alternative_log_predictive_density,
             alternative_log_score_advantage,
@@ -611,7 +611,7 @@ impl ComparativeBaselineModel {
             adequacy_threshold,
             minimum_log_score_advantage,
             outcome,
-            claim_ceiling: "relative predictive comparison only; not proof of life, biogenicity, or mechanism identity",
+            claim_ceiling: "relative predictive comparison only; not proof of life, biogenicity, or mechanism identity".to_owned(),
         })
     }
 
@@ -834,7 +834,7 @@ mod tests {
             .compare_with_alternative(
                 &held_out,
                 AlternativeModelPrediction {
-                    model_id: "alternative-mechanism-v0",
+                    model_id: "alternative-mechanism-v0".to_owned(),
                     predicted_mean: -10.0,
                     predictive_stddev: 0.1,
                 },
@@ -856,7 +856,7 @@ mod tests {
             .compare_with_alternative(
                 &held_out,
                 AlternativeModelPrediction {
-                    model_id: "candidate-structured-chemistry-v1",
+                    model_id: "candidate-structured-chemistry-v1".to_owned(),
                     predicted_mean: 2.0,
                     predictive_stddev: 0.1,
                 },
@@ -879,7 +879,7 @@ mod tests {
             .compare_with_alternative(
                 &held_out,
                 AlternativeModelPrediction {
-                    model_id: "broad-alternative",
+                    model_id: "broad-alternative".to_owned(),
                     predicted_mean: 0.0,
                     predictive_stddev: 1.0,
                 },
@@ -901,7 +901,7 @@ mod tests {
             .compare_with_alternative(
                 &held_out,
                 AlternativeModelPrediction {
-                    model_id: "poor-alternative",
+                    model_id: "poor-alternative".to_owned(),
                     predicted_mean: 2.0,
                     predictive_stddev: 0.05,
                 },
