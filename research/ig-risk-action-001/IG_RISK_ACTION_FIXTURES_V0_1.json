@@ -655,7 +655,7 @@
     },
     {
       "scenario_id": "RA-ANSWER-01",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -779,7 +779,7 @@
     },
     {
       "scenario_id": "RA-ANSWER-03",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -903,7 +903,7 @@
     },
     {
       "scenario_id": "RA-ANSWER-05",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "factual_reasoning",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1027,7 +1027,7 @@
     },
     {
       "scenario_id": "RA-ABSTAIN-01",
-      "task_family": "factual_reasoning",
+      "task_family": "retrieval",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1089,7 +1089,7 @@
     },
     {
       "scenario_id": "RA-ABSTAIN-02",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "retrieval",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1151,7 +1151,7 @@
     },
     {
       "scenario_id": "RA-ABSTAIN-03",
-      "task_family": "factual_reasoning",
+      "task_family": "retrieval",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1213,7 +1213,7 @@
     },
     {
       "scenario_id": "RA-ABSTAIN-04",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "retrieval",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1275,7 +1275,7 @@
     },
     {
       "scenario_id": "RA-ABSTAIN-05",
-      "task_family": "factual_reasoning",
+      "task_family": "retrieval",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1337,7 +1337,7 @@
     },
     {
       "scenario_id": "RA-ABSTAIN-06",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "retrieval",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1399,7 +1399,7 @@
     },
     {
       "scenario_id": "RA-REQUESTEVIDENCE-01",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "retrieval",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1461,7 +1461,7 @@
     },
     {
       "scenario_id": "RA-REQUESTEVIDENCE-02",
-      "task_family": "factual_reasoning",
+      "task_family": "retrieval",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1585,7 +1585,7 @@
     },
     {
       "scenario_id": "RA-REQUESTEVIDENCE-04",
-      "task_family": "factual_reasoning",
+      "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1709,7 +1709,7 @@
     },
     {
       "scenario_id": "RA-REQUESTEVIDENCE-06",
-      "task_family": "factual_reasoning",
+      "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1771,7 +1771,7 @@
     },
     {
       "scenario_id": "RA-ESCALATE-01",
-      "task_family": "factual_reasoning",
+      "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -1895,7 +1895,7 @@
     },
     {
       "scenario_id": "RA-ESCALATE-03",
-      "task_family": "factual_reasoning",
+      "task_family": "mechanical_diagnosis",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -2019,7 +2019,7 @@
     },
     {
       "scenario_id": "RA-ESCALATE-05",
-      "task_family": "factual_reasoning",
+      "task_family": "institutional_process",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -2081,7 +2081,7 @@
     },
     {
       "scenario_id": "RA-ESCALATE-06",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "institutional_process",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -2143,7 +2143,7 @@
     },
     {
       "scenario_id": "RA-DEFER-01",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "institutional_process",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -2205,7 +2205,7 @@
     },
     {
       "scenario_id": "RA-DEFER-02",
-      "task_family": "factual_reasoning",
+      "task_family": "institutional_process",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -2267,7 +2267,7 @@
     },
     {
       "scenario_id": "RA-DEFER-03",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "institutional_process",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -2329,7 +2329,7 @@
     },
     {
       "scenario_id": "RA-DEFER-04",
-      "task_family": "factual_reasoning",
+      "task_family": "institutional_process",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -2391,7 +2391,7 @@
     },
     {
       "scenario_id": "RA-DEFER-05",
-      "task_family": "mechanical_diagnosis",
+      "task_family": "institutional_process",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
@@ -2453,7 +2453,7 @@
     },
     {
       "scenario_id": "RA-DEFER-06",
-      "task_family": "factual_reasoning",
+      "task_family": "institutional_process",
       "probability_source": "SyntheticScenarioOracle",
       "probability_target": "scenario_defined_action_outcome_success",
       "probabilities": {
