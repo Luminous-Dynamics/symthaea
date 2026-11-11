@@ -507,7 +507,13 @@ mod tests {
         let (join, acoustic, bio) = records();
         let mut findings = Findings::default();
         let statuses = check_join(&join, &acoustic, &bio, &mut findings);
-        assert_eq!(statuses, vec!["acoustic:synthetic", "biofouling:synthetic"]);
+        assert_eq!(
+            statuses,
+            vec![
+                "acoustic:synthetic".to_owned(),
+                "biofouling:synthetic".to_owned()
+            ]
+        );
         assert!(!findings.invalid);
         assert!(!findings.incomparable);
         assert!(findings.incomplete);
