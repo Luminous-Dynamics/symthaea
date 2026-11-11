@@ -102,19 +102,7 @@ Targets are aspirational; they are not achieved results.
 
 The architecture should orchestrate and qualify specialist tools; it should not attempt to reproduce a commercial CFD solver or physical testing laboratory.
 
-## 8. Sources
-
-- Raven & Klinkenberg, *Practical ship afterbody optimisation by multifidelity techniques* (2023): https://www.marin.nl/en/publications/practical-ship-afterbody-optimisation-by-multifidelity-techniques
-- Cordelier et al., *Multi-fidelity approaches for general constrained Bayesian optimization with application to aircraft design* (2026): https://www.gerad.ca/en/papers/G-2026-17
-- Aydogdu et al., *Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization* (27 March 2026): https://doi.org/10.1007/s11081-026-10078-5
-- Paladaechanan et al., *Ensemble adaptive gated multi-fidelity neural network for Bayesian optimization: Application to hydrofoil design* (15 January 2026): https://doi.org/10.1016/j.oceaneng.2025.123314
-
-## 9. Claim ceiling
-
-A surrogate improvement is not a validated improvement. A multi-fidelity sample-efficiency gain does not demonstrate better ship performance. Final candidates require independently qualified higher-fidelity or physical validation, matched cargo service and declared uncertainty.
-
-
-## 10. Environmental-condition extensions: acoustic noise and hull biofouling
+## 8. Environmental-condition extensions: acoustic noise and hull biofouling
 
 The validated design frontier now includes two measured environmental dimensions that are coupled to propulsor and afterbody choices:
 
@@ -161,7 +149,7 @@ The benchmark should compare:
 
 Report cost to independently validated environmental-service Pareto improvement, not count of cheap surrogate queries.
 
-## 11. Extended falsification suite
+## 9. Extended falsification suite
 
 - A low-fidelity acoustic score cannot qualify a candidate for measured-URN superiority.
 - A modelled or uninspected hull cannot be assigned zero fouling or zero invasive-species risk.
@@ -172,3 +160,13 @@ Report cost to independently validated environmental-service Pareto improvement,
 
 These additions do not alter the earlier acceptance targets; they extend the benchmark's objective and constraint contract.
 
+## 10. Sources
+
+- Raven & Klinkenberg, *Practical ship afterbody optimisation by multifidelity techniques* (2023): https://www.marin.nl/en/publications/practical-ship-afterbody-optimisation-by-multifidelity-techniques
+- Cordelier et al., *Multi-fidelity approaches for general constrained Bayesian optimization with application to aircraft design* (2026): https://www.gerad.ca/en/papers/G-2026-17
+- Aydogdu et al., *Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization* (27 March 2026): https://doi.org/10.1007/s11081-026-10078-5
+- Paladaechanan et al., *Ensemble adaptive gated multi-fidelity neural network for Bayesian optimization: Application to hydrofoil design* (15 January 2026): https://doi.org/10.1016/j.oceaneng.2025.123314
+
+## 11. Claim ceiling
+
+A surrogate improvement is not a validated improvement. A multi-fidelity sample-efficiency gain does not demonstrate better ship performance. Final candidates require independently qualified higher-fidelity or physical validation, matched cargo service and declared uncertainty.
