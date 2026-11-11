@@ -830,8 +830,50 @@ mod tests {
         MidiPerformanceManifestV1, MidiPerformanceNoteReceiptV1, MidiPerformanceTrackReceiptV1,
     };
 
+    fn variable_length_quantity(value: u64) -> Vec<u8> {
+        let mut bytes = [0u8; 10];
+        let mut index = bytes.len() - 1;
+        bytes[index] = (value & 0x7f) as u8;
+        let mut remaining = value >> 7;
+        while remaining > 0 {
+            index -= 1;
+            bytes[index] = ((remaining & 0x7f) as u8) | 0x80;
+            remaining >>= 7;
+        }
+        bytes[index..].to_vec()
+    }
+
+    fn test_midi_bytes(pitch: u8, end_tick: u64) -> Vec<u8> {
+        let mut tempo_track = vec![
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, // 500,000 us/quarter
+            0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08, // 4/4
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let mut note_track = vec![
+            0x00, 0xc0, 0x00, // GM program 0 on channel 0
+            0x00, 0x90, pitch, 100, // NoteOn at tick zero
+        ];
+        note_track.extend(variable_length_quantity(end_tick));
+        note_track.extend_from_slice(&[0x80, pitch, 0x00]); // NoteOff
+        note_track.extend_from_slice(&[0x00, 0xff, 0x2f, 0x00]);
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"MThd");
+        bytes.extend_from_slice(&6u32.to_be_bytes());
+        bytes.extend_from_slice(&1u16.to_be_bytes()); // MIDI Type 1
+        bytes.extend_from_slice(&2u16.to_be_bytes()); // tempo + note tracks
+        bytes.extend_from_slice(&960u16.to_be_bytes());
+        bytes.extend_from_slice(b"MTrk");
+        bytes.extend_from_slice(&(tempo_track.len() as u32).to_be_bytes());
+        bytes.append(&mut tempo_track);
+        bytes.extend_from_slice(b"MTrk");
+        bytes.extend_from_slice(&(note_track.len() as u32).to_be_bytes());
+        bytes.extend_from_slice(&note_track);
+        bytes
+    }
+
     fn midi_artifact(pitch: u8, end_tick: u64) -> MidiPerformanceArtifactV1 {
-        let midi_bytes = b"deterministic-test-midi".to_vec();
+        let midi_bytes = test_midi_bytes(pitch, end_tick);
         let mut manifest = MidiPerformanceManifestV1 {
             schema: MIDI_PERFORMANCE_SCHEMA_V1.into(),
             score_digest_schema: symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
@@ -977,6 +1019,27 @@ mod tests {
             AudioEventObservationStatusV1::InsufficientDuration
         );
         assert!(receipt.note_observations[0].harmonic_salience_db.is_none());
+    }
+
+    #[test]
+    fn midi_file_note_events_must_match_manifest_even_after_resealing_digests() {
+        let mut midi = midi_artifact(69, 1_920);
+        let marker = [0x90, 69, 100];
+        let position = midi
+            .midi_bytes
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .unwrap();
+        midi.midi_bytes[position + 1] = 70;
+        midi.manifest.midi_sha256 = sha256_hex(&midi.midi_bytes);
+        let manifest_bytes = serde_json::to_vec(&midi.manifest).unwrap();
+        midi.manifest_sha256 = domain_separated_sha256(
+            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
+            &manifest_bytes,
+        );
+        let wav = sine_wav(440.0, 1.0);
+        let issues = observe_rendered_audio_events_v1(&wav, &midi).unwrap_err();
+        assert!(issues.contains(&AudioEventObservationIssueV1::MidiBytesDoNotMatchManifest));
     }
 
     #[test]
