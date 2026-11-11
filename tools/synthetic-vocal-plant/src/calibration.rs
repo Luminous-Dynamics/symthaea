@@ -14,8 +14,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::observer::{
-    LPC_ANALYZER_ID, LPC_ANALYZER_VERSION, NoOpCalibrationReport,
-    calibrate_no_op_repeatability, observe_phrase,
+    AUTOCORRELATION_ANALYZER_ID, AUTOCORRELATION_ANALYZER_VERSION, LPC_ANALYZER_ID,
+    LPC_ANALYZER_VERSION, NoOpCalibrationReport, calibrate_no_op_repeatability,
+    observe_phrase,
 };
 use crate::{
     DEFAULT_CROSSFADE_MS, DEFAULT_SAMPLE_RATE_HZ, EditPatch, RENDERER_BACKEND_ID,
@@ -410,7 +411,20 @@ fn metric_repeatability_map(
                 metric.metric_id
             ));
         }
-        map.insert(metric.metric_id.clone(), (metric.unit.clone(), delta));
+        match map.get_mut(&metric.metric_id) {
+            Some((existing_unit, existing_delta)) => {
+                if existing_unit != &metric.unit {
+                    return Err(format!(
+                        "no-op calibration metric {} has inconsistent units",
+                        metric.metric_id
+                    ));
+                }
+                *existing_delta = existing_delta.max(delta);
+            }
+            None => {
+                map.insert(metric.metric_id.clone(), (metric.unit.clone(), delta));
+            }
+        }
     }
     Ok(map)
 }
@@ -544,10 +558,15 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
 
     let mut fitted_sensitivities = Vec::new();
     for ((metric_id, control_id), samples) in &samples_by_cell {
-        let (metric_unit, _) = units_by_metric
+        let metric_unit = units_by_metric
             .get(metric_id)
-            .and_then(|unit| repeatability.get(metric_id).map(|repeat| (unit, repeat)))
+            .ok_or_else(|| format!("metric {metric_id} missing calibration unit"))?;
+        let (repeat_unit, _) = repeatability
+            .get(metric_id)
             .ok_or_else(|| format!("metric {metric_id} missing repeatability observation"))?;
+        if metric_unit != repeat_unit {
+            return Err(format!("metric {metric_id} calibration/repeatability units differ"));
+        }
         let (slope, coefficient_uncertainty, max_residual) =
             fit_through_origin(samples)?;
         fitted_sensitivities.push(FittedSensitivity {
@@ -702,10 +721,13 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
     let calibration_receipt_sha256 = sha256_bytes(&calibration_receipt_bytes);
     let frozen_context_sha256 = sha256_bytes(
         format!(
-            "{}:{}:{}:{}",
+            "{}:{}:{}:{}:{}:{}:{}",
             RENDERER_BACKEND_ID,
             LPC_ANALYZER_ID,
             LPC_ANALYZER_VERSION,
+            AUTOCORRELATION_ANALYZER_ID,
+            AUTOCORRELATION_ANALYZER_VERSION,
+            RESPONSE_FIT_METHOD,
             sample_rate_hz
         )
         .as_bytes(),
