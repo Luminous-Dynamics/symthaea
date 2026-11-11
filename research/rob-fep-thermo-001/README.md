@@ -321,3 +321,11 @@ A dependency-free Rust reference combiner and focused workflow are now included:
 - [adaptive-horizon-reference.yml](../../.github/workflows/adaptive-horizon-reference.yml)
 
 It consumes only prequalified caps, enforces canonical order/common context/prefix closure, preserves all binding ties, and returns Eligible / ZeroHorizon / Blocked. It has 11 authored unit tests and no actuation authorization API. Rust compile/test/Clippy remains an exact-head CI gate.
+
+
+## Counterfactual action-value qualification
+
+A new addendum composes OpenWAM's counterfactual outcome-identification ideas with existing Symthaea owners #598/#664/#9010/#10625/#8764:
+[ counterfactual_action_value_extension.md ](./counterfactual_action_value_extension.md)
+
+It separates prediction accuracy, action-outcome identification, decision ranking and held-out closed-loop value. It requires same-history candidate branches, repeated continuations and held-out selection/evaluation so one lucky rollout cannot masquerade as action value.
