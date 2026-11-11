@@ -38,8 +38,8 @@ jobs:
             --corpus fixtures/ev_battery/mission_capability_v0_1.json \
             > "$RUNNER_TEMP/mission-capability-report.json"
           jq -e '
-            .case_count == 11 and
-            .feasible_count == 4 and
+            .case_count == 12 and
+            .feasible_count == 5 and
             .infeasible_count == 3 and
             .not_computable_count == 1 and
             .unsupported_domain_count == 1 and
@@ -61,6 +61,9 @@ jobs:
             any(.cases[]; .case_id == "exact_reserve_boundary" and
               .disposition == "FEASIBLE_WITHIN_DECLARED_ENVELOPE" and
               .minimum_energy_remaining_above_reserve_kwh_lower == 0) and
+            any(.cases[]; .case_id == "cold_weather_negative_celsius_domain" and
+              .disposition == "FEASIBLE_WITHIN_DECLARED_ENVELOPE" and
+              .battery_energy_accounting_complete == true) and
             any(.cases[]; .case_id == "regen_exceeds_charge_acceptance" and
               .disposition == "INFEASIBLE" and
               .battery_energy_accounting_complete == true and
