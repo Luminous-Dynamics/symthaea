@@ -21,27 +21,30 @@ It also rejects duplicate trial IDs, blank identity fields, malformed expected-t
 Thirty-one unit tests cover the fail-closed audit, manifest and source-adapter scoring cases. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
 
 
-## RoboRecover policy-recovery scoring
+## RoboRecover recovery scoring
 
-The `roborecover_score` module consumes a frozen scenario manifest and normalized source result records.
+The `roborecover_score` module consumes a frozen scenario manifest and normalized source result records. It reports three distinct rate families, all with the same scenario-equal and Macro-9 weighting:
 
-- **Policy-recovery RSR:** calculate each scenario's success rate using policy-attributable task completion, then average scenarios equally.
-- **Macro-9 RSR:** average scenario-equal rates within each of the nine declared occupied Stage–Type groups, then average the nine groups equally.
-- **Physical-safe RSR (Luminous extension):** apply the same scenario/group weighting, but count only physically continuous, executed, upstream-verified compliant completions.
+- **Source environment-completion RSR:** raw source completion evidence. This may include completion during replay before a policy has acted.
+- **Policy-recovery RSR:** task completion attributable to the policy after handoff.
+- **Physical-safe RSR (Luminous extension):** policy-attributable completion plus continuous physical state, a physically realizable intervention, executed actions and upstream verified compliant safety evidence.
 
-Each score is bound to one platform, one split and one policy/intervention `arm_id`. Never pool base-policy, correction, monitor or state-rewind arms into one result. Every planned trial remains in the denominator; missing, duplicate, unplanned, identity-invalid and metadata-mismatched trials do not become successes.
+For every family, Overall RSR averages scenario rates equally; Macro-9 averages rates within the nine declared occupied Stage–Type groups, then gives each group equal weight. One score is bound to one platform, one split and one policy/intervention `arm_id`. Do not pool base-policy, correction, monitor or rewind arms.
 
 ### Source status normalization and an upstream ambiguity
 
-The adapter deliberately distinguishes three things:
+The adapter uses source-specific completion rules:
 
-1. **Source environment completion:** RoboTwin's raw `eval_success_at_end` or LIBERO's completion status.
-2. **Policy-attributable completion:** RoboTwin requires `status=infer_ok`, `inference_steps>0` and `eval_success_at_end=true`; LIBERO requires `status=success` and `inference_steps>0`. `replay_already_done` is a separate replay-preempted result, never policy recovery.
-3. **Physical-safe completion:** additionally requires continuous physical state, a physically realizable intervention, executed actions and upstream verified compliant safety evidence.
+- RoboTwin policy completion requires `status=infer_ok`, `inference_steps>0` and `eval_success_at_end=true`.
+- LIBERO policy completion requires `status=success` and `inference_steps>0`.
+- `replay_already_done` is always a replay-preempted environment completion, never a policy recovery.
+- Contradictory or unknown status/success combinations remain explicit and are not counted as policy success.
 
-This distinction is necessary because the inspected RoboTwin source can emit `status=replay_already_done`, `infer_steps=0` and `eval_success_at_end=true`. Its source summary counts the raw boolean as success while its failed-files list includes the same row. The ambiguity is documented in [upstream RoboRecover issue #2](https://github.com/RUCKBReasoning/RoboRecover/issues/2). The issue's constructed reproducer is not evidence that any published leaderboard result was affected. We therefore report source environment completions, replay-preempted rows, policy-attributable recoveries, unknowns and contradictions separately instead of silently choosing one meaning.
+This distinction is necessary because the inspected RoboTwin source can emit `status=replay_already_done`, `infer_steps=0` and `eval_success_at_end=true`. Its source summary counts the raw boolean as success while its failed-files list includes the same row. The ambiguity is documented in [upstream RoboRecover issue #2](https://github.com/RUCKBReasoning/RoboRecover/issues/2). That issue's constructed reproducer is not evidence that a published result was affected.
 
-The nine Macro-9 groups are frozen explicitly in the manifest and matched to the paper's declared test groups. No group is inferred from whichever scenarios happened to execute. This adapter does not claim to replace the upstream scorer or reproduce published results until exact source revision, evaluator behavior and complete licensed scenario data are pinned and tested.
+The scorer therefore reports source environment completion, replay-preempted rows, policy-attributable recovery, unknown outcomes and contradictory outcomes separately. This is a policy-attribution clarification, not a claim that we have reproduced the paper's published leaderboard results. Full scenario data hosting and redistribution terms remain pending in the upstream repository.
+
+The nine Macro-9 groups are explicitly frozen in the manifest and matched to the paper's declared test groups. No group is inferred from whichever scenarios happened to execute. Missing, duplicate, unplanned, identity-invalid and metadata-mismatched trials remain failures in the planned denominator.
 
 ## Interpretation
 
