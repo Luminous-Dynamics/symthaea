@@ -120,5 +120,34 @@
     "sample_size": "The 54-world upstream evaluation set is an initial external evaluation, not automatically powered for every domain subgroup. Confirmatory work must use a preregistered power analysis and account for only five or six eval worlds in most domains.",
     "independence": "Do not treat the evaluation subset and parent test inventory as independent samples."
   },
-  "claim_ceiling": "This protocol proposes matched experiment-selection and stopping comparisons. No policy arm has been run here. No EVSI advantage, SOTA superiority, safety or causal reasoning competence is claimed."
+  "claim_ceiling": "This protocol proposes matched experiment-selection and stopping comparisons. No policy arm has been run here. No EVSI advantage, SOTA superiority, safety or causal reasoning competence is claimed.",
+  "executable_reference_selector": {
+    "module": "research/aced-adapter-001/qualifier/src/decision_value.rs",
+    "status": "implemented_synthetic_unit_test_reference_not_model_trial",
+    "methods": [
+      {
+        "id": "expected_information_gain",
+        "objective": "Expected entropy reduction in bits minus experiment cost.",
+        "known_limitation": "Can prefer informative observations that do not alter the best downstream action."
+      },
+      {
+        "id": "expected_value_of_sample_information",
+        "objective": "Expected improvement in optimal downstream action utility after an observation, minus experiment cost.",
+        "known_limitation": "Does not account for intervention risk unless a separate risk term is added."
+      },
+      {
+        "id": "risk_adjusted_evsi",
+        "objective": "Expected improvement in optimal downstream action utility minus experiment cost and a preregistered risk-aversion coefficient times experiment risk.",
+        "known_limitation": "The coefficient and risk measure are task-specific assumptions and must be declared before trial execution."
+      }
+    ],
+    "counterexample": "Three hypotheses have prior [0.45, 0.45, 0.10]. Two hypotheses recommend the same action; the low-probability third hypothesis recommends another action. A probe that separates the first two hypotheses reduces entropy but does not change the optimal action. A noisier signal that discriminates the third hypothesis has lower entropy gain but positive decision value. A perfect-information intervention can have higher raw EVSI but be rejected when its declared risk penalty exceeds its value.",
+    "negative_controls": [
+      "malformed likelihoods fail closed",
+      "negative net value returns stop/no experiment",
+      "deterministic identifier tie-break",
+      "risk-adjusted EVSI rejects the high-risk perfect-information experiment in the synthetic counterexample"
+    ],
+    "claim_ceiling": "Purely synthetic algorithmic reference and unit tests. No ACED worlds, hidden world payloads, external data, model calls or human evaluations are executed by this module."
+  }
 }
