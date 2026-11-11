@@ -51,6 +51,8 @@ pub struct StageTypeGroup {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PlannedScenario {
     pub scenario_id: String,
+    /// SHA-256 of the exact upstream scenario JSON from the split manifest.
+    pub scenario_content_sha256: String,
     pub stage: RecoveryStage,
     pub deviation: DeviationType,
     /// Expected independent rollout IDs for this scenario.
@@ -61,6 +63,13 @@ pub struct PlannedScenario {
 pub struct RoboRecoverManifest {
     pub platform: BenchmarkPlatform,
     pub split: BenchmarkSplit,
+    /// Canonical upstream repository and exact source revision.
+    pub source_repository: String,
+    pub source_revision: String,
+    /// Git blob SHA of the exact upstream splits/<platform>_<split>.csv file.
+    pub split_manifest_blob_sha: String,
+    /// SHA-256 of the exact policy-specific evaluator adapter.
+    pub evaluator_digest: String,
     /// One score is one policy/intervention arm; never pool arm IDs.
     pub arm_id: String,
     pub scenarios: Vec<PlannedScenario>,
@@ -166,6 +175,11 @@ pub fn source_reports_environment_completion(trial: &RoboRecoverTrial) -> Option
 pub enum ManifestIssue {
     NoScenarios,
     BlankArmId,
+    BlankSourceRepository,
+    BlankSourceRevision,
+    BlankSplitManifestBlobSha,
+    BlankEvaluatorDigest,
+    BlankScenarioDigest(String),
     BlankScenarioId,
     ScenarioGroupNotInMacro9(StageTypeGroup),
     DuplicateScenarioId(String),
@@ -258,12 +272,29 @@ pub fn validate_manifest(
     if manifest.arm_id.trim().is_empty() {
         issues.push(ManifestIssue::BlankArmId);
     }
+    if manifest.source_repository.trim().is_empty() {
+        issues.push(ManifestIssue::BlankSourceRepository);
+    }
+    if manifest.source_revision.trim().is_empty() {
+        issues.push(ManifestIssue::BlankSourceRevision);
+    }
+    if manifest.split_manifest_blob_sha.trim().is_empty() {
+        issues.push(ManifestIssue::BlankSplitManifestBlobSha);
+    }
+    if manifest.evaluator_digest.trim().is_empty() {
+        issues.push(ManifestIssue::BlankEvaluatorDigest);
+    }
 
     let mut scenario_ids = BTreeSet::new();
     let mut expected_trial_ids = BTreeSet::new();
     let mut group_presence = BTreeSet::new();
 
     for scenario in &manifest.scenarios {
+        if scenario.scenario_content_sha256.trim().is_empty() {
+            issues.push(ManifestIssue::BlankScenarioDigest(
+                scenario.scenario_id.clone(),
+            ));
+        }
         if scenario.scenario_id.trim().is_empty() {
             issues.push(ManifestIssue::BlankScenarioId);
         } else if !scenario_ids.insert(scenario.scenario_id.clone()) {
@@ -406,7 +437,9 @@ pub fn score_roborecover(
             && trial.evidence.arm_id == manifest.arm_id
             && trial.stage == scenario.stage
             && trial.deviation == scenario.deviation
-            && trial.evidence.scenario_id == scenario.scenario_id;
+            && trial.evidence.scenario_id == scenario.scenario_id
+            && trial.evidence.scenario_digest == scenario.scenario_content_sha256
+            && trial.evidence.evaluator_digest == manifest.evaluator_digest;
 
         if !metadata_matches {
             metadata_mismatch_rows += 1;
@@ -547,6 +580,8 @@ pub fn score_roborecover(
                             && trial.stage == scenario.stage
                             && trial.deviation == scenario.deviation
                             && trial.evidence.scenario_id == scenario.scenario_id
+                            && trial.evidence.scenario_digest == scenario.scenario_content_sha256
+                            && trial.evidence.evaluator_digest == manifest.evaluator_digest
                             && trial.evidence.has_complete_identity()
                     })
         })
@@ -613,6 +648,7 @@ mod tests {
             .enumerate()
             .map(|(index, group)| PlannedScenario {
                 scenario_id: format!("scenario-{index}"),
+                scenario_content_sha256: format!("sha256:scenario-{index}"),
                 stage: group.stage,
                 deviation: group.deviation,
                 expected_trial_ids: vec![format!("trial-{index}-0")],
@@ -621,6 +657,10 @@ mod tests {
         RoboRecoverManifest {
             platform: BenchmarkPlatform::RoboTwin,
             split: BenchmarkSplit::Test,
+            source_repository: "RUCKBReasoning/RoboRecover".to_owned(),
+            source_revision: "089b9420e8b7c303e2338a8212a8b6c27c26a79b".to_owned(),
+            split_manifest_blob_sha: "c9b40e12d6f8d2dab723815dfc2e966ea7e62cd5".to_owned(),
+            evaluator_digest: "e335523db8ad4a2e06def1180f0e734334dbbd3b873df69d46873e17face700d".to_owned(),
             arm_id: "base-policy".to_owned(),
             scenarios,
             macro9_groups: groups,
@@ -651,7 +691,7 @@ mod tests {
                 arm_id: "base-policy".to_owned(),
                 policy_digest: "sha256:policy".to_owned(),
                 scenario_digest: format!("sha256:scenario-{scenario_index}"),
-                evaluator_digest: "sha256:evaluator".to_owned(),
+                evaluator_digest: manifest().evaluator_digest,
                 intervention,
                 world_state,
                 executed_action_count: 3,
@@ -963,6 +1003,8 @@ mod tests {
     fn libero_success_status_requires_inference_and_replay_completion_is_separate() {
         let mut m = manifest();
         m.platform = BenchmarkPlatform::Libero;
+        m.split_manifest_blob_sha = "925af3d5ab5e810cd65b86f6d4f35bbc3891d67f".to_owned();
+        m.evaluator_digest = "3e1cd54025389f4fb2b3e60c9bceb7e3ecafaddfc0e8ac4092f1e0313d14c9b1".to_owned();
         let mut success = sample(
             0,
             0,
