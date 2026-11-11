@@ -1290,7 +1290,7 @@ mod tests {
             0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08,
             0x00, 0xff, 0x2f, 0x00,
         ];
-        let mut first = vec![
+        let first = vec![
             0x00, 0xc0, 0x00,
             0x00, 0x90, 60, 90,
             0x87, 0x40, 0x80, 60, 0x00,
@@ -1313,7 +1313,6 @@ mod tests {
             bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
             bytes.extend_from_slice(track);
         }
-        first.clear();
         bytes
     }
 
