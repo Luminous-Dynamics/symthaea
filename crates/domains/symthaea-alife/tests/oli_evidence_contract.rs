@@ -410,6 +410,60 @@ fn disjoint_declared_independence_groups_allow_independent_conflict_record() {
 }
 
 #[test]
+fn identical_artifact_digest_blocks_independent_conflict_claim() {
+    let mut candidate = profile();
+    let digest = "a".repeat(64);
+    let mut supporting = measurement("support-1", EvidenceOutcome::SignalDetected);
+    supporting.independence_group = Some("source-a".to_owned());
+    supporting.artifact_sha256 = Some(digest.clone());
+    let mut contradicting = measurement("contradict-1", EvidenceOutcome::NoDetection);
+    contradicting.independence_group = Some("source-b".to_owned());
+    contradicting.artifact_sha256 = Some(digest);
+    candidate.evidence.extend([supporting, contradicting]);
+
+    let mut property = finding(
+        Property::InformationTransfer,
+        PropertyAssessment::InsufficientEvidence,
+        &["support-1", "contradict-1"],
+    );
+    property.coverage = Some(coverage());
+    property.evidence_conflicts.push(conflict(
+        true,
+        ConflictResolution::Unresolved,
+    ));
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("same artifact cannot be independent evidence");
+    assert!(errors.iter().any(|error| error.contains("identical artifact digest")));
+}
+
+#[test]
+fn independently_sourced_conflict_can_be_adjudicated_for_support() {
+    let mut candidate = profile();
+    let mut supporting = measurement("support-1", EvidenceOutcome::SignalDetected);
+    supporting.independence_group = Some("source-a".to_owned());
+    supporting.artifact_sha256 = Some("a".repeat(64));
+    let mut contradicting = measurement("contradict-1", EvidenceOutcome::NoDetection);
+    contradicting.independence_group = Some("source-b".to_owned());
+    contradicting.artifact_sha256 = Some("b".repeat(64));
+    candidate.evidence.extend([supporting, contradicting]);
+
+    let mut property = finding(
+        Property::InformationTransfer,
+        PropertyAssessment::SupportedWithinScope,
+        &["support-1", "contradict-1"],
+    );
+    property.coverage = Some(coverage());
+    property.evidence_conflicts.push(conflict(
+        true,
+        ConflictResolution::ResolvedForSupport,
+    ));
+    candidate.findings.push(property);
+
+    assert!(candidate.validate().is_ok());
+}
+
+#[test]
 fn conflict_evidence_must_be_linked_to_the_containing_property_finding() {
     let mut candidate = profile();
     let mut supporting = measurement("support-1", EvidenceOutcome::SignalDetected);
