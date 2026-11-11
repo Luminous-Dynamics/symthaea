@@ -275,12 +275,15 @@ pub struct RoboRecoverScoreReport {
     pub source_environment_completions: usize,
     pub replay_preempted_rows: usize,
     pub policy_recovery_successes: usize,
+    pub policy_not_completed_rows: usize,
     pub unknown_policy_outcome_rows: usize,
     pub contradictory_policy_outcome_rows: usize,
     pub physical_safe_successes: usize,
     pub missing_expected_trial_ids: Vec<String>,
     pub duplicate_trial_ids: Vec<String>,
-    pub audit: AuditReport,
+    /// Low-level trial-ID/identity audit. The accepted_trial_rows count above
+    /// additionally applies platform, split, source, policy and evaluator matching.
+    pub identity_audit: AuditReport,
     pub scenarios: Vec<ScenarioScore>,
     pub groups: Vec<GroupScore>,
     /// Scenario-equal source-reported environment completion rate. May include replay preemption.
@@ -490,6 +493,7 @@ pub fn score_roborecover(
     let mut source_environment_completions = 0;
     let mut replay_preempted_rows = 0;
     let mut policy_recovery_successes = 0;
+    let mut policy_not_completed_rows = 0;
     let mut unknown_policy_outcome_rows = 0;
     let mut contradictory_policy_outcome_rows = 0;
     let mut physical_safe_successes = 0;
@@ -542,9 +546,9 @@ pub fn score_roborecover(
                 accumulator.policy_recovery_successes += 1;
             }
             PolicyCompletion::ReplayPreempted => replay_preempted_rows += 1,
+            PolicyCompletion::NotCompleted => policy_not_completed_rows += 1,
             PolicyCompletion::Unknown => unknown_policy_outcome_rows += 1,
             PolicyCompletion::Contradictory => contradictory_policy_outcome_rows += 1,
-            PolicyCompletion::NotCompleted => {}
         }
 
         if classify_policy_completion(trial) == PolicyCompletion::PolicyCompleted
@@ -701,12 +705,13 @@ pub fn score_roborecover(
         source_environment_completions,
         replay_preempted_rows,
         policy_recovery_successes,
+        policy_not_completed_rows,
         unknown_policy_outcome_rows,
         contradictory_policy_outcome_rows,
         physical_safe_successes,
         missing_expected_trial_ids,
         duplicate_trial_ids: audit.duplicate_trial_ids.clone(),
-        audit,
+        identity_audit: audit,
         scenarios: scenario_scores,
         groups: group_scores,
         source_environment_completion_overall_rsr,
@@ -877,7 +882,7 @@ mod tests {
         assert_eq!(report.physical_safe_successes, 0);
         assert!((report.policy_recovery_overall_rsr - (1.0 / 9.0)).abs() < 1e-12);
         assert_eq!(report.physical_safe_overall_rsr, 0.0);
-        assert_eq!(report.audit.safety_violation_rows, 1);
+        assert_eq!(report.identity_audit.safety_violation_rows, 1);
     }
 
     #[test]
@@ -896,7 +901,7 @@ mod tests {
         let report = score_roborecover(&m, &[trial]).unwrap();
         assert_eq!(report.policy_recovery_successes, 1);
         assert_eq!(report.physical_safe_successes, 0);
-        assert_eq!(report.audit.simulator_rewind_rows, 1);
+        assert_eq!(report.identity_audit.simulator_rewind_rows, 1);
     }
 
     #[test]
@@ -1175,6 +1180,7 @@ mod tests {
         let report = score_roborecover(&m, &[trial]).unwrap();
         assert_eq!(report.accepted_trial_rows, 1);
         assert_eq!(report.policy_recovery_successes, 0);
+        assert_eq!(report.policy_not_completed_rows, 0);
         assert_eq!(report.unknown_policy_outcome_rows, 1);
         assert_eq!(report.physical_safe_successes, 0);
     }
@@ -1456,6 +1462,24 @@ mod tests {
             classify_policy_completion(&trial),
             PolicyCompletion::ReplayPreempted
         );
+    }
+
+
+    #[test]
+    fn known_policy_failure_is_reported_separately_from_unknown_or_contradictory() {
+        let m = manifest();
+        let mut trial = failed_trial(
+            0,
+            0,
+        );
+        trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+
+        let report = score_roborecover(&m, &[trial]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 1);
+        assert_eq!(report.policy_recovery_successes, 0);
+        assert_eq!(report.policy_not_completed_rows, 1);
+        assert_eq!(report.unknown_policy_outcome_rows, 0);
+        assert_eq!(report.contradictory_policy_outcome_rows, 0);
     }
 
 }
