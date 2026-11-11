@@ -573,13 +573,7 @@
         "selected_horizon_ticks": 20,
         "binding_constraints": [
           "freshness",
-          "deadline",
-          "thermal",
-          "actuator",
-          "dynamics",
-          "viability",
-          "queue",
-          "continuity"
+          "queue"
         ],
         "eligible_for_independent_projection": true,
         "actuation_authorized": false
