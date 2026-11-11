@@ -11,14 +11,14 @@ The crate audits trial identities and separates:
 - human handoff;
 - task failure and infrastructure-indeterminate outcomes.
 
-It also rejects duplicate trial IDs, blank identity fields, and trials outside an optional frozen expected-trial manifest. Missing expected trials remain visible instead of disappearing from the denominator.
+It also rejects duplicate trial IDs, blank identity fields, malformed expected-trial manifests (duplicate or blank IDs), and trials outside a frozen manifest. Missing expected trials remain visible instead of disappearing from the denominator. Raw observed rewind and safety-violation markers remain visible even when a row is excluded from confirmatory accounting.
 
 ## Run
 
     cargo test -p symthaea-robotics-recovery-audit
     cargo fmt --manifest-path crates/domains/symthaea-robotics-recovery-audit/Cargo.toml -- --check
 
-The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, benchmark-specific score implementation, sensor classifier, or physical safety controller.
+Thirteen unit tests cover the fail-closed cases. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, benchmark-specific score implementation, sensor classifier, or physical safety controller.
 
 ## Interpretation
 
