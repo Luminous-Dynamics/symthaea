@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
+      # This is a standalone harness with pinned dependencies; root workspace
+      # manifest/lock changes do not alter its inputs or test corpus.
       - "crates/domains/symthaea-culinary/**"
       - "tools/beverage-benchmark-harness/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
@@ -15,8 +15,8 @@ on:
       - ".github/workflows/beverage-benchmark.yml"
   pull_request:
     paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
+      # This is a standalone harness with pinned dependencies; root workspace
+      # manifest/lock changes do not alter its inputs or test corpus.
       - "crates/domains/symthaea-culinary/**"
       - "tools/beverage-benchmark-harness/**"
       - "docs/research/BEVERAGE_ENGINEERING_BENCHMARK_V1.md"
