@@ -1135,7 +1135,7 @@ mod tests {
     #[test]
     fn action_law_violation_is_rejected() {
         let mut action = c2_action();
-        action.permutations[1] = vec![1, 0, 2, 3];
+        action.permutations[1] = vec![1, 2, 3, 0];
         assert_eq!(
             validate_action(&action, 4, QualificationBudgetV1::default()),
             Err(QuotientErrorV1::ActionLawViolation)
