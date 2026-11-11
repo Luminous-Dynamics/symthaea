@@ -863,6 +863,14 @@ mod tests {
         );
         assert!(report.selected_proposal.as_ref().unwrap().proposal_only);
         assert_eq!(report.feasible_candidate_count, 2);
+        let selected_record = report
+            .candidate_evaluations
+            .iter()
+            .find(|record| record.candidate_id == "minimum-safe")
+            .unwrap();
+        assert_eq!(selected_record.deltas.len(), 2);
+        assert_eq!(selected_record.deltas[0].control_id, "pitch_offset");
+        assert_eq!(selected_record.deltas[0].delta, 1.0);
     }
 
     #[test]
