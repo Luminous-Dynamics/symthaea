@@ -754,24 +754,34 @@ mod tests {
 
     #[test]
     fn embodiment_schema_context_encoder_and_runtime_are_part_of_identity() {
-        let mut candidate_identity = identity();
-        candidate_identity.robot_embodiment_digest = "9".repeat(64);
-        assert_eq!(
-            select_policy(&context(), &identity(), &[record("p", 99, 0)], &RouterConfig::default())
-                .unwrap()
-                .rejected_records
-                .get(&RouterRejection::IdentityMismatch),
-            Some(&1)
-        );
+        let mutations: [fn(&mut RouterEvidenceIdentity); 4] = [
+            |identity| identity.robot_embodiment_digest = "9".repeat(64),
+            |identity| identity.observation_action_schema_digest = "8".repeat(64),
+            |identity| identity.context_encoder_digest = "7".repeat(64),
+            |identity| identity.runtime_environment_digest = "6".repeat(64),
+        ];
 
-        candidate_identity = identity();
-        candidate_identity.observation_action_schema_digest = "8".repeat(64);
-        assert_eq!(
-            select_policy(&context(), &candidate_identity, &[record("p", 99, 0)], &RouterConfig::default())
-                .unwrap()
-                .evidence_identity,
-            candidate_identity
-        );
+        for mutate in mutations {
+            let expected = identity();
+            let mut supplied = identity();
+            mutate(&mut supplied);
+
+            let decision = select_policy(
+                &context(),
+                &supplied,
+                &[record("policy", 99, 0)],
+                &RouterConfig::default(),
+            )
+            .unwrap();
+
+            assert!(decision.selected.is_none());
+            assert_eq!(
+                decision.rejected_records.get(&RouterRejection::IdentityMismatch),
+                Some(&1)
+            );
+            assert_eq!(decision.evidence_identity, supplied);
+            assert_ne!(decision.evidence_identity, expected);
+        }
     }
 
     #[test]
