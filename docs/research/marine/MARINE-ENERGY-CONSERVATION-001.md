@@ -42,7 +42,7 @@ For the whole declared system:
 
 Internal transfers cancel. The auditor calculates both component and system residuals and checks them against supplied expanded-uncertainty budgets.
 
-A residual within a declared budget is only BALANCED_WITHIN_DECLARED_UNCERTAINTY. It is not proof that meters, boundary definitions, calibrations or uncertainty propagation are correct. Engineering allowance is not accepted as metrology uncertainty and cannot create a qualifying pass.
+A residual within a declared budget is only BALANCED_WITHIN_DECLARED_UNCERTAINTY. It is not proof that meters, boundary definitions, calibrations or uncertainty propagation are correct. Engineering allowance is not accepted as metrology uncertainty and cannot create a qualifying pass. The system-level tolerance field is the conservative sum of component tolerance bounds (triangle-inequality bound), not a covariance-aware statistical propagation. Component-level checks remain authoritative; the aggregate can never rescue a failed component.
 
 Unknown flows/losses/storage changes make the balance INCOMPLETE, never zero. A residual outside the declared budget is UNBALANCED; malformed or unresolved flow graphs are INVALID.
 
