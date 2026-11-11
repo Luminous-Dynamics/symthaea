@@ -10,17 +10,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
     InterventionKind, WorldStateContinuity,
-    roborecover_manifest::{pinned_split_blob_sha, ROBORECOVER_SOURCE_REPOSITORY, ROBORECOVER_SOURCE_REVISION},
+    roborecover_manifest::{
+        pinned_split_blob_sha, PinnedTrainingParentFrame, ROBORECOVER_SOURCE_REPOSITORY,
+        ROBORECOVER_SOURCE_REVISION,
+    },
     roborecover_score::{BenchmarkPlatform, BenchmarkSplit, DeviationType, RecoveryStage},
 };
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ParentScenarioIdentity {
-    pub scenario_sha256: String,
-    pub task_name: String,
-    pub stage: RecoveryStage,
-    pub deviation: DeviationType,
-}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DiscoveryCampaignManifest {
@@ -28,9 +23,8 @@ pub struct DiscoveryCampaignManifest {
     pub platform: BenchmarkPlatform,
     /// Challenge generation is restricted to the official training split.
     pub source_split: BenchmarkSplit,
-    /// Exact parent frame imported from the pinned 800-row training CSV.
-    /// Candidate IDs, hashes, task names and Stage–Type fields must join this frame.
-    pub allowed_parent_scenarios: BTreeMap<String, ParentScenarioIdentity>,
+    /// Opaque parent frame emitted by the pinned split CSV importer.
+    pub pinned_training_parent_frame: PinnedTrainingParentFrame,
     pub source_repository: String,
     pub source_revision: String,
     pub train_split_manifest_blob_sha: String,
@@ -218,12 +212,12 @@ pub fn validate_campaign_manifest(
     if !manifest.simulator_hours.is_finite() || manifest.simulator_hours <= 0.0 {
         issues.push(DiscoveryManifestIssue::InvalidSimulatorHours);
     }
-    if manifest.allowed_parent_scenarios.len() != 800
-        || manifest.allowed_parent_scenarios.iter().any(|(sample_id, parent)| {
-            !valid_id(sample_id)
-                || !valid_hex(&parent.scenario_sha256, 64)
-                || parent.task_name.trim().is_empty()
-        })
+    if manifest.pinned_training_parent_frame.len() != 800
+        || !manifest.pinned_training_parent_frame.matches_source(
+            &manifest.source_repository,
+            &manifest.source_revision,
+            &manifest.train_split_manifest_blob_sha,
+        )
     {
         issues.push(DiscoveryManifestIssue::InvalidParentFrame);
     }
@@ -235,7 +229,7 @@ fn candidate_identity_matches(
     candidate: &DiscoveryCandidate,
     manifest: &DiscoveryCampaignManifest,
 ) -> bool {
-    let Some(parent) = manifest.allowed_parent_scenarios.get(&candidate.parent_sample_id) else {
+    let Some(parent) = manifest.pinned_training_parent_frame.get(&candidate.parent_sample_id) else {
         return false;
     };
 
