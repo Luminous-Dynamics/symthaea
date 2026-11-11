@@ -125,6 +125,20 @@ The module includes negative controls for malformed probability models, determin
 
 The selector is a reference baseline, not a claim of general optimality. In a real trial, posterior probabilities, likelihood calibration, utility functions and risk weights must be supplied from information available to the agent before observing the outcome. The hidden ACED SCM, oracle fix and grader must never be used to fit or backfill those values.
 
+## Prospective experiment-value trace
+
+The reusable Rust library now also exports `experiment_trace`. Its trace contract records three event types:
+
+1. `experiment_proposal`: exact belief-state digest, selector, outcome probabilities, predicted information gain, predicted value of sample information, risk, risk aversion, cost and predicted net value.
+2. `experiment_observation`: a later event referencing the proposal event ID, with observed / failed / unknown status, an observation digest when available and actual cost.
+3. `stop`: the final evidence-state digest and reason. A stop is rejected if any proposed experiment lacks an observed, failed or unknown reconciliation event.
+
+Each event carries a sequence number, previous-event digest and SHA-256 over a canonical JSON envelope. The validator rejects altered forecasts, hash-chain breaks, unknown/future proposal references, duplicate observations, malformed outcome distributions, inconsistent selector arithmetic, and proposals after stop.
+
+The schema is `EXPERIMENT_VALUE_TRACE_V0_1.schema.json`; the Rust implementation is `qualifier/src/experiment_trace.rs`. Tests validate append-only proposal/observation ordering and negative controls. The trace is not yet wired into an ACED model runner.
+
+**Important limit:** a hash chain alone does not prove when an event was created. To make a forecast genuinely prospective, the event digest must be anchored outside the agent process at proposal time (for example, by a trusted timestamping/signing service or independently controlled append-only recorder). The current module validates structure and internal hash consistency only; it does not provide trusted time, signer identity or WORM storage.
+
 ## Baselines and ablations
 
 Reproduce the official scripted/mock controls and official evaluation protocol where licensing and execution contracts allow. Then compare under matched model snapshot, prompts, tools, 15-experiment/32-turn budgets and compute accounting:
