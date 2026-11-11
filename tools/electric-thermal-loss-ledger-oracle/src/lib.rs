@@ -771,18 +771,24 @@ mod tests {
             Err(LedgerError::NumericalOverflow)
         );
 
-        let source_value = source(
-            "huge-loss",
-            "component",
-            HeatLossKind::Other,
-            f64::MAX,
-            vec![ThermalNodeAllocation {
-                thermal_node_id: "node".to_owned(),
-                fraction: 1.0,
-            }],
-        );
+        let source_values = [
+            source(
+                "huge-loss-a",
+                "component-a",
+                HeatLossKind::Other,
+                f64::MAX,
+                vec![],
+            ),
+            source(
+                "huge-loss-b",
+                "component-b",
+                HeatLossKind::Other,
+                f64::MAX,
+                vec![],
+            ),
+        ];
         assert_eq!(
-            allocate_loss_heat(&[source_value]),
+            allocate_loss_heat(&source_values),
             Err(LedgerError::NumericalOverflow)
         );
         assert!(matches!(
