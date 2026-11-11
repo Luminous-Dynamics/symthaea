@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 use std::f64::consts::TAU;
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-propulsion-observation-oracle-v0.2.0";
+pub const MODEL_VERSION: &str = "electric-propulsion-observation-oracle-v0.3.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimeDomain {
