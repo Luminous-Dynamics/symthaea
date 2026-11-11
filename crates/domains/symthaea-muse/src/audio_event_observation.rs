@@ -520,7 +520,7 @@ fn decode_wav(wav_bytes: &[u8]) -> Result<DecodedWavV1, AudioEventObservationIss
     })
 }
 
-fn expected_frame(tick: u64, tempo_us: u32, ppq: u16, sample_rate: u32) -> Option<u64> {
+pub(crate) fn expected_frame(tick: u64, tempo_us: u32, ppq: u16, sample_rate: u32) -> Option<u64> {
     if ppq == 0 {
         return None;
     }
