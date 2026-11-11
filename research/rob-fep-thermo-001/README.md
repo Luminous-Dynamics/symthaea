@@ -381,3 +381,6 @@ The programme now distinguishes:
 - starvation: fraction of control steps without a valid queued action.
 
 For fleet experiments, add Round Robin, EDF and Armory Lookahead; compare against a Luminous mission-aware admission/batching candidate under equal robot/model/compute budgets. Measure per-tier and per-robot service, not only total throughput.
+
+
+The distributed-inference fixture corpus has expanded to 24 cases. DI23 introduces an empirical PoMA-style outcome (7/100 missed actuation windows = 0.07) and separately records missed-actuation task-loss cost. DI24 requires a matched heterogeneous-fleet comparison across Round Robin, EDF, Armory Lookahead and the Luminous candidate, with per-robot starvation, per-tier throughput and safety reporting. These are synthetic schema/semantic controls, not measured benchmark results.
