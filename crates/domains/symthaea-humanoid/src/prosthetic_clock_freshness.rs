@@ -43,6 +43,8 @@ pub struct SourceClockCorrelationV1 {
     pub firmware_revision_ref: String,
     /// Exact DAQ/acquisition configuration reference.
     pub acquisition_configuration_ref: String,
+    /// Whether source timestamps are guaranteed nondecreasing within this epoch.
+    pub source_time_monotonic: bool,
     /// Source-clock anchor, normalized to nanoseconds.
     pub source_anchor_ns: u64,
     /// Immutable identity of the receiver monotonic clock profile.
@@ -123,6 +125,8 @@ pub enum SourceFreshnessIndeterminateReason {
     InvalidCorrelationInterval,
     /// The declared drift bound is too large to guarantee a positive clock rate.
     InvalidDriftBound,
+    /// This clock profile does not guarantee monotonic source timestamps.
+    UnsupportedNonMonotonicSourceClock,
     /// The source timestamp is outside the correlation's declared validity.
     ObservationOutsideCorrelationValidity,
     /// Evaluation time precedes trusted receive time.
@@ -261,6 +265,12 @@ pub fn assess_source_capture_freshness(
     if correlation.drift_bound_ppm >= 1_000_000 {
         return indeterminate(SourceFreshnessIndeterminateReason::InvalidDriftBound, None);
     }
+    if !correlation.source_time_monotonic {
+        return indeterminate(
+            SourceFreshnessIndeterminateReason::UnsupportedNonMonotonicSourceClock,
+            None,
+        );
+    }
     if observation.source_timestamp_ns < correlation.valid_source_from_ns
         || observation.source_timestamp_ns > correlation.valid_source_until_ns
     {
@@ -351,6 +361,7 @@ pub struct SourceEpochReplayGuard {
     active_epochs: HashMap<(String, String), String>,
     seen_epochs: HashSet<(String, String, String)>,
     last_sequences: HashMap<(String, String, String), u64>,
+    last_source_timestamps: HashMap<(String, String, String), u64>,
 }
 
 /// Errors returned by the epoch-scoped replay guard.
@@ -370,6 +381,8 @@ pub enum SourceEpochReplayError {
     InactiveOrUnknownEpoch,
     /// Sequence is not strictly increasing within its exact epoch.
     NonIncreasingSequence,
+    /// Source timestamp regressed within an epoch declared monotonic.
+    SourceTimestampRegression,
 }
 
 impl SourceEpochReplayGuard {
@@ -478,7 +491,16 @@ impl SourceEpochReplayGuard {
         {
             return Err(SourceEpochReplayError::NonIncreasingSequence);
         }
-        self.last_sequences.insert(epoch_key, observation.sequence);
+        if self
+            .last_source_timestamps
+            .get(&epoch_key)
+            .is_some_and(|previous| observation.source_timestamp_ns < *previous)
+        {
+            return Err(SourceEpochReplayError::SourceTimestampRegression);
+        }
+        self.last_sequences.insert(epoch_key.clone(), observation.sequence);
+        self.last_source_timestamps
+            .insert(epoch_key, observation.source_timestamp_ns);
         Ok(())
     }
 }
@@ -494,6 +516,7 @@ mod tests {
             source_clock_epoch_ref: "boot-7".into(),
             firmware_revision_ref: "firmware-3".into(),
             acquisition_configuration_ref: "daq-config-2".into(),
+            source_time_monotonic: true,
             source_anchor_ns: 100,
             receiver_anchor_monotonic_ns: 1_000,
             receiver_clock_profile_ref: "receiver-monotonic-v1".into(),
@@ -713,6 +736,16 @@ mod tests {
     #[test]
     fn rejects_unbounded_drift_and_evaluation_before_receive() {
         let mut clock = correlation();
+        clock.source_time_monotonic = false;
+        assert!(matches!(
+            assess_source_capture_freshness(&clock, &observation(), 20),
+            SourceFreshnessAssessment::Indeterminate {
+                reason: SourceFreshnessIndeterminateReason::UnsupportedNonMonotonicSourceClock,
+                ..
+            }
+        ));
+
+        let mut clock = correlation();
         clock.drift_bound_ppm = 1_000_000;
         assert!(matches!(
             assess_source_capture_freshness(&clock, &observation(), 20),
@@ -770,8 +803,17 @@ mod tests {
             Err(SourceEpochReplayError::NonIncreasingSequence)
         );
 
+        let mut regression = observation();
+        regression.sequence = 2;
+        regression.source_timestamp_ns = 109;
+        assert_eq!(
+            guard.admit_sequence(&regression),
+            Err(SourceEpochReplayError::SourceTimestampRegression)
+        );
+
         let mut next = observation();
         next.sequence = 2;
+        next.source_timestamp_ns = 111;
         guard.admit_sequence(&next).unwrap();
 
         guard
