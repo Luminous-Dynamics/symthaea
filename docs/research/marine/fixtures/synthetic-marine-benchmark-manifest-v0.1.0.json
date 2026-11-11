@@ -1,0 +1,224 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "SYNTHETIC-MARINE-ROUTE-ROBUSTNESS-0001",
+  "revision": "0.1.0",
+  "title": "Synthetic common-case manifest for forecast-aware ship routing",
+  "task_class": "voyage_routing",
+  "claim_stage": "synthetic_smoke",
+  "reference_case": {
+    "case_id": "SYNTHETIC-WAPS-CASE-0001",
+    "case_schema_id": "urn:luminous-dynamics:marine-propulsion-case:0.4.0",
+    "case_schema_version": "0.4.0",
+    "case_content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "service_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "configuration_revision": "SYNTHETIC-CONFIG-REV-0001",
+    "environment_fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "geometry_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "datasets": [
+    {
+      "dataset_id": "SYNTHETIC-FORECAST-ROUTE-SCENARIOS-0001",
+      "evidence_class": "synthetic",
+      "unit_of_analysis": "voyage",
+      "time_period": "Synthetic software fixture only; no real voyage period.",
+      "rights_status": "not_applicable",
+      "license_or_access_basis": "Synthetic generated test values; contains no real vessel observations.",
+      "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "source_ids": [
+        "SYNTHETIC-BENCHMARK-ONLY"
+      ],
+      "transformations": [
+        "Deterministic hand-authored scenarios for schema/audit smoke tests only."
+      ],
+      "limitations": [
+        "Not measured weather, route, fuel, vessel or performance data.",
+        "Cannot support physical, fuel-saving, safety or regulatory claims."
+      ]
+    }
+  ],
+  "evaluation_protocol": {
+    "split_strategy": "grouped_route_season",
+    "partition_unit": "route_season",
+    "held_out_partition_ids": [
+      "SYNTHETIC-HELDOUT-ROUTE-SEASON-01"
+    ],
+    "purge_or_embargo": "Hold out entire route-season blocks; no adjacent-window leakage. Synthetic fixture contains no training/test rows.",
+    "forecast_vintage_required": true,
+    "operational_inputs_only": true,
+    "future_observations_prohibited": true,
+    "same_service_fingerprint_required": true,
+    "environment_boundary_separate": true,
+    "leakage_audits": [
+      {
+        "audit_id": "future_weather_not_available_at_decision",
+        "result": "not_run",
+        "evidence_reference": "Synthetic protocol declaration only."
+      },
+      {
+        "audit_id": "feature_target_arithmetic_leakage",
+        "result": "not_run",
+        "evidence_reference": "No model inputs or targets exist in this smoke fixture."
+      }
+    ],
+    "reproduction_command": "cargo run --bin marine-benchmark-manifest-audit -- <schema.json> <manifest.json>"
+  },
+  "baselines": [
+    {
+      "baseline_id": "B0",
+      "name": "Slow steaming",
+      "algorithm_family": "fixed_speed_policy",
+      "version": "reference-v1",
+      "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "deployable": true,
+      "oracle_only": false,
+      "limitations": [
+        "Synthetic manifest placeholder; no score."
+      ]
+    },
+    {
+      "baseline_id": "B1",
+      "name": "Distributional QR-DQN + Wasserstein DRO",
+      "algorithm_family": "distributional_reinforcement_learning_plus_DRO",
+      "version": "research-baseline-reference",
+      "configuration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "deployable": true,
+      "oracle_only": false,
+      "limitations": [
+        "Published 2026 method comparator; must be independently reimplemented on common inputs before ranking."
+      ]
+    },
+    {
+      "baseline_id": "B2",
+      "name": "CVaR + DRO risk-aware digital twin",
+      "algorithm_family": "reduced_order_digital_twin_plus_CVaR_DRO",
+      "version": "research-baseline-reference",
+      "configuration_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "deployable": true,
+      "oracle_only": false,
+      "limitations": [
+        "Published short-sea method comparator; not a high-fidelity CFD model."
+      ]
+    },
+    {
+      "baseline_id": "B3",
+      "name": "Perfect-foresight DP",
+      "algorithm_family": "dynamic_programming",
+      "version": "offline-oracle-v1",
+      "configuration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "deployable": false,
+      "oracle_only": true,
+      "limitations": [
+        "Non-deployable clairvoyant reference; not eligible as an operational baseline."
+      ]
+    }
+  ],
+  "metric_contracts": [
+    {
+      "metric_id": "fuel_energy_per_delivered_cargo_work",
+      "unit": "MJ/tonne-nautical_mile",
+      "boundary": "Whole-vessel fuel and electrical energy divided by delivered cargo transport work under the frozen service contract.",
+      "direction": "minimize",
+      "aggregation": "distribution",
+      "stratification": [
+        "route_season",
+        "wind_sector",
+        "sea_state",
+        "loading_condition",
+        "WAPS_state"
+      ],
+      "uncertainty_required": true
+    },
+    {
+      "metric_id": "arrival_delay",
+      "unit": "h",
+      "boundary": "Actual/realized arrival minus contracted arrival time.",
+      "direction": "minimize",
+      "aggregation": "p95",
+      "stratification": [
+        "route_season",
+        "port_call",
+        "weather_regime"
+      ],
+      "uncertainty_required": true
+    },
+    {
+      "metric_id": "service_penalty_cvar95",
+      "unit": "declared_service_penalty_units",
+      "boundary": "Pre-registered service loss function covering delay, reserve and missed contract work.",
+      "direction": "minimize",
+      "aggregation": "cvar95",
+      "stratification": [
+        "route_season",
+        "failure_mode"
+      ],
+      "uncertainty_required": true
+    },
+    {
+      "metric_id": "controller_regret_vs_perfect_foresight",
+      "unit": "fraction_of_oracle_objective",
+      "boundary": "Difference in objective under identical scenario and hard constraints; oracle is not deployable.",
+      "direction": "minimize",
+      "aggregation": "p95",
+      "stratification": [
+        "forecast_horizon",
+        "forecast_bias",
+        "distribution_shift"
+      ],
+      "uncertainty_required": true
+    }
+  ],
+  "hard_gates": [
+    {
+      "gate_id": "same_service",
+      "description": "All compared policies deliver the same declared cargo service and arrival contract.",
+      "compensable": false,
+      "failure_disposition": "INCOMPARABLE"
+    },
+    {
+      "gate_id": "forecast_no_lookahead",
+      "description": "Deployable policies receive only forecasts/observations available at decision time.",
+      "compensable": false,
+      "failure_disposition": "BLOCKED"
+    },
+    {
+      "gate_id": "safety_reserve",
+      "description": "All independently supplied safety, reserve, battery and actuator constraints remain non-compensable.",
+      "compensable": false,
+      "failure_disposition": "BLOCKED"
+    }
+  ],
+  "source_registry": [
+    {
+      "source_id": "SYNTHETIC-BENCHMARK-ONLY",
+      "title": "Synthetic benchmark manifest fixture",
+      "uri": "https://github.com/Luminous-Dynamics/symthaea",
+      "evidence_class": "synthetic_protocol_fixture",
+      "limitations": [
+        "No physical evidence or measured data."
+      ]
+    },
+    {
+      "source_id": "ROUTING-DRO-DISTRL-2026-TRD-105598",
+      "title": "Robust low-carbon ship routing under weather uncertainty",
+      "uri": "https://doi.org/10.1016/j.trd.2026.105598",
+      "evidence_class": "peer_reviewed_single_corridor_method_comparator",
+      "limitations": [
+        "Author-reported results; not independent validation or common-case benchmark scores."
+      ]
+    },
+    {
+      "source_id": "RISK-AWARE-SHORTSEA-DT-CVAR-DRO-2026-JEMS-95826",
+      "title": "Risk-aware digital twin speed optimization on İstanbul-Piraeus",
+      "uri": "https://doi.org/10.4274/jems.2026.95826",
+      "evidence_class": "peer_reviewed_single_corridor_method_comparator",
+      "limitations": [
+        "Author-reported results; single short-sea case and reduced-order model."
+      ]
+    }
+  ],
+  "claim_ceiling": "This synthetic manifest demonstrates protocol structure only. It contains no performance results and cannot establish prediction accuracy, fuel savings, safe operation, seaworthiness, statutory compliance or vessel qualification.",
+  "limitations": [
+    "Baseline entries are method labels only; the synthetic fixture has no fitted models or score receipts.",
+    "Cross-paper results are not comparable until independently reproduced under the same service, vessel, route, forecast vintage and metric boundaries."
+  ]
+}
