@@ -198,6 +198,7 @@ pub enum ManifestIssue {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScenarioScore {
     pub scenario_id: String,
+    pub scenario_content_sha256: String,
     pub stage: RecoveryStage,
     pub deviation: DeviationType,
     pub expected_trials: usize,
@@ -223,6 +224,10 @@ pub struct GroupScore {
 pub struct RoboRecoverScoreReport {
     pub platform: BenchmarkPlatform,
     pub split: BenchmarkSplit,
+    pub source_repository: String,
+    pub source_revision: String,
+    pub split_manifest_blob_sha: String,
+    pub evaluator_digest: String,
     pub arm_id: String,
     pub scenario_count: usize,
     pub expected_trial_count: usize,
@@ -504,6 +509,7 @@ pub fn score_roborecover(
 
         scenario_scores.push(ScenarioScore {
             scenario_id: scenario.scenario_id.clone(),
+            scenario_content_sha256: scenario.scenario_content_sha256.clone(),
             stage: scenario.stage,
             deviation: scenario.deviation,
             expected_trials: scenario.expected_trial_ids.len(),
@@ -615,6 +621,10 @@ pub fn score_roborecover(
     Ok(RoboRecoverScoreReport {
         platform: manifest.platform,
         split: manifest.split,
+        source_repository: manifest.source_repository.clone(),
+        source_revision: manifest.source_revision.clone(),
+        split_manifest_blob_sha: manifest.split_manifest_blob_sha.clone(),
+        evaluator_digest: manifest.evaluator_digest.clone(),
         arm_id: manifest.arm_id.clone(),
         scenario_count: manifest.scenarios.len(),
         expected_trial_count: expected_trial_ids.len(),
@@ -1147,6 +1157,54 @@ mod tests {
         assert!(validate_manifest(&m).unwrap_err().contains(
             &ManifestIssue::InvalidScenarioDigest("scenario-0".to_owned())
         ));
+    }
+
+
+    #[test]
+    fn scenario_and_evaluator_digest_mismatches_block_confirmatory_scoring() {
+        let m = manifest();
+        let mut wrong_scenario = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        wrong_scenario.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        wrong_scenario.evidence.scenario_digest = "f".repeat(64);
+
+        let report = score_roborecover(&m, &[wrong_scenario]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 0);
+        assert_eq!(report.metadata_mismatch_rows, 1);
+        assert_eq!(report.policy_recovery_successes, 0);
+
+        let mut wrong_evaluator = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        wrong_evaluator.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
+        wrong_evaluator.evidence.evaluator_digest = "e".repeat(64);
+
+        let report = score_roborecover(&m, &[wrong_evaluator]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 0);
+        assert_eq!(report.metadata_mismatch_rows, 1);
+        assert_eq!(report.policy_recovery_successes, 0);
+    }
+
+    #[test]
+    fn score_receipt_carries_source_split_evaluator_and_scenario_identity() {
+        let m = manifest();
+        let report = score_roborecover(&m, &[]).unwrap();
+        assert_eq!(report.source_repository, m.source_repository);
+        assert_eq!(report.source_revision, m.source_revision);
+        assert_eq!(report.split_manifest_blob_sha, m.split_manifest_blob_sha);
+        assert_eq!(report.evaluator_digest, m.evaluator_digest);
+        assert_eq!(report.scenarios[0].scenario_content_sha256, m.scenarios[0].scenario_content_sha256);
     }
 
 }
