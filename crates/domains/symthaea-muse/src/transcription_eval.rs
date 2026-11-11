@@ -35,7 +35,10 @@ pub const MIDI_TRANSCRIPTION_DEFAULT_ONSET_TOLERANCE_MS_V1: u32 = 50;
 pub const MIDI_TRANSCRIPTION_DEFAULT_PITCH_TOLERANCE_CENTS_V1: u16 = 50;
 pub const MIDI_TRANSCRIPTION_DEFAULT_OFFSET_RATIO_BPS_V1: u16 = 2_000;
 pub const MIDI_TRANSCRIPTION_DEFAULT_OFFSET_MIN_TOLERANCE_MS_V1: u32 = 50;
+pub const MIDI_TRANSCRIPTION_DEFAULT_FRAME_STEP_MS_V1: u16 = 10;
 pub const MIDI_TRANSCRIPTION_MAX_NOTES_V1: usize = 20_000;
+pub const MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATION_SCANS_V1: usize = 10_000_000;
+pub const MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATIONS_V1: usize = 2_000_000;
 pub const MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1: usize = 2_000_000;
 pub const MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1: usize = 10_000_000;
 
@@ -46,6 +49,7 @@ pub struct MidiTranscriptionEvaluationConfigV1 {
     pub offset_ratio_basis_points: u16,
     pub offset_min_tolerance_ms: u32,
     pub velocity_tolerance: u8,
+    pub frame_step_ms: u16,
 }
 
 impl Default for MidiTranscriptionEvaluationConfigV1 {
@@ -56,6 +60,7 @@ impl Default for MidiTranscriptionEvaluationConfigV1 {
             offset_ratio_basis_points: MIDI_TRANSCRIPTION_DEFAULT_OFFSET_RATIO_BPS_V1,
             offset_min_tolerance_ms: MIDI_TRANSCRIPTION_DEFAULT_OFFSET_MIN_TOLERANCE_MS_V1,
             velocity_tolerance: 10,
+            frame_step_ms: MIDI_TRANSCRIPTION_DEFAULT_FRAME_STEP_MS_V1,
         }
     }
 }
@@ -140,6 +145,11 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub exact_program_full_note_metrics: MidiTranscriptionMetricV1,
     /// Full-note match plus MIDI velocity within the configured tolerance.
     pub velocity_aware_full_note_metrics: MidiTranscriptionMetricV1,
+    /// Framewise pitch activity; simultaneous same-pitch notes collapse into one active cell.
+    pub frame_pitch_metrics: MidiTranscriptionMetricV1,
+    /// Framewise GM-program/pitch activity; not a persistent instrument identity metric.
+    pub frame_program_pitch_metrics: MidiTranscriptionMetricV1,
+    pub frame_step_ms: u16,
     pub velocity_error: MidiTranscriptionValueErrorSummaryV1,
     pub onset_error_ms: MidiTranscriptionTimingErrorSummaryV1,
     pub offset_error_ms: MidiTranscriptionTimingErrorSummaryV1,
@@ -202,6 +212,9 @@ struct ReportCommitmentV1<'a> {
     exact_program_onset_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_full_note_metrics: &'a MidiTranscriptionMetricV1,
     velocity_aware_full_note_metrics: &'a MidiTranscriptionMetricV1,
+    frame_pitch_metrics: &'a MidiTranscriptionMetricV1,
+    frame_program_pitch_metrics: &'a MidiTranscriptionMetricV1,
+    frame_step_ms: u16,
     velocity_error: &'a MidiTranscriptionValueErrorSummaryV1,
     onset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
     offset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
@@ -230,6 +243,11 @@ fn validate_config(
     if config.pitch_tolerance_cents > 1_200 {
         return Err(MidiTranscriptionEvaluationIssueV1::InvalidConfig {
             field: "pitch_tolerance_cents".into(),
+        });
+    }
+    if config.frame_step_ms == 0 || config.frame_step_ms > 1_000 {
+        return Err(MidiTranscriptionEvaluationIssueV1::InvalidConfig {
+            field: "frame_step_ms".into(),
         });
     }
     if config.offset_ratio_basis_points == 0
@@ -942,6 +960,78 @@ fn metric_from_matching(
     }
 }
 
+fn frame_activation_sets(
+    notes: &[EvaluationNoteV1],
+    frame_step_ms: u16,
+) -> Result<
+    (BTreeSet<(u8, u64)>, BTreeSet<(u8, u8, u64)>),
+    MidiTranscriptionEvaluationIssueV1,
+> {
+    let frame_step_seconds = f64::from(frame_step_ms) / 1_000.0;
+    let mut pitch_frames = BTreeSet::new();
+    let mut program_pitch_frames = BTreeSet::new();
+    let mut frame_scans = 0usize;
+
+    for note in notes {
+        let Some(offset_seconds) = note.offset_seconds else {
+            // Unknown release time cannot contribute a defensible frame span.
+            continue;
+        };
+        if !note.onset_seconds.is_finite()
+            || !offset_seconds.is_finite()
+            || note.onset_seconds < 0.0
+            || offset_seconds <= note.onset_seconds
+        {
+            continue;
+        }
+        // Frames are half-open time cells. A note activates every cell with
+        // non-zero interval overlap; repeated same-pitch activations collapse
+        // to one pitch/frame for the instrument-agnostic view.
+        let start_value = (note.onset_seconds / frame_step_seconds).floor();
+        let end_value = (offset_seconds / frame_step_seconds).ceil();
+        if !start_value.is_finite()
+            || !end_value.is_finite()
+            || start_value < 0.0
+            || end_value > u64::MAX as f64
+        {
+            return Err(MidiTranscriptionEvaluationIssueV1::FrameActivationBudgetExceeded {
+                scans: usize::MAX,
+                maximum: MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATION_SCANS_V1,
+            });
+        }
+        let start = start_value as u64;
+        let end = (end_value as u64).max(start.saturating_add(1));
+        for frame in start..end {
+            frame_scans = frame_scans.saturating_add(1);
+            if frame_scans > MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATION_SCANS_V1 {
+                return Err(MidiTranscriptionEvaluationIssueV1::FrameActivationBudgetExceeded {
+                    scans: frame_scans,
+                    maximum: MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATION_SCANS_V1,
+                });
+            }
+            pitch_frames.insert((note.pitch_midi, frame));
+            program_pitch_frames.insert((note.gm_program, note.pitch_midi, frame));
+            if pitch_frames.len() > MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATIONS_V1
+                || program_pitch_frames.len() > MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATIONS_V1
+            {
+                return Err(MidiTranscriptionEvaluationIssueV1::FrameActivationBudgetExceeded {
+                    scans: frame_scans,
+                    maximum: MIDI_TRANSCRIPTION_MAX_FRAME_ACTIVATIONS_V1,
+                });
+            }
+        }
+    }
+    Ok((pitch_frames, program_pitch_frames))
+}
+
+fn metric_from_set_counts(
+    reference_count: usize,
+    predicted_count: usize,
+    true_positive_count: usize,
+) -> MidiTranscriptionMetricV1 {
+    metric_from_matching(reference_count, predicted_count, true_positive_count)
+}
+
 fn value_error_summary(values: &[f64]) -> MidiTranscriptionValueErrorSummaryV1 {
     if values.is_empty() {
         return MidiTranscriptionValueErrorSummaryV1 {
@@ -1124,7 +1214,21 @@ pub fn evaluate_midi_transcription_v1(
         })
         .collect();
 
-    let velocity_errors: Vec<_> = velocity_matching
+    let (reference_pitch_frames, reference_program_frames) =
+        frame_activation_sets(&reference_notes, config.frame_step_ms)?;
+    let (prediction_pitch_frames, prediction_program_frames) =
+        frame_activation_sets(&predicted_notes, config.frame_step_ms)?;
+    let frame_pitch_true_positives = reference_pitch_frames
+        .intersection(&prediction_pitch_frames)
+        .count();
+    let frame_program_true_positives = reference_program_frames
+        .intersection(&prediction_program_frames)
+        .count();
+
+    // Velocity MAE is measured on full-note matches, independently of the
+    // stricter velocity-aware match F1, so the error does not disappear when
+    // a transcriber gets the velocity wrong.
+    let velocity_errors: Vec<_> = full_matching
         .iter()
         .map(|(reference_index, prediction_index)| {
             (i16::from(predicted_notes[*prediction_index].velocity_midi)
@@ -1173,6 +1277,17 @@ pub fn evaluate_midi_transcription_v1(
             predicted_notes.len(),
             velocity_matching.len(),
         ),
+        frame_pitch_metrics: metric_from_set_counts(
+            reference_pitch_frames.len(),
+            prediction_pitch_frames.len(),
+            frame_pitch_true_positives,
+        ),
+        frame_program_pitch_metrics: metric_from_set_counts(
+            reference_program_frames.len(),
+            prediction_program_frames.len(),
+            frame_program_true_positives,
+        ),
+        frame_step_ms: config.frame_step_ms,
         velocity_error: value_error_summary(&velocity_errors),
         onset_error_ms: timing_error_summary(&onset_errors),
         offset_error_ms: timing_error_summary(&offset_errors),
