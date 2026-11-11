@@ -50,8 +50,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "checked_out_sha=$(git rev-parse HEAD)"
-          echo "event=\${GITHUB_EVENT_NAME}"
-          echo "ref=\${GITHUB_REF}"
+          echo "event=${GITHUB_EVENT_NAME}"
+          echo "ref=${GITHUB_REF}"
 
       - name: Check Muse formatting
         run: cargo fmt --check -p symthaea-muse
