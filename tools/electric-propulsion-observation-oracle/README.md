@@ -62,3 +62,25 @@ cargo clippy --locked --manifest-path tools/electric-propulsion-observation-orac
 ```
 
 Synthetic synchronization tests validate only this software contract. They do not calibrate an instrument, establish metrology traceability, validate a motor map, prove physical powertrain performance or qualify aircraft/flight evidence.
+
+
+## Motor-map operating point projection (v0.3)
+
+The oracle can now turn a synchronized bundle into a typed `MotorMapOperatingPoint` using `derive_motor_map_operating_point`. The caller names the torque channel, RPM channel and exact expected motor-shaft boundary.
+
+The projection requires:
+- torque quantity/unit = N m and speed quantity/unit = RPM;
+- both channels identify the same declared motor-shaft physical boundary;
+- both use the explicit `PositiveMotoring` sign convention and positive measured values;
+- run, asset, configuration, context, source-evidence, calibration, raw-data and clock provenance remains present;
+- source timestamps, offsets, skew and combined clock+sample-time errors remain internally consistent with the synchronized bundle and its declared envelope.
+
+It derives `omega = RPM × 2π / 60` and `P_shaft = torque × omega`. It also reports a conservative rectangular absolute-bound interval:
+
+`P_lower = max(0, torque - u_torque) × max(0, omega - u_omega)`
+
+`P_upper = (torque + u_torque) × (omega + u_omega)`
+
+This bound assumes the supplied absolute uncertainty values define hard per-channel bounds and takes their rectangular combination. It is not a Gaussian confidence interval, does not infer covariance, and is not an instrument calibration. The output preserves each channel's calibration ID/certificate digest, raw-data digest, clock source/uncertainty, selected timestamp/sequence, sample offset/skew and combined time-error, plus the torque-to-RPM sample time separation.
+
+This output is a candidate input to the strict motor efficiency-map oracle. It is not itself a measured map, a qualified motor operating limit, or proof of hardware performance.
