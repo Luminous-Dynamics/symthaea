@@ -226,3 +226,53 @@ The competitive programme now adds a distinct real-time lane, tracked by [Symtha
 - **Long-horizon system identification** on a KUKA LWR iiwa reports measured-input rollouts up to 1000 steps and ID/OOD splits; it is a reminder that one-step fit is not enough for iterative planning.
 
 These lanes are not pooled with quadruped endurance or thermal manipulation metrics. They add an orthogonal comparison: whether more computation, more observations or a richer model improve the action *at the time it is actually applied*, after the environment has evolved and the physical resources have changed.
+
+
+## 9. New real-time benchmark federation (11 November 2026)
+
+Three public benchmarks now provide complementary, maintained reference lanes:
+
+### RT-SAFE — navigation safety while reasoning
+
+RT-SAFE's October 2026 preprint uses 5 city maps, 36 navigation routes, 8 VLMs and 16 available actions. In its matched static-versus-real-time comparison, task completion changes from 91.3% to 94.1%, while safe completion falls from 19.8% to 0.7%; collision count rises by 12.3×. The study reports that the simulated world advances during inference and separates collisions during inference from collisions during action.
+
+Use it to test safe arrival, passive/inference-window collisions, active/action collisions, route compliance and real-time reasoning cost. Important limitation: the public snapshot notes exploratory route selection, single-seed route conditions, provider-specific settings and exclusions of some incomplete/output-truncated/model-identity-mismatched episodes; it is a preprint, not a physical mobile-robot benchmark. Keep its route/task metrics separate from locomotion.
+
+Sources: https://arxiv.org/abs/2610.09294 ; https://xtrose29.github.io/RT-SAFE/
+
+### LIBERO-Dynamic — latency-aware manipulation
+
+LIBERO-Dynamic covers all 40 LIBERO tasks with three target-motion families, three speed tiers and a shared 1,800-episode population. Model inference latency is calibrated and frozen while the physical simulation continues. It supports synchronous hold, asynchronous queueing, RTC and a delay-aware VLASH reference, and reports four real-robot conditions at two action horizons.
+
+Released π0.5 PyTorch execution-strategy results are 43.1% success for synchronous hold (K=10), 48.4% for async queueing (K=6), and 37.8% for RTC (K=16); separately trained VLASH reaches 55.4%, so it is not a controller-only ablation. The JAX π0.5 asynchronous result is 57.8% over the 1,800-episode population. These are specific model/training/horizon strata, not universal rankings.
+
+Use it for action-horizon sweeps, queue underflow, observation staleness, asynchronous chunk alignment, and physical transfer. It is the best immediate external manipulation lane for our timing protocol.
+
+Source: https://github.com/renshaojie233/LIBERO-Dynamic
+
+### RoboDyna — contact-rich dynamic manipulation
+
+RoboDyna supplies 20 conceptual tasks plus 10 household tasks, 3,500 demonstrations and paired sync/async evaluation. In its 5.4K episode model evaluation, all tested policies achieved under 20% success; latency flipped 5–12% of episode outcomes while average success changed at most 3%, and human baselines outperformed the tested policies under matched conditions.
+
+Use it for causal physical interaction, moving-object prediction, partial completion and human reference comparisons.
+
+Source: https://robodyna.github.io/robodyna/
+
+### Common cross-lane temporal contract
+
+Use a shared event record across these lanes:
+- observation cutoff and clock-domain identity;
+- observation timestamp interval / uncertainty;
+- model and policy digest;
+- proposal generated time and action-chunk identity;
+- executed-prefix digest and next action index;
+- clock-map offset/drift interval;
+- projection/RTA admission time and result;
+- controller dispatch time and matching execution outcome;
+- action application time and physical-state snapshot.
+
+The cross-lane invariant is that an action's source observation, model, executed prefix and physical application time remain traceably aligned. The exact platform safety controller remains independent.
+
+Do not pool scores across RT-SAFE navigation, LIBERO-Dynamic manipulation, RoboDyna dynamic interaction and Symtropy thermodynamic locomotion. Standardize event semantics and compare within each lane.
+
+The action-chunk known-answer corpus and contract are in [action_chunk_temporal_alignment.md](./action_chunk_temporal_alignment.md) and [fixtures/action_chunk_alignment_v0_1.json](./fixtures/action_chunk_alignment_v0_1.json).
