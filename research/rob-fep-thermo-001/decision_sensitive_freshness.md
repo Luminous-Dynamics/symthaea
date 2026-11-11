@@ -149,3 +149,8 @@ Luminous should report, as separate metrics:
 - physical resource and recovery consequences.
 
 Do not identify AoA with the AoI measurement implemented in Symtropy #4713. AoA, actuator-side AoI, command-to-motion delay, EVSI and missed-actuation cost are related but distinct. A lower AoI does not imply lower probability of missing a critical action if the actuation deadline or physical feasibility changed.
+
+
+## PoMA and fleet service
+
+The corpus now contains DI23 (missed actuation opportunities / declared miss cost) and DI24 (matched fleet scheduler matrix). PoMA is reported as a separate empirical missed-deadline frequency; it is not derived from AoI or EVSI.
