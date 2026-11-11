@@ -1036,6 +1036,26 @@ mod tests {
     }
 
     #[test]
+    fn latin_loop_without_associativity_is_rejected_as_a_group() {
+        let group = FiniteGroupV1 {
+            group_id: "nonassociative-latin-loop-order-six".to_owned(),
+            identity: 0,
+            multiplication: vec![
+                vec![0, 1, 2, 3, 4, 5],
+                vec![1, 3, 5, 2, 0, 4],
+                vec![2, 5, 4, 1, 3, 0],
+                vec![3, 2, 0, 4, 5, 1],
+                vec![4, 0, 3, 5, 1, 2],
+                vec![5, 4, 1, 0, 2, 3],
+            ],
+        };
+        assert_eq!(
+            validate_group(&group, QualificationBudgetV1::default()),
+            Err(QuotientErrorV1::NonAssociativeGroup)
+        );
+    }
+
+    #[test]
     fn non_latin_multiplication_table_is_rejected() {
         let mut action = c2_action();
         action.group.multiplication = vec![vec![0, 1], vec![1, 1]];
