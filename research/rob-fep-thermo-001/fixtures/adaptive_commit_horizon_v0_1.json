@@ -21,45 +21,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 8
+            "max_ticks": 8,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah01_queue_is_tightest"
       },
       "expected": {
         "disposition": "eligible",
@@ -78,45 +97,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah02_thermal_cap_binds",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah02_thermal_cap_binds",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah02_thermal_cap_binds",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 3
+            "max_ticks": 3,
+            "context_digest": "ctx-ah02_thermal_cap_binds",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah02_thermal_cap_binds",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah02_thermal_cap_binds",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah02_thermal_cap_binds",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah02_thermal_cap_binds",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah02_thermal_cap_binds",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah02_thermal_cap_binds"
       },
       "expected": {
         "disposition": "eligible",
@@ -135,45 +173,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah03_viability_cap_binds",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah03_viability_cap_binds",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah03_viability_cap_binds",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 8
+            "max_ticks": 8,
+            "context_digest": "ctx-ah03_viability_cap_binds",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah03_viability_cap_binds",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah03_viability_cap_binds",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 2
+            "max_ticks": 2,
+            "context_digest": "ctx-ah03_viability_cap_binds",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah03_viability_cap_binds",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah03_viability_cap_binds",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah03_viability_cap_binds"
       },
       "expected": {
         "disposition": "eligible",
@@ -192,45 +249,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah04_required_thermal_evidence_unknown",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah04_required_thermal_evidence_unknown",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah04_required_thermal_evidence_unknown",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "unknown",
-            "max_ticks": null
+            "max_ticks": null,
+            "context_digest": null,
+            "prefix_closed": false
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah04_required_thermal_evidence_unknown",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah04_required_thermal_evidence_unknown",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah04_required_thermal_evidence_unknown",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah04_required_thermal_evidence_unknown",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah04_required_thermal_evidence_unknown",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah04_required_thermal_evidence_unknown"
       },
       "expected": {
         "disposition": "unknown_hold",
@@ -247,45 +323,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah05_zero_deadline_slack",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah05_zero_deadline_slack",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 0
+            "max_ticks": 0,
+            "context_digest": "ctx-ah05_zero_deadline_slack",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 8
+            "max_ticks": 8,
+            "context_digest": "ctx-ah05_zero_deadline_slack",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah05_zero_deadline_slack",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah05_zero_deadline_slack",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah05_zero_deadline_slack",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah05_zero_deadline_slack",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah05_zero_deadline_slack",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah05_zero_deadline_slack"
       },
       "expected": {
         "disposition": "zero_horizon_fallback",
@@ -304,45 +399,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah06_queue_underflow",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah06_queue_underflow",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah06_queue_underflow",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 8
+            "max_ticks": 8,
+            "context_digest": "ctx-ah06_queue_underflow",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah06_queue_underflow",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah06_queue_underflow",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah06_queue_underflow",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 0
+            "max_ticks": 0,
+            "context_digest": "ctx-ah06_queue_underflow",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah06_queue_underflow",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah06_queue_underflow"
       },
       "expected": {
         "disposition": "zero_horizon_fallback",
@@ -361,45 +475,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah07_dynamics_digest_mismatch",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah07_dynamics_digest_mismatch",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah07_dynamics_digest_mismatch",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 8
+            "max_ticks": 8,
+            "context_digest": "ctx-ah07_dynamics_digest_mismatch",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah07_dynamics_digest_mismatch",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "digest_mismatch",
-            "max_ticks": null
+            "max_ticks": null,
+            "context_digest": null,
+            "prefix_closed": false
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah07_dynamics_digest_mismatch",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah07_dynamics_digest_mismatch",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah07_dynamics_digest_mismatch",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah07_dynamics_digest_mismatch"
       },
       "expected": {
         "disposition": "provenance_mismatch",
@@ -416,45 +549,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah08_stale_freshness_certificate",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "stale",
-            "max_ticks": null
+            "max_ticks": null,
+            "context_digest": null,
+            "prefix_closed": false
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah08_stale_freshness_certificate",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 8
+            "max_ticks": 8,
+            "context_digest": "ctx-ah08_stale_freshness_certificate",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah08_stale_freshness_certificate",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah08_stale_freshness_certificate",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah08_stale_freshness_certificate",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah08_stale_freshness_certificate",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah08_stale_freshness_certificate",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah08_stale_freshness_certificate"
       },
       "expected": {
         "disposition": "unknown_hold",
@@ -471,45 +623,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 32
+            "max_ticks": 32,
+            "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 28
+            "max_ticks": 28,
+            "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 24
+            "max_ticks": 24,
+            "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 18
+            "max_ticks": 18,
+            "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 5
+            "max_ticks": 5,
+            "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 32,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability"
       },
       "expected": {
         "disposition": "eligible",
@@ -528,45 +699,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 32
+            "max_ticks": 32,
+            "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 20
+            "max_ticks": 20,
+            "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 24
+            "max_ticks": 24,
+            "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 26
+            "max_ticks": 26,
+            "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 22
+            "max_ticks": 22,
+            "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 24
+            "max_ticks": 24,
+            "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 21
+            "max_ticks": 21,
+            "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 20
+            "max_ticks": 20,
+            "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 28
+            "max_ticks": 28,
+            "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 32,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah10_low_risk_stable_long_commitment"
       },
       "expected": {
         "disposition": "eligible",
@@ -586,45 +776,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 24
+            "max_ticks": 24,
+            "context_digest": "ctx-ah11_progress_only_recommends_too_long",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah11_progress_only_recommends_too_long",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah11_progress_only_recommends_too_long",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 4
+            "max_ticks": 4,
+            "context_digest": "ctx-ah11_progress_only_recommends_too_long",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah11_progress_only_recommends_too_long",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah11_progress_only_recommends_too_long",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah11_progress_only_recommends_too_long",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah11_progress_only_recommends_too_long",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah11_progress_only_recommends_too_long",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 24,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah11_progress_only_recommends_too_long"
       },
       "expected": {
         "disposition": "eligible",
@@ -643,45 +852,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 8
+            "max_ticks": 8,
+            "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah12_eligible_is_not_actuation_authority"
       },
       "expected": {
         "disposition": "eligible",
@@ -700,45 +928,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah13_short_queue_limits_commitment",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah13_short_queue_limits_commitment",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah13_short_queue_limits_commitment",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 8
+            "max_ticks": 8,
+            "context_digest": "ctx-ah13_short_queue_limits_commitment",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 14
+            "max_ticks": 14,
+            "context_digest": "ctx-ah13_short_queue_limits_commitment",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah13_short_queue_limits_commitment",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah13_short_queue_limits_commitment",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 2
+            "max_ticks": 2,
+            "context_digest": "ctx-ah13_short_queue_limits_commitment",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah13_short_queue_limits_commitment",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah13_short_queue_limits_commitment"
       },
       "expected": {
         "disposition": "eligible",
@@ -757,45 +1004,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah14_actuator_bound_stale",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah14_actuator_bound_stale",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah14_actuator_bound_stale",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 8
+            "max_ticks": 8,
+            "context_digest": "ctx-ah14_actuator_bound_stale",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "stale",
-            "max_ticks": null
+            "max_ticks": null,
+            "context_digest": null,
+            "prefix_closed": false
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah14_actuator_bound_stale",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah14_actuator_bound_stale",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah14_actuator_bound_stale",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah14_actuator_bound_stale",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah14_actuator_bound_stale"
       },
       "expected": {
         "disposition": "unknown_hold",
@@ -812,45 +1078,64 @@
         "bounds": {
           "proposal": {
             "status": "qualified",
-            "max_ticks": 16
+            "max_ticks": 16,
+            "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
+            "prefix_closed": true
           },
           "freshness": {
             "status": "qualified",
-            "max_ticks": 10
+            "max_ticks": 10,
+            "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
+            "prefix_closed": true
           },
           "deadline": {
             "status": "qualified",
-            "max_ticks": 9
+            "max_ticks": 9,
+            "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
+            "prefix_closed": true
           },
           "thermal": {
             "status": "qualified",
-            "max_ticks": 3
+            "max_ticks": 3,
+            "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
+            "prefix_closed": true
           },
           "actuator": {
             "status": "qualified",
-            "max_ticks": 3
+            "max_ticks": 3,
+            "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
+            "prefix_closed": true
           },
           "dynamics": {
             "status": "qualified",
-            "max_ticks": 11
+            "max_ticks": 11,
+            "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
+            "prefix_closed": true
           },
           "viability": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
+            "prefix_closed": true
           },
           "queue": {
             "status": "qualified",
-            "max_ticks": 6
+            "max_ticks": 6,
+            "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
+            "prefix_closed": true
           },
           "continuity": {
             "status": "qualified",
-            "max_ticks": 12
+            "max_ticks": 12,
+            "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
+            "prefix_closed": true
           }
         },
         "progress_only_recommended_ticks": 16,
         "executed_prefix_matches": true,
         "model_digest_matches": true,
-        "minimum_commit_ticks": 1
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah15_tied_thermal_and_actuator_limits"
       },
       "expected": {
         "disposition": "eligible",
@@ -860,6 +1145,154 @@
           "actuator"
         ],
         "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH16_BOUND_FROM_DIFFERENT_ACTION_CONTEXT",
+      "description": "All caps are individually finite and qualified, but the thermal cap was computed against a different action-prefix/model-state context and cannot be composed.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8,
+            "context_digest": "ctx-other-action-prefix",
+            "prefix_closed": true
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah01_queue_is_tightest"
+      },
+      "expected": {
+        "disposition": "provenance_mismatch",
+        "selected_horizon_ticks": null,
+        "binding_constraints": [],
+        "eligible_for_independent_projection": false,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH17_BOUND_IS_NOT_PREFIX_CLOSED",
+      "description": "A thermal bound checks only the final state rather than every intermediate prefix, so a minimum of this cap cannot establish continuous constraint satisfaction.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 16,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": false
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          }
+        },
+        "progress_only_recommended_ticks": 16,
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah01_queue_is_tightest"
+      },
+      "expected": {
+        "disposition": "invalid_bound_semantics",
+        "selected_horizon_ticks": null,
+        "binding_constraints": [],
+        "eligible_for_independent_projection": false,
         "actuation_authorized": false
       }
     }
