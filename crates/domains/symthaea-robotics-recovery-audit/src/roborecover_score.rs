@@ -317,7 +317,7 @@ pub fn validate_manifest(
 
 /// Score one platform, split and policy/intervention arm against a frozen manifest.
 ///
-//// The policy-recovery outcome is source-protocol aware:
+/// The policy-recovery outcome is source-protocol aware:
 /// - RoboTwin requires status=infer_ok, at least one inference action, and
 ///   eval_success_at_end=true.
 /// - LIBERO requires status=success and at least one inference action.
