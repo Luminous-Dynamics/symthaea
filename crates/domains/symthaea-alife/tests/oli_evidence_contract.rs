@@ -410,6 +410,32 @@ fn disjoint_declared_independence_groups_allow_independent_conflict_record() {
 }
 
 #[test]
+fn blank_independence_group_does_not_qualify_as_independent_evidence() {
+    let mut candidate = profile();
+    let mut supporting = measurement("support-1", EvidenceOutcome::SignalDetected);
+    supporting.independence_group = Some("source-a".to_owned());
+    let mut contradicting = measurement("contradict-1", EvidenceOutcome::NoDetection);
+    contradicting.independence_group = Some("   ".to_owned());
+    candidate.evidence.extend([supporting, contradicting]);
+
+    let mut property = finding(
+        Property::InformationTransfer,
+        PropertyAssessment::InsufficientEvidence,
+        &["support-1", "contradict-1"],
+    );
+    property.coverage = Some(coverage());
+    property.evidence_conflicts.push(conflict(
+        true,
+        ConflictResolution::Unresolved,
+    ));
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("blank source groups cannot establish independence");
+    assert!(errors.iter().any(|error| error.contains("independence_group must be omitted rather than empty")));
+    assert!(errors.iter().any(|error| error.contains("lacks a non-empty independence_group")));
+}
+
+#[test]
 fn unresolved_conflict_blocks_a_definitive_property_disposition() {
     let mut candidate = profile();
     let mut supporting = measurement("support-1", EvidenceOutcome::SignalDetected);
