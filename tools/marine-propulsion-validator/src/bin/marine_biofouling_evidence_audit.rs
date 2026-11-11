@@ -735,14 +735,9 @@ mod tests {
     fn synthetic_performance_pair_is_never_claim_eligible() {
         let record = fixture();
         let mut findings = Findings::default();
-        let (_, _, _, cleaning, _) = check_record(&record, &mut findings);
-        let mut findings_again = Findings::default();
-        let mut eligible =
-            check_performance_comparison(&record, cleaning.as_deref(), &mut findings_again);
-        if record["record_status"].as_str() != Some("measured") {
-            eligible = false;
-        }
+        let (_, _, _, _, eligible) = check_record(&record, &mut findings);
         assert!(!eligible);
+        assert!(findings.incomplete);
     }
 
     #[test]
