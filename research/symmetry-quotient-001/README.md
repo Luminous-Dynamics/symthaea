@@ -2,7 +2,7 @@
 
 This crate is the first executable slice of [SYMM-QUOTIENT-001](https://github.com/Luminous-Dynamics/symthaea/issues/11616).
 
-It starts with a finite, exactly enumerable domain: a two-element group acting by explicit permutations on a finite candidate universe. This makes the unquotiented search small enough to enumerate independently and compare against an exhaustive orbit oracle.
+It starts with finite, exactly enumerable domains: C2 and C3 actions, plus a non-abelian D4 action on ordered pairs of square vertices. These make the unquotiented search small enough to enumerate independently and compare against exhaustive orbit oracles.
 
 ## Authority boundary
 
