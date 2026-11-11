@@ -323,6 +323,14 @@ Track dynamic manoeuvrability separately from propulsion efficiency: turning cir
 
 See [#11521 — WAPS manoeuvrability qualification](https://github.com/Luminous-Dynamics/symthaea/issues/11521) and [MARINE-WAPS-MANOEUVRABILITY-001](./MARINE-WAPS-MANOEUVRABILITY-001.md).
 
+### 14.5 Co-design contractual schedule slack and onboard storage
+
+A schedule window is a temporal flexibility allowance, not a battery. The new [MARINE-SERVICE-FLEXIBILITY-001](./MARINE-SERVICE-FLEXIBILITY-001.md) benchmark compares fixed schedules, schedule-flexible policies, battery-only and combined policies against the same cargo-service fingerprint and port calls. It preserves per-call slack (not a route-wide sum unless transferability is proven), turnaround and departure cutoffs, p50/p90/p95 delay and missed-window outcomes. Its first Rust audit and synthetic fixture are tracked in [#11558](https://github.com/Luminous-Dynamics/symthaea/issues/11558). Fuel/energy must come from separate validated models and matched trials; the audit reports temporal arithmetic only.
+
+### 14.6 Select measurements by identifiability and decision value
+
+The programme now includes [MARINE-MEASUREMENT-VOI-IDENTIFIABILITY-001](./MARINE-MEASUREMENT-VOI-IDENTIFIABILITY-001.md), tracked in [#11559](https://github.com/Luminous-Dynamics/symthaea/issues/11559). Its governing principle is to establish observation independence, structural rank, practical excitation and sensor provenance before model calibration. Sensor portfolios are selected by expected reduction in decision regret minus lifecycle installation, calibration, maintenance, communications and crew burden. This extends the v0.3/v0.4 evidence registries and clock-drift work; it does not assume that more channels mean better identifiability.
+
 ## 15. Sources
 
 - Liu et al., 2026 wind-propelled ship deployment and technology review, International Journal of Naval Architecture and Ocean Engineering 18, 100785. https://doi.org/10.1016/j.ijnaoe.2026.100785
