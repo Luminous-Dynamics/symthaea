@@ -48,6 +48,9 @@ pub struct MidiTranscriptionEvaluationConfigV1 {
     pub pitch_tolerance_cents: u16,
     pub offset_ratio_basis_points: u16,
     pub offset_min_tolerance_ms: u32,
+    /// Enable only when the prediction pipeline actually estimates dynamics.
+    /// Many AMT models serialize placeholder MIDI velocities.
+    pub velocity_metrics_enabled: bool,
     pub velocity_tolerance: u8,
     pub frame_step_ms: u16,
 }
@@ -59,6 +62,7 @@ impl Default for MidiTranscriptionEvaluationConfigV1 {
             pitch_tolerance_cents: MIDI_TRANSCRIPTION_DEFAULT_PITCH_TOLERANCE_CENTS_V1,
             offset_ratio_basis_points: MIDI_TRANSCRIPTION_DEFAULT_OFFSET_RATIO_BPS_V1,
             offset_min_tolerance_ms: MIDI_TRANSCRIPTION_DEFAULT_OFFSET_MIN_TOLERANCE_MS_V1,
+            velocity_metrics_enabled: false,
             velocity_tolerance: 10,
             frame_step_ms: MIDI_TRANSCRIPTION_DEFAULT_FRAME_STEP_MS_V1,
         }
@@ -144,13 +148,13 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     /// Exact GM program, pitch, onset and offset must match.
     pub exact_program_full_note_metrics: MidiTranscriptionMetricV1,
     /// Full-note match plus MIDI velocity within the configured tolerance.
-    pub velocity_aware_full_note_metrics: MidiTranscriptionMetricV1,
+    pub velocity_aware_full_note_metrics: Option<MidiTranscriptionMetricV1>,
     /// Framewise pitch activity; simultaneous same-pitch notes collapse into one active cell.
     pub frame_pitch_metrics: MidiTranscriptionMetricV1,
     /// Framewise GM-program/pitch activity; not a persistent instrument identity metric.
     pub frame_program_pitch_metrics: MidiTranscriptionMetricV1,
     pub frame_step_ms: u16,
-    pub velocity_error: MidiTranscriptionValueErrorSummaryV1,
+    pub velocity_error: Option<MidiTranscriptionValueErrorSummaryV1>,
     pub onset_error_ms: MidiTranscriptionTimingErrorSummaryV1,
     pub offset_error_ms: MidiTranscriptionTimingErrorSummaryV1,
     pub report_sha256: String,
@@ -211,11 +215,11 @@ struct ReportCommitmentV1<'a> {
     full_note_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_onset_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_full_note_metrics: &'a MidiTranscriptionMetricV1,
-    velocity_aware_full_note_metrics: &'a MidiTranscriptionMetricV1,
+    velocity_aware_full_note_metrics: &'a Option<MidiTranscriptionMetricV1>,
     frame_pitch_metrics: &'a MidiTranscriptionMetricV1,
     frame_program_pitch_metrics: &'a MidiTranscriptionMetricV1,
     frame_step_ms: u16,
-    velocity_error: &'a MidiTranscriptionValueErrorSummaryV1,
+    velocity_error: &'a Option<MidiTranscriptionValueErrorSummaryV1>,
     onset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
     offset_error_ms: &'a MidiTranscriptionTimingErrorSummaryV1,
 }
@@ -1198,10 +1202,12 @@ pub fn evaluate_midi_transcription_v1(
         maximum_cardinality_matching(&adjacency, predicted_notes.len())?
     };
 
-    let velocity_matching = {
+    let velocity_matching = if config.velocity_metrics_enabled {
         let adjacency =
             build_adjacency(&reference_notes, &predicted_notes, &config, true, false, true)?;
-        maximum_cardinality_matching(&adjacency, predicted_notes.len())?
+        Some(maximum_cardinality_matching(&adjacency, predicted_notes.len())?)
+    } else {
+        None
     };
 
     let onset_errors: Vec<_> = onset_matching
@@ -1238,14 +1244,18 @@ pub fn evaluate_midi_transcription_v1(
     // Velocity MAE is measured on full-note matches, independently of the
     // stricter velocity-aware match F1, so the error does not disappear when
     // a transcriber gets the velocity wrong.
-    let velocity_errors: Vec<_> = full_matching
-        .iter()
-        .map(|(reference_index, prediction_index)| {
-            (i16::from(predicted_notes[*prediction_index].velocity_midi)
-                - i16::from(reference_notes[*reference_index].velocity_midi))
-                .unsigned_abs() as f64
-        })
-        .collect();
+    let velocity_errors: Vec<_> = if config.velocity_metrics_enabled {
+        full_matching
+            .iter()
+            .map(|(reference_index, prediction_index)| {
+                (i16::from(predicted_notes[*prediction_index].velocity_midi)
+                    - i16::from(reference_notes[*reference_index].velocity_midi))
+                    .unsigned_abs() as f64
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
 
     let mut report = MidiTranscriptionEvaluationReportV1 {
         schema: MIDI_TRANSCRIPTION_EVALUATION_SCHEMA_V1.into(),
@@ -1282,11 +1292,13 @@ pub fn evaluate_midi_transcription_v1(
             predicted_notes.len(),
             program_full_matching.len(),
         ),
-        velocity_aware_full_note_metrics: metric_from_matching(
-            reference_notes.len(),
-            predicted_notes.len(),
-            velocity_matching.len(),
-        ),
+        velocity_aware_full_note_metrics: velocity_matching.map(|matching| {
+            metric_from_matching(
+                reference_notes.len(),
+                predicted_notes.len(),
+                matching.len(),
+            )
+        }),
         frame_pitch_metrics: metric_from_set_counts(
             reference_pitch_frames.len(),
             prediction_pitch_frames.len(),
@@ -1298,7 +1310,9 @@ pub fn evaluate_midi_transcription_v1(
             frame_program_true_positives,
         ),
         frame_step_ms: config.frame_step_ms,
-        velocity_error: value_error_summary(&velocity_errors),
+        velocity_error: config
+            .velocity_metrics_enabled
+            .then(|| value_error_summary(&velocity_errors)),
         onset_error_ms: timing_error_summary(&onset_errors),
         offset_error_ms: timing_error_summary(&offset_errors),
         report_sha256: String::new(),
@@ -1568,14 +1582,20 @@ mod tests {
         let report = evaluate_midi_transcription_v1(
             &prediction,
             &reference,
-            default_config(),
+            MidiTranscriptionEvaluationConfigV1 {
+                velocity_metrics_enabled: true,
+                ..default_config()
+            },
         )
         .unwrap();
         assert_eq!(report.onset_pitch_metrics.f1, 1.0);
         assert_eq!(report.full_note_metrics.f1, 1.0);
-        assert_eq!(report.velocity_aware_full_note_metrics.f1, 0.0);
-        assert_eq!(report.velocity_error.sample_count, 2);
-        assert_eq!(report.velocity_error.mean_absolute_error, Some(60.0));
+        assert_eq!(report.velocity_aware_full_note_metrics.as_ref().unwrap().f1, 0.0);
+        assert_eq!(report.velocity_error.as_ref().unwrap().sample_count, 2);
+        assert_eq!(
+            report.velocity_error.as_ref().unwrap().mean_absolute_error,
+            Some(60.0)
+        );
     }
 
     #[test]
