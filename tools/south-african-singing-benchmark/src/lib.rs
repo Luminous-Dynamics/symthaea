@@ -990,9 +990,8 @@ mod tests {
         );
 
         let mut duplicate_reference = valid_case();
-        duplicate_reference.references.push(
-            duplicate_reference.references[0].clone()
-        );
+        let duplicate = duplicate_reference.references[0].clone();
+        duplicate_reference.references.push(duplicate);
         assert!(
             validate_singing_benchmark_manifest(&spec(), &[duplicate_reference]).is_err()
         );
