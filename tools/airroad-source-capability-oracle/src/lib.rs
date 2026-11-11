@@ -322,7 +322,9 @@ fn validate_profile_identity(
     if !profile.energy_budget.usable_energy_above_hard_floor.validate()
         || !profile.energy_budget.protected_end_reserve.validate()
     {
-        return Err("usable energy and protected reserve bounds must be finite, non-negative and ordered");
+        return Err(
+            "usable energy and protected reserve bounds must be finite, non-negative and ordered",
+        );
     }
     Ok(())
 }
@@ -389,7 +391,11 @@ fn assess_scenario(
     reference_segments: &[DcBusSegmentResult],
     scenario: CapabilityScenario,
 ) -> SourceCapabilityScenarioReport {
-    let Some(segments) = scenario_summary(bus, scenario).as_ref().ok().map(|s| s.segments.as_slice()) else {
+    let Some(segments) = scenario_summary(bus, scenario)
+        .as_ref()
+        .ok()
+        .map(|summary| summary.segments.as_slice())
+    else {
         return empty_scenario_report(
             scenario,
             SourceCapabilityDisposition::Infeasible,
@@ -534,14 +540,14 @@ fn assess_scenario(
 
     let identity_failure = report.failures.iter().any(|failure| {
         matches!(
-            failure.kind,
+            &failure.kind,
             SourceCapabilityFailureKind::IdentityMismatch(_)
                 | SourceCapabilityFailureKind::OperatingPointMismatch(_)
         )
     });
     let unknown_failure = report.failures.iter().any(|failure| {
         matches!(
-            failure.kind,
+            &failure.kind,
             SourceCapabilityFailureKind::MissingCapability(_)
                 | SourceCapabilityFailureKind::InvalidCapability(_)
         )
@@ -586,8 +592,13 @@ pub fn qualify_source_capability(
     let mut source_ids = BTreeSet::new();
     let mut battery_instances = BTreeSet::new();
     for profile in &input.source_profiles {
-        if !profiles_by_bus.insert(profile.bus_id.clone(), profile).is_none() {
-            return Err(SourceCapabilityJoinError::DuplicateIdentity("bus source profile"));
+        if profiles_by_bus
+            .insert(profile.bus_id.clone(), profile)
+            .is_some()
+        {
+            return Err(SourceCapabilityJoinError::DuplicateIdentity(
+                "bus source profile",
+            ));
         }
         if !source_ids.insert(profile.source_id.clone()) {
             return Err(SourceCapabilityJoinError::DuplicateIdentity("source ID"));
@@ -597,12 +608,21 @@ pub fn qualify_source_capability(
         }
     }
 
-    let known_buses = input
-        .bus_demand
-        .buses
-        .iter()
-        .map(|bus| bus.bus_id.as_str())
-        .collect::<BTreeSet<_>>();
+    let mut known_buses = BTreeSet::new();
+    for bus in &input.bus_demand.buses {
+        if bus.bus_id.trim().is_empty()
+            || bus.source_boundary_id.trim().is_empty()
+            || bus.configuration_digest != input.aircraft_configuration_digest
+            || bus.source_evidence_manifest_digest.trim().is_empty()
+        {
+            return Err(SourceCapabilityJoinError::InvalidBusDemandConfiguration(
+                bus.bus_id.clone(),
+            ));
+        }
+        if !known_buses.insert(bus.bus_id.as_str()) {
+            return Err(SourceCapabilityJoinError::DuplicateIdentity("bus ID"));
+        }
+    }
     for profile in &input.source_profiles {
         if !known_buses.contains(profile.bus_id.as_str()) {
             return Err(SourceCapabilityJoinError::UnexpectedBus(profile.bus_id.clone()));
@@ -747,8 +767,14 @@ mod tests {
             external_load_energy_j: 0.0,
             total_bus_energy_j: total_energy_j,
             average_bus_power_w: total_energy_j / active_duration_s,
-            peak_bus_power_w: segments.iter().map(|segment| segment.total_bus_power_w).fold(0.0, f64::max),
-            peak_bus_current_a: segments.iter().map(|segment| segment.total_bus_current_a).fold(0.0, f64::max),
+            peak_bus_power_w: segments
+                .iter()
+                .map(|segment| segment.total_bus_power_w)
+                .fold(0.0, f64::max),
+            peak_bus_current_a: segments
+                .iter()
+                .map(|segment| segment.total_bus_current_a)
+                .fold(0.0, f64::max),
             segments,
         }
     }
