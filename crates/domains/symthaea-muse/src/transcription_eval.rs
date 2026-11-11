@@ -35,7 +35,8 @@ pub const MIDI_TRANSCRIPTION_DEFAULT_ONSET_TOLERANCE_MS_V1: u32 = 50;
 pub const MIDI_TRANSCRIPTION_DEFAULT_PITCH_TOLERANCE_CENTS_V1: u16 = 50;
 pub const MIDI_TRANSCRIPTION_DEFAULT_OFFSET_RATIO_BPS_V1: u16 = 2_000;
 pub const MIDI_TRANSCRIPTION_DEFAULT_OFFSET_MIN_TOLERANCE_MS_V1: u32 = 50;
-pub const MIDI_TRANSCRIPTION_MAX_NOTES_V1: usize = 250_000;
+pub const MIDI_TRANSCRIPTION_MAX_NOTES_V1: usize = 20_000;
+pub const MIDI_TRANSCRIPTION_MAX_CANDIDATE_PAIRS_V1: usize = 2_000_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MidiTranscriptionEvaluationConfigV1 {
@@ -141,11 +142,12 @@ pub enum MidiTranscriptionEvaluationIssueV1 {
     InvalidReferenceTrack { track_index: u16 },
     InvalidReferenceNote { ordinal: usize },
     InvalidClockAlignmentProfile,
+    TooManyCandidatePairs { count: usize, maximum: usize },
     SerializationFailed,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct MidiMidiTempoPointV1 {
+pub struct MidiTempoPointV1 {
     pub start_tick: u64,
     pub start_seconds: f64,
     pub microseconds_per_quarter: u32,
@@ -227,7 +229,7 @@ fn tempo_points_from_events(
     let mut sorted = events.to_vec();
     sorted.sort_by_key(|(tick, track, order, _)| (*tick, *track, *order));
 
-    let mut points = vec![TempoPointV1 {
+    let mut points = vec![MidiTempoPointV1 {
         start_tick: 0,
         start_seconds: 0.0,
         microseconds_per_quarter: 500_000,
@@ -252,7 +254,7 @@ fn tempo_points_from_events(
         if !start_seconds.is_finite() {
             return Err(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow);
         }
-        points.push(TempoPointV1 {
+        points.push(MidiTempoPointV1 {
             start_tick: tick,
             start_seconds,
             microseconds_per_quarter: tempo,
@@ -421,6 +423,223 @@ pub fn parse_transcribed_midi_v1(
         unclosed_note_count: u32::try_from(unclosed_note_count).unwrap_or(u32::MAX),
         orphan_note_off_count: u32::try_from(orphan_note_off_count).unwrap_or(u32::MAX),
     })
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn validate_reference_artifact_v1(
+    reference: &MidiPerformanceArtifactV1,
+) -> Result<(), MidiTranscriptionEvaluationIssueV1> {
+    use midly::{MetaMessage, MidiMessage, TrackEventKind};
+
+    let manifest = &reference.manifest;
+    if manifest.schema != MIDI_PERFORMANCE_SCHEMA_V1
+        || manifest.score_digest_schema
+            != symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1
+        || manifest.timeline_digest_schema != MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1
+        || manifest.binding_digest_schema != MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1
+        || manifest.capability_digest_schema != MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1
+        || manifest.ticks_per_quarter == 0
+        || manifest.tempo_microseconds_per_quarter == 0
+        || manifest.tempo_microseconds_per_quarter > 16_777_215
+        || manifest.meter_numerator == 0
+        || manifest.meter_denominator == 0
+    {
+        return Err(MidiTranscriptionEvaluationIssueV1::InvalidReference);
+    }
+    for digest in [
+        manifest.score_sha256.as_str(),
+        manifest.timeline_sha256.as_str(),
+        manifest.binding_sha256.as_str(),
+        manifest.capability_sha256.as_str(),
+        manifest.midi_sha256.as_str(),
+        reference.manifest_sha256.as_str(),
+    ] {
+        if !valid_sha256(digest) {
+            return Err(MidiTranscriptionEvaluationIssueV1::InvalidReference);
+        }
+    }
+    if sha256_hex(&reference.midi_bytes) != manifest.midi_sha256 {
+        return Err(MidiTranscriptionEvaluationIssueV1::ReferenceMidiDigestMismatch);
+    }
+    let manifest_bytes = serde_json::to_vec(manifest)
+        .map_err(|_| MidiTranscriptionEvaluationIssueV1::SerializationFailed)?;
+    let actual_manifest_digest = domain_separated_sha256(
+        MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
+        &manifest_bytes,
+    );
+    if actual_manifest_digest != reference.manifest_sha256 {
+        return Err(MidiTranscriptionEvaluationIssueV1::ReferenceManifestDigestMismatch);
+    }
+
+    let smf = Smf::parse(&reference.midi_bytes)
+        .map_err(|_| MidiTranscriptionEvaluationIssueV1::InvalidReference)?;
+    if smf.header.format != Format::Parallel
+        || !matches!(
+            smf.header.timing,
+            Timing::Metrical(ppq) if ppq.as_int() == manifest.ticks_per_quarter
+        )
+        || smf.tracks.len() != manifest.tracks.len() + 1
+    {
+        return Err(MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest);
+    }
+
+    type NoteOnKey = (u16, u64, u8, u8, u8);
+    type NoteOffKey = (u16, u64, u8, u8);
+    type ProgramKey = (u16, u64, u8, u8);
+    let track_receipts: BTreeMap<_, _> = manifest
+        .tracks
+        .iter()
+        .map(|track| (track.track_index, track))
+        .collect();
+    if track_receipts.len() != manifest.tracks.len() {
+        return Err(MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest);
+    }
+
+    let mut expected_ons: BTreeMap<NoteOnKey, usize> = BTreeMap::new();
+    let mut expected_offs: BTreeMap<NoteOffKey, usize> = BTreeMap::new();
+    let mut expected_programs: BTreeMap<ProgramKey, usize> = BTreeMap::new();
+    for track in &manifest.tracks {
+        if track.track_index == 0
+            || usize::from(track.track_index) >= smf.tracks.len()
+            || track.midi_channel > 15
+            || track.gm_program > 127
+            || track.segment_end_tick <= track.segment_start_tick
+        {
+            return Err(MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest);
+        }
+        *expected_programs
+            .entry((
+                track.track_index,
+                track.segment_start_tick,
+                track.midi_channel,
+                track.gm_program,
+            ))
+            .or_insert(0) += 1;
+    }
+    let mut ordinals = std::collections::BTreeSet::new();
+    for note in &manifest.notes {
+        if !ordinals.insert(note.source_note_ordinal)
+            || note.pitch_midi > 127
+            || note.velocity_midi == 0
+            || note.end_tick <= note.start_tick
+        {
+            return Err(MidiTranscriptionEvaluationIssueV1::InvalidReferenceNote {
+                ordinal: note.source_note_ordinal,
+            });
+        }
+        let Some(track) = track_receipts.get(&note.track_index) else {
+            return Err(MidiTranscriptionEvaluationIssueV1::InvalidReferenceTrack {
+                track_index: note.track_index,
+            });
+        };
+        if track.part_id != note.part_id
+            || track.segment_id != note.segment_id
+            || track.instrument_id != note.instrument_id
+            || note.start_tick < track.segment_start_tick
+            || note.end_tick > track.segment_end_tick
+        {
+            return Err(MidiTranscriptionEvaluationIssueV1::InvalidReferenceNote {
+                ordinal: note.source_note_ordinal,
+            });
+        }
+        *expected_ons
+            .entry((
+                note.track_index,
+                note.start_tick,
+                track.midi_channel,
+                note.pitch_midi,
+                note.velocity_midi,
+            ))
+            .or_insert(0) += 1;
+        *expected_offs
+            .entry((
+                note.track_index,
+                note.end_tick,
+                track.midi_channel,
+                note.pitch_midi,
+            ))
+            .or_insert(0) += 1;
+    }
+    let mut actual_ons: BTreeMap<NoteOnKey, usize> = BTreeMap::new();
+    let mut actual_offs: BTreeMap<NoteOffKey, usize> = BTreeMap::new();
+    let mut actual_programs: BTreeMap<ProgramKey, usize> = BTreeMap::new();
+    let mut tempo_events = 0usize;
+    let mut meter_events = 0usize;
+
+    for (track_index, events) in smf.tracks.iter().enumerate() {
+        let track_index = u16::try_from(track_index)
+            .map_err(|_| MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest)?;
+        let mut absolute_tick = 0u64;
+        for event in events {
+            absolute_tick = absolute_tick
+                .checked_add(u64::from(event.delta.as_int()))
+                .ok_or(MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest)?;
+            match event.kind {
+                TrackEventKind::Meta(MetaMessage::Tempo(value)) => {
+                    if track_index != 0
+                        || absolute_tick != 0
+                        || value.as_int() != manifest.tempo_microseconds_per_quarter
+                    {
+                        return Err(MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest);
+                    }
+                    tempo_events += 1;
+                }
+                TrackEventKind::Meta(MetaMessage::TimeSignature(numerator, denominator, _, _)) => {
+                    let expected_denominator_power =
+                        manifest.meter_denominator.trailing_zeros() as u8;
+                    if track_index != 0
+                        || absolute_tick != 0
+                        || numerator != manifest.meter_numerator
+                        || manifest.meter_denominator.count_ones() != 1
+                        || denominator != expected_denominator_power
+                    {
+                        return Err(MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest);
+                    }
+                    meter_events += 1;
+                }
+                TrackEventKind::Midi { channel, message } => {
+                    let channel = channel.as_int();
+                    match message {
+                        MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
+                            *actual_ons
+                                .entry((track_index, absolute_tick, channel, key.as_int(), vel.as_int()))
+                                .or_insert(0) += 1;
+                        }
+                        MidiMessage::NoteOff { key, .. } => {
+                            *actual_offs
+                                .entry((track_index, absolute_tick, channel, key.as_int()))
+                                .or_insert(0) += 1;
+                        }
+                        MidiMessage::NoteOn { key, .. } => {
+                            *actual_offs
+                                .entry((track_index, absolute_tick, channel, key.as_int()))
+                                .or_insert(0) += 1;
+                        }
+                        MidiMessage::ProgramChange { program } => {
+                            *actual_programs
+                                .entry((track_index, absolute_tick, channel, program.as_int()))
+                                .or_insert(0) += 1;
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    if tempo_events != 1
+        || meter_events != 1
+        || actual_ons != expected_ons
+        || actual_offs != expected_offs
+        || actual_programs != expected_programs
+    {
+        return Err(MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest);
+    }
+    Ok(())
 }
 
 fn reference_notes(
