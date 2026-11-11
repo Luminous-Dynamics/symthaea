@@ -52,7 +52,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:feasible_correct",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:feasible_correct",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -78,7 +85,11 @@
             "unit": "kW",
             "measured_value": 24,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -86,7 +97,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -94,7 +109,11 @@
             "unit": "kWh",
             "measured_value": 3,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -102,7 +121,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "TEMPERATURE_MAXIMUM",
@@ -110,7 +133,11 @@
             "unit": "degC",
             "measured_value": 48,
             "measurement_ref": "synthetic-measurement-5",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-5",
+            "calibration_ref": "synthetic-calibration-5",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
@@ -166,7 +193,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:false_feasible_thermal",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:false_feasible_thermal",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -192,7 +226,11 @@
             "unit": "kW",
             "measured_value": 24,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -200,7 +238,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -208,7 +250,11 @@
             "unit": "kWh",
             "measured_value": 3,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -216,7 +262,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "TEMPERATURE_MAXIMUM",
@@ -224,7 +274,11 @@
             "unit": "degC",
             "measured_value": 61,
             "measurement_ref": "synthetic-measurement-5",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-5",
+            "calibration_ref": "synthetic-calibration-5",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
@@ -280,7 +334,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:false_feasible_reserve",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:false_feasible_reserve",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -306,7 +367,11 @@
             "unit": "kW",
             "measured_value": 24,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -314,7 +379,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -322,7 +391,11 @@
             "unit": "kWh",
             "measured_value": 0.8,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -330,7 +403,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "TEMPERATURE_MAXIMUM",
@@ -338,7 +415,11 @@
             "unit": "degC",
             "measured_value": 48,
             "measurement_ref": "synthetic-measurement-5",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-5",
+            "calibration_ref": "synthetic-calibration-5",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
@@ -394,7 +475,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:infeasible_correct",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:infeasible_correct",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -420,7 +508,11 @@
             "unit": "kW",
             "measured_value": 15,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -428,7 +520,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -436,7 +532,11 @@
             "unit": "kWh",
             "measured_value": 3,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -444,7 +544,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "TEMPERATURE_MAXIMUM",
@@ -452,7 +556,11 @@
             "unit": "degC",
             "measured_value": 48,
             "measurement_ref": "synthetic-measurement-5",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-5",
+            "calibration_ref": "synthetic-calibration-5",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
@@ -508,7 +616,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:false_infeasible",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:false_infeasible",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -534,7 +649,11 @@
             "unit": "kW",
             "measured_value": 24,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -542,7 +661,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -550,7 +673,11 @@
             "unit": "kWh",
             "measured_value": 3,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -558,7 +685,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "TEMPERATURE_MAXIMUM",
@@ -566,7 +697,11 @@
             "unit": "degC",
             "measured_value": 48,
             "measurement_ref": "synthetic-measurement-5",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-5",
+            "calibration_ref": "synthetic-calibration-5",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
@@ -622,7 +757,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:abstained_out_of_domain",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:abstained_out_of_domain",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -648,7 +790,11 @@
             "unit": "kW",
             "measured_value": 24,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -656,7 +802,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -664,7 +814,11 @@
             "unit": "kWh",
             "measured_value": 3,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -672,7 +826,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "TEMPERATURE_MAXIMUM",
@@ -680,7 +838,11 @@
             "unit": "degC",
             "measured_value": 48,
             "measurement_ref": "synthetic-measurement-5",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-5",
+            "calibration_ref": "synthetic-calibration-5",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
@@ -736,7 +898,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:non_battery_abort",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:non_battery_abort",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -762,7 +931,11 @@
             "unit": "kW",
             "measured_value": 24,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -770,7 +943,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -778,7 +955,11 @@
             "unit": "kWh",
             "measured_value": 3,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -786,7 +967,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "TEMPERATURE_MAXIMUM",
@@ -794,7 +979,11 @@
             "unit": "degC",
             "measured_value": 48,
             "measurement_ref": "synthetic-measurement-5",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-5",
+            "calibration_ref": "synthetic-calibration-5",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
@@ -850,7 +1039,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:inconclusive_reference",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:inconclusive_reference",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -876,7 +1072,11 @@
             "unit": "kW",
             "measured_value": 24,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -884,7 +1084,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -892,7 +1096,11 @@
             "unit": "kWh",
             "measured_value": 3,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -900,7 +1108,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "TEMPERATURE_MAXIMUM",
@@ -908,7 +1120,11 @@
             "unit": "degC",
             "measured_value": 48,
             "measurement_ref": "synthetic-measurement-5",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-5",
+            "calibration_ref": "synthetic-calibration-5",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
@@ -964,7 +1180,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:reference_asset_mismatch",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:reference_asset_mismatch",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -990,7 +1213,11 @@
             "unit": "kW",
             "measured_value": 24,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -998,7 +1225,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -1006,7 +1237,11 @@
             "unit": "kWh",
             "measured_value": 3,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -1014,7 +1249,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "TEMPERATURE_MAXIMUM",
@@ -1022,7 +1261,11 @@
             "unit": "degC",
             "measured_value": 48,
             "measurement_ref": "synthetic-measurement-5",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-5",
+            "calibration_ref": "synthetic-calibration-5",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
@@ -1078,7 +1321,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:completed_but_measurement_failed",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:completed_but_measurement_failed",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -1104,7 +1354,11 @@
             "unit": "kW",
             "measured_value": 24,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -1112,7 +1366,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -1120,7 +1378,11 @@
             "unit": "kWh",
             "measured_value": 3,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -1128,7 +1390,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "TEMPERATURE_MAXIMUM",
@@ -1136,7 +1402,11 @@
             "unit": "degC",
             "measured_value": 60,
             "measurement_ref": "synthetic-measurement-5",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-5",
+            "calibration_ref": "synthetic-calibration-5",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
@@ -1192,7 +1462,14 @@
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
           }
-        ]
+        ],
+        "model_artifact_ref": "synthetic-model-artifact:incomplete_reference_measurements",
+        "model_artifact_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "split_manifest_ref": "synthetic-blind-split:incomplete_reference_measurements",
+        "split_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evaluation_partition": "TEST_BLIND",
+        "split_frozen_at_ms": 1799999980000,
+        "prediction_frozen_at_ms": 1799999990000
       },
       "reference": {
         "asset": {
@@ -1218,7 +1495,11 @@
             "unit": "kW",
             "measured_value": 24,
             "measurement_ref": "synthetic-measurement-1",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-1",
+            "calibration_ref": "synthetic-calibration-1",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "CHARGE_ACCEPTANCE",
@@ -1226,7 +1507,11 @@
             "unit": "kW",
             "measured_value": 10,
             "measurement_ref": "synthetic-measurement-2",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-2",
+            "calibration_ref": "synthetic-calibration-2",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "ENERGY_RESERVE",
@@ -1234,7 +1519,11 @@
             "unit": "kWh",
             "measured_value": 3,
             "measurement_ref": "synthetic-measurement-3",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-3",
+            "calibration_ref": "synthetic-calibration-3",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           },
           {
             "constraint": "SOC_MINIMUM",
@@ -1242,7 +1531,11 @@
             "unit": "percent",
             "measured_value": 18,
             "measurement_ref": "synthetic-measurement-4",
-            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sensor_ref": "synthetic-meter-4",
+            "calibration_ref": "synthetic-calibration-4",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000
           }
         ]
       }
