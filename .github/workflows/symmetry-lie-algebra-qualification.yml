@@ -1,0 +1,43 @@
+name: Symmetry Lie Algebra Qualification
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "crates/bridges/symthaea-physics-bridge/src/linear_lie_algebra.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/linear_group_action.rs"
+      - ".github/workflows/symmetry-lie-algebra-qualification.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/bridges/symthaea-physics-bridge/src/linear_lie_algebra.rs"
+      - "crates/bridges/symthaea-physics-bridge/src/linear_group_action.rs"
+      - ".github/workflows/symmetry-lie-algebra-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: symmetry-lie-algebra-qualification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualification:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format the new qualification module
+        run: rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/linear_lie_algebra.rs
+      - name: Test the physics bridge library
+        run: cargo test --locked -p symthaea-physics-bridge --lib
+      - name: Clippy the physics bridge library
+        run: cargo clippy --locked -p symthaea-physics-bridge --lib --no-deps -- -D warnings
