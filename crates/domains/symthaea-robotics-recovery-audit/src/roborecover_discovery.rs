@@ -11,8 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::{
     InterventionKind, WorldStateContinuity,
     roborecover_manifest::{
-        pinned_split_blob_sha, PinnedTrainingParentFrame, ROBORECOVER_SOURCE_REPOSITORY,
-        ROBORECOVER_SOURCE_REVISION,
+        pinned_split_blob_sha, PinnedTrainingParentFrame, TrainingParentScenario,
+        ROBORECOVER_SOURCE_REPOSITORY, ROBORECOVER_SOURCE_REVISION,
     },
     roborecover_score::{BenchmarkPlatform, BenchmarkSplit, DeviationType, RecoveryStage},
 };
@@ -479,11 +479,11 @@ pub fn score_discovery_campaign(
 mod tests {
     use super::*;
 
-    fn manifest() -> DiscoveryCampaignManifest {
-        let mut allowed_parent_scenarios = BTreeMap::new();
-        allowed_parent_scenarios.insert(
+    fn parent_entries() -> BTreeMap<String, TrainingParentScenario> {
+        let mut entries = BTreeMap::new();
+        entries.insert(
             "parent-01".to_owned(),
-            ParentScenarioIdentity {
+            TrainingParentScenario {
                 scenario_sha256: "1".repeat(64),
                 task_name: "move_can_pot".to_owned(),
                 stage: RecoveryStage::Approach,
@@ -491,9 +491,9 @@ mod tests {
             },
         );
         for index in 0..799 {
-            allowed_parent_scenarios.insert(
+            entries.insert(
                 format!("sample-{index:03}"),
-                ParentScenarioIdentity {
+                TrainingParentScenario {
                     scenario_sha256: format!("{index:064x}"),
                     task_name: "move_can_pot".to_owned(),
                     stage: RecoveryStage::Approach,
@@ -501,17 +501,28 @@ mod tests {
                 },
             );
         }
+        entries
+    }
+
+    fn manifest() -> DiscoveryCampaignManifest {
+        let source_repository = ROBORECOVER_SOURCE_REPOSITORY.to_owned();
+        let source_revision = ROBORECOVER_SOURCE_REVISION.to_owned();
+        let train_split_manifest_blob_sha =
+            pinned_split_blob_sha(BenchmarkPlatform::RoboTwin, BenchmarkSplit::Train).to_owned();
+        let pinned_training_parent_frame = PinnedTrainingParentFrame::fixture(
+            &source_repository,
+            &source_revision,
+            &train_split_manifest_blob_sha,
+            parent_entries(),
+        );
         DiscoveryCampaignManifest {
             campaign_id: "campaign-01".to_owned(),
             platform: BenchmarkPlatform::RoboTwin,
             source_split: BenchmarkSplit::Train,
-            allowed_parent_scenarios,
-            source_repository: ROBORECOVER_SOURCE_REPOSITORY.to_owned(),
-            source_revision: ROBORECOVER_SOURCE_REVISION.to_owned(),
-            train_split_manifest_blob_sha: pinned_split_blob_sha(
-                BenchmarkPlatform::RoboTwin,
-                BenchmarkSplit::Train,
-            ).to_owned(),
+            pinned_training_parent_frame,
+            source_repository,
+            source_revision,
+            train_split_manifest_blob_sha,
             simulator_digest: "a".repeat(64),
             evaluator_digest: "b".repeat(64),
             generator_digest: "c".repeat(64),
@@ -726,16 +737,27 @@ mod tests {
     }
 
     #[test]
-    fn rejects_incomplete_or_malformed_training_parent_frame() {
+    fn rejects_incomplete_or_wrong_source_training_parent_frame() {
+        let mut entries = parent_entries();
+        entries.remove("parent-01");
         let mut m = manifest();
-        m.allowed_parent_scenarios.remove("parent-01");
+        m.pinned_training_parent_frame = PinnedTrainingParentFrame::fixture(
+            &m.source_repository,
+            &m.source_revision,
+            &m.train_split_manifest_blob_sha,
+            entries,
+        );
         assert!(validate_campaign_manifest(&m)
             .unwrap_err()
             .contains(&DiscoveryManifestIssue::InvalidParentFrame));
 
         let mut m = manifest();
-        m.allowed_parent_scenarios.get_mut("parent-01").unwrap().scenario_sha256 =
-            "not-a-digest".to_owned();
+        m.pinned_training_parent_frame = PinnedTrainingParentFrame::fixture(
+            &m.source_repository,
+            &m.source_revision,
+            &"0".repeat(40),
+            parent_entries(),
+        );
         assert!(validate_campaign_manifest(&m)
             .unwrap_err()
             .contains(&DiscoveryManifestIssue::InvalidParentFrame));
