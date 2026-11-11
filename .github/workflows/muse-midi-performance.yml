@@ -18,6 +18,7 @@ on:
       - "research/melothaea-audio-event-observation-v1"
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
+      - "crates/domains/symthaea-muse/src/audio_event_observation.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-music-theory/src/orchestration.rs"
