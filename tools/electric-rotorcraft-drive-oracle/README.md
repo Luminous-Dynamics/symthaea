@@ -13,7 +13,7 @@ The rotor-side mechanical power is torque multiplied by angular velocity. The or
 - Each component conversion loss is reported separately.
 - Loss energy is not assigned to a battery or thermal node by this crate; the physical thermal architecture must own that allocation.
 - DC bus voltage is an explicit operating-point input. Battery OCV, SOC, SOH, internal resistance, voltage sag and battery current limits remain separate battery-model responsibilities.
-- This v0.1 crate is motoring-only. Regeneration and reverse power flow are outside the model.
+- This v0.2 crate is motoring-only. Regeneration and reverse power flow are outside the model.
 - The operating-point efficiencies must already be valid for the torque, RPM, temperature and configuration being evaluated. This crate does not create, interpolate or extrapolate motor/inverter maps.
 
 This is not a motor electromagnetic model, inverter switching model, battery model, rotor aerodynamic model, aircraft solver, BMS or protection controller. Synthetic reference PASS is not a physical qualification or airworthiness result.
