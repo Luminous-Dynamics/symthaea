@@ -16,28 +16,30 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "action-context-alignment-fixtures-v0.2"
+      "const": "action-context-alignment-fixtures-v0.3"
     },
     "benchmark_id": {
       "const": "ACTION-CONTEXT-ALIGNMENT-001"
     },
     "status": {
-      "const": "synthetic_preflight_and_runtime_pair_design_unexecuted"
+      "const": "synthetic_preflight_runtime_identity_pair_design_unexecuted"
     },
     "fixture_count": {
-      "const": 48
+      "const": 60
     },
     "pair_count": {
-      "const": 24
+      "const": 30
     },
     "mutation_dimensions": {
       "type": "array",
       "minItems": 7,
-      "maxItems": 8,
+      "maxItems": 10,
       "uniqueItems": true,
       "items": {
         "enum": [
           "principal_binding",
+          "actor_binding",
+          "on_behalf_of_binding",
           "local_recognition",
           "target_allowlist",
           "purpose_binding",
@@ -50,8 +52,8 @@
     },
     "fixtures": {
       "type": "array",
-      "minItems": 42,
-      "maxItems": 42,
+      "minItems": 60,
+      "maxItems": 60,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -87,6 +89,8 @@
           "mutation_dimension": {
             "enum": [
               "principal_binding",
+              "actor_binding",
+              "on_behalf_of_binding",
               "local_recognition",
               "target_allowlist",
               "purpose_binding",
@@ -166,20 +170,28 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "principal_binding",
+              "principal_ref",
+              "actor_ref",
+              "on_behalf_of_ref",
               "local_recognition",
               "target_allowlist",
-              "purpose_binding",
+              "purpose_ref",
               "expires_at_unix",
               "delegated_scope",
               "pre_state_sha256"
             ],
             "properties": {
-              "principal_binding": {
-                "enum": [
-                  "Exact",
-                  "Mismatch"
-                ]
+              "principal_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "actor_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "on_behalf_of_ref": {
+                "type": "string",
+                "minLength": 1
               },
               "local_recognition": {
                 "type": "boolean"
@@ -193,11 +205,9 @@
                   "minLength": 1
                 }
               },
-              "purpose_binding": {
-                "enum": [
-                  "Exact",
-                  "Different"
-                ]
+              "purpose_ref": {
+                "type": "string",
+                "minLength": 1
               },
               "expires_at_unix": {
                 "type": "integer",
