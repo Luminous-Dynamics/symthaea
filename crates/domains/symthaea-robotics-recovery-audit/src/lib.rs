@@ -235,7 +235,6 @@ pub fn audit_trials(
     report.duplicate_trial_rows = observed_id_counts
         .values()
         .filter(|count| **count > 1)
-        .map(|count| *count)
         .sum();
 
     // Raw adverse-event markers remain visible even when a row is excluded
