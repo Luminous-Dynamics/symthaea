@@ -181,5 +181,72 @@
       "denominator": "Only completed observations with an independently resolved outcome class enter Brier/log-loss denominators. Failed/unknown attempts remain visible and receive separate counts; they are not silently discarded.",
       "adjudication": "Observed outcome class must be determined from the immutable observation by the independent evaluator, under a predeclared outcome taxonomy. The model does not choose its own realized label."
     }
+  },
+  "external_benchmark_crosswalk": [
+    {
+      "name": "Causal-Discovery-Bench",
+      "url": "https://arxiv.org/abs/2611.09934",
+      "reported": "3,802 episodes; 13 models from 5 vendors; 40 metrics grouped into 7 families; paper attributes 94.5% of evaluated errors to experiment design rather than inference.",
+      "design_implication": "Add sequential experiment-design, resource-aware testing, conflicting-evidence and stop/commit metrics. Preserve per-decision forecasts."
+    },
+    {
+      "name": "Heuresis",
+      "url": "https://arxiv.org/abs/2610.22846",
+      "reported": "Anonymous simulated datasets over six mechanism families. Reported GPT-6.1 Sol +14 adjacency-F1 points and Claude Opus 5.5 +7.4 on hardest family over best algorithm. Paper says code/data will be released.",
+      "design_implication": "Separate fixed algorithm, algorithm router and data-driven graph repair. Require edge-level change receipts bound to evidence."
+    },
+    {
+      "name": "CausalGame",
+      "url": "https://proceedings.mlr.press/v306/chen26l.html",
+      "reported": "14 interactive causal game settings and 29 frontier models; includes hidden confounding, selection bias and noisy measurements.",
+      "design_implication": "Add these bias families as distinct robustness strata; do not conflate game score with hidden-SCM causal repair."
+    },
+    {
+      "name": "FIRE-Bench",
+      "url": "https://proceedings.mlr.press/v306/wang26d.html",
+      "reported": "ICML 2026 full-cycle insight rediscovery; strongest reported frontier agent below 50 F1 with high run-to-run variance.",
+      "design_implication": "Add reproducible full-cycle rediscovery, multi-run variance and experiment-design/execution/evidence attribution."
+    },
+    {
+      "name": "ScienceAgentBench",
+      "url": "https://proceedings.iclr.cc/paper_files/paper/2025/hash/f12b4df26344f3be803c06b555252efe-Abstract-Conference.html",
+      "reported": "102 tasks from 44 peer-reviewed publications, validated by 9 experts; best reported independent solve rate 32.4% under its three-attempt protocol.",
+      "design_implication": "Use as a verified scientific-program analysis crosswalk, not an active-experiment result."
+    },
+    {
+      "name": "SDABench",
+      "url": "https://arxiv.org/abs/2607.11079",
+      "reported": "527 real-data and 6,000 synthetic instances; six analytical capabilities and five scientific domains; 15 LLMs.",
+      "design_implication": "Use for descriptive/exploratory/inferential/predictive/causal/mechanistic capability decomposition, subject to source and artifact audit."
+    }
+  ],
+  "stagewise_evaluation_ladder": [
+    "supplied-evidence inference and assumption selection",
+    "single decision-relevant experiment design",
+    "sequential experiment design under finite resource budgets",
+    "conflicting-evidence resolution and justified stop/commit",
+    "complete scientific rediscovery or causal repair trajectory",
+    "independent oracle validation and artifact/evidence provenance"
+  ],
+  "trajectory_failure_attribution": [
+    "experiment choice: information gain versus downstream value",
+    "measurement/protocol: statistical power, measurement quality and intervention validity",
+    "resource accounting: budget, cost, tool failures and time",
+    "belief update: likelihood calibration, contradictory evidence and subgroup heterogeneity",
+    "decision: dose/combination, utility, risk and uncertainty",
+    "stopping: premature stop, delayed stop and unreconciled effects",
+    "execution: tool/sandbox failures, reproducibility and observer mismatch",
+    "reporting: unsupported mechanism claims, citations and evidence-to-claim alignment"
+  ],
+  "forecast_quality": {
+    "scores": [
+      "multiclass Brier score",
+      "log loss",
+      "reliability diagrams / per-outcome calibration bins",
+      "sharpness and outcome-frequency baselines"
+    ],
+    "caveat": "Brier score combines reliability/calibration, resolution/discrimination and outcome uncertainty; it is not a pure calibration metric. Report reliability diagrams or a proper decomposition alongside proper scores where sample size permits.",
+    "zero_probability": "An observed outcome assigned zero forecast probability remains an explicit infinite-log-loss event; do not silently clip.",
+    "denominators": "Observed outcomes only for proper scores; failed/unknown attempts remain separately counted, not silently dropped."
   }
 }
