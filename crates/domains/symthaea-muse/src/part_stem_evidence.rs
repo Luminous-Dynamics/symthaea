@@ -132,6 +132,7 @@ pub enum PartStemEvidenceIssueV1 {
     InvalidNoteReceipt { ordinal: usize },
     DuplicateSourceOrdinal { ordinal: usize },
     WavMissing { sha256: String },
+    UnexpectedWavInput { sha256: String },
     DuplicateWavInput { sha256: String },
     WavTooLarge { sha256: String },
     TotalWavBytesExceeded,
@@ -943,7 +944,7 @@ pub fn validate_part_stem_bundle_v1(
         .collect();
     for input in wav_inputs {
         if !declared_wavs.contains(input.wav_sha256.as_str()) {
-            issues.push(PartStemEvidenceIssueV1::WavMissing {
+            issues.push(PartStemEvidenceIssueV1::UnexpectedWavInput {
                 sha256: input.wav_sha256.clone(),
             });
         }
@@ -1581,6 +1582,122 @@ mod tests {
         assert!(issues.iter().any(|issue| matches!(
             issue,
             PartStemEvidenceIssueV1::StemIdentityMismatch { track_index: 1 }
+        )));
+    }
+
+
+    #[test]
+    fn non_finite_float_stem_samples_are_rejected() {
+        let (mut bundle, midi, _) = fixture();
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 48_000,
+            bits_per_sample: 32,
+            sample_format: SampleFormat::Float,
+        };
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut writer = hound::WavWriter::new(&mut cursor, spec).unwrap();
+            for index in 0..24_000 {
+                writer.write_sample(if index == 12_000 { f32::NAN } else { 0.0 }).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+        let wav_bytes = cursor.into_inner();
+        let digest = sha256_hex(&wav_bytes);
+        bundle.audio_clock.sample_format = PartStemSampleFormatV1::PcmFloat32;
+        bundle.audio_clock.bits_per_sample = 32;
+        bundle.stems[0].wav_sha256 = digest.clone();
+        bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
+        let wavs = vec![PartStemWavInputV1 {
+            wav_sha256: digest,
+            wav_bytes,
+        }];
+        let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            PartStemEvidenceIssueV1::NonFiniteAudioSample { .. }
+        )));
+    }
+
+    #[test]
+    fn truncated_wav_bytes_are_rejected_even_with_a_fresh_digest() {
+        let (mut bundle, midi, wavs) = fixture();
+        let mut truncated = wavs[0].wav_bytes.clone();
+        truncated.truncate(truncated.len() - 10);
+        let digest = sha256_hex(&truncated);
+        bundle.stems[0].wav_sha256 = digest.clone();
+        bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
+        let inputs = vec![PartStemWavInputV1 {
+            wav_sha256: digest,
+            wav_bytes: truncated,
+        }];
+        let issues = validate_part_stem_bundle_v1(&bundle, &midi, &inputs).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            PartStemEvidenceIssueV1::InvalidWav { .. }
+                | PartStemEvidenceIssueV1::WavSampleCountMismatch { .. }
+        )));
+    }
+
+    #[test]
+    fn midi_note_mutation_is_rejected_after_all_outer_hashes_are_resealed() {
+        let (mut bundle, mut midi, wavs) = fixture();
+        let marker = [0x00, 0x90, 60, 100];
+        let position = midi.midi_bytes.windows(marker.len())
+            .position(|window| window == marker).unwrap();
+        midi.midi_bytes[position + 2] = 61;
+        midi.manifest.midi_sha256 = sha256_hex(&midi.midi_bytes);
+        let manifest_bytes = serde_json::to_vec(&midi.manifest).unwrap();
+        midi.manifest_sha256 = domain_sha256(
+            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
+            &manifest_bytes,
+        );
+        bundle.midi_sha256 = midi.manifest.midi_sha256.clone();
+        bundle.midi_manifest_sha256 = midi.manifest_sha256.clone();
+        bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
+
+        let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            PartStemEvidenceIssueV1::MidiNoteSetMismatch { track_index: 1 }
+        )));
+    }
+
+    #[test]
+    fn unreferenced_extra_wav_object_is_rejected() {
+        let (bundle, midi, mut wavs) = fixture();
+        let extra_bytes = pcm_wav(24_000);
+        let extra_digest = sha256_hex(&extra_bytes);
+        wavs.push(PartStemWavInputV1 {
+            wav_sha256: extra_digest.clone(),
+            wav_bytes: extra_bytes,
+        });
+        let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            PartStemEvidenceIssueV1::UnexpectedWavInput { sha256 } if sha256 == &extra_digest
+        )));
+    }
+
+    #[test]
+    fn structural_receipt_is_deterministic_for_frozen_inputs() {
+        let (bundle, midi, wavs) = fixture();
+        let first = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap();
+        let second = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.receipt_sha256, second.receipt_sha256);
+    }
+
+    #[test]
+    fn manifest_frame_count_mismatch_is_rejected() {
+        let (mut bundle, midi, wavs) = fixture();
+        bundle.audio_clock.frame_count += 1;
+        bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
+        let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            PartStemEvidenceIssueV1::WavSampleCountMismatch { .. }
         )));
     }
 
