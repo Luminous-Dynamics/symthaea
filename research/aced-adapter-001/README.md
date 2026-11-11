@@ -133,6 +133,22 @@ Plan v0.2 also requires one of two seeded randomized allocation methods (`seeded
 
 The experiment-plan artifact is separately defined by `ACED_EXPERIMENT_PLAN_V0_2.schema.json`, with a synthetic fixture at `qualifier/tests/fixtures/aced_experiment_plan_v0_2.json`. The Rust library exposes `validate_experiment_plan` and `validate_trace_with_plans(trace, plan_artifacts)`: it validates the closed nested plan fields, recomputes the canonical SHA-256 from the supplied plan object, resolves every proposal digest to exactly one supplied plan, and requires `experiment_id == plan_id`. Substituted controls/interventions, a missing plan artifact or a mismatched plan ID fail closed. This validates the supplied artifact and trace relationship; it does not prove that the proposal was timestamped before execution or that the external runner executed the plan faithfully.
 
+## Robust EVSI across plausible decision models
+
+The selector library now has a separate `robust_decision_value` module. It evaluates the same candidate experiment against a **predeclared set of plausible decision models**, where each scenario supplies its own prior, action-utility table and experiment likelihoods.
+
+The selected experiment maximizes its **worst-case net EVSI** over the declared set:
+
+`minimum_scenario(EVSI - experiment_cost - risk_penalty)`
+
+This addresses a failure mode of plug-in EVSI: a probe may look valuable only under one fragile prior/likelihood/utility specification. The robust selector refuses to let a high mean or best-case value hide a non-positive worst case. It reports minimum/maximum EVSI, the minimum/maximum scenario net value, the descriptive scenario mean and the number of scenarios. It does not assign probabilities to scenarios or present the arithmetic mean as an expectation.
+
+The module requires at least two distinct scenario identities, an identical candidate experiment set, and invariant declared cost/risk across scenarios. It fails closed on duplicate identities, set mismatch, cost/risk drift, invalid probabilities and invalid remaining budgets; it returns no experiment when no candidate has positive worst-case net value.
+
+**Evidence requirement:** the uncertainty set must be fixed before the outcome is observed. Build it from independently calibrated model alternatives, predeclared parameter bounds or a held-out uncertainty analysis. Do not let the candidate invent favorable scenarios after seeing the result. Report scenario coverage and sensitivity to set construction. Worst-case robustness can be conservative; compare it with nominal EVSI and EIG as separate arms. The module is a finite-set robust decision rule, not a Bayesian posterior over models, not distributionally robust optimization over an unbounded ambiguity set, and not a multi-stage POMDP solver.
+
+The executable tests use synthetic decision tables to show how the lower-envelope rule prefers an experiment that remains valuable across model alternatives, even when a competing experiment has higher best-case value. They are algorithm controls only, not ACED world runs or model results.
+
 ## Prospective experiment-value trace
 
 The reusable Rust library now also exports `experiment_trace`. Its trace contract records three event types:
