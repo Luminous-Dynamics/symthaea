@@ -187,7 +187,7 @@ pub enum MidiTranscriptionEvaluationIssueV1 {
     SerializationFailed,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct MidiTempoPointV1 {
     pub start_tick: u64,
     pub start_seconds: f64,
@@ -370,7 +370,7 @@ pub fn parse_transcribed_midi_v1(
 
     let mut tempo_events = Vec::new();
     let mut absolute_events = Vec::new();
-    let mut program_at_tick: BTreeMap<(u64, u8), u8> = BTreeMap::new();
+    let mut program_at_tick: BTreeMap<(u64, u8), (usize, u8)> = BTreeMap::new();
 
     // Type-1 MIDI tracks are parallel parts on a shared channel namespace.
     // Merge their absolute events before applying channel program state or
@@ -392,8 +392,10 @@ pub fn parse_transcribed_midi_v1(
                 let channel = channel.as_int();
                 let program = program.as_int();
                 if program_at_tick
-                    .insert((tick, channel), program)
-                    .is_some_and(|prior| prior != program)
+                    .insert((tick, channel), (track_index, program))
+                    .is_some_and(|(prior_track, prior_program)| {
+                        prior_track != track_index && prior_program != program
+                    })
                 {
                     return Err(MidiTranscriptionEvaluationIssueV1::ConflictingProgramChange {
                         tick,
@@ -406,27 +408,12 @@ pub fn parse_transcribed_midi_v1(
     }
 
     let tempo_points = tempo_points_from_events(&tempo_events, ticks_per_quarter)?;
-    absolute_events.sort_by_key(|(tick, track_index, event_index, kind)| {
-        let priority = match kind {
-            TrackEventKind::Midi {
-                message: MidiMessage::ProgramChange { .. },
-                ..
-            } => 0,
-            TrackEventKind::Midi {
-                message: MidiMessage::NoteOff { .. },
-                ..
-            } => 1,
-            TrackEventKind::Midi {
-                message: MidiMessage::NoteOn { vel, .. },
-                ..
-            } if vel.as_int() == 0 => 1,
-            TrackEventKind::Midi {
-                message: MidiMessage::NoteOn { .. },
-                ..
-            } => 2,
-            _ => 3,
-        };
-        (*tick, priority, *track_index, *event_index)
+    // Preserve each track's event order at equal ticks. Cross-track tie
+    // order is deterministic (track index, then event index); MIDI Type 1
+    // does not define a stronger total order for simultaneous events on a
+    // shared channel.
+    absolute_events.sort_by_key(|(tick, track_index, event_index, _)| {
+        (*tick, *track_index, *event_index)
     });
 
     let mut notes = Vec::new();
@@ -838,86 +825,211 @@ fn maximum_cardinality_matching(
     adjacency: &[Vec<usize>],
     predicted_count: usize,
 ) -> Result<Vec<(usize, usize)>, MidiTranscriptionEvaluationIssueV1> {
-    // Iterative augmenting-path search avoids recursion and reuses generation
-    // marks across roots. This keeps sparse, high-note-count inputs from
-    // repeatedly allocating O(V) visited arrays for every reference note.
+    // Port of mir_eval.util._bipartite_match (Eppstein/Hopcroft-Karp) with
+    // explicit stacks instead of recursive DFS. The graph orientation and
+    // traversal order mirror mir_eval: predicted vertices in MIDI output
+    // order, each connected to reference vertices in reference order.
     let reference_count = adjacency.len();
-    let mut reference_to_prediction = vec![None; reference_count];
-    let mut prediction_to_reference = vec![None; predicted_count];
-    let mut parent_prediction = vec![usize::MAX; predicted_count];
-    let mut seen_references = vec![0u32; reference_count];
-    let mut seen_predictions = vec![0u32; predicted_count];
-    let mut generation = 0u32;
-    let mut edge_scans = 0usize;
-
-    for root in 0..reference_count {
-        if reference_to_prediction[root].is_some() || adjacency[root].is_empty() {
-            continue;
-        }
-        generation = generation.saturating_add(1);
-        let mut queue = VecDeque::new();
-        seen_references[root] = generation;
-        queue.push_back(root);
-        let mut free_prediction = None;
-
-        'search: while let Some(reference_index) = queue.pop_front() {
-            for &prediction_index in &adjacency[reference_index] {
-                edge_scans = edge_scans.saturating_add(1);
-                if edge_scans > MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1 {
-                    return Err(MidiTranscriptionEvaluationIssueV1::MatchingWorkBudgetExceeded {
-                        scans: edge_scans,
-                        maximum: MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1,
-                    });
-                }
-                if prediction_index >= predicted_count
-                    || seen_predictions[prediction_index] == generation
-                {
-                    continue;
-                }
-                seen_predictions[prediction_index] = generation;
-                parent_prediction[prediction_index] = reference_index;
-
-                match prediction_to_reference[prediction_index] {
-                    None => {
-                        free_prediction = Some(prediction_index);
-                        break 'search;
-                    }
-                    Some(matched_reference)
-                        if seen_references[matched_reference] != generation =>
-                    {
-                        seen_references[matched_reference] = generation;
-                        queue.push_back(matched_reference);
-                    }
-                    Some(_) => {}
-                }
+    let mut graph = vec![Vec::<usize>::new(); predicted_count];
+    for (reference_index, predictions) in adjacency.iter().enumerate() {
+        for &prediction_index in predictions {
+            if prediction_index >= predicted_count {
+                return Err(MidiTranscriptionEvaluationIssueV1::InvalidPredictionMidi);
             }
-        }
-
-        let Some(mut prediction_index) = free_prediction else {
-            continue;
-        };
-        loop {
-            let reference_index = parent_prediction[prediction_index];
-            if reference_index == usize::MAX {
-                break;
-            }
-            let previous_prediction = reference_to_prediction[reference_index];
-            reference_to_prediction[reference_index] = Some(prediction_index);
-            prediction_to_reference[prediction_index] = Some(reference_index);
-
-            let Some(previous_prediction) = previous_prediction else {
-                break;
-            };
-            prediction_to_reference[previous_prediction] = None;
-            prediction_index = previous_prediction;
+            graph[prediction_index].push(reference_index);
         }
     }
 
-    let mut matching: Vec<_> = prediction_to_reference
+    let mut reference_to_prediction = vec![None; reference_count];
+    let mut prediction_to_reference = vec![None; predicted_count];
+    let mut edge_scans = 0usize;
+
+    // Upstream greedy initialization.
+    for prediction_index in 0..predicted_count {
+        for &reference_index in &graph[prediction_index] {
+            edge_scans = edge_scans.saturating_add(1);
+            if edge_scans > MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1 {
+                return Err(MidiTranscriptionEvaluationIssueV1::MatchingWorkBudgetExceeded {
+                    scans: edge_scans,
+                    maximum: MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1,
+                });
+            }
+            if reference_to_prediction[reference_index].is_none() {
+                reference_to_prediction[reference_index] = Some(prediction_index);
+                prediction_to_reference[prediction_index] = Some(reference_index);
+                break;
+            }
+        }
+    }
+
+    // predecessor_of_prediction:
+    //   None      => not in the current layered residual graph
+    //   Some(None)=> unmatched root prediction vertex
+    //   Some(Some(reference)) => reached through that matched reference vertex
+    let mut predecessor_of_prediction = vec![None::<Option<usize>>; predicted_count];
+    let mut predecessors_of_reference = vec![None::<Vec<usize>>; reference_count];
+    let mut new_layer_generation = vec![0u32; reference_count];
+    let mut new_layer_slot = vec![0usize; reference_count];
+    let mut generation = 0u32;
+
+    loop {
+        predecessor_of_prediction.fill(None);
+        for prediction_index in 0..predicted_count {
+            if prediction_to_reference[prediction_index].is_none()
+                && !graph[prediction_index].is_empty()
+            {
+                predecessor_of_prediction[prediction_index] = Some(None);
+            }
+        }
+
+        let mut layer: Vec<usize> = (0..predicted_count)
+            .filter(|&prediction_index| predecessor_of_prediction[prediction_index].is_some())
+            .collect();
+        predecessors_of_reference.fill(None);
+        let mut unmatched_references = Vec::new();
+
+        // Build Hopcroft-Karp alternating layers. Preserve first-encounter
+        // order exactly as the upstream dictionary implementation does.
+        while !layer.is_empty() && unmatched_references.is_empty() {
+            generation = generation.wrapping_add(1);
+            if generation == 0 {
+                new_layer_generation.fill(0);
+                generation = 1;
+            }
+            let mut new_layer: Vec<(usize, Vec<usize>)> = Vec::new();
+
+            for &prediction_index in &layer {
+                for &reference_index in &graph[prediction_index] {
+                    edge_scans = edge_scans.saturating_add(1);
+                    if edge_scans > MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1 {
+                        return Err(MidiTranscriptionEvaluationIssueV1::MatchingWorkBudgetExceeded {
+                            scans: edge_scans,
+                            maximum: MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1,
+                        });
+                    }
+                    if predecessors_of_reference[reference_index].is_some() {
+                        continue;
+                    }
+                    let slot = if new_layer_generation[reference_index] != generation {
+                        new_layer_generation[reference_index] = generation;
+                        let slot = new_layer.len();
+                        new_layer_slot[reference_index] = slot;
+                        new_layer.push((reference_index, Vec::new()));
+                        slot
+                    } else {
+                        new_layer_slot[reference_index]
+                    };
+                    new_layer[slot].1.push(prediction_index);
+                }
+            }
+
+            layer.clear();
+            for (reference_index, predecessor_predictions) in new_layer {
+                predecessors_of_reference[reference_index] = Some(predecessor_predictions);
+                if let Some(matched_prediction) = reference_to_prediction[reference_index] {
+                    layer.push(matched_prediction);
+                    predecessor_of_prediction[matched_prediction] = Some(Some(reference_index));
+                } else {
+                    unmatched_references.push(reference_index);
+                }
+            }
+        }
+
+        if unmatched_references.is_empty() {
+            break;
+        }
+
+        // Iterative equivalent of mir_eval's recursive recurse(reference).
+        // Each frame retains the predecessor prediction selected by its
+        // parent so a successful path can be unwound without recursion.
+        struct DfsFrame {
+            reference_index: usize,
+            neighbors: Vec<usize>,
+            next_neighbor: usize,
+            incoming_prediction: Option<usize>,
+        }
+
+        for root_reference in unmatched_references {
+            let Some(root_neighbors) = predecessors_of_reference[root_reference].take() else {
+                continue;
+            };
+            let mut stack = vec![DfsFrame {
+                reference_index: root_reference,
+                neighbors: root_neighbors,
+                next_neighbor: 0,
+                incoming_prediction: None,
+            }];
+            let mut augmented = false;
+
+            while !stack.is_empty() && !augmented {
+                let top = stack.len() - 1;
+                let mut pushed = false;
+
+                while stack[top].next_neighbor < stack[top].neighbors.len() {
+                    let prediction_index = stack[top].neighbors[stack[top].next_neighbor];
+                    stack[top].next_neighbor += 1;
+                    edge_scans = edge_scans.saturating_add(1);
+                    if edge_scans > MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1 {
+                        return Err(MidiTranscriptionEvaluationIssueV1::MatchingWorkBudgetExceeded {
+                            scans: edge_scans,
+                            maximum: MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1,
+                        });
+                    }
+
+                    let Some(previous_reference) =
+                        predecessor_of_prediction[prediction_index].take()
+                    else {
+                        continue;
+                    };
+
+                    match previous_reference {
+                        None => {
+                            let terminal_reference = stack[top].reference_index;
+                            reference_to_prediction[terminal_reference] = Some(prediction_index);
+                            prediction_to_reference[prediction_index] = Some(terminal_reference);
+
+                            for stack_index in (0..top).rev() {
+                                let parent_reference = stack[stack_index].reference_index;
+                                let incoming_prediction = stack[stack_index + 1]
+                                    .incoming_prediction
+                                    .ok_or(MidiTranscriptionEvaluationIssueV1::InvalidPredictionMidi)?;
+                                reference_to_prediction[parent_reference] =
+                                    Some(incoming_prediction);
+                                prediction_to_reference[incoming_prediction] =
+                                    Some(parent_reference);
+                            }
+                            augmented = true;
+                            break;
+                        }
+                        Some(previous_reference) => {
+                            if let Some(neighbors) =
+                                predecessors_of_reference[previous_reference].take()
+                            {
+                                stack.push(DfsFrame {
+                                    reference_index: previous_reference,
+                                    neighbors,
+                                    next_neighbor: 0,
+                                    incoming_prediction: Some(prediction_index),
+                                });
+                                pushed = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if !augmented && !pushed {
+                    stack.pop();
+                }
+            }
+        }
+    }
+
+    let mut matching: Vec<_> = reference_to_prediction
         .iter()
         .enumerate()
-        .filter_map(|(prediction_index, reference_index)| {
-            reference_index.map(|reference_index| (reference_index, prediction_index))
+        .filter_map(|(reference_index, prediction_index)| {
+            prediction_index.map(|prediction_index| (reference_index, prediction_index))
         })
         .collect();
     matching.sort_unstable_by_key(|(reference_index, _)| *reference_index);
