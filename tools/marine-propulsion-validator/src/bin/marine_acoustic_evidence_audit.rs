@@ -240,7 +240,7 @@ fn check_record(record: &Value, findings: &mut Findings) {
     );
     match (measurement_window.as_ref(), calibration_start, calibration_end) {
         (Some((start, end)), Some(valid_from), Some(valid_until)) => {
-            if valid_from >= valid_until || valid_from > *start || valid_until < *end {
+            if valid_from >= valid_until || valid_from > start.clone() || valid_until < end.clone() {
                 findings.push(
                     "/hydrophone",
                     "INVALID",
