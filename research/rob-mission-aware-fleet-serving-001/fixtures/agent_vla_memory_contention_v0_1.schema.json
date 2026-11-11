@@ -156,7 +156,8 @@
         "camera_deadline_slack_ticks",
         "robot_worst_vla_starvation_ticks",
         "robot_vla_starvation_cap_ticks",
-        "local_control_reserved"
+        "local_control_reserved",
+        "brain_turn_slack_ticks"
       ],
       "properties": {
         "gpu_capacity_units": {
@@ -237,6 +238,9 @@
         },
         "local_control_reserved": {
           "const": true
+        },
+        "brain_turn_slack_ticks": {
+          "$ref": "#/$defs/nonnegative"
         }
       }
     },
