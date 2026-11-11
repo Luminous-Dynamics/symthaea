@@ -106,7 +106,7 @@ The energy ledger therefore never credits regenerative energy above the upstream
 
 The lower-bound energy remaining above reserve is updated after every fully evaluated step. It must never cross below zero. A mission that passes every instantaneous power limit but crosses its cumulative energy reserve is INFEASIBLE.
 
-The report includes `battery_energy_accounting_complete`. If any interval is missing capability evidence, has incomplete cell coverage, conflicts with the mission identity, or is outside the model domain, that flag is false and the mission-wide minimum-reserve value is null. Accumulated discharge/regeneration totals are partial in that case and must not be interpreted as a full-mission result. A fully evaluated but infeasible mission retains its modeled negative reserve result.
+The report includes `battery_energy_accounting_complete`. If any interval is missing capability evidence, has incomplete cell coverage, conflicts with the mission identity, is outside the model domain, or exits early on a cell-level constraint before energy integration, that flag is false and the mission-wide minimum-reserve value is null. Accumulated discharge/regeneration totals are partial in that case and must not be interpreted as a full-mission result. A fully evaluated but infeasible mission retains its modeled negative reserve result.
 
 ### Cell-level constraints and domain
 
