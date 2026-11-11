@@ -94,6 +94,8 @@ The helper pins the expected episode, agent, camera, 640×360 RGB geometry, one-
 
 The request schema is `schemas/episode-request-v1.schema.json`; the emitted fused receipt schema is `schemas/driving-observation-receipt-v1.schema.json`. the emitted fused receipt schema is `schemas/driving-observation-receipt-v1.schema.json`. Each observation references an RGB pixel artifact by a path relative to the request file. The CLI rejects absolute paths, parent-directory traversal and symlinks that resolve outside the request directory. It checks the source pixel digest against the upstream Symtropy policy receipt before advancing the Vision Manifold.
 
+The CLI validates the complete episode before committing output files. Fused HDC vectors are staged in memory; if a later observation fails identity, receipt, timing, sequence or encoder validation, neither the receipts JSON nor any policy-input artifact is written. The receipts output path must not already exist, and the policy-input directory must be absent or empty before processing. This prevents a rejected multi-frame episode from leaving a partial set of apparently usable policy inputs.
+
 The CLI writes:
 - one serialized `DrivingObservationReceipt` per delivered observation;
 - a sequential predecessor-receipt chain;
@@ -107,3 +109,6 @@ Only delivered frames are passed through this bridge. Missing/dropped/stale obse
 ## Claim ceiling
 
 Passing tests establish deterministic fusion and receipt construction over finite supplied frames and vehicle states. They do not establish visual semantic accuracy, depth estimation, a trained camera-conditioned policy, closed-loop driving performance, causality, operational timing, world-model validity or physical safety.
+
+
+CLI tests additionally verify that a later sequence rollback does not leave partial policy-input artifacts.
