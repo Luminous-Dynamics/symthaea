@@ -17,6 +17,7 @@ Each upstream owner supplies an integer upper bound in control ticks, under a fr
 - `N_proposal`: available proposal/chunk length;
 - `N_freshness`: maximum continuation before observation/certificate freshness expires;
 - `N_deadline`: actions executable before the hard deadline after reserving measured compute/projection/communication time;
+- `N_risk`: largest contiguous prefix for which #4232 has already preallocated immutable risk across every required step/constraint event; the one-step marginal chance bounds from #4010 and the family-wise finite-horizon budget from #4232 remain separately qualified;
 - `N_thermal`: maximum prefix whose qualified per-node thermal upper bounds remain inside limits;
 - `N_actuator`: maximum prefix inside torque/current/voltage/response authority;
 - `N_dynamics`: maximum prefix supported by qualified set-valued dynamics/contact assumptions;
@@ -26,7 +27,7 @@ Each upstream owner supplies an integer upper bound in control ticks, under a fr
 
 For complete, fresh, qualified inputs:
 
-`N_commit = min(N_proposal, N_freshness, N_deadline, N_thermal, N_actuator, N_dynamics, N_viability, N_queue, N_continuity)`
+`N_commit = min(N_proposal, N_freshness, N_deadline, N_risk, N_thermal, N_actuator, N_dynamics, N_viability, N_queue, N_continuity)`
 
 Do not combine these into a learned scalar. Preserve all binding constraints, including ties.
 
@@ -62,7 +63,7 @@ A passing fixture verifies only the min-of-qualified-bounds reference semantics 
 
 ## Exact known-answer note
 
-The 15-case corpus was fetched back after commit and its expected horizon values were independently replayed as the minimum of the nine qualified bounds. Binding constraints are all ties at the minimum. The stable long-horizon case has two ties: freshness and queue, both at 20 ticks. This is synthetic reference arithmetic only.
+The 21-case corpus has been fetched back and replayed. The ten required bounds include finite-horizon risk spending. AH20 shows a preallocated risk cap binding at two ticks; AH21 shows that an unallocated/Unknown risk budget blocks new-prefix eligibility. The stable long-horizon case has two ties: freshness and queue, both at 20 ticks. This is synthetic reference arithmetic only.
 
 
 ## Composition preconditions: one context, prefix-closed caps
@@ -85,7 +86,7 @@ Do not ask one method to solve every part of the horizon problem. First, a candi
 - other learned/adaptive selector.
 
 Second, the common physical/evidence envelope clips the candidate:
-`N_commit = min(N_candidate, N_freshness, N_deadline, N_thermal, N_actuator, N_dynamics, N_viability, N_queue, N_continuity)`.
+`N_commit = min(N_candidate, N_freshness, N_deadline, N_risk, N_thermal, N_actuator, N_dynamics, N_viability, N_queue, N_continuity)`.
 
 This allows a fair test of different horizon proposal algorithms while giving each the same independent physical constraint wrapper. The proposal algorithm can recommend less than the maximum eligible horizon; it can never make the physical cap larger.
 
@@ -95,3 +96,16 @@ The new fixture corpus contains 19 cases. AH18 shows a PACE-style 12-tick propos
 ## Executable Rust reference
 
 The dependency-free reference combiner is at [adaptive-horizon-reference/src/lib.rs](./adaptive-horizon-reference/src/lib.rs). It consumes upstream caps only; it does not estimate them. Eleven tests cover min/ties, Unknown/stale/context mismatch/prefix closure, model/prefix identity mismatch, zero horizon, minimum threshold and non-authorization. A dedicated Rust 1.96 workflow runs format, test and strict Clippy on this branch. The code has been source-audited and fetched back; no Rust pass is claimed until the exact-head workflow succeeds.
+
+
+## Probabilistic risk is separate from robust viability
+
+The risk cap is consumed from Symtropy #4232, not inferred by the horizon selector. #4010 owns one-step marginal chance admission; #4232 owns finite-horizon family-wise alpha allocation and non-recycling; #4588 owns robust observation-constrained future mobility. These answer different questions and must remain separate:
+
+- **Chance-risk budget:** how much preallocated probabilistic violation budget remains for the declared finite horizon under qualified marginal-tail assumptions.
+- **Robust viability:** whether every physically possible successor in the declared set-valued envelope retains a permitted continuation.
+- **Thermal/actuator/dynamics caps:** whether every intermediate prefix step remains within qualified physical limits.
+
+Define `N_risk` as the largest contiguous next-action prefix for which every required step × constraint event already has an immutable preallocation from #4232, bound to the same episode, candidate, model, calibration, clock and context digest. A one-step alpha value cannot be reused at each footfall. Skipped allocations are not transferred to later steps; consumed allocations are not returned; uncertain execution reconciliation blocks further risk claims. If the ledger cannot provide a complete prefix-closed allocation, risk status is Unknown and no new commitment is eligible.
+
+A risk cap does not make a physically nonviable action safe, and a robustly viable action does not automatically satisfy a probabilistic family-wise risk target. The two predicates must both be reported.
