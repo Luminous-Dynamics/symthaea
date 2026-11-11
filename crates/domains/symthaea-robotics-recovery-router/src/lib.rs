@@ -42,6 +42,8 @@ pub enum RejectionReason {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OutcomeCounts {
+    /// Independently declared count of valid policy attempts.
+    pub declared_attempts: u64,
     /// Policy-completed task success with independently verified safe outcome.
     pub safe_recoveries: u64,
     /// Any adverse event, or completion whose safety/physical continuity is
@@ -58,9 +60,10 @@ impl OutcomeCounts {
     /// Number of classified policy attempts; infrastructure-indeterminate rows
     /// are excluded and separately retained.
     pub fn attempts(&self) -> Option<u64> {
-        self.safe_recoveries
+        let partition = self.safe_recoveries
             .checked_add(self.adverse_or_unverified)?
-            .checked_add(self.known_non_completions)
+            .checked_add(self.known_non_completions)?;
+        (partition == self.declared_attempts).then_some(partition)
     }
 
     pub fn is_partitioned(&self) -> bool {
@@ -440,6 +443,7 @@ mod tests {
             aggregate_evidence_sha256: "3".repeat(64),
             evidence_scope: EvidenceScope::TrainingOnlyCrossFitted,
             outcomes: OutcomeCounts {
+                declared_attempts: safe + adverse + known_failure,
                 safe_recoveries: safe,
                 adverse_or_unverified: adverse,
                 known_non_completions: known_failure,
