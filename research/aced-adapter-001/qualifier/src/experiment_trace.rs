@@ -163,8 +163,9 @@ fn validate_distribution(value: &Value) -> Result<(), String> {
 }
 
 fn validate_proposal(payload: &Value) -> Result<ProposalPrediction, String> {
-    const FIELDS: [&str; 10] = [
+    const FIELDS: [&str; 11] = [
         "experiment_id",
+        "experiment_plan_sha256",
         "belief_state_sha256",
         "selector",
         "predicted_outcome_distribution",
@@ -177,11 +178,14 @@ fn validate_proposal(payload: &Value) -> Result<ProposalPrediction, String> {
     ];
     if !exact_fields(payload, &FIELDS) {
         return Err(
-            "experiment_proposal payload does not match its closed ten-field contract".into(),
+            "experiment_proposal payload does not match its closed eleven-field contract".into(),
         );
     }
     let id = text(payload, "experiment_id")
         .ok_or_else(|| "experiment proposal has no experiment_id".to_string())?;
+    if !text(payload, "experiment_plan_sha256").is_some_and(is_sha256) {
+        return Err(format!("experiment {id} has a malformed experiment-plan digest"));
+    }
     if !text(payload, "belief_state_sha256").is_some_and(is_sha256) {
         return Err(format!("experiment {id} has a malformed belief-state digest"));
     }
@@ -566,6 +570,7 @@ mod tests {
     fn proposal() -> Value {
         json!({
             "experiment_id": "probe-1",
+            "experiment_plan_sha256": "d".repeat(64),
             "belief_state_sha256": "a".repeat(64),
             "selector": "RISK_ADJUSTED_EVSI",
             "predicted_outcome_distribution": [
