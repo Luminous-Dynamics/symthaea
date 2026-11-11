@@ -211,7 +211,10 @@
     "maximum_discovery_reserve_fraction": 0.3,
     "discovery_reserve_is_not_counted_as_a_new_measurement_until_activated": true,
     "qc_cannot_be_removed_to_improve_nominal_information_gain": true,
-    "safety_rights_contamination_and_authority_are_non_tradable": true
+    "safety_rights_contamination_and_authority_are_non_tradable": true,
+    "discovery_reserve_fraction_basis": "data_storage_units",
+    "nominal_reserve_fraction": 0.2,
+    "reserve_fraction_calculation": "R_DISCOVERY_REANALYSIS reserves 2 of 10 data-storage units; reserve is a budget allocation, not an already executed measurement."
   },
   "dependence_model": {
     "principle": "Outcomes from actions sharing a common_cause_group must not be assumed conditionally independent without a justified model.",
