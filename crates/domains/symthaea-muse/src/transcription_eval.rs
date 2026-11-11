@@ -25,7 +25,7 @@ use crate::midi_performance::{
 use midly::{Format, MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 pub const MIDI_TRANSCRIPTION_EVALUATION_SCHEMA_V1: &str =
     "muse-midi-transcription-evaluation-v1";
@@ -345,6 +345,9 @@ pub fn parse_transcribed_midi_v1(
     if !matches!(smf.header.format, Format::SingleTrack | Format::Parallel) {
         return Err(MidiTranscriptionEvaluationIssueV1::UnsupportedMidiFormat);
     }
+    if smf.header.format == Format::SingleTrack && smf.tracks.len() != 1 {
+        return Err(MidiTranscriptionEvaluationIssueV1::UnsupportedMidiFormat);
+    }
     let ticks_per_quarter = match smf.header.timing {
         Timing::Metrical(value) => value.as_int(),
         Timing::Timecode(_, _) => {
@@ -382,7 +385,7 @@ pub fn parse_transcribed_midi_v1(
         let track_index_u16 = u16::try_from(track_index)
             .map_err(|_| MidiTranscriptionEvaluationIssueV1::UnsupportedMidiFormat)?;
         let mut programs = [0u8; 16];
-        let mut pending: HashMap<(u8, u8), VecDeque<(u64, u8, u8)>> = HashMap::new();
+        let mut pending: BTreeMap<(u8, u8), VecDeque<(u64, u8, u8)>> = BTreeMap::new();
         let mut pending_note_count = 0usize;
         for (tick, kind) in events {
             match *kind {
@@ -503,6 +506,9 @@ pub fn parse_transcribed_midi_v1(
             .then_with(|| left.pitch_midi.cmp(&right.pitch_midi))
             .then_with(|| left.gm_program.cmp(&right.gm_program))
             .then_with(|| left.track_index.cmp(&right.track_index))
+            .then_with(|| left.midi_channel.cmp(&right.midi_channel))
+            .then_with(|| left.velocity_midi.cmp(&right.velocity_midi))
+            .then_with(|| left.offset_tick.cmp(&right.offset_tick))
     });
 
     Ok(ParsedMidiTranscriptionV1 {
@@ -788,24 +794,25 @@ fn maximum_cardinality_matching(
     adjacency: &[Vec<usize>],
     predicted_count: usize,
 ) -> Result<Vec<(usize, usize)>, MidiTranscriptionEvaluationIssueV1> {
-    // Iterative augmenting-path search avoids recursive DFS stack growth on
-    // long duplicate-heavy passages. The candidate-edge and work budgets are
-    // hard fail-closed limits.
+    // Iterative augmenting-path search avoids recursion and reuses generation
+    // marks across roots. This keeps sparse, high-note-count inputs from
+    // repeatedly allocating O(V) visited arrays for every reference note.
     let reference_count = adjacency.len();
     let mut reference_to_prediction = vec![None; reference_count];
     let mut prediction_to_reference = vec![None; predicted_count];
+    let mut parent_prediction = vec![usize::MAX; predicted_count];
+    let mut seen_references = vec![0u32; reference_count];
+    let mut seen_predictions = vec![0u32; predicted_count];
+    let mut generation = 0u32;
     let mut edge_scans = 0usize;
 
     for root in 0..reference_count {
-        if reference_to_prediction[root].is_some() {
+        if reference_to_prediction[root].is_some() || adjacency[root].is_empty() {
             continue;
         }
+        generation = generation.saturating_add(1);
         let mut queue = VecDeque::new();
-        let mut seen_references = vec![false; reference_count];
-        let mut seen_predictions = vec![false; predicted_count];
-        let mut parent_prediction = vec![None; predicted_count];
-
-        seen_references[root] = true;
+        seen_references[root] = generation;
         queue.push_back(root);
         let mut free_prediction = None;
 
@@ -818,19 +825,23 @@ fn maximum_cardinality_matching(
                         maximum: MIDI_TRANSCRIPTION_MAX_MATCHING_EDGE_SCANS_V1,
                     });
                 }
-                if prediction_index >= predicted_count || seen_predictions[prediction_index] {
+                if prediction_index >= predicted_count
+                    || seen_predictions[prediction_index] == generation
+                {
                     continue;
                 }
-                seen_predictions[prediction_index] = true;
-                parent_prediction[prediction_index] = Some(reference_index);
+                seen_predictions[prediction_index] = generation;
+                parent_prediction[prediction_index] = reference_index;
 
                 match prediction_to_reference[prediction_index] {
                     None => {
                         free_prediction = Some(prediction_index);
                         break 'search;
                     }
-                    Some(matched_reference) if !seen_references[matched_reference] => {
-                        seen_references[matched_reference] = true;
+                    Some(matched_reference)
+                        if seen_references[matched_reference] != generation =>
+                    {
+                        seen_references[matched_reference] = generation;
                         queue.push_back(matched_reference);
                     }
                     Some(_) => {}
@@ -842,9 +853,10 @@ fn maximum_cardinality_matching(
             continue;
         };
         loop {
-            let Some(reference_index) = parent_prediction[prediction_index] else {
+            let reference_index = parent_prediction[prediction_index];
+            if reference_index == usize::MAX {
                 break;
-            };
+            }
             let previous_prediction = reference_to_prediction[reference_index];
             reference_to_prediction[reference_index] = Some(prediction_index);
             prediction_to_reference[prediction_index] = Some(reference_index);
@@ -1187,7 +1199,7 @@ pub fn evaluate_midi_transcription_v1(
 
     let onset_matching = {
         let adjacency =
-            build_adjacency(&reference_notes, &predicted_notes, &config, false, false)?;
+            build_adjacency(&reference_notes, &predicted_notes, &config, false, false, false)?;
         maximum_cardinality_matching(&adjacency, predicted_notes.len())?
     };
     let full_matching = {
