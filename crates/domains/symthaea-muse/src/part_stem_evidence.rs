@@ -5,6 +5,12 @@
 //! or acoustic/perceptual fidelity.
 
 use crate::audio_event_observation::{
+    AUDIO_EVENT_OBSERVATION_MAX_AUDIO_FRAMES_V1,
+    AUDIO_EVENT_OBSERVATION_MAX_INTERLEAVED_SAMPLES_V1,
+    AUDIO_EVENT_OBSERVATION_MAX_MIDI_BYTES_V1,
+    AUDIO_EVENT_OBSERVATION_MAX_NOTES_V1,
+    AUDIO_EVENT_OBSERVATION_MAX_TRACKS_V1,
+    AUDIO_EVENT_OBSERVATION_MAX_WAV_BYTES_V1,
     AudioEventObservationIssueV1, AudioStemEventObservationReceiptV1,
     observe_rendered_audio_stem_events_v1,
 };
@@ -29,12 +35,12 @@ pub const PART_STEM_RECEIPT_DIGEST_SCHEMA_V1: &str =
     "muse-part-stem-validation-receipt-serde-json-sha256-v1";
 
 pub const PART_STEM_MAX_BUNDLE_BYTES_V1: usize = 16 * 1024 * 1024;
-pub const PART_STEM_MAX_STEMS_V1: usize = 256;
-pub const PART_STEM_MAX_NOTES_V1: usize = 100_000;
-pub const PART_STEM_MAX_MIDI_BYTES_V1: usize = 64 * 1024 * 1024;
-pub const PART_STEM_MAX_WAV_BYTES_V1: usize = 256 * 1024 * 1024;
+pub const PART_STEM_MAX_STEMS_V1: usize = AUDIO_EVENT_OBSERVATION_MAX_TRACKS_V1;
+pub const PART_STEM_MAX_NOTES_V1: usize = AUDIO_EVENT_OBSERVATION_MAX_NOTES_V1;
+pub const PART_STEM_MAX_MIDI_BYTES_V1: usize = AUDIO_EVENT_OBSERVATION_MAX_MIDI_BYTES_V1;
+pub const PART_STEM_MAX_WAV_BYTES_V1: usize = AUDIO_EVENT_OBSERVATION_MAX_WAV_BYTES_V1;
 pub const PART_STEM_MAX_TOTAL_WAV_BYTES_V1: u64 = 512 * 1024 * 1024;
-pub const PART_STEM_MAX_AUDIO_FRAMES_V1: u64 = 24_000_000;
+pub const PART_STEM_MAX_AUDIO_FRAMES_V1: u64 = AUDIO_EVENT_OBSERVATION_MAX_AUDIO_FRAMES_V1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -658,7 +664,9 @@ fn validate_wav(
         return Err(WavErrorV1::TooManyFrames);
     }
     let max_samples = PART_STEM_MAX_AUDIO_FRAMES_V1
-        .checked_mul(channels).ok_or(WavErrorV1::TooManyFrames)?;
+        .checked_mul(channels)
+        .ok_or(WavErrorV1::TooManyFrames)?
+        .min(AUDIO_EVENT_OBSERVATION_MAX_INTERLEAVED_SAMPLES_V1);
     let mut samples = 0u64;
     match spec.sample_format {
         SampleFormat::Float => {
