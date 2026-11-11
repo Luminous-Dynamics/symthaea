@@ -1264,7 +1264,7 @@ fn summarize_dc_bus_scenario(
                     feeder_id: Some(branch.feeder_id.clone()),
                     kind: DcBusFailureKind::PropulsionDrive(
                         DriveError::InvalidConfiguration(
-                            "map/configuration/context/evidence lineage is incomplete or mismatched",
+                            "map evidence lineage is incomplete or mismatched",
                         ),
                     ),
                 });
@@ -1852,6 +1852,7 @@ mod tests {
             branch_id: branch_id.clone(),
             drive_path_id: path_id.to_owned(),
             bus_id: "main-bus".to_owned(),
+            configuration_digest: "aircraft-config-sha256".to_owned(),
             feeder_id: format!("feeder-{path_id}"),
             meter_boundary_id: format!("meter-{path_id}"),
             protection_device_id: format!("breaker-{path_id}"),
@@ -1905,6 +1906,42 @@ mod tests {
             drive_paths: profiles,
             external_loads: Vec::new(),
         }
+    }
+
+    #[test]
+    fn branch_and_external_load_context_must_match_aircraft_configuration() {
+        let model = config();
+        let profile = shared_bus_path(&model, "left", 5_000.0, 400.0);
+        let mut input = shared_bus_input(vec![profile], 100_000.0, 500.0);
+        input.branches[0].configuration_digest = "stale-config".to_owned();
+        assert!(matches!(
+            evaluate_dc_bus_mission(&input),
+            Err(DcBusCompositionError::InvalidConfiguration(_))
+        ));
+
+        let profile = shared_bus_path(&model, "left", 5_000.0, 400.0);
+        let mut input = shared_bus_input(vec![profile], 100_000.0, 500.0);
+        input.external_loads.push(DcBusExternalLoadProfile {
+            load_id: "tms".to_owned(),
+            meter_boundary_id: "tms-meter".to_owned(),
+            bus_id: "main-bus".to_owned(),
+            configuration_digest: "aircraft-config-sha256".to_owned(),
+            kind: DcBusExternalLoadKind::ThermalManagement,
+            evidence_manifest_digest: "tms-evidence".to_owned(),
+            intervals: vec![DcBusExternalLoadInterval {
+                segment_id: "hover".to_owned(),
+                start_timestamp_ns: 0,
+                end_timestamp_ns: 2_000_000_000,
+                context_digest: String::new(),
+                power_lower_bound_w: 10.0,
+                power_nominal_w: 10.0,
+                power_upper_bound_w: 10.0,
+            }],
+        });
+        assert!(matches!(
+            evaluate_dc_bus_mission(&input),
+            Err(DcBusCompositionError::ScheduleMismatch(_))
+        ));
     }
 
     #[test]
@@ -2080,12 +2117,14 @@ mod tests {
             load_id: "coolant-pump".to_owned(),
             meter_boundary_id: "tms-pump-meter".to_owned(),
             bus_id: "main-bus".to_owned(),
+            configuration_digest: "aircraft-config-sha256".to_owned(),
             kind: DcBusExternalLoadKind::ThermalManagement,
             evidence_manifest_digest: "pump-evidence".to_owned(),
             intervals: vec![DcBusExternalLoadInterval {
                 segment_id: "hover".to_owned(),
                 start_timestamp_ns: 0,
                 end_timestamp_ns: 2_000_000_000,
+                context_digest: "hot-hover-tms-context".to_owned(),
                 power_lower_bound_w: 450.0,
                 power_nominal_w: 500.0,
                 power_upper_bound_w: 600.0,
