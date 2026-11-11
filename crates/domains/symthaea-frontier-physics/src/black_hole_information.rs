@@ -17,6 +17,8 @@ use num_complex::Complex64;
 pub const MAX_DENSE_REDUCED_DIMENSION: usize = 64;
 /// Match the existing state-vector circuit ceiling; larger states require a tensor-network backend.
 pub const MAX_DENSE_STATE_QUBITS: usize = 20;
+/// Upper product dimension for the O(m*n) harmonic-number Page oracle.
+pub const MAX_PAGE_REFERENCE_TOTAL_DIMENSION: usize = 1 << MAX_DENSE_STATE_QUBITS;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum QuantumInformationError {
@@ -25,6 +27,7 @@ pub enum QuantumInformationError {
     DimensionMismatch { expected: usize, actual: usize },
     DenseDimensionLimit { requested: usize, maximum: usize },
     DenseStateQubitLimit { requested: usize, maximum: usize },
+    PageReferenceDimensionLimit { requested: usize, maximum: usize },
     InvalidTolerance(f64),
     NonFiniteState { index: usize },
     NonFiniteMatrix { row: usize, column: usize },
@@ -45,6 +48,7 @@ impl fmt::Display for QuantumInformationError {
             Self::DimensionMismatch { expected, actual } => write!(f, "dimension mismatch: expected {expected}, got {actual}"),
             Self::DenseDimensionLimit { requested, maximum } => write!(f, "dense dimension {requested} exceeds limit {maximum}"),
             Self::DenseStateQubitLimit { requested, maximum } => write!(f, "dense state with {requested} qubits exceeds limit {maximum}"),
+            Self::PageReferenceDimensionLimit { requested, maximum } => write!(f, "Page reference dimension product {requested} exceeds limit {maximum}"),
             Self::InvalidTolerance(t) => write!(f, "invalid tolerance {t}"),
             Self::NonFiniteState { index } => write!(f, "non-finite state amplitude at index {index}"),
             Self::NonFiniteMatrix { row, column } => write!(f, "non-finite matrix entry ({row}, {column})"),
@@ -264,6 +268,59 @@ impl DensityMatrix {
     }
 }
 
+/// Exact Page theorem benchmark for a Haar-random pure state on
+/// C^m tensor C^n, returned in nats.
+///
+/// E[S_A] = H_(m*n) - H_max(m,n) - (min(m,n)-1)/(2*max(m,n)).
+///
+/// This is an ensemble-average reference for finite-dimensional random pure
+/// states. It is not an evaporation Hamiltonian, a local-circuit result, or a
+/// gravitational path-integral calculation. The bounded O(m*n) harmonic sum
+/// makes the numerical cost explicit and deterministic.
+pub fn page_average_entropy_nats(
+    subsystem_a_dimension: usize,
+    subsystem_b_dimension: usize,
+) -> Result<f64, QuantumInformationError> {
+    if subsystem_a_dimension == 0 {
+        return Err(QuantumInformationError::InvalidDimension(0));
+    }
+    if subsystem_b_dimension == 0 {
+        return Err(QuantumInformationError::InvalidDimension(0));
+    }
+    let total_dimension = subsystem_a_dimension
+        .checked_mul(subsystem_b_dimension)
+        .ok_or(QuantumInformationError::DimensionOverflow)?;
+    if total_dimension > MAX_PAGE_REFERENCE_TOTAL_DIMENSION {
+        return Err(QuantumInformationError::PageReferenceDimensionLimit {
+            requested: total_dimension,
+            maximum: MAX_PAGE_REFERENCE_TOTAL_DIMENSION,
+        });
+    }
+    let smaller = subsystem_a_dimension.min(subsystem_b_dimension);
+    let larger = subsystem_a_dimension.max(subsystem_b_dimension);
+    let entropy = harmonic_number(total_dimension)
+        - harmonic_number(larger)
+        - (smaller - 1) as f64 / (2.0 * larger as f64);
+    if entropy.is_finite() && entropy >= 0.0 {
+        Ok(entropy)
+    } else {
+        Err(QuantumInformationError::NonFiniteMatrix { row: 0, column: 0 })
+    }
+}
+
+/// Compensated harmonic sum H_n = sum_(k=1)^n 1/k.
+fn harmonic_number(n: usize) -> f64 {
+    let mut sum = 0.0;
+    let mut compensation = 0.0;
+    for k in 1..=n {
+        let adjusted = 1.0 / k as f64 - compensation;
+        let next = sum + adjusted;
+        compensation = (next - sum) - adjusted;
+        sum = next;
+    }
+    sum
+}
+
 fn validate_tolerance(t: f64) -> Result<(), QuantumInformationError> {
     if !t.is_finite() || t <= 0.0 { return Err(QuantumInformationError::InvalidTolerance(t)); }
     Ok(())
@@ -407,6 +464,47 @@ mod tests {
         let state = vec![Complex64::new(0.5, 0.0); 4];
         assert!(matches!(DensityMatrix::from_pure_state(&state, 2, &[0, 0], TOL),
             Err(QuantumInformationError::DuplicateQubit(0))));
+    }
+
+    #[test]
+    fn page_haar_average_matches_analytic_small_dimensions() {
+        close_page(page_average_entropy_nats(1, 8).unwrap(), 0.0, 1e-14);
+        close_page(page_average_entropy_nats(2, 2).unwrap(), 1.0 / 3.0, 1e-14);
+        close_page(
+            page_average_entropy_nats(2, 4).unwrap(),
+            0.5095238095238095,
+            1e-14,
+        );
+    }
+
+    #[test]
+    fn page_haar_average_is_symmetric_and_bounded_by_log_smaller_dimension() {
+        for (m, n) in [(2, 8), (4, 16), (32, 32), (128, 64)] {
+            let forward = page_average_entropy_nats(m, n).unwrap();
+            let reverse = page_average_entropy_nats(n, m).unwrap();
+            assert!((forward - reverse).abs() < 1e-13);
+            assert!(forward <= (m.min(n) as f64).ln() + 1e-13);
+            assert!(forward >= 0.0);
+        }
+    }
+
+    #[test]
+    fn page_reference_rejects_invalid_or_oversized_dimensions() {
+        assert!(matches!(
+            page_average_entropy_nats(0, 4),
+            Err(QuantumInformationError::InvalidDimension(0))
+        ));
+        assert!(matches!(
+            page_average_entropy_nats(MAX_PAGE_REFERENCE_TOTAL_DIMENSION + 1, 1),
+            Err(QuantumInformationError::PageReferenceDimensionLimit { .. })
+        ));
+    }
+
+    fn close_page(actual: f64, expected: f64, tolerance: f64) {
+        assert!(
+            (actual - expected).abs() <= tolerance,
+            "actual={actual:.16e}, expected={expected:.16e}, tolerance={tolerance:.3e}"
+        );
     }
 
     #[test]
