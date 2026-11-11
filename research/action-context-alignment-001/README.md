@@ -16,7 +16,9 @@ The v0.1 corpus has **42 fixtures / 21 matched pairs** across seven authority di
 - delegated scope;
 - pre-state commitment.
 
-Each pair includes one authorized positive control and one single-delta counterfactual. All non-mutated task and context fields remain byte-for-byte equivalent.
+It also includes three runtime-trigger pairs: critical tool failure, conflicting evidence and emergent risk. Each runtime pair holds the task and initially eligible authority context constant, then changes only the post-read trigger from None to the relevant trigger.
+
+Each pre-execution pair includes one authorized positive control and one single-delta counterfactual. All non-mutated task and context fields remain byte-for-byte equivalent. Runtime pairs include a continue control and a stop-before-further-effect control.
 
 ## Independent eligibility oracle
 
@@ -65,4 +67,4 @@ cargo run --manifest-path research/action-context-alignment-001/qualifier/Cargo.
 
 ## Claim ceiling
 
-A PASS qualifies only fixture structure, one-field pairing and the deterministic eligibility oracle. It does not prove model understanding, real authorization, safe actuation, capability issuance, production enforcement, or superiority over AgentAbstain / AuthGateBench. Direct model trials require frozen model/prompt/tool profiles, held-out pairs, deterministic gate checks and independently verified side-effect witnesses.
+A PASS qualifies only fixture structure, one-field preflight pairing, post-read stop/continue pairing and the deterministic eligibility/disposition oracle. It does not prove model understanding, real authorization, safe actuation, capability issuance, production enforcement, runtime monitoring effectiveness, or superiority over AgentAbstain / AuthGateBench. Direct model trials require frozen model/prompt/tool profiles, held-out pairs, deterministic gate checks and independently verified side-effect witnesses.
