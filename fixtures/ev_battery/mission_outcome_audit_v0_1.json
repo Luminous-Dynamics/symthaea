@@ -1,0 +1,1251 @@
+{
+  "corpus_version": "ev-mission-outcome-audit/0.1",
+  "cases": [
+    {
+      "case_id": "feasible_correct",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-feasible_correct",
+          "pack_ref": "pack-feasible_correct",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-feasible_correct",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-feasible_correct",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-feasible_correct",
+          "pack_ref": "pack-feasible_correct",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-feasible_correct",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-feasible_correct",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "MISSION_COMPLETED_WITHIN_LIMITS",
+        "outcome_reason": null,
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 24,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 3,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "measured_value": 48,
+            "measurement_ref": "synthetic-measurement-5",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "false_feasible_thermal",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-false_feasible_thermal",
+          "pack_ref": "pack-false_feasible_thermal",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-false_feasible_thermal",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-false_feasible_thermal",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-false_feasible_thermal",
+          "pack_ref": "pack-false_feasible_thermal",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-false_feasible_thermal",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-false_feasible_thermal",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "BATTERY_CONSTRAINT_EXCEEDED",
+        "outcome_reason": "cell thermal limit exceeded",
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 24,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 3,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "measured_value": 61,
+            "measurement_ref": "synthetic-measurement-5",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "false_feasible_reserve",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-false_feasible_reserve",
+          "pack_ref": "pack-false_feasible_reserve",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-false_feasible_reserve",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-false_feasible_reserve",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-false_feasible_reserve",
+          "pack_ref": "pack-false_feasible_reserve",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-false_feasible_reserve",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-false_feasible_reserve",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "BATTERY_CONSTRAINT_EXCEEDED",
+        "outcome_reason": "mission energy reserve depleted",
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 24,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 0.8,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "measured_value": 48,
+            "measurement_ref": "synthetic-measurement-5",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "infeasible_correct",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-infeasible_correct",
+          "pack_ref": "pack-infeasible_correct",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-infeasible_correct",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-infeasible_correct",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "INFEASIBLE",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-infeasible_correct",
+          "pack_ref": "pack-infeasible_correct",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-infeasible_correct",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-infeasible_correct",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "BATTERY_CONSTRAINT_EXCEEDED",
+        "outcome_reason": "pack power requirement not met",
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 15,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 3,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "measured_value": 48,
+            "measurement_ref": "synthetic-measurement-5",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "false_infeasible",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-false_infeasible",
+          "pack_ref": "pack-false_infeasible",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-false_infeasible",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-false_infeasible",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "INFEASIBLE",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-false_infeasible",
+          "pack_ref": "pack-false_infeasible",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-false_infeasible",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-false_infeasible",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "MISSION_COMPLETED_WITHIN_LIMITS",
+        "outcome_reason": null,
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 24,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 3,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "measured_value": 48,
+            "measurement_ref": "synthetic-measurement-5",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "abstained_out_of_domain",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-abstained_out_of_domain",
+          "pack_ref": "pack-abstained_out_of_domain",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-abstained_out_of_domain",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-abstained_out_of_domain",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "UNSUPPORTED_DOMAIN",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-abstained_out_of_domain",
+          "pack_ref": "pack-abstained_out_of_domain",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-abstained_out_of_domain",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-abstained_out_of_domain",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "MISSION_COMPLETED_WITHIN_LIMITS",
+        "outcome_reason": null,
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 24,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 3,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "measured_value": 48,
+            "measurement_ref": "synthetic-measurement-5",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "non_battery_abort",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-non_battery_abort",
+          "pack_ref": "pack-non_battery_abort",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-non_battery_abort",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-non_battery_abort",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-non_battery_abort",
+          "pack_ref": "pack-non_battery_abort",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-non_battery_abort",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-non_battery_abort",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "NON_BATTERY_ABORT",
+        "outcome_reason": "route closure prevented mission completion",
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 24,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 3,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "measured_value": 48,
+            "measurement_ref": "synthetic-measurement-5",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "inconclusive_reference",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-inconclusive_reference",
+          "pack_ref": "pack-inconclusive_reference",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-inconclusive_reference",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-inconclusive_reference",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "INFEASIBLE",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-inconclusive_reference",
+          "pack_ref": "pack-inconclusive_reference",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-inconclusive_reference",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-inconclusive_reference",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "INCONCLUSIVE",
+        "outcome_reason": "reference instrumentation lost",
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 24,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 3,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "measured_value": 48,
+            "measurement_ref": "synthetic-measurement-5",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "reference_asset_mismatch",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-reference_asset_mismatch",
+          "pack_ref": "pack-reference_asset_mismatch",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-reference_asset_mismatch",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-reference_asset_mismatch",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-reference-other",
+          "pack_ref": "pack-reference-other",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-reference_asset_mismatch",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-reference_asset_mismatch",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "MISSION_COMPLETED_WITHIN_LIMITS",
+        "outcome_reason": null,
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 24,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 3,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "measured_value": 48,
+            "measurement_ref": "synthetic-measurement-5",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "completed_but_measurement_failed",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-completed_but_measurement_failed",
+          "pack_ref": "pack-completed_but_measurement_failed",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-completed_but_measurement_failed",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-completed_but_measurement_failed",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-completed_but_measurement_failed",
+          "pack_ref": "pack-completed_but_measurement_failed",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-completed_but_measurement_failed",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-completed_but_measurement_failed",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "MISSION_COMPLETED_WITHIN_LIMITS",
+        "outcome_reason": null,
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 24,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 3,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "measured_value": 60,
+            "measurement_ref": "synthetic-measurement-5",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "incomplete_reference_measurements",
+      "prediction": {
+        "asset": {
+          "vehicle_ref": "vehicle-incomplete_reference_measurements",
+          "pack_ref": "pack-incomplete_reference_measurements",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-incomplete_reference_measurements",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mission_report_ref": "mission-report-incomplete_reference_measurements",
+        "mission_report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evaluator_version": "mission-capability-evaluator/0.1",
+        "disposition": "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+        "required_measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 20,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "limit_value": 8,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "limit_value": 2,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "limit_value": 10,
+            "relation": "MINIMUM_REQUIRED"
+          },
+          {
+            "constraint": "TEMPERATURE_MAXIMUM",
+            "scope_ref": "cell-001",
+            "unit": "degC",
+            "limit_value": 55,
+            "relation": "MAXIMUM_ALLOWED"
+          }
+        ]
+      },
+      "reference": {
+        "asset": {
+          "vehicle_ref": "vehicle-incomplete_reference_measurements",
+          "pack_ref": "pack-incomplete_reference_measurements",
+          "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "mission_profile_ref": "mission-profile-incomplete_reference_measurements",
+        "mission_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_class": "SYNTHETIC_KNOWN_TRUTH",
+        "protocol_ref": "synthetic-independent-reference-protocol/0.1",
+        "protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "evidence_ref": "synthetic-reference-incomplete_reference_measurements",
+        "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "outcome": "MISSION_COMPLETED_WITHIN_LIMITS",
+        "outcome_reason": null,
+        "observed_at_ms": 1800000000000,
+        "measurements": [
+          {
+            "constraint": "DISCHARGE_POWER",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 24,
+            "measurement_ref": "synthetic-measurement-1",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "CHARGE_ACCEPTANCE",
+            "scope_ref": "pack",
+            "unit": "kW",
+            "measured_value": 10,
+            "measurement_ref": "synthetic-measurement-2",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "ENERGY_RESERVE",
+            "scope_ref": "pack",
+            "unit": "kWh",
+            "measured_value": 3,
+            "measurement_ref": "synthetic-measurement-3",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "constraint": "SOC_MINIMUM",
+            "scope_ref": "cell-001",
+            "unit": "percent",
+            "measured_value": 18,
+            "measurement_ref": "synthetic-measurement-4",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    }
+  ]
+}
