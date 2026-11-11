@@ -43,7 +43,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "ELIGIBLE_FOR_PREREGISTRATION_REVIEW_ONLY"
     },
@@ -86,7 +90,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -129,7 +137,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -172,7 +184,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -215,7 +231,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -258,7 +278,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -301,7 +325,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -344,7 +372,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -387,7 +419,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -430,7 +466,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -473,7 +513,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -516,7 +560,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -559,7 +607,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -602,7 +654,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -645,7 +701,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -688,7 +748,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -731,7 +795,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": false,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -774,7 +842,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -817,7 +889,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -860,7 +936,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -903,7 +983,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -946,7 +1030,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "REJECTED_FOR_STUDY_SCOPE"
     },
@@ -989,7 +1077,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "REJECTED_FOR_STUDY_SCOPE"
     },
@@ -1032,7 +1124,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "REJECTED_FOR_STUDY_SCOPE"
     },
@@ -1075,7 +1171,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "REJECTED_FOR_STUDY_SCOPE"
     },
@@ -1118,7 +1218,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -1161,7 +1265,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -1204,7 +1312,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -1247,7 +1359,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -1290,7 +1406,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": false,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -1333,7 +1453,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -1376,7 +1500,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "REJECTED_FOR_STUDY_SCOPE"
     },
@@ -1419,7 +1547,11 @@
         "cluster_nesting_declared": false,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -1462,7 +1594,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "MORE_EVIDENCE_REQUIRED"
     },
@@ -1505,7 +1641,11 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "NOT_COMPARABLE"
     },
@@ -1548,9 +1688,201 @@
         "cluster_nesting_declared": true,
         "analysis_preregistered": true,
         "all_variance_strata_separately_reported": true,
-        "no_unplanned_product_revision_mixing": true
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
       },
       "expected_disposition": "ELIGIBLE_FOR_PREREGISTRATION_REVIEW_ONLY"
+    },
+    {
+      "case_id": "HSM-037",
+      "description": "A participating laboratory's current accreditation scope schedule has not been checked against the exact measurand, method and range.",
+      "signals": {
+        "primary_endpoint_defined": true,
+        "functional_unit_defined": true,
+        "comparators_pinned": true,
+        "same_protocol_across_arms": true,
+        "same_conditions_and_trace": true,
+        "software_model_versions_pinned": true,
+        "adaptation_budget_frozen": true,
+        "repeatability_runs_per_cell": 5,
+        "independent_lab_count": 3,
+        "production_lot_count": 3,
+        "units_per_lot": 4,
+        "household_count": 12,
+        "duty_cycle_profile_count": 3,
+        "holdout_lab_count": 1,
+        "holdout_lot_count": 1,
+        "holdout_household_count": 3,
+        "holdout_not_used_for_tuning": true,
+        "power_analysis_present": true,
+        "hierarchical_model_registered": true,
+        "analysis_code_digest_present": true,
+        "calibration_and_provenance_complete": true,
+        "independent_reference_method_present": true,
+        "randomization_preregistered": true,
+        "assessor_blinding_or_independent_adjudication": true,
+        "exclusion_rules_preregistered": true,
+        "missingness_policy_preregistered": true,
+        "consent_and_privacy_plan_present": true,
+        "purpose_bound_data_use": true,
+        "pseudoreplication_guard": true,
+        "hard_gates_noncompensatory": true,
+        "outlier_rule_preregistered": true,
+        "deviation_log_enabled": true,
+        "cluster_nesting_declared": true,
+        "analysis_preregistered": true,
+        "all_variance_strata_separately_reported": true,
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": false,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
+      },
+      "expected_disposition": "MORE_EVIDENCE_REQUIRED"
+    },
+    {
+      "case_id": "HSM-038",
+      "description": "The study has not resolved whether a relevant proficiency-testing scheme applies to participating laboratories.",
+      "signals": {
+        "primary_endpoint_defined": true,
+        "functional_unit_defined": true,
+        "comparators_pinned": true,
+        "same_protocol_across_arms": true,
+        "same_conditions_and_trace": true,
+        "software_model_versions_pinned": true,
+        "adaptation_budget_frozen": true,
+        "repeatability_runs_per_cell": 5,
+        "independent_lab_count": 3,
+        "production_lot_count": 3,
+        "units_per_lot": 4,
+        "household_count": 12,
+        "duty_cycle_profile_count": 3,
+        "holdout_lab_count": 1,
+        "holdout_lot_count": 1,
+        "holdout_household_count": 3,
+        "holdout_not_used_for_tuning": true,
+        "power_analysis_present": true,
+        "hierarchical_model_registered": true,
+        "analysis_code_digest_present": true,
+        "calibration_and_provenance_complete": true,
+        "independent_reference_method_present": true,
+        "randomization_preregistered": true,
+        "assessor_blinding_or_independent_adjudication": true,
+        "exclusion_rules_preregistered": true,
+        "missingness_policy_preregistered": true,
+        "consent_and_privacy_plan_present": true,
+        "purpose_bound_data_use": true,
+        "pseudoreplication_guard": true,
+        "hard_gates_noncompensatory": true,
+        "outlier_rule_preregistered": true,
+        "deviation_log_enabled": true,
+        "cluster_nesting_declared": true,
+        "analysis_preregistered": true,
+        "all_variance_strata_separately_reported": true,
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": false,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": true
+      },
+      "expected_disposition": "MORE_EVIDENCE_REQUIRED"
+    },
+    {
+      "case_id": "HSM-039",
+      "description": "A proficiency-testing score is incorrectly substituted for the study's between-laboratory reproducibility estimate.",
+      "signals": {
+        "primary_endpoint_defined": true,
+        "functional_unit_defined": true,
+        "comparators_pinned": true,
+        "same_protocol_across_arms": true,
+        "same_conditions_and_trace": true,
+        "software_model_versions_pinned": true,
+        "adaptation_budget_frozen": true,
+        "repeatability_runs_per_cell": 5,
+        "independent_lab_count": 3,
+        "production_lot_count": 3,
+        "units_per_lot": 4,
+        "household_count": 12,
+        "duty_cycle_profile_count": 3,
+        "holdout_lab_count": 1,
+        "holdout_lot_count": 1,
+        "holdout_household_count": 3,
+        "holdout_not_used_for_tuning": true,
+        "power_analysis_present": true,
+        "hierarchical_model_registered": true,
+        "analysis_code_digest_present": true,
+        "calibration_and_provenance_complete": true,
+        "independent_reference_method_present": true,
+        "randomization_preregistered": true,
+        "assessor_blinding_or_independent_adjudication": true,
+        "exclusion_rules_preregistered": true,
+        "missingness_policy_preregistered": true,
+        "consent_and_privacy_plan_present": true,
+        "purpose_bound_data_use": true,
+        "pseudoreplication_guard": true,
+        "hard_gates_noncompensatory": true,
+        "outlier_rule_preregistered": true,
+        "deviation_log_enabled": true,
+        "cluster_nesting_declared": true,
+        "analysis_preregistered": true,
+        "all_variance_strata_separately_reported": true,
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": false,
+        "method_edition_current": true
+      },
+      "expected_disposition": "NOT_COMPARABLE"
+    },
+    {
+      "case_id": "HSM-040",
+      "description": "The protocol relies on withdrawn ISO 5725-2:2019 as its current interlaboratory precision method instead of ISO 5725-2:2025.",
+      "signals": {
+        "primary_endpoint_defined": true,
+        "functional_unit_defined": true,
+        "comparators_pinned": true,
+        "same_protocol_across_arms": true,
+        "same_conditions_and_trace": true,
+        "software_model_versions_pinned": true,
+        "adaptation_budget_frozen": true,
+        "repeatability_runs_per_cell": 5,
+        "independent_lab_count": 3,
+        "production_lot_count": 3,
+        "units_per_lot": 4,
+        "household_count": 12,
+        "duty_cycle_profile_count": 3,
+        "holdout_lab_count": 1,
+        "holdout_lot_count": 1,
+        "holdout_household_count": 3,
+        "holdout_not_used_for_tuning": true,
+        "power_analysis_present": true,
+        "hierarchical_model_registered": true,
+        "analysis_code_digest_present": true,
+        "calibration_and_provenance_complete": true,
+        "independent_reference_method_present": true,
+        "randomization_preregistered": true,
+        "assessor_blinding_or_independent_adjudication": true,
+        "exclusion_rules_preregistered": true,
+        "missingness_policy_preregistered": true,
+        "consent_and_privacy_plan_present": true,
+        "purpose_bound_data_use": true,
+        "pseudoreplication_guard": true,
+        "hard_gates_noncompensatory": true,
+        "outlier_rule_preregistered": true,
+        "deviation_log_enabled": true,
+        "cluster_nesting_declared": true,
+        "analysis_preregistered": true,
+        "all_variance_strata_separately_reported": true,
+        "no_unplanned_product_revision_mixing": true,
+        "laboratory_scope_schedule_current": true,
+        "proficiency_assessment_applicability_resolved": true,
+        "proficiency_evidence_not_substituted_for_reproducibility": true,
+        "method_edition_current": false
+      },
+      "expected_disposition": "NOT_COMPARABLE"
     }
   ]
 }
