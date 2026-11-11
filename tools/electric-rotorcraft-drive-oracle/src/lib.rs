@@ -1134,15 +1134,6 @@ fn selected_external_power(
     }
 }
 
-fn dc_bus_add_finite(total: &mut f64, value: f64) -> Result<(), DcBusCompositionError> {
-    let next = *total + value;
-    if !next.is_finite() {
-        return Err(DcBusCompositionError::NumericalOverflow);
-    }
-    *total = next;
-    Ok(())
-}
-
 fn summarize_dc_bus_scenario(
     bus: &DcBusConfig,
     branches: &[&DcBusBranchConfig],
@@ -1179,7 +1170,7 @@ fn summarize_dc_bus_scenario(
 
     for (segment_index, reference_segment) in reference_path.segments.iter().enumerate() {
         let duration_s = reference_segment.duration_s;
-        let mut bus_voltage_v = reference_segment.dc_bus_voltage_v;
+        let bus_voltage_v = reference_segment.dc_bus_voltage_v;
         let mut propulsion_power_w = 0.0;
         let mut external_power_w = 0.0;
         let mut total_power_w = 0.0;
@@ -1300,26 +1291,6 @@ fn summarize_dc_bus_scenario(
                 });
             }
 
-            if let Err(_) = dc_bus_add_finite(&mut propulsion_power_w.clone(), 0.0) {
-                failures.push(DcBusScenarioFailure {
-                    bus_id: bus.bus_id.clone(),
-                    segment_id: segment.segment_id.clone(),
-                    branch_id: Some(branch.branch_id.clone()),
-                    drive_path_id: Some(branch.drive_path_id.clone()),
-                    feeder_id: Some(branch.feeder_id.clone()),
-                    kind: DcBusFailureKind::NumericalOverflow,
-                });
-            }
-            if let Err(_) = dc_bus_add_finite(&mut propulsion_power_w.clone(), 0.0) {
-                failures.push(DcBusScenarioFailure {
-                    bus_id: bus.bus_id.clone(),
-                    segment_id: segment.segment_id.clone(),
-                    branch_id: Some(branch.branch_id.clone()),
-                    drive_path_id: Some(branch.drive_path_id.clone()),
-                    feeder_id: Some(branch.feeder_id.clone()),
-                    kind: DcBusFailureKind::NumericalOverflow,
-                });
-            }
             propulsion_power_w += power_w;
             total_power_w += power_w;
             total_current_a += current_a;
@@ -1445,8 +1416,6 @@ fn summarize_dc_bus_scenario(
             branches: branch_results,
             external_loads: external_results,
         });
-        bus_voltage_v = 0.0;
-        let _ = bus_voltage_v;
     }
 
     if !failures.is_empty() {
@@ -1519,6 +1488,7 @@ pub fn evaluate_dc_bus_mission(
     }
 
     let mut branch_ids = std::collections::BTreeSet::new();
+    let mut feeder_ids = std::collections::BTreeSet::new();
     let mut path_ids = std::collections::BTreeSet::new();
     let mut meter_boundaries = std::collections::BTreeSet::new();
     for branch in &input.branches {
@@ -1544,6 +1514,9 @@ pub fn evaluate_dc_bus_mission(
         }
         if !path_ids.insert(branch.drive_path_id.clone()) {
             return Err(DcBusCompositionError::DuplicateIdentity("drive path assignment"));
+        }
+        if !feeder_ids.insert(branch.feeder_id.clone()) {
+            return Err(DcBusCompositionError::DuplicateIdentity("feeder ID"));
         }
         if !meter_boundaries.insert(branch.meter_boundary_id.clone()) {
             return Err(DcBusCompositionError::DuplicateIdentity("meter boundary ID"));
@@ -1624,6 +1597,13 @@ pub fn evaluate_dc_bus_mission(
                 DcBusCompositionError::MissingDrivePath(branches[0].drive_path_id.clone())
             })?;
         let reference_segments = &first_path.segments;
+        for pair in reference_segments.windows(2) {
+            if pair[1].start_timestamp_ns != pair[0].end_timestamp_ns {
+                return Err(DcBusCompositionError::ScheduleMismatch(
+                    first_path.drive_path_id.clone(),
+                ));
+            }
+        }
         for branch in &branches[1..] {
             let path = input
                 .drive_paths
