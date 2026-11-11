@@ -116,7 +116,13 @@ pub struct FormantObservationSummary {
     pub voicing_threshold: f32,
     pub analysis_frame_count: usize,
     pub voiced_frame_count: usize,
-    pub ordered_formant_frame_count: usize,
+    /// Frames whose LPC output equals the extractor's documented fallback
+    /// frequency/bandwidth pair for the corresponding formant.
+    pub f1_fallback_sentinel_frames: usize,
+    pub f2_fallback_sentinel_frames: usize,
+    pub f3_fallback_sentinel_frames: usize,
+    /// Fully ordered frames with no fallback sentinel detected.
+    pub qualified_formant_frame_count: usize,
     pub median_f1_hz: Option<f32>,
     pub median_f2_hz: Option<f32>,
     pub median_f3_hz: Option<f32>,
@@ -617,20 +623,42 @@ pub fn measure_segment_formants(
         &[]
     };
 
-    let config = ExtractionConfig::default();
+    let mut config = ExtractionConfig::default();
+    // Align the observer's voiced pitch gate to the synthetic plant's full
+    // supported range rather than silently dropping the 400–700 Hz strata.
+    config.f0_max = 700.0;
     let frames = formant_extraction::extract_formant_frames(samples, sample_rate_hz, &config);
     let voiced: Vec<&FormantFrame> = frames
         .iter()
         .filter(|frame| frame.source_type == SourceType::Vowel && frame.energy > 0.02)
         .collect();
+    // The existing extractor substitutes these frequency/bandwidth defaults
+    // when a spectral peak is absent. Count those sentinels and do not treat a
+    // fallback triplet as an observed three-formant result.
+    let f1_fallback_sentinel_frames = voiced
+        .iter()
+        .filter(|frame| frame.f1 == 500.0 && frame.b1 == 90.0)
+        .count();
+    let f2_fallback_sentinel_frames = voiced
+        .iter()
+        .filter(|frame| frame.f2 == 1_500.0 && frame.b2 == 110.0)
+        .count();
+    let f3_fallback_sentinel_frames = voiced
+        .iter()
+        .filter(|frame| frame.f3 == 2_500.0 && frame.b3 == 150.0)
+        .count();
     let max_formant_hz = config.analysis_sr as f32 * 0.45;
     let ordered: Vec<&FormantFrame> = voiced
         .iter()
         .copied()
         .filter(|frame| {
-            [frame.f1, frame.f2, frame.f3]
-                .iter()
-                .all(|value| value.is_finite() && *value >= 150.0 && *value < max_formant_hz)
+            let has_fallback_sentinel = (frame.f1 == 500.0 && frame.b1 == 90.0)
+                || (frame.f2 == 1_500.0 && frame.b2 == 110.0)
+                || (frame.f3 == 2_500.0 && frame.b3 == 150.0);
+            !has_fallback_sentinel
+                && [frame.f1, frame.f2, frame.f3]
+                    .iter()
+                    .all(|value| value.is_finite() && *value >= 150.0 && *value < max_formant_hz)
                 && frame.f1 < frame.f2
                 && frame.f2 < frame.f3
         })
@@ -655,7 +683,18 @@ pub fn measure_segment_formants(
         voicing_threshold: config.voicing_threshold,
         analysis_frame_count: frames.len(),
         voiced_frame_count: voiced.len(),
-        ordered_formant_frame_count: ordered.len(),
+        f1_fallback_sentinel_frames,
+        f2_fallback_sentinel_frames,
+        f3_fallback_sentinel_frames,
+        qualified_formant_frame_count: ordered.len(),
+        median_f1_hz: median_f1_hz,
+        median_f2_hz: median_f2_hz,
+        median_f3_hz: median_f3_hz,
+        mad_f1_hz,
+        mad_f2_hz,
+        mad_f3_hz,
+    })
+}
         median_f1_hz,
         median_f2_hz,
         median_f3_hz,
