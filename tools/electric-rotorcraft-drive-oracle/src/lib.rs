@@ -21,7 +21,7 @@
 use std::f64::consts::TAU;
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.2.0";
+pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.5.0";
 
 /// Explicit operating-point efficiencies and bus limits.
 ///
@@ -138,6 +138,67 @@ pub struct DriveKinematicReport {
     pub motor_angular_velocity_rad_s: f64,
     pub motor_speed_rpm: f64,
     pub motor_shaft_output_torque_nm: f64,
+}
+
+
+/// A motor efficiency interval linked to one exact map and evidence manifest.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MotorEfficiencyEvidence {
+    pub map_id: String,
+    pub map_digest: String,
+    pub map_model_version: String,
+    pub torque_cell_lower_index: usize,
+    pub speed_cell_lower_index: usize,
+    pub interpolation_weights: [f64; 4],
+    pub configuration_digest: String,
+    pub context_digest: String,
+    pub evidence_manifest_digest: String,
+    pub motor_torque_nm: f64,
+    pub motor_speed_rpm: f64,
+    pub efficiency_lower_bound: f64,
+    pub efficiency_nominal: f64,
+    pub efficiency_upper_bound: f64,
+}
+
+/// Required configuration and operating context for the consuming aircraft.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DriveMapExpectedContext<'a> {
+    pub configuration_digest: &'a str,
+    pub context_digest: &'a str,
+}
+
+/// Motor-side shaft state, derived independently of motor electrical efficiency.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MotorShaftOperatingPoint {
+    pub rotor_angular_velocity_rad_s: f64,
+    pub rotor_shaft_power_w: f64,
+    pub motor_angular_velocity_rad_s: f64,
+    pub motor_speed_rpm: f64,
+    pub motor_shaft_output_power_w: f64,
+    pub motor_shaft_output_torque_nm: f64,
+}
+
+/// Three drive-chain evaluations over one map-qualified motor-efficiency interval.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DriveMapEnvelope {
+    pub map_id: String,
+    pub map_digest: String,
+    pub map_model_version: String,
+    pub torque_cell_lower_index: usize,
+    pub speed_cell_lower_index: usize,
+    pub interpolation_weights: [f64; 4],
+    pub configuration_digest: String,
+    pub context_digest: String,
+    pub evidence_manifest_digest: String,
+    pub motor_operating_point: MotorShaftOperatingPoint,
+    pub efficiency_lower_bound: f64,
+    pub efficiency_nominal: f64,
+    pub efficiency_upper_bound: f64,
+    /// Lowest efficiency / highest DC demand. Typed failures remain visible.
+    pub adverse_efficiency_scenario: Result<DriveReport, DriveError>,
+    pub nominal_efficiency_scenario: Result<DriveReport, DriveError>,
+    /// Highest efficiency / lowest DC demand. Typed failures remain visible.
+    pub favourable_efficiency_scenario: Result<DriveReport, DriveError>,
 }
 
 /// Explicit non-PASS outcomes for unsupported or infeasible operating points.
@@ -316,6 +377,173 @@ pub fn evaluate_drive(config: &DriveConfig, input: DriveInput) -> Result<DriveRe
     })
 }
 
+
+/// Derive the motor-side shaft operating point from rotor demand and an
+/// explicit transmission speed ratio/efficiency, without needing motor or
+/// inverter efficiency. Use this before querying a motor efficiency map.
+pub fn derive_motor_shaft_operating_point(
+    input: DriveInput,
+    transmission: TransmissionKinematics,
+    transmission_efficiency: f64,
+) -> Result<MotorShaftOperatingPoint, DriveError> {
+    let ratio = transmission.motor_to_rotor_speed_ratio;
+    if !ratio.is_finite() || ratio <= 0.0 {
+        return Err(DriveError::InvalidConfiguration(
+            "motor-to-rotor speed ratio must be finite and positive for motoring",
+        ));
+    }
+    if !transmission_efficiency.is_finite()
+        || !(0.0 < transmission_efficiency && transmission_efficiency <= 1.0)
+    {
+        return Err(DriveError::InvalidConfiguration(
+            "transmission efficiency must be finite and in (0, 1]",
+        ));
+    }
+    if !input.rotor_shaft_torque_nm.is_finite()
+        || !input.rotor_speed_rpm.is_finite()
+        || input.rotor_shaft_torque_nm <= 0.0
+        || input.rotor_speed_rpm <= 0.0
+    {
+        return Err(DriveError::InvalidOperatingPoint(
+            "rotor torque and speed must be finite and positive for motoring",
+        ));
+    }
+
+    let rotor_angular_velocity_rad_s = input.rotor_speed_rpm * TAU / 60.0;
+    let rotor_shaft_power_w = input.rotor_shaft_torque_nm * rotor_angular_velocity_rad_s;
+    let motor_angular_velocity_rad_s = rotor_angular_velocity_rad_s * ratio;
+    let motor_speed_rpm = motor_angular_velocity_rad_s * 60.0 / TAU;
+    let motor_shaft_output_power_w = rotor_shaft_power_w / transmission_efficiency;
+    let motor_shaft_output_torque_nm =
+        motor_shaft_output_power_w / motor_angular_velocity_rad_s;
+
+    let derived = [
+        rotor_angular_velocity_rad_s,
+        rotor_shaft_power_w,
+        motor_angular_velocity_rad_s,
+        motor_speed_rpm,
+        motor_shaft_output_power_w,
+        motor_shaft_output_torque_nm,
+    ];
+    if derived.iter().any(|value| !value.is_finite() || *value <= 0.0) {
+        return Err(DriveError::NumericalOverflow);
+    }
+
+    Ok(MotorShaftOperatingPoint {
+        rotor_angular_velocity_rad_s,
+        rotor_shaft_power_w,
+        motor_angular_velocity_rad_s,
+        motor_speed_rpm,
+        motor_shaft_output_power_w,
+        motor_shaft_output_torque_nm,
+    })
+}
+
+/// Evaluate one drive chain at lower, nominal and upper map-qualified motor
+/// efficiencies. Expected configuration and context digests are checked before
+/// any scenario is evaluated. Each scenario retains its own typed failure.
+pub fn evaluate_drive_with_map_evidence(
+    config: &DriveConfig,
+    input: DriveInput,
+    transmission: TransmissionKinematics,
+    expected_context: DriveMapExpectedContext<'_>,
+    evidence: &MotorEfficiencyEvidence,
+) -> Result<DriveMapEnvelope, DriveError> {
+    if evidence.map_id.trim().is_empty()
+        || evidence.map_digest.trim().is_empty()
+        || evidence.map_model_version.trim().is_empty()
+        || evidence.configuration_digest.trim().is_empty()
+        || evidence.context_digest.trim().is_empty()
+        || evidence.evidence_manifest_digest.trim().is_empty()
+        || expected_context.configuration_digest.trim().is_empty()
+        || expected_context.context_digest.trim().is_empty()
+    {
+        return Err(DriveError::InvalidConfiguration(
+            "map, configuration, context and evidence identities must not be empty",
+        ));
+    }
+    if evidence.configuration_digest != expected_context.configuration_digest {
+        return Err(DriveError::InvalidConfiguration(
+            "motor efficiency map configuration digest does not match drive configuration",
+        ));
+    }
+    if evidence.context_digest != expected_context.context_digest {
+        return Err(DriveError::InvalidConfiguration(
+            "motor efficiency map context digest does not match drive operating context",
+        ));
+    }
+
+    if evidence
+        .interpolation_weights
+        .iter()
+        .any(|weight| !weight.is_finite() || !(0.0..=1.0).contains(weight))
+        || (evidence.interpolation_weights.iter().sum::<f64>() - 1.0).abs() > 1.0e-12
+    {
+        return Err(DriveError::InvalidConfiguration(
+            "map interpolation weights must be finite, within [0, 1], and sum to one",
+        ));
+    }
+
+    let efficiencies = [
+        evidence.efficiency_lower_bound,
+        evidence.efficiency_nominal,
+        evidence.efficiency_upper_bound,
+    ];
+    if efficiencies
+        .iter()
+        .any(|value| !value.is_finite() || !(0.0 < *value && *value <= 1.0))
+        || !(evidence.efficiency_lower_bound
+            <= evidence.efficiency_nominal
+            && evidence.efficiency_nominal
+                <= evidence.efficiency_upper_bound)
+    {
+        return Err(DriveError::InvalidConfiguration(
+            "motor efficiency bounds must be finite and ordered in (0, 1]",
+        ));
+    }
+
+    let motor_operating_point = derive_motor_shaft_operating_point(
+        input,
+        transmission,
+        config.transmission_efficiency,
+    )?;
+    if evidence.motor_torque_nm.to_bits()
+        != motor_operating_point.motor_shaft_output_torque_nm.to_bits()
+        || evidence.motor_speed_rpm.to_bits() != motor_operating_point.motor_speed_rpm.to_bits()
+    {
+        return Err(DriveError::InvalidOperatingPoint(
+            "motor efficiency evidence does not match the current motor torque-speed point",
+        ));
+    }
+
+    let evaluate_at_efficiency = |efficiency: f64| {
+        let scenario_config = DriveConfig {
+            motor_efficiency: efficiency,
+            ..*config
+        };
+        evaluate_drive(&scenario_config, input)
+    };
+
+    Ok(DriveMapEnvelope {
+        map_id: evidence.map_id.clone(),
+        map_digest: evidence.map_digest.clone(),
+        map_model_version: evidence.map_model_version.clone(),
+        torque_cell_lower_index: evidence.torque_cell_lower_index,
+        speed_cell_lower_index: evidence.speed_cell_lower_index,
+        interpolation_weights: evidence.interpolation_weights,
+        configuration_digest: evidence.configuration_digest.clone(),
+        context_digest: evidence.context_digest.clone(),
+        evidence_manifest_digest: evidence.evidence_manifest_digest.clone(),
+        motor_operating_point,
+        efficiency_lower_bound: evidence.efficiency_lower_bound,
+        efficiency_nominal: evidence.efficiency_nominal,
+        efficiency_upper_bound: evidence.efficiency_upper_bound,
+        adverse_efficiency_scenario: evaluate_at_efficiency(evidence.efficiency_lower_bound),
+        nominal_efficiency_scenario: evaluate_at_efficiency(evidence.efficiency_nominal),
+        favourable_efficiency_scenario: evaluate_at_efficiency(evidence.efficiency_upper_bound),
+    })
+}
+
 /// Evaluate the existing rotor-side drive-chain reference and derive the motor
 /// shaft operating point using an explicit gearbox speed ratio.
 ///
@@ -329,34 +557,19 @@ pub fn evaluate_drive_with_kinematics(
     input: DriveInput,
     transmission: TransmissionKinematics,
 ) -> Result<DriveKinematicReport, DriveError> {
-    let ratio = transmission.motor_to_rotor_speed_ratio;
-    if !ratio.is_finite() || ratio <= 0.0 {
-        return Err(DriveError::InvalidConfiguration(
-            "motor-to-rotor speed ratio must be finite and positive for motoring",
-        ));
-    }
-
+    let motor_point = derive_motor_shaft_operating_point(
+        input,
+        transmission,
+        config.transmission_efficiency,
+    )?;
     let drive = evaluate_drive(config, input)?;
-    let motor_angular_velocity_rad_s = drive.rotor_angular_velocity_rad_s * ratio;
-    let motor_speed_rpm = motor_angular_velocity_rad_s * 60.0 / TAU;
-    let motor_shaft_output_torque_nm =
-        drive.motor_shaft_output_power_w / motor_angular_velocity_rad_s;
-
-    let derived = [
-        motor_angular_velocity_rad_s,
-        motor_speed_rpm,
-        motor_shaft_output_torque_nm,
-    ];
-    if derived.iter().any(|value| !value.is_finite()) || derived.iter().any(|value| *value <= 0.0) {
-        return Err(DriveError::NumericalOverflow);
-    }
 
     Ok(DriveKinematicReport {
         drive,
-        motor_to_rotor_speed_ratio: ratio,
-        motor_angular_velocity_rad_s,
-        motor_speed_rpm,
-        motor_shaft_output_torque_nm,
+        motor_to_rotor_speed_ratio: transmission.motor_to_rotor_speed_ratio,
+        motor_angular_velocity_rad_s: motor_point.motor_angular_velocity_rad_s,
+        motor_speed_rpm: motor_point.motor_speed_rpm,
+        motor_shaft_output_torque_nm: motor_point.motor_shaft_output_torque_nm,
     })
 }
 
@@ -384,6 +597,35 @@ mod tests {
             rotor_speed_rpm: speed_rpm,
             dc_bus_voltage_v: bus_voltage_v,
             duration_s,
+        }
+    }
+
+    fn map_evidence(
+        model: &DriveConfig,
+        input: DriveInput,
+        transmission: TransmissionKinematics,
+    ) -> MotorEfficiencyEvidence {
+        let point = derive_motor_shaft_operating_point(
+            input,
+            transmission,
+            model.transmission_efficiency,
+        )
+        .unwrap();
+        MotorEfficiencyEvidence {
+            map_id: "motor-map-v1".to_owned(),
+            map_digest: "motor-map-sha256".to_owned(),
+            map_model_version: "electric-propulsion-map-oracle-v0.2.0".to_owned(),
+            torque_cell_lower_index: 3,
+            speed_cell_lower_index: 7,
+            interpolation_weights: [0.375, 0.125, 0.375, 0.125],
+            configuration_digest: "aircraft-config-sha256".to_owned(),
+            context_digest: "motor-context-sha256".to_owned(),
+            evidence_manifest_digest: "measurement-manifest-sha256".to_owned(),
+            motor_torque_nm: point.motor_shaft_output_torque_nm,
+            motor_speed_rpm: point.motor_speed_rpm,
+            efficiency_lower_bound: 0.90,
+            efficiency_nominal: 0.95,
+            efficiency_upper_bound: 0.98,
         }
     }
 
@@ -617,6 +859,303 @@ mod tests {
             evaluate_drive(&model, input),
             Err(DriveError::NumericalOverflow)
         );
+    }
+
+    #[test]
+    fn motor_shaft_operating_point_is_independent_of_motor_efficiency() {
+        let input = input_for_power(10_000.0, 400.0, 12.0);
+        let point = derive_motor_shaft_operating_point(
+            input,
+            TransmissionKinematics {
+                motor_to_rotor_speed_ratio: 5.0,
+            },
+            0.90,
+        )
+        .unwrap();
+        assert!((point.motor_speed_rpm - 15_000.0).abs() < 1.0e-9);
+        assert!((point.motor_shaft_output_power_w - 11_111.111_111_111_11).abs() < 1.0e-8);
+        assert!((point.motor_shaft_output_torque_nm - 7.073_553_026_306_46).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn map_evidence_produces_ordered_drive_demand_envelope() {
+        let mut model = config();
+        model.transmission_efficiency = 0.90;
+        model.inverter_efficiency = 0.98;
+        let input = input_for_power(10_000.0, 400.0, 12.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 5.0,
+        };
+        let evidence = map_evidence(&model, input, transmission);
+        let result = evaluate_drive_with_map_evidence(
+            &model,
+            input,
+            transmission,
+            DriveMapExpectedContext {
+                configuration_digest: "aircraft-config-sha256",
+                context_digest: "motor-context-sha256",
+            },
+            &evidence,
+        )
+        .unwrap();
+
+        let adverse = result.adverse_efficiency_scenario.unwrap();
+        let nominal = result.nominal_efficiency_scenario.unwrap();
+        let favourable = result.favourable_efficiency_scenario.unwrap();
+        assert!(adverse.dc_bus_input_power_w > nominal.dc_bus_input_power_w);
+        assert!(nominal.dc_bus_input_power_w > favourable.dc_bus_input_power_w);
+        assert!(
+            (adverse.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.90 * 0.98)).abs()
+                < 1.0e-8
+        );
+        assert!(
+            (nominal.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.95 * 0.98)).abs()
+                < 1.0e-8
+        );
+        assert!(
+            (favourable.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.98 * 0.98)).abs()
+                < 1.0e-8
+        );
+        assert_eq!(result.map_id, "motor-map-v1");
+        assert_eq!(result.map_digest, "motor-map-sha256");
+        assert_eq!(result.map_model_version, "electric-propulsion-map-oracle-v0.2.0");
+        assert_eq!(result.torque_cell_lower_index, 3);
+        assert_eq!(result.speed_cell_lower_index, 7);
+        assert_eq!(result.interpolation_weights, [0.375, 0.125, 0.375, 0.125]);
+        assert_eq!(
+            result.evidence_manifest_digest,
+            "measurement-manifest-sha256"
+        );
+        assert!((result.motor_operating_point.motor_speed_rpm - 15_000.0).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn adverse_bus_limit_failure_is_not_hidden_by_nominal_pass() {
+        let mut model = config();
+        model.transmission_efficiency = 0.90;
+        model.inverter_efficiency = 0.98;
+        model.maximum_dc_bus_power_w = 12_000.0;
+        let input = input_for_power(10_000.0, 400.0, 12.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 5.0,
+        };
+        let evidence = map_evidence(&model, input, transmission);
+        let result = evaluate_drive_with_map_evidence(
+            &model,
+            input,
+            transmission,
+            DriveMapExpectedContext {
+                configuration_digest: "aircraft-config-sha256",
+                context_digest: "motor-context-sha256",
+            },
+            &evidence,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            result.adverse_efficiency_scenario,
+            Err(DriveError::DcBusPowerLimitExceeded { .. })
+        ));
+        assert!(result.nominal_efficiency_scenario.is_ok());
+        assert!(result.favourable_efficiency_scenario.is_ok());
+    }
+
+    #[test]
+    fn map_configuration_and_context_mismatches_fail_closed() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let evidence = map_evidence(&model, input, transmission);
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "other-aircraft",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "other-temperature-or-firmware-context",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+    }
+
+    #[test]
+    fn stale_motor_operating_point_evidence_is_rejected() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.motor_speed_rpm += 1.0;
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidOperatingPoint(_))
+        ));
+    }
+
+    #[test]
+    fn invalid_map_efficiency_interval_and_missing_provenance_fail_closed() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.efficiency_lower_bound = 0.99;
+        evidence.efficiency_nominal = 0.95;
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.efficiency_lower_bound = 0.0;
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.evidence_manifest_digest.clear();
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+    }
+
+    #[test]
+    fn missing_map_content_digest_is_rejected() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.map_digest.clear();
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+    }
+
+    #[test]
+    fn invalid_map_model_version_or_interpolation_weights_fail_closed() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.map_model_version.clear();
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.interpolation_weights = [0.5, 0.5, 0.5, 0.5];
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.interpolation_weights[0] = f64::NAN;
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
     }
 
     #[test]
