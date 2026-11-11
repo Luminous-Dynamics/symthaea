@@ -29,6 +29,10 @@ const EXPECTED_CASES: &[(&str,&str)] = &[
 ("HSM-030","MORE_EVIDENCE_REQUIRED"),("HSM-031","NOT_COMPARABLE"),("HSM-032","REJECTED_FOR_STUDY_SCOPE"),
 ("HSM-033","MORE_EVIDENCE_REQUIRED"),("HSM-034","MORE_EVIDENCE_REQUIRED"),("HSM-035","NOT_COMPARABLE"),
 ("HSM-036","ELIGIBLE_FOR_PREREGISTRATION_REVIEW_ONLY"),
+("HSM-037","MORE_EVIDENCE_REQUIRED"),
+("HSM-038","MORE_EVIDENCE_REQUIRED"),
+("HSM-039","NOT_COMPARABLE"),
+("HSM-040","NOT_COMPARABLE"),
 ];
 const SIGNAL_FIELDS:&[&str]=&[
 "primary_endpoint_defined","functional_unit_defined","comparators_pinned","same_protocol_across_arms",
@@ -40,7 +44,9 @@ const SIGNAL_FIELDS:&[&str]=&[
 "assessor_blinding_or_independent_adjudication","exclusion_rules_preregistered","missingness_policy_preregistered",
 "consent_and_privacy_plan_present","purpose_bound_data_use","pseudoreplication_guard",
 "hard_gates_noncompensatory","outlier_rule_preregistered","deviation_log_enabled","cluster_nesting_declared",
-"analysis_preregistered","all_variance_strata_separately_reported","no_unplanned_product_revision_mixing"
+"analysis_preregistered","all_variance_strata_separately_reported","no_unplanned_product_revision_mixing",
+"laboratory_scope_schedule_current","proficiency_assessment_applicability_resolved",
+"proficiency_evidence_not_substituted_for_reproducibility","method_edition_current"
 ];
 
 #[derive(Debug)] struct UniqueJson(Value);
@@ -81,6 +87,10 @@ pub fn classify_signals(s:&Value)->&'static str{
  ||count(s,"household_count")<2||count(s,"duty_cycle_profile_count")<2
  {return "NOT_COMPARABLE";}
  if count(s,"holdout_lab_count")<1||count(s,"holdout_lot_count")<1||count(s,"holdout_household_count")<1
+ {return "MORE_EVIDENCE_REQUIRED";}
+ if !flag(s,"proficiency_evidence_not_substituted_for_reproducibility")||!flag(s,"method_edition_current")
+ {return "NOT_COMPARABLE";}
+ if !flag(s,"laboratory_scope_schedule_current")||!flag(s,"proficiency_assessment_applicability_resolved")
  {return "MORE_EVIDENCE_REQUIRED";}
  if !flag(s,"power_analysis_present")||!flag(s,"hierarchical_model_registered")
  ||!flag(s,"analysis_code_digest_present")||!flag(s,"calibration_and_provenance_complete")
@@ -177,7 +187,7 @@ fn validate_json_schema(value:&Value,schema:&Value,root:&Value,path:&str,errors:
 }
 
 fn validate_manifest(v:&Value)->Result<(),String>{
- let root_fields:&[&str]=&["schema_version","study_design_id","parent_issue","classification","claim_ceiling","product_scope","evidence_strata","confirmatory_holdouts","analysis_contract","comparison_contract","evidence_and_rights","design_state","planned_counts","power_analysis","protocol_digest","result"];
+ let root_fields:&[&str]=&["schema_version","study_design_id","parent_issue","classification","claim_ceiling","product_scope","evidence_strata","confirmatory_holdouts","analysis_contract","comparison_contract","evidence_and_rights","laboratory_competence_contract","design_state","planned_counts","power_analysis","protocol_digest","result"];
  if !exact_keys(v,root_fields)
  ||text(v,"schema_version")!="luminous.home-service-metrology-study-design/0.1"
  ||text(v,"study_design_id")!="HOME-SVC-METROLOGY-STUDY-DESIGN-V0.1"
@@ -258,6 +268,16 @@ fn validate_manifest(v:&Value)->Result<(),String>{
  if !exact_keys(rights,rights_fields)||rights.as_object().is_none_or(|o|o.values().any(|x|x.as_bool()!=Some(true))){
   return Err("EVIDENCE_RIGHTS_POLICY_WEAKENED".into());
  }
+ let lab=&v["laboratory_competence_contract"];
+ let lab_fields:&[&str]=&["scope_schedule_per_laboratory_required","scope_must_cover_exact_measurand_method_range","proficiency_assessment_reference","proficiency_assessment_may_be_not_applicable_with_justification","proficiency_is_not_reproducibility_substitute","withdrawn_method_edition_forbidden"];
+ if !exact_keys(lab,lab_fields)
+  ||lab["scope_schedule_per_laboratory_required"]!=true
+  ||lab["scope_must_cover_exact_measurand_method_range"]!=true
+  ||text(lab,"proficiency_assessment_reference")!="ISO/IEC 17043:2023 + ISO 13528:2022/Amd 1:2026"
+  ||lab["proficiency_assessment_may_be_not_applicable_with_justification"]!=true
+  ||lab["proficiency_is_not_reproducibility_substitute"]!=true
+  ||lab["withdrawn_method_edition_forbidden"]!=true
+ {return Err("LABORATORY_COMPETENCE_CONTRACT_INVALID".into());}
  Ok(())
 }
 
@@ -307,6 +327,9 @@ mod tests{
  #[test] fn comparison_contract_cannot_enable_a_scalar_score(){let mut m=parse(MANIFEST_JSON).unwrap();m["comparison_contract"]["no_single_scalar_score"]=Value::Bool(false);assert!(validate_manifest(&m).is_err());}
  #[test] fn unknown_study_signal_fields_are_rejected(){let mut c=parse(CORPUS_JSON).unwrap();c["cases"][0]["signals"]["posthoc_score"]=Value::from(4);assert!(validate_corpus(&c).is_err());}
  #[test] fn a_holdout_used_for_tuning_is_not_confirmatory(){let c=parse(CORPUS_JSON).unwrap();let mut s=c["cases"][0]["signals"].clone();s["holdout_not_used_for_tuning"]=Value::Bool(false);assert_eq!(classify_signals(&s),"REJECTED_FOR_STUDY_SCOPE");}
+ #[test] fn exact_lab_scope_schedule_is_required(){let c=parse(CORPUS_JSON).unwrap();let mut s=c["cases"][0]["signals"].clone();s["laboratory_scope_schedule_current"]=Value::Bool(false);assert_eq!(classify_signals(&s),"MORE_EVIDENCE_REQUIRED");}
+ #[test] fn proficiency_testing_is_not_reproducibility(){let c=parse(CORPUS_JSON).unwrap();let mut s=c["cases"][0]["signals"].clone();s["proficiency_evidence_not_substituted_for_reproducibility"]=Value::Bool(false);assert_eq!(classify_signals(&s),"NOT_COMPARABLE");}
+ #[test] fn withdrawn_interlaboratory_method_edition_is_not_current(){let c=parse(CORPUS_JSON).unwrap();let mut s=c["cases"][0]["signals"].clone();s["method_edition_current"]=Value::Bool(false);assert_eq!(classify_signals(&s),"NOT_COMPARABLE");}
  #[test] fn tracked_36_known_answers_validate(){assert_eq!(validate_tracked().unwrap(),36);}
  #[test] fn duplicate_json_members_are_rejected(){assert!(parse(r#"{"x":1,"x":2}"#).is_err());}
  #[test] fn one_lab_cannot_claim_reproducibility(){let c=parse(CORPUS_JSON).unwrap();assert_eq!(classify_signals(&c["cases"][1]["signals"]),"NOT_COMPARABLE");}
