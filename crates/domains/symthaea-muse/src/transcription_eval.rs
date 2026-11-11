@@ -1869,6 +1869,58 @@ mod tests {
     }
 
     #[test]
+    fn onset_only_metric_can_match_wrong_pitch_while_pitch_aware_metric_rejects_it() {
+        let reference_notes = vec![(60, 0, 480)];
+        let prediction_notes = vec![(67, 0, 480)];
+        let reference = reference_artifact(&reference_notes, 40);
+        let prediction = build_midi(&prediction_notes, 40, &[(0, 500_000)]);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.onset_only_metrics.f1, 1.0);
+        assert_eq!(report.onset_pitch_metrics.f1, 0.0);
+        assert_eq!(report.full_note_metrics.f1, 0.0);
+    }
+
+    #[test]
+    fn offset_only_metric_can_match_wrong_pitch_and_wrong_onset() {
+        let reference_notes = vec![(60, 0, 960)];
+        let prediction_notes = vec![(67, 480, 960)];
+        let reference = reference_artifact(&reference_notes, 40);
+        let prediction = build_midi(&prediction_notes, 40, &[(0, 500_000)]);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.offset_only_metrics.f1, 1.0);
+        assert_eq!(report.onset_only_metrics.f1, 0.0);
+        assert_eq!(report.onset_pitch_metrics.f1, 0.0);
+        assert_eq!(report.full_note_metrics.f1, 0.0);
+    }
+
+    #[test]
+    fn average_overlap_ratio_is_reported_for_full_note_matches() {
+        let reference_notes = vec![(60, 0, 1_920)];
+        let prediction_notes = vec![(60, 96, 1_824)];
+        let reference = reference_artifact(&reference_notes, 40);
+        let prediction = build_midi(&prediction_notes, 40, &[(0, 500_000)]);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.full_note_metrics.f1, 1.0);
+        assert!(report.average_overlap_ratio.unwrap() < 1.0);
+        assert!(report.average_overlap_ratio.unwrap() > 0.89);
+    }
+
+    #[test]
     fn unclosed_note_is_kept_for_onset_metrics_but_cannot_match_full_note() {
         let notes = vec![(60, 0, 480)];
         let reference = reference_artifact(&notes, 40);
