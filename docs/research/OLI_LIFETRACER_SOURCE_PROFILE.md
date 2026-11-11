@@ -62,7 +62,7 @@ This is a more meaningful generalization challenge than simply changing the clas
 
 ## Two further audit flags
 
-**Raw scan schema ambiguity.** The paper says each scan has seven columns, but the same passage enumerates eight names: row index, spectrum, RT1, RT2, TOF, m/z, area and resolution. The raw parser must inspect actual headers and preserve the discrepancy in the receipt until resolved.
+**Raw scan schema audit.** The paper says seven columns, then names row index plus seven measurements. The Hugging Face viewer exposes seven data columns—Spectrum, RT1, RT2, TOF, m/z, Area and Resolution—and may display the row index only as a table index. That likely explains the count mismatch, but the exact raw CSV header must still be inspected before implementing a parser.
 
 **Small sample power.** Eighteen samples are insufficient for a strong low-error-rate claim. The source score is a reproduction target, not evidence of a sub-1% error rate or broad transfer to other instruments, laboratories, geological families or biospheres.
 
