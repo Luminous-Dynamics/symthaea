@@ -20,7 +20,10 @@ const DOMAINS: [&str; 3] = [
 ];
 
 fn string_field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
-    value.get(key)?.as_str().filter(|text| !text.trim().is_empty())
+    value
+        .get(key)?
+        .as_str()
+        .filter(|text| !text.trim().is_empty())
 }
 
 fn unsigned_field(value: &Value, key: &str) -> Option<u64> {
@@ -37,13 +40,16 @@ fn gcd(mut a: u128, mut b: u128) -> u128 {
 }
 
 fn checked_mul(a: u128, b: u128) -> Result<u128, String> {
-    a.checked_mul(b).ok_or_else(|| "Bayesian oracle arithmetic overflow".to_string())
+    a.checked_mul(b)
+        .ok_or_else(|| "Bayesian oracle arithmetic overflow".to_string())
 }
 
 fn validate_schema(schema: &Value) -> Result<(), String> {
     if string_field(schema, "$schema") != Some("https://json-schema.org/draft/2020-12/schema")
         || string_field(schema, "$id")
-            != Some("https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-causal-primitives-001/CAUSAL_PRIMITIVES_FIXTURES_V0_1.schema.json")
+            != Some(
+                "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-causal-primitives-001/CAUSAL_PRIMITIVES_FIXTURES_V0_1.schema.json",
+            )
         || string_field(schema, "type") != Some("object")
         || schema["additionalProperties"] != false
         || schema["properties"]["tasks"]["type"] != "array"
@@ -53,7 +59,9 @@ fn validate_schema(schema: &Value) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_equations(equations: &Value) -> Result<(BTreeSet<String>, Vec<(String, String)>), String> {
+fn validate_equations(
+    equations: &Value,
+) -> Result<(BTreeSet<String>, Vec<(String, String)>), String> {
     let rows = equations
         .as_array()
         .ok_or_else(|| "equations must be an array".to_string())?;
@@ -94,7 +102,9 @@ fn validate_equations(equations: &Value) -> Result<(BTreeSet<String>, Vec<(Strin
             _ => false,
         };
         if !cardinality_ok {
-            return Err(format!("equations[{index}] has invalid operation/input arity"));
+            return Err(format!(
+                "equations[{index}] has invalid operation/input arity"
+            ));
         }
 
         let mut unique_inputs = BTreeSet::new();
@@ -136,7 +146,9 @@ fn parse_edge_set(value: &Value) -> Result<BTreeSet<(String, String)>, String> {
             .filter(|text| !text.is_empty())
             .ok_or_else(|| format!("expected_edges[{index}] has an invalid target"))?;
         if source == target || !edges.insert((source.to_string(), target.to_string())) {
-            return Err(format!("expected_edges[{index}] is a self-edge or duplicate"));
+            return Err(format!(
+                "expected_edges[{index}] is a self-edge or duplicate"
+            ));
         }
     }
     Ok(edges)
@@ -158,7 +170,9 @@ fn evaluate_equations(
 
     let mut state = BTreeMap::<String, bool>::new();
     for equation in equations.as_array().expect("validated array") {
-        let node = string_field(equation, "node").expect("validated node").to_string();
+        let node = string_field(equation, "node")
+            .expect("validated node")
+            .to_string();
         if node == target {
             state.insert(node, intervention_value);
             continue;
@@ -215,15 +229,18 @@ fn validate_belief_update(update: &Value) -> Result<(), String> {
         .filter(|value| *value > 0)
         .ok_or_else(|| "prior denominator must be positive".to_string())? as u128;
     let l1_n = unsigned_field(&update["evidence_likelihood"], "numerator")
-        .ok_or_else(|| "evidence likelihood numerator is missing".to_string())? as u128;
+        .ok_or_else(|| "evidence likelihood numerator is missing".to_string())?
+        as u128;
     let l1_d = unsigned_field(&update["evidence_likelihood"], "denominator")
         .filter(|value| *value > 0)
-        .ok_or_else(|| "evidence likelihood denominator must be positive".to_string())? as u128;
+        .ok_or_else(|| "evidence likelihood denominator must be positive".to_string())?
+        as u128;
     let l0_n = unsigned_field(&update["null_likelihood"], "numerator")
         .ok_or_else(|| "null likelihood numerator is missing".to_string())? as u128;
     let l0_d = unsigned_field(&update["null_likelihood"], "denominator")
         .filter(|value| *value > 0)
-        .ok_or_else(|| "null likelihood denominator must be positive".to_string())? as u128;
+        .ok_or_else(|| "null likelihood denominator must be positive".to_string())?
+        as u128;
 
     if prior_n > prior_d || l1_n > l1_d || l0_n > l0_d {
         return Err("prior and likelihood probabilities must lie in [0,1]".into());
@@ -240,10 +257,12 @@ fn validate_belief_update(update: &Value) -> Result<(), String> {
     let expected_d = denominator / divisor;
 
     let actual_n = unsigned_field(&update["expected_posterior"], "numerator")
-        .ok_or_else(|| "expected posterior numerator is missing".to_string())? as u128;
+        .ok_or_else(|| "expected posterior numerator is missing".to_string())?
+        as u128;
     let actual_d = unsigned_field(&update["expected_posterior"], "denominator")
         .filter(|value| *value > 0)
-        .ok_or_else(|| "expected posterior denominator must be positive".to_string())? as u128;
+        .ok_or_else(|| "expected posterior denominator must be positive".to_string())?
+        as u128;
 
     if actual_n != expected_n || actual_d != expected_d {
         return Err(format!(
@@ -277,7 +296,10 @@ fn validate_manifest(manifest: &Value) -> Result<Report, Vec<String>> {
         return Err(vec!["tasks must be an array".into()]);
     };
     if tasks.len() != EXPECTED_TASKS {
-        errors.push(format!("expected {EXPECTED_TASKS} tasks, got {}", tasks.len()));
+        errors.push(format!(
+            "expected {EXPECTED_TASKS} tasks, got {}",
+            tasks.len()
+        ));
     }
 
     let mut task_ids = BTreeSet::new();
@@ -324,7 +346,10 @@ fn validate_manifest(manifest: &Value) -> Result<Report, Vec<String>> {
                 };
                 if derived_edges.iter().cloned().collect::<BTreeSet<_>>() != expected {
                     Err("causal-prior edge oracle does not match structural equations".to_string())
-                } else if payload["description"].as_str().is_none_or(|text| text.trim().is_empty()) {
+                } else if payload["description"]
+                    .as_str()
+                    .is_none_or(|text| text.trim().is_empty())
+                {
                     Err("causal-prior description is missing".to_string())
                 } else {
                     Ok(())
@@ -352,9 +377,15 @@ fn validate_manifest(manifest: &Value) -> Result<Report, Vec<String>> {
                     || string_field(payload, "expected_effect").is_none()
                     || string_field(payload, "narrative").is_none()
                 {
-                    Err("agency-sensitivity pair is missing a required identity or outcome".to_string())
+                    Err(
+                        "agency-sensitivity pair is missing a required identity or outcome"
+                            .to_string(),
+                    )
                 } else {
-                    agency_pairs.entry(pair_id.to_string()).or_default().push(task);
+                    agency_pairs
+                        .entry(pair_id.to_string())
+                        .or_default()
+                        .push(task);
                     Ok(())
                 }
             }
@@ -367,7 +398,9 @@ fn validate_manifest(manifest: &Value) -> Result<Report, Vec<String>> {
 
     for primitive in PRIMITIVES {
         if primitive_counts.get(primitive).copied().unwrap_or_default() != 10 {
-            errors.push(format!("primitive {primitive} must contain exactly ten tasks"));
+            errors.push(format!(
+                "primitive {primitive} must contain exactly ten tasks"
+            ));
         }
     }
     if domains.len() != DOMAINS.len() {
@@ -375,11 +408,16 @@ fn validate_manifest(manifest: &Value) -> Result<Report, Vec<String>> {
     }
 
     if agency_pairs.len() != 5 {
-        errors.push(format!("expected five agency-framing pairs, got {}", agency_pairs.len()));
+        errors.push(format!(
+            "expected five agency-framing pairs, got {}",
+            agency_pairs.len()
+        ));
     }
     for (pair_id, members) in &agency_pairs {
         if members.len() != 2 {
-            errors.push(format!("agency pair {pair_id} must have exactly two members"));
+            errors.push(format!(
+                "agency pair {pair_id} must have exactly two members"
+            ));
             continue;
         }
         let left = &members[0]["agency_sensitivity"];
@@ -455,7 +493,10 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(errors) => {
-            eprintln!("CAUSAL-PRIMITIVES QUALIFICATION FAILED ({} findings):", errors.len());
+            eprintln!(
+                "CAUSAL-PRIMITIVES QUALIFICATION FAILED ({} findings):",
+                errors.len()
+            );
             for error in errors {
                 eprintln!(" - {error}");
             }
@@ -503,8 +544,7 @@ mod tests {
     #[test]
     fn causal_prior_oracle_must_match_structural_equations() {
         let mut value = parsed();
-        value["tasks"][0]["causal_prior"]["expected_edges"][0][0] =
-            Value::String("UNKNOWN".into());
+        value["tasks"][0]["causal_prior"]["expected_edges"][0][0] = Value::String("UNKNOWN".into());
         assert!(validate_manifest(&value).is_err());
     }
 
@@ -514,8 +554,7 @@ mod tests {
         let previous = value["tasks"][10]["forward_state_trace"]["expected_state"]["X1"]
             .as_bool()
             .unwrap();
-        value["tasks"][10]["forward_state_trace"]["expected_state"]["X1"] =
-            Value::Bool(!previous);
+        value["tasks"][10]["forward_state_trace"]["expected_state"]["X1"] = Value::Bool(!previous);
         assert!(validate_manifest(&value).is_err());
     }
 
@@ -545,8 +584,7 @@ mod tests {
     #[test]
     fn self_dependent_equation_is_rejected() {
         let mut value = parsed();
-        value["tasks"][0]["causal_prior"]["equations"][1]["inputs"][0] =
-            Value::String("X1".into());
+        value["tasks"][0]["causal_prior"]["equations"][1]["inputs"][0] = Value::String("X1".into());
         assert!(validate_manifest(&value).is_err());
     }
 
