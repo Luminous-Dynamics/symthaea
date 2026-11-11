@@ -472,3 +472,8 @@ The Luminous target is to compare these methods under matched robot/task/model/n
 
 
 The mission-aware fleet-serving child [#11627](https://github.com/Luminous-Dynamics/symthaea/issues/11627) / [draft PR #11630](https://github.com/Luminous-Dynamics/symthaea/pull/11630) is now included as a distinct constrained admission benchmark.
+
+
+### Decision-sufficiency horizon as a new control bound
+
+A fixed freshness threshold is useful but does not tell us whether the current information is still decision-sufficient. The new [decision-sufficiency protocol](./decision_sufficiency_horizon.md) adds a calibrated upper bound on stale-action regret and a robust common-admissibility requirement. It is a separate bound in the adaptive commitment horizon: stable old information may remain sufficient, while very recent information may already be inadequate after a fast state transition.
