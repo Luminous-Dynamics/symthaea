@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/aced-adapter-001/ACED_QUERY_WORLD_INVENTORY_V0_1.schema.json",
+  "title": "ACED Query metadata-only world inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "tracks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "aced-query-world-inventory-v0.1"
+    },
+    "benchmark_id": {
+      "const": "ACED-QUERY-ADAPTER-001"
+    },
+    "tracks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core_struct",
+        "core_decision",
+        "guess_struct",
+        "guess_decision"
+      ],
+      "properties": {
+        "core_struct": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "track",
+              "file",
+              "path",
+              "git_blob_sha",
+              "bytes",
+              "sha256",
+              "domain",
+              "task_family",
+              "seed",
+              "variables_n",
+              "edge_k",
+              "sample_n"
+            ],
+            "properties": {
+              "track": {
+                "const": "core_struct"
+              },
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "git_blob_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task_family": {
+                "type": "string",
+                "minLength": 1
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "variables_n": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "edge_k": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "sample_n": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "core_decision": {
+          "type": "array",
+          "minItems": 60,
+          "maxItems": 60,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "track",
+              "file",
+              "path",
+              "git_blob_sha",
+              "bytes",
+              "sha256",
+              "domain",
+              "task_family",
+              "seed",
+              "variables_n",
+              "edge_k",
+              "sample_n"
+            ],
+            "properties": {
+              "track": {
+                "const": "core_decision"
+              },
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "git_blob_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task_family": {
+                "type": "string",
+                "minLength": 1
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "variables_n": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "edge_k": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "sample_n": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "guess_struct": {
+          "type": "array",
+          "minItems": 30,
+          "maxItems": 30,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "track",
+              "file",
+              "path",
+              "git_blob_sha",
+              "bytes",
+              "sha256",
+              "domain",
+              "task_family",
+              "seed",
+              "variables_n",
+              "edge_k",
+              "sample_n"
+            ],
+            "properties": {
+              "track": {
+                "const": "guess_struct"
+              },
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "git_blob_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task_family": {
+                "type": "string",
+                "minLength": 1
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "variables_n": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "edge_k": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "sample_n": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "guess_decision": {
+          "type": "array",
+          "minItems": 48,
+          "maxItems": 48,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "track",
+              "file",
+              "path",
+              "git_blob_sha",
+              "bytes",
+              "sha256",
+              "domain",
+              "task_family",
+              "seed",
+              "variables_n",
+              "edge_k",
+              "sample_n"
+            ],
+            "properties": {
+              "track": {
+                "const": "guess_decision"
+              },
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "git_blob_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task_family": {
+                "type": "string",
+                "minLength": 1
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "variables_n": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "edge_k": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "sample_n": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
