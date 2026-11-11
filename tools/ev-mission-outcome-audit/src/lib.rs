@@ -228,7 +228,8 @@ fn valid_relation(constraint: &str, relation: &str) -> bool {
         | "CHARGE_ACCEPTANCE"
         | "ENERGY_RESERVE"
         | "SOC_MINIMUM"
-        | "VOLTAGE_MINIMUM" => relation == "MINIMUM_REQUIRED",
+        | "VOLTAGE_MINIMUM"
+        | "TEMPERATURE_MINIMUM" => relation == "MINIMUM_REQUIRED",
         "SOC_MAXIMUM" | "VOLTAGE_MAXIMUM" | "TEMPERATURE_MAXIMUM" => {
             relation == "MAXIMUM_ALLOWED"
         }
@@ -1469,6 +1470,15 @@ mod tests {
         let bytes = serde_json::to_vec(&corpus).expect("duplicate vehicle corpus");
         let error = audit_corpus(SCHEMA, &bytes).expect_err("duplicate vehicle is not independent");
         assert!(error.contains("duplicate vehicle identity"));
+    }
+
+    #[test]
+    fn cold_cell_temperature_minimum_violation_is_a_false_feasible_outcome() {
+        let report = report();
+        let row = row(&report, "false_feasible_thermal");
+        assert_eq!(row.classification, "FALSE_FEASIBLE");
+        assert!(row.violated_constraints.iter().any(|value| value == "TEMPERATURE_MINIMUM"));
+        assert!(row.violated_constraints.iter().any(|value| value == "TEMPERATURE_MAXIMUM"));
     }
 
 }
