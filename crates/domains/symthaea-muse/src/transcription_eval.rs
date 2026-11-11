@@ -1466,7 +1466,9 @@ fn part_separation_summary_v1(
         matched_reference_parts.insert(reference_note.part_id);
     }
 
-    let summarize = |groups: &BTreeMap<impl Ord, BTreeMap<u16, u32>>| {
+    fn summarize_groups<K: Ord>(
+        groups: &BTreeMap<K, BTreeMap<u16, u32>>,
+    ) -> (usize, usize, usize) {
         let mut mixed_count = 0usize;
         let mut mixed_notes = 0usize;
         let mut dominant_notes = 0usize;
@@ -1481,11 +1483,11 @@ fn part_separation_summary_v1(
                 part_counts.values().copied().max().unwrap_or(0) as usize;
         }
         (mixed_count, mixed_notes, dominant_notes)
-    };
+    }
     let (mixed_tracks, mixed_track_notes, dominant_track_notes) =
-        summarize(&by_prediction_track);
+        summarize_groups(&by_prediction_track);
     let (mixed_lanes, mixed_lane_notes, dominant_lane_notes) =
-        summarize(&by_prediction_lane);
+        summarize_groups(&by_prediction_lane);
 
     let total_matched_notes = matching.len();
     Some(MidiTranscriptionPartSeparationSummaryV1 {
