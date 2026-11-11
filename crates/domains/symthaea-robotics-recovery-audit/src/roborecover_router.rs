@@ -16,6 +16,9 @@ use super::roborecover_score::{
 pub struct RouterConfig {
     pub minimum_planned_trials: u32,
     pub minimum_known_coverage: f64,
+    /// Minimum Wilson lower bound for physical-safe completion. Without this,
+    /// a router could select the least-bad policy even when every policy is poor.
+    pub minimum_physical_safe_success_lower_bound: f64,
     pub maximum_adverse_risk_upper_bound: f64,
     pub maximum_p95_latency_ms: f64,
     pub minimum_context_confidence: f64,
@@ -27,6 +30,7 @@ impl Default for RouterConfig {
         Self {
             minimum_planned_trials: 50,
             minimum_known_coverage: 0.90,
+            minimum_physical_safe_success_lower_bound: 0.60,
             maximum_adverse_risk_upper_bound: 0.10,
             maximum_p95_latency_ms: 1_000.0,
             minimum_context_confidence: 0.80,
@@ -53,6 +57,14 @@ pub struct RouterEvidenceIdentity {
     pub evaluator_digest: String,
     pub competence_table_digest: String,
     pub crossfit_partition_digest: String,
+    /// Exact robot/arm embodiment; do not pool competence across embodiments.
+    pub robot_embodiment_digest: String,
+    /// Observation and action contract used to produce and execute policies.
+    pub observation_action_schema_digest: String,
+    /// Frozen feature/context encoder used to infer PredictedPolicyContext.
+    pub context_encoder_digest: String,
+    /// Runtime and hardware identity for latency measurements.
+    pub runtime_environment_digest: String,
 }
 
 /// Policy competence counts are derived only from the training split.
@@ -85,6 +97,7 @@ pub enum RouterRejection {
     InvalidCounts,
     InsufficientKnownCoverage,
     AdverseRiskBudgetExceeded,
+    PhysicalSafeSuccessLowerBoundTooLow,
     LatencyBudgetExceeded,
 }
 
@@ -110,6 +123,9 @@ pub struct SelectedPolicy {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RouterDecision {
+    /// Provenance and predicted context are returned with every decision receipt.
+    pub evidence_identity: RouterEvidenceIdentity,
+    pub predicted_context: PredictedPolicyContext,
     pub selected: Option<SelectedPolicy>,
     pub abstain_reason: Option<AbstainReason>,
     pub compatible_records_considered: usize,
@@ -149,6 +165,8 @@ fn config_is_valid(config: &RouterConfig) -> bool {
     config.minimum_planned_trials > 0
         && config.minimum_known_coverage.is_finite()
         && (0.0..=1.0).contains(&config.minimum_known_coverage)
+        && config.minimum_physical_safe_success_lower_bound.is_finite()
+        && (0.0..=1.0).contains(&config.minimum_physical_safe_success_lower_bound)
         && config.maximum_adverse_risk_upper_bound.is_finite()
         && (0.0..=1.0).contains(&config.maximum_adverse_risk_upper_bound)
         && config.maximum_p95_latency_ms.is_finite()
@@ -191,12 +209,18 @@ pub fn select_policy(
         || !valid_hex(&identity.evaluator_digest, 64)
         || !valid_hex(&identity.competence_table_digest, 64)
         || !valid_hex(&identity.crossfit_partition_digest, 64)
+        || !valid_hex(&identity.robot_embodiment_digest, 64)
+        || !valid_hex(&identity.observation_action_schema_digest, 64)
+        || !valid_hex(&identity.context_encoder_digest, 64)
+        || !valid_hex(&identity.runtime_environment_digest, 64)
     {
         return Err("invalid_router_evidence_identity");
     }
 
     let Some(group) = context.group else {
         return Ok(RouterDecision {
+            evidence_identity: identity.clone(),
+            predicted_context: context.clone(),
             selected: None,
             abstain_reason: Some(AbstainReason::NoPredictedContext),
             compatible_records_considered: 0,
@@ -210,6 +234,8 @@ pub fn select_policy(
         || context.confidence > 1.0
     {
         return Ok(RouterDecision {
+            evidence_identity: identity.clone(),
+            predicted_context: context.clone(),
             selected: None,
             abstain_reason: Some(AbstainReason::ContextConfidenceTooLow),
             compatible_records_considered: 0,
@@ -260,11 +286,15 @@ pub fn select_policy(
             continue;
         }
 
-        let accounted = record.physical_safe_successes
-            .saturating_add(record.successful_but_unsafe)
-            .saturating_add(record.task_failures)
-            .saturating_add(record.unknown_or_contradictory)
-            .saturating_add(record.invalid_rows);
+        let Some(accounted) = record.physical_safe_successes
+            .checked_add(record.successful_but_unsafe)
+            .and_then(|count| count.checked_add(record.task_failures))
+            .and_then(|count| count.checked_add(record.unknown_or_contradictory))
+            .and_then(|count| count.checked_add(record.invalid_rows))
+        else {
+            reject(&mut rejected, RouterRejection::InvalidCounts);
+            continue;
+        };
         if record.planned_trials == 0
             || accounted > record.planned_trials
             || record.physical_safe_successes > accounted
@@ -315,6 +345,10 @@ pub fn select_policy(
             continue;
         };
 
+        if success_lower < config.minimum_physical_safe_success_lower_bound {
+            reject(&mut rejected, RouterRejection::PhysicalSafeSuccessLowerBoundTooLow);
+            continue;
+        }
         if adverse_upper > config.maximum_adverse_risk_upper_bound {
             reject(&mut rejected, RouterRejection::AdverseRiskBudgetExceeded);
             continue;
@@ -358,6 +392,8 @@ pub fn select_policy(
     };
 
     Ok(RouterDecision {
+        evidence_identity: identity.clone(),
+        predicted_context: context.clone(),
         selected,
         abstain_reason,
         compatible_records_considered,
@@ -389,6 +425,10 @@ mod tests {
             evaluator_digest: "c".repeat(64),
             competence_table_digest: "d".repeat(64),
             crossfit_partition_digest: "e".repeat(64),
+            robot_embodiment_digest: "1".repeat(64),
+            observation_action_schema_digest: "2".repeat(64),
+            context_encoder_digest: "3".repeat(64),
+            runtime_environment_digest: "4".repeat(64),
         }
     }
 
@@ -688,6 +728,99 @@ mod tests {
         assert_eq!(
             decision.rejected_records.get(&RouterRejection::IdentityMismatch),
             Some(&1)
+        );
+    }
+
+
+    #[test]
+    fn low_safe_recovery_lower_bound_abstains_even_when_risk_is_low() {
+        let candidate = record("weak-policy", 0, 0);
+        let decision = select_policy(
+            &context(),
+            &identity(),
+            &[candidate],
+            &RouterConfig::default(),
+        )
+        .unwrap();
+
+        assert!(decision.selected.is_none());
+        assert_eq!(
+            decision.rejected_records.get(
+                &RouterRejection::PhysicalSafeSuccessLowerBoundTooLow
+            ),
+            Some(&1)
+        );
+    }
+
+    #[test]
+    fn embodiment_schema_context_encoder_and_runtime_are_part_of_identity() {
+        let mut candidate_identity = identity();
+        candidate_identity.robot_embodiment_digest = "9".repeat(64);
+        assert_eq!(
+            select_policy(&context(), &identity(), &[record("p", 99, 0)], &RouterConfig::default())
+                .unwrap()
+                .rejected_records
+                .get(&RouterRejection::IdentityMismatch),
+            Some(&1)
+        );
+
+        candidate_identity = identity();
+        candidate_identity.observation_action_schema_digest = "8".repeat(64);
+        assert_eq!(
+            select_policy(&context(), &candidate_identity, &[record("p", 99, 0)], &RouterConfig::default())
+                .unwrap()
+                .evidence_identity,
+            candidate_identity
+        );
+    }
+
+    #[test]
+    fn overflowing_outcome_counts_are_rejected_instead_of_saturating() {
+        let mut candidate = record("overflow", 1, 0);
+        candidate.planned_trials = u32::MAX;
+        candidate.physical_safe_successes = u32::MAX;
+        candidate.successful_but_unsafe = u32::MAX;
+        candidate.task_failures = u32::MAX;
+        candidate.unknown_or_contradictory = u32::MAX;
+        candidate.invalid_rows = u32::MAX;
+
+        let decision = select_policy(
+            &context(),
+            &identity(),
+            &[candidate],
+            &RouterConfig::default(),
+        )
+        .unwrap();
+        assert!(decision.selected.is_none());
+        assert_eq!(
+            decision.rejected_records.get(&RouterRejection::InvalidCounts),
+            Some(&1)
+        );
+    }
+
+    #[test]
+    fn router_decision_carries_source_and_predicted_context_receipt() {
+        let identity = identity();
+        let context = context();
+        let decision = select_policy(
+            &context,
+            &identity,
+            &[record("policy-a", 99, 0)],
+            &RouterConfig::default(),
+        )
+        .unwrap();
+
+        assert_eq!(decision.evidence_identity, identity);
+        assert_eq!(decision.predicted_context, context);
+    }
+
+    #[test]
+    fn minimum_success_bound_configuration_is_validated() {
+        let mut config = RouterConfig::default();
+        config.minimum_physical_safe_success_lower_bound = f64::NAN;
+        assert_eq!(
+            select_policy(&context(), &identity(), &[], &config),
+            Err("invalid_router_config")
         );
     }
 
