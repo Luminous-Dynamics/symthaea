@@ -165,6 +165,8 @@ pub enum TranscriptionExperimentReceiptIssueV1 {
     AudioDigestMismatch,
     PredictionMidiDigestMismatch,
     InvalidModelArtifact,
+    ModelArtifactDigestMismatch,
+    ArtifactDigestMismatch { field: String },
     InvalidConditioningBinding,
     InvalidPreprocessing { field: String },
     InvalidRuntime { field: String },
@@ -339,13 +341,27 @@ pub fn transcription_experiment_public_benchmark_eligible_v1(
         && receipt.model_license_reference.as_deref().is_some_and(|value| !value.trim().is_empty())
 }
 
-/// Check receipt structure, exact audio/MIDI bytes, and the nested evaluator
-/// report. The report's own commitment is recomputed; it must bind the same
-/// predicted MIDI and reference manifest as this experiment receipt.
+/// Actual artifacts available to the validator. The input bytes for every
+/// supplied digest are re-hashed; a digest string alone is not treated as
+/// proof that the artifact matches.
+pub struct TranscriptionExperimentEvidenceV1<'a> {
+    pub source_audio_bytes: &'a [u8],
+    pub model_input_audio_bytes: &'a [u8],
+    pub dataset_manifest_bytes: &'a [u8],
+    pub inference_config_bytes: &'a [u8],
+    pub preprocessing_config_bytes: &'a [u8],
+    /// Required for OpenWeights. Optional for hosted APIs and opaque runtimes.
+    pub model_artifact_bytes: Option<&'a [u8]>,
+    pub prediction_midi_bytes: &'a [u8],
+}
+
+/// Check receipt structure, exact source/preprocessed audio, dataset and
+/// configuration artifacts, MIDI bytes, and nested evaluator report. A
+/// receipt digest is tamper-evident only when its expected value is held by a
+/// trusted party; this hash is not a producer signature or attestation.
 pub fn validate_transcription_experiment_receipt_v1(
     receipt: &TranscriptionExperimentReceiptV1,
-    audio_bytes: &[u8],
-    prediction_midi_bytes: &[u8],
+    evidence: &TranscriptionExperimentEvidenceV1<'_>,
     report: &MidiTranscriptionEvaluationReportV1,
 ) -> Vec<TranscriptionExperimentReceiptIssueV1> {
     let mut issues = Vec::new();
@@ -413,9 +429,6 @@ pub fn validate_transcription_experiment_receipt_v1(
             });
         }
     }
-    if let Some(reference) = receipt.inference_config_reference.as_str().strip_prefix(" ") {
-        let _ = reference;
-    }
     if let Some(revision) = receipt.model_code_revision.as_deref() {
         if revision.trim().is_empty() {
             issues.push(TranscriptionExperimentReceiptIssueV1::MissingField {
@@ -425,16 +438,22 @@ pub fn validate_transcription_experiment_receipt_v1(
     }
 
     match receipt.model_delivery {
-        TranscriptionModelDeliveryV1::OpenWeights
-        | TranscriptionModelDeliveryV1::OpaqueLocalRuntime => {
-            if receipt.model_artifact_sha256.is_none() {
+        TranscriptionModelDeliveryV1::OpenWeights => {
+            if receipt.model_artifact_sha256.is_none()
+                || evidence.model_artifact_bytes.is_none()
+            {
                 issues.push(TranscriptionExperimentReceiptIssueV1::InvalidModelArtifact);
             }
         }
-        TranscriptionModelDeliveryV1::HostedApi => {
-            if receipt.model_provider.trim().is_empty() {
-                issues.push(TranscriptionExperimentReceiptIssueV1::InvalidModelArtifact);
-            }
+        TranscriptionModelDeliveryV1::OpaqueLocalRuntime
+        | TranscriptionModelDeliveryV1::HostedApi => {}
+    }
+    if let (Some(expected), Some(actual)) = (
+        receipt.model_artifact_sha256.as_deref(),
+        evidence.model_artifact_bytes,
+    ) {
+        if expected != sha256_hex(actual) {
+            issues.push(TranscriptionExperimentReceiptIssueV1::ModelArtifactDigestMismatch);
         }
     }
 
@@ -480,11 +499,49 @@ pub fn validate_transcription_experiment_receipt_v1(
         });
     }
 
-    if receipt.input_audio_sha256 != sha256_hex(audio_bytes) {
-        issues.push(TranscriptionExperimentReceiptIssueV1::AudioDigestMismatch);
-    }
-    if receipt.prediction_midi_sha256 != sha256_hex(prediction_midi_bytes) {
-        issues.push(TranscriptionExperimentReceiptIssueV1::PredictionMidiDigestMismatch);
+    for (field, expected, actual) in [
+        (
+            "input_audio_sha256",
+            receipt.input_audio_sha256.as_str(),
+            evidence.source_audio_bytes,
+        ),
+        (
+            "model_input_audio_sha256",
+            receipt.model_input_audio_sha256.as_str(),
+            evidence.model_input_audio_bytes,
+        ),
+        (
+            "dataset_manifest_sha256",
+            receipt.dataset_manifest_sha256.as_str(),
+            evidence.dataset_manifest_bytes,
+        ),
+        (
+            "inference_config_sha256",
+            receipt.inference_config_sha256.as_str(),
+            evidence.inference_config_bytes,
+        ),
+        (
+            "preprocessing_config_sha256",
+            receipt.preprocessing_config_sha256.as_str(),
+            evidence.preprocessing_config_bytes,
+        ),
+        (
+            "prediction_midi_sha256",
+            receipt.prediction_midi_sha256.as_str(),
+            evidence.prediction_midi_bytes,
+        ),
+    ] {
+        if expected != sha256_hex(actual) {
+            if field == "input_audio_sha256" {
+                issues.push(TranscriptionExperimentReceiptIssueV1::AudioDigestMismatch);
+            } else if field == "prediction_midi_sha256" {
+                issues.push(TranscriptionExperimentReceiptIssueV1::PredictionMidiDigestMismatch);
+            } else {
+                issues.push(TranscriptionExperimentReceiptIssueV1::ArtifactDigestMismatch {
+                    field: field.into(),
+                });
+            }
+        }
     }
 
     if report.prediction_midi_sha256 != receipt.prediction_midi_sha256
@@ -507,7 +564,6 @@ pub fn validate_transcription_experiment_receipt_v1(
 
     issues
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
