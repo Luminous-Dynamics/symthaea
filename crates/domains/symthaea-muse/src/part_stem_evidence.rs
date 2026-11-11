@@ -10,6 +10,7 @@ use crate::audio_event_observation::{
 };
 use crate::midi_performance::{
     MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, MIDI_PERFORMANCE_SCHEMA_V1,
+    MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1,
     MidiPerformanceArtifactV1, MidiPerformanceManifestV1, MidiPerformanceTrackReceiptV1,
 };
 use hound::{SampleFormat, WavReader};
@@ -355,7 +356,7 @@ fn verify_midi(
         return Err(vec![PartStemEvidenceIssueV1::TooManyNotes]);
     }
     if manifest.schema != MIDI_PERFORMANCE_SCHEMA_V1
-        || manifest.ticks_per_quarter == 0
+        || manifest.ticks_per_quarter != MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1
         || manifest.tempo_microseconds_per_quarter == 0
         || manifest.tempo_microseconds_per_quarter > 16_777_215
         || manifest.meter_numerator == 0
