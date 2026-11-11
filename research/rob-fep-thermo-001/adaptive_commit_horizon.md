@@ -63,3 +63,12 @@ A passing fixture verifies only the min-of-qualified-bounds reference semantics 
 ## Exact known-answer note
 
 The 15-case corpus was fetched back after commit and its expected horizon values were independently replayed as the minimum of the nine qualified bounds. Binding constraints are all ties at the minimum. The stable long-horizon case has two ties: freshness and queue, both at 20 ticks. This is synthetic reference arithmetic only.
+
+
+## Composition preconditions: one context, prefix-closed caps
+
+The minimum rule is sound only if every qualified cap is an upper bound over the same candidate prefix and the same frozen evidence context. Each cap must bind the same context digest covering at least the mission/state snapshot, action-chunk and executed-prefix identity, policy/model bundle, uncertainty/operating envelope, clock-map/calibration identity and control period. A cap derived under a different context is a provenance mismatch; do not take the minimum of individually plausible but mutually incompatible numbers.
+
+Each cap must also be **prefix-closed**: every intermediate tick from 1 through the reported cap satisfies that cap's constraint. A thermal model that checks only the final temperature after the horizon is not sufficient; likewise, a viability cap must preserve admissible continuation/safe-stop throughout the committed prefix, not merely at its endpoint. If a source cannot provide a prefix-closed bound, mark it invalid/Unknown and require a different proof or a more conservative representation.
+
+The fixture schema now requires a context digest and prefix-closure declaration for every bound. Two additional cases reject a mixed action/model context and a non-prefix-closed thermal cap. The corpus contains 17 cases; the fetched-back semantic replay verifies the minimum and all binding ties for every fully qualified/coherent case.
