@@ -43,8 +43,8 @@ fn validate_inputs(
     experiments: &[Experiment],
     risk_aversion: f64,
 ) -> Result<(), String> {
-    if prior.is_empty() || action_utilities.is_empty() || experiments.is_empty() {
-        return Err("prior, action table and experiment set must be non-empty".into());
+    if prior.is_empty() || action_utilities.is_empty() {
+        return Err("prior and action table must be non-empty".into());
     }
     if prior.iter().any(|p| !p.is_finite() || *p < 0.0)
         || (prior.iter().sum::<f64>() - 1.0).abs() > PROBABILITY_TOLERANCE
@@ -60,6 +60,7 @@ fn validate_inputs(
         return Err("risk aversion must be finite and non-negative".into());
     }
 
+    let mut experiment_ids = std::collections::BTreeSet::new();
     for experiment in experiments {
         if experiment.id.trim().is_empty()
             || !experiment.cost.is_finite()
@@ -67,9 +68,10 @@ fn validate_inputs(
             || !experiment.risk.is_finite()
             || experiment.risk < 0.0
             || experiment.outcomes.is_empty()
+            || !experiment_ids.insert(experiment.id.as_str())
         {
             return Err(format!(
-                "experiment {} has invalid identity, cost, risk or outcomes",
+                "experiment {} has invalid or duplicate identity, cost, risk or outcomes",
                 experiment.id
             ));
         }
@@ -194,6 +196,9 @@ pub fn select_experiment(
         return Err("minimum net value must be finite".into());
     }
     validate_inputs(prior, action_utilities, experiments, risk_aversion)?;
+    if experiments.is_empty() {
+        return Ok(None);
+    }
 
     let mut scored = experiments
         .iter()
@@ -357,6 +362,44 @@ mod tests {
         )
         .unwrap()
         .is_none());
+    }
+
+    #[test]
+    fn empty_experiment_set_stops_cleanly() {
+        let prior = vec![0.5, 0.5];
+        let actions = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        assert!(select_experiment(
+            &prior,
+            &actions,
+            &[],
+            SelectionMethod::ExpectedValueOfSampleInformation,
+            0.0,
+            0.0,
+        )
+        .unwrap()
+        .is_none());
+    }
+
+    #[test]
+    fn duplicate_experiment_identity_fails_closed() {
+        let prior = vec![0.5, 0.5];
+        let actions = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let first = experiment(
+            "same-id",
+            0.0,
+            0.0,
+            &[("yes", &[1.0, 0.0]), ("no", &[0.0, 1.0])],
+        );
+        let second = first.clone();
+        assert!(select_experiment(
+            &prior,
+            &actions,
+            &[first, second],
+            SelectionMethod::ExpectedValueOfSampleInformation,
+            0.0,
+            0.0,
+        )
+        .is_err());
     }
 
     #[test]
