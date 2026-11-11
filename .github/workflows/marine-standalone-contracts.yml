@@ -289,7 +289,7 @@ jobs:
             docs/research/marine/fixtures/synthetic-marine-acoustic-timebase-v0.1.0.json \
             docs/research/marine/marine-biofouling-evidence-v0.1.0.schema.json \
             docs/research/marine/fixtures/synthetic-marine-biofouling-timebase-v0.1.0.json \
-             "$RUNNER_TEMP/marine-acoustic-timebase-report.json" \
+            "$RUNNER_TEMP/marine-acoustic-timebase-report.json" \
             > "$RUNNER_TEMP/marine-hull-state-join-report.json"
           status=$?
           set -e
@@ -309,7 +309,7 @@ jobs:
             docs/research/marine/fixtures/synthetic-marine-acoustic-timebase-v0.1.0.json \
             docs/research/marine/marine-biofouling-evidence-v0.1.0.schema.json \
             docs/research/marine/fixtures/synthetic-marine-biofouling-timebase-v0.1.0.json \
-             "$RUNNER_TEMP/marine-acoustic-timebase-report.json" \
+            "$RUNNER_TEMP/marine-acoustic-timebase-report.json" \
             > "$RUNNER_TEMP/marine-hull-state-join-report.json"
           status=$?
           set -e
