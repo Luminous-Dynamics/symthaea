@@ -94,7 +94,7 @@ pub struct DriveInput {
 
 /// Positive motoring speed ratio, defined as motor speed divided by rotor speed.
 ///
-//// This is a kinematic ratio only. Transmission efficiency remains separately
+/// This is a kinematic ratio only. Transmission efficiency remains separately
 /// supplied through DriveConfig. Reverse power flow and direction changes are
 /// outside this motoring-only reference.
 #[derive(Debug, Clone, Copy, PartialEq)]
