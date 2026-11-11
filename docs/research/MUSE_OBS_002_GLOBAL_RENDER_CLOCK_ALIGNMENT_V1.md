@@ -30,9 +30,9 @@ The estimator:
 4. Builds a Hann-windowed, positive spectral-flux envelope with a 2,048-frame FFT and 256-frame hop by default. Stereo channels are transformed independently and their magnitude spectra are averaged; PCM downmixing is avoided so anti-phase content cannot cancel the timing evidence.
 5. Searches a caller-declared audio-minus-MIDI offset range, defaulting to −250 ms through +2,000 ms.
 6. Scores candidate offsets against the full distinct MIDI onset sequence, penalizing candidates that cannot account for expected events.
-7. Measures the winning correlation peak, best competing peak, peak margin, peak ratio, matched-onset coverage, and the contiguous high-support peak width.
+7. Measures the winning correlation peak, best competing peak, peak margin, peak ratio, in-WAV onset timestamp coverage, and the contiguous high-support peak width. The coverage count means the expected onset timestamp lies inside the actual WAV frame range; it does not mean an acoustic event was detected.
 8. Emits an explicit \`Candidate\`, \`AmbiguousCandidate\`, \`InsufficientOnsetDiversity\`, \`InsufficientAudioCoverage\`, or \`NoPositiveEvidence\` state.
-9. Seals the profile to the score digest, MIDI bytes, MIDI manifest, WAV bytes, algorithm, search configuration and alignment observations.
+9. Seals the profile to the score digest, MIDI bytes, MIDI manifest, WAV bytes, algorithm, search configuration and alignment observations. Profile validation checks structural invariants and deterministic replay against the exact same implementation; this catches re-sealed inconsistencies but is not an independent second algorithm.
 
 The high-support width is an empirical correlation-peak width, **not** a statistical confidence interval. The ambiguity-ratio threshold is a fixed diagnostic heuristic and is not a calibrated probability.
 
@@ -65,6 +65,18 @@ V1 does **not** establish:
 The estimator operates on a constant-tempo MIDI manifest. It deliberately does not create a second beat-to-seconds engine. Piecewise tempo maps and score/performance timing semantics remain coordinated with [#9477](https://github.com/Luminous-Dynamics/symthaea/issues/9477) and [#9476](https://github.com/Luminous-Dynamics/symthaea/issues/9476). The existing \`theory_realize\` swing/rubato timeline remains authoritative for its own realization path.
 
 ## Benchmark and industry comparison
+
+### MuScriptor — a new multi-instrument transcription baseline
+
+The July 2026 MuScriptor release is a much stronger open multi-instrument transcription comparator than MT3/YourMT3+ alone. Its model card reports, on the authors' held-out 372-track `D_Test`, instrument-agnostic F1 values of 60.4 onset, 72.4 frame, 48.6 offset, 49.6 drums, and 47.8 Multi-F1 for the 1.3B full-pipeline model, compared with 32.5 / 45.5 / 17.8 / 41.4 / 21.9 for the YourMT3+ baseline on that same set. These are the authors' benchmark results, not a universal AMT ranking.
+
+Its tokenizer omits velocity, cannot represent simultaneous same-pitch notes from the same instrument, and treats drums as onset-only. It processes audio in 5-second chunks, and the weights are CC BY-NC 4.0 with additional use conditions. Therefore:
+- use it as a non-commercial, frozen external comparator only where licence terms permit;
+- compare its event outputs on the same exact score/audio pairs and report chunk-boundary effects;
+- keep onset, offset, frame, drum and instrument-family results separate;
+- include same-pitch overlaps, velocity, and drum duration as explicit unsupported/coverage panels rather than scoring them as model failures.
+
+Sources: https://arxiv.org/abs/2607.08168 and https://huggingface.co/MuScriptor/muscriptor-large
 
 ### TimingBench — temporal control, not transcription
 
