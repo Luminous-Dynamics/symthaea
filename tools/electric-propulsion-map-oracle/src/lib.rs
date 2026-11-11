@@ -388,10 +388,11 @@ mod tests {
 
     #[test]
     fn bilinear_lookup_matches_independent_asymmetric_reference() {
-        let result = fixture().lookup(query(2.5, 1_500.0)).unwrap();
+        let result = fixture().lookup(query(3.25, 1_500.0)).unwrap();
         assert!((result.efficiency - 0.81875).abs() < 1.0e-12);
         assert_eq!(result.torque_cell_lower_index, 0);
         assert_eq!(result.speed_cell_lower_index, 0);
+        assert_eq!(result.evidence_manifest_digest, "evidence");
         assert_eq!(result.interpolation_weights, [0.375, 0.125, 0.375, 0.125]);
     }
 
@@ -493,6 +494,23 @@ mod tests {
     }
 
     #[test]
+    fn non_positive_motoring_operating_points_are_rejected() {
+        let map = fixture();
+        for torque in [0.0, -1.0] {
+            assert!(matches!(
+                map.lookup(query(torque, 1_500.0)),
+                Err(MapError::InvalidQuery(_))
+            ));
+        }
+        for speed in [0.0, -1.0] {
+            assert!(matches!(
+                map.lookup(query(5.0, speed)),
+                Err(MapError::InvalidQuery(_))
+            ));
+        }
+    }
+
+    #[test]
     fn conservative_uncertainty_adds_weighted_node_and_systematic_bounds() {
         let result = fixture().lookup(query(2.5, 1_500.0)).unwrap();
         assert!((result.absolute_uncertainty_bound - 0.0275).abs() < 1.0e-12);
@@ -512,8 +530,8 @@ mod tests {
                 "c",
                 "x",
                 "evidence",
-                vec![0.0],
-                vec![1.0, 2.0],
+                vec![1.0],
+                vec![1_000.0, 2_000.0],
                 base_nodes.clone(),
                 0.0,
             ),
@@ -522,8 +540,8 @@ mod tests {
                 "c",
                 "x",
                 "evidence",
-                vec![0.0, 0.0],
-                vec![1.0, 2.0],
+                vec![1.0, 1.0],
+                vec![1_000.0, 2_000.0],
                 base_nodes.clone(),
                 0.0,
             ),
@@ -532,8 +550,8 @@ mod tests {
                 "c",
                 "x",
                 "evidence",
-                vec![0.0, f64::NAN],
-                vec![1.0, 2.0],
+                vec![1.0, f64::NAN],
+                vec![1_000.0, 2_000.0],
                 base_nodes.clone(),
                 0.0,
             ),
@@ -542,8 +560,8 @@ mod tests {
                 "c",
                 "x",
                 "evidence",
-                vec![0.0, 1.0],
-                vec![2.0, 1.0],
+                vec![1.0, 2.0],
+                vec![2_000.0, 1_000.0],
                 base_nodes.clone(),
                 0.0,
             ),
@@ -552,8 +570,8 @@ mod tests {
                 "c",
                 "x",
                 "evidence",
-                vec![0.0, 1.0],
                 vec![1.0, 2.0],
+                vec![1_000.0, 2_000.0],
                 base_nodes[..3].to_vec(),
                 0.0,
             ),
@@ -577,7 +595,7 @@ mod tests {
                     "c",
                     "x",
                     "evidence",
-                    vec![0.0, 1.0],
+                    vec![1.0, 2.0],
                     vec![1_000.0, 2_000.0],
                     vec![node; 4],
                     0.0,
@@ -613,6 +631,19 @@ mod tests {
                 .is_err()
             );
         }
+        assert!(
+            EfficiencyMap2D::new(
+                "m",
+                "c",
+                "x",
+                "",
+                vec![1.0, 2.0],
+                vec![1_000.0, 2_000.0],
+                nodes.clone(),
+                0.0,
+            )
+            .is_err()
+        );
         for uncertainty in [-0.01, 1.01, f64::NAN] {
             assert!(
                 EfficiencyMap2D::new(
@@ -637,7 +668,7 @@ mod tests {
             "config",
             "context",
             "evidence",
-            vec![0.0, 5.0, 10.0],
+            vec![1.0, 5.0, 10.0],
             vec![1_000.0, 1_500.0, 2_000.0],
             vec![
                 MapNode {
