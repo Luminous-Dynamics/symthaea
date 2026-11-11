@@ -476,7 +476,7 @@ fn validate_observation(
 
 fn validate_stop(
     payload: &Value,
-    proposals: &BTreeMap<String, String>,
+    proposals: &BTreeMap<String, ProposalPrediction>,
     observed_proposals: &BTreeSet<String>,
 ) -> Result<(), String> {
     if !exact_fields(payload, &["evidence_state_sha256", "reason"]) {
@@ -736,6 +736,12 @@ mod tests {
         );
         assert_eq!(plan_schema["additionalProperties"], false);
         validate_experiment_plan(&parsed_plan()).expect("plan fixture satisfies Rust contract");
+        assert_eq!(
+            plan_schema["required"].as_array().unwrap().len(),
+            14
+        );
+        assert!(plan_schema["properties"]["target"]["additionalProperties"] == false);
+        assert!(plan_schema["properties"]["control"]["additionalProperties"] == false);
         assert_eq!(schema["additionalProperties"], false);
         assert_eq!(
             schema["properties"]["events"]["items"]["oneOf"]
