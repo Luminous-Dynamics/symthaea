@@ -38,9 +38,11 @@ jobs:
 
       - name: Audit frozen synthetic mission outcomes
         run: |
+          TRUST_MANIFEST_SHA256="$(sha256sum fixtures/ev_battery/mission_outcome_trust_empty_v0_1.json | awk '{print $1}')"
           cargo run --manifest-path tools/ev-mission-outcome-audit/Cargo.toml -- \
             --schema schemas/transport/ev_mission_outcome_audit_v0_1.schema.json \
             --trust-manifest fixtures/ev_battery/mission_outcome_trust_empty_v0_1.json \
+            --expected-trust-manifest-sha256 "$TRUST_MANIFEST_SHA256" \
             --corpus fixtures/ev_battery/mission_outcome_audit_v0_1.json \
             > "$RUNNER_TEMP/mission-outcome-report.json"
           jq -e '
