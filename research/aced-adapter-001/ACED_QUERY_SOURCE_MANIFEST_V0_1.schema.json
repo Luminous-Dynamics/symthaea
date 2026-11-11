@@ -14,7 +14,9 @@
     "distributions",
     "split_relationships",
     "candidate_data_boundary",
-    "claim_ceiling"
+    "claim_ceiling",
+    "core_decision_guess_decision_filename_collision_count",
+    "core_decision_guess_decision_filename_collision_files"
   ],
   "properties": {
     "schema_version": {
@@ -319,6 +321,18 @@
     "claim_ceiling": {
       "type": "string",
       "minLength": 1
+    },
+    "core_decision_guess_decision_filename_collision_count": {
+      "type": "integer",
+      "const": 2
+    },
+    "core_decision_guess_decision_filename_collision_files": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   }
 }
