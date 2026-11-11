@@ -650,6 +650,12 @@ fn validate_reference_artifact_v1(
         return Err(MidiTranscriptionEvaluationIssueV1::ReferenceManifestDigestMismatch);
     }
 
+    if reference.midi_bytes.len() > MIDI_TRANSCRIPTION_MAX_MIDI_BYTES_V1 {
+        return Err(MidiTranscriptionEvaluationIssueV1::MidiTooLarge {
+            count: reference.midi_bytes.len(),
+            maximum: MIDI_TRANSCRIPTION_MAX_MIDI_BYTES_V1,
+        });
+    }
     let smf = Smf::parse(&reference.midi_bytes)
         .map_err(|_| MidiTranscriptionEvaluationIssueV1::InvalidReference)?;
     if smf.header.format != Format::Parallel
@@ -2031,11 +2037,13 @@ mod tests {
             default_config(),
         )
         .unwrap();
-        assert_eq!(report.frame_pitch_metrics.f1, 1.0);
-        assert_eq!(report.frame_program_pitch_metrics.f1, 1.0);
+        let pitch_frames = report.frame_pitch_metrics.as_ref().unwrap();
+        let program_frames = report.frame_program_pitch_metrics.as_ref().unwrap();
+        assert_eq!(pitch_frames.f1, 1.0);
+        assert_eq!(program_frames.f1, 1.0);
         assert_eq!(report.frame_step_ms, 10);
         // Same-pitch overlapping note cells are unioned in frame metrics.
-        assert!(report.frame_pitch_metrics.true_positives < 3 * 50);
+        assert!(pitch_frames.true_positives < 3 * 50);
     }
 
     #[test]
