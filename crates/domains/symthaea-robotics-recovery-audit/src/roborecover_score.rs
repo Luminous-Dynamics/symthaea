@@ -179,7 +179,11 @@ pub enum ManifestIssue {
     BlankSourceRevision,
     BlankSplitManifestBlobSha,
     BlankEvaluatorDigest,
+    InvalidSourceRevision,
+    InvalidSplitManifestBlobSha,
+    InvalidEvaluatorDigest,
     BlankScenarioDigest(String),
+    InvalidScenarioDigest(String),
     BlankScenarioId,
     ScenarioGroupNotInMacro9(StageTypeGroup),
     DuplicateScenarioId(String),
@@ -262,6 +266,11 @@ struct ScenarioAccumulator {
 ///
 /// The nine Macro-9 groups must be explicit and unique. This function does not
 /// assume which nine of the possible sixteen stage/type combinations are used.
+fn is_lower_or_upper_hex_digest(value: &str, expected_len: usize) -> bool {
+    value.len() == expected_len && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+/// Validate source identity, split membership and scenario digests before scoring.
 pub fn validate_manifest(
     manifest: &RoboRecoverManifest,
 ) -> Result<(), Vec<ManifestIssue>> {
@@ -277,12 +286,18 @@ pub fn validate_manifest(
     }
     if manifest.source_revision.trim().is_empty() {
         issues.push(ManifestIssue::BlankSourceRevision);
+    } else if !is_lower_or_upper_hex_digest(&manifest.source_revision, 40) {
+        issues.push(ManifestIssue::InvalidSourceRevision);
     }
     if manifest.split_manifest_blob_sha.trim().is_empty() {
         issues.push(ManifestIssue::BlankSplitManifestBlobSha);
+    } else if !is_lower_or_upper_hex_digest(&manifest.split_manifest_blob_sha, 40) {
+        issues.push(ManifestIssue::InvalidSplitManifestBlobSha);
     }
     if manifest.evaluator_digest.trim().is_empty() {
         issues.push(ManifestIssue::BlankEvaluatorDigest);
+    } else if !is_lower_or_upper_hex_digest(&manifest.evaluator_digest, 64) {
+        issues.push(ManifestIssue::InvalidEvaluatorDigest);
     }
 
     let mut scenario_ids = BTreeSet::new();
@@ -292,6 +307,10 @@ pub fn validate_manifest(
     for scenario in &manifest.scenarios {
         if scenario.scenario_content_sha256.trim().is_empty() {
             issues.push(ManifestIssue::BlankScenarioDigest(
+                scenario.scenario_id.clone(),
+            ));
+        } else if !is_lower_or_upper_hex_digest(&scenario.scenario_content_sha256, 64) {
+            issues.push(ManifestIssue::InvalidScenarioDigest(
                 scenario.scenario_id.clone(),
             ));
         }
@@ -648,7 +667,7 @@ mod tests {
             .enumerate()
             .map(|(index, group)| PlannedScenario {
                 scenario_id: format!("scenario-{index}"),
-                scenario_content_sha256: format!("sha256:scenario-{index}"),
+                scenario_content_sha256: format!("{index:064x}"),
                 stage: group.stage,
                 deviation: group.deviation,
                 expected_trial_ids: vec![format!("trial-{index}-0")],
@@ -690,7 +709,7 @@ mod tests {
                 scenario_id: scenario.scenario_id.clone(),
                 arm_id: "base-policy".to_owned(),
                 policy_digest: "sha256:policy".to_owned(),
-                scenario_digest: format!("sha256:scenario-{scenario_index}"),
+                scenario_digest: format!("{scenario_index:064x}"),
                 evaluator_digest: manifest().evaluator_digest,
                 intervention,
                 world_state,
@@ -1014,6 +1033,7 @@ mod tests {
             super::super::WorldStateContinuity::Preserved,
         );
         success.platform = BenchmarkPlatform::Libero;
+        success.evidence.evaluator_digest = m.evaluator_digest.clone();
         success.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
         success.source_status = "success".to_owned();
         success.inference_steps = 1;
@@ -1028,6 +1048,7 @@ mod tests {
             super::super::WorldStateContinuity::Preserved,
         );
         replay.platform = BenchmarkPlatform::Libero;
+        replay.evidence.evaluator_digest = m.evaluator_digest.clone();
         replay.evidence.trial_id = m.scenarios[1].expected_trial_ids[0].clone();
         replay.source_status = "replay_already_done".to_owned();
         replay.inference_steps = 0;
@@ -1104,6 +1125,28 @@ mod tests {
             classify_policy_completion(&trial),
             PolicyCompletion::Contradictory
         );
+    }
+
+
+    #[test]
+    fn source_and_scenario_provenance_require_exact_digest_formats() {
+        let mut m = manifest();
+        m.source_revision = "main".to_owned();
+        assert!(validate_manifest(&m).unwrap_err().contains(&ManifestIssue::InvalidSourceRevision));
+
+        let mut m = manifest();
+        m.split_manifest_blob_sha = "latest".to_owned();
+        assert!(validate_manifest(&m).unwrap_err().contains(&ManifestIssue::InvalidSplitManifestBlobSha));
+
+        let mut m = manifest();
+        m.evaluator_digest = "sha256:evaluator".to_owned();
+        assert!(validate_manifest(&m).unwrap_err().contains(&ManifestIssue::InvalidEvaluatorDigest));
+
+        let mut m = manifest();
+        m.scenarios[0].scenario_content_sha256 = "scenario-0".to_owned();
+        assert!(validate_manifest(&m).unwrap_err().contains(
+            &ManifestIssue::InvalidScenarioDigest("scenario-0".to_owned())
+        ));
     }
 
 }
