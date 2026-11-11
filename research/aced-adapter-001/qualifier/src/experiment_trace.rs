@@ -6,13 +6,30 @@ const SCHEMA_VERSION: &str = "aced-experiment-value-trace-v0.1";
 const GENESIS_SHA256: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 const TOLERANCE: f64 = 1e-9;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TraceReport {
     pub event_count: usize,
     pub proposal_count: usize,
     pub observation_count: usize,
+    pub scored_observation_count: usize,
+    pub mean_brier_score: Option<f64>,
+    /// None when any observed outcome had zero forecast probability (infinite log loss).
+    pub mean_log_loss: Option<f64>,
+    pub zero_probability_outcome_count: usize,
     pub stopped: bool,
     pub terminal_sha256: String,
+}
+
+#[derive(Clone, Debug)]
+struct ProposalPrediction {
+    experiment_id: String,
+    outcome_probabilities: BTreeMap<String, f64>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ObservationScores {
+    brier_score: f64,
+    log_loss: Option<f64>,
 }
 
 fn text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
@@ -145,7 +162,7 @@ fn validate_distribution(value: &Value) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_proposal(payload: &Value) -> Result<String, String> {
+fn validate_proposal(payload: &Value) -> Result<ProposalPrediction, String> {
     const FIELDS: [&str; 10] = [
         "experiment_id",
         "belief_state_sha256",
@@ -178,6 +195,17 @@ fn validate_proposal(payload: &Value) -> Result<String, String> {
         return Err(format!("experiment {id} has an unsupported selector"));
     }
     validate_distribution(&payload["predicted_outcome_distribution"])?;
+    let outcome_probabilities = payload["predicted_outcome_distribution"]
+        .as_array()
+        .expect("distribution validated above")
+        .iter()
+        .map(|outcome| {
+            (
+                text(outcome, "outcome").expect("outcome identity validated above").to_string(),
+                finite_number(outcome, "probability").expect("probability validated above"),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
     for key in [
         "predicted_eig_bits",
         "predicted_evsi",
@@ -208,14 +236,17 @@ fn validate_proposal(payload: &Value) -> Result<String, String> {
             "experiment {id} predicted_selection_score is inconsistent with selector arithmetic"
         ));
     }
-    Ok(id.to_string())
+    Ok(ProposalPrediction {
+        experiment_id: id.to_string(),
+        outcome_probabilities,
+    })
 }
 
 fn validate_observation(
     payload: &Value,
-    proposals: &BTreeMap<String, String>,
+    proposals: &BTreeMap<String, ProposalPrediction>,
     observed_proposals: &mut BTreeSet<String>,
-) -> Result<(), String> {
+) -> Result<Option<ObservationScores>, String> {
     if !exact_fields(
         payload,
         &[
@@ -223,17 +254,18 @@ fn validate_observation(
             "observation_status",
             "observation_sha256",
             "actual_cost",
+            "observed_outcome",
         ],
     ) {
         return Err(
-            "experiment_observation payload does not match its closed four-field contract".into(),
+            "experiment_observation payload does not match its closed five-field contract".into(),
         );
     }
     let proposal_id = text(payload, "proposal_event_id")
         .ok_or_else(|| "observation has no proposal_event_id".to_string())?;
-    if !proposals.contains_key(proposal_id) {
+    let Some(prediction) = proposals.get(proposal_id) else {
         return Err(format!("observation references unknown or future proposal {proposal_id}"));
-    }
+    };
     if !observed_proposals.insert(proposal_id.to_string()) {
         return Err(format!("proposal {proposal_id} has more than one observation event"));
     }
@@ -248,20 +280,40 @@ fn validate_observation(
                     "observed proposal {proposal_id} lacks a digest or actual cost"
                 ));
             }
+            let observed_outcome = text(payload, "observed_outcome")
+                .ok_or_else(|| format!("observed proposal {proposal_id} lacks an outcome label"))?;
+            if !prediction.outcome_probabilities.contains_key(observed_outcome) {
+                return Err(format!(
+                    "observed outcome {observed_outcome} was not in the proposal's preregistered outcome space"
+                ));
+            }
+            let mut brier_score = 0.0;
+            for (outcome, probability) in &prediction.outcome_probabilities {
+                let target = if outcome == observed_outcome { 1.0 } else { 0.0 };
+                brier_score += (probability - target).powi(2);
+            }
+            let observed_probability = prediction.outcome_probabilities[observed_outcome];
+            let log_loss = if observed_probability > 0.0 {
+                Some(-observed_probability.ln())
+            } else {
+                None
+            };
+            Ok(Some(ObservationScores { brier_score, log_loss }))
         }
         "failed" | "unknown" => {
             if !payload["observation_sha256"].is_null()
+                || !payload["observed_outcome"].is_null()
                 || (!payload["actual_cost"].is_null()
                     && finite_number(payload, "actual_cost").is_none_or(|cost| cost < 0.0))
             {
                 return Err(format!(
-                    "failed/unknown proposal {proposal_id} must not claim an observation digest"
+                    "failed/unknown proposal {proposal_id} must not claim an observation digest or outcome"
                 ));
             }
+            Ok(None)
         }
-        _ => return Err(format!("proposal {proposal_id} has unsupported observation status")),
+        _ => Err(format!("proposal {proposal_id} has unsupported observation status")),
     }
-    Ok(())
 }
 
 fn validate_stop(
@@ -309,9 +361,12 @@ pub fn validate_trace(trace: &Value) -> Result<TraceReport, Vec<String>> {
 
     let mut previous_hash = GENESIS_SHA256.to_string();
     let mut event_ids = BTreeSet::new();
-    let mut proposals = BTreeMap::<String, String>::new();
+    let mut proposals = BTreeMap::<String, ProposalPrediction>::new();
     let mut experiment_ids = BTreeSet::<String>::new();
     let mut observed_proposals = BTreeSet::<String>::new();
+    let mut brier_sum = 0.0;
+    let mut log_loss_sum = 0.0;
+    let mut log_loss_count = 0usize;
     let mut stopped = false;
     let mut report = TraceReport::default();
 
@@ -368,11 +423,14 @@ pub fn validate_trace(trace: &Value) -> Result<TraceReport, Vec<String>> {
                     errors.push(format!("event {event_id} proposes an experiment after stop"));
                 }
                 match validate_proposal(payload) {
-                    Ok(experiment_id) => {
-                        if !experiment_ids.insert(experiment_id.clone()) {
-                            errors.push(format!("duplicate experiment proposal {experiment_id}"));
+                    Ok(prediction) => {
+                        if !experiment_ids.insert(prediction.experiment_id.clone()) {
+                            errors.push(format!(
+                                "duplicate experiment proposal {}",
+                                prediction.experiment_id
+                            ));
                         } else {
-                            proposals.insert(event_id.to_string(), experiment_id);
+                            proposals.insert(event_id.to_string(), prediction);
                             report.proposal_count += 1;
                         }
                     }
@@ -384,7 +442,19 @@ pub fn validate_trace(trace: &Value) -> Result<TraceReport, Vec<String>> {
                     errors.push(format!("event {event_id} records an observation after stop"));
                 }
                 match validate_observation(payload, &proposals, &mut observed_proposals) {
-                    Ok(()) => report.observation_count += 1,
+                    Ok(scores) => {
+                        report.observation_count += 1;
+                        if let Some(scores) = scores {
+                            report.scored_observation_count += 1;
+                            brier_sum += scores.brier_score;
+                            if let Some(log_loss) = scores.log_loss {
+                                log_loss_sum += log_loss;
+                                log_loss_count += 1;
+                            } else {
+                                report.zero_probability_outcome_count += 1;
+                            }
+                        }
+                    }
                     Err(error) => errors.push(format!("event {event_id}: {error}")),
                 }
             }
@@ -403,6 +473,12 @@ pub fn validate_trace(trace: &Value) -> Result<TraceReport, Vec<String>> {
 
     report.stopped = stopped;
     report.terminal_sha256 = previous_hash;
+    if report.scored_observation_count > 0 {
+        report.mean_brier_score = Some(brier_sum / report.scored_observation_count as f64);
+        if report.zero_probability_outcome_count == 0 && log_loss_count > 0 {
+            report.mean_log_loss = Some(log_loss_sum / log_loss_count as f64);
+        }
+    }
     if errors.is_empty() {
         Ok(report)
     } else {
@@ -507,13 +583,18 @@ mod tests {
                 "proposal_event_id": "event-0",
                 "observation_status": "observed",
                 "observation_sha256": "b".repeat(64),
-                "actual_cost": 0.02
+                "actual_cost": 0.02,
+                "observed_outcome": "positive"
             }),
         );
         let result = validate_trace(&trace(vec![first, second])).unwrap();
         assert_eq!(result.event_count, 2);
         assert_eq!(result.proposal_count, 1);
         assert_eq!(result.observation_count, 1);
+        assert_eq!(result.scored_observation_count, 1);
+        assert_eq!(result.mean_brier_score, Some(0.98));
+        assert!((result.mean_log_loss.unwrap() - -(0.3_f64).ln()).abs() < TOLERANCE);
+        assert_eq!(result.zero_probability_outcome_count, 0);
         assert!(!result.stopped);
         assert!(is_sha256(&result.terminal_sha256));
     }
@@ -635,7 +716,8 @@ mod tests {
                 "proposal_event_id": "event-0",
                 "observation_status": "failed",
                 "observation_sha256": Value::Null,
-                "actual_cost": Value::Null
+                "actual_cost": Value::Null,
+                "observed_outcome": Value::Null
             }),
         );
         assert!(validate_trace(&trace(vec![first, second, third])).is_err());
