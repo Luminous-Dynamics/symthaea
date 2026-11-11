@@ -299,6 +299,24 @@ fn detection_limit_requires_units() {
 }
 
 #[test]
+fn legacy_coverage_defaults_missing_false_negative_modes_to_unknown() {
+    let legacy = r#"{
+        "modality": "time-resolved optical imaging",
+        "scope": "declared field of view",
+        "observation_duration_seconds": 30.0,
+        "spatial_coverage_fraction": 0.8,
+        "detection_limit": null
+    }"#;
+    let decoded: ObservationCoverage =
+        serde_json::from_str(legacy).expect("legacy coverage remains readable");
+
+    assert_eq!(decoded.false_negative_risks, vec![FalseNegativeRisk::Unknown]);
+    let mut issues = Vec::new();
+    decoded.validate("coverage", &mut issues);
+    assert!(issues.is_empty(), "{issues:#?}");
+}
+
+#[test]
 fn unfamiliar_substrate_labels_are_open_world() {
     let mut candidate = profile();
     candidate.substrate_family = "unknown field-coupled hybrid substrate".to_owned();
