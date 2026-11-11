@@ -469,3 +469,6 @@ Required metrics: throughput and safe-success by robot tier; per-robot starvatio
 - **RED:** Li et al., arXiv:2605.24044. Adaptive deadline-aware DAG scheduling for multi-task robotic inference, evaluated on Jetson and Apple M-series platforms under the authors' scheduling assumptions.
 
 The Luminous target is to compare these methods under matched robot/task/model/network/compute conditions and go further by incorporating qualified action-buffer depletion, actuation-side AoI, PoMA-style deadline misses, EVSI, thermal/actuator state and recovery constraints. Keep hard local safety and safe-stop outside the shared scheduler.
+
+
+The mission-aware fleet-serving child [#11627](https://github.com/Luminous-Dynamics/symthaea/issues/11627) / [draft PR #11630](https://github.com/Luminous-Dynamics/symthaea/pull/11630) is now included as a distinct constrained admission benchmark.
