@@ -90,7 +90,7 @@ For requested battery power (P) and symmetric uncertainty (delta_P), define:
 - worst-case charge request: (max(delta_P-P,0));
 - guaranteed regenerative power: (max(-P-delta_P,0)).
 
-The first two must fit the conservative lower discharge and charge-acceptance bounds supplied by the upstream pack model. Guaranteed regenerative energy is credited only when the entire uncertainty interval remains in the charging direction, and only at the declared lower-bound regenerative efficiency.
+The first two must fit the conservative lower discharge and charge-acceptance bounds supplied by the upstream pack model. Guaranteed regenerative energy is credited only when the entire uncertainty interval remains in the charging direction, capped by the upstream conservative charge-acceptance bound and multiplied by the declared lower-bound regenerative efficiency.
 
 This also handles uncertainty intervals that straddle zero: the evaluator checks both possible power directions rather than assuming the nominal sign is certain.
 
