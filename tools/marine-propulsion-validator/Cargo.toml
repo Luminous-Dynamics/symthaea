@@ -45,3 +45,7 @@ path = "src/bin/marine_emissions_evidence_audit.rs"
 [[bin]]
 name = "marine-service-flexibility-audit"
 path = "src/bin/marine_service_flexibility_audit.rs"
+
+[[bin]]
+name = "marine-port-call-energy-audit"
+path = "src/bin/marine_port_call_energy_audit.rs"
