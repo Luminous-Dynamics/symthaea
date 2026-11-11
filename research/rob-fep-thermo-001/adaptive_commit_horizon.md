@@ -58,3 +58,8 @@ Cases include binding queue, thermal and viability caps; Unknown/stale/provenanc
 ## Claim boundary
 
 A passing fixture verifies only the min-of-qualified-bounds reference semantics for the finite corpus. It does not validate any physical bound, thermal estimator, clock, dynamics model, actuator capability, viability calculation or controller. No hardware or SOTA improvement is claimed.
+
+
+## Exact known-answer note
+
+The 15-case corpus was fetched back after commit and its expected horizon values were independently replayed as the minimum of the nine qualified bounds. Binding constraints are all ties at the minimum. The stable long-horizon case has two ties: freshness and queue, both at 20 ticks. This is synthetic reference arithmetic only.
