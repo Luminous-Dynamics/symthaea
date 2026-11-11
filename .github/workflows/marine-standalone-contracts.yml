@@ -289,17 +289,18 @@ jobs:
           cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
             --bin marine-hull-state-evidence-join-audit -- \
             docs/research/marine/marine-hull-state-evidence-join-v0.1.0.schema.json \
-            docs/research/marine/fixtures/synthetic-marine-hull-state-evidence-join-v0.1.0.json \
+            docs/research/marine/fixtures/synthetic-marine-hull-state-timebase-join-v0.1.0.json \
             docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
-            docs/research/marine/fixtures/synthetic-marine-acoustic-evidence-v0.1.0.json \
+            docs/research/marine/fixtures/synthetic-marine-acoustic-timebase-v0.1.0.json \
             docs/research/marine/marine-biofouling-evidence-v0.1.0.schema.json \
-            docs/research/marine/fixtures/synthetic-marine-biofouling-evidence-v0.1.0.json \
+            docs/research/marine/fixtures/synthetic-marine-biofouling-timebase-v0.1.0.json \
+             "$RUNNER_TEMP/marine-acoustic-timebase-report.json" \
             > "$RUNNER_TEMP/marine-hull-state-join-report.json"
           status=$?
           set -e
           cat "$RUNNER_TEMP/marine-hull-state-join-report.json"
           test "$status" -eq 2
-          jq -e '.disposition == "INCOMPLETE" and .context_links_valid == true and (.source_record_statuses | length) == 2' "$RUNNER_TEMP/marine-hull-state-join-report.json"
+          jq -e '.disposition == "INCOMPLETE" and .context_links_valid == true and .timebase_binding_valid == true and (.source_record_statuses | length) == 2' "$RUNNER_TEMP/marine-hull-state-join-report.json"
 
       - name: Preserve generated lockfile and audit receipts
         if: always()
