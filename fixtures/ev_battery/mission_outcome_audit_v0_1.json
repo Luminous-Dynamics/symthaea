@@ -51,6 +51,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:feasible_correct",
@@ -138,6 +145,18 @@
             "calibration_ref": "synthetic-calibration-5",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": 25,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-feasible_correct-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
@@ -193,6 +212,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:false_feasible_thermal",
@@ -280,6 +306,18 @@
             "calibration_ref": "synthetic-calibration-5",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": -15,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-false_feasible_thermal-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
@@ -335,6 +373,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:false_feasible_reserve",
@@ -422,6 +467,18 @@
             "calibration_ref": "synthetic-calibration-5",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": 25,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-false_feasible_reserve-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
@@ -477,6 +534,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:infeasible_correct",
@@ -564,6 +628,18 @@
             "calibration_ref": "synthetic-calibration-5",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": 25,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-infeasible_correct-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
@@ -619,6 +695,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:false_infeasible",
@@ -706,6 +789,18 @@
             "calibration_ref": "synthetic-calibration-5",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": 25,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-false_infeasible-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
@@ -761,6 +856,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:abstained_out_of_domain",
@@ -848,6 +950,18 @@
             "calibration_ref": "synthetic-calibration-5",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": 25,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-abstained_out_of_domain-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
@@ -903,6 +1017,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:non_battery_abort",
@@ -990,6 +1111,18 @@
             "calibration_ref": "synthetic-calibration-5",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": 25,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-non_battery_abort-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
@@ -1045,6 +1178,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:inconclusive_reference",
@@ -1132,6 +1272,18 @@
             "calibration_ref": "synthetic-calibration-5",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": 25,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-inconclusive_reference-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
@@ -1187,6 +1339,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:reference_asset_mismatch",
@@ -1274,6 +1433,18 @@
             "calibration_ref": "synthetic-calibration-5",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": 25,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-reference_asset_mismatch-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
@@ -1329,6 +1500,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:completed_but_measurement_failed",
@@ -1416,6 +1594,18 @@
             "calibration_ref": "synthetic-calibration-5",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": 25,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-completed_but_measurement_failed-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
@@ -1471,6 +1661,13 @@
             "unit": "degC",
             "limit_value": 55,
             "relation": "MAXIMUM_ALLOWED"
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "limit_value": 5,
+            "relation": "MINIMUM_REQUIRED"
           }
         ],
         "model_artifact_ref": "synthetic-model-artifact:incomplete_reference_measurements",
@@ -1546,6 +1743,18 @@
             "calibration_ref": "synthetic-calibration-4",
             "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
             "measured_at_ms": 1799999995000
+          },
+          {
+            "constraint": "TEMPERATURE_MINIMUM",
+            "scope_ref": "cell-002",
+            "unit": "degC",
+            "measured_value": 25,
+            "sensor_ref": "synthetic-meter-cell-002-temp",
+            "calibration_ref": "synthetic-calibration-cell-002-temp",
+            "calibration_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "measured_at_ms": 1799999995000,
+            "measurement_ref": "synthetic-measurement-incomplete_reference_measurements-temp-min",
+            "measurement_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         ],
         "admission": null
