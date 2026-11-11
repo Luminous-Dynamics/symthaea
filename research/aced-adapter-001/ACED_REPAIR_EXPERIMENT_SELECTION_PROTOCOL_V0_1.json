@@ -194,7 +194,8 @@
         "numeric sample design: planned total units, standardized effect size, two-sided alpha, target power, and named power method",
         "budget, cost model, safety limits and reversible/irreversible effect classification",
         "predeclared stop, continue, replicate and conflict-resolution rules",
-        "expected confounders, selection effects and known identification assumptions"
+        "expected confounders, selection effects and known identification assumptions",
+        "a preregistered supported control arm and seeded randomized allocation method"
       ],
       "immutability_rule": "The full plan artifact must be durably recorded before an experiment is authorized or executed. The digest in experiment_proposal binds to that exact artifact. Any plan change requires a new proposal event and new plan digest; do not overwrite the prior artifact.",
       "verification_rule": "The Rust function validate_trace_with_plans(trace, plan_artifacts) validates each closed plan's required nested objects and recomputes canonical SHA-256; every proposal digest must resolve to exactly one supplied plan artifact, and proposal experiment_id must equal plan_id. Altered plan artifacts and ID mismatches fail closed.",
@@ -224,7 +225,32 @@
           "approximate_achieved_power": 0.8013
         },
         "claim_limit": "A normal-approximation planning calculator for independent, equal-allocation, continuous outcomes. Not a substitute for design-specific power analysis for clustered, paired, binary, ordinal, survival, adaptive, sequential, repeated-look or multiplicity-adjusted experiments.",
-        "primary_endpoint_requirement": "The plan must declare primary_outcome.scale=continuous and estimand=difference_in_means; the variable must appear in measurement.variables. Categorical forecast labels are a separate outcome taxonomy and must not be confused with the endpoint scale used in the power calculation."
+        "primary_endpoint_requirement": "The plan must declare primary_outcome.scale=continuous and estimand=difference_in_means; the variable must appear in measurement.variables. Categorical forecast labels are a separate outcome taxonomy and must not be confused with the endpoint scale used in the power calculation.",
+        "metrics": [
+          "planned_units_per_arm",
+          "required_units_per_arm",
+          "achieved_power_at_planned_n",
+          "underpowered_plan_rejection_rate",
+          "effect_size_sensitivity",
+          "allocation/control fidelity",
+          "sample-size cost per decision-relevant information unit"
+        ]
+      },
+      "supported_designs": {
+        "allocation_methods": [
+          "seeded_randomized_pair_assignment",
+          "blocked_seeded_randomization"
+        ],
+        "control_kinds": [
+          "matched_no_intervention_control",
+          "active_control",
+          "sham_control"
+        ],
+        "rejection_examples": [
+          "uncontrolled_total_effect",
+          "no_control"
+        ],
+        "limitation": "These are the only controlled randomized designs accepted by plan v0.2. Observational designs, crossover/paired analyses and adaptive randomization require separate schemas and design-specific power methods; they must not be relabeled as this design."
       }
     }
   },
