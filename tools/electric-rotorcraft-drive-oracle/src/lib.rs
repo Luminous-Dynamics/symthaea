@@ -529,36 +529,19 @@ pub fn evaluate_drive_with_kinematics(
     input: DriveInput,
     transmission: TransmissionKinematics,
 ) -> Result<DriveKinematicReport, DriveError> {
-    let ratio = transmission.motor_to_rotor_speed_ratio;
-    if !ratio.is_finite() || ratio <= 0.0 {
-        return Err(DriveError::InvalidConfiguration(
-            "motor-to-rotor speed ratio must be finite and positive for motoring",
-        ));
-    }
-
+    let motor_point = derive_motor_shaft_operating_point(
+        input,
+        transmission,
+        config.transmission_efficiency,
+    )?;
     let drive = evaluate_drive(config, input)?;
-    let motor_angular_velocity_rad_s = drive.rotor_angular_velocity_rad_s * ratio;
-    let motor_speed_rpm = motor_angular_velocity_rad_s * 60.0 / TAU;
-    let motor_shaft_output_torque_nm =
-        drive.motor_shaft_output_power_w / motor_angular_velocity_rad_s;
-
-    let derived = [
-        motor_angular_velocity_rad_s,
-        motor_speed_rpm,
-        motor_shaft_output_torque_nm,
-    ];
-    if derived.iter().any(|value| !value.is_finite())
-        || derived.iter().any(|value| *value <= 0.0)
-    {
-        return Err(DriveError::NumericalOverflow);
-    }
 
     Ok(DriveKinematicReport {
         drive,
-        motor_to_rotor_speed_ratio: ratio,
-        motor_angular_velocity_rad_s,
-        motor_speed_rpm,
-        motor_shaft_output_torque_nm,
+        motor_to_rotor_speed_ratio: transmission.motor_to_rotor_speed_ratio,
+        motor_angular_velocity_rad_s: motor_point.motor_angular_velocity_rad_s,
+        motor_speed_rpm: motor_point.motor_speed_rpm,
+        motor_shaft_output_torque_nm: motor_point.motor_shaft_output_torque_nm,
     })
 }
 
