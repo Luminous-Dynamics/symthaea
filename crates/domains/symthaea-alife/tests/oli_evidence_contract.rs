@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use symthaea_alife::agnostic_evidence::{
-    EvidenceBasis, EvidenceOutcome, EvidenceRecord, HypothesisClass, ObservationCoverage,
+    EvidenceBasis, EvidenceOutcome, EvidenceRecord, FalseNegativeRisk, HypothesisClass, ObservationCoverage,
     Property, PropertyAssessment, PropertyFinding, SystemProfile, SYMTHAEA_OLI_CONTEXT_VERSION,
 };
 
@@ -36,7 +36,18 @@ fn coverage() -> ObservationCoverage {
         scope: "field of view covering 80% of the discharge chamber".to_owned(),
         observation_duration_seconds: Some(30.0),
         spatial_coverage_fraction: Some(0.8),
+        temporal_coverage_fraction: Some(0.6),
+        temporal_sampling_interval_seconds: Some(2.0),
+        target_process_timescale_seconds: Some(0.5),
         detection_limit: Some(0.01),
+        detection_limit_units: Some("relative signal units".to_owned()),
+        reference_abundance: None,
+        detection_probability_at_reference: None,
+        calibration_evidence_id: None,
+        false_negative_risks: vec![
+            FalseNegativeRisk::LowAbundance,
+            FalseNegativeRisk::TemporalAliasing,
+        ],
     }
 }
 
@@ -208,6 +219,74 @@ fn model_inadequacy_requires_a_derived_adequacy_diagnostic() {
         &["residuals-001"],
     ));
     assert!(supported.validate().is_ok());
+}
+
+#[test]
+fn temporal_undersampling_requires_an_explicit_aliasing_risk() {
+    let mut candidate = profile();
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::NoDetection));
+    let mut property = finding(
+        Property::SelfMaintenance,
+        PropertyAssessment::InsufficientEvidence,
+        &["m1"],
+    );
+    let mut measured = coverage();
+    measured.false_negative_risks.retain(|risk| *risk != FalseNegativeRisk::TemporalAliasing);
+    property.coverage = Some(measured);
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("undersampling risk must be explicit");
+    assert!(errors.iter().any(|error| error.contains("must record TemporalAliasing")));
+}
+
+#[test]
+fn no_detection_requires_at_least_one_explicit_false_negative_risk() {
+    let mut candidate = profile();
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::NoDetection));
+    let mut property = finding(
+        Property::SelfMaintenance,
+        PropertyAssessment::InsufficientEvidence,
+        &["m1"],
+    );
+    let mut measured = coverage();
+    measured.false_negative_risks.clear();
+    property.coverage = Some(measured);
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("false-negative risk is mandatory");
+    assert!(errors.iter().any(|error| error.contains("false-negative risk mode")));
+}
+
+#[test]
+fn calibrated_detection_probability_requires_a_linked_reference_record() {
+    let mut candidate = profile();
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::NoDetection));
+    let mut property = finding(
+        Property::SelfMaintenance,
+        PropertyAssessment::InsufficientEvidence,
+        &["m1"],
+    );
+    let mut measured = coverage();
+    measured.reference_abundance = Some(0.5);
+    measured.detection_probability_at_reference = Some(0.95);
+    measured.calibration_evidence_id = Some("calibration-001".to_owned());
+    property.coverage = Some(measured);
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("calibration evidence must be linked");
+    assert!(errors.iter().any(|error| error.contains("calibration_evidence_id references missing")));
+
+    candidate.evidence.push(measurement("calibration-001", EvidenceOutcome::SignalDetected));
+    assert!(candidate.validate().is_ok());
+}
+
+#[test]
+fn detection_limit_requires_units() {
+    let mut measured = coverage();
+    measured.detection_limit_units = None;
+    let mut issues = Vec::new();
+    measured.validate("coverage", &mut issues);
+    assert!(issues.iter().any(|error| error.contains("detection_limit requires non-empty units")));
 }
 
 #[test]
