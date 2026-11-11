@@ -1,0 +1,468 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea/qvf-r-case-v0.1.schema.json",
+  "title": "Symthaea Query-Visible Frontier Replay Case v0.1",
+  "description": "Synthetic benchmark case for replaying whether an exact representation was query-visible on a specific serving replica by a historical cutoff. This is not an execution receipt, evidence ledger, or truth assessment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "qualification_authority",
+    "clock_basis",
+    "contract_refs",
+    "source_artifacts",
+    "materializations",
+    "visibility_observations",
+    "rights_events",
+    "queries",
+    "expected_outcomes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea:qvf-r-case:v0.1"
+    },
+    "case_id": {
+      "$ref": "#/$defs/ref"
+    },
+    "qualification_authority": {
+      "const": "SyntheticQualificationOnly"
+    },
+    "clock_basis": {
+      "const": "SyntheticFixtureOnly"
+    },
+    "contract_refs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "source_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/source_artifact"
+      }
+    },
+    "materializations": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/materialization"
+      }
+    },
+    "visibility_observations": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "$ref": "#/$defs/visibility_observation"
+      }
+    },
+    "rights_events": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/rights_event"
+      }
+    },
+    "queries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/query"
+      }
+    },
+    "expected_outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2048,
+      "items": {
+        "$ref": "#/$defs/expected_outcome"
+      }
+    }
+  },
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:/#-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "instant": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_ref",
+        "content_sha256",
+        "temporal_assertion_refs",
+        "provenance_family_ref",
+        "initial_rights_decision_ref"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "temporal_assertion_refs": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "provenance_family_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "initial_rights_decision_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "materialization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation_ref",
+        "representation_kind",
+        "representation_sha256",
+        "parent_artifact_refs",
+        "transform_ref",
+        "transform_version",
+        "index_ref",
+        "index_revision_ref",
+        "materialized_at",
+        "materialization_observation_ref",
+        "inherited_provenance_family_refs",
+        "canonical_statement_ref",
+        "canonical_version_ref",
+        "source_span_refs",
+        "parent_statement_version_refs",
+        "statement_relation_refs"
+      ],
+      "properties": {
+        "representation_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "representation_kind": {
+          "enum": [
+            "source_text",
+            "extracted_text",
+            "translation",
+            "embedding",
+            "vector_chunk",
+            "summary",
+            "bridge_fact"
+          ]
+        },
+        "representation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "parent_artifact_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "transform_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "transform_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "embedding_profile_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "index_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "index_revision_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "materialized_at": {
+          "$ref": "#/$defs/instant"
+        },
+        "materialization_observation_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "inherited_provenance_family_refs": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "dependency_state": {
+          "enum": [
+            "active",
+            "invalidated",
+            "unknown"
+          ],
+          "default": "unknown"
+        },
+        "canonical_statement_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "canonical_version_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "source_span_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "parent_statement_version_refs": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "statement_relation_refs": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        }
+      }
+    },
+    "visibility_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_ref",
+        "representation_ref",
+        "replica_ref",
+        "index_ref",
+        "index_revision_ref",
+        "visibility_state",
+        "observed_at",
+        "evidence_ref"
+      ],
+      "properties": {
+        "observation_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "representation_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "replica_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "index_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "index_revision_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "visibility_state": {
+          "enum": [
+            "Visible",
+            "NotVisible",
+            "Unknown"
+          ]
+        },
+        "observed_at": {
+          "$ref": "#/$defs/instant"
+        },
+        "evidence_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "rights_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rights_event_ref",
+        "target_ref",
+        "target_kind",
+        "decision_ref",
+        "payload_access",
+        "effective_at"
+      ],
+      "properties": {
+        "rights_event_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "target_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "target_kind": {
+          "enum": [
+            "artifact",
+            "representation",
+            "provenance_family"
+          ]
+        },
+        "decision_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "payload_access": {
+          "enum": [
+            "Allow",
+            "Deny",
+            "Unknown"
+          ]
+        },
+        "metadata_access": {
+          "enum": [
+            "Allow",
+            "Deny",
+            "Unknown"
+          ]
+        },
+        "effective_at": {
+          "$ref": "#/$defs/instant"
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_ref",
+        "query_commitment_sha256",
+        "retrieval_plan_ref",
+        "execution_receipt_ref",
+        "valid_at_ref",
+        "known_at_cutoff",
+        "executed_at",
+        "serving_replica_ref",
+        "index_ref",
+        "index_revision_ref",
+        "authorization_chain_ref",
+        "temporal_resolution_ref",
+        "resolved_statement_version_refs"
+      ],
+      "properties": {
+        "query_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "query_commitment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "retrieval_plan_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "execution_receipt_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "valid_at_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "known_at_cutoff": {
+          "$ref": "#/$defs/instant"
+        },
+        "executed_at": {
+          "$ref": "#/$defs/instant"
+        },
+        "serving_replica_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "index_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "index_revision_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "authorization_chain_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "temporal_resolution_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "resolved_statement_version_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        }
+      }
+    },
+    "expected_outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_ref",
+        "representation_ref",
+        "expected_state",
+        "reason_ref",
+        "expected_statement_version_ref"
+      ],
+      "properties": {
+        "query_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "representation_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "expected_state": {
+          "enum": [
+            "EligibleForRetrieval",
+            "NotMaterializedByCutoff",
+            "NotVisibleOnServingReplicaByCutoff",
+            "VisibilityUnknown",
+            "RightsDenied",
+            "DerivedRepresentationInvalidated",
+            "OutsideRequestedValidTime",
+            "SupersededForRequestedAsOfView",
+            "WrongPropositionVersionForTemporalResolution"
+          ]
+        },
+        "reason_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "required_evidence_refs": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "expected_statement_version_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    }
+  }
+}
