@@ -40,7 +40,7 @@ Every case binds:
 - independent reference protocol and digest;
 - reference evidence object and digest;
 - time of physical observation;
-- per-constraint measurement references, digests, units and observed values;
+- per-constraint measurement references, digests, units and observed values; each measurement reference and mission report reference must be unique within the audit corpus;
 - sensor identity plus calibration reference/digest for each physical measurement, with measurement time after prediction freeze and no later than the reference observation time.
 
 The reference must bind to the *same* physical asset/configuration/topology and mission-profile digest as the prediction. A near-match, another pack, a different firmware/configuration or a different mission profile is not a valid reference.
