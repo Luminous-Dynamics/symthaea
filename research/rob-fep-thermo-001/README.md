@@ -389,3 +389,12 @@ The distributed-inference fixture corpus has expanded to 24 cases. DI23 introduc
 ## Mission-aware fleet admission workstream
 
 A dedicated child protocol is now tracked at [Symthaea #11627](https://github.com/Luminous-Dynamics/symthaea/issues/11627), with draft [PR #11630](https://github.com/Luminous-Dynamics/symthaea/pull/11630). It compares Round Robin, EDF, Armory Lookahead and RED against a constrained Luminous policy using per-robot action-buffer slack, actuation-miss risk, EVSI, thermal/actuator/recovery evidence and service floors. Its 12 synthetic cases deliberately encode no performance winner.
+
+
+## Decision-sufficiency horizon
+
+The new task-conditioned decision-sufficiency extension is [decision_sufficiency_horizon.md](./decision_sufficiency_horizon.md), with four synthetic known-answer fixtures and a strict schema:
+- [fixtures/decision_sufficiency_v0_1.json](./fixtures/decision_sufficiency_v0_1.json)
+- [fixtures/decision_sufficiency_v0_1.schema.json](./fixtures/decision_sufficiency_v0_1.schema.json)
+
+It adds a separate commitment bound: a stale action may remain adequate in a stable scene even when AoI is large, while a very fresh observation can be decision-insufficient after a fast transition. The bound uses task-loss regret UCB plus robust common-admissibility and current evidence validity; Unknown or uncalibrated coverage does not extend commitment.
