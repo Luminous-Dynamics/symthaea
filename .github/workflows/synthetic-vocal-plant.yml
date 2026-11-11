@@ -1,0 +1,62 @@
+name: SYNTH-VOCAL-001 synthetic acoustic plant
+
+on:
+  pull_request:
+    paths:
+      - "tools/synthetic-vocal-plant/**"
+      - "docs/research/SYNTHETIC_VOCAL_PLANT_BENCHMARK_V1.md"
+      - ".github/workflows/synthetic-vocal-plant.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-vocal-plant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "SYNTH_VOCAL_PLANT_SOURCE_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Generate standalone dependency lock
+        run: cargo generate-lockfile --manifest-path tools/synthetic-vocal-plant/Cargo.toml
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/synthetic-vocal-plant/Cargo.toml --all -- --check
+
+      - name: Run synthetic contract tests
+        run: cargo test --manifest-path tools/synthetic-vocal-plant/Cargo.toml --locked --all-targets
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path tools/synthetic-vocal-plant/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Generate deterministic WAV fixture suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/synthetic-vocal-plant"
+          cargo run --manifest-path tools/synthetic-vocal-plant/Cargo.toml --locked -- "$output"
+          test -s "$output/baseline.wav"
+          test -s "$output/no_op.wav"
+          test -s "$output/pitch_up_100c.wav"
+          test -s "$output/manifest.json"
+          test -s "$output/manifest.sha256"
+          grep -q '"content_class": "synthetic_only"' "$output/manifest.json"
