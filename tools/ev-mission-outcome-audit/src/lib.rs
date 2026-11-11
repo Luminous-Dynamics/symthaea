@@ -1459,10 +1459,11 @@ mod tests {
     fn duplicate_vehicle_identity_is_rejected_as_correlated_sampling() {
         let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
         let first_vehicle = corpus.cases[0].prediction.asset.vehicle_ref.clone();
+        let second_pack = corpus.cases[1].prediction.asset.pack_ref.clone();
         corpus.cases[1].prediction.asset.vehicle_ref = first_vehicle.clone();
         corpus.cases[1].reference.asset.vehicle_ref = first_vehicle.clone();
         let assignment = corpus.split_manifest.assignments.iter_mut()
-            .find(|assignment| assignment.pack_ref == corpus.cases[1].prediction.asset.pack_ref)
+            .find(|assignment| assignment.pack_ref == second_pack)
             .unwrap();
         assignment.vehicle_ref = first_vehicle;
         let bytes = serde_json::to_vec(&corpus).expect("duplicate vehicle corpus");
