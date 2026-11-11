@@ -1035,6 +1035,7 @@ pub fn audit_corpus_with_trust(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
     use serde_json::Value;
 
     const SCHEMA: &[u8] =
@@ -1235,15 +1236,38 @@ mod tests {
                     format!("physical-measurement-{index:03}-{measurement_index:02}");
                 measurement.measurement_sha256 = digest.clone();
             }
+            case.reference.admission = None;
             corpus.cases.push(case);
         }
         let manifest_digest = split_manifest_sha256(&corpus.split_manifest).expect("manifest digest");
         for case in &mut corpus.cases {
             case.prediction.split_manifest_sha256 = manifest_digest.clone();
         }
+        let signing_key = SigningKey::from_bytes(&[42u8; 32]);
+        for case in &mut corpus.cases {
+            let message = reference_signing_bytes(&case.reference).expect("reference claims");
+            let signature = signing_key.sign(&message);
+            case.reference.admission = Some(ReferenceAdmission {
+                authority_ref: "synthetic-test-authority-001".to_owned(),
+                signature_hex: hex::encode(signature.to_bytes()),
+            });
+        }
+        let trust = TrustManifest {
+            trust_manifest_version: "ev-mission-outcome-trust/0.1".to_owned(),
+            trusted_authorities: vec![TrustedAuthority {
+                authority_ref: "synthetic-test-authority-001".to_owned(),
+                role: "INDEPENDENT_TEST_AUTHORITY".to_owned(),
+                public_key_hex: hex::encode(signing_key.verifying_key().to_bytes()),
+                valid_from_ms: 0,
+                valid_until_ms: None,
+            }],
+        };
+        let trust_bytes = serde_json::to_vec(&trust).expect("trust manifest");
         let bytes = serde_json::to_vec(&corpus).expect("physical holdout corpus");
-        let report = audit_corpus(SCHEMA, &bytes).expect("physical holdout audit");
-        assert_eq!(report.physical_reference_case_count, 59);
+        let report = audit_corpus_with_trust(SCHEMA, &trust_bytes, &bytes)
+            .expect("signed physical holdout audit");
+        assert_eq!(report.physical_reference_claim_count, 59);
+        assert_eq!(report.admitted_physical_reference_count, 59);
         assert_eq!(report.split_assignment_count, 59);
         assert_eq!(report.test_blind_assignment_count, 59);
         assert_eq!(report.physical_predicted_feasible_count, 59);
@@ -1342,6 +1366,65 @@ mod tests {
         let bytes = serde_json::to_vec(&corpus).expect("duplicate physical group manifest");
         let error = audit_corpus(SCHEMA, &bytes).expect_err("duplicate physical group must fail");
         assert!(error.contains("appears more than once across split assignments"));
+    }
+
+    #[test]
+    fn an_unsigned_physical_reference_claim_never_enters_the_physical_denominator() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let item = corpus.cases.iter_mut().find(|item| item.case_id == "feasible_correct").unwrap();
+        item.reference.evidence_class = "INDEPENDENT_PHYSICAL_REFERENCE".to_owned();
+        let bytes = serde_json::to_vec(&corpus).expect("unsigned physical claim");
+        let report = audit_corpus(SCHEMA, &bytes).expect("unsigned reference retained but rejected");
+        assert_eq!(report.physical_reference_claim_count, 1);
+        assert_eq!(report.admitted_physical_reference_count, 0);
+        assert_eq!(report.physical_scorable_count, 0);
+        assert_eq!(report.physical_false_feasible_upper_95_one_sided, None);
+        assert_eq!(row(&report, "feasible_correct").classification, "REJECTED_REFERENCE");
+    }
+
+    #[test]
+    fn post_signature_measurement_mutation_invalidates_physical_reference_admission() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let item = corpus.cases.iter_mut().find(|item| item.case_id == "feasible_correct").unwrap();
+        item.reference.evidence_class = "INDEPENDENT_PHYSICAL_REFERENCE".to_owned();
+        item.reference.admission = None;
+        let signing_key = SigningKey::from_bytes(&[42u8; 32]);
+        let trust = TrustManifest {
+            trust_manifest_version: "ev-mission-outcome-trust/0.1".to_owned(),
+            trusted_authorities: vec![TrustedAuthority {
+                authority_ref: "test-authority".to_owned(),
+                role: "INDEPENDENT_TEST_AUTHORITY".to_owned(),
+                public_key_hex: hex::encode(signing_key.verifying_key().to_bytes()),
+                valid_from_ms: 0,
+                valid_until_ms: None,
+            }],
+        };
+        let message = reference_signing_bytes(&item.reference).expect("reference claims");
+        let signature = signing_key.sign(&message);
+        item.reference.admission = Some(ReferenceAdmission {
+            authority_ref: "test-authority".to_owned(),
+            signature_hex: hex::encode(signature.to_bytes()),
+        });
+        item.reference.measurements[0].measured_value += 0.25;
+        let trust_bytes = serde_json::to_vec(&trust).expect("trust manifest");
+        let bytes = serde_json::to_vec(&corpus).expect("tampered physical reference");
+        let report = audit_corpus_with_trust(SCHEMA, &trust_bytes, &bytes)
+            .expect("tampered reference is recorded as rejected");
+        assert_eq!(row(&report, "feasible_correct").classification, "REJECTED_REFERENCE");
+        assert_eq!(report.admitted_physical_reference_count, 0);
+        assert_eq!(report.physical_scorable_count, 0);
+    }
+
+    #[test]
+    fn reference_signature_is_independent_of_measurement_array_order() {
+        let corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let mut first = corpus.cases[0].reference.clone();
+        let mut second = first.clone();
+        second.measurements.reverse();
+        let a = reference_signing_bytes(&first).expect("first claims");
+        let b = reference_signing_bytes(&second).expect("permuted claims");
+        assert_eq!(sha256(&a), sha256(&b));
+        first.admission = None;
     }
 
 }
