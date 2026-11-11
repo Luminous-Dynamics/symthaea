@@ -1675,6 +1675,49 @@ mod tests {
     }
 
     #[test]
+    fn explicit_nondefault_tempo_at_tick_zero_overrides_midi_default() {
+        let prediction = build_midi(
+            &[(60, 960, 1_440)],
+            40,
+            &[(0, 1_000_000)],
+        );
+        let parsed = parse_transcribed_midi_v1(&prediction).unwrap();
+        assert!((parsed.notes[0].onset_seconds - 1.0).abs() < 1e-9);
+        assert!((parsed.notes[0].offset_seconds.unwrap() - 1.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn exactly_fifty_millisecond_onset_error_is_included_by_default() {
+        let reference_notes = vec![(60, 0, 480)];
+        let predicted_notes = vec![(60, 96, 576)]; // 50 ms at 500,000 us/qn and 960 PPQ.
+        let reference = reference_artifact(&reference_notes, 40);
+        let prediction = build_midi(&predicted_notes, 40, &[(0, 500_000)]);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.onset_pitch_metrics.true_positives, 1);
+        assert_eq!(report.full_note_metrics.true_positives, 1);
+    }
+
+    #[test]
+    fn velocity_metrics_are_absent_by_default_without_an_explicit_claim() {
+        let notes = vec![(60, 0, 480)];
+        let reference = reference_artifact(&notes, 40);
+        let prediction = build_midi_with_velocity(&notes, 40, &[(0, 500_000)], 1);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert!(report.velocity_aware_full_note_metrics.is_none());
+        assert!(report.velocity_error.is_none());
+    }
+
+    #[test]
     fn unclosed_note_is_kept_for_onset_metrics_but_cannot_match_full_note() {
         let notes = vec![(60, 0, 480)];
         let reference = reference_artifact(&notes, 40);
