@@ -2989,6 +2989,26 @@ mod tests {
         ]
     }
 
+    fn output_representation(
+        representation_id: &str,
+        component_names: &[&str],
+        component_unit_ids: &[&str],
+        generator_id: &str,
+        matrix: Vec<Vec<f64>>,
+    ) -> LinearVectorFieldOutputRepresentationV1 {
+        LinearVectorFieldOutputRepresentationV1 {
+            representation_id: representation_id.to_string(),
+            coordinate_basis_id: "output-basis".to_string(),
+            component_names: component_names.iter().map(|name| name.to_string()).collect(),
+            component_unit_ids: component_unit_ids.iter().map(|unit| unit.to_string()).collect(),
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: generator_id.to_string(),
+                matrix,
+            }],
+        }
+    }
+
+
 
     fn rotational_vector_field() -> Vec<Expr> {
         vec![
@@ -3004,6 +3024,171 @@ mod tests {
             mul(Expr::Const(-1.0), mul(radial_scale.clone(), var("y"))),
             mul(radial_scale, var("x")),
         ]
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_accepts_state_and_output_representation_match() {
+        let report = check_exact_vector_field_equivariance(
+            &rotational_vector_field(),
+            &metric_aware_so2_action(),
+            &output_representation(
+                "same-state-output",
+                &["vx", "vy"],
+                &["m/s", "m/s"],
+                "J",
+                vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+            ),
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.generator_results[0].component_residual_term_counts, vec![0, 0]);
+        assert_eq!(report.output_representation.component_names, vec!["vx", "vy"]);
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_accepts_twice_angle_complex_square_output() {
+        // F(x,y) = (x^2-y^2, 2xy) transforms under B=2J when the
+        // state transforms under A=J. This is a concrete A != B fixture.
+        let vector_field = vec![
+            sub(pow2("x"), pow2("y")),
+            mul(Expr::Const(2.0), mul(var("x"), var("y"))),
+        ];
+        let output = output_representation(
+            "weight-two-output",
+            &["real", "imag"],
+            &["1", "1"],
+            "J",
+            vec![vec![0.0, -2.0], vec![2.0, 0.0]],
+        );
+        let report = check_exact_vector_field_equivariance(
+            &vector_field,
+            &metric_aware_so2_action(),
+            &output,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.generator_results[0].component_residual_term_counts, vec![0, 0]);
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_rejects_wrong_output_representation() {
+        let vector_field = vec![
+            sub(pow2("x"), pow2("y")),
+            mul(Expr::Const(2.0), mul(var("x"), var("y"))),
+        ];
+        let wrong_output = output_representation(
+            "wrong-weight-output",
+            &["real", "imag"],
+            &["1", "1"],
+            "J",
+            vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+        );
+        let report = check_exact_vector_field_equivariance(
+            &vector_field,
+            &metric_aware_so2_action(),
+            &wrong_output,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(!report.equivariant_under_every_generator());
+        assert!(report.generator_results[0]
+            .component_residual_term_counts
+            .iter()
+            .any(|count| *count > 0));
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_supports_scalar_output_with_distinct_dimension() {
+        let scalar_output = vec![add(pow2("x"), pow2("y"))];
+        let output = output_representation(
+            "scalar-radial-output",
+            &["radius_squared"],
+            &["m^2"],
+            "J",
+            vec![vec![0.0]],
+        );
+        let report = check_exact_vector_field_equivariance(
+            &scalar_output,
+            &metric_aware_so2_action(),
+            &output,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.generator_results[0].component_residual_term_counts, vec![0]);
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_keeps_unacted_parameters_symbolic() {
+        let vector_field = vec![
+            mul(var("rate"), sub(pow2("x"), pow2("y"))),
+            mul(Expr::Const(2.0), mul(var("rate"), mul(var("x"), var("y")))),
+        ];
+        let output = output_representation(
+            "weighted-complex-square",
+            &["real", "imag"],
+            &["1", "1"],
+            "J",
+            vec![vec![0.0, -2.0], vec![2.0, 0.0]],
+        );
+        let report = check_exact_vector_field_equivariance(
+            &vector_field,
+            &metric_aware_so2_action(),
+            &output,
+            ExactPolynomialLieProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert!(report.expression_variables.contains(&"rate".to_string()));
+    }
+
+    #[test]
+    fn exact_vector_field_equivariance_rejects_bad_output_pairing_and_budget() {
+        let vector_field = vec![var("x"), var("y")];
+        let missing = output_representation(
+            "missing-generator",
+            &["vx", "vy"],
+            &["1", "1"],
+            "other-generator",
+            vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+        );
+        assert_eq!(
+            check_exact_vector_field_equivariance(
+                &vector_field,
+                &metric_aware_so2_action(),
+                &missing,
+                ExactPolynomialLieProfileV1::default(),
+            ),
+            Err(ExactVectorFieldEquivarianceErrorV1::MissingOutputGenerator {
+                generator_id: "J".to_string(),
+            })
+        );
+
+        let output = output_representation(
+            "budget-limited",
+            &["vx", "vy"],
+            &["1", "1"],
+            "J",
+            vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+        );
+        let mut limited = ExactPolynomialLieProfileV1::default();
+        limited.maximum_term_products = 1;
+        assert_eq!(
+            check_exact_vector_field_equivariance(
+                &vector_field,
+                &metric_aware_so2_action(),
+                &output,
+                limited,
+            ),
+            Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded)
+        );
     }
 
     #[test]
