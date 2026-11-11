@@ -221,51 +221,65 @@ fn spectral_flux(
     hop_frames: usize,
 ) -> Result<Vec<f64>, AudioClockAlignmentIssueV1> {
     let channels = usize::from(wav.info.channels);
-    let samples: Vec<Vec<f32>> = (0..channels)
-        .map(|channel| {
-            wav.interleaved_samples
-                .chunks_exact(channels)
-                .map(|frame| frame[channel])
-                .collect()
-        })
-        .collect();
-    if samples.iter().any(|channel| channel.len() < fft_frames) {
+    let audio_frames = usize::try_from(wav.info.frame_count).map_err(|_| {
+        AudioClockAlignmentIssueV1::InvalidConfig {
+            field: "audio_frame_count_out_of_range".into(),
+        }
+    })?;
+    if channels == 0 || audio_frames < fft_frames {
         return Err(AudioClockAlignmentIssueV1::TooFewAudioFrames);
+    }
+    let expected_samples = audio_frames.checked_mul(channels).ok_or_else(|| {
+        AudioClockAlignmentIssueV1::InvalidConfig {
+            field: "audio_sample_count_overflow".into(),
+        }
+    })?;
+    if wav.interleaved_samples.len() != expected_samples {
+        return Err(AudioClockAlignmentIssueV1::WavInvalid {
+            issue: AudioEventObservationIssueV1::SampleCountNotDivisibleByChannels,
+        });
     }
 
     // Prefix one complete window of silence. A flux frame's timestamp is its
     // center relative to the original WAV, so the first frames can observe an
     // onset at sample frame zero without inventing a positive lead-in.
-    let padded: Vec<Vec<f32>> = samples
-        .iter()
-        .map(|channel| {
-            let mut padded = vec![0.0f32; fft_frames];
-            padded.extend_from_slice(channel);
-            padded.extend(std::iter::repeat_n(0.0f32, fft_frames));
-            padded
-        })
-        .collect();
-
-    let frame_count = (padded[0].len() - fft_frames) / hop_frames + 1;
+    // Use the original interleaved PCM as the backing store; do not allocate
+    // one full copy per channel for long recordings.
+    let padded_frames = audio_frames
+        .checked_add(fft_frames.checked_mul(2).ok_or_else(|| {
+            AudioClockAlignmentIssueV1::InvalidConfig {
+                field: "fft_padding_overflow".into(),
+            }
+        })?)
+        .ok_or_else(|| AudioClockAlignmentIssueV1::InvalidConfig {
+            field: "padded_audio_frame_count_overflow".into(),
+        })?;
+    let frame_count = (padded_frames - fft_frames) / hop_frames + 1;
     let mut planner = FftPlanner::<f32>::new();
     let fft = planner.plan_fft_forward(fft_frames);
     let mut previous: Option<Vec<f64>> = None;
     let mut flux = Vec::with_capacity(frame_count);
     let window_denominator = (fft_frames - 1) as f64;
     let bins = fft_frames / 2;
+    let audio_end_padded = fft_frames + audio_frames;
 
     for frame_index in 0..frame_count {
         let start = frame_index * hop_frames;
         // Average channel magnitudes after each channel's FFT. Never average
         // stereo PCM samples first: anti-phase content could cancel to silence.
         let mut magnitude = vec![0.0f64; bins];
-        for channel in &padded {
+        for channel in 0..channels {
             let mut buffer = vec![Complex::new(0.0f32, 0.0f32); fft_frames];
             for (index, value) in buffer.iter_mut().enumerate() {
-                let hann = 0.5
-                    - 0.5
-                        * (std::f64::consts::TAU * index as f64 / window_denominator).cos();
-                value.re = channel[start + index] * hann as f32;
+                let padded_index = start + index;
+                if (fft_frames..audio_end_padded).contains(&padded_index) {
+                    let source_frame = padded_index - fft_frames;
+                    let sample_index = source_frame * channels + channel;
+                    let hann = 0.5
+                        - 0.5
+                            * (std::f64::consts::TAU * index as f64 / window_denominator).cos();
+                    value.re = wav.interleaved_samples[sample_index] * hann as f32;
+                }
             }
             fft.process(&mut buffer);
             for (bin, value) in buffer.iter().enumerate().take(bins + 1).skip(1) {
