@@ -53,6 +53,10 @@ A fixture is `EligibleForTestAdapter` only when all of the following hold:
 
 The expected result is generated from these typed predicates, not from a model rationale or an LLM judge.
 
+## External authorization benchmark crosswalk
+
+See [AUTHORIZATION_BENCHMARK_CROSSWALK_V0_1.md](AUTHORIZATION_BENCHMARK_CROSSWALK_V0_1.md) for a detailed comparison against APort Vault, XAAB, Veto / Can Is Not May, AuthorizationBench and AgentAbstain; event-level metric definitions; confirmatory task families; confidence bounds; and independent reproduction requirements.
+
 ## Metrics for later model trials
 
 - paired context-flip accuracy and both-members-correct rate;
