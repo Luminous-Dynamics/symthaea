@@ -1091,6 +1091,12 @@ fn build_adjacency(
 
         let mut candidates = Vec::new();
         for (prediction_index, predicted_note) in predicted.iter().enumerate().take(end).skip(start) {
+            if mir_eval_round_distance_v1(
+                (reference_note.onset_seconds - predicted_note.onset_seconds).abs(),
+            ) > onset_tolerance_seconds
+            {
+                continue;
+            }
             let pitch_error_cents = (i32::from(reference_note.pitch_midi)
                 - i32::from(predicted_note.pitch_midi))
                 .unsigned_abs() as i32
@@ -1115,7 +1121,10 @@ fn build_adjacency(
                 let Some(reference_offset) = reference_note.offset_seconds else {
                     continue;
                 };
-                if (reference_offset - predicted_offset).abs() > offset_tolerance {
+                if mir_eval_round_distance_v1(
+                    (reference_offset - predicted_offset).abs(),
+                ) > offset_tolerance
+                {
                     continue;
                 }
             }
