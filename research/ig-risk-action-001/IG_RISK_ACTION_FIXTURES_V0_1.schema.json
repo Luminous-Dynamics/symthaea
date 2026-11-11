@@ -55,7 +55,7 @@
           "scenario_id",
           "task_family",
           "probability_source",
-          "confidence_target",
+          "probability_target",
           "probabilities",
           "loss_matrix",
           "tie_break_order",
@@ -78,8 +78,8 @@
           "probability_source": {
             "const": "SyntheticScenarioOracle"
           },
-          "confidence_target": {
-            "const": "post_answer_correctness"
+          "probability_target": {
+            "const": "scenario_defined_action_outcome_success"
           },
           "probabilities": {
             "type": "object"
