@@ -1,3 +1,4 @@
+use crate::power_design::TwoSidedMeanPowerDesign;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -143,7 +144,7 @@ pub fn validate_experiment_plan(plan: &Value) -> Result<(), String> {
     ) {
         return Err("experiment plan does not match its closed fourteen-field contract".into());
     }
-    if text(plan, "schema_version") != Some("aced-experiment-plan-v0.1")
+    if text(plan, "schema_version") != Some("aced-experiment-plan-v0.2")
         || text(plan, "plan_id").is_none()
         || text(plan, "benchmark_id") != Some("ACED-REPAIR-ADAPTER-001")
     {
@@ -194,12 +195,32 @@ pub fn validate_experiment_plan(plan: &Value) -> Result<(), String> {
     validate_string_array(&measurement["outcome_taxonomy"], "measurement.outcome_taxonomy")?;
 
     let sample = &plan["sample"];
-    if !exact_fields(sample, &["planned_units", "power_assumptions"])
-        || sample["planned_units"].as_u64().is_none_or(|units| units == 0)
-        || text(sample, "power_assumptions").is_none()
+    if !exact_fields(
+        sample,
+        &[
+            "planned_units",
+            "standardized_effect_size",
+            "alpha",
+            "target_power",
+            "power_method",
+        ],
+    ) || sample["planned_units"].as_u64().is_none_or(|units| units < 2 || units % 2 != 0)
+        || text(sample, "power_method")
+            != Some("two_sided_equal_allocation_independent_means_normal_approximation")
     {
-        return Err("experiment plan sample/power contract mismatch".into());
+        return Err("experiment plan numeric sample/power contract mismatch".into());
     }
+    let power_design = TwoSidedMeanPowerDesign {
+        standardized_effect_size: finite_number(sample, "standardized_effect_size")
+            .unwrap_or(f64::NAN),
+        alpha: finite_number(sample, "alpha").unwrap_or(f64::NAN),
+        target_power: finite_number(sample, "target_power").unwrap_or(f64::NAN),
+    };
+    let planned_units = sample["planned_units"]
+        .as_u64()
+        .ok_or_else(|| "experiment plan planned_units must be an integer".to_string())?;
+    power_design.qualify_planned_total(planned_units)
+        .map_err(|error| format!("experiment plan is underpowered or invalid: {error}"))?;
 
     let budget = &plan["budget"];
     if !exact_fields(budget, &["max_experiments", "max_turns", "max_cost_units"])
@@ -709,9 +730,9 @@ mod tests {
     const TRACE_SCHEMA: &str =
         include_str!("../../EXPERIMENT_VALUE_TRACE_V0_1.schema.json");
     const PLAN_SCHEMA: &str =
-        include_str!("../../ACED_EXPERIMENT_PLAN_V0_1.schema.json");
+        include_str!("../../ACED_EXPERIMENT_PLAN_V0_2.schema.json");
     const PLAN_FIXTURE: &str =
-        include_str!("../tests/fixtures/aced_experiment_plan_v0_1.json");
+        include_str!("../tests/fixtures/aced_experiment_plan_v0_2.json");
 
     fn parsed_plan() -> Value {
         serde_json::from_str(PLAN_FIXTURE).expect("plan fixture JSON")
@@ -732,10 +753,13 @@ mod tests {
             serde_json::from_str(PLAN_SCHEMA).expect("experiment plan schema JSON");
         assert_eq!(
             text(&plan_schema, "title"),
-            Some("ACED prospective experiment plan v0.1")
+            Some("ACED prospective experiment plan v0.2")
         );
         assert_eq!(plan_schema["additionalProperties"], false);
         validate_experiment_plan(&parsed_plan()).expect("plan fixture satisfies Rust contract");
+        let mut underpowered = parsed_plan();
+        underpowered["sample"]["planned_units"] = Value::from(40);
+        assert!(validate_experiment_plan(&underpowered).is_err());
         assert_eq!(
             plan_schema["required"].as_array().unwrap().len(),
             14
