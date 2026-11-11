@@ -26,6 +26,7 @@
         "proposal",
         "freshness",
         "deadline",
+        "risk",
         "thermal",
         "actuator",
         "dynamics",
@@ -36,8 +37,8 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 19,
-      "maxItems": 19,
+      "minItems": 21,
+      "maxItems": 21,
       "uniqueItems": true,
       "allOf": [
         {
@@ -316,6 +317,36 @@
             "properties": {
               "case_id": {
                 "const": "AH19_CHUNKTRUST_PROPOSAL_CLIPPED_BY_VIABILITY"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH20_PREALLOCATED_RISK_CAP_BINDS"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH21_RISK_BUDGET_UNALLOCATED"
               }
             },
             "required": [
