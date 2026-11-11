@@ -39,7 +39,7 @@ This is deliberately not a detailed GPU/KV-cache runtime model. The next extensi
 
 ## Output and limits
 
-The result identifies admitted requests, request-level rejections, consumed resources, the next Round Robin cursor and any service-floor obligations not met. It carries no actuation authority. A service-floor breach makes the schedule unacceptable even if aggregate throughput increases.
+The result identifies admitted requests, request-level rejections, consumed resources, the next Round Robin cursor, service-floor obligations not met by the batch, and maximum-starvation breaches that predate the current admission decision. An already-overdue robot remains eligible and is prioritized for remediation; the prior breach remains visible rather than being erased by a late service event. It carries no actuation authority. A service-floor breach makes the schedule unacceptable even if aggregate throughput increases.
 
 This is deterministic policy/reference logic only. It does not validate network timing, PoMA calibration, EVSI estimation, model identity cryptographically, physical state, hardware resource estimates or hard-real-time guarantees.
 
