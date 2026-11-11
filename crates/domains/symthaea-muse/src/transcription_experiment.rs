@@ -463,12 +463,11 @@ pub fn validate_transcription_experiment_receipt_v1(
         TranscriptionModelDeliveryV1::OpaqueLocalRuntime
         | TranscriptionModelDeliveryV1::HostedApi => {}
     }
-    if let (Some(expected), Some(actual)) = (
-        receipt.model_artifact_sha256.as_deref(),
-        evidence.model_artifact_bytes,
-    ) {
-        if expected != sha256_hex(actual) {
-            issues.push(TranscriptionExperimentReceiptIssueV1::ModelArtifactDigestMismatch);
+    if let Some(expected) = receipt.model_artifact_sha256.as_deref() {
+        match evidence.model_artifact_bytes {
+            Some(actual) if expected == sha256_hex(actual) => {}
+            Some(_) => issues.push(TranscriptionExperimentReceiptIssueV1::ModelArtifactDigestMismatch),
+            None => issues.push(TranscriptionExperimentReceiptIssueV1::InvalidModelArtifact),
         }
     }
 
