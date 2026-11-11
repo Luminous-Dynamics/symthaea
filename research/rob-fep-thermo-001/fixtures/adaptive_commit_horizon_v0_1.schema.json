@@ -467,6 +467,7 @@
         "proposal",
         "freshness",
         "deadline",
+        "risk",
         "thermal",
         "actuator",
         "dynamics",
@@ -500,6 +501,9 @@
           "$ref": "#/$defs/bound"
         },
         "continuity": {
+          "$ref": "#/$defs/bound"
+        },
+        "risk": {
           "$ref": "#/$defs/bound"
         }
       }
