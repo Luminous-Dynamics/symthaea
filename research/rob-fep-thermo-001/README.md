@@ -292,16 +292,16 @@ Local low-level control, RTA and safe-stop remain independent and available with
 
 ## Viability-constrained action commitment horizon
 
-A new benchmark child is tracked by [Symthaea #11581](https://github.com/Luminous-Dynamics/symthaea/issues/11581). It compares fixed-K, progress-triggered, horizon-decoupled, action-prefix-conditioned and latent Reuse-then-Refine execution against a **bottleneck horizon** bounded by freshness, deadline, thermal, actuator, dynamics, viability, queue and continuity evidence.
+A new benchmark child is tracked by [Symthaea #11581](https://github.com/Luminous-Dynamics/symthaea/issues/11581). It compares fixed-K, progress-triggered, horizon-decoupled, action-prefix-conditioned and latent Reuse-then-Refine execution against a **bottleneck horizon** bounded by freshness, deadline, non-recyclable risk, thermal, actuator, dynamics, viability, queue and continuity evidence.
 
-See [adaptive_commit_horizon.md](./adaptive_commit_horizon.md) and its 19 synthetic known-answer cases:
+See [adaptive_commit_horizon.md](./adaptive_commit_horizon.md) and its 21 synthetic known-answer cases:
 - [fixtures/adaptive_commit_horizon_v0_1.json](./fixtures/adaptive_commit_horizon_v0_1.json)
 - [fixtures/adaptive_commit_horizon_v0_1.schema.json](./fixtures/adaptive_commit_horizon_v0_1.schema.json)
 
 The result is only a maximum eligible prefix for independent projection/admission, never an actuation permit.
 
 
-The 19-case adaptive-horizon corpus now includes shared-context and prefix-closure checks. Every qualified cap must bind the same context digest (state/action/model/uncertainty/clock/control-period identity) and be valid for every intermediate prefix tick; mismatched or endpoint-only bounds block eligibility.
+The 21-case adaptive-horizon corpus now includes shared-context and prefix-closure checks. Every qualified cap must bind the same context digest (state/action/model/uncertainty/clock/control-period identity) and be valid for every intermediate prefix tick; mismatched or endpoint-only bounds block eligibility.
 
 
 ## Integrated decision architecture
@@ -329,3 +329,6 @@ A new addendum composes OpenWAM's counterfactual outcome-identification ideas wi
 [ counterfactual_action_value_extension.md ](./counterfactual_action_value_extension.md)
 
 It separates prediction accuracy, action-outcome identification, decision ranking and held-out closed-loop value. It requires same-history candidate branches, repeated continuations and held-out selection/evaluation so one lucky rollout cannot masquerade as action value.
+
+
+The adaptive commitment horizon consumes finite-horizon non-recyclable chance-risk allocation from Symtropy #4232 as a separate `N_risk` cap. This remains distinct from one-step chance constraints (#4010) and robust observation-constrained viability (#4588).
