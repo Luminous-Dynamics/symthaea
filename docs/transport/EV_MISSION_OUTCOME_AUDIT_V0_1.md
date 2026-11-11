@@ -67,6 +67,7 @@ The corpus also carries the complete split manifest: asset/configuration/topolog
 Each observed constraint is replayed against the frozen limit:
 - `MINIMUM_REQUIRED`: observed value must be greater than or equal to the declared limit.
 - `MAXIMUM_ALLOWED`: observed value must be less than or equal to the declared limit.
+`TEMPERATURE_MINIMUM` and `TEMPERATURE_MAXIMUM` are separate constraints. A pack can be infeasible at either end of its thermal operating window; a low-temperature violation is not hidden by a compliant maximum-temperature reading from another cell or module.
 
 The audit checks relation/constraint compatibility (for example, temperature is a maximum-allowed constraint; discharge power is a minimum-required capability). The reference outcome label must also agree with the numeric observations. A battery-constraint failure, non-battery abort or inconclusive test must include an explicit outcome reason. A prediction outside the TEST_BLIND partition, or a prediction/model/split freeze after the physical result is observed, is not eligible for scoring.
 
@@ -120,7 +121,7 @@ Report:
 - false-infeasible rate and exact bound;
 - true feasible/infeasible counts;
 - abstention and NOT_SCORABLE coverage;
-- false-feasible violations by discharge power, charge acceptance, energy reserve, SOC, voltage and temperature;
+- false-feasible violations by discharge power, charge acceptance, energy reserve, SOC, voltage, minimum cell temperature and maximum cell temperature;
 - subgroup outcomes by chemistry, temperature, SOC, age, topology, firmware/configuration and duty class, only where independent group counts support them;
 - completion, useful work, energy and charge/regen accounting, missed service and downtime at matched whole-vehicle boundaries.
 
