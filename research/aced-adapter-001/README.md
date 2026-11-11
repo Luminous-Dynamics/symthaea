@@ -60,7 +60,7 @@ The inventory distinguishes track membership from content identity:
 
 Decision-task domains are parsed separately from task family and scenario subtype. For the Core decision track, `invalid_premise` has six `valid_proposed_intervention` and four `wrong_side_intervention` subtypes. They remain one family and their actual domains remain distinct; they are not mislabeled as extra domains.
 
-The library exposes `query_inventory::qualify_query_inventory`; the `aced-query-index-qualifier` binary validates exact track counts, distributions, path safety, the inventory and source-ledger digests, all 148 path/digest entries, payload overlap, filename collisions and the metadata-only candidate boundary. It does not download or verify payload bytes, execute the four-turn Query protocol, or produce any agent score.
+The library exposes `query_inventory::qualify_query_inventory` and `query_protocol::qualify_query_comparison_protocol`; the `aced-query-index-qualifier` binary validates exact track counts, distributions, path safety, the inventory and source-ledger digests, all 148 path/digest entries, payload overlap, filename collisions, the metadata-only candidate boundary, paper task denominators, parser identity, published baseline and resource-regime contract, and the closed comparison schema. It does not download or verify payload bytes, execute the four-turn Query protocol, or produce any agent score.
 
 ## ACED-Query comparison protocol
 
@@ -94,7 +94,9 @@ cargo run --manifest-path research/aced-adapter-001/qualifier/Cargo.toml --bin a
 cargo run --manifest-path research/aced-adapter-001/qualifier/Cargo.toml --bin aced-query-index-qualifier -- \
   research/aced-adapter-001/upstream/aced_query_world_inventory.json \
   research/aced-adapter-001/ACED_QUERY_SOURCE_MANIFEST_V0_1.json \
-  research/aced-adapter-001/upstream/SHA256SUMS
+  research/aced-adapter-001/upstream/SHA256SUMS \
+  research/aced-adapter-001/ACED_QUERY_COMPARISON_PROTOCOL_V0_1.json \
+  research/aced-adapter-001/ACED_QUERY_COMPARISON_PROTOCOL_V0_1.schema.json
 ```
 
 A passing inventory qualifier checks:
