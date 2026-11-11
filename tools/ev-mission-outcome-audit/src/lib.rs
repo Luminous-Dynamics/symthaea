@@ -836,14 +836,22 @@ pub fn clopper_pearson_upper(
 
 pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditReport, String> {
     let empty_manifest = br#"{"trust_manifest_version":"ev-mission-outcome-trust/0.1","trusted_authorities":[]}"#;
-    audit_corpus_with_trust(schema_bytes, empty_manifest, corpus_bytes)
+    audit_corpus_with_trust(schema_bytes, empty_manifest, &sha256(empty_manifest), corpus_bytes)
 }
 
 pub fn audit_corpus_with_trust(
     schema_bytes: &[u8],
     trust_manifest_bytes: &[u8],
+    expected_trust_manifest_sha256: &str,
     corpus_bytes: &[u8],
 ) -> Result<AuditReport, String> {
+    if !is_sha256(expected_trust_manifest_sha256) {
+        return Err("expected trust-manifest digest is malformed".to_owned());
+    }
+    let actual_trust_manifest_sha256 = sha256(trust_manifest_bytes);
+    if actual_trust_manifest_sha256 != expected_trust_manifest_sha256 {
+        return Err("external trust manifest does not match the caller-pinned SHA-256".to_owned());
+    }
     let validator = compile_schema(schema_bytes)?;
     let value: Value =
         serde_json::from_slice(corpus_bytes).map_err(|error| format!("corpus JSON: {error}"))?;
@@ -983,7 +991,7 @@ pub fn audit_corpus_with_trust(
         test_blind_assignment_count,
         non_test_blind_assignment_count,
         canonical_corpus_sha256: sha256(&canonical),
-        trust_manifest_sha256: sha256(trust_manifest_bytes),
+        trust_manifest_sha256: actual_trust_manifest_sha256,
         report_sha256: String::new(),
         case_count: cases.len(),
         true_feasible_count: count("TRUE_FEASIBLE"),
@@ -1264,7 +1272,8 @@ mod tests {
         };
         let trust_bytes = serde_json::to_vec(&trust).expect("trust manifest");
         let bytes = serde_json::to_vec(&corpus).expect("physical holdout corpus");
-        let report = audit_corpus_with_trust(SCHEMA, &trust_bytes, &bytes)
+        let trust_digest = sha256(&trust_bytes);
+        let report = audit_corpus_with_trust(SCHEMA, &trust_bytes, &trust_digest, &bytes)
             .expect("signed physical holdout audit");
         assert_eq!(report.physical_reference_claim_count, 59);
         assert_eq!(report.admitted_physical_reference_count, 59);
@@ -1408,7 +1417,8 @@ mod tests {
         item.reference.measurements[0].measured_value += 0.25;
         let trust_bytes = serde_json::to_vec(&trust).expect("trust manifest");
         let bytes = serde_json::to_vec(&corpus).expect("tampered physical reference");
-        let report = audit_corpus_with_trust(SCHEMA, &trust_bytes, &bytes)
+        let trust_digest = sha256(&trust_bytes);
+        let report = audit_corpus_with_trust(SCHEMA, &trust_bytes, &trust_digest, &bytes)
             .expect("tampered reference is recorded as rejected");
         assert_eq!(row(&report, "feasible_correct").classification, "REJECTED_REFERENCE");
         assert_eq!(report.admitted_physical_reference_count, 0);
@@ -1425,6 +1435,17 @@ mod tests {
         let b = reference_signing_bytes(&second).expect("permuted claims");
         assert_eq!(sha256(&a), sha256(&b));
         first.admission = None;
+    }
+
+    #[test]
+    fn external_trust_manifest_must_match_the_caller_pinned_digest() {
+        let trust = br#"{"trust_manifest_version":"ev-mission-outcome-trust/0.1","trusted_authorities":[]}"#;
+        let wrong = "0".repeat(64);
+        let error = audit_corpus_with_trust(SCHEMA, trust, &wrong, CORPUS)
+            .expect_err("wrong trust digest must fail before scoring");
+        assert!(error.contains("caller-pinned SHA-256"));
+        let right = sha256(trust);
+        assert!(audit_corpus_with_trust(SCHEMA, trust, &right, CORPUS).is_ok());
     }
 
 }
