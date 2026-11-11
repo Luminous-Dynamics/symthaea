@@ -26,6 +26,14 @@ pub enum BenchmarkSplit {
     Test,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExecutionMode {
+    /// Reconstruct the off-nominal state, then hand control to the policy.
+    ReplayThenInfer,
+    /// Evaluate the clean initial state without a recovery handoff.
+    SeedOnly,
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum RecoveryStage {
     Approach,
@@ -63,6 +71,8 @@ pub struct PlannedScenario {
 pub struct RoboRecoverManifest {
     pub platform: BenchmarkPlatform,
     pub split: BenchmarkSplit,
+    /// Must be ReplayThenInfer for confirmatory recovery scoring.
+    pub execution_mode: ExecutionMode,
     /// Canonical upstream repository and exact source revision.
     pub source_repository: String,
     pub source_revision: String,
@@ -99,6 +109,7 @@ pub enum PolicyCompletion {
 pub struct RoboRecoverTrial {
     pub platform: BenchmarkPlatform,
     pub split: BenchmarkSplit,
+    pub execution_mode: ExecutionMode,
     pub source_revision: String,
     pub split_manifest_blob_sha: String,
     pub stage: RecoveryStage,
@@ -178,6 +189,7 @@ pub fn source_reports_environment_completion(trial: &RoboRecoverTrial) -> Option
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ManifestIssue {
     NoScenarios,
+    SeedOnlyIsNotRecovery,
     BlankArmId,
     BlankSourceRepository,
     BlankSourceRevision,
@@ -231,6 +243,7 @@ pub struct GroupScore {
 pub struct RoboRecoverScoreReport {
     pub platform: BenchmarkPlatform,
     pub split: BenchmarkSplit,
+    pub execution_mode: ExecutionMode,
     pub source_repository: String,
     pub source_revision: String,
     pub split_manifest_blob_sha: String,
@@ -290,6 +303,9 @@ pub fn validate_manifest(
     let mut issues = Vec::new();
     if manifest.scenarios.is_empty() {
         issues.push(ManifestIssue::NoScenarios);
+    }
+    if manifest.execution_mode != ExecutionMode::ReplayThenInfer {
+        issues.push(ManifestIssue::SeedOnlyIsNotRecovery);
     }
     if manifest.arm_id.trim().is_empty() {
         issues.push(ManifestIssue::BlankArmId);
@@ -476,6 +492,7 @@ pub fn score_roborecover(
 
         let metadata_matches = trial.platform == manifest.platform
             && trial.split == manifest.split
+            && trial.execution_mode == manifest.execution_mode
             && trial.source_revision == manifest.source_revision
             && trial.split_manifest_blob_sha == manifest.split_manifest_blob_sha
             && trial.evidence.policy_digest == manifest.policy_digest
@@ -627,6 +644,7 @@ pub fn score_roborecover(
                     .is_some_and(|scenario| {
                         trial.platform == manifest.platform
                             && trial.split == manifest.split
+                            && trial.execution_mode == manifest.execution_mode
                             && trial.source_revision == manifest.source_revision
                             && trial.split_manifest_blob_sha == manifest.split_manifest_blob_sha
                             && trial.evidence.policy_digest == manifest.policy_digest
@@ -650,6 +668,7 @@ pub fn score_roborecover(
     Ok(RoboRecoverScoreReport {
         platform: manifest.platform,
         split: manifest.split,
+        execution_mode: manifest.execution_mode,
         source_repository: manifest.source_repository.clone(),
         source_revision: manifest.source_revision.clone(),
         split_manifest_blob_sha: manifest.split_manifest_blob_sha.clone(),
@@ -716,6 +735,7 @@ mod tests {
         RoboRecoverManifest {
             platform: BenchmarkPlatform::RoboTwin,
             split: BenchmarkSplit::Test,
+            execution_mode: ExecutionMode::ReplayThenInfer,
             source_repository: "RUCKBReasoning/RoboRecover".to_owned(),
             source_revision: "089b9420e8b7c303e2338a8212a8b6c27c26a79b".to_owned(),
             split_manifest_blob_sha: "c9b40e12d6f8d2dab723815dfc2e966ea7e62cd5".to_owned(),
@@ -740,6 +760,7 @@ mod tests {
         RoboRecoverTrial {
             platform: manifest.platform,
             split: manifest.split,
+            execution_mode: manifest.execution_mode,
             source_revision: manifest.source_revision.clone(),
             split_manifest_blob_sha: manifest.split_manifest_blob_sha.clone(),
             stage: scenario.stage,
@@ -1331,6 +1352,36 @@ mod tests {
         );
         trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
         trial.evidence.policy_digest = "f".repeat(64);
+
+        let report = score_roborecover(&m, &[trial]).unwrap();
+        assert_eq!(report.accepted_trial_rows, 0);
+        assert_eq!(report.metadata_mismatch_rows, 1);
+        assert_eq!(report.policy_recovery_successes, 0);
+    }
+
+
+    #[test]
+    fn clean_seed_only_runs_are_not_recovery_evidence() {
+        let mut m = manifest();
+        m.execution_mode = ExecutionMode::SeedOnly;
+        assert!(validate_manifest(&m)
+            .unwrap_err()
+            .contains(&ManifestIssue::SeedOnlyIsNotRecovery));
+    }
+
+    #[test]
+    fn execution_mode_mismatch_blocks_trial_admission() {
+        let m = manifest();
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.execution_mode = ExecutionMode::SeedOnly;
+        trial.evidence.trial_id = m.scenarios[0].expected_trial_ids[0].clone();
 
         let report = score_roborecover(&m, &[trial]).unwrap();
         assert_eq!(report.accepted_trial_rows, 0);
