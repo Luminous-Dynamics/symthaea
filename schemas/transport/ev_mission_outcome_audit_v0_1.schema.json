@@ -76,7 +76,8 @@
             "SOC_MAXIMUM",
             "VOLTAGE_MINIMUM",
             "VOLTAGE_MAXIMUM",
-            "TEMPERATURE_MAXIMUM"
+            "TEMPERATURE_MAXIMUM",
+            "TEMPERATURE_MINIMUM"
           ]
         },
         "scope_ref": {
@@ -127,7 +128,8 @@
             "SOC_MAXIMUM",
             "VOLTAGE_MINIMUM",
             "VOLTAGE_MAXIMUM",
-            "TEMPERATURE_MAXIMUM"
+            "TEMPERATURE_MAXIMUM",
+            "TEMPERATURE_MINIMUM"
           ]
         },
         "scope_ref": {
