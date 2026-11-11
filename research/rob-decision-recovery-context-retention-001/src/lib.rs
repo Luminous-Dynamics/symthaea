@@ -399,7 +399,21 @@ pub fn plan_retention(
                 context.context_id.clone(),
             ));
         }
-        if let DecisionImpact::Qualified { loss_scale_id, .. } = &context.decision_impact {
+        if let DecisionImpact::Qualified {
+            loss_scale_id,
+            calibration_id,
+            calibration_digest,
+            ..
+        } = &context.decision_impact
+        {
+            if loss_scale_id.trim().is_empty()
+                || calibration_id.trim().is_empty()
+                || calibration_digest.trim().is_empty()
+            {
+                return Err(RetentionError::InvalidDecisionEvidence(
+                    context.context_id.clone(),
+                ));
+            }
             if let Some(first) = qualified_scale {
                 if first != loss_scale_id {
                     return Err(RetentionError::IncomparableLossScales {
@@ -663,9 +677,10 @@ mod tests {
 
     #[test]
     fn lru_control_can_choose_different_victim_than_luminous() {
-        let low_regret_old = context("low-regret-old", 40, 1, 1, false, 50, 200_000, 5);
-        let high_regret_recent = context("high-regret-recent", 40, 90, 800, true, 900_000, 900_000, 500);
-        let contexts = vec![low_regret_old, high_regret_recent];
+        let low_regret_recent = context("low-regret-recent", 40, 90, 1, false, 50, 200_000, 5);
+        let high_regret_old_recovery =
+            context("high-regret-old-recovery", 40, 1, 800, true, 900_000, 900_000, 500);
+        let contexts = vec![low_regret_recent, high_regret_old_recovery];
         let lru = plan_retention(
             RetentionPolicy::Lru,
             &request(80, 40),
@@ -678,8 +693,8 @@ mod tests {
             &contexts,
         )
         .unwrap();
-        assert_eq!(ids(&lru), vec!["low-regret-old"]);
-        assert_eq!(ids(&luminous), vec!["low-regret-old"]);
+        assert_eq!(ids(&lru), vec!["high-regret-old-recovery"]);
+        assert_eq!(ids(&luminous), vec!["low-regret-recent"]);
     }
 
     #[test]
