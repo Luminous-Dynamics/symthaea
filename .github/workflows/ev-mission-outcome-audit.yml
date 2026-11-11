@@ -68,5 +68,6 @@ jobs:
             .physical_false_feasible_upper_95_one_sided == null and
             any(.cases[]; .case_id == "false_feasible_thermal" and
               .classification == "FALSE_FEASIBLE" and
-              (.violated_constraints | index("TEMPERATURE_MAXIMUM")) != null)
+              (.violated_constraints | index("TEMPERATURE_MAXIMUM")) != null and
+              (.violated_constraints | index("TEMPERATURE_MINIMUM")) != null)
           ' "$RUNNER_TEMP/mission-outcome-report.json"
