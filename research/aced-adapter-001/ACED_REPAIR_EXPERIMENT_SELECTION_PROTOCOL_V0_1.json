@@ -161,7 +161,7 @@
     "rust_module": "qualifier/src/experiment_trace.rs",
     "status": "reusable_synthetic_trace_validator_not_yet_connected_to_model_runner",
     "event_types": {
-      "experiment_proposal": "Pre-observation commitment to belief digest, selector, predicted outcomes, EIG in bits, EVSI in utility, risk, risk-aversion coefficient, cost in utility, and selector-specific predicted_selection_score. EIG score is EIG bits; EVSI score is EVSI minus cost; risk-adjusted EVSI score is EVSI minus cost minus risk-aversion coefficient times risk.",
+      "experiment_proposal": "Pre-observation commitment to experiment_plan_sha256, belief digest, selector, predicted outcomes, EIG in bits, EVSI in utility, risk, risk-aversion coefficient, cost in utility, and selector-specific predicted_selection_score.",
       "experiment_observation": "Append-only later record referencing exactly one proposal event, with observed/failed/unknown status, evaluator-resolved outcome class and output digest when observed, and actual cost. Failed/unknown attempts remain in the event log but are excluded from proper-score denominators.",
       "stop": "Terminal reason and evidence-state digest; it is rejected if any proposal lacks an observation/failure/unknown reconciliation event."
     },
@@ -180,6 +180,25 @@
       "log_loss": "For observed outcomes with nonzero forecast probability, -ln(probability assigned to the observed class). An observed zero-probability class is represented as infinite/unavailable log loss and counted separately; no silent epsilon clipping.",
       "denominator": "Only completed observations with an independently resolved outcome class enter Brier/log-loss denominators. Failed/unknown attempts remain visible and receive separate counts; they are not silently discarded.",
       "adjudication": "Observed outcome class must be determined from the immutable observation by the independent evaluator, under a predeclared outcome taxonomy. The model does not choose its own realized label."
+    },
+    "experiment_plan_binding": {
+      "digest_field": "experiment_plan_sha256",
+      "status": "digest_required; full plan artifact external to trace",
+      "canonicalization": "SHA-256 over deterministic canonical JSON with recursively lexicographically sorted object keys, preserved array order and no insignificant whitespace.",
+      "required_plan_fields": [
+        "target and causal question / hypothesis",
+        "intervention and treatment values",
+        "control / comparison design",
+        "randomization or allocation procedure when applicable",
+        "measurement variables, measurement timing and outcome taxonomy",
+        "planned sample size and statistical power / precision assumptions",
+        "budget, cost model, safety limits and reversible/irreversible effect classification",
+        "predeclared stop, continue, replicate and conflict-resolution rules",
+        "expected confounders, selection effects and known identification assumptions"
+      ],
+      "immutability_rule": "The full plan artifact must be durably recorded before an experiment is authorized or executed. The digest in experiment_proposal binds to that exact artifact. Any plan change requires a new proposal event and new plan digest; do not overwrite the prior artifact.",
+      "verification_rule": "A future runner must independently retrieve the plan artifact, recompute its digest and verify it before dispatch; it must separately verify any observed execution receipt against the plan. The current trace validator checks only digest shape and event-chain consistency, because the plan artifact is not yet part of its input.",
+      "claim_ceiling": "A plan digest is not proof of prospective timing or execution fidelity. Trusted timestamp/signature anchoring and an independent execution observer are still required."
     }
   },
   "external_benchmark_crosswalk": [
