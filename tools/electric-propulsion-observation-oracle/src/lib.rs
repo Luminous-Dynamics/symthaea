@@ -713,7 +713,7 @@ mod tests {
     }
 
     fn channels() -> Vec<MeasurementChannel> {
-        vec![
+        let mut values = vec![
             channel(
                 "torque",
                 MeasurementQuantity::Torque,
@@ -749,7 +749,113 @@ mod tests {
                 1_000,
                 323.15,
             ),
-        ]
+        ];
+        values[0].physical_boundary_id = "motor-shaft".to_owned();
+        values[1].physical_boundary_id = "motor-shaft".to_owned();
+        values[0].sign_convention = SignConvention::PositiveMotoring;
+        values[1].sign_convention = SignConvention::PositiveMotoring;
+        values
+    }
+
+    #[test]
+    fn motor_map_projection_derives_shaft_power_and_preserves_provenance() {
+        let run = manifest();
+        let synced = synchronize_at(&run, &channels(), &required(), 1_000).unwrap();
+        let result = derive_motor_map_operating_point(
+            &synced,
+            "torque",
+            "rpm",
+            "motor-shaft",
+        )
+        .unwrap();
+
+        let expected_omega = 15_000.0 * TAU / 60.0;
+        let expected_power = 7.5 * expected_omega;
+        assert!((result.motor_angular_velocity_rad_s - expected_omega).abs() < 1.0e-12);
+        assert!((result.shaft_power_w - expected_power).abs() < 1.0e-9);
+        assert!(result.shaft_power_lower_bound_w < result.shaft_power_w);
+        assert!(result.shaft_power_upper_bound_w > result.shaft_power_w);
+        assert!(
+            (result.shaft_power_absolute_uncertainty_bound_w
+                - (result.shaft_power_w - result.shaft_power_lower_bound_w)
+                    .max(result.shaft_power_upper_bound_w - result.shaft_power_w))
+                .abs()
+                < 1.0e-12
+        );
+        assert_eq!(result.run_id, "run-001");
+        assert_eq!(result.configuration_digest, "config-sha256");
+        assert_eq!(result.evidence_manifest_digest, "manifest-sha256");
+        assert_eq!(result.motor_shaft_boundary_id, "motor-shaft");
+        assert_eq!(result.torque_calibration_certificate_digest, "cal-sha-torque");
+        assert_eq!(result.speed_calibration_certificate_digest, "cal-sha-rpm");
+        assert_eq!(result.torque_raw_data_digest, "raw-sha-torque");
+        assert_eq!(result.speed_raw_data_digest, "raw-sha-rpm");
+        assert_eq!(result.torque_timestamp_ns, 1_000);
+        assert_eq!(result.speed_timestamp_ns, 1_000);
+    }
+
+    #[test]
+    fn motor_map_projection_rejects_different_shaft_boundaries() {
+        let run = manifest();
+        let mut values = channels();
+        values[1].physical_boundary_id = "rotor-shaft".to_owned();
+        let synced = synchronize_at(&run, &values, &required(), 1_000).unwrap();
+        assert!(matches!(
+            derive_motor_map_operating_point(
+                &synced,
+                "torque",
+                "rpm",
+                "motor-shaft"
+            ),
+            Err(ObservationError::InvalidMotorMapOperatingPoint(_))
+        ));
+    }
+
+    #[test]
+    fn motor_map_projection_requires_positive_motoring_convention() {
+        let run = manifest();
+        let mut values = channels();
+        values[0].sign_convention = SignConvention::SignedEngineering;
+        let synced = synchronize_at(&run, &values, &required(), 1_000).unwrap();
+        assert!(matches!(
+            derive_motor_map_operating_point(
+                &synced,
+                "torque",
+                "rpm",
+                "motor-shaft"
+            ),
+            Err(ObservationError::InvalidMotorMapOperatingPoint(_))
+        ));
+    }
+
+    #[test]
+    fn motor_map_projection_rejects_zero_or_negative_operating_points() {
+        let run = manifest();
+        let mut values = channels();
+        values[0].samples[1].value = 0.0;
+        let synced = synchronize_at(&run, &values, &required(), 1_000).unwrap();
+        assert!(matches!(
+            derive_motor_map_operating_point(
+                &synced,
+                "torque",
+                "rpm",
+                "motor-shaft"
+            ),
+            Err(ObservationError::InvalidMotorMapOperatingPoint(_))
+        ));
+
+        let mut values = channels();
+        values[1].samples[1].value = -1.0;
+        let synced = synchronize_at(&run, &values, &required(), 1_000).unwrap();
+        assert!(matches!(
+            derive_motor_map_operating_point(
+                &synced,
+                "torque",
+                "rpm",
+                "motor-shaft"
+            ),
+            Err(ObservationError::InvalidMotorMapOperatingPoint(_))
+        ));
     }
 
     #[test]
