@@ -80,6 +80,8 @@ pub struct OrbitV1 {
     pub representative_index: usize,
     pub representative_id: String,
     pub members: Vec<MemberWitnessV1>,
+    /// Complete stabilizer subgroup: every g with g·representative = representative.
+    pub stabilizer_group_elements: Vec<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,6 +90,10 @@ pub struct CertificateEvidenceV1 {
     pub action_law_checks: usize,
     pub task_semantic_checks: usize,
     pub orbit_member_witnesses: usize,
+    pub stabilizer_membership_checks: usize,
+    pub stabilizer_subgroup_closure_checks: usize,
+    pub stabilizer_witnesses: usize,
+    pub orbit_stabilizer_checks: usize,
     pub complete_domain_cover: bool,
 }
 
@@ -171,6 +177,9 @@ pub enum QuotientErrorV1 {
     BadRepresentative,
     BadWitness,
     BadInverseWitness,
+    BadStabilizerWitness,
+    StabilizerNotSubgroup,
+    OrbitStabilizerMismatch,
     TaskSemanticsMismatch,
     IncompleteOrbit,
     OverlappingOrbit,
@@ -275,10 +284,18 @@ fn preflight(
         .and_then(|value| value.checked_add(ordering_work))
         .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
 
+    // Stabilizers: membership scan (gn), subgroup inverse/product closure
+    // (at most g²n), and one orbit-stabilizer identity per candidate at most.
+    let stabilizer_work = g2n
+        .checked_add(gn)
+        .and_then(|value| value.checked_add(candidate_count))
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+
     let required = group_work
         .checked_add(action_work)
         .and_then(|value| value.checked_add(task_work))
         .and_then(|value| value.checked_add(orbit_work))
+        .and_then(|value| value.checked_add(stabilizer_work))
         .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
     if required > budget.maximum_work_units {
         return Err(QuotientErrorV1::WorkBudgetExceeded);
@@ -513,14 +530,55 @@ fn build_orbits(
             });
         }
         members.sort_by(|a, b| a.candidate_id.cmp(&b.candidate_id));
+        let stabilizer_group_elements = action
+            .permutations
+            .iter()
+            .enumerate()
+            .filter_map(|(element, permutation)| {
+                (permutation[representative] == representative).then_some(element)
+            })
+            .collect();
+
         orbits.push(OrbitV1 {
             representative_index: representative,
             representative_id: problem.candidate_ids[representative].clone(),
             members,
+            stabilizer_group_elements,
         });
     }
     orbits.sort_by(|a, b| a.representative_id.cmp(&b.representative_id));
     orbits
+}
+
+fn stabilizer_evidence_counts(
+    group_order: usize,
+    orbits: &[OrbitV1],
+) -> Result<(usize, usize, usize, usize), QuotientErrorV1> {
+    let orbit_count = orbits.len();
+    let membership_checks = group_order
+        .checked_mul(orbit_count)
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    let mut closure_checks = 0usize;
+    let mut stabilizer_witnesses = 0usize;
+    for orbit in orbits {
+        let stabilizer_order = orbit.stabilizer_group_elements.len();
+        let local_closure_checks = stabilizer_order
+            .checked_mul(stabilizer_order)
+            .and_then(|value| value.checked_add(stabilizer_order))
+            .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+        closure_checks = closure_checks
+            .checked_add(local_closure_checks)
+            .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+        stabilizer_witnesses = stabilizer_witnesses
+            .checked_add(stabilizer_order)
+            .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    }
+    Ok((
+        membership_checks,
+        closure_checks,
+        stabilizer_witnesses,
+        orbit_count,
+    ))
 }
 
 pub fn compile_quotient(
@@ -538,6 +596,12 @@ pub fn compile_quotient(
         Err(violation) => return Ok(CompileOutcomeV1::Blocked(violation)),
     };
     let orbits = build_orbits(problem, action, &validated.group.inverses);
+    let (
+        stabilizer_membership_checks,
+        stabilizer_subgroup_closure_checks,
+        stabilizer_witnesses,
+        orbit_stabilizer_checks,
+    ) = stabilizer_evidence_counts(group_order, &orbits)?;
     Ok(CompileOutcomeV1::Authorized(QuotientCertificateV1 {
         schema_version: 1,
         problem_id: problem.problem_id.clone(),
@@ -552,6 +616,10 @@ pub fn compile_quotient(
             action_law_checks: validated.checks,
             task_semantic_checks: task_checks,
             orbit_member_witnesses: candidate_count,
+            stabilizer_membership_checks,
+            stabilizer_subgroup_closure_checks,
+            stabilizer_witnesses,
+            orbit_stabilizer_checks,
             complete_domain_cover: true,
         },
     }))
@@ -666,16 +734,58 @@ pub fn verify_certificate(
         if expected_members != actual_members {
             return Err(QuotientErrorV1::IncompleteOrbit);
         }
+
+        let expected_stabilizer: Vec<usize> = action
+            .permutations
+            .iter()
+            .enumerate()
+            .filter_map(|(element, permutation)| (permutation[rep] == rep).then_some(element))
+            .collect();
+        if orbit.stabilizer_group_elements != expected_stabilizer {
+            return Err(QuotientErrorV1::BadStabilizerWitness);
+        }
+        let stabilizer_set: BTreeSet<usize> =
+            orbit.stabilizer_group_elements.iter().copied().collect();
+        for element in &orbit.stabilizer_group_elements {
+            if !stabilizer_set.contains(&validated.group.inverses[*element]) {
+                return Err(QuotientErrorV1::StabilizerNotSubgroup);
+            }
+            for other in &orbit.stabilizer_group_elements {
+                let product = action.group.multiplication[*element][*other];
+                if !stabilizer_set.contains(&product) {
+                    return Err(QuotientErrorV1::StabilizerNotSubgroup);
+                }
+            }
+        }
+
+        let orbit_stabilizer_product = orbit
+            .members
+            .len()
+            .checked_mul(orbit.stabilizer_group_elements.len())
+            .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+        if orbit_stabilizer_product != group_order {
+            return Err(QuotientErrorV1::OrbitStabilizerMismatch);
+        }
     }
     if covered.iter().any(|value| !value) || witnessed != candidate_count {
         return Err(QuotientErrorV1::IncompleteDomainCover);
     }
 
+    let (
+        stabilizer_membership_checks,
+        stabilizer_subgroup_closure_checks,
+        stabilizer_witnesses,
+        orbit_stabilizer_checks,
+    ) = stabilizer_evidence_counts(group_order, &certificate.orbits)?;
     let expected_evidence = CertificateEvidenceV1 {
         group_axiom_checks: validated.group.checks,
         action_law_checks: validated.checks,
         task_semantic_checks: task_checks,
         orbit_member_witnesses: candidate_count,
+        stabilizer_membership_checks,
+        stabilizer_subgroup_closure_checks,
+        stabilizer_witnesses,
+        orbit_stabilizer_checks,
         complete_domain_cover: true,
     };
     if certificate.evidence != expected_evidence {
@@ -1110,6 +1220,19 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![4, 8, 4]
         );
+        assert_eq!(
+            certificate
+                .orbits
+                .iter()
+                .map(|orbit| orbit.stabilizer_group_elements.len())
+                .collect::<Vec<_>>(),
+            vec![2, 1, 2]
+        );
+        assert!(
+            certificate.orbits.iter().all(|orbit| {
+                orbit.members.len() * orbit.stabilizer_group_elements.len() == 8
+            })
+        );
         verify_certificate(
             &problem,
             &action,
@@ -1117,6 +1240,21 @@ mod tests {
             QualificationBudgetV1::default(),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn incomplete_stabilizer_witness_is_rejected() {
+        let (problem, action, mut certificate) = authorized_fixture();
+        certificate.orbits[0].stabilizer_group_elements.pop();
+        assert_eq!(
+            verify_certificate(
+                &problem,
+                &action,
+                &certificate,
+                QualificationBudgetV1::default()
+            ),
+            Err(QuotientErrorV1::BadStabilizerWitness)
+        );
     }
 
     #[test]
