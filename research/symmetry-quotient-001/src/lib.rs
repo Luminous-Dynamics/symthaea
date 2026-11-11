@@ -204,6 +204,16 @@ fn nonempty(value: &str) -> bool {
     !value.trim().is_empty()
 }
 
+fn ceil_log2(value: usize) -> usize {
+    if value <= 1 {
+        0
+    } else {
+        usize::BITS as usize - (value - 1).leading_zeros() as usize
+    }
+}
+
+/// Conservative loop/comparison budget for group, action, task, and orbit work.
+/// It includes BTreeSet/sort comparison envelopes, not allocator or wall-clock cost.
 fn preflight(
     group_order: usize,
     candidate_count: usize,
@@ -221,6 +231,7 @@ fn preflight(
     if candidate_count > budget.maximum_candidates {
         return Err(QuotientErrorV1::CandidateCountExceeded);
     }
+
     let g2 = group_order
         .checked_mul(group_order)
         .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
@@ -233,10 +244,38 @@ fn preflight(
     let g2n = g2
         .checked_mul(candidate_count)
         .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
-    let required = g3
-        .checked_add(g2n)
-        .and_then(|v| v.checked_add(gn))
-        .and_then(|v| v.checked_add(candidate_count))
+
+    // Group: Latin rows/columns (2g²), inverse search (<=g²),
+    // associativity (g³), and two-sided identity (2g).
+    let group_work = g3
+        .checked_add(g2.checked_mul(3).ok_or(QuotientErrorV1::ArithmeticOverflow)?)
+        .and_then(|value| value.checked_add(group_order.checked_mul(2)?))
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+
+    // Action: permutation validation (gn), identity action (n), and
+    // composition law (g²n). Task preservation then checks every g*x (gn).
+    let action_work = g2n
+        .checked_add(gn)
+        .and_then(|value| value.checked_add(candidate_count))
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    let task_work = gn;
+
+    // Orbit construction: generator visits, witness lookup, and ordered-set
+    // insertion are bounded by 3gn plus the corresponding logarithmic
+    // comparison envelopes for candidate/orbit ordering.
+    let ordering_work = candidate_count
+        .checked_mul(ceil_log2(candidate_count))
+        .and_then(|value| value.checked_add(gn.checked_mul(ceil_log2(group_order))?))
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    let orbit_work = gn
+        .checked_mul(3)
+        .and_then(|value| value.checked_add(ordering_work))
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+
+    let required = group_work
+        .checked_add(action_work)
+        .and_then(|value| value.checked_add(task_work))
+        .and_then(|value| value.checked_add(orbit_work))
         .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
     if required > budget.maximum_work_units {
         return Err(QuotientErrorV1::WorkBudgetExceeded);
