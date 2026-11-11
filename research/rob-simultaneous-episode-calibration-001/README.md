@@ -15,9 +15,11 @@ The calibration reference therefore:
 4. takes a finite-sample split-conformal order statistic across episodes;
 5. expands every future action/tick interval by the same calibrated amount.
 
-For episode e, candidate action a and tick t, with supplied predicted interval [l,u] and independently observed loss y:
+For episode e, candidate action a and tick t, with predicted interval [l,u] and an independently adjudicated reference expected-loss interval [r-,r+]:
 
-    S_e = max_(t,a) max(0, l-y, y-u)
+    S_e = max_(t,a) max(0, l-r-, r+-u)
+
+The reference target must be an exact finite-oracle expectation or a separately qualified interval that contains the expected task loss. One noisy realized outcome is not sufficient ground truth for an expected-loss predictor.
 
 For n exchangeable complete calibration episodes and miscoverage alpha:
 
