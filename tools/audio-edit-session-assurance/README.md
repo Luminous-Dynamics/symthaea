@@ -17,7 +17,7 @@ The ledger treats each turn as an append-only state transition. Constraints pers
 - EditExecuted binds action/system receipts, exact parent output and new output.
 - ExecutionAttemptFailed retains failed/unsupported/abstained attempts.
 - ObservationAttached binds a decision to one active constraint and exact current output.
-- SessionFinalized binds the final output and active-ledger digest.
+- SessionFinalized binds the final output, active-ledger digest and exact sorted active-constraint ID set; replay checks that set against derived state.
 
 Events are append-only, indexed contiguously and chained through previous-event digests. This crate validates digest syntax, uniqueness and chain continuity; canonical serialization and cryptographic digest recomputation belong to the event producer.
 
