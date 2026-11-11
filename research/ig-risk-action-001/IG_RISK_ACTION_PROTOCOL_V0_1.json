@@ -11,7 +11,7 @@
     "Defer"
   ],
   "utility_equation": "EU(a)=p_a*U_correct-(1-p_a)*C_wrong-C_a",
-  "confidence_target": "post_answer_correctness",
+  "probability_target": "scenario_defined_action_outcome_success",
   "probability_source": "SyntheticScenarioOracle",
   "separation_invariants": [
     "verbal self-reported confidence != calibrated probability",
