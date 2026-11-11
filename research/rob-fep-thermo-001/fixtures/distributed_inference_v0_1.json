@@ -1479,7 +1479,7 @@
         "actuation_authorized": false,
         "whole_system_energy_claim": "not_evaluated",
         "actuation_aoi_gate": "fail",
-        "decision_value_gate": "not_evaluated",
+        "decision_value_gate": "pass",
         "foreground_deadline_gate": "not_evaluated"
       }
     },
