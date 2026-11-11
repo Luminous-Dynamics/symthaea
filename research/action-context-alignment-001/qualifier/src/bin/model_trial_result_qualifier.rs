@@ -73,6 +73,41 @@ fn expected_gate(fixture: &Value) -> &'static str {
     }
 }
 
+fn write_canonical_json(value: &Value, output: &mut Vec<u8>) -> Result<(), String> {
+    match value {
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {
+            serde_json::to_writer(output, value)
+                .map_err(|error| format!("canonical JSON scalar serialization failed: {error}"))?;
+        }
+        Value::Array(items) => {
+            output.push(b'[');
+            for (index, item) in items.iter().enumerate() {
+                if index > 0 {
+                    output.push(b',');
+                }
+                write_canonical_json(item, output)?;
+            }
+            output.push(b']');
+        }
+        Value::Object(fields) => {
+            let mut keys = fields.keys().collect::<Vec<_>>();
+            keys.sort_unstable();
+            output.push(b'{');
+            for (index, key) in keys.iter().enumerate() {
+                if index > 0 {
+                    output.push(b',');
+                }
+                serde_json::to_writer(&mut *output, key)
+                    .map_err(|error| format!("canonical JSON key serialization failed: {error}"))?;
+                output.push(b':');
+                write_canonical_json(&fields[*key], output)?;
+            }
+            output.push(b'}');
+        }
+    }
+    Ok(())
+}
+
 fn policy_input_sha256(fixture: &Value) -> Result<String, String> {
     let mut projection = serde_json::Map::new();
     for key in ["task", "authority_context", "runtime_context"] {
@@ -81,8 +116,8 @@ fn policy_input_sha256(fixture: &Value) -> Result<String, String> {
             .ok_or_else(|| format!("policy input is missing {key}"))?;
         projection.insert(key.to_string(), value.clone());
     }
-    let canonical_bytes = serde_json::to_vec(&Value::Object(projection))
-        .map_err(|error| format!("policy input canonical JSON failed: {error}"))?;
+    let mut canonical_bytes = Vec::new();
+    write_canonical_json(&Value::Object(projection), &mut canonical_bytes)?;
     Ok(format!("{:x}", Sha256::digest(canonical_bytes)))
 }
 
@@ -465,6 +500,14 @@ mod tests {
     }
 
     #[test]
+    fn sha256_implementation_matches_published_known_answer() {
+        assert_eq!(
+            format!("{:x}", Sha256::digest(b"abc")),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
     fn golden_policy_input_hashes_match_exact_three_object_projection() {
         let result = parsed(RESULTS);
         let fixtures = parsed(FIXTURES);
@@ -478,6 +521,18 @@ mod tests {
             text(case, "policy_input_sha256"),
             Some(policy_input_sha256(fixture).expect("projection hash").as_str())
         );
+    }
+
+    #[test]
+    fn changed_policy_visible_fixture_input_is_rejected() {
+        let result = parsed(RESULTS);
+        let mut fixtures = parsed(FIXTURES);
+        let fixture = fixtures["fixtures"].as_array_mut().unwrap().iter_mut()
+            .find(|item| text(item, "fixture_id") == Some("ACA-RUNTIME-TOOL-FAILURE-01-STOP"))
+            .unwrap();
+        fixture["runtime_context"]["observation_text"] =
+            Value::String("A substituted observation that was not present in the hashed model input.".into());
+        assert!(validate_result(&result, &fixtures).is_err());
     }
 
     #[test]
