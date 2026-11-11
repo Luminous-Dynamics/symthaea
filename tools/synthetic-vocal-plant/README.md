@@ -111,3 +111,6 @@ A separate confirmatory phrase is then used for one unseen probe per control. Ev
 The fitted matrix may still be **not promotable**. That is a valid result: it exposes model inadequacy instead of weakening a tolerance or forcing a correction. The profile is local to the exact legacy renderer, sample rate and analyzer versions; it must not be reused for another backend or extrapolated outside its measured trust radii.
 
 This module prepares VCCA's inputs but does not duplicate its candidate-ranking algorithm. Every resulting VCCA action remains PROPOSAL_ONLY and requires capability admission plus fresh post-render measurement.
+
+
+The compiler separately checks whether each advertised control produced a positive response in its designated target metric. An ignored or wrong-direction control is marked unsupported in the VCCA adapter, with zero-only action bounds, and prevents profile promotion. A complete-looking matrix cannot make an ineffective renderer control appear supported.
