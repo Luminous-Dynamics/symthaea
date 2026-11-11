@@ -2573,6 +2573,236 @@ mod tests {
         ]
     }
 
+
+    fn rotational_vector_field() -> Vec<Expr> {
+        vec![
+            mul(Expr::Const(-1.0), var("y")),
+            var("x"),
+        ]
+    }
+
+    fn radial_rotation_vector_field() -> Vec<Expr> {
+        let radial_squared = add(pow2("x"), pow2("y"));
+        let radial_scale = Expr::Func(UnaryFn::Sin, Box::new(radial_squared));
+        vec![
+            mul(Expr::Const(-1.0), mul(radial_scale.clone(), var("y"))),
+            mul(radial_scale, var("x")),
+        ]
+    }
+
+    #[test]
+    fn vector_field_equivariance_accepts_linear_and_radially_scaled_rotation_fields() {
+        for vector_field in [
+            rotational_vector_field(),
+            radial_rotation_vector_field(),
+        ] {
+            let report = evaluate_metric_aware_vector_field_equivariance(
+                &vector_field,
+                &metric_aware_so2_action(),
+                &metric_sample_states(),
+                &[],
+                MetricAwareVectorFieldEquivarianceProfileV1::default(),
+            )
+            .unwrap();
+
+            assert!(report.equivariant_under_every_generator());
+            assert_eq!(report.generator_results[0].invalid_sample_count, 0);
+            assert_eq!(
+                report.generator_results[0].informative_sample_count,
+                metric_sample_states().len()
+            );
+            assert!(report.generator_results[0].maximum_relative_defect < 1.0e-14);
+        }
+    }
+
+    #[test]
+    fn vector_field_equivariance_rejects_anisotropic_dynamics() {
+        let vector_field = vec![
+            mul(Expr::Const(2.0), var("x")),
+            var("y"),
+        ];
+        let report = evaluate_metric_aware_vector_field_equivariance(
+            &vector_field,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareVectorFieldEquivarianceProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(!report.equivariant_under_every_generator());
+        assert!(report.generator_results[0].maximum_relative_defect > 1.0e-2);
+    }
+
+    #[test]
+    fn vector_field_equivariance_is_covariant_under_nonorthogonal_coordinate_change() {
+        // D = [[1,1],[0,1]], A' = D A D^-1, G' = D^-T G D^-1.
+        // F = sin(x²+y²) Jx becomes F' = sin(X²-2XY+2Y²) A'X.
+        let transform = nalgebra::Matrix2::new(1.0, 1.0, 0.0, 1.0);
+        let inverse = transform.try_inverse().unwrap();
+        let generator = nalgebra::Matrix2::new(0.0, -1.0, 1.0, 0.0);
+        let transformed_generator = transform * generator * inverse;
+        let transformed_metric = inverse.transpose() * inverse;
+        let transformed_action = crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "sample-so2-sheared-vector-field".to_string(),
+            coordinate_basis_id: "XY".to_string(),
+            coordinate_names: vec!["X".to_string(), "Y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: transformed_metric
+                .row_iter()
+                .map(|row| row.iter().copied().collect())
+                .collect(),
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "J-prime".to_string(),
+                matrix: transformed_generator
+                    .row_iter()
+                    .map(|row| row.iter().copied().collect())
+                    .collect(),
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+
+        let base_states = metric_sample_states();
+        let transformed_states: Vec<Vec<f64>> = base_states
+            .iter()
+            .map(|state| {
+                let transformed = transform * nalgebra::Vector2::new(state[0], state[1]);
+                vec![transformed[0], transformed[1]]
+            })
+            .collect();
+
+        let base = evaluate_metric_aware_vector_field_equivariance(
+            &radial_rotation_vector_field(),
+            &metric_aware_so2_action(),
+            &base_states,
+            &[],
+            MetricAwareVectorFieldEquivarianceProfileV1::default(),
+        )
+        .unwrap();
+
+        let radial_form = sub(
+            add(pow2("X"), mul(Expr::Const(2.0), pow2("Y"))),
+            mul(Expr::Const(2.0), mul(var("X"), var("Y"))),
+        );
+        let radial_scale = Expr::Func(UnaryFn::Sin, Box::new(radial_form));
+        let transformed_field = vec![
+            mul(
+                radial_scale.clone(),
+                sub(var("X"), mul(Expr::Const(2.0), var("Y"))),
+            ),
+            mul(radial_scale, sub(var("X"), var("Y"))),
+        ];
+        let transformed = evaluate_metric_aware_vector_field_equivariance(
+            &transformed_field,
+            &transformed_action,
+            &transformed_states,
+            &[],
+            MetricAwareVectorFieldEquivarianceProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(base.equivariant_under_every_generator());
+        assert!(transformed.equivariant_under_every_generator());
+        assert!(
+            (base.generator_results[0].maximum_relative_defect
+                - transformed.generator_results[0].maximum_relative_defect)
+                .abs()
+                < 1.0e-12
+        );
+        for (base_sample, transformed_sample) in base.generator_results[0]
+            .sample_relative_defects
+            .iter()
+            .zip(&transformed.generator_results[0].sample_relative_defects)
+        {
+            assert!((base_sample.unwrap() - transformed_sample.unwrap()).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn vector_field_equivariance_holds_with_fixed_parameters() {
+        let vector_field = vec![
+            mul(Expr::Const(-1.0), mul(var("rate"), var("y"))),
+            mul(var("rate"), var("x")),
+        ];
+        let report = evaluate_metric_aware_vector_field_equivariance(
+            &vector_field,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[("rate", 2.5)],
+            MetricAwareVectorFieldEquivarianceProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.fixed_bindings, vec![("rate".to_string(), 2.5)]);
+    }
+
+    #[test]
+    fn vector_field_equivariance_abstains_on_zero_fields_and_invalid_domains() {
+        let zero_field = vec![Expr::Const(0.0), Expr::Const(0.0)];
+        let zero_report = evaluate_metric_aware_vector_field_equivariance(
+            &zero_field,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareVectorFieldEquivarianceProfileV1::default(),
+        )
+        .unwrap();
+        assert!(!zero_report.equivariant_under_every_generator());
+        assert_eq!(
+            zero_report.generator_results[0].uninformative_sample_count,
+            metric_sample_states().len()
+        );
+
+        let invalid_field = vec![
+            Expr::Func(UnaryFn::Sqrt, Box::new(var("x"))),
+            var("y"),
+        ];
+        let invalid_report = evaluate_metric_aware_vector_field_equivariance(
+            &invalid_field,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareVectorFieldEquivarianceProfileV1::default(),
+        )
+        .unwrap();
+        assert!(!invalid_report.equivariant_under_every_generator());
+        assert_eq!(invalid_report.generator_results[0].invalid_sample_count, 1);
+    }
+
+    #[test]
+    fn vector_field_equivariance_rejects_unsupported_inputs_and_dimension_mismatches() {
+        let unsupported = vec![
+            Expr::Func(UnaryFn::Abs, Box::new(var("x"))),
+            var("y"),
+        ];
+        assert_eq!(
+            evaluate_metric_aware_vector_field_equivariance(
+                &unsupported,
+                &metric_aware_so2_action(),
+                &metric_sample_states(),
+                &[],
+                MetricAwareVectorFieldEquivarianceProfileV1::default(),
+            ),
+            Err(MetricAwareVectorFieldEquivarianceErrorV1::UnsupportedExpression)
+        );
+
+        assert_eq!(
+            evaluate_metric_aware_vector_field_equivariance(
+                &[var("x")],
+                &metric_aware_so2_action(),
+                &metric_sample_states(),
+                &[],
+                MetricAwareVectorFieldEquivarianceProfileV1::default(),
+            ),
+            Err(MetricAwareVectorFieldEquivarianceErrorV1::VectorFieldDimensionMismatch {
+                expected: 2,
+                actual: 1,
+            })
+        );
+    }
+
     #[test]
     fn metric_aware_sampler_accepts_exact_radial_invariant_and_retains_receipt() {
         let report = evaluate_metric_aware_linear_action_samples(
