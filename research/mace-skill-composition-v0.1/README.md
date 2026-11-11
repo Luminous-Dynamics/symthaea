@@ -38,7 +38,7 @@ go run . < example-request.json
 
 Exit 0 means the structured request passed this reference contract; exit 1 means policy rejection; exit 2 means malformed input.
 
-The public branch currently contains 12 named Go test functions, including a generated two-step label/read oracle test and four sink/capability-binding regressions. Earlier local archive/test-count claims conflict; see `RESULTS.md` for the unresolved archive identity and exact-head verification status. Do not treat historical local results as verification of the latest branch head.
+The public branch currently contains 13 named Go test functions, including a generated two-step label/read oracle test and four sink/capability-binding regressions. Earlier local archive/test-count claims conflict; see `RESULTS.md` for the unresolved archive identity and exact-head verification status. Do not treat historical local results as verification of the latest branch head.
 
 ## Important limits
 
