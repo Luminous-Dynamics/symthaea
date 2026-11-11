@@ -1455,7 +1455,8 @@ mod tests {
                 .find(|case| case.case_id == case_id)
                 .expect("negative control case");
             assert!(!case.accepted);
-            assert!(case.plan.is_none());
+            assert!(!case.errors.is_empty());
+            assert!(case.summary.is_none());
         }
     }
 
