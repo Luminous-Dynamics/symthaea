@@ -545,6 +545,26 @@ mod tests {
     }
 
     #[test]
+    fn eig_trace_score_is_not_reduced_by_utility_cost() {
+        let mut payload = proposal();
+        payload["selector"] = Value::String("EIG".into());
+        payload["predicted_eig_bits"] = json!(0.24);
+        payload["predicted_evsi"] = json!(0.18);
+        payload["predicted_risk"] = json!(0.01);
+        payload["risk_aversion_coefficient"] = json!(1.0);
+        payload["predicted_cost"] = json!(100.0);
+        payload["predicted_selection_score"] = json!(0.24);
+        let first = event(
+            "event-0",
+            0,
+            "experiment_proposal",
+            GENESIS_SHA256,
+            payload,
+        );
+        assert!(validate_trace(&trace(vec![first])).is_ok());
+    }
+
+    #[test]
     fn inconsistent_predicted_selection_score_is_rejected() {
         let mut payload = proposal();
         payload["predicted_selection_score"] = json!(0.42);
