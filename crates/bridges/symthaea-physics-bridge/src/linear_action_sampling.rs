@@ -630,7 +630,7 @@ fn finite_difference_gradient(
     let observed = if raw_differences.iter().all(|value| value.is_finite()) {
         raw_differences
     } else if expression_value_scale == 0.0 {
-        vec![0.0_f64; dimension]
+        vec![0.0_f64; direction_count]
     } else {
         function_pairs
             .iter()
@@ -641,7 +641,7 @@ fn finite_difference_gradient(
         .iter()
         .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
     let normalized_observed: Vec<f64> = if observed_scale == 0.0 {
-        vec![0.0_f64; dimension]
+        vec![0.0_f64; direction_count]
     } else {
         observed.iter().map(|value| value / observed_scale).collect()
     };
@@ -1822,6 +1822,33 @@ mod tests {
                 profile
             ),
             Err(LinearActionSamplingErrorV1::GradientReconstructionResidualExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn overcomplete_zero_gradient_remains_uninformative() {
+        let sample = LinearActionSampleV1 {
+            sample_id: "overcomplete-constant".to_string(),
+            state: vec![1.0, 2.0],
+            direction_basis: vec![
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![1.0, 1.0],
+            ],
+        };
+        let profile = LinearActionSamplingProfileV1 {
+            maximum_samples: 1,
+            minimum_informative_samples: 1,
+            ..sampling_profile()
+        };
+        assert!(matches!(
+            evaluate_linear_action_samples(
+                &Expr::Const(3.0),
+                &canonical_action(),
+                &[sample],
+                profile
+            ),
+            Err(LinearActionSamplingErrorV1::InsufficientInformativeSamples { .. })
         ));
     }
 
