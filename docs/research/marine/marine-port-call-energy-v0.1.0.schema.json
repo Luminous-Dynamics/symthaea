@@ -139,7 +139,15 @@
         "frequency_hz",
         "phase_count",
         "ship_max_input_power_w",
-        "berth_connection_limit_w"
+        "berth_connection_limit_w",
+        "ship_connector_standard",
+        "berth_connector_standard",
+        "ship_voltage_v",
+        "berth_voltage_v",
+        "ship_frequency_hz",
+        "berth_frequency_hz",
+        "ship_phase_count",
+        "berth_phase_count"
       ],
       "properties": {
         "compatibility": {
@@ -183,6 +191,38 @@
         "berth_connection_limit_w": {
           "type": "integer",
           "minimum": 0
+        },
+        "ship_connector_standard": {
+          "type": "string",
+          "minLength": 1
+        },
+        "berth_connector_standard": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ship_voltage_v": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "berth_voltage_v": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ship_frequency_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "berth_frequency_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ship_phase_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "berth_phase_count": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
