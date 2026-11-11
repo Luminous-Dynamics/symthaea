@@ -576,6 +576,7 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
             AudioClockAlignmentStatusV1::NoPositiveEvidence,
             &expected_onsets,
             u32::try_from(matched_counts[best_index]).unwrap_or(u32::MAX),
+            Some(lags[best_index]),
             Some(best_score),
         )
         .map_err(|issue| vec![issue]);
@@ -729,8 +730,13 @@ pub fn validate_audio_clock_alignment_profile_v1(
     };
     let has_accepted_offset = profile.audio_minus_midi_offset_frames.is_some()
         && profile.audio_minus_midi_offset_ms.is_some();
+    let offset_fields_mismatch = profile.audio_minus_midi_offset_frames.is_some()
+        != profile.audio_minus_midi_offset_ms.is_some();
     let candidate_diagnostics_valid = profile.best_candidate_offset_frames.is_some()
         && profile.best_peak_score.is_some_and(|value| value.is_finite() && value > 1e-12)
+        && profile.competing_peak_score.is_some()
+        && profile.peak_margin.is_some()
+        && profile.competing_peak_ratio.is_some()
         && finite_nonnegative(profile.competing_peak_score)
         && finite_nonnegative(profile.peak_margin)
         && finite_nonnegative(profile.competing_peak_ratio)
@@ -743,6 +749,7 @@ pub fn validate_audio_clock_alignment_profile_v1(
         AudioClockAlignmentStatusV1::Candidate
         | AudioClockAlignmentStatusV1::AmbiguousCandidate => {
             if !has_accepted_offset
+                || offset_fields_mismatch
                 || !candidate_diagnostics_valid
                 || profile.best_candidate_offset_frames != profile.audio_minus_midi_offset_frames
                 || profile.audio_minus_midi_offset_ms.is_some_and(|milliseconds| {
@@ -764,6 +771,7 @@ pub fn validate_audio_clock_alignment_profile_v1(
         }
         AudioClockAlignmentStatusV1::SearchBoundaryCandidate => {
             if has_accepted_offset
+                || offset_fields_mismatch
                 || profile.best_candidate_offset_frames.is_none()
                 || !candidate_diagnostics_valid
             {
@@ -774,6 +782,8 @@ pub fn validate_audio_clock_alignment_profile_v1(
         }
         AudioClockAlignmentStatusV1::InsufficientOnsetDiversity => {
             if has_accepted_offset
+                || offset_fields_mismatch
+                || profile.best_candidate_offset_frames.is_some()
                 || profile.unique_expected_onset_count >= u32::from(profile.config.minimum_unique_onsets)
             {
                 issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
@@ -783,6 +793,7 @@ pub fn validate_audio_clock_alignment_profile_v1(
         }
         AudioClockAlignmentStatusV1::InsufficientAudioCoverage => {
             if has_accepted_offset
+                || offset_fields_mismatch
                 || profile.matched_expected_onset_count >= u32::from(profile.config.minimum_unique_onsets)
                 || profile.best_candidate_offset_frames.is_none()
                 || !finite_nonnegative(profile.best_peak_score)
@@ -794,7 +805,9 @@ pub fn validate_audio_clock_alignment_profile_v1(
         }
         AudioClockAlignmentStatusV1::NoPositiveEvidence => {
             if has_accepted_offset
-                || profile.best_peak_score.is_none_or(|value| !value.is_finite() || value <= 1e-12)
+                || offset_fields_mismatch
+                || profile.best_candidate_offset_frames.is_none()
+                || profile.best_peak_score.is_none_or(|value| !value.is_finite() || value > 1e-12)
             {
                 issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
                     field: "no_positive_evidence".into(),
