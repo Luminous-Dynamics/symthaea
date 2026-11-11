@@ -415,14 +415,14 @@ pub fn plan_retention(
                 ));
             }
             if let Some(first) = qualified_scale {
-                if first != loss_scale_id {
+                if first != loss_scale_id.as_str() {
                     return Err(RetentionError::IncomparableLossScales {
                         first: first.to_owned(),
                         other: loss_scale_id.clone(),
                     });
                 }
             } else {
-                qualified_scale = Some(loss_scale_id);
+                qualified_scale = Some(loss_scale_id.as_str());
             }
         }
         used = used
