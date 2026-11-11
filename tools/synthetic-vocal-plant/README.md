@@ -71,3 +71,23 @@ A passing result establishes only deterministic behavior of this generated fixtu
 - operation of the Series 23 physical articulatory backend.
 
 The next integration step is to export the measurements using the exact metric IDs, units, calibration receipts and provenance fields expected by VCRB-001, VIA-001, VCCR-001, VMEA-001 and VELB-001. It must not create a duplicate evaluator or allow the fixture generator to self-certify the analyzer.
+
+
+## Independent acoustic observations — SYNTH-OBS-001
+
+The CLI also writes a second, independently versioned observation bundle:
+
+- `observations.jsonl`: per-case/per-segment F0, F1–F3, relative energy and voicing-coverage measurements.
+- `calibration.json`: deterministic no-op repeatability report from a separate calibration parameter family.
+- `observer-manifest.json` and `observer-manifest.sha256`: analyzer identities/versions, extraction configuration digest, PCM/observation/calibration artifact digests, synthetic-only flags and split identities.
+
+Two separate PCM-only F0 paths are retained:
+
+1. `synthetic-vocal-plant.autocorrelation-f0` — this tool's normalized-autocorrelation implementation.
+2. `symthaea_vocal_tract::formant_extraction::extract_formant_frames` — the existing vocal-tract crate's LPC/autocorrelation extraction path, which also supplies F1–F3, relative energy and voicing.
+
+The observers are not averaged. Their cents disagreement is retained as a diagnostic, with a 50-cent alert threshold. If one or both observers cannot produce a valid F0, the report records that explicitly. An absent F0 or formant value is `INDETERMINATE`, not zero and not a pass.
+
+All metric observations bind a stable metric ID, unit, analyzer ID/version, exact PCM digest, sample window and eligible frame count. The VCRB adapter exports only observations marked `Observed`; it does not duplicate VCRB's control-response evaluation logic.
+
+Calibration uses a separately named and parameterized synthetic family. The report records exact PCM repeatability and per-metric maximum absolute repeat deltas. This deterministic calibration is a measurement-pipeline check; it is not statistical calibration for stochastic neural renderers.
