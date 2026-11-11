@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ev_mission_outcome_trust_v0_1",
+  "title": "EV mission outcome trust manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "trust_manifest_version",
+    "trusted_authorities"
+  ],
+  "properties": {
+    "trust_manifest_version": {
+      "const": "ev-mission-outcome-trust/0.1"
+    },
+    "trusted_authorities": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "authority_ref",
+          "role",
+          "public_key_hex",
+          "valid_from_ms",
+          "valid_until_ms"
+        ],
+        "properties": {
+          "authority_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "const": "INDEPENDENT_TEST_AUTHORITY"
+          },
+          "public_key_hex": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "valid_from_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "valid_until_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}
