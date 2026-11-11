@@ -584,7 +584,7 @@ mod tests {
         let mut result = parsed(RESULTS);
         result["results"].as_array_mut().unwrap().pop();
         result["result_count"] = Value::from(59);
-        assert!(validate_result(&result, &parsed(FIXTURES)).is_err());
+        assert!(validate_test_result(&result, &parsed(FIXTURES), FIXTURES.as_bytes()).is_err());
     }
 
     #[test]
@@ -608,7 +608,7 @@ mod tests {
         case["effect_witness"]["status"] = Value::String("SIMULATED_APPLIED".into());
         case["effect_witness"]["after_state_sha256"] = Value::String("f".repeat(64));
         case["effect_witness"]["effect_receipt_sha256"] = Value::String("e".repeat(64));
-        assert!(validate_result(&result, &fixtures).is_err());
+        assert!(validate_test_result(&result, &fixtures, FIXTURES.as_bytes()).is_err());
     }
 
     #[test]
