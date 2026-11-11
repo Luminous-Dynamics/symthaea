@@ -526,6 +526,19 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
         .map_err(|issue| vec![issue]);
     }
     let best_score = scores[best_index];
+    if best_score <= 1e-12 {
+        return profile_with_no_estimate(
+            midi,
+            wav_bytes,
+            wav.info,
+            config,
+            AudioClockAlignmentStatusV1::NoPositiveEvidence,
+            &expected_onsets,
+            u32::try_from(matched_counts[best_index]).unwrap_or(u32::MAX),
+            Some(best_score),
+        )
+        .map_err(|issue| vec![issue]);
+    }
     let competing_score = scores
         .iter()
         .enumerate()
@@ -562,9 +575,7 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
 
     let ambiguity_threshold =
         f64::from(config.ambiguity_ratio_basis_points) / 10_000.0;
-    let status = if best_score <= 1e-12 {
-        AudioClockAlignmentStatusV1::NoPositiveEvidence
-    } else if ratio.is_some_and(|value| value >= ambiguity_threshold) {
+    let status = if ratio.is_some_and(|value| value >= ambiguity_threshold) {
         AudioClockAlignmentStatusV1::AmbiguousCandidate
     } else {
         AudioClockAlignmentStatusV1::Candidate
@@ -878,6 +889,8 @@ mod tests {
             profile.status,
             AudioClockAlignmentStatusV1::NoPositiveEvidence
         );
+        assert_eq!(profile.best_peak_score, Some(0.0));
+        assert!(profile.support_start_frames.is_none());
         assert!(profile.audio_minus_midi_offset_frames.is_none());
     }
 
