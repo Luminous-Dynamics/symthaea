@@ -434,3 +434,6 @@ A profile can be generated while remaining `promotable=false`. That is a fail-cl
 ### Current source and evidence state
 
 The stacked branch now includes the original plant, two independent PCM observation paths, a no-op calibration report, metric-level VCRB-shaped observations, a response-profile compiler and a VCCA-shaped profile adapter. Total authored test count is 30 across the three slices. Rust execution remains pending until exact-head CI runs; no compilation, test, Clippy or generated-WAV pass is claimed from the local authoring environment.
+
+
+A further fail-closed support gate checks that each declared control produces a positive response in its designated target metric (pitch→measured F0, formant scale→measured F1, energy→measured relative RMS). If the renderer accepts but ignores a control, its VCCA adapter entry is marked unsupported with zero-only bounds and the whole response profile cannot be promoted. Matrix completeness alone is not treated as proof that a control works.
