@@ -1138,6 +1138,10 @@ pub fn midi_transcription_evaluation_commitment_v1(
         full_note_metrics: &report.full_note_metrics,
         exact_program_onset_metrics: &report.exact_program_onset_metrics,
         exact_program_full_note_metrics: &report.exact_program_full_note_metrics,
+        velocity_aware_full_note_metrics: &report.velocity_aware_full_note_metrics,
+        frame_pitch_metrics: &report.frame_pitch_metrics,
+        frame_program_pitch_metrics: &report.frame_program_pitch_metrics,
+        frame_step_ms: report.frame_step_ms,
         onset_error_ms: &report.onset_error_ms,
         velocity_error: &report.velocity_error,
         offset_error_ms: &report.offset_error_ms,
@@ -1149,9 +1153,9 @@ pub fn midi_transcription_evaluation_commitment_v1(
 }
 
 /// Evaluate a model-produced MIDI file against the exact part-aware MIDI
-/// reference. If a validated clock profile is supplied, raw metrics remain
-/// untouched and an additional global time correction is applied to the
-/// predicted events only when the profile status is an unambiguous Candidate.
+/// reference. Prediction timestamps are interpreted in the reference score's
+/// MIDI clock domain; use the separate clock-alignment stage before evaluation
+/// when the source WAV has a known global render offset.
 pub fn evaluate_midi_transcription_v1(
     prediction_midi_bytes: &[u8],
     reference: &MidiPerformanceArtifactV1,
