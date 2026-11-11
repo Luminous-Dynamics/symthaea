@@ -89,7 +89,6 @@ func TestCrossSkillConflictBlocksComposition(t *testing.T) {
 	s2 := x.Skills[0]
 	s2.ID = "s2"
 	s2.Conflicts = []string{"s1"}
-	x.Skills[0].Conflicts = []string{"s2"}
 	x.Skills = append(x.Skills, s2)
 	x.Plan.Steps = append(x.Plan.Steps, Step{
 		ID: "st2", SkillID: "s2", Inputs: []string{"o1"}, OutputID: "o2",
@@ -105,7 +104,6 @@ func TestCanonicalReportIsStableAcrossRepeatedRuns(t *testing.T) {
 	s2 := x.Skills[0]
 	s2.ID = "s2"
 	s2.Conflicts = []string{"s1"}
-	x.Skills[0].Conflicts = []string{"s2"}
 	x.Skills = append(x.Skills, s2)
 	x.Plan.Steps = append(x.Plan.Steps, Step{
 		ID: "st2", SkillID: "s2", Inputs: []string{"o1"}, OutputID: "o2",
