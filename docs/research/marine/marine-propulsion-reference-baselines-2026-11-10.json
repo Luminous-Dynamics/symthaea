@@ -1887,6 +1887,123 @@
         "Treating draft ISSM as binding law",
         "Declaring compliance from a research manoeuvring benchmark"
       ]
+    },
+    {
+      "source_id": "JMSE-MEASUREMENT-IDENTIFIABILITY-2026-1940",
+      "title": "Measurement Adequacy and Parameter Identifiability Before Calibration of a Physics-Informed Ship-Performance Model: A Methodological Case Study on Four Tanker Voyages",
+      "publisher": "Journal of Marine Science and Engineering",
+      "publication_date": "2026-10-17",
+      "url": "https://doi.org/10.3390/jmse14201940",
+      "evidence_class": "peer_reviewed_methodological_case_study_with_processed_CC_BY_4_0_reproduction_package",
+      "scope": {
+        "records": 207,
+        "voyages": 4,
+        "vessels": 1,
+        "measurement_audit": "Before-calibration audit of onboard performance-monitoring channels; underlying acquisition architecture not documented.",
+        "method": [
+          "exact algebraic dependence tests among speed/current/distance fields",
+          "five-test measurement screening",
+          "structural sensitivity matrix rank analysis",
+          "practical identifiability and conditioning",
+          "prospective scalar correction with frozen adaptation window"
+        ],
+        "reported_findings": {
+          "five_parameter_model_structural_sensitivity_rank_upper_bound": 2,
+          "practically_identifiable_parameters_on_reported_records": 1,
+          "scalar_kappa_interpretation": "ratio of reconstructed main-engine fuel to reported power at nominal specific consumption; not a physical efficiency or independently identified hull/engine state",
+          "remaining_route_fuel_prediction_percent_range": "-5.67 to +0.70",
+          "sensitivity_range_across_fuel_fields_and_freeze_points_percent": "-8.5 to +2.1"
+        },
+        "reproduction_package": {
+          "zenodo_doi": "10.5281/zenodo.23235788",
+          "license": "CC BY 4.0",
+          "contents": [
+            "processed 207-record CSV",
+            "traceability workbook",
+            "analysis code",
+            "checksums",
+            "verification scripts",
+            "archived outputs"
+          ]
+        },
+        "proprietary_inputs": "Original commercial workbook and sailing-leg performance pages are not distributed."
+      },
+      "limitations": [
+        "One tanker and four voyages; no cargo/WAPS generalization is established.",
+        "The underlying sensor types, manufacturers, calibration, sampling, filtering and manual-entry status are undocumented.",
+        "The paper's scalar correction κ must not be interpreted as physical efficiency or independent vessel-condition state.",
+        "Route-total agreement is not proof of segment-level physical identifiability.",
+        "The study's rank bound is specific to its observation model and parameterization; do not generalize the same rank deficiency to other models."
+      ],
+      "eligible_use": [
+        "reproduce pre-calibration measurement adequacy screening",
+        "structural and practical identifiability benchmark",
+        "prospective adaptation leakage controls",
+        "synthetic measurement-portfolio/VOI tests"
+      ],
+      "ineligible_use": [
+        "unverified cargo-vessel performance labels",
+        "WAPS saving claims",
+        "claim that every ship-performance model has rank at most two"
+      ]
+    },
+    {
+      "source_id": "CIMAC-HYBRID-MONITORING-GUIDELINE-2021",
+      "title": "Monitoring Systems for Marine Hybrid Propulsion Systems",
+      "publisher": "CIMAC Working Group 20 — System Integration",
+      "publication_date": "2021-11",
+      "url": "https://www.cimac.com/cms/upload/Publication_Press/WG_Publications/CIMAC_WG20_Guideline_Monitoring_Systems_for_Marine_Hybrid_Propulsion_Systems_Nov_2021.pdf",
+      "evidence_class": "industry_monitoring_guideline",
+      "scope": {
+        "focus": "Monitoring-system implementation for marine hybrid propulsion systems, data integration, quality assurance, reliability and reporting.",
+        "data_quality_dimensions": [
+          "syntactic quality",
+          "semantic quality",
+          "pragmatic quality"
+        ],
+        "relevance": "Supports a decision-oriented measurement contract and hybrid-system monitoring architecture."
+      },
+      "limitations": [
+        "Guideline provides information and recommendations, not a vessel-specific monitoring-system design or certification.",
+        "It does not calculate the marginal economic value of a sensor portfolio."
+      ],
+      "eligible_use": [
+        "monitoring architecture requirements",
+        "data quality taxonomy",
+        "hybrid system interface and reporting design"
+      ],
+      "ineligible_use": [
+        "claim that any sensor deployment meets class/flag requirements"
+      ]
+    },
+    {
+      "source_id": "MARINE-FUEL-METROLOGY-2024-114161",
+      "title": "Metrology for reliable fuel consumption measurements in the maritime sector",
+      "publisher": "Measurement",
+      "publication_date": "2024-02-28",
+      "url": "https://doi.org/10.1016/j.measurement.2024.114161",
+      "evidence_class": "peer_reviewed_marine_fuel_meter_metrology",
+      "scope": {
+        "method": "Dynamic flow-meter calibration test profile and evaluation criteria for maritime applications.",
+        "findings": [
+          "proposes a dynamic flow-meter calibration profile",
+          "demonstrates implementation on a conventional test rig",
+          "assesses a spindle screw meter",
+          "shows that flow-meter housing can affect measurement performance"
+        ]
+      },
+      "limitations": [
+        "Specific test-rig and meter configuration; do not transfer accuracy claims to untested ship installations.",
+        "Does not independently validate a vessel's installed fuel-flow system."
+      ],
+      "eligible_use": [
+        "fuel flow meter test planning",
+        "dynamic calibration protocol design",
+        "measurement uncertainty budgeting"
+      ],
+      "ineligible_use": [
+        "assume installed meters are accurate without calibration and installation evidence"
+      ]
     }
   ]
 }
