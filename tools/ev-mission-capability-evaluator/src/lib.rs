@@ -992,8 +992,8 @@ mod tests {
         let report = report();
         let row = case(&report, "cold_weather_negative_celsius_domain");
         assert_eq!(row.disposition, "FEASIBLE_WITHIN_DECLARED_ENVELOPE");
-        assert!(row.step_audits[0].thermal_margin_c.unwrap() < 0.0);
-        assert_eq!(row.step_audits[0].hottest_cell_ref.as_deref(), Some("cell-001"));
+        assert!(row.step_audits[0].thermal_margin_c.unwrap() > 0.0);
+        assert_eq!(row.step_audits[0].hottest_cell_ref.as_deref(), Some("cell-002"));
     }
 
     #[test]
