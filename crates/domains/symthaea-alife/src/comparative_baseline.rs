@@ -342,7 +342,10 @@ impl ComparativeBaselineModel {
             ));
         }
 
-        let degrees_of_freedom = total_controls.saturating_sub(by_system.len());
+        // One fitted common slope plus one fitted mean per system consume degrees
+        // of freedom; measurement uncertainty is then subtracted from the residual
+        // variance estimate below.
+        let degrees_of_freedom = total_controls.saturating_sub(by_system.len() + 1);
         let observed_within_variance = if degrees_of_freedom > 0 {
             within_sse / degrees_of_freedom as f64
         } else {
