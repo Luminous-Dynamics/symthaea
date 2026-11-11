@@ -38,4 +38,6 @@ jobs:
           cargo run --manifest-path research/aced-adapter-001/qualifier/Cargo.toml --bin aced-query-index-qualifier -- \
             research/aced-adapter-001/upstream/aced_query_world_inventory.json \
             research/aced-adapter-001/ACED_QUERY_SOURCE_MANIFEST_V0_1.json \
-            research/aced-adapter-001/upstream/SHA256SUMS
+            research/aced-adapter-001/upstream/SHA256SUMS \
+            research/aced-adapter-001/ACED_QUERY_COMPARISON_PROTOCOL_V0_1.json \
+            research/aced-adapter-001/ACED_QUERY_COMPARISON_PROTOCOL_V0_1.schema.json
