@@ -40,14 +40,15 @@ A high salience value is not proof of note identity. Polyphonic overlap, reverb 
 
 ## Test coverage authored
 
-Six focused tests cover:
+Seven focused tests cover:
 
 1. a synthetic A4 tone produces a measurable expected-pitch observation;
 2. an off-pitch synthetic control has lower expected-fundamental salience;
 3. notes shorter than the analysis window abstain;
 4. MIDI-byte tampering is rejected before analysis;
 5. WAV replacement and receipt-field tampering are detected;
-6. non-finite float audio is rejected.
+6. silent audio produces an explicit no-energy abstention;
+7. non-finite float audio is rejected.
 
 The tests are authored but have not been compiled or run in this environment. The focused GitHub Actions workflow checks out the exact PR head and uses Rust 1.96.0.
 
