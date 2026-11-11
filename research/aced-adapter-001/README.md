@@ -4,6 +4,10 @@
 **Owner:** [Symthaea #11598](https://github.com/Luminous-Dynamics/symthaea/issues/11598)  
 **Parent:** [IG-CAUSAL-PRIMITIVES-001 #11505](https://github.com/Luminous-Dynamics/symthaea/issues/11505)
 
+## Comparative targets
+
+The cross-domain research comparison and proposed SOTA target ladder are maintained in [INDUSTRY_BENCHMARK_CROSSWALK_V0_1.md](INDUSTRY_BENCHMARK_CROSSWALK_V0_1.md). It compares ACED, ACDB, AgentAbstain, Agentic Abstention, AuthGateBench, AuthorizationBench, AgentGovBench and DelibSim without treating their metrics as interchangeable. All Luminous numeric targets are explicitly proposed, not results.
+
 ## Research target
 
 Integrate the official MIT-licensed [ACED-Bench](https://github.com/Rose-STL-Lab/ACED-Bench) as an external active causal investigation comparator.
