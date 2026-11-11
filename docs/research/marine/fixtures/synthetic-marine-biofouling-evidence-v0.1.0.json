@@ -113,12 +113,12 @@
       "observed_at": "2026-10-10T10:00:00Z",
       "condition_fingerprint": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "speed_through_water_kn": 12,
-      "shaft_power_kw": 3000,
+      "shaft_power_kw": 2800,
       "shaft_rpm": 85,
       "draft_m": 9,
       "trim_m": 0.2,
       "sea_state": "synthetic-sea-state",
-      "fuel_flow_kg_per_h": 420,
+      "fuel_flow_kg_per_h": 410,
       "source_trace_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
     },
     "after": {
@@ -149,6 +149,7 @@
     }
   ],
   "limitations": [
-    "Synthetic fixture only; all permits, inspection, biological and performance data are fabricated test values."
+    "Synthetic fixture only; all permits, inspection, biological and performance data are fabricated test values.",
+    "Synthetic baseline acoustic shaft power is matched to the acoustic evidence fixture for cross-record join software testing only."
   ]
 }
