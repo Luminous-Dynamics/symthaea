@@ -39,6 +39,17 @@
 //! numeric lane, which preserves its seed, domain, finite-difference step and tolerances.
 //! A sampled candidate is never promoted to exact or formal evidence.
 //!
+//! ## Declared-action metric-aware sampling
+//!
+//! `evaluate_metric_aware_linear_action_samples` accepts an admitted linear
+//! action, explicit sample states in its declared coordinate basis, and fixed
+//! parameter bindings. It uses forward-mode automatic differentiation for the
+//! supported smooth AST fragment, then evaluates the dual/primal cosine after
+//! Cholesky metric whitening. The exact states, action declarations, admission
+//! diagnostics and versioned expression encoding are retained in the report.
+//! Unsupported or nondifferentiable expressions abstain; invalid samples are
+//! counted and cannot produce a positive invariance decision.
+//!
 //! ## Sampled numeric Lie-derivative fallback
 //!
 //! The sampled lane can detect radial expressions such as square roots and reciprocal
@@ -78,7 +89,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use symthaea_core::hdc::lie_theory::{self, LieAlgebra};
 
+use crate::linear_group_action::AdmittedLinearGroupActionV1;
 use crate::types::{LieGroup, SymmetryDescriptor};
+
+const HARD_MAX_METRIC_AWARE_ACTION_DIMENSION: usize = 32;
+const HARD_MAX_METRIC_AWARE_ACTION_GENERATORS: usize = 128;
+const HARD_MAX_METRIC_AWARE_SAMPLES: usize = 4096;
+const HARD_MAX_METRIC_AWARE_EXPRESSION_NODES: usize = 16_384;
+const HARD_MAX_METRIC_AWARE_GRADIENT_WORK: usize = 20_000_000;
+const HARD_MAX_METRIC_AWARE_GENERATOR_SAMPLE_PAIRS: usize = 65_536;
 
 /// Fully specified numerical policy used by the bounded Lie-derivative fallback.
 ///
@@ -264,6 +283,115 @@ impl SymmetryInferenceReport {
     /// Compatibility projection for APIs that still consume only a descriptor.
     pub fn descriptor_or_none(&self) -> SymmetryDescriptor {
         self.candidate.clone().unwrap_or_else(SymmetryDescriptor::none)
+    }
+}
+
+/// Numerical policy for replayable metric-aware linear-action sampling.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct MetricAwareLinearActionSampleProfileV1 {
+    pub maximum_samples: usize,
+    pub maximum_expression_nodes: usize,
+    pub maximum_total_gradient_work: usize,
+    /// Maximum number of (generator, sample) pairs evaluated for matrix actions.
+    pub maximum_total_generator_sample_pairs: usize,
+    pub minimum_informative_samples_per_generator: usize,
+    /// Maximum squared cosine in metric-whitened coordinates.
+    pub squared_cosine_tolerance: f64,
+}
+
+impl Default for MetricAwareLinearActionSampleProfileV1 {
+    fn default() -> Self {
+        Self {
+            maximum_samples: 4096,
+            maximum_expression_nodes: 16_384,
+            maximum_total_gradient_work: 20_000_000,
+            maximum_total_generator_sample_pairs: 65_536,
+            minimum_informative_samples_per_generator: 1,
+            squared_cosine_tolerance: 1e-8,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MetricAwareLinearActionSampleErrorV1 {
+    InvalidProfile,
+    ActionDimensionLimitExceeded { actual: usize, maximum: usize },
+    GeneratorCountLimitExceeded { actual: usize, maximum: usize },
+    TooManySamples { actual: usize, maximum: usize },
+    EmptySampleSet,
+    SampleDimensionMismatch { sample_index: usize, expected: usize, actual: usize },
+    NonFiniteSampleCoordinate { sample_index: usize, coordinate_index: usize },
+    ExpressionTooComplex { actual: usize, maximum: usize },
+    TotalGradientWorkExceeded { actual: usize, maximum: usize },
+    GeneratorSampleBudgetExceeded { actual: usize, maximum: usize },
+    EmptyFixedBindingName { index: usize },
+    DuplicateFixedBinding { name: String },
+    FixedBindingConflictsWithActionCoordinate { name: String },
+    NonFiniteFixedBinding { name: String },
+    MissingFixedBinding { name: String },
+    UnsupportedExpression,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MetricAwareGeneratorSampleResultV1 {
+    pub generator_id: String,
+    pub sample_count: usize,
+    pub informative_sample_count: usize,
+    pub uninformative_sample_count: usize,
+    pub invalid_sample_count: usize,
+    pub maximum_squared_residual: f64,
+    pub mean_squared_residual: f64,
+}
+
+/// Replayable sampled evidence for a declared action and scalar expression.
+/// The effective and original declarations, exact expression tree, states and
+/// fixed parameters are retained in the receipt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MetricAwareLinearActionSampleReportV1 {
+    pub action_id: String,
+    pub coordinate_basis_id: String,
+    pub action_declaration: crate::linear_group_action::LinearGroupActionV1,
+    pub original_action_declaration: crate::linear_group_action::LinearGroupActionV1,
+    pub action_admission_profile: crate::linear_group_action::LinearGroupActionAdmissionProfileV1,
+    pub action_admission_diagnostics: crate::linear_group_action::LinearGroupActionAdmissionDiagnosticsV1,
+    pub coordinate_names: Vec<String>,
+    pub coordinate_unit_ids: Vec<String>,
+    pub expression_display: String,
+    /// Structural AST representation with exact IEEE-754 bit patterns.
+    pub expression_canonical: String,
+    pub expression_complexity: usize,
+    pub profile: MetricAwareLinearActionSampleProfileV1,
+    pub fixed_bindings: Vec<(String, f64)>,
+    pub sample_states: Vec<Vec<f64>>,
+    pub generator_results: Vec<MetricAwareGeneratorSampleResultV1>,
+}
+
+impl MetricAwareLinearActionSampleReportV1 {
+    /// True only when every generator has enough informative samples, no invalid
+    /// evaluations, and a maximum residual within the declared threshold.
+    pub fn invariant_under_every_generator(&self) -> bool {
+        !self.generator_results.is_empty()
+            && self.generator_results.iter().all(|result| {
+                result.invalid_sample_count == 0
+                    && result.informative_sample_count
+                        >= self.profile.minimum_informative_samples_per_generator
+                    && result.maximum_squared_residual
+                        <= self.profile.squared_cosine_tolerance
+            })
+    }
+
+    pub fn total_invalid_evaluations(&self) -> usize {
+        self.generator_results
+            .iter()
+            .map(|result| result.invalid_sample_count)
+            .sum()
+    }
+
+    pub fn total_informative_evaluations(&self) -> usize {
+        self.generator_results
+            .iter()
+            .map(|result| result.informative_sample_count)
+            .sum()
     }
 }
 /// Infer a best-effort symmetry descriptor from a discovered expression.
@@ -1009,6 +1137,616 @@ fn exact_polynomial_symmetry_candidate(
 /// binding order as `state`). Mirrors
 /// `conjecture_engine::gp_support::fd_gradient`, reimplemented locally since
 /// that helper is `pub(crate)` to symthaea-core.
+#[derive(Debug, Clone)]
+struct DualValue {
+    value: f64,
+    gradient: Vec<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DualEvaluationError {
+    Unsupported,
+    Nondifferentiable,
+    InvalidDomain,
+    NonFinite,
+}
+
+fn checked_dual(value: f64, gradient: Vec<f64>) -> Result<DualValue, DualEvaluationError> {
+    if !value.is_finite() || gradient.iter().any(|entry| !entry.is_finite()) {
+        return Err(DualEvaluationError::NonFinite);
+    }
+    Ok(DualValue { value, gradient })
+}
+
+/// Forward-mode differentiation for the smooth, supported expression fragment.
+/// Abs, Floor and Sum abstain rather than receiving an unjustified derivative.
+fn eval_expression_with_gradient(
+    expr: &Expr,
+    variable_names: &[String],
+    active_variable_indices: &[usize],
+    values: &[f64],
+) -> Result<DualValue, DualEvaluationError> {
+    let dimension = variable_names.len();
+    match expr {
+        Expr::Var(name) => {
+            let index = variable_names
+                .iter()
+                .position(|candidate| candidate == name)
+                .ok_or(DualEvaluationError::Unsupported)?;
+            let mut gradient = vec![0.0; dimension];
+            if active_variable_indices.contains(&index) {
+                gradient[index] = 1.0;
+            }
+            checked_dual(values[index], gradient)
+        }
+        Expr::Const(value) => checked_dual(*value, vec![0.0; dimension]),
+        Expr::BinOp(operation, left_expr, right_expr) => {
+            let left = eval_expression_with_gradient(
+                left_expr,
+                variable_names,
+                active_variable_indices,
+                values,
+            )?;
+            let right = eval_expression_with_gradient(
+                right_expr,
+                variable_names,
+                active_variable_indices,
+                values,
+            )?;
+            let mut gradient = vec![0.0; dimension];
+            let value = match operation {
+                BinOp::Add => {
+                    for (out, (left_gradient, right_gradient)) in gradient
+                        .iter_mut()
+                        .zip(left.gradient.iter().zip(&right.gradient))
+                    {
+                        *out = left_gradient + right_gradient;
+                    }
+                    left.value + right.value
+                }
+                BinOp::Sub => {
+                    for (out, (left_gradient, right_gradient)) in gradient
+                        .iter_mut()
+                        .zip(left.gradient.iter().zip(&right.gradient))
+                    {
+                        *out = left_gradient - right_gradient;
+                    }
+                    left.value - right.value
+                }
+                BinOp::Mul => {
+                    for (out, (left_gradient, right_gradient)) in gradient
+                        .iter_mut()
+                        .zip(left.gradient.iter().zip(&right.gradient))
+                    {
+                        *out = left_gradient * right.value + left.value * right_gradient;
+                    }
+                    left.value * right.value
+                }
+                BinOp::Div => {
+                    if right.value.abs() <= 1e-15 {
+                        return Err(DualEvaluationError::InvalidDomain);
+                    }
+                    let denominator = right.value * right.value;
+                    for (out, (left_gradient, right_gradient)) in gradient
+                        .iter_mut()
+                        .zip(left.gradient.iter().zip(&right.gradient))
+                    {
+                        *out = (left_gradient * right.value - left.value * right_gradient)
+                            / denominator;
+                    }
+                    left.value / right.value
+                }
+                BinOp::Pow => {
+                    let exponent_is_constant = right.gradient.iter().all(|entry| *entry == 0.0);
+                    if left.value > 0.0 {
+                        let value = left.value.powf(right.value);
+                        let log_base = left.value.ln();
+                        for (out, (left_gradient, right_gradient)) in gradient
+                            .iter_mut()
+                            .zip(left.gradient.iter().zip(&right.gradient))
+                        {
+                            *out = value
+                                * (right.value * left_gradient / left.value
+                                    + log_base * right_gradient);
+                        }
+                        value
+                    } else if left.value < 0.0
+                        && exponent_is_constant
+                        && right.value.fract() == 0.0
+                    {
+                        let value = left.value.powf(right.value);
+                        let derivative = right.value * left.value.powf(right.value - 1.0);
+                        for (out, left_gradient) in gradient.iter_mut().zip(&left.gradient) {
+                            *out = derivative * left_gradient;
+                        }
+                        value
+                    } else if left.value == 0.0 && exponent_is_constant && right.value > 0.0 {
+                        if right.value == 1.0 {
+                            gradient.clone_from(&left.gradient);
+                        } else if right.value > 1.0 {
+                            gradient.fill(0.0);
+                        } else {
+                            return Err(DualEvaluationError::Nondifferentiable);
+                        }
+                        0.0_f64.powf(right.value)
+                    } else {
+                        return Err(DualEvaluationError::InvalidDomain);
+                    }
+                }
+            };
+            checked_dual(value, gradient)
+        }
+        Expr::Func(function, argument) => {
+            let argument = eval_expression_with_gradient(
+                argument,
+                variable_names,
+                active_variable_indices,
+                values,
+            )?;
+            let mut gradient = vec![0.0; dimension];
+            let value = match function {
+                UnaryFn::Sqrt => {
+                    if argument.value < 0.0 {
+                        return Err(DualEvaluationError::InvalidDomain);
+                    }
+                    if argument.value == 0.0 {
+                        return Err(DualEvaluationError::Nondifferentiable);
+                    }
+                    let value = argument.value.sqrt();
+                    let derivative = 0.5 / value;
+                    for (out, input) in gradient.iter_mut().zip(&argument.gradient) {
+                        *out = derivative * input;
+                    }
+                    value
+                }
+                UnaryFn::Log => {
+                    if argument.value <= 0.0 {
+                        return Err(DualEvaluationError::InvalidDomain);
+                    }
+                    for (out, input) in gradient.iter_mut().zip(&argument.gradient) {
+                        *out = input / argument.value;
+                    }
+                    argument.value.ln()
+                }
+                UnaryFn::Exp => {
+                    let value = argument.value.exp();
+                    for (out, input) in gradient.iter_mut().zip(&argument.gradient) {
+                        *out = value * input;
+                    }
+                    value
+                }
+                UnaryFn::Sin => {
+                    let derivative = argument.value.cos();
+                    for (out, input) in gradient.iter_mut().zip(&argument.gradient) {
+                        *out = derivative * input;
+                    }
+                    argument.value.sin()
+                }
+                UnaryFn::Cos => {
+                    let derivative = -argument.value.sin();
+                    for (out, input) in gradient.iter_mut().zip(&argument.gradient) {
+                        *out = derivative * input;
+                    }
+                    argument.value.cos()
+                }
+                UnaryFn::Abs | UnaryFn::Floor => return Err(DualEvaluationError::Unsupported),
+            };
+            checked_dual(value, gradient)
+        }
+        Expr::Sum(_, _) => Err(DualEvaluationError::Unsupported),
+    }
+}
+
+/// Return true only for the smooth AST subset supported by the metric-aware
+/// forward-mode derivative. Reject unsupported syntax before fixed-binding
+/// resolution so a summation or nondifferentiable node cannot be misreported
+/// as a missing parameter.
+fn metric_aware_expression_supported(expr: &Expr) -> bool {
+    match expr {
+        Expr::Var(_) | Expr::Const(_) => true,
+        Expr::BinOp(_, left, right) => {
+            metric_aware_expression_supported(left)
+                && metric_aware_expression_supported(right)
+        }
+        Expr::Func(UnaryFn::Abs | UnaryFn::Floor, _) | Expr::Sum(_, _) => false,
+        Expr::Func(_, argument) => metric_aware_expression_supported(argument),
+    }
+}
+
+fn canonical_expression(expr: &Expr) -> String {
+    format!("symthaea-expr-v1:{}", canonical_expression_node(expr))
+}
+
+fn canonical_expression_node(expr: &Expr) -> String {
+    match expr {
+        Expr::Var(name) => format!("V{}:{name}", name.len()),
+        Expr::Const(value) => format!("C{:016x}", value.to_bits()),
+        Expr::BinOp(operation, left, right) => {
+            let tag = match operation {
+                BinOp::Add => "ADD",
+                BinOp::Sub => "SUB",
+                BinOp::Mul => "MUL",
+                BinOp::Div => "DIV",
+                BinOp::Pow => "POW",
+            };
+            format!("B{tag}({},{})", canonical_expression_node(left), canonical_expression_node(right))
+        }
+        Expr::Func(function, argument) => {
+            let tag = match function {
+                UnaryFn::Sqrt => "SQRT",
+                UnaryFn::Log => "LOG",
+                UnaryFn::Exp => "EXP",
+                UnaryFn::Sin => "SIN",
+                UnaryFn::Cos => "COS",
+                UnaryFn::Abs => "ABS",
+                UnaryFn::Floor => "FLOOR",
+            };
+            format!("F{tag}({})", canonical_expression_node(argument))
+        }
+        Expr::Sum(body, variable) => {
+            format!("SUM{}:{variable}({})", variable.len(), canonical_expression_node(body))
+        }
+    }
+}
+
+/// Solve L * result = rhs for a lower-triangular L using forward substitution.
+fn solve_lower_triangular(lower: &[Vec<f64>], rhs: &[f64]) -> Option<Vec<f64>> {
+    let mut result = Vec::with_capacity(rhs.len());
+    for (row_index, rhs_value) in rhs.iter().enumerate() {
+        let correction = result
+            .iter()
+            .zip(lower[row_index].iter())
+            .map(|(value, coefficient)| *value * *coefficient)
+            .sum::<f64>();
+        let pivot = lower[row_index][row_index];
+        if !pivot.is_finite() || pivot <= 0.0 {
+            return None;
+        }
+        let value = (*rhs_value - correction) / pivot;
+        if !value.is_finite() {
+            return None;
+        }
+        result.push(value);
+    }
+    Some(result)
+}
+
+fn stable_vector_norm(values: &[f64]) -> f64 {
+    values
+        .iter()
+        .fold(0.0_f64, |norm, value| norm.hypot(*value))
+}
+
+/// Evaluate replayable metric-aware residuals for arbitrary admitted linear actions.
+///
+/// The derivative is computed analytically by forward-mode AD on the supported
+/// smooth AST fragment. For G = s L L^T, this evaluates the Euclidean cosine
+/// between L^-1 grad(f) and L^T A x, exactly the metric-aware dual/primal cosine.
+/// No explicit inverse of G or finite-difference step is used.
+pub fn evaluate_metric_aware_linear_action_samples(
+    expr: &Expr,
+    action: &AdmittedLinearGroupActionV1,
+    sample_states: &[Vec<f64>],
+    fixed_bindings: &[(&str, f64)],
+    profile: MetricAwareLinearActionSampleProfileV1,
+) -> Result<MetricAwareLinearActionSampleReportV1, MetricAwareLinearActionSampleErrorV1> {
+    if profile.maximum_samples == 0
+        || profile.maximum_samples > HARD_MAX_METRIC_AWARE_SAMPLES
+        || profile.maximum_expression_nodes == 0
+        || profile.maximum_expression_nodes > HARD_MAX_METRIC_AWARE_EXPRESSION_NODES
+        || profile.maximum_total_gradient_work == 0
+        || profile.maximum_total_gradient_work > HARD_MAX_METRIC_AWARE_GRADIENT_WORK
+        || profile.maximum_total_generator_sample_pairs == 0
+        || profile.maximum_total_generator_sample_pairs
+            > HARD_MAX_METRIC_AWARE_GENERATOR_SAMPLE_PAIRS
+        || profile.minimum_informative_samples_per_generator == 0
+        || profile.minimum_informative_samples_per_generator > profile.maximum_samples
+        || !profile.squared_cosine_tolerance.is_finite()
+        || !(0.0..=1.0).contains(&profile.squared_cosine_tolerance)
+    {
+        return Err(MetricAwareLinearActionSampleErrorV1::InvalidProfile);
+    }
+    if sample_states.is_empty() {
+        return Err(MetricAwareLinearActionSampleErrorV1::EmptySampleSet);
+    }
+    if sample_states.len() > profile.maximum_samples {
+        return Err(MetricAwareLinearActionSampleErrorV1::TooManySamples {
+            actual: sample_states.len(),
+            maximum: profile.maximum_samples,
+        });
+    }
+
+    let declaration = action.action();
+    let dimension = declaration.coordinate_names.len();
+    if dimension > HARD_MAX_METRIC_AWARE_ACTION_DIMENSION {
+        return Err(MetricAwareLinearActionSampleErrorV1::ActionDimensionLimitExceeded {
+            actual: dimension,
+            maximum: HARD_MAX_METRIC_AWARE_ACTION_DIMENSION,
+        });
+    }
+    if declaration.generators.len() > HARD_MAX_METRIC_AWARE_ACTION_GENERATORS {
+        return Err(MetricAwareLinearActionSampleErrorV1::GeneratorCountLimitExceeded {
+            actual: declaration.generators.len(),
+            maximum: HARD_MAX_METRIC_AWARE_ACTION_GENERATORS,
+        });
+    }
+    let complexity = expr.complexity();
+    if !metric_aware_expression_supported(expr) {
+        return Err(MetricAwareLinearActionSampleErrorV1::UnsupportedExpression);
+    }
+    if complexity > profile.maximum_expression_nodes {
+        return Err(MetricAwareLinearActionSampleErrorV1::ExpressionTooComplex {
+            actual: complexity,
+            maximum: profile.maximum_expression_nodes,
+        });
+    }
+
+    for (sample_index, sample) in sample_states.iter().enumerate() {
+        if sample.len() != dimension {
+            return Err(MetricAwareLinearActionSampleErrorV1::SampleDimensionMismatch {
+                sample_index,
+                expected: dimension,
+                actual: sample.len(),
+            });
+        }
+        for (coordinate_index, value) in sample.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(MetricAwareLinearActionSampleErrorV1::NonFiniteSampleCoordinate {
+                    sample_index,
+                    coordinate_index,
+                });
+            }
+        }
+    }
+
+    let mut fixed_values = BTreeMap::new();
+    for (index, (raw_name, value)) in fixed_bindings.iter().enumerate() {
+        let name = *raw_name;
+        if name.trim().is_empty() {
+            return Err(MetricAwareLinearActionSampleErrorV1::EmptyFixedBindingName { index });
+        }
+        if declaration.coordinate_names.iter().any(|coordinate| coordinate.as_str() == name) {
+            return Err(
+                MetricAwareLinearActionSampleErrorV1::FixedBindingConflictsWithActionCoordinate {
+                    name: name.to_string(),
+                },
+            );
+        }
+        if !value.is_finite() {
+            return Err(MetricAwareLinearActionSampleErrorV1::NonFiniteFixedBinding {
+                name: name.to_string(),
+            });
+        }
+        if fixed_values.insert(name.to_string(), *value).is_some() {
+            return Err(MetricAwareLinearActionSampleErrorV1::DuplicateFixedBinding {
+                name: name.to_string(),
+            });
+        }
+    }
+
+    let mut variable_names = Vec::new();
+    collect_var_names(expr, &mut variable_names);
+    for coordinate_name in &declaration.coordinate_names {
+        if !variable_names.contains(coordinate_name) {
+            variable_names.push(coordinate_name.clone());
+        }
+    }
+    for name in &variable_names {
+        if !declaration.coordinate_names.contains(name)
+            && !fixed_values.contains_key(name)
+        {
+            return Err(MetricAwareLinearActionSampleErrorV1::MissingFixedBinding {
+                name: name.clone(),
+            });
+        }
+    }
+    let coordinate_indices: Vec<usize> = declaration
+        .coordinate_names
+        .iter()
+        .map(|name| {
+            variable_names
+                .iter()
+                .position(|candidate| candidate == name)
+                .expect("action coordinates appended to variable order")
+        })
+        .collect();
+
+    let total_work = sample_states
+        .len()
+        .checked_mul(declaration.generators.len())
+        .and_then(|count| count.checked_mul(complexity))
+        .and_then(|count| count.checked_mul(variable_names.len()))
+        .ok_or(MetricAwareLinearActionSampleErrorV1::InvalidProfile)?;
+    let generator_sample_pairs = sample_states
+        .len()
+        .checked_mul(declaration.generators.len())
+        .ok_or(MetricAwareLinearActionSampleErrorV1::InvalidProfile)?;
+    if generator_sample_pairs > profile.maximum_total_generator_sample_pairs {
+        return Err(MetricAwareLinearActionSampleErrorV1::GeneratorSampleBudgetExceeded {
+            actual: generator_sample_pairs,
+            maximum: profile.maximum_total_generator_sample_pairs,
+        });
+    }
+    if total_work > profile.maximum_total_gradient_work {
+        return Err(
+            MetricAwareLinearActionSampleErrorV1::TotalGradientWorkExceeded {
+                actual: total_work,
+                maximum: profile.maximum_total_gradient_work,
+            },
+        );
+    }
+
+    let fixed_bindings_owned: Vec<(String, f64)> = fixed_bindings
+        .iter()
+        .map(|(name, value)| ((*name).to_string(), *value))
+        .collect();
+    let lower = action.scaled_metric_cholesky_lower();
+    let mut generator_results = Vec::with_capacity(declaration.generators.len());
+
+    for generator in &declaration.generators {
+        let mut informative_sample_count = 0usize;
+        let mut uninformative_sample_count = 0usize;
+        let mut invalid_sample_count = 0usize;
+        let mut maximum_squared_residual = 0.0_f64;
+        let mut residual_sum = 0.0_f64;
+
+        for sample in sample_states {
+            let mut values = vec![0.0_f64; variable_names.len()];
+            for (coordinate_index, variable_index) in coordinate_indices.iter().enumerate() {
+                values[*variable_index] = sample[coordinate_index];
+            }
+            for (name, value) in &fixed_values {
+                let variable_index = variable_names
+                    .iter()
+                    .position(|candidate| candidate == name)
+                    .expect("fixed expression variable retained in AST variable order");
+                values[variable_index] = *value;
+            }
+
+            let dual = match eval_expression_with_gradient(
+                expr,
+                &variable_names,
+                &coordinate_indices,
+                &values,
+            ) {
+                Ok(result) => result,
+                Err(DualEvaluationError::Unsupported) => {
+                    return Err(MetricAwareLinearActionSampleErrorV1::UnsupportedExpression);
+                }
+                Err(
+                    DualEvaluationError::Nondifferentiable
+                    | DualEvaluationError::InvalidDomain
+                    | DualEvaluationError::NonFinite,
+                ) => {
+                    invalid_sample_count = invalid_sample_count.saturating_add(1);
+                    continue;
+                }
+            };
+
+            let mut gradient = vec![0.0_f64; dimension];
+            for (coordinate_index, variable_index) in coordinate_indices.iter().enumerate() {
+                gradient[coordinate_index] = dual.gradient[*variable_index];
+            }
+
+            // The residual is directional, so common positive scales on A*x
+            // and df do not change it. Normalize the generator and state before
+            // multiplication to avoid overflowing a finite but badly scaled
+            // coordinate representation.
+            let generator_scale = generator
+                .matrix
+                .iter()
+                .flatten()
+                .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+            let state_scale = sample
+                .iter()
+                .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+            if generator_scale == 0.0 || !generator_scale.is_finite() {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            }
+            let mut flow = vec![0.0_f64; dimension];
+            if state_scale > 0.0 {
+                for (row_index, row) in generator.matrix.iter().enumerate() {
+                    for (column_index, coefficient) in row.iter().enumerate() {
+                        flow[row_index] += (coefficient / generator_scale)
+                            * (sample[column_index] / state_scale);
+                    }
+                }
+            }
+            if flow.iter().any(|value| !value.is_finite()) {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            }
+
+            // Only the gradient direction is needed by the cosine residual.
+            // Normalize before the triangular solve to protect extreme expression
+            // amplitudes and metric-whitened coordinates.
+            let gradient_scale = gradient
+                .iter()
+                .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+            let normalized_gradient = if gradient_scale > 0.0 {
+                gradient.iter().map(|value| value / gradient_scale).collect::<Vec<_>>()
+            } else {
+                vec![0.0_f64; dimension]
+            };
+            let Some(whitened_gradient) = solve_lower_triangular(lower, &normalized_gradient) else {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            };
+            let mut whitened_flow = vec![0.0_f64; dimension];
+            for (column_index, output) in whitened_flow.iter_mut().enumerate() {
+                for (row_index, flow_value) in flow.iter().enumerate() {
+                    *output += lower[row_index][column_index] * *flow_value;
+                }
+            }
+            if whitened_flow.iter().any(|value| !value.is_finite()) {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            }
+
+            let gradient_norm = stable_vector_norm(&whitened_gradient);
+            let flow_norm = stable_vector_norm(&whitened_flow);
+            if !gradient_norm.is_finite() || !flow_norm.is_finite() {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            }
+            if gradient_norm == 0.0 || flow_norm == 0.0 {
+                uninformative_sample_count = uninformative_sample_count.saturating_add(1);
+                continue;
+            }
+
+            let directional_cosine = whitened_gradient
+                .iter()
+                .zip(&whitened_flow)
+                .map(|(gradient_value, flow_value)| {
+                    (gradient_value / gradient_norm) * (flow_value / flow_norm)
+                })
+                .sum::<f64>();
+            if !directional_cosine.is_finite() {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                continue;
+            }
+            let squared_residual = (directional_cosine * directional_cosine).clamp(0.0, 1.0);
+            informative_sample_count = informative_sample_count.saturating_add(1);
+            maximum_squared_residual = maximum_squared_residual.max(squared_residual);
+            residual_sum += squared_residual;
+        }
+
+        let mean_squared_residual = if informative_sample_count == 0 {
+            0.0
+        } else {
+            residual_sum / informative_sample_count as f64
+        };
+        generator_results.push(MetricAwareGeneratorSampleResultV1 {
+            generator_id: generator.id.clone(),
+            sample_count: sample_states.len(),
+            informative_sample_count,
+            uninformative_sample_count,
+            invalid_sample_count,
+            maximum_squared_residual,
+            mean_squared_residual,
+        });
+    }
+
+    Ok(MetricAwareLinearActionSampleReportV1 {
+        action_id: declaration.action_id.clone(),
+        coordinate_basis_id: declaration.coordinate_basis_id.clone(),
+        action_declaration: declaration.clone(),
+        original_action_declaration: action.declared_action().clone(),
+        action_admission_profile: *action.profile(),
+        action_admission_diagnostics: action.diagnostics().clone(),
+        coordinate_names: declaration.coordinate_names.clone(),
+        coordinate_unit_ids: declaration.coordinate_unit_ids.clone(),
+        expression_display: expr.to_string(),
+        expression_canonical: canonical_expression(expr),
+        expression_complexity: complexity,
+        profile,
+        fixed_bindings: fixed_bindings_owned,
+        sample_states: sample_states.to_vec(),
+        generator_results,
+    })
+}
+
 fn fd_gradient(
     expr: &Expr,
     state: &[f64],
@@ -1282,6 +2020,767 @@ mod tests {
 
     fn var(name: &str) -> Expr {
         Expr::Var(name.to_string())
+    }
+
+    fn metric_aware_so2_action() -> crate::linear_group_action::AdmittedLinearGroupActionV1 {
+        crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "sample-so2".to_string(),
+            coordinate_basis_id: "xy".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "J".to_string(),
+                matrix: vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap()
+    }
+
+    fn metric_sample_states() -> Vec<Vec<f64>> {
+        vec![
+            vec![1.0, 2.0],
+            vec![2.0, -1.0],
+            vec![-0.5, 1.5],
+            vec![3.0, 0.25],
+        ]
+    }
+
+    #[test]
+    fn metric_aware_sampler_accepts_exact_radial_invariant_and_retains_receipt() {
+        let report = evaluate_metric_aware_linear_action_samples(
+            &add(pow2("x"), pow2("y")),
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.invariant_under_every_generator());
+        assert_eq!(report.sample_states, metric_sample_states());
+        assert_eq!(report.coordinate_unit_ids, vec!["1".to_string(), "1".to_string()]);
+        assert!(report.expression_canonical.starts_with("symthaea-expr-v1:BADD("));
+        assert_eq!(report.action_declaration.action_id, "sample-so2");
+        assert_eq!(report.original_action_declaration.action_id, "sample-so2");
+        assert_eq!(report.total_invalid_evaluations(), 0);
+        assert_eq!(report.total_informative_evaluations(), 4);
+        assert!(report.generator_results[0].maximum_squared_residual < 1e-28);
+    }
+
+    #[test]
+    fn analytic_and_directional_derivative_witnesses_agree_on_frozen_smooth_samples() {
+        use crate::linear_action_sampling::{
+            LinearActionSampleV1, LinearActionSamplingProfileV1, evaluate_linear_action_samples,
+        };
+
+        let samples = metric_sample_states();
+        let directional_samples: Vec<LinearActionSampleV1> = samples
+            .iter()
+            .enumerate()
+            .map(|(index, state)| LinearActionSampleV1 {
+                sample_id: format!("dual-witness-{index}"),
+                state: state.clone(),
+                direction_basis: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            })
+            .collect();
+        let mut directional_profile = LinearActionSamplingProfileV1::default();
+        directional_profile.minimum_informative_samples = samples.len();
+        directional_profile.maximum_samples = 16;
+        directional_profile.squared_cosine_tolerance = 1e-8;
+
+        let controls = [
+            (
+                Expr::Func(UnaryFn::Sqrt, Box::new(add(pow2("x"), pow2("y")))),
+                true,
+            ),
+            (
+                Expr::Func(
+                    UnaryFn::Sqrt,
+                    Box::new(add(pow2("x"), mul(Expr::Const(2.0), pow2("y")))),
+                ),
+                false,
+            ),
+            (
+                Expr::Func(UnaryFn::Sin, Box::new(add(pow2("x"), pow2("y")))),
+                true,
+            ),
+        ];
+
+        for (expression, expected_invariant) in controls {
+            let action = metric_aware_so2_action();
+            let analytic = evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &action,
+                &samples,
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            )
+            .unwrap();
+            let directional = evaluate_linear_action_samples(
+                &expression,
+                &action,
+                &directional_samples,
+                directional_profile,
+            )
+            .unwrap();
+
+            assert_eq!(analytic.invariant_under_every_generator(), expected_invariant);
+            assert_eq!(directional.invariant_within_tolerance(), expected_invariant);
+            assert_eq!(
+                analytic.generator_results[0].informative_sample_count,
+                directional.generator_statistics[0].informative_sample_count
+            );
+            for (analytic_index, directional_residual) in directional.generator_statistics[0]
+                .sample_residuals
+                .iter()
+                .enumerate()
+            {
+                let analytic_per_sample = if analytic_index < samples.len() {
+                    // The analytic report contains aggregate per-generator
+                    // statistics; the finite-difference path retains per-sample
+                    // residuals. Re-run AD on this singleton to pair the witnesses.
+                    let one_sample = vec![samples[analytic_index].clone()];
+                    let one = evaluate_metric_aware_linear_action_samples(
+                        &expression,
+                        &action,
+                        &one_sample,
+                        &[],
+                        MetricAwareLinearActionSampleProfileV1::default(),
+                    )
+                    .unwrap();
+                    one.generator_results[0].maximum_squared_residual
+                } else {
+                    unreachable!("paired sample index is in range")
+                };
+                assert!(
+                    (analytic_per_sample
+                        - directional_residual.normalized_squared_residual.unwrap())
+                        .abs()
+                        < 2.0e-7,
+                    "analytic and directional residuals disagree at sample {analytic_index}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn metric_aware_sampler_supports_composed_smooth_unary_functions() {
+        let radius = sqrt_of(add(pow2("x"), pow2("y")));
+        let expression = Expr::Func(UnaryFn::Sin, Box::new(radius));
+        let report = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert!(report.invariant_under_every_generator());
+        assert!(report.generator_results[0].maximum_squared_residual < 1e-26);
+    }
+
+    #[test]
+    fn metric_aware_receipt_expression_identity_preserves_exact_constant_bits() {
+        let first = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(var("x")),
+            Box::new(Expr::Const(1.0000001)),
+        );
+        let second = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(var("x")),
+            Box::new(Expr::Const(1.0000002)),
+        );
+        let first_report = evaluate_metric_aware_linear_action_samples(
+            &first,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        let second_report = evaluate_metric_aware_linear_action_samples(
+            &second,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert_eq!(first_report.expression_display, second_report.expression_display);
+        assert_ne!(first_report.expression_canonical, second_report.expression_canonical);
+    }
+
+    #[test]
+    fn metric_aware_sampler_is_scale_safe_for_large_generator_and_state() {
+        // A and x are finite, but the unscaled product A*x would overflow:
+        // 1e160 * 1e150 > f64::MAX. Directional normalization preserves it.
+        let scale = 1.0e160;
+        let action = crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "large-scale-so2".to_string(),
+            coordinate_basis_id: "xy-large".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "large-J".to_string(),
+                matrix: vec![vec![0.0, -scale], vec![scale, 0.0]],
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+        let report = evaluate_metric_aware_linear_action_samples(
+            &add(pow2("x"), pow2("y")),
+            &action,
+            &[vec![2.0e150, 1.0e150]],
+            &[],
+            MetricAwareLinearActionSampleProfileV1 {
+                maximum_samples: 1,
+                minimum_informative_samples_per_generator: 1,
+                ..MetricAwareLinearActionSampleProfileV1::default()
+            },
+        )
+        .unwrap();
+        assert!(report.invariant_under_every_generator());
+        assert_eq!(report.generator_results[0].invalid_sample_count, 0);
+        assert!(report.generator_results[0].maximum_squared_residual < 1.0e-20);
+    }
+
+    #[test]
+    fn metric_aware_sampler_rejects_anisotropic_expression() {
+        let expression = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
+        let report = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(!report.invariant_under_every_generator());
+        assert!(report.generator_results[0].maximum_squared_residual > 1e-3);
+    }
+
+    #[test]
+    fn metric_aware_sampler_is_covariant_under_nonorthogonal_coordinate_change() {
+        // D = [[1,1],[0,1]], A' = D A D^-1, G' = D^-T D^-1.
+        // The transformed scalar is f'(X,Y) = X² - 2XY + 2Y².
+        let transformed_action = crate::linear_group_action::LinearGroupActionV1 {
+            action_id: "sample-so2-sheared".to_string(),
+            coordinate_basis_id: "XY".to_string(),
+            coordinate_names: vec!["X".to_string(), "Y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, -1.0], vec![-1.0, 2.0]],
+            generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                id: "conjugated-J".to_string(),
+                matrix: vec![vec![1.0, -2.0], vec![1.0, -1.0]],
+            }],
+        }
+        .try_admit(crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default())
+        .unwrap();
+        let base_samples = metric_sample_states();
+        let transformed_samples: Vec<Vec<f64>> = base_samples
+            .iter()
+            .map(|state| vec![state[0] + state[1], state[1]])
+            .collect();
+        let base_report = evaluate_metric_aware_linear_action_samples(
+            &add(pow2("x"), pow2("y")),
+            &metric_aware_so2_action(),
+            &base_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        let transformed_expression = sub(
+            add(pow2("X"), mul(Expr::Const(2.0), pow2("Y"))),
+            mul(Expr::Const(2.0), mul(var("X"), var("Y"))),
+        );
+        let transformed_report = evaluate_metric_aware_linear_action_samples(
+            &transformed_expression,
+            &transformed_action,
+            &transformed_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(base_report.invariant_under_every_generator());
+        assert!(transformed_report.invariant_under_every_generator());
+        let base_residual = base_report.generator_results[0].maximum_squared_residual;
+        let transformed_residual =
+            transformed_report.generator_results[0].maximum_squared_residual;
+        assert!(
+            (base_residual - transformed_residual).abs() < 1e-24,
+            "metric-aware residual changed under basis transform: {base_residual} vs {transformed_residual}"
+        );
+
+        // Repeat the metamorphic comparison for a non-invariant quadratic:
+        // x² + 2y² transforms to X² - 2XY + 3Y².
+        let base_anisotropic = add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
+        let transformed_anisotropic = sub(
+            add(pow2("X"), mul(Expr::Const(3.0), pow2("Y"))),
+            mul(Expr::Const(2.0), mul(var("X"), var("Y"))),
+        );
+        let base_negative = evaluate_metric_aware_linear_action_samples(
+            &base_anisotropic,
+            &metric_aware_so2_action(),
+            &base_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        let transformed_negative = evaluate_metric_aware_linear_action_samples(
+            &transformed_anisotropic,
+            &transformed_action,
+            &transformed_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert!(!base_negative.invariant_under_every_generator());
+        assert!(!transformed_negative.invariant_under_every_generator());
+        let base_negative_residual =
+            base_negative.generator_results[0].maximum_squared_residual;
+        let transformed_negative_residual =
+            transformed_negative.generator_results[0].maximum_squared_residual;
+        assert!(
+            (base_negative_residual - transformed_negative_residual).abs() < 1e-12,
+            "negative-control residual changed under basis transform: {base_negative_residual} vs {transformed_negative_residual}"
+        );
+    }
+
+    #[test]
+    fn metric_aware_sampler_is_covariant_across_six_nonorthogonal_coordinate_changes() {
+        use nalgebra::Matrix2;
+
+        let transforms = [
+            Matrix2::new(1.0, 1.0, 0.0, 1.0),
+            Matrix2::new(2.0, 1.0, 1.0, 1.0),
+            Matrix2::new(1.0, 0.5, -0.25, 2.0),
+            Matrix2::new(0.5, -1.0, 1.0, 1.0),
+            Matrix2::new(2.0, -1.0, 0.5, 1.0),
+            Matrix2::new(1.0, 0.0, 3.0, 1.0),
+        ];
+        let identity_metric = Matrix2::identity();
+        let canonical_generator = Matrix2::new(0.0, -1.0, 1.0, 0.0);
+        let canonical_samples = metric_sample_states();
+        let canonical_action = metric_aware_so2_action();
+        let canonical_radial = add(pow2("x"), pow2("y"));
+        let canonical_anisotropic =
+            add(pow2("x"), mul(Expr::Const(2.0), pow2("y")));
+
+        let canonical_positive = evaluate_metric_aware_linear_action_samples(
+            &canonical_radial,
+            &canonical_action,
+            &canonical_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        let canonical_negative = evaluate_metric_aware_linear_action_samples(
+            &canonical_anisotropic,
+            &canonical_action,
+            &canonical_samples,
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        let canonical_negative_residual =
+            canonical_negative.generator_results[0].maximum_squared_residual;
+        assert!(canonical_positive.invariant_under_every_generator());
+        assert!(!canonical_negative.invariant_under_every_generator());
+
+        let quadratic_expression = |matrix: Matrix2<f64>| {
+            add(
+                add(
+                    mul(Expr::Const(matrix[(0, 0)]), pow2("X")),
+                    mul(
+                        Expr::Const(2.0 * matrix[(0, 1)]),
+                        mul(var("X"), var("Y")),
+                    ),
+                ),
+                mul(Expr::Const(matrix[(1, 1)]), pow2("Y")),
+            )
+        };
+
+        for (index, transform) in transforms.iter().enumerate() {
+            let inverse = transform
+                .try_inverse()
+                .expect("every frozen basis transform must be invertible");
+            let transformed_metric = inverse.transpose() * identity_metric * inverse;
+            let transformed_generator = transform * canonical_generator * inverse;
+            let transformed_action = crate::linear_group_action::LinearGroupActionV1 {
+                action_id: format!("sample-so2-basis-{index}"),
+                coordinate_basis_id: format!("basis-{index}"),
+                coordinate_names: vec!["X".to_string(), "Y".to_string()],
+                coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+                metric: transformed_metric
+                    .row_iter()
+                    .map(|row| row.iter().copied().collect())
+                    .collect(),
+                generators: vec![crate::linear_group_action::LinearGeneratorV1 {
+                    id: "conjugated-J".to_string(),
+                    matrix: transformed_generator
+                        .row_iter()
+                        .map(|row| row.iter().copied().collect())
+                        .collect(),
+                }],
+            }
+            .try_admit(
+                crate::linear_group_action::LinearGroupActionAdmissionProfileV1::default(),
+            )
+            .unwrap();
+
+            let transformed_samples: Vec<Vec<f64>> = canonical_samples
+                .iter()
+                .map(|state| {
+                    let transformed =
+                        transform * nalgebra::Vector2::new(state[0], state[1]);
+                    vec![transformed[0], transformed[1]]
+                })
+                .collect();
+            let positive_expression = quadratic_expression(transformed_metric);
+            let negative_metric = inverse.transpose()
+                * Matrix2::new(1.0, 0.0, 0.0, 2.0)
+                * inverse;
+            let negative_expression = quadratic_expression(negative_metric);
+
+            let positive = evaluate_metric_aware_linear_action_samples(
+                &positive_expression,
+                &transformed_action,
+                &transformed_samples,
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            )
+            .unwrap();
+            let negative = evaluate_metric_aware_linear_action_samples(
+                &negative_expression,
+                &transformed_action,
+                &transformed_samples,
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            )
+            .unwrap();
+
+            assert!(
+                positive.invariant_under_every_generator(),
+                "radial invariant failed under basis transform {index}"
+            );
+            assert!(!negative.invariant_under_every_generator());
+            let negative_residual = negative.generator_results[0].maximum_squared_residual;
+            assert!(
+                (canonical_negative_residual - negative_residual).abs() < 2.0e-10,
+                "anisotropic residual changed under basis transform {index}: {canonical_negative_residual} vs {negative_residual}"
+            );
+        }
+    }
+
+    #[test]
+    fn fixed_parameters_are_constant_when_differentiating_the_action_coordinates() {
+        // z is a fixed parameter used as the exponent. It is not part of the
+        // action and therefore its AD component must be zero in the directional
+        // derivative contract, even though z appears in the AST.
+        let action = metric_aware_so2_action();
+        let expression = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(var("x")),
+            Box::new(var("z")),
+        );
+        let report = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &action,
+            &[vec![-2.0, 1.0], vec![-1.5, 0.75], vec![-1.0, 2.0]],
+            &[("z", 3.0)],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+
+        assert_eq!(report.generator_results[0].invalid_sample_count, 0);
+        assert_eq!(report.generator_results[0].informative_sample_count, 3);
+        assert!(!report.invariant_under_every_generator());
+    }
+
+    #[test]
+    fn metric_aware_sampler_supports_fixed_parameters_and_requires_them() {
+        let expression = mul(var("z"), add(pow2("x"), pow2("y")));
+        let action = metric_aware_so2_action();
+        let missing = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &action,
+            &metric_sample_states(),
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        );
+        assert_eq!(
+            missing,
+            Err(MetricAwareLinearActionSampleErrorV1::MissingFixedBinding {
+                name: "z".to_string()
+            })
+        );
+
+        let report = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &action,
+            &metric_sample_states(),
+            &[("z", 3.0)],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert!(report.invariant_under_every_generator());
+        assert_eq!(report.fixed_bindings, vec![("z".to_string(), 3.0)]);
+    }
+
+    #[test]
+    fn metric_aware_sampler_abstains_on_invalid_and_uninformative_samples() {
+        let expression = Expr::Func(UnaryFn::Sqrt, Box::new(var("x")));
+        let report = evaluate_metric_aware_linear_action_samples(
+            &expression,
+            &metric_aware_so2_action(),
+            &[vec![-1.0, 1.0], vec![1.0, 0.0]],
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert!(!report.invariant_under_every_generator());
+        assert_eq!(report.generator_results[0].invalid_sample_count, 1);
+
+        let radial = add(pow2("x"), pow2("y"));
+        let report = evaluate_metric_aware_linear_action_samples(
+            &radial,
+            &metric_aware_so2_action(),
+            &[vec![0.0, 0.0], vec![1.0, 0.0]],
+            &[],
+            MetricAwareLinearActionSampleProfileV1::default(),
+        )
+        .unwrap();
+        assert_eq!(report.generator_results[0].uninformative_sample_count, 1);
+        assert_eq!(report.generator_results[0].informative_sample_count, 1);
+    }
+
+    #[test]
+    fn metric_aware_sampler_rejects_unsupported_nondifferentiable_ast() {
+        let expression = Expr::Func(UnaryFn::Abs, Box::new(var("x")));
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &metric_sample_states(),
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::UnsupportedExpression)
+        );
+    }
+
+    #[test]
+    fn metric_aware_sampler_rejects_profiles_above_hard_resource_ceilings() {
+        let expression = add(pow2("x"), pow2("y"));
+        let states = metric_sample_states();
+
+        let too_many_samples = MetricAwareLinearActionSampleProfileV1 {
+            maximum_samples: HARD_MAX_METRIC_AWARE_SAMPLES + 1,
+            ..MetricAwareLinearActionSampleProfileV1::default()
+        };
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                too_many_samples
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::InvalidProfile)
+        );
+
+        let too_many_nodes = MetricAwareLinearActionSampleProfileV1 {
+            maximum_expression_nodes: HARD_MAX_METRIC_AWARE_EXPRESSION_NODES + 1,
+            ..MetricAwareLinearActionSampleProfileV1::default()
+        };
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                too_many_nodes
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::InvalidProfile)
+        );
+
+        let too_much_work = MetricAwareLinearActionSampleProfileV1 {
+            maximum_total_gradient_work: HARD_MAX_METRIC_AWARE_GRADIENT_WORK + 1,
+            ..MetricAwareLinearActionSampleProfileV1::default()
+        };
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                too_much_work
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::InvalidProfile)
+        );
+
+        let too_many_pairs = MetricAwareLinearActionSampleProfileV1 {
+            maximum_total_generator_sample_pairs:
+                HARD_MAX_METRIC_AWARE_GENERATOR_SAMPLE_PAIRS + 1,
+            ..MetricAwareLinearActionSampleProfileV1::default()
+        };
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                too_many_pairs
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::InvalidProfile)
+        );
+    }
+
+    #[test]
+    fn metric_aware_sampler_enforces_hard_action_dimension_and_generator_limits() {
+        use crate::linear_group_action::{
+            LinearGeneratorV1, LinearGroupActionAdmissionProfileV1, LinearGroupActionV1,
+        };
+
+        let dimension = HARD_MAX_METRIC_AWARE_ACTION_DIMENSION + 1;
+        let mut generator = vec![vec![0.0_f64; dimension]; dimension];
+        generator[0][1] = -1.0;
+        generator[1][0] = 1.0;
+        let large_dimension_action = LinearGroupActionV1 {
+            action_id: "metric-sampler-over-dimension-cap".to_string(),
+            coordinate_basis_id: "large-basis".to_string(),
+            coordinate_names: (0..dimension).map(|index| format!("x{index}")).collect(),
+            coordinate_unit_ids: vec!["1".to_string(); dimension],
+            metric: (0..dimension)
+                .map(|row| {
+                    (0..dimension)
+                        .map(|column| if row == column { 1.0 } else { 0.0 })
+                        .collect()
+                })
+                .collect(),
+            generators: vec![LinearGeneratorV1 {
+                id: "J".to_string(),
+                matrix: generator,
+            }],
+        }
+        .try_admit(LinearGroupActionAdmissionProfileV1 {
+            maximum_dimension: dimension,
+            ..LinearGroupActionAdmissionProfileV1::default()
+        })
+        .unwrap();
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &Expr::Var("x0".to_string()),
+                &large_dimension_action,
+                &[vec![1.0; dimension]],
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::ActionDimensionLimitExceeded {
+                actual: dimension,
+                maximum: HARD_MAX_METRIC_AWARE_ACTION_DIMENSION,
+            })
+        );
+
+        let too_many_generators = LinearGroupActionV1 {
+            action_id: "metric-sampler-over-generator-cap".to_string(),
+            coordinate_basis_id: "xy".to_string(),
+            coordinate_names: vec!["x".to_string(), "y".to_string()],
+            coordinate_unit_ids: vec!["1".to_string(), "1".to_string()],
+            metric: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            generators: (0..=HARD_MAX_METRIC_AWARE_ACTION_GENERATORS)
+                .map(|index| LinearGeneratorV1 {
+                    id: format!("J-{index}"),
+                    matrix: vec![vec![0.0, -1.0], vec![1.0, 0.0]],
+                })
+                .collect(),
+        }
+        .try_admit(LinearGroupActionAdmissionProfileV1 {
+            maximum_generators: HARD_MAX_METRIC_AWARE_ACTION_GENERATORS + 1,
+            ..LinearGroupActionAdmissionProfileV1::default()
+        })
+        .unwrap();
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &add(pow2("x"), pow2("y")),
+                &too_many_generators,
+                &metric_sample_states(),
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::GeneratorCountLimitExceeded {
+                actual: HARD_MAX_METRIC_AWARE_ACTION_GENERATORS + 1,
+                maximum: HARD_MAX_METRIC_AWARE_ACTION_GENERATORS,
+            })
+        );
+    }
+
+    #[test]
+    fn metric_aware_sampler_rejects_summation_before_fixed_binding_resolution() {
+        let expression = Expr::Sum(Box::new(var("x")), "k".to_string());
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &metric_sample_states(),
+                &[],
+                MetricAwareLinearActionSampleProfileV1::default(),
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::UnsupportedExpression)
+        );
+    }
+
+    #[test]
+    fn metric_aware_sampler_enforces_sample_and_work_budgets() {
+        let expression = add(pow2("x"), pow2("y"));
+        let states = metric_sample_states();
+        let mut too_few = MetricAwareLinearActionSampleProfileV1::default();
+        too_few.maximum_samples = 2;
+        assert_eq!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                too_few
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::TooManySamples {
+                actual: 4,
+                maximum: 2
+            })
+        );
+
+        let mut low_work = MetricAwareLinearActionSampleProfileV1::default();
+        low_work.maximum_total_gradient_work = 1;
+        assert!(matches!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                low_work
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::TotalGradientWorkExceeded { .. })
+        ));
+
+        let mut low_pair_budget = MetricAwareLinearActionSampleProfileV1::default();
+        low_pair_budget.maximum_total_generator_sample_pairs = 2;
+        assert!(matches!(
+            evaluate_metric_aware_linear_action_samples(
+                &expression,
+                &metric_aware_so2_action(),
+                &states,
+                &[],
+                low_pair_budget
+            ),
+            Err(MetricAwareLinearActionSampleErrorV1::GeneratorSampleBudgetExceeded { .. })
+        ));
     }
 
     #[test]

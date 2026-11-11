@@ -50,6 +50,7 @@ pub mod discovery;
 pub mod equation_ast;
 pub mod integrated_discovery;
 pub mod linear_group_action;
+pub mod linear_action_sampling;
 pub mod lyapunov;
 pub mod noise_robustness;
 pub mod pde_wave_stage_a;
@@ -74,16 +75,23 @@ pub use linear_group_action::{
     LinearGroupActionAdmissionDiagnosticsV1, LinearGroupActionAdmissionError,
     LinearGroupActionAdmissionProfileV1, LinearGroupActionV1,
 };
+pub use linear_action_sampling::{
+    LinearActionGeneratorSampleStatisticsV1, LinearActionSampleConditionDiagnosticV1,
+    LinearActionSampleResidualV1, LinearActionSampleV1, LinearActionSampledInvarianceReportV1,
+    LinearActionSamplingErrorV1, LinearActionSamplingProfileV1, evaluate_linear_action_samples,
+};
 pub use recognize::{
     RecognitionReport, expr_to_equation_node, recognize_expr, recognize_expr_with_units,
 };
 pub use symmetry::SymmetryEncoder;
 pub use symmetry_inference::{
-    ExactPolynomialLieProfileV1, ExactPolynomialSearchStatus, NumericLieDerivativeProfileV2,
-    LieDerivativeSampleStatisticsV1, StructuralSymmetryPattern, SymmetryClaimScope,
-    SymmetryInferenceEvidence,
-    SymmetryInferenceReport,
-    SymmetryInferenceSearchStatus, infer_symmetry, infer_symmetry_numeric,
+    ExactPolynomialLieProfileV1, ExactPolynomialSearchStatus,
+    MetricAwareGeneratorSampleResultV1, MetricAwareLinearActionSampleErrorV1,
+    MetricAwareLinearActionSampleProfileV1, MetricAwareLinearActionSampleReportV1,
+    NumericLieDerivativeProfileV2, LieDerivativeSampleStatisticsV1,
+    StructuralSymmetryPattern, SymmetryClaimScope, SymmetryInferenceEvidence,
+    SymmetryInferenceReport, SymmetryInferenceSearchStatus,
+    evaluate_metric_aware_linear_action_samples, infer_symmetry, infer_symmetry_numeric,
     infer_symmetry_numeric_with_evidence, infer_symmetry_with_evidence,
 };
 pub use tensor_structure::TensorEncoder;
