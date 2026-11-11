@@ -1,6 +1,6 @@
 # Symthaea Robotics Recovery Audit
 
-A dependency-free Rust reference kernel for one narrow obligation in ROB-RECOVERY-ASSURANCE-001: **do not count simulator state rewind as physically realizable robot recovery**.
+A Rust reference kernel for one narrow obligation in ROB-RECOVERY-ASSURANCE-001: **do not count simulator state rewind as physically realizable robot recovery**.
 
 The crate audits trial identities and separates:
 
@@ -18,7 +18,7 @@ It also rejects duplicate trial IDs, blank identity fields, malformed expected-t
     cargo test -p symthaea-robotics-recovery-audit
     cargo fmt --manifest-path crates/domains/symthaea-robotics-recovery-audit/Cargo.toml -- --check
 
-92 unit tests are included: 14 audit-kernel, 14 split-manifest importer, 37 scorer, 15 policy-router and 12 discovery-accounting tests. They have not been executed in this environment; no local Rust compile/test receipt or passing exact-head CI run is available. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
+94 unit tests are included: 14 audit-kernel, 16 split-manifest importer, 37 scorer, 15 policy-router and 12 discovery-accounting tests. They have not been executed in this environment; no local Rust compile/test receipt or passing exact-head CI run is available. The only direct external dependency is `sha1`, used to recompute Git blob identities for pinned CSV bytes. The crate does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
 
 
 ## Pinned split-manifest importer
@@ -34,9 +34,9 @@ It pins the Git blob identities for all four official split CSVs:
 
 It checks the exact header, row count (800 train / 200 test), unique sample IDs and paths, expected platform/split-relative path, both 64-hex SHA fields, positive action counts and the source invariant `actions == replay_prefix_steps`. For test splits it freezes not just the nine Macro-9 groups but their exact platform-specific row counts. Train is Macro-9-free and may contain the additional Move/Wrong Target group.
 
-The importer maps the CSV `sha256` to the scenario JSON digest and `original_sha256` to its original-trajectory lineage digest. It carries task name, relative source path, action count and replay-prefix length into the scenario and trial records; the scorer rejects any mismatch.
+The importer recomputes the Git blob SHA-1 from the exact CSV bytes using Git's canonical `blob <length>\0<content>` preimage and requires equality with the pinned split blob identity. A modified CSV cannot pass by merely supplying the expected blob SHA. The test suite includes a known-vector comparison against `git hash-object`. The importer maps the CSV `sha256` to the scenario JSON digest and `original_sha256` to its original-trajectory lineage digest. It carries task name, relative source path, action count and replay-prefix length into the scenario and trial records; the scorer rejects any mismatch.
 
-The source CSV does not expose scenario construction source (Natural / ActionPerturbed / HumanConstructed), nor does the split record include the scenario JSON bytes. The importer therefore assigns `ScenarioSource::Unknown` and validates hash syntax only. It does not claim to fetch or re-hash the scenario artifacts. The caller must fetch the CSV from the exact pinned commit and supply the Git blob identity returned by that source fetch; this importer compares that supplied identity against the frozen expected blob SHA, but does not recompute Git's SHA-1 object hash from the CSV text.
+The source CSV does not expose scenario construction source (Natural / ActionPerturbed / HumanConstructed), nor does the split record include the scenario JSON bytes. The importer therefore assigns `ScenarioSource::Unknown` and validates hash syntax only. It does not claim to fetch or re-hash the scenario artifacts. The caller must still fetch the CSV from the exact pinned commit; the importer independently verifies that its bytes produce the pinned Git blob SHA-1. This does not fetch or verify the referenced scenario JSON artifacts or third-party simulator assets.
 
 ## RoboRecover recovery scoring
 
