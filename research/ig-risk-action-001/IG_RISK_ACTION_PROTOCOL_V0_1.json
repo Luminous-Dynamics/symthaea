@@ -44,5 +44,11 @@
     "CALIBER Findings EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.2420/",
     "SAGE Findings EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1214/"
   ],
-  "claim_ceiling": "Exact synthetic action-oracle consistency only. Calibration and model action competence require separate empirical experiments."
+  "claim_ceiling": "Exact synthetic action-oracle consistency only. Calibration and model action competence require separate empirical experiments.",
+  "task_family_distribution": {
+    "factual_reasoning": 10,
+    "retrieval": 10,
+    "mechanical_diagnosis": 10,
+    "institutional_process": 10
+  }
 }
