@@ -150,6 +150,7 @@ pub struct SyntheticResponseProfile {
     pub sample_rate_hz: u32,
     pub target_segment_role: String,
     pub calibration_splits: Vec<CalibrationSplitIdentity>,
+    pub calibration_pairs: Vec<CalibrationPairRecord>,
     pub confirmatory_source_case_id: String,
     pub confirmatory_parameter_sha256: String,
     pub no_op_calibration: NoOpCalibrationReport,
@@ -209,6 +210,7 @@ fn target_id_for_family(segments: &[SyntheticSegmentSpec]) -> Result<&str, Strin
     segments
         .iter()
         .find(|segment| segment.segment_id.ends_with("-target"))
+        .or_else(|| segments.iter().find(|segment| segment.segment_id == "proxy-vowel-c"))
         .map(|segment| segment.segment_id.as_str())
         .ok_or_else(|| "calibration family does not declare a target segment".into())
 }
@@ -590,7 +592,7 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
         return Err("response matrix is incomplete or contains unqualified cells".into());
     }
 
-    let holdout_baseline = family("holdout", 1.0, 1.0, 1.0);
+    let holdout_baseline = confirmatory_segments.clone();
     let holdout_target_id = target_id_for_family(&holdout_baseline)?.to_owned();
     let (_, holdout_baseline_metrics) = render_and_measure(
         confirmatory_source_case_id,
@@ -734,6 +736,7 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
         sample_rate_hz,
         target_segment_role: "synthetic_proxy_event".into(),
         calibration_splits,
+        calibration_pairs,
         confirmatory_source_case_id: confirmatory_source_case_id.into(),
         confirmatory_parameter_sha256,
         no_op_calibration,
@@ -766,6 +769,7 @@ fn build_profile() -> Result<SyntheticResponseProfile, String> {
         &profile.analyzer_id,
         &profile.analyzer_version,
         &profile.calibration_splits,
+        &profile.calibration_pairs,
         &profile.confirmatory_source_case_id,
         &profile.confirmatory_parameter_sha256,
         &profile.fitted_sensitivities,
@@ -796,67 +800,14 @@ pub fn generate_response_profile(output_dir: &Path) -> Result<SyntheticResponseP
     )
     .map_err(|error| format!("failed to write profile digest: {error}"))?;
 
-    let pairs = {
-        let mut all = Vec::new();
-        let probes = probe_matrix();
-        for (source, segments) in [
-            ("SYNTH_CAL_FAMILY_A", family("cal-a", 0.90, 0.95, 0.88)),
-            ("SYNTH_CAL_FAMILY_B", family("cal-b", 1.08, 1.05, 0.96)),
-        ] {
-            let target_id = target_id_for_family(&segments)?.to_owned();
-            let (baseline_rendered, baseline_metrics) =
-                render_and_measure(source, "baseline", &segments, DEFAULT_SAMPLE_RATE_HZ)?;
-            let family_parameter_sha256 = family_digest(&segments)?;
-            for probe in probes.iter().filter(|probe| !probe.control_id.is_empty()) {
-                let edited = apply_edit(
-                    &segments,
-                    &target_id,
-                    &probe.patch,
-                    DEFAULT_SAMPLE_RATE_HZ,
-                )?;
-                let (intervention_rendered, intervention_metrics) =
-                    render_and_measure(source, "intervention", &edited, DEFAULT_SAMPLE_RATE_HZ)?;
-                let metric_deltas = baseline_metrics
-                    .iter()
-                    .map(|(metric_id, (unit, baseline_value))| {
-                        let (intervention_unit, intervention_value) = intervention_metrics
-                            .get(metric_id)
-                            .ok_or_else(|| format!("missing metric {metric_id}"))?;
-                        if unit != intervention_unit {
-                            return Err(format!("unit mismatch for {metric_id}"));
-                        }
-                        Ok(MeasuredMetricDelta {
-                            metric_id: metric_id.clone(),
-                            unit: unit.clone(),
-                            baseline_value: *baseline_value,
-                            intervention_value: *intervention_value,
-                            delta: intervention_value - baseline_value,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, String>>()?;
-                all.push(CalibrationPairRecord {
-                    source_case_id: source.into(),
-                    family_parameter_sha256: family_parameter_sha256.clone(),
-                    control_id: probe.control_id.clone(),
-                    control_unit: probe.control_unit.clone(),
-                    input_delta: probe.input_delta,
-                    target_segment_id: target_id.clone(),
-                    baseline_pcm_sha256: sha256_pcm(&baseline_rendered.samples),
-                    intervention_pcm_sha256: sha256_pcm(&intervention_rendered.samples),
-                    metric_deltas,
-                });
-            }
-        }
-        all
-    };
-    let pair_bytes = serde_json::to_vec_pretty(&pairs)
+    let pair_bytes = serde_json::to_vec_pretty(&profile.calibration_pairs)
         .map_err(|error| format!("failed to serialize calibration pairs: {error}"))?;
     std::fs::write(output_dir.join("response-calibration-pairs.json"), &pair_bytes)
         .map_err(|error| format!("failed to write calibration pairs: {error}"))?;
     std::fs::write(
         output_dir.join("response-calibration-pairs.sha256"),
         format!(
-            "{}  response-calibration-pairs.json\n",
+            "{}  response-calibration-pairs.json\\n",
             sha256_bytes(&pair_bytes)
         ),
     )
