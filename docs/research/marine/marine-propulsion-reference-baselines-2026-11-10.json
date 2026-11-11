@@ -2253,6 +2253,38 @@
       "ineligible_use": [
         "Replacing certified MARPOL amendments or official coordinates"
       ]
+    },
+    {
+      "source_id": "CLASSNK-MEPC84-WIND-GFI-GUIDANCE-2026",
+      "title": "Preliminary Report of IMO MEPC 84 — draft GFI guidance for wind propulsion monitoring, reporting and verification",
+      "publisher": "ClassNK, External Affairs Department",
+      "publication_date": "2026-05-04",
+      "url": "https://www.classnk.or.jp/hp/pdf/info_service/imo_and_iacs/MEPC84_sumE.pdf",
+      "evidence_class": "classification_society_meeting_summary_of_draft_guideline_work",
+      "scope": {
+        "sections": [
+          "1.1.2",
+          "1.2"
+        ],
+        "details": [
+          "ISWG-GHG 21 worked on draft guidance for calculation of attained annual GHG Fuel Intensity (GFI), including draft guidance on monitoring, reporting and verifying energy derived from wind propulsion systems.",
+          "The report states that development would continue while discussions on IMO mid-term measures remained ongoing."
+        ],
+        "implication": "Useful evidence of planned methodological work; not an adopted wind-energy calculation or present reporting obligation."
+      },
+      "limitations": [
+        "This is a preliminary class-society summary of committee working-group activity, not a final adopted guideline.",
+        "The IMO mid-term measure framework remained unresolved as of the MEPC 84 outcome; draft guidance must not be treated as operative.",
+        "Do not infer a final wind-energy formula, certification method or regulatory credit from this source."
+      ],
+      "eligible_use": [
+        "Research planning for wind energy MRV evidence",
+        "Draft methodology change monitoring"
+      ],
+      "ineligible_use": [
+        "Statutory wind-energy calculation",
+        "Claiming adopted IMO WAPS MRV requirements"
+      ]
     }
   ]
 }
