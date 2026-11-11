@@ -1056,14 +1056,19 @@ mod tests {
         assert_eq!(canonical_report.status, transformed_report.status);
         assert!(
             (canonical_report.diagnostics.maximum_bracket_closure_defect
-                - transformed_report.diagnostics.maximum_bracket_closure_defect)
+                - transformed_report
+                    .diagnostics
+                    .maximum_bracket_closure_defect)
                 .abs()
                 < 1.0e-12
         );
         assert!(
             (canonical_report.diagnostics.maximum_jacobi_defect.unwrap()
-                - transformed_report.diagnostics.maximum_jacobi_defect.unwrap())
-                .abs()
+                - transformed_report
+                    .diagnostics
+                    .maximum_jacobi_defect
+                    .unwrap())
+            .abs()
                 < 1.0e-12
         );
     }
