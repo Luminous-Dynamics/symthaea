@@ -236,9 +236,23 @@ fn run_audit(schema: &Value, case: &Value) -> AuditReport {
         );
     }
 
+    match service_call.get("source_id").and_then(Value::as_str) {
+        Some(source_id) if source_ids.contains(source_id) => {}
+        Some(source_id) => findings.push(
+            "/service_port_call/source_id",
+            "INVALID",
+            format!("service-call source '{source_id}' does not resolve in /evidence_sources"),
+        ),
+        None => findings.push(
+            "/service_port_call/source_id",
+            "INVALID",
+            "service-call contract must resolve to an evidence source",
+        ),
+    }
+
 
     let mut berth_duration_seconds = 0u64;
-    match (berth_start, berth_end, arrival, departure) {
+    match (berth_start, berth_end, arrival.clone(), departure.clone()) {
         (Some(start), Some(end), Some(arrive), Some(depart)) => {
             if end <= start || depart <= arrive || arrive < start || depart > end {
                 findings.push(
@@ -633,6 +647,14 @@ mod tests {
         let mut findings = Findings::default();
         validate_schema(&schema, &case, &mut findings);
         assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn unresolved_service_schedule_source_is_invalid() {
+        let (schema, mut case) = fixture();
+        case["service_port_call"]["source_id"] = serde_json::json!("MISSING-SCHEDULE-SOURCE");
+        let report = run_audit(&schema, &case);
+        assert_eq!(report.disposition, "INVALID");
     }
 
     #[test]
