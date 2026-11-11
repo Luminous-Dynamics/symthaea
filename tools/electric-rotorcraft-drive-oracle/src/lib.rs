@@ -21,7 +21,7 @@
 use std::f64::consts::TAU;
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.3.0";
+pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.4.0";
 
 /// Explicit operating-point efficiencies and bus limits.
 ///
@@ -145,6 +145,7 @@ pub struct DriveKinematicReport {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MotorEfficiencyEvidence {
     pub map_id: String,
+    pub map_digest: String,
     pub configuration_digest: String,
     pub context_digest: String,
     pub evidence_manifest_digest: String,
@@ -177,6 +178,7 @@ pub struct MotorShaftOperatingPoint {
 #[derive(Debug, Clone, PartialEq)]
 pub struct DriveMapEnvelope {
     pub map_id: String,
+    pub map_digest: String,
     pub configuration_digest: String,
     pub context_digest: String,
     pub evidence_manifest_digest: String,
@@ -440,6 +442,7 @@ pub fn evaluate_drive_with_map_evidence(
     evidence: &MotorEfficiencyEvidence,
 ) -> Result<DriveMapEnvelope, DriveError> {
     if evidence.map_id.trim().is_empty()
+        || evidence.map_digest.trim().is_empty()
         || evidence.configuration_digest.trim().is_empty()
         || evidence.context_digest.trim().is_empty()
         || evidence.evidence_manifest_digest.trim().is_empty()
@@ -503,6 +506,7 @@ pub fn evaluate_drive_with_map_evidence(
 
     Ok(DriveMapEnvelope {
         map_id: evidence.map_id.clone(),
+        map_digest: evidence.map_digest.clone(),
         configuration_digest: evidence.configuration_digest.clone(),
         context_digest: evidence.context_digest.clone(),
         evidence_manifest_digest: evidence.evidence_manifest_digest.clone(),
@@ -585,6 +589,7 @@ mod tests {
         .unwrap();
         MotorEfficiencyEvidence {
             map_id: "motor-map-v1".to_owned(),
+            map_digest: "motor-map-sha256".to_owned(),
             configuration_digest: "aircraft-config-sha256".to_owned(),
             context_digest: "motor-context-sha256".to_owned(),
             evidence_manifest_digest: "measurement-manifest-sha256".to_owned(),
@@ -884,6 +889,7 @@ mod tests {
                 < 1.0e-8
         );
         assert_eq!(result.map_id, "motor-map-v1");
+        assert_eq!(result.map_digest, "motor-map-sha256");
         assert_eq!(
             result.evidence_manifest_digest,
             "measurement-manifest-sha256"
@@ -1024,6 +1030,30 @@ mod tests {
 
         let mut evidence = map_evidence(&model, input, transmission);
         evidence.evidence_manifest_digest.clear();
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+    }
+
+    #[test]
+    fn missing_map_content_digest_is_rejected() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.map_digest.clear();
         assert!(matches!(
             evaluate_drive_with_map_evidence(
                 &model,
