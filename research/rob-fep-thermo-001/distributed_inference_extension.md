@@ -131,3 +131,10 @@ A whole-system claim must not silently treat edge/cloud/network energy as zero. 
 ## Thermal mission boundary
 
 The offload benchmark now composes with [Symtropy #4689](https://github.com/Luminous-Dynamics/symtropy/issues/4689) for quadruped missions. Remote deliberation may overlap with local locomotion, but every elapsed interval contributes to physical state evolution. Compute/edge/network heat and energy are included only when instrumented and model-qualified. A remote result remains a proposal and cannot pause or replace local safety, RTA, action projection or safe-stop.
+
+
+## Actuation-side freshness and decision value
+
+The distributed placement protocol now has a dedicated [decision-sensitive freshness extension](./decision_sensitive_freshness.md). It distinguishes result age at receipt from actuation-side Age of Information (AoI), and AoI from decision-focused EVSI. The new cases DI20–DI22 cover stale-at-actuation despite fresh receipt, a fresh update with zero EVSI, and shared-memory contention that delays foreground camera work.
+
+The 22-case corpus also now treats DI18 (compression quality loss) and DI19 (fleet-priority admission) as isolated cases with earlier freshness gates passing. The schema requires the actuation-AoI / EVSI / foreground-deadline gate fields; any remote result eligible for local admission must have authenticated identity, matching model and observation anchor, known clock mapping, current RTA admissibility and an AoI pass.
