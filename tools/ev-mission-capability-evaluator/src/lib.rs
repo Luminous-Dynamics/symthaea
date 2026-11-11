@@ -572,6 +572,8 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
             }
         }
         if let Some((cell_ref, cell_disposition, thermal_margin)) = cell_problem {
+            // This interval is not integrated into the cumulative battery energy ledger.
+            battery_energy_accounting_complete = false;
             if cell_disposition == "INFEASIBLE" {
                 disposition = "INFEASIBLE".to_owned();
             } else if cell_disposition == "UNSUPPORTED_DOMAIN"
@@ -1021,6 +1023,15 @@ mod tests {
         let bytes = serde_json::to_vec(&corpus).expect("mutated corpus");
         let report = audit_corpus(SCHEMA, &bytes).expect("invalid temperature interval");
         assert_eq!(case(&report, "cold_weather_negative_celsius_domain").disposition, "REJECTED_INPUT");
+    }
+
+    #[test]
+    fn cell_limit_failure_does_not_publish_a_partial_mission_energy_minimum() {
+        let report = report();
+        let row = case(&report, "thermal_limit_crossed_in_later_segment");
+        assert_eq!(row.disposition, "INFEASIBLE");
+        assert!(!row.battery_energy_accounting_complete);
+        assert_eq!(row.minimum_energy_remaining_above_reserve_kwh_lower, None);
     }
 
 }
