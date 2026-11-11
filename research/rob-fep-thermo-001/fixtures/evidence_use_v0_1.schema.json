@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rob-fep-thermo-001/fixtures/evidence_use_v0_1.schema.json",
+  "title": "ROB-FEP-THERMO-001 evidence-use gate known answers v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "gates",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "const": "ROB-FEP-THERMO-001-EVIDENCE-USE"
+    },
+    "status": {
+      "const": "synthetic_known_answers_only"
+    },
+    "gates": {
+      "type": "array",
+      "const": [
+        "meaningful_reference",
+        "identifiability",
+        "evidence_use",
+        "decision_value",
+        "selection_value",
+        "safe_realization"
+      ]
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/EU01"
+          },
+          {
+            "$ref": "#/$defs/EU02"
+          },
+          {
+            "$ref": "#/$defs/EU03"
+          },
+          {
+            "$ref": "#/$defs/EU04"
+          },
+          {
+            "$ref": "#/$defs/EU05"
+          },
+          {
+            "$ref": "#/$defs/EU06"
+          },
+          {
+            "$ref": "#/$defs/EU07"
+          },
+          {
+            "$ref": "#/$defs/EU08"
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "gate": {
+      "enum": [
+        "pass",
+        "fail",
+        "unknown",
+        "not_evaluated"
+      ]
+    },
+    "disposition": {
+      "enum": [
+        "abstain",
+        "decline_probe",
+        "no_selection_value",
+        "reject_realization",
+        "evidence_chain_qualified"
+      ]
+    },
+    "nullable_boolean": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "nullable_number": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference_available",
+        "within_training_support",
+        "mechanism_identifiable",
+        "evidence_acquired",
+        "evidence_used",
+        "posterior_changed",
+        "evsi",
+        "selected_probe_cost",
+        "fixed_baseline_evsi",
+        "projected_action_admissible"
+      ],
+      "properties": {
+        "reference_available": {
+          "type": "boolean"
+        },
+        "within_training_support": {
+          "$ref": "#/$defs/nullable_boolean"
+        },
+        "mechanism_identifiable": {
+          "$ref": "#/$defs/nullable_boolean"
+        },
+        "evidence_acquired": {
+          "type": "boolean"
+        },
+        "evidence_used": {
+          "$ref": "#/$defs/nullable_boolean"
+        },
+        "posterior_changed": {
+          "$ref": "#/$defs/nullable_boolean"
+        },
+        "evsi": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "selected_probe_cost": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fixed_baseline_evsi": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "projected_action_admissible": {
+          "$ref": "#/$defs/nullable_boolean"
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_status",
+        "disposition"
+      ],
+      "properties": {
+        "gate_status": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "meaningful_reference",
+            "identifiability",
+            "evidence_use",
+            "decision_value",
+            "selection_value",
+            "safe_realization"
+          ],
+          "properties": {
+            "meaningful_reference": {
+              "$ref": "#/$defs/gate"
+            },
+            "identifiability": {
+              "$ref": "#/$defs/gate"
+            },
+            "evidence_use": {
+              "$ref": "#/$defs/gate"
+            },
+            "decision_value": {
+              "$ref": "#/$defs/gate"
+            },
+            "selection_value": {
+              "$ref": "#/$defs/gate"
+            },
+            "safe_realization": {
+              "$ref": "#/$defs/gate"
+            }
+          }
+        },
+        "disposition": {
+          "$ref": "#/$defs/disposition"
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    },
+    "EU01": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/case"
+        },
+        {
+          "properties": {
+            "case_id": {
+              "const": "EU01_REFERENCE_NOT_MEANINGFUL"
+            }
+          }
+        }
+      ]
+    },
+    "EU02": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/case"
+        },
+        {
+          "properties": {
+            "case_id": {
+              "const": "EU02_MECHANISM_NOT_IDENTIFIABLE"
+            }
+          }
+        }
+      ]
+    },
+    "EU03": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/case"
+        },
+        {
+          "properties": {
+            "case_id": {
+              "const": "EU03_EVIDENCE_ACQUIRED_BUT_UNUSED"
+            }
+          }
+        }
+      ]
+    },
+    "EU04": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/case"
+        },
+        {
+          "properties": {
+            "case_id": {
+              "const": "EU04_POSTERIOR_CHANGED_BUT_ZERO_DECISION_VALUE"
+            }
+          }
+        }
+      ]
+    },
+    "EU05": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/case"
+        },
+        {
+          "properties": {
+            "case_id": {
+              "const": "EU05_DECISION_VALUE_BUT_NO_SELECTION_VALUE"
+            }
+          }
+        }
+      ]
+    },
+    "EU06": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/case"
+        },
+        {
+          "properties": {
+            "case_id": {
+              "const": "EU06_DIAGNOSIS_VALUE_BUT_REALIZATION_REJECTED"
+            }
+          }
+        }
+      ]
+    },
+    "EU07": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/case"
+        },
+        {
+          "properties": {
+            "case_id": {
+              "const": "EU07_ALL_EVIDENCE_GATES_PASS"
+            }
+          }
+        }
+      ]
+    },
+    "EU08": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/case"
+        },
+        {
+          "properties": {
+            "case_id": {
+              "const": "EU08_OUT_OF_SUPPORT_EVIDENCE"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
