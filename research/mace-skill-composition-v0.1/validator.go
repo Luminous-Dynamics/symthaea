@@ -320,7 +320,15 @@ func Validate(in Request) Report {
 		if st.Tokens < 0 || st.Tokens > sk.MaxTokens {
 			fail("SKILL_TOKEN_BUDGET", st.ID, "step token use exceeds skill budget")
 		}
-		exposure += st.Tokens
+		// Token counts are untrusted request data. Saturate and reject rather
+		// than allowing signed-integer overflow to wrap the aggregate negative.
+		maxInt := int(^uint(0) >> 1)
+		if st.Tokens > 0 && st.Tokens > maxInt-exposure {
+			fail("EXPOSURE_COUNTER_OVERFLOW", st.ID, "aggregate skill exposure counter would overflow")
+			exposure = maxInt
+		} else if st.Tokens > 0 {
+			exposure += st.Tokens
+		}
 		for _, cap := range sk.RequiredCapabilities {
 			if !has(c.Capabilities, cap) {
 				fail("MISSING_CAPABILITY", st.ID, "principal lacks required capability "+cap)
