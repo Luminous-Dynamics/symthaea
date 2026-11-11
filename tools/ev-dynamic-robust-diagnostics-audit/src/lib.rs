@@ -143,14 +143,6 @@ struct CandidatePolicy {
     terminal_action_by_history: BTreeMap<String, usize>,
 }
 
-#[derive(Clone, Copy)]
-struct PartialPath {
-    probability: f64,
-    state: usize,
-    tests: f64,
-    cost: f64,
-}
-
 fn sha256(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
@@ -367,12 +359,6 @@ fn build_leaves(
     }
     leaves.sort();
     Ok(leaves)
-}
-
-fn policy_hash(policy: &CandidatePolicy, problem: &Problem) -> Result<String, String> {
-    let plan = to_policy_plan(policy, problem)?;
-    let bytes = serde_json::to_vec(&plan).map_err(|error| error.to_string())?;
-    Ok(sha256(&bytes))
 }
 
 fn to_policy_plan(policy: &CandidatePolicy, problem: &Problem) -> Result<PolicyPlan, String> {
@@ -693,7 +679,7 @@ mod tests {
     #[test]
     fn frozen_corpus_replays_all_expected_dynamic_known_truth_cases() {
         let report = report();
-        assert_eq!(report.problem_count, 3);
+        assert_eq!(report.problem_count, 4);
         assert_eq!(report.canonical_corpus_sha256.len(), 64);
         assert!(report.reports.iter().all(|row| {
             row.dynamic_robust_loss.is_finite()
@@ -786,10 +772,11 @@ mod tests {
     }
 
     #[test]
-    fn correlated_sensor_evidence_is_not_silently_assumed_by_this_kernel() {
+    fn unknown_joint_likelihood_fields_are_rejected_not_silently_ignored() {
         let mut corpus: Value = serde_json::from_slice(CORPUS).expect("corpus JSON");
-        corpus["problems"][0]["loss_unit"] = Value::String("decision_loss_with_joint_likelihood_ref_required".into());
+        corpus["problems"][0]["worlds"][0]["test_models"][0]["joint_likelihood_ref"] =
+            Value::String("unqualified-shared-sensor-model".into());
         let bytes = serde_json::to_vec(&corpus).expect("tagged corpus");
-        assert!(audit_corpus(SCHEMA, &bytes).is_ok());
+        assert!(audit_corpus(SCHEMA, &bytes).is_err());
     }
 }
