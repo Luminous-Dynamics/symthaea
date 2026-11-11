@@ -83,6 +83,8 @@ Keep failures, outages, rejected results, Unknown clock mappings, incomplete run
 
 ## Synthetic known-answer fixtures
 
+The current corpus contains 17 synthetic known-answer cases.
+
 - `fixtures/distributed_inference_v0_1.json`
 - `fixtures/distributed_inference_v0_1.schema.json`
 
