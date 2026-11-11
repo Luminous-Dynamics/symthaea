@@ -2,435 +2,6 @@
   "corpus_version": "ev-early-window-outcomes/0.1",
   "cases": [
     {
-      "case_id": "multioutput-30s-accepted",
-      "expected_disposition": "ACCEPT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_DISCHARGE",
-      "prediction_cutoff_seconds": 30,
-      "features": [
-        {
-          "feature_id": "v-i-t-30s",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "OBSERVED_PREFIX",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 30,
-          "available_at_seconds": 30,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "soh-reference",
-          "kind": "SOH",
-          "unit": "fraction",
-          "target_value": 0.87,
-          "label_source": "INDEPENDENT_REFERENCE_TEST",
-          "evidence_ref": "synthetic-evidence:soh-reference",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:SOH",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 130,
-          "target_window_start_seconds": 31,
-          "target_window_end_seconds": 130,
-          "horizon_seconds": 300,
-          "uncertainty": 0.015,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "NOT_APPLICABLE",
-          "observed_duration_seconds": null,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
-        },
-        {
-          "target_id": "rdt-exact",
-          "kind": "REMAINING_DISCHARGE_TIME",
-          "unit": "seconds",
-          "target_value": 600,
-          "label_source": "INDEPENDENT_REFERENCE_TEST",
-          "evidence_ref": "synthetic-evidence:rdt-exact",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:REMAINING_DISCHARGE_TIME",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 630,
-          "target_window_start_seconds": 31,
-          "target_window_end_seconds": 630,
-          "horizon_seconds": 900,
-          "uncertainty": 0.01,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "EXACT_ENDPOINT_EVENT",
-          "observed_duration_seconds": 600,
-          "competing_event_code": null,
-          "load_profile_ref": "declared-load-profile-001",
-          "load_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-        },
-        {
-          "target_id": "thermal-peak",
-          "kind": "PEAK_TEMPERATURE",
-          "unit": "degC",
-          "target_value": 48.2,
-          "label_source": "INDEPENDENT_THERMAL_MEASUREMENT",
-          "evidence_ref": "synthetic-evidence:thermal-peak",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:PEAK_TEMPERATURE",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 150,
-          "target_window_start_seconds": 31,
-          "target_window_end_seconds": 150,
-          "horizon_seconds": 120,
-          "uncertainty": 0.01,
-          "coverage_fraction": 1,
-          "target_resolution": "CELL",
-          "censoring_state": "NOT_APPLICABLE",
-          "observed_duration_seconds": null,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
-        },
-        {
-          "target_id": "pack-power-envelope",
-          "kind": "POWER_ENVELOPE",
-          "unit": "W",
-          "target_value": 5200,
-          "label_source": "QUALIFIED_PHYSICAL_MODEL",
-          "evidence_ref": "synthetic-evidence:pack-power-envelope",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:POWER_ENVELOPE",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 90,
-          "target_window_start_seconds": 31,
-          "target_window_end_seconds": 90,
-          "horizon_seconds": 60,
-          "uncertainty": 0.01,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "NOT_APPLICABLE",
-          "observed_duration_seconds": null,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
-        }
-      ]
-    },
-    {
-      "case_id": "rdt-right-censored-preserved",
-      "expected_disposition": "ACCEPT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_DISCHARGE",
-      "prediction_cutoff_seconds": 60,
-      "features": [
-        {
-          "feature_id": "prefix-60s",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "OBSERVED_PREFIX",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 60,
-          "available_at_seconds": 60,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "rdt-censored",
-          "kind": "REMAINING_DISCHARGE_TIME",
-          "unit": "seconds",
-          "target_value": null,
-          "label_source": "INDEPENDENT_REFERENCE_TEST",
-          "evidence_ref": "synthetic-evidence:rdt-censored",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:REMAINING_DISCHARGE_TIME",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 960,
-          "target_window_start_seconds": 61,
-          "target_window_end_seconds": 960,
-          "horizon_seconds": 1800,
-          "uncertainty": 0.01,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "RIGHT_CENSORED",
-          "observed_duration_seconds": 900,
-          "competing_event_code": null,
-          "load_profile_ref": "declared-load-profile-002",
-          "load_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-        }
-      ]
-    },
-    {
-      "case_id": "rdt-competing-event-preserved",
-      "expected_disposition": "ACCEPT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_DISCHARGE",
-      "prediction_cutoff_seconds": 60,
-      "features": [
-        {
-          "feature_id": "prefix-60s-b",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "OBSERVED_PREFIX",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 60,
-          "available_at_seconds": 60,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "rdt-aborted",
-          "kind": "REMAINING_DISCHARGE_TIME",
-          "unit": "seconds",
-          "target_value": null,
-          "label_source": "INDEPENDENT_REFERENCE_TEST",
-          "evidence_ref": "synthetic-evidence:rdt-aborted",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:REMAINING_DISCHARGE_TIME",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 360,
-          "target_window_start_seconds": 61,
-          "target_window_end_seconds": 360,
-          "horizon_seconds": 1800,
-          "uncertainty": 0.01,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "COMPETING_EVENT",
-          "observed_duration_seconds": 300,
-          "competing_event_code": "THERMAL_PROTECTION_ABORT",
-          "load_profile_ref": "declared-load-profile-003",
-          "load_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-        }
-      ]
-    },
-    {
-      "case_id": "thermal-coverage-not-computable",
-      "expected_disposition": "ACCEPT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_DISCHARGE",
-      "prediction_cutoff_seconds": 120,
-      "features": [
-        {
-          "feature_id": "prefix-120s",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "OBSERVED_PREFIX",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 120,
-          "available_at_seconds": 120,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "peak-incomplete",
-          "kind": "PEAK_TEMPERATURE",
-          "unit": "degC",
-          "target_value": null,
-          "label_source": "INDEPENDENT_THERMAL_MEASUREMENT",
-          "evidence_ref": "synthetic-evidence:peak-incomplete",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:PEAK_TEMPERATURE",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 720,
-          "target_window_start_seconds": 121,
-          "target_window_end_seconds": 720,
-          "horizon_seconds": 600,
-          "uncertainty": 0.01,
-          "coverage_fraction": 0.75,
-          "target_resolution": "CELL",
-          "censoring_state": "NOT_APPLICABLE",
-          "observed_duration_seconds": null,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
-        }
-      ]
-    },
-    {
-      "case_id": "operational-soh-reference-labelled",
-      "expected_disposition": "ACCEPT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_CHARGE",
-      "prediction_cutoff_seconds": 300,
-      "features": [
-        {
-          "feature_id": "prefix-300s",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "OBSERVED_PREFIX",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 300,
-          "available_at_seconds": 300,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "soh-operational",
-          "kind": "SOH",
-          "unit": "fraction",
-          "target_value": 0.91,
-          "label_source": "OPERATIONAL_DERIVED",
-          "evidence_ref": "synthetic-evidence:soh-operational",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:SOH",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 3900,
-          "target_window_start_seconds": 301,
-          "target_window_end_seconds": 3900,
-          "horizon_seconds": 300,
-          "uncertainty": 0.03,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "NOT_APPLICABLE",
-          "observed_duration_seconds": null,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
-        }
-      ]
-    },
-    {
-      "case_id": "late-feature-rejected",
-      "expected_disposition": "REJECT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_DISCHARGE",
-      "prediction_cutoff_seconds": 30,
-      "features": [
-        {
-          "feature_id": "late-data",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "OBSERVED_PREFIX",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 30,
-          "available_at_seconds": 31,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "soh-late",
-          "kind": "SOH",
-          "unit": "fraction",
-          "target_value": 0.9,
-          "label_source": "INDEPENDENT_REFERENCE_TEST",
-          "evidence_ref": "synthetic-evidence:soh-late",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:SOH",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 130,
-          "target_window_start_seconds": 31,
-          "target_window_end_seconds": 130,
-          "horizon_seconds": 300,
-          "uncertainty": 0.01,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "NOT_APPLICABLE",
-          "observed_duration_seconds": null,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
-        }
-      ]
-    },
-    {
-      "case_id": "full-lifetime-feature-rejected",
-      "expected_disposition": "REJECT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_DISCHARGE",
-      "prediction_cutoff_seconds": 30,
-      "features": [
-        {
-          "feature_id": "full-life",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "FULL_LIFETIME",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 80000,
-          "available_at_seconds": 80000,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "soh-full-life",
-          "kind": "SOH",
-          "unit": "fraction",
-          "target_value": 0.9,
-          "label_source": "INDEPENDENT_REFERENCE_TEST",
-          "evidence_ref": "synthetic-evidence:soh-full-life",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:SOH",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 130,
-          "target_window_start_seconds": 31,
-          "target_window_end_seconds": 130,
-          "horizon_seconds": 300,
-          "uncertainty": 0.01,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "NOT_APPLICABLE",
-          "observed_duration_seconds": null,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
-        }
-      ]
-    },
-    {
-      "case_id": "reference-before-cutoff-rejected",
-      "expected_disposition": "REJECT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_DISCHARGE",
-      "prediction_cutoff_seconds": 30,
-      "features": [
-        {
-          "feature_id": "prefix-valid",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "OBSERVED_PREFIX",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 30,
-          "available_at_seconds": 30,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "soh-ref-old",
-          "kind": "SOH",
-          "unit": "fraction",
-          "target_value": 0.9,
-          "label_source": "INDEPENDENT_REFERENCE_TEST",
-          "evidence_ref": "synthetic-evidence:soh-ref-old",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:SOH",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 20,
-          "target_window_start_seconds": 10,
-          "target_window_end_seconds": 20,
-          "horizon_seconds": 300,
-          "uncertainty": 0.01,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "NOT_APPLICABLE",
-          "observed_duration_seconds": null,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
-        }
-      ]
-    },
-    {
       "case_id": "censored-rdt-as-point-rejected",
       "expected_disposition": "REJECT",
       "asset_ref": "synthetic-pack-001",
@@ -471,142 +42,11 @@
           "observed_duration_seconds": 900,
           "competing_event_code": null,
           "load_profile_ref": "declared-load-profile-004",
-          "load_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-        }
-      ]
-    },
-    {
-      "case_id": "rdt-missing-load-profile-rejected",
-      "expected_disposition": "REJECT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_DISCHARGE",
-      "prediction_cutoff_seconds": 60,
-      "features": [
-        {
-          "feature_id": "prefix-valid-61",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "OBSERVED_PREFIX",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 60,
-          "available_at_seconds": 60,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "rdt-no-load",
-          "kind": "REMAINING_DISCHARGE_TIME",
-          "unit": "seconds",
-          "target_value": 600,
-          "label_source": "INDEPENDENT_REFERENCE_TEST",
-          "evidence_ref": "synthetic-evidence:rdt-no-load",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:REMAINING_DISCHARGE_TIME",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 660,
-          "target_window_start_seconds": 61,
-          "target_window_end_seconds": 660,
-          "horizon_seconds": 900,
-          "uncertainty": 0.01,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "EXACT_ENDPOINT_EVENT",
-          "observed_duration_seconds": 600,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
-        }
-      ]
-    },
-    {
-      "case_id": "thermal-incomplete-but-numeric-rejected",
-      "expected_disposition": "REJECT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_DISCHARGE",
-      "prediction_cutoff_seconds": 60,
-      "features": [
-        {
-          "feature_id": "prefix-valid-62",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "OBSERVED_PREFIX",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 60,
-          "available_at_seconds": 60,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "thermal-false-peak",
-          "kind": "PEAK_TEMPERATURE",
-          "unit": "degC",
-          "target_value": 62,
-          "label_source": "INDEPENDENT_THERMAL_MEASUREMENT",
-          "evidence_ref": "synthetic-evidence:thermal-false-peak",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:PEAK_TEMPERATURE",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 180,
-          "target_window_start_seconds": 61,
-          "target_window_end_seconds": 180,
-          "horizon_seconds": 120,
-          "uncertainty": 0.01,
-          "coverage_fraction": 0.8,
-          "target_resolution": "CELL",
-          "censoring_state": "NOT_APPLICABLE",
-          "observed_duration_seconds": null,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
-        }
-      ]
-    },
-    {
-      "case_id": "power-ml-label-rejected",
-      "expected_disposition": "REJECT",
-      "asset_ref": "synthetic-pack-001",
-      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "prediction_event_ref": "synthetic-discharge-event-001",
-      "modality": "PARTIAL_DISCHARGE",
-      "prediction_cutoff_seconds": 60,
-      "features": [
-        {
-          "feature_id": "prefix-valid-63",
-          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-          "source_class": "OBSERVED_PREFIX",
-          "source_window_start_seconds": 0,
-          "source_window_end_seconds": 60,
-          "available_at_seconds": 60,
-          "uses_target_or_future_data": false
-        }
-      ],
-      "targets": [
-        {
-          "target_id": "power-unqualified",
-          "kind": "POWER_ENVELOPE",
-          "unit": "W",
-          "target_value": 6000,
-          "label_source": "OPERATIONAL_DERIVED",
-          "evidence_ref": "synthetic-evidence:power-unqualified",
-          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "reference_protocol_ref": "synthetic-protocol:POWER_ENVELOPE",
-          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "reference_time_seconds": 120,
-          "target_window_start_seconds": 61,
-          "target_window_end_seconds": 120,
-          "horizon_seconds": 60,
-          "uncertainty": 0.01,
-          "coverage_fraction": 1,
-          "target_resolution": "PACK",
-          "censoring_state": "NOT_APPLICABLE",
-          "observed_duration_seconds": null,
-          "competing_event_code": null,
-          "load_profile_ref": null,
-          "load_profile_sha256": null
+          "load_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:rdt-bad-censored",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
         }
       ]
     },
@@ -651,7 +91,11 @@
           "observed_duration_seconds": null,
           "competing_event_code": null,
           "load_profile_ref": null,
-          "load_profile_sha256": null
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:soh-dup",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
         },
         {
           "target_id": "soh-dup",
@@ -674,7 +118,680 @@
           "observed_duration_seconds": null,
           "competing_event_code": null,
           "load_profile_ref": null,
-          "load_profile_sha256": null
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:soh-dup",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "full-lifetime-feature-rejected",
+      "expected_disposition": "REJECT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 30,
+      "features": [
+        {
+          "feature_id": "full-life",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "FULL_LIFETIME",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 80000,
+          "available_at_seconds": 80000,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "soh-full-life",
+          "kind": "SOH",
+          "unit": "fraction",
+          "target_value": 0.9,
+          "label_source": "INDEPENDENT_REFERENCE_TEST",
+          "evidence_ref": "synthetic-evidence:soh-full-life",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:SOH",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 130,
+          "target_window_start_seconds": 31,
+          "target_window_end_seconds": 130,
+          "horizon_seconds": 300,
+          "uncertainty": 0.01,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:soh-full-life",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "late-feature-rejected",
+      "expected_disposition": "REJECT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 30,
+      "features": [
+        {
+          "feature_id": "late-data",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 30,
+          "available_at_seconds": 31,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "soh-late",
+          "kind": "SOH",
+          "unit": "fraction",
+          "target_value": 0.9,
+          "label_source": "INDEPENDENT_REFERENCE_TEST",
+          "evidence_ref": "synthetic-evidence:soh-late",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:SOH",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 130,
+          "target_window_start_seconds": 31,
+          "target_window_end_seconds": 130,
+          "horizon_seconds": 300,
+          "uncertainty": 0.01,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:soh-late",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "multioutput-30s-accepted",
+      "expected_disposition": "ACCEPT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 30,
+      "features": [
+        {
+          "feature_id": "v-i-t-30s",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 30,
+          "available_at_seconds": 30,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "soh-reference",
+          "kind": "SOH",
+          "unit": "fraction",
+          "target_value": 0.87,
+          "label_source": "INDEPENDENT_REFERENCE_TEST",
+          "evidence_ref": "synthetic-evidence:soh-reference",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:SOH",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 130,
+          "target_window_start_seconds": 31,
+          "target_window_end_seconds": 130,
+          "horizon_seconds": 300,
+          "uncertainty": 0.015,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:soh-reference",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        {
+          "target_id": "rdt-exact",
+          "kind": "REMAINING_DISCHARGE_TIME",
+          "unit": "seconds",
+          "target_value": 600,
+          "label_source": "INDEPENDENT_REFERENCE_TEST",
+          "evidence_ref": "synthetic-evidence:rdt-exact",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:REMAINING_DISCHARGE_TIME",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 630,
+          "target_window_start_seconds": 31,
+          "target_window_end_seconds": 630,
+          "horizon_seconds": 900,
+          "uncertainty": 0.01,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "EXACT_ENDPOINT_EVENT",
+          "observed_duration_seconds": 600,
+          "competing_event_code": null,
+          "load_profile_ref": "declared-load-profile-001",
+          "load_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:rdt-exact",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        {
+          "target_id": "thermal-peak",
+          "kind": "PEAK_TEMPERATURE",
+          "unit": "degC",
+          "target_value": 48.2,
+          "label_source": "INDEPENDENT_THERMAL_MEASUREMENT",
+          "evidence_ref": "synthetic-evidence:thermal-peak",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:PEAK_TEMPERATURE",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 150,
+          "target_window_start_seconds": 31,
+          "target_window_end_seconds": 150,
+          "horizon_seconds": 120,
+          "uncertainty": 0.01,
+          "coverage_fraction": 1,
+          "target_resolution": "CELL",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:thermal-peak",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        {
+          "target_id": "pack-power-envelope",
+          "kind": "POWER_ENVELOPE",
+          "unit": "W",
+          "target_value": 5200,
+          "label_source": "QUALIFIED_PHYSICAL_MODEL",
+          "evidence_ref": "synthetic-evidence:pack-power-envelope",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:POWER_ENVELOPE",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 90,
+          "target_window_start_seconds": 31,
+          "target_window_end_seconds": 90,
+          "horizon_seconds": 60,
+          "uncertainty": 0.01,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:pack-power-envelope",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "operational-soh-reference-labelled",
+      "expected_disposition": "ACCEPT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_CHARGE",
+      "prediction_cutoff_seconds": 300,
+      "features": [
+        {
+          "feature_id": "prefix-300s",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 300,
+          "available_at_seconds": 300,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "soh-operational",
+          "kind": "SOH",
+          "unit": "fraction",
+          "target_value": 0.91,
+          "label_source": "OPERATIONAL_DERIVED",
+          "evidence_ref": "synthetic-evidence:soh-operational",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:SOH",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 3900,
+          "target_window_start_seconds": 301,
+          "target_window_end_seconds": 3900,
+          "horizon_seconds": 300,
+          "uncertainty": 0.03,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:soh-operational",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "power-ml-label-rejected",
+      "expected_disposition": "REJECT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 60,
+      "features": [
+        {
+          "feature_id": "prefix-valid-63",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 60,
+          "available_at_seconds": 60,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "power-unqualified",
+          "kind": "POWER_ENVELOPE",
+          "unit": "W",
+          "target_value": 6000,
+          "label_source": "OPERATIONAL_DERIVED",
+          "evidence_ref": "synthetic-evidence:power-unqualified",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:POWER_ENVELOPE",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 120,
+          "target_window_start_seconds": 61,
+          "target_window_end_seconds": 120,
+          "horizon_seconds": 60,
+          "uncertainty": 0.01,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:power-unqualified",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "rdt-competing-event-preserved",
+      "expected_disposition": "ACCEPT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 60,
+      "features": [
+        {
+          "feature_id": "prefix-60s-b",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 60,
+          "available_at_seconds": 60,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "rdt-aborted",
+          "kind": "REMAINING_DISCHARGE_TIME",
+          "unit": "seconds",
+          "target_value": null,
+          "label_source": "INDEPENDENT_REFERENCE_TEST",
+          "evidence_ref": "synthetic-evidence:rdt-aborted",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:REMAINING_DISCHARGE_TIME",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 360,
+          "target_window_start_seconds": 61,
+          "target_window_end_seconds": 360,
+          "horizon_seconds": 1800,
+          "uncertainty": 0.01,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "COMPETING_EVENT",
+          "observed_duration_seconds": 300,
+          "competing_event_code": "THERMAL_PROTECTION_ABORT",
+          "load_profile_ref": "declared-load-profile-003",
+          "load_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:rdt-aborted",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "rdt-missing-load-profile-rejected",
+      "expected_disposition": "REJECT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 60,
+      "features": [
+        {
+          "feature_id": "prefix-valid-61",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 60,
+          "available_at_seconds": 60,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "rdt-no-load",
+          "kind": "REMAINING_DISCHARGE_TIME",
+          "unit": "seconds",
+          "target_value": 600,
+          "label_source": "INDEPENDENT_REFERENCE_TEST",
+          "evidence_ref": "synthetic-evidence:rdt-no-load",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:REMAINING_DISCHARGE_TIME",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 660,
+          "target_window_start_seconds": 61,
+          "target_window_end_seconds": 660,
+          "horizon_seconds": 900,
+          "uncertainty": 0.01,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "EXACT_ENDPOINT_EVENT",
+          "observed_duration_seconds": 600,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:rdt-no-load",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "rdt-right-censored-preserved",
+      "expected_disposition": "ACCEPT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 60,
+      "features": [
+        {
+          "feature_id": "prefix-60s",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 60,
+          "available_at_seconds": 60,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "rdt-censored",
+          "kind": "REMAINING_DISCHARGE_TIME",
+          "unit": "seconds",
+          "target_value": null,
+          "label_source": "INDEPENDENT_REFERENCE_TEST",
+          "evidence_ref": "synthetic-evidence:rdt-censored",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:REMAINING_DISCHARGE_TIME",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 960,
+          "target_window_start_seconds": 61,
+          "target_window_end_seconds": 960,
+          "horizon_seconds": 1800,
+          "uncertainty": 0.01,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "RIGHT_CENSORED",
+          "observed_duration_seconds": 900,
+          "competing_event_code": null,
+          "load_profile_ref": "declared-load-profile-002",
+          "load_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:rdt-censored",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "reference-before-cutoff-rejected",
+      "expected_disposition": "REJECT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 30,
+      "features": [
+        {
+          "feature_id": "prefix-valid",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 30,
+          "available_at_seconds": 30,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "soh-ref-old",
+          "kind": "SOH",
+          "unit": "fraction",
+          "target_value": 0.9,
+          "label_source": "INDEPENDENT_REFERENCE_TEST",
+          "evidence_ref": "synthetic-evidence:soh-ref-old",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:SOH",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 20,
+          "target_window_start_seconds": 10,
+          "target_window_end_seconds": 20,
+          "horizon_seconds": 300,
+          "uncertainty": 0.01,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:soh-ref-old",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "target-asset-configuration-mismatch-rejected",
+      "expected_disposition": "REJECT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 30,
+      "features": [
+        {
+          "feature_id": "v-i-t-30s",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 30,
+          "available_at_seconds": 30,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "soh-reference",
+          "kind": "SOH",
+          "unit": "fraction",
+          "target_value": 0.87,
+          "label_source": "INDEPENDENT_REFERENCE_TEST",
+          "evidence_ref": "synthetic-evidence:soh-reference",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:SOH",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 130,
+          "target_window_start_seconds": 31,
+          "target_window_end_seconds": 130,
+          "horizon_seconds": 300,
+          "uncertainty": 0.015,
+          "coverage_fraction": 1,
+          "target_resolution": "PACK",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-other-pack-999",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:soh-reference",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "thermal-coverage-not-computable",
+      "expected_disposition": "ACCEPT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 120,
+      "features": [
+        {
+          "feature_id": "prefix-120s",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 120,
+          "available_at_seconds": 120,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "peak-incomplete",
+          "kind": "PEAK_TEMPERATURE",
+          "unit": "degC",
+          "target_value": null,
+          "label_source": "INDEPENDENT_THERMAL_MEASUREMENT",
+          "evidence_ref": "synthetic-evidence:peak-incomplete",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:PEAK_TEMPERATURE",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 720,
+          "target_window_start_seconds": 121,
+          "target_window_end_seconds": 720,
+          "horizon_seconds": 600,
+          "uncertainty": 0.01,
+          "coverage_fraction": 0.75,
+          "target_resolution": "CELL",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:peak-incomplete",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "thermal-incomplete-but-numeric-rejected",
+      "expected_disposition": "REJECT",
+      "asset_ref": "synthetic-pack-001",
+      "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prediction_event_ref": "synthetic-discharge-event-001",
+      "modality": "PARTIAL_DISCHARGE",
+      "prediction_cutoff_seconds": 60,
+      "features": [
+        {
+          "feature_id": "prefix-valid-62",
+          "feature_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_class": "OBSERVED_PREFIX",
+          "source_window_start_seconds": 0,
+          "source_window_end_seconds": 60,
+          "available_at_seconds": 60,
+          "uses_target_or_future_data": false
+        }
+      ],
+      "targets": [
+        {
+          "target_id": "thermal-false-peak",
+          "kind": "PEAK_TEMPERATURE",
+          "unit": "degC",
+          "target_value": 62,
+          "label_source": "INDEPENDENT_THERMAL_MEASUREMENT",
+          "evidence_ref": "synthetic-evidence:thermal-false-peak",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reference_protocol_ref": "synthetic-protocol:PEAK_TEMPERATURE",
+          "reference_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "reference_time_seconds": 180,
+          "target_window_start_seconds": 61,
+          "target_window_end_seconds": 180,
+          "horizon_seconds": 120,
+          "uncertainty": 0.01,
+          "coverage_fraction": 0.8,
+          "target_resolution": "CELL",
+          "censoring_state": "NOT_APPLICABLE",
+          "observed_duration_seconds": null,
+          "competing_event_code": null,
+          "load_profile_ref": null,
+          "load_profile_sha256": null,
+          "asset_ref": "synthetic-pack-001",
+          "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "reference_condition_ref": "synthetic-reference-condition:thermal-false-peak",
+          "reference_condition_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
         }
       ]
     }
