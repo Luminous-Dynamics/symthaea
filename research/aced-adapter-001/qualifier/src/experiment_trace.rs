@@ -187,12 +187,26 @@ pub fn validate_experiment_plan(plan: &Value) -> Result<(), String> {
     }
 
     let measurement = &plan["measurement"];
-    if !exact_fields(measurement, &["variables", "timepoints", "outcome_taxonomy"]) {
+    if !exact_fields(
+        measurement,
+        &["variables", "timepoints", "outcome_taxonomy", "primary_outcome"],
+    ) {
         return Err("experiment plan measurement contract mismatch".into());
     }
     validate_string_array(&measurement["variables"], "measurement.variables")?;
     validate_string_array(&measurement["timepoints"], "measurement.timepoints")?;
     validate_string_array(&measurement["outcome_taxonomy"], "measurement.outcome_taxonomy")?;
+    let primary_outcome = &measurement["primary_outcome"];
+    if !exact_fields(primary_outcome, &["variable", "scale", "estimand", "unit"])
+        || text(primary_outcome, "scale") != Some("continuous")
+        || text(primary_outcome, "estimand") != Some("difference_in_means")
+        || text(primary_outcome, "unit").is_none()
+        || !measurement["variables"]
+            .as_array()
+            .is_some_and(|variables| variables.iter().any(|variable| variable.as_str() == text(primary_outcome, "variable")))
+    {
+        return Err("power method requires a declared continuous primary mean-difference outcome".into());
+    }
 
     let sample = &plan["sample"];
     if !exact_fields(
