@@ -106,6 +106,7 @@ fn validate_schema(schema: &Value) -> Result<(), String> {
         || fixture_items["properties"]["authority_context"]["additionalProperties"] != false
         || fixture_items["properties"]["runtime_context"]["additionalProperties"] != false
         || fixture_items["properties"]["oracle_annotations"]["additionalProperties"] != false
+        || fixture_items["properties"]["oracle_annotations"]["additionalProperties"] != false
     {
         return Err("schema identity or bounded nested-object contract mismatch".into());
     }
@@ -299,7 +300,7 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
     if declared_dimensions != Some(expected_dimensions)
         || declared_dimension_count != Some(DIMENSIONS.len())
     {
-        errors.push("declared mutation dimensions do not match v0.3 contract".into());
+        errors.push("declared mutation dimensions do not match v0.4 contract".into());
     }
 
     let mut fixture_ids = BTreeSet::new();
