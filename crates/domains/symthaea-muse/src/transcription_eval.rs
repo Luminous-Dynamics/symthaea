@@ -30,7 +30,7 @@ use std::collections::{BTreeMap, VecDeque};
 pub const MIDI_TRANSCRIPTION_EVALUATION_SCHEMA_V1: &str =
     "muse-midi-transcription-evaluation-v1";
 pub const MIDI_TRANSCRIPTION_EVALUATION_ALGORITHM_V1: &str =
-    "mir-eval-default-tolerance-max-cardinality-bipartite-v1";
+    "mir-eval-0.8.2-hopcroft-karp-matching-thresholds-v1";
 pub const MIDI_TRANSCRIPTION_DEFAULT_ONSET_TOLERANCE_MS_V1: u32 = 50;
 pub const MIDI_TRANSCRIPTION_DEFAULT_PITCH_TOLERANCE_CENTS_V1: u16 = 50;
 pub const MIDI_TRANSCRIPTION_DEFAULT_OFFSET_RATIO_BPS_V1: u16 = 2_000;
@@ -147,8 +147,8 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub onset_pitch_metrics: MidiTranscriptionMetricV1,
     /// Instrument-agnostic: pitch, onset and offset must match.
     pub full_note_metrics: MidiTranscriptionMetricV1,
-    /// Average interval overlap ratio over the full-note matched pairs.
-    pub average_overlap_ratio: Option<f64>,
+    /// Average interval overlap ratio over full-note matches; zero if none.
+    pub average_overlap_ratio: f64,
     /// Exact GM program, pitch and onset must match.
     pub exact_program_onset_metrics: MidiTranscriptionMetricV1,
     /// Exact GM program, pitch, onset and offset must match.
@@ -222,7 +222,7 @@ struct ReportCommitmentV1<'a> {
     offset_only_metrics: &'a MidiTranscriptionMetricV1,
     onset_pitch_metrics: &'a MidiTranscriptionMetricV1,
     full_note_metrics: &'a MidiTranscriptionMetricV1,
-    average_overlap_ratio: &'a Option<f64>,
+    average_overlap_ratio: f64,
     exact_program_onset_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_full_note_metrics: &'a MidiTranscriptionMetricV1,
     velocity_aware_full_note_metrics: &'a Option<MidiTranscriptionMetricV1>,
@@ -1036,6 +1036,12 @@ fn maximum_cardinality_matching(
     Ok(matching)
 }
 
+fn mir_eval_round_distance_v1(distance: f64) -> f64 {
+    // mir_eval 0.8.2 rounds onset/offset distances to N_DECIMALS = 4
+    // before its inclusive threshold comparison.
+    (distance * 10_000.0).round_ties_even() / 10_000.0
+}
+
 fn build_adjacency(
     reference: &[EvaluationNoteV1],
     predicted: &[MidiTranscribedNoteV1],
@@ -1160,8 +1166,8 @@ fn build_offset_only_adjacency(
             * f64::from(config.offset_ratio_basis_points)
             / 10_000.0)
             .max(f64::from(config.offset_min_tolerance_ms) / 1_000.0);
-        let lower = reference_offset - tolerance;
-        let upper = reference_offset + tolerance;
+        let lower = reference_offset - tolerance - 0.00005;
+        let upper = reference_offset + tolerance + 0.00005;
         let start = predicted_offsets.partition_point(|(offset, _)| *offset < lower);
         let end = predicted_offsets.partition_point(|(offset, _)| *offset <= upper);
         let mut candidates: Vec<usize> = predicted_offsets[start..end]
@@ -1185,16 +1191,24 @@ fn average_overlap_ratio_v1(
     reference: &[EvaluationNoteV1],
     predicted: &[MidiTranscribedNoteV1],
     matching: &[(usize, usize)],
-) -> Option<f64> {
+) -> f64 {
     if matching.is_empty() {
-        return None;
+        return 0.0;
     }
     let mut ratios = Vec::with_capacity(matching.len());
     for (reference_index, prediction_index) in matching {
-        let reference_note = reference.get(*reference_index)?;
-        let predicted_note = predicted.get(*prediction_index)?;
-        let reference_offset = reference_note.offset_seconds?;
-        let predicted_offset = predicted_note.offset_seconds?;
+        let Some(reference_note) = reference.get(*reference_index) else {
+            return 0.0;
+        };
+        let Some(predicted_note) = predicted.get(*prediction_index) else {
+            return 0.0;
+        };
+        let (Some(reference_offset), Some(predicted_offset)) = (
+            reference_note.offset_seconds,
+            predicted_note.offset_seconds,
+        ) else {
+            return 0.0;
+        };
         let overlap = (reference_offset.min(predicted_offset)
             - reference_note.onset_seconds.max(predicted_note.onset_seconds))
             .max(0.0);
@@ -1205,7 +1219,7 @@ fn average_overlap_ratio_v1(
         }
         ratios.push((overlap / union_span).clamp(0.0, 1.0));
     }
-    Some(ratios.iter().sum::<f64>() / ratios.len() as f64)
+    ratios.iter().sum::<f64>() / ratios.len() as f64
 }
 
 fn metric_from_matching(
@@ -1404,7 +1418,7 @@ pub fn midi_transcription_evaluation_commitment_v1(
         offset_only_metrics: &report.offset_only_metrics,
         onset_pitch_metrics: &report.onset_pitch_metrics,
         full_note_metrics: &report.full_note_metrics,
-        average_overlap_ratio: &report.average_overlap_ratio,
+        average_overlap_ratio: report.average_overlap_ratio,
         exact_program_onset_metrics: &report.exact_program_onset_metrics,
         exact_program_full_note_metrics: &report.exact_program_full_note_metrics,
         velocity_aware_full_note_metrics: &report.velocity_aware_full_note_metrics,
@@ -1988,6 +2002,27 @@ mod tests {
     }
 
     #[test]
+    fn matching_order_reproduces_mir_eval_hopcroft_karp_fixture() {
+        // Port of mir_eval/tests/test_util.py::test_bipartite_match.
+        // Predicted vertices p0..p9 connect to reference vertices with
+        // progressively shorter prefixes. This forces multiple HK layers.
+        let mut adjacency = vec![Vec::new(); 10];
+        for reference_index in 0..10 {
+            for prediction_index in 0..(10 - reference_index) {
+                adjacency[reference_index].push(prediction_index);
+            }
+        }
+        let matches = maximum_cardinality_matching(&adjacency, 10).unwrap();
+        assert_eq!(
+            matches,
+            vec![
+                (0, 9), (1, 8), (2, 7), (3, 6), (4, 5),
+                (5, 4), (6, 3), (7, 2), (8, 1), (9, 0),
+            ]
+        );
+    }
+
+    #[test]
     fn conflicting_tempo_events_at_the_same_tick_are_rejected() {
         let midi = build_midi(&[(60, 0, 480)], 40, &[(0, 500_000), (0, 600_000)]);
         assert_eq!(
@@ -2087,8 +2122,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.full_note_metrics.f1, 1.0);
-        assert!(report.average_overlap_ratio.unwrap() < 1.0);
-        assert!(report.average_overlap_ratio.unwrap() > 0.89);
+        assert!(report.average_overlap_ratio < 1.0);
+        assert!(report.average_overlap_ratio > 0.89);
     }
 
     #[test]
