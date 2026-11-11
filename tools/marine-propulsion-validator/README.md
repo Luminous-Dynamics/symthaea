@@ -113,6 +113,19 @@ cargo run --bin marine-emissions-evidence-audit -- \
 
 The emissions audit validates the Draft 2020-12 evidence contract, method-to-IMO-resolution mapping, measured-vs-engine-load-calculated evidence mode, gas completeness, calibration disposition, rights, sample counts, timebase binding and sample-rate/window consistency. A synthetic or incomplete record cannot qualify as physical performance evidence.
 
+Audit the synthetic schedule-flexibility contract:
+
+~~~sh
+cargo run --bin marine-service-flexibility-audit -- \
+  docs/research/marine/marine-service-flexibility-v0.1.0.schema.json \
+  docs/research/marine/fixtures/synthetic-service-flexibility-v0.1.0.json
+~~~
+
+The auditor checks common service identity, complete port-call coverage, arrival windows,
+minimum turnaround, latest departure and per-call slack arithmetic. It reports time only:
+temporal slack is never converted into kWh. Synthetic and absent energy evidence remain
+INCOMPLETE, and out-of-window schedules are BLOCKED.
+
 ## Enforced checks
 
 - Draft 2020-12 schema meta-validation and instance validation with format checks.
@@ -140,6 +153,7 @@ The emissions audit validates the Draft 2020-12 evidence contract, method-to-IMO
 - v0.4.0 timebase reference epoch and residual drift-rate uncertainty; channel alignment bounds
   include base synchronization uncertainty plus accumulated drift uncertainty at the farthest
   sample-window endpoint. Unknown drift uncertainty remains INCOMPLETE, never zero.
+- The schedule-flexibility audit checks exact service fingerprints across baseline/candidate arms, complete port-call coverage, RFC3339 time windows, turnaround and departure cutoffs, and per-call temporal slack. It never converts hours of slack into energy and synthetic schedule cases remain INCOMPLETE.
 - v0.3.0 timebase uncertainty comparison uses reviewed conversion between seconds, milliseconds,
   microseconds, minutes and hours rather than requiring identical unit strings.
 
