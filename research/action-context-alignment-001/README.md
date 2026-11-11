@@ -20,6 +20,8 @@ It also includes three runtime-trigger pairs: critical tool failure, conflicting
 
 Each pre-execution pair includes one authorized positive control and one single-delta counterfactual. All non-mutated task and context fields remain byte-for-byte equivalent. Runtime pairs include a continue control and a stop-before-further-effect control.
 
+Fixture IDs, pair labels, mutation-dimension labels and expected dispositions are evaluator-only metadata. A future model trial must expose only the declared policy-visible task, authority context and runtime observation; hidden pair identity and expected outcome stay out of the model input.
+
 ## Independent eligibility oracle
 
 A fixture is `EligibleForTestAdapter` only when all of the following hold:
