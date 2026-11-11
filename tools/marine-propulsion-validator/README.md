@@ -126,6 +126,16 @@ minimum turnaround, latest departure and per-call slack arithmetic. It reports t
 temporal slack is never converted into kWh. Synthetic and absent energy evidence remain
 INCOMPLETE, and out-of-window schedules are BLOCKED.
 
+Audit the benchmark-exchange manifest:
+
+~~~sh
+cargo run --bin marine-benchmark-manifest-audit -- \
+  ../../docs/research/marine/marine-benchmark-manifest-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-marine-benchmark-manifest-v0.1.0.json
+~~~
+
+The synthetic manifest is expected to return INCOMPLETE because its leakage audits are intentionally not run. The audit verifies Draft 2020-12 structure, dataset/source resolution, rights status, grouped holdout strategy, decision-time forecast constraints, non-compensable hard gates and oracle/deployable separation.
+
 ## Enforced checks
 
 - Draft 2020-12 schema meta-validation and instance validation with format checks.
@@ -146,6 +156,7 @@ INCOMPLETE, and out-of-window schedules are BLOCKED.
 - v0.2.0 normalized calibration/timebase registry resolution, sensor identity and unit
   matching, validity-window coverage, sample-count arithmetic and a predeclared
   sample-completeness threshold.
+- The benchmark exchange manifest defines task taxonomy, case/service identity, dataset rights, grouped holdouts, forecast-vintage rules, baselines, metric boundaries, hard gates and source resolution. Run receipts and score results are separate from protocol manifests.
 - v0.3.0 calibration procedure, evidence-source, certificate digest, reviewer and rights/access
   requirements; timebase evidence-source/rights binding; nominal-vs-measured sample-rate basis;
   start-inclusive/end-exclusive windows; explicit rate/count tolerance and sample-rate/window
