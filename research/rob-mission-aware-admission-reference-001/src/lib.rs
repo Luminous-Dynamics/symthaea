@@ -40,6 +40,8 @@ pub struct InferenceRequest {
     pub memory_bandwidth_units: u64,
     /// Network payload/transfer demand in bytes.
     pub network_bytes: u64,
+    /// Incremental KV-cache allocation required for this request; None is Unknown.
+    pub kv_cache_growth_tokens: Option<u64>,
     /// Endpoint/session/model/request identity evidence is valid.
     pub identity_valid: bool,
     /// Source and decision receipt digests are complete and match.
@@ -69,6 +71,8 @@ pub struct ResourceBudget {
     pub memory_bandwidth_units: u64,
     /// Network transfer budget in bytes.
     pub network_bytes: u64,
+    /// Available additional KV-cache token capacity.
+    pub kv_cache_growth_tokens: u64,
 }
 
 /// Resources consumed by an admitted batch.
@@ -80,6 +84,8 @@ pub struct ResourceUse {
     pub memory_bandwidth_units: u64,
     /// Network bytes admitted.
     pub network_bytes: u64,
+    /// Additional KV-cache tokens reserved by this batch.
+    pub kv_cache_growth_tokens: u64,
 }
 
 impl ResourceUse {
@@ -96,6 +102,16 @@ impl ResourceUse {
             .network_bytes
             .checked_add(request.network_bytes)
             .ok_or(ReferenceError::ResourceArithmeticOverflow)?;
+        self.kv_cache_growth_tokens = self
+            .kv_cache_growth_tokens
+            .checked_add(
+                request
+                    .kv_cache_growth_tokens
+                    .ok_or(ReferenceError::UnknownKvCacheDemand(
+                        request.request_id.clone(),
+                    ))?,
+            )
+            .ok_or(ReferenceError::ResourceArithmeticOverflow)?;
         Ok(())
     }
 
@@ -103,6 +119,7 @@ impl ResourceUse {
         self.gpu_micros <= budget.gpu_micros
             && self.memory_bandwidth_units <= budget.memory_bandwidth_units
             && self.network_bytes <= budget.network_bytes
+            && self.kv_cache_growth_tokens <= budget.kv_cache_growth_tokens
     }
 }
 
@@ -148,6 +165,8 @@ pub enum RejectReason {
     UnknownClockRelation,
     /// Actuation-side age upper bound is missing.
     UnknownActuationAge,
+    /// Incremental KV-cache growth demand is missing.
+    UnknownKvCacheDemand,
     /// Actuation-side age exceeds the task limit.
     StaleActuationAge,
     /// p99 return latency or action-buffer slack is missing.
@@ -189,6 +208,8 @@ pub enum ReferenceError {
     IncomparableLossScales,
     /// Resource sum overflowed its integer representation.
     ResourceArithmeticOverflow,
+    /// KV-cache growth demand was not supplied for the request.
+    UnknownKvCacheDemand(String),
 }
 
 /// One request's final disposition.
@@ -286,6 +307,10 @@ fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
     }
     if request.max_starvation_ticks == 0 {
         return Err(RejectReason::StarvationEvidenceInvalid);
+    }
+
+    if request.kv_cache_growth_tokens.is_none() {
+        return Err(RejectReason::UnknownKvCacheDemand);
     }
 
     let evsi = request.evsi_units.ok_or(RejectReason::UnknownDecisionValue)?;
@@ -563,6 +588,7 @@ mod tests {
             gpu_micros: 10,
             memory_bandwidth_units: 10,
             network_bytes: 10,
+            kv_cache_growth_tokens: Some(10),
             identity_valid: true,
             evidence_digest_valid: true,
             clock_mapping_valid: true,
@@ -580,6 +606,7 @@ mod tests {
             gpu_micros: 100,
             memory_bandwidth_units: 100,
             network_bytes: 100,
+            kv_cache_growth_tokens: 100,
         }
     }
 
@@ -802,6 +829,41 @@ mod tests {
             }, &[floor]).unwrap();
         assert!(!report.service_floors_met);
         assert_eq!(report.service_floor_violations, vec!["r1"]);
+    }
+
+    #[test]
+    fn unknown_kv_cache_growth_is_rejected() {
+        let mut q = request("q1", "r1");
+        q.kv_cache_growth_tokens = None;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::UnknownKvCacheDemand)
+        );
+    }
+
+    #[test]
+    fn kv_cache_growth_is_an_independent_capacity_constraint() {
+        let mut q1 = request("q1", "r1");
+        let mut q2 = request("q2", "r2");
+        q1.kv_cache_growth_tokens = Some(60);
+        q2.kv_cache_growth_tokens = Some(60);
+        let tight = ResourceBudget {
+            gpu_micros: 100,
+            memory_bandwidth_units: 100,
+            network_bytes: 100,
+            kv_cache_growth_tokens: 100,
+        };
+        let report = admit_batch(
+            SchedulerPolicy::RoundRobin,
+            &cursor(),
+            tight,
+            &[q1, q2],
+        )
+        .unwrap();
+        assert_eq!(report.admitted_request_ids.len(), 1);
+        assert_eq!(report.resource_use.kv_cache_growth_tokens, 60);
     }
 
     #[test]
