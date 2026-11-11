@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/schemas/muse-part-stem-evidence-v1.schema.json",
+  "title": "Muse part-stem evidence bundle V1",
+  "description": "A content-addressed manifest binding full-length isolated WAV stems to exact part-aware MIDI tracks. It is an evidence container, not acoustic certification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "score_sha256",
+    "midi_sha256",
+    "midi_manifest_sha256",
+    "audio_clock",
+    "stems",
+    "bundle_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "muse-part-stem-evidence-v1"
+    },
+    "score_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "midi_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "midi_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "audio_clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin",
+        "sample_rate_hz",
+        "channels",
+        "sample_format",
+        "bits_per_sample",
+        "frame_count"
+      ],
+      "properties": {
+        "origin": {
+          "const": "score_zero"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 192000
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "sample_format": {
+          "enum": [
+            "pcm-integer",
+            "pcm-float32"
+          ]
+        },
+        "bits_per_sample": {
+          "enum": [
+            16,
+            24,
+            32
+          ]
+        },
+        "frame_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "stems": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/stem"
+      }
+    },
+    "bundle_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "stem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "part_id",
+        "segment_id",
+        "instrument_id",
+        "midi_track_index",
+        "render_method",
+        "renderer_id",
+        "renderer_binary_sha256",
+        "patch_id",
+        "patch_asset_sha256",
+        "render_config_sha256",
+        "track_event_set_sha256",
+        "source_note_ordinals",
+        "wav_sha256"
+      ],
+      "properties": {
+        "part_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "segment_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\\\S.*"
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\\\S.*"
+        },
+        "midi_track_index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "render_method": {
+          "const": "single_track_input"
+        },
+        "renderer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\\\S.*"
+        },
+        "renderer_binary_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "patch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": ".*\\\\S.*"
+        },
+        "patch_asset_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "render_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "track_event_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_note_ordinals": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100000,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          }
+        },
+        "wav_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
