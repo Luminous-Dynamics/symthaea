@@ -1,4 +1,4 @@
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey};
 use jsonschema::{Validator, draft202012};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -6,6 +6,8 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const CORPUS_VERSION: &str = "ev-mission-outcome-audit/0.1";
+const TRUST_SCHEMA_BYTES: &[u8] =
+    include_bytes!("../../../schemas/transport/ev_mission_outcome_trust_v0_1.schema.json");
 const CONFIDENCE_95: f64 = 0.95;
 const EPS: f64 = 1e-9;
 
@@ -34,6 +36,30 @@ pub struct SplitAssignment {
     pub topology_sha256: String,
     pub physical_group_ref: String,
     pub partition: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrustManifest {
+    pub trust_manifest_version: String,
+    pub trusted_authorities: Vec<TrustedAuthority>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrustedAuthority {
+    pub authority_ref: String,
+    pub role: String,
+    pub public_key_hex: String,
+    pub valid_from_ms: u64,
+    pub valid_until_ms: Option<u64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReferenceAdmission {
+    pub authority_ref: String,
+    pub signature_hex: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -133,6 +159,7 @@ pub struct CaseAudit {
     pub case_id: String,
     pub pack_ref: String,
     pub evidence_class: String,
+    pub reference_admission_state: String,
     pub predicted_disposition: String,
     pub reference_outcome: String,
     pub classification: String,
@@ -164,7 +191,8 @@ pub struct AuditReport {
     pub conflicting_reference_count: usize,
     pub rejected_reference_count: usize,
     pub synthetic_scorable_count: usize,
-    pub physical_reference_case_count: usize,
+    pub physical_reference_claim_count: usize,
+    pub admitted_physical_reference_count: usize,
     pub physical_scorable_count: usize,
     pub physical_predicted_feasible_count: usize,
     pub physical_false_feasible_count: usize,
@@ -479,6 +507,10 @@ fn decode_hex<const N: usize>(value: &str, label: &str) -> Result<[u8; N], Strin
 fn reference_signing_bytes(reference: &PhysicalReference) -> Result<Vec<u8>, String> {
     let mut claims = reference.clone();
     claims.admission = None;
+    claims.measurements.sort_by(|left, right| {
+        (&left.constraint, &left.scope_ref, &left.unit)
+            .cmp(&(&right.constraint, &right.scope_ref, &right.unit))
+    });
     serde_json::to_vec(&claims).map_err(|error| format!("reference claims serialization: {error}"))
 }
 
@@ -663,12 +695,19 @@ fn classify_reference(case: &ValidationCase, manifest: &TrustManifest) -> (Strin
 }
 
 fn audit_case(case: &ValidationCase, manifest: &TrustManifest) -> CaseAudit {
+    let admission_result = verify_physical_admission(&case.reference, manifest);
+    let reference_admission_state = match case.reference.evidence_class.as_str() {
+        "SYNTHETIC_KNOWN_TRUTH" if admission_result.is_ok() => "SYNTHETIC_ONLY",
+        "INDEPENDENT_PHYSICAL_REFERENCE" if admission_result.is_ok() => "ADMITTED_BY_TRUSTED_TEST_AUTHORITY",
+        _ => "REJECTED_UNTRUSTED_OR_INVALID",
+    }.to_owned();
     let errors = validate_case_structure(case);
     if !errors.is_empty() {
         return CaseAudit {
             case_id: case.case_id.clone(),
             pack_ref: case.prediction.asset.pack_ref.clone(),
             evidence_class: case.reference.evidence_class.clone(),
+            reference_admission_state,
             predicted_disposition: case.prediction.disposition.clone(),
             reference_outcome: case.reference.outcome.clone(),
             classification: "REJECTED_REFERENCE".to_owned(),
@@ -717,6 +756,7 @@ fn audit_case(case: &ValidationCase, manifest: &TrustManifest) -> CaseAudit {
         case_id: case.case_id.clone(),
         pack_ref: case.prediction.asset.pack_ref.clone(),
         evidence_class: case.reference.evidence_class.clone(),
+        reference_admission_state,
         predicted_disposition: case.prediction.disposition.clone(),
         reference_outcome: case.reference.outcome.clone(),
         classification,
@@ -810,8 +850,10 @@ pub fn audit_corpus_with_trust(
     validate_schema(&validator, &value)?;
     let mut corpus: Corpus =
         serde_json::from_value(value).map_err(|error| format!("corpus decode: {error}"))?;
+    let trust_validator = compile_schema(TRUST_SCHEMA_BYTES)?;
     let trust_value: Value = serde_json::from_slice(trust_manifest_bytes)
         .map_err(|error| format!("trust manifest JSON: {error}"))?;
+    validate_schema(&trust_validator, &trust_value)?;
     let trust_manifest: TrustManifest = serde_json::from_value(trust_value)
         .map_err(|error| format!("trust manifest decode: {error}"))?;
     validate_trust_manifest(&trust_manifest)?;
@@ -893,6 +935,7 @@ pub fn audit_corpus_with_trust(
             .iter()
             .filter(|row| {
                 row.evidence_class == "INDEPENDENT_PHYSICAL_REFERENCE"
+                    && row.reference_admission_state == "ADMITTED_BY_TRUSTED_TEST_AUTHORITY"
                     && row.classification == classification
             })
             .count()
@@ -904,19 +947,31 @@ pub fn audit_corpus_with_trust(
     let physical_scorable = physical_predicted_feasible + physical_predicted_infeasible;
     let physical_false_feasible = physical("FALSE_FEASIBLE");
     let physical_false_infeasible = physical("FALSE_INFEASIBLE");
-    let physical_reference_case_count = cases
+    let physical_reference_claim_count = cases
         .iter()
         .filter(|row| row.evidence_class == "INDEPENDENT_PHYSICAL_REFERENCE")
+        .count();
+    let admitted_physical_reference_count = cases
+        .iter()
+        .filter(|row| {
+            row.evidence_class == "INDEPENDENT_PHYSICAL_REFERENCE"
+                && row.reference_admission_state == "ADMITTED_BY_TRUSTED_TEST_AUTHORITY"
+        })
         .count();
     let has_synthetic_references = cases
         .iter()
         .any(|row| row.evidence_class == "SYNTHETIC_KNOWN_TRUTH");
 
-    let source_grade = match (physical_reference_case_count > 0, has_synthetic_references) {
-        (false, true) => "SYNTHETIC_ONLY",
-        (true, true) => "MIXED_SYNTHETIC_AND_PHYSICAL_REFERENCE_INPUTS",
-        (true, false) => "PHYSICAL_REFERENCE_INPUTS_PRESENT_NOT_A_QUALIFICATION",
-        (false, false) => "NO_REFERENCE_CLASSIFIED",
+    let source_grade = match (
+        admitted_physical_reference_count > 0,
+        physical_reference_claim_count > 0,
+        has_synthetic_references,
+    ) {
+        (false, false, true) => "SYNTHETIC_ONLY",
+        (false, true, _) => "PHYSICAL_REFERENCE_CLAIMS_UNVERIFIED",
+        (true, true, true) => "MIXED_SYNTHETIC_AND_ADMITTED_PHYSICAL_REFERENCE",
+        (true, _, false) => "ADMITTED_PHYSICAL_REFERENCE_PRESENT_NOT_A_QUALIFICATION",
+        (false, false, false) => "NO_REFERENCE_CLASSIFIED",
     }
     .to_owned();
 
@@ -943,7 +998,8 @@ pub fn audit_corpus_with_trust(
             + synthetic("FALSE_FEASIBLE")
             + synthetic("TRUE_INFEASIBLE")
             + synthetic("FALSE_INFEASIBLE"),
-        physical_reference_case_count,
+        physical_reference_claim_count,
+        admitted_physical_reference_count,
         physical_scorable_count: physical_scorable,
         physical_predicted_feasible_count: physical_predicted_feasible,
         physical_false_feasible_count: physical_false_feasible,
