@@ -153,8 +153,6 @@ pub struct SynchronizedOperatingPoint {
     pub observations: Vec<SynchronizedObservation>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-
 /// A motor-shaft operating point projected from two synchronized, calibrated
 /// raw observations. The power interval is a rectangular absolute-bound
 /// propagation; it is not a probabilistic confidence interval.
@@ -191,6 +189,7 @@ pub struct MotorMapOperatingPoint {
     pub maximum_combined_time_error_ns: u64,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum ObservationError {
     InvalidManifest(&'static str),
     InvalidChannel(&'static str),
