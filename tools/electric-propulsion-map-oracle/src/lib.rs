@@ -213,8 +213,8 @@ impl EfficiencyMap2D {
         let mut nodal_uncertainty = 0.0;
         for (weight, index) in weights.iter().zip(node_indices) {
             let node = self.nodes[index];
-            efficiency += weight * node.efficiency;
-            nodal_uncertainty += weight * node.absolute_uncertainty_bound;
+            efficiency += *weight * node.efficiency;
+            nodal_uncertainty += *weight * node.absolute_uncertainty_bound;
         }
         let absolute_uncertainty_bound =
             nodal_uncertainty + self.systematic_uncertainty_bound;
@@ -269,6 +269,18 @@ fn validate_axis(axis: &[f64], name: &'static str) -> Result<(), MapError> {
                 "torque axis must be strictly increasing"
             } else {
                 "speed axis must be strictly increasing"
+            },
+        ));
+    }
+    if axis
+        .windows(2)
+        .any(|pair| !(pair[1] - pair[0]).is_finite())
+    {
+        return Err(MapError::InvalidMap(
+            if name == "torque" {
+                "torque axis intervals must be finite"
+            } else {
+                "speed axis intervals must be finite"
             },
         ));
     }
@@ -472,11 +484,51 @@ mod tests {
             4
         ];
         let invalid = [
-            EfficiencyMap2D::new("m", "c", "x", vec![0.0], vec![1.0, 2.0], base_nodes.clone(), 0.0),
-            EfficiencyMap2D::new("m", "c", "x", vec![0.0, 0.0], vec![1.0, 2.0], base_nodes.clone(), 0.0),
-            EfficiencyMap2D::new("m", "c", "x", vec![0.0, f64::NAN], vec![1.0, 2.0], base_nodes.clone(), 0.0),
-            EfficiencyMap2D::new("m", "c", "x", vec![0.0, 1.0], vec![2.0, 1.0], base_nodes.clone(), 0.0),
-            EfficiencyMap2D::new("m", "c", "x", vec![0.0, 1.0], vec![1.0, 2.0], base_nodes[..3].to_vec(), 0.0),
+            EfficiencyMap2D::new(
+                "m",
+                "c",
+                "x",
+                vec![0.0],
+                vec![1.0, 2.0],
+                base_nodes.clone(),
+                0.0,
+            ),
+            EfficiencyMap2D::new(
+                "m",
+                "c",
+                "x",
+                vec![0.0, 0.0],
+                vec![1.0, 2.0],
+                base_nodes.clone(),
+                0.0,
+            ),
+            EfficiencyMap2D::new(
+                "m",
+                "c",
+                "x",
+                vec![0.0, f64::NAN],
+                vec![1.0, 2.0],
+                base_nodes.clone(),
+                0.0,
+            ),
+            EfficiencyMap2D::new(
+                "m",
+                "c",
+                "x",
+                vec![0.0, 1.0],
+                vec![2.0, 1.0],
+                base_nodes.clone(),
+                0.0,
+            ),
+            EfficiencyMap2D::new(
+                "m",
+                "c",
+                "x",
+                vec![0.0, 1.0],
+                vec![1.0, 2.0],
+                base_nodes[..3].to_vec(),
+                0.0,
+            ),
         ];
         assert!(invalid.into_iter().all(|result| result.is_err()));
     }
@@ -491,13 +543,18 @@ mod tests {
             MapNode { efficiency: 0.9, absolute_uncertainty_bound: f64::INFINITY },
             MapNode { efficiency: 0.9, absolute_uncertainty_bound: 1.01 },
         ] {
-            assert!(EfficiencyMap2D::new(
-                "m", "c", "x",
-                vec![0.0, 1.0],
-                vec![1_000.0, 2_000.0],
-                vec![node; 4],
-                0.0
-            ).is_err());
+            assert!(
+                EfficiencyMap2D::new(
+                    "m",
+                    "c",
+                    "x",
+                    vec![0.0, 1.0],
+                    vec![1_000.0, 2_000.0],
+                    vec![node; 4],
+                    0.0,
+                )
+                .is_err()
+            );
         }
     }
 
@@ -513,22 +570,32 @@ mod tests {
             ("m", "c", ""),
             (" ", "c", "x"),
         ] {
-            assert!(EfficiencyMap2D::new(
-                map_id, config, context,
-                vec![0.0, 1.0],
-                vec![1_000.0, 2_000.0],
-                nodes.clone(),
-                0.0
-            ).is_err());
+            assert!(
+                EfficiencyMap2D::new(
+                    map_id,
+                    config,
+                    context,
+                    vec![0.0, 1.0],
+                    vec![1_000.0, 2_000.0],
+                    nodes.clone(),
+                    0.0,
+                )
+                .is_err()
+            );
         }
         for uncertainty in [-0.01, 1.01, f64::NAN] {
-            assert!(EfficiencyMap2D::new(
-                "m", "c", "x",
-                vec![0.0, 1.0],
-                vec![1_000.0, 2_000.0],
-                nodes.clone(),
-                uncertainty
-            ).is_err());
+            assert!(
+                EfficiencyMap2D::new(
+                    "m",
+                    "c",
+                    "x",
+                    vec![0.0, 1.0],
+                    vec![1_000.0, 2_000.0],
+                    nodes.clone(),
+                    uncertainty,
+                )
+                .is_err()
+            );
         }
     }
 
@@ -541,17 +608,23 @@ mod tests {
             vec![0.0, 5.0, 10.0],
             vec![1_000.0, 1_500.0, 2_000.0],
             vec![
-                MapNode { efficiency: 0.8, absolute_uncertainty_bound: 0.0 };
+                MapNode {
+                    efficiency: 0.8,
+                    absolute_uncertainty_bound: 0.0,
+                };
                 9
             ],
-            0.0
-        ).unwrap();
-        let result = map.lookup(MapQuery {
-            configuration_digest: "config",
-            context_digest: "context",
-            motor_torque_nm: 5.0,
-            motor_speed_rpm: 1_500.0
-        }).unwrap();
+            0.0,
+        )
+        .unwrap();
+        let result = map
+            .lookup(MapQuery {
+                configuration_digest: "config",
+                context_digest: "context",
+                motor_torque_nm: 5.0,
+                motor_speed_rpm: 1_500.0,
+            })
+            .unwrap();
         assert_eq!(result.torque_cell_lower_index, 1);
         assert_eq!(result.speed_cell_lower_index, 1);
         assert_eq!(result.interpolation_weights, [1.0, 0.0, 0.0, 0.0]);
